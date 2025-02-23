@@ -1,98 +1,219 @@
-# ggbot
-Autonomous AI Trading Agent
+# ggbot Spec Sheet
 
-**Description**  
-ggbot is an autonomous AI trading agent that operates on Gains Network’s gTrade platform, implementing a five‑module architecture to orchestrate data extraction, AI‑driven decision making, JSON command structuring, trade lifecycle management, and on‑chain execution—all on a resource‑constrained VM.
+## Overview
 
----
+### Purpose
+ggbot is an autonomous AI trading agent focused on a single crypto pair (e.g., BTC/USD) on Gains Network’s gTrade platform. It automates:
 
-## Architecture Overview
+- Data extraction
+- Trade decision-making
+- JSON structuring
+- Trade execution
+- Lifecycle management  
 
-This project is structured into five primary modules:
-
-1. **Extraction Module (`extraction/`)**  
-   - Scrapes chart data (e.g., from TradingView), computes technical indicators, and gathers real-time price data from Gains Network.
-
-2. **Decision & Monitoring Module (`decision/`)**  
-   - Uses a reasoning LLM to analyze signals and decide on trade actions (open, adjust, or close).
-
-3. **Structuring Module (`structuring/`)**  
-   - Validates and converts the LLM’s high-level recommendations into strict JSON commands for Gains Network’s contracts.
-
-4. **Trades Module (`trades/`)**  
-   - Manages the database records for trades, including updates, closures, and historical logs.
-
-5. **On‑Chain Execution Module (`onchain/`)**  
-   - Interacts with Gains Network’s diamond contract on Base L2, handling wallet management, transaction signing, and on‑chain event monitoring.
-
-A `common/` folder holds shared utilities like logging and configuration, while `docs/` and `tests/` store documentation and tests.
+All within a resource-constrained environment (2 GB RAM, 1 vCPU).
 
 ---
 
-## Repository Structure
+## 1. Technical Architecture
 
+### 1.1 Modules
+
+#### **Extraction Module**
+**Purpose:** Automate data gathering from TradingView (ggShot signals) and compute technical indicators (RSI, MACD) using real-time price data from Gains Network’s diamond contract on Base L2.
+
+**Key Points:**
+- **Browser-Use (Playwright):** `login()`, `navigateToChart()`, `configureIndicators()`, `extractDOMData()`.
+- **Session Persistence:** Maintains `BrowserContext` to reduce CAPTCHA triggers.
+- **ChatGPT 4o (Vision):** Handles screenshot parsing if DOM scraping fails.
+- **TA-Lib Integration:** Computes indicators (RSI, MACD) every 5 minutes.
+- **Timeframe-Aligned Extraction:** Triggers ggShot extraction right after each candle closes.
+- **Multi-Timeframe Capability (Future Use):** Code allows referencing multiple timeframes (e.g., 4h, 1h, 15m).
+- **Resource Management:** Single Playwright browser context to conserve RAM and CPU.
+
+---
+
+#### **Decision Module**
+**Purpose:** Analyze extracted data, maintain active trade oversight, and decide on opening, adjusting, or closing positions using a reasoning LLM (e.g., DeepSeek R1).
+
+**Key Points:**
+- **LLM Integration:** Processes signals from ggShot, RSI, MACD, and trade history.
+- **Prompt Usage:** Instructs LLM to consider all signals and return an action (open, adjust, close) with confidence scores.
+- **Ongoing Monitoring:** Evaluates active positions every 5 minutes.
+- **LLM Fallback Logic:** Reverts to “no new trade” or “manual hold” strategy if LLM is unavailable.
+
+---
+
+#### **Structuring Module**
+**Purpose:** Convert high-level trade actions into validated JSON commands suitable for Gains Network’s diamond contract.
+
+**Key Points:**
+- **Schema Enforcement:** Uses `jsonschema` to validate fields (`pairIndex`, `collateralAmount`, `leverage`).
+- **Risk Filtering:** Queries `getMaxLeverage(pairIndex)` from gTrade’s contract.
+- **Final JSON Output:** Produces contract-compatible objects.
+
+---
+
+#### **Trades Module**
+**Purpose:** Maintain a detailed record of trades—both active and closed—including chat logs, confidence scores, partial closes, and final outcomes.
+
+**Key Points:**
+- **Trade Records & History:** Logs each trade, adjustments, and final results.
+- **Chat History Management:** Appends LLM’s reasoning to a `reasoning_log` field.
+- **Database Fields:** `confidence_score`, `timeframe`, `reasoning_log`, and `partial_close` events.
+
+---
+
+#### **On-Chain Execution Module**
+**Purpose:** Securely interact with gTrade’s diamond contract on Base L2, handling wallet management, transaction signing, and event monitoring.
+
+**Key Points:**
+- **Coinbase AgentKit:** Provides `signTransaction()`, `sendTransaction()`, and event monitoring.
+- **Diamond Contract Integration:** Uses facet selectors (`openPosition()`, `closePosition()`, etc.).
+- **Event Monitoring:** Listens for confirmations and liquidations.
+
+---
+
+### 1.2 Inter-Module Interactions
+
+#### **Data Flow**
+1. **Extraction Module** → Stores ggShot signals, TA indicators, and price data in the database.
+2. **Decision Module** → Pulls relevant data to generate a new/updated trade action.
+3. **Structuring Module** → Validates and formats the action into JSON.
+4. **On-Chain Execution Module** → Signs and submits the JSON command.
+5. **Trades Module** → Logs trade lifecycle.
+
+#### **Communication**
+- PostgreSQL stores signals, trades, logs, etc.
+- Redis or in-memory caching for frequently accessed data.
+
+#### **Resource Management**
+- **Single browser context**
+- **Minimal concurrency**
+- **Batched API queries**
+
+---
+
+## 2. Codebase Structure
+
+```bash
 ggbot/
-├── docs/         # Documentation & reference
-├── extraction/   # Extraction Module
-├── decision/     # Decision & Monitoring Module
-├── structuring/  # Structuring Module
-├── trades/       # Trades Module
-├── onchain/      # On-Chain Execution Module
-├── common/       # Shared utilities (logger, config, etc.)
-├── tests/        # Tests for each module
-├── .gitignore
-├── requirements.txt
-├── README.md
-└── .env.example  # Example environment variables (e.g., API keys, RPC URLs)
+├── docs/                    # Architecture diagrams, design docs, change logs
+├── extraction/              # Extraction Module
+│   ├── browser_use/         # Playwright scripts
+│   ├── vision/              # ChatGPT 4o (Vision) integration
+│   ├── ta_lib/              # TA-Lib integration
+│   └── extraction_main.py   # Entry point
+├── decision/                # Decision & Monitoring Module
+│   ├── llm_integration/     # DeepSeek R1 or similar LLM
+│   ├── strategy/            # Trading strategy logic
+│   └── decision_main.py     # Entry point
+├── structuring/             # Structuring Module
+│   ├── json_schema/         # JSON schema definitions
+│   └── structuring_main.py  # Entry point
+├── trades/                  # Trades Module
+│   ├── trades_main.py       # Trade lifecycle management
+│   └── models.py            # Database models
+├── onchain/                 # On-Chain Execution Module
+│   ├── agentkit/            # Coinbase AgentKit integration
+│   └── onchain_main.py      # Entry point
+├── common/                  # Shared utilities
+│   ├── logger.py            # Centralized logging
+│   ├── config.py            # Environment/config loader
+│   └── utils.py             # Generic helpers
+├── tests/                   # Test suites
+├── requirements.txt         # Dependency list
+├── README.md                # Project overview & setup
+└── .env.example             # Environment configuration
+
+# 3. Database Design
+
+## 3.1 Schema Definition
+
+### **sessions**
+| Column       | Type       |
+|-------------|-----------|
+| session_id  | UUID (PK) |
+| user_id     | UUID      |
+| cookie_data | JSONB     |
+| created_at  | TIMESTAMP |
+| expires_at  | TIMESTAMP |
+
+### **trades**
+| Column            | Type       |
+|------------------|-----------|
+| trade_id        | UUID (PK) |
+| pair_index      | VARCHAR   |
+| timeframe       | VARCHAR   |
+| collateral_amount | NUMERIC   |
+| leverage        | INTEGER   |
+| stop_loss       | NUMERIC   |
+| take_profit     | NUMERIC   |
+| confidence_score | NUMERIC   |
+| reasoning_log   | TEXT      |
+| trade_status    | VARCHAR   |
+| created_at      | TIMESTAMP |
+
+### **logs**
+| Column    | Type        |
+|----------|------------|
+| log_id   | SERIAL (PK) |
+| module   | VARCHAR    |
+| log_level | VARCHAR    |
+| message  | TEXT       |
+| timestamp | TIMESTAMP |
 
 ---
 
-## Installation & Setup
+# 4. Dependencies & Libraries
 
-1. **Clone the Repository**  
-   ```bash
-   git clone https://github.com/sevnightingale/ggbot.git
-   cd ggbot
-(Optional) Create a Python Virtual Environment
+- **Browser Automation:** Playwright  
+- **Image Processing/OCR:** ChatGPT 4o (Vision), Tesseract (fallback)  
+- **LLM Integration:** DeepSeek R1 or equivalent  
+- **JSON Validation:** `jsonschema`  
+- **Blockchain Interaction:** Coinbase AgentKit, Web3.py/Ethers.js  
+- **TA Libraries:** TA-Lib  
+- **Logging & Monitoring:** `loguru`  
+- **Environment Management:** `python-dotenv`  
+- **Database:** PostgreSQL, Redis (optional)  
+- **Containerization:** Docker  
 
-bash
-Copy
-Edit
-python3 -m venv .venv
-source .venv/bin/activate
-This keeps dependencies isolated on your system.
+---
 
-Install Dependencies
+# 5. Development Environment Setup
 
-bash
-Copy
-Edit
-pip install -r requirements.txt
-(Run this after requirements.txt is populated with the necessary libraries.)
+### **Required Tools**
+- **IDE:** `code-server` (remote) or VSCode/PyCharm  
+- **Version Control:** Git  
+- **Containerization:** Docker  
+- **Build Tools:** Makefile or npm scripts  
 
-Configure Environment Variables
+---
 
-Copy .env.example to .env:
-bash
-Copy
-Edit
-cp .env.example .env
-Open .env and add your secrets (API keys, RPC URLs, private keys, etc.).
-Do not commit your .env to version control.
-Run or Develop
+# 6. Security Considerations
 
-Each module (extraction, decision, structuring, trades, onchain) will eventually have a main script or entry point.
-The tests/ directory will contain unit and integration tests.
+- **Data Encryption:** Encrypt sensitive data.  
+- **Authentication:** Implement if GUI/admin panel is added.  
+- **Wallet Security:** Use secure key handling.  
+- **Rate Limiting:** Prevent overload.  
 
-Key Project Documents
-Master Plan: High-level vision and goals.
-Pipeline: Detailed workflow for data extraction, decision-making, and on-chain execution.
-Spec Sheet: Technical architecture and codebase structure.
-Action Plan: Step-by-step tasks for building and deploying ggbot.
-Contributing
-Branch off main for any new feature or bug fix.
-Commit changes with clear messages.
-Push to GitHub and create a Pull Request.
-Review and merge once approved.
-License
-No license has been chosen yet for ggbot.
+---
+
+# 7. Testing & Validation
+
+- **Unit Testing:** Module-level validation.  
+- **Integration Testing:** Ensuring correct data flow.  
+- **E2E Testing:** Simulating trades in dry-run mode.  
+- **Stress Testing:** Evaluating VM performance.  
+
+---
+
+# Conclusion
+
+ggbot is designed for a **single-pair MVP** on Gains Network’s gTrade with:
+
+- **Timeframe-aligned extraction** (e.g., 15m candles).  
+- **LLM-driven decision logic** with fallback strategies.  
+- **Robust JSON structuring** and risk filtering.  
+- **Secure contract interactions** via Coinbase AgentKit.  
+- **Optimized for a low-resource environment** (2 GB RAM, 1 vCPU).  
