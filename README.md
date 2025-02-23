@@ -31,11 +31,19 @@ A `common/` folder holds shared utilities like logging and configuration, while 
 
 ## Repository Structure
 
-ggbot/ ├── docs/ # Documentation & reference ├── extraction/ # Extraction Module ├── decision/ # Decision & Monitoring Module ├── structuring/ # Structuring Module ├── trades/ # Trades Module ├── onchain/ # On-Chain Execution Module ├── common/ # Shared utilities (logger, config, etc.) ├── tests/ # Tests for each module ├── .gitignore ├── requirements.txt ├── README.md └── .env.example # Sample environment variables (e.g., API keys, RPC URLs)
-
-yaml
-Copy
-Edit
+ggbot/
+├── docs/         # Documentation & reference
+├── extraction/   # Extraction Module
+├── decision/     # Decision & Monitoring Module
+├── structuring/  # Structuring Module
+├── trades/       # Trades Module
+├── onchain/      # On-Chain Execution Module
+├── common/       # Shared utilities (logger, config, etc.)
+├── tests/        # Tests for each module
+├── .gitignore
+├── requirements.txt
+├── README.md
+└── .env.example  # Example environment variables (e.g., API keys, RPC URLs)
 
 ---
 
@@ -73,8 +81,9 @@ Open .env and add your secrets (API keys, RPC URLs, private keys, etc.).
 Do not commit your .env to version control.
 Run or Develop
 
-Each module (extraction, decision, structuring, trades, onchain) will have a main entry point or script for execution.
-Tests are stored in the tests/ folder.
+Each module (extraction, decision, structuring, trades, onchain) will eventually have a main script or entry point.
+The tests/ directory will contain unit and integration tests.
+
 Key Project Documents
 Master Plan: High-level vision and goals.
 Pipeline: Detailed workflow for data extraction, decision-making, and on-chain execution.
