@@ -15,7 +15,7 @@ All within a resource-constrained environment (2 GB RAM, 1 vCPU).
 
 ---
 
-## 1. Technical Architecture
+# 1. Technical Architecture
 
 ### 1.1 Modules
 
@@ -94,37 +94,41 @@ All within a resource-constrained environment (2 GB RAM, 1 vCPU).
 
 ---
 
-## 2. Codebase Structure
+# 2. Codebase Structure
 
----
-ggbot/
-├── docs/                    # Architecture diagrams, design docs, change logs
-├── extraction/              # Extraction Module
-│   ├── browser_use/         # Playwright scripts
-│   ├── vision/              # ChatGPT 4o (Vision) integration
-│   ├── ta_lib/              # TA-Lib integration
-│   └── extraction_main.py   # Entry point
-├── decision/                # Decision & Monitoring Module
-│   ├── llm_integration/     # DeepSeek R1 or similar LLM
-│   ├── strategy/            # Trading strategy logic
-│   └── decision_main.py     # Entry point
-├── structuring/             # Structuring Module
-│   ├── json_schema/         # JSON schema definitions
-│   └── structuring_main.py  # Entry point
-├── trades/                  # Trades Module
-│   ├── trades_main.py       # Trade lifecycle management
-│   └── models.py            # Database models
-├── onchain/                 # On-Chain Execution Module
-│   ├── agentkit/            # Coinbase AgentKit integration
-│   └── onchain_main.py      # Entry point
-├── common/                  # Shared utilities
-│   ├── logger.py            # Centralized logging
-│   ├── config.py            # Environment/config loader
-│   └── utils.py             # Generic helpers
-├── tests/                   # Test suites
-├── requirements.txt         # Dependency list
-├── README.md                # Project overview & setup
-└── .env.example             # Environment configuration
+
+| **Directory/File**          | **Description**                                       |
+|----------------------------|-------------------------------------------------------|
+| `ggbot/`                   | Root project directory                               |
+| `├── docs/`                | Architecture diagrams, design docs, change logs     |
+| `├── extraction/`          | **Extraction Module**                               |
+| `│   ├── browser_use/`     | Playwright scripts                                  |
+| `│   ├── vision/`          | ChatGPT 4o (Vision) integration                     |
+| `│   ├── ta_lib/`          | TA-Lib integration                                  |
+| `│   └── extraction_main.py` | Entry point for extraction module                 |
+| `├── decision/`            | **Decision & Monitoring Module**                    |
+| `│   ├── llm_integration/` | DeepSeek R1 or similar LLM integration              |
+| `│   ├── strategy/`        | Trading strategy logic                              |
+| `│   └── decision_main.py` | Entry point for decision module                     |
+| `├── structuring/`         | **Structuring Module**                              |
+| `│   ├── json_schema/`     | JSON schema definitions                             |
+| `│   └── structuring_main.py` | Entry point for structuring module               |
+| `├── trades/`              | **Trades Module**                                   |
+| `│   ├── trades_main.py`   | Trade lifecycle management                          |
+| `│   └── models.py`        | Database models                                     |
+| `├── onchain/`             | **On-Chain Execution Module**                       |
+| `│   ├── agentkit/`        | Coinbase AgentKit integration                       |
+| `│   └── onchain_main.py`  | Entry point for on-chain execution module           |
+| `├── common/`              | **Shared utilities**                                |
+| `│   ├── logger.py`        | Centralized logging                                |
+| `│   ├── config.py`        | Environment/config loader                          |
+| `│   └── utils.py`         | Generic helper functions                           |
+| `├── tests/`               | Test suites for different modules                   |
+| `├── requirements.txt`     | Dependency list                                     |
+| `├── README.md`            | Project overview & setup instructions               |
+| `└── .env.example`         | Environment configuration template                  |
+
+
 # 3. Database Design
 
 ## 3.1 Schema Definition
