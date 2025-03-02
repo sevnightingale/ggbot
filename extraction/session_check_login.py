@@ -1,6 +1,6 @@
 import asyncio
 import logging
-import subprocess
+import subprocess  # Already added, ensuring no NameError
 from playwright.async_api import async_playwright, Playwright
 import os
 import json
@@ -31,7 +31,6 @@ async def load_cookies(context, cookie_file):
         logger.debug(f"Original cookie: {json.dumps(cookie, indent=2)}")
         new_cookie = {"name": cookie["name"], "value": cookie["value"]}
         
-        # Required fields
         if "domain" not in cookie:
             logger.warning(f"Cookie {cookie.get('name', 'unknown')} missing domain, skipping")
             continue
@@ -42,13 +41,8 @@ async def load_cookies(context, cookie_file):
         else:
             new_cookie["path"] = cookie["path"]
         
-        # Optional but common fields
-        if "expires" in cookie:
-            if isinstance(cookie["expires"], (int, float)):
-                new_cookie["expires"] = cookie["expires"]
-            else:
-                logger.warning(f"Unexpected expires type for {cookie.get('name', 'unknown')}: {cookie['expires']}")
-                del cookie["expires"]
+        if "expires" in cookie and isinstance(cookie["expires"], (int, float)):
+            new_cookie["expires"] = cookie["expires"]
         if "secure" in cookie:
             new_cookie["secure"] = cookie["secure"]
         
@@ -84,10 +78,10 @@ async def check_session(playwright: Playwright):
     
     # Check for session expiration
     if "this chart layout isn't available" in content.lower():
-        print("Session expired. Initiating re-login...")
+        logger.info("Session expired. Initiating re-login...")
         await re_login(playwright, context, page)
     else:
-        print("Session is valid. Proceeding to extraction...")
+        logger.info("Session is valid. Proceeding to extraction...")
         await trigger_extraction()
     
     await browser.close()
@@ -102,10 +96,8 @@ async def re_login(playwright: Playwright, context, page):
     
     # Wait for the login form to appear
     await page.wait_for_selector('input[name="username"]', timeout=10000)
-    await page.wait_for_selector('input[name="password"]', timeout=10000)
-    
-    # Fill in credentials and submit
     await page.fill('input[name="username"]', os.getenv("TVIEW_USERNAME"))
+    await page.wait_for_selector('input[name="password"]', timeout=10000)
     await page.fill('input[name="password"]', os.getenv("TVIEW_PASSWORD"))
     await page.click('button[type="submit"]')
     
@@ -116,10 +108,10 @@ async def re_login(playwright: Playwright, context, page):
     await page.goto(CHART_URL)
     content = await page.content()
     if "this chart layout isn't available" not in content.lower():
-        print("Re-login successful. Saving new cookies...")
+        logger.info("Re-login successful. Saving new cookies...")
         await save_cookies(context, "tv_cookies.json")
     else:
-        print("Re-login failed. Manual intervention may be required.")
+        logger.error("Re-login failed. Manual intervention may be required.")
 
 from extraction_main import run_extraction
 
@@ -127,9 +119,9 @@ async def trigger_extraction():
     """Trigger the extraction process by calling the extraction function directly."""
     try:
         await run_extraction()
-        print("Extraction process triggered successfully.")
+        logger.info("Extraction process triggered successfully.")
     except Exception as e:
-        print(f"Error triggering extraction: {e}")
+        logger.error(f"Error triggering extraction: {e}")
 
 async def main():
     async with async_playwright() as playwright:
