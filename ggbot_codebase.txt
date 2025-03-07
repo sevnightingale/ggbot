@@ -1,0 +1,931 @@
+Directory structure:
+└── ggbot/
+    ├── README.md
+    ├── launch_chromium.sh
+    ├── requirements.txt
+    ├── start_xvfb.sh
+    ├── test_db.py
+    ├── .env.example
+    ├── common/
+    │   ├── config.py
+    │   ├── db.py
+    │   ├── logger.py
+    │   └── __pycache__/
+    ├── db_migrations/
+    │   ├── 0001_create_tables.sql
+    │   ├── 0002_add_user_id.sql
+    │   └── 0003_create_market_data.sql
+    ├── decision/
+    ├── docs/
+    ├── extraction/
+    │   ├── browser_data
+    │   ├── extraction.py
+    │   ├── prompts.py
+    │   └── __pycache__/
+    ├── frontend/
+    ├── logs/
+    ├── models/
+    │   └── installed_packages.txt
+    ├── onchain/
+    ├── structuring/
+    ├── tests/
+    └── trades/
+
+================================================
+File: README.md
+================================================
+# ggbot Spec Sheet
+
+## Overview
+
+### Purpose
+ggbot is an autonomous AI trading agent focused on a single crypto pair (e.g., BTC/USD) on Gains Network’s gTrade platform. It automates:
+
+- Data extraction
+- Trade decision-making
+- JSON structuring
+- Trade execution
+- Lifecycle management  
+
+All within a resource-constrained environment (2 GB RAM, 1 vCPU).
+
+---
+
+# 1. Technical Architecture
+
+### 1.1 Modules
+
+#### **Extraction Module**
+**Purpose:** Automate data gathering from TradingView (ggShot signals) and compute technical indicators (RSI, MACD) using real-time price data from Gains Network’s diamond contract on Base L2.
+
+**Key Points:**
+- **Browser-Use (Playwright):** `login()`, `navigateToChart()`, `configureIndicators()`, `extractDOMData()`.
+- **Session Persistence:** Maintains `BrowserContext` to reduce CAPTCHA triggers.
+- **ChatGPT 4o (Vision):** Handles screenshot parsing if DOM scraping fails.
+- **TA-Lib Integration:** Computes indicators (RSI, MACD) every 5 minutes.
+- **Timeframe-Aligned Extraction:** Triggers ggShot extraction right after each candle closes.
+- **Multi-Timeframe Capability (Future Use):** Code allows referencing multiple timeframes (e.g., 4h, 1h, 15m).
+- **Resource Management:** Single Playwright browser context to conserve RAM and CPU.
+
+---
+
+#### **Decision Module**
+**Purpose:** Analyze extracted data, maintain active trade oversight, and decide on opening, adjusting, or closing positions using a reasoning LLM (e.g., DeepSeek R1).
+
+**Key Points:**
+- **LLM Integration:** Processes signals from ggShot, RSI, MACD, and trade history.
+- **Prompt Usage:** Instructs LLM to consider all signals and return an action (open, adjust, close) with confidence scores.
+- **Ongoing Monitoring:** Evaluates active positions every 5 minutes.
+- **LLM Fallback Logic:** Reverts to “no new trade” or “manual hold” strategy if LLM is unavailable.
+
+---
+
+#### **Structuring Module**
+**Purpose:** Convert high-level trade actions into validated JSON commands suitable for Gains Network’s diamond contract.
+
+**Key Points:**
+- **Schema Enforcement:** Uses `jsonschema` to validate fields (`pairIndex`, `collateralAmount`, `leverage`).
+- **Risk Filtering:** Queries `getMaxLeverage(pairIndex)` from gTrade’s contract.
+- **Final JSON Output:** Produces contract-compatible objects.
+
+---
+
+#### **Trades Module**
+**Purpose:** Maintain a detailed record of trades—both active and closed—including chat logs, confidence scores, partial closes, and final outcomes.
+
+**Key Points:**
+- **Trade Records & History:** Logs each trade, adjustments, and final results.
+- **Chat History Management:** Appends LLM’s reasoning to a `reasoning_log` field.
+- **Database Fields:** `confidence_score`, `timeframe`, `reasoning_log`, and `partial_close` events.
+
+---
+
+#### **On-Chain Execution Module**
+**Purpose:** Securely interact with gTrade’s diamond contract on Base L2, handling wallet management, transaction signing, and event monitoring.
+
+**Key Points:**
+- **Coinbase AgentKit:** Provides `signTransaction()`, `sendTransaction()`, and event monitoring.
+- **Diamond Contract Integration:** Uses facet selectors (`openPosition()`, `closePosition()`, etc.).
+- **Event Monitoring:** Listens for confirmations and liquidations.
+
+---
+
+### 1.2 Inter-Module Interactions
+
+#### **Data Flow**
+1. **Extraction Module** → Stores ggShot signals, TA indicators, and price data in the database.
+2. **Decision Module** → Pulls relevant data to generate a new/updated trade action.
+3. **Structuring Module** → Validates and formats the action into JSON.
+4. **On-Chain Execution Module** → Signs and submits the JSON command.
+5. **Trades Module** → Logs trade lifecycle.
+
+#### **Communication**
+- PostgreSQL stores signals, trades, logs, etc.
+- Redis or in-memory caching for frequently accessed data.
+
+#### **Resource Management**
+- **Single browser context**
+- **Minimal concurrency**
+- **Batched API queries**
+
+---
+
+# 2. Codebase Structure
+
+
+| **Directory/File**          | **Description**                                       |
+|----------------------------|-------------------------------------------------------|
+| `ggbot/`                   | Root project directory                               |
+| `├── docs/`                | Architecture diagrams, design docs, change logs     |
+| `├── extraction/`          | **Extraction Module**                               |
+| `│   ├── browser_use/`     | Playwright scripts                                  |
+| `│   ├── vision/`          | ChatGPT 4o (Vision) integration                     |
+| `│   ├── ta_lib/`          | TA-Lib integration                                  |
+| `│   └── extraction_main.py` | Entry point for extraction module                 |
+| `├── decision/`            | **Decision & Monitoring Module**                    |
+| `│   ├── llm_integration/` | DeepSeek R1 or similar LLM integration              |
+| `│   ├── strategy/`        | Trading strategy logic                              |
+| `│   └── decision_main.py` | Entry point for decision module                     |
+| `├── structuring/`         | **Structuring Module**                              |
+| `│   ├── json_schema/`     | JSON schema definitions                             |
+| `│   └── structuring_main.py` | Entry point for structuring module               |
+| `├── trades/`              | **Trades Module**                                   |
+| `│   ├── trades_main.py`   | Trade lifecycle management                          |
+| `│   └── models.py`        | Database models                                     |
+| `├── onchain/`             | **On-Chain Execution Module**                       |
+| `│   ├── agentkit/`        | Coinbase AgentKit integration                       |
+| `│   └── onchain_main.py`  | Entry point for on-chain execution module           |
+| `├── common/`              | **Shared utilities**                                |
+| `│   ├── logger.py`        | Centralized logging                                |
+| `│   ├── config.py`        | Environment/config loader                          |
+| `│   └── utils.py`         | Generic helper functions                           |
+| `├── tests/`               | Test suites for different modules                   |
+| `├── requirements.txt`     | Dependency list                                     |
+| `├── README.md`            | Project overview & setup instructions               |
+| `└── .env.example`         | Environment configuration template                  |
+
+
+# 3. Database Design
+
+## 3.1 Schema Definition
+
+### **sessions**
+| Column       | Type       |
+|-------------|-----------|
+| session_id  | UUID (PK) |
+| user_id     | UUID      |
+| cookie_data | JSONB     |
+| created_at  | TIMESTAMP |
+| expires_at  | TIMESTAMP |
+
+### **trades**
+| Column            | Type       |
+|------------------|-----------|
+| trade_id        | UUID (PK) |
+| pair_index      | VARCHAR   |
+| timeframe       | VARCHAR   |
+| collateral_amount | NUMERIC   |
+| leverage        | INTEGER   |
+| stop_loss       | NUMERIC   |
+| take_profit     | NUMERIC   |
+| confidence_score | NUMERIC   |
+| reasoning_log   | TEXT      |
+| trade_status    | VARCHAR   |
+| created_at      | TIMESTAMP |
+
+### **logs**
+| Column    | Type        |
+|----------|------------|
+| log_id   | SERIAL (PK) |
+| module   | VARCHAR    |
+| log_level | VARCHAR    |
+| message  | TEXT       |
+| timestamp | TIMESTAMP |
+
+---
+
+# 4. Dependencies & Libraries
+
+- **Browser Automation:** Playwright  
+- **Image Processing/OCR:** ChatGPT 4o (Vision), Tesseract (fallback)  
+- **LLM Integration:** DeepSeek R1 or equivalent  
+- **JSON Validation:** `jsonschema`  
+- **Blockchain Interaction:** Coinbase AgentKit, Web3.py/Ethers.js  
+- **TA Libraries:** TA-Lib  
+- **Logging & Monitoring:** `loguru`  
+- **Environment Management:** `python-dotenv`  
+- **Database:** PostgreSQL, Redis (optional)  
+- **Containerization:** Docker  
+
+---
+
+# 5. Development Environment Setup
+
+### **Required Tools**
+- **IDE:** `code-server` (remote) or VSCode/PyCharm  
+- **Version Control:** Git  
+- **Containerization:** Docker  
+- **Build Tools:** Makefile or npm scripts  
+
+---
+
+# 6. Security Considerations
+
+- **Data Encryption:** Encrypt sensitive data.  
+- **Authentication:** Implement if GUI/admin panel is added.  
+- **Wallet Security:** Use secure key handling.  
+- **Rate Limiting:** Prevent overload.  
+
+---
+
+# 7. Testing & Validation
+
+- **Unit Testing:** Module-level validation.  
+- **Integration Testing:** Ensuring correct data flow.  
+- **E2E Testing:** Simulating trades in dry-run mode.  
+- **Stress Testing:** Evaluating VM performance.  
+
+---
+
+# Conclusion
+
+ggbot is designed for a **single-pair MVP** on Gains Network’s gTrade with:
+
+- **Timeframe-aligned extraction** (e.g., 15m candles).  
+- **LLM-driven decision logic** with fallback strategies.  
+- **Robust JSON structuring** and risk filtering.  
+- **Secure contract interactions** via Coinbase AgentKit.  
+- **Optimized for a low-resource environment** (2 GB RAM, 1 vCPU).  
+
+
+================================================
+File: launch_chromium.sh
+================================================
+#!/bin/bash
+export DISPLAY=:1
+chromium-browser --no-sandbox --disable-gpu --disable-software-rasterizer &
+
+
+
+================================================
+File: requirements.txt
+================================================
+# requirements.txt for ggbot
+
+# Browser automation and AI agent control
+git+https://github.com/browser-use/browser-use.git
+
+# Blockchain and on-chain operations with Coinbase AgentKit
+coinbase-agentkit>=0.1.0
+coinbase-agentkit-langchain>=0.1.0
+
+# Core dependencies for ggbot functionality
+playwright>=1.35.0
+jsonschema>=4.0.0
+web3>=6.0.0
+loguru>=0.7.0
+python-dotenv>=1.0.0
+langchain>=0.0.200
+
+# Additional utilities
+psycopg2-binary>=2.9.5
+redis>=4.3.4
+pytesseract>=0.3.10  # Optional: for OCR fallback if needed
+
+# Historical price data + technical analysis
+yfinance>=0.2.26
+pandas-ta==0.3.14b0
+
+
+================================================
+File: start_xvfb.sh
+================================================
+#!/bin/bash
+Xvfb :1 -screen 0 1920x1080x24 &
+export DISPLAY=:1
+
+================================================
+File: test_db.py
+================================================
+import uuid
+import psycopg2
+import os
+from common.db import upsert_market_data
+from common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DEFAULT_USER_ID
+
+# Database connection function
+def get_db_connection():
+    return psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+
+# Ensure the default user exists in the users table
+def ensure_default_user():
+    conn = get_db_connection()
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO users (user_id, username)
+                    VALUES (%s, %s)
+                    ON CONFLICT (user_id) DO NOTHING;
+                """, (DEFAULT_USER_ID, "default_user"))
+    finally:
+        conn.close()
+
+# Ensure default user is present
+ensure_default_user()
+
+# Example market data
+symbol = "BTC/USD"
+timeframe = "4h"
+data = {
+    "ggShot": {
+        "signal": "LONG",
+        "take_profits": [{"tp1": 87500.0}],
+        "trailing_stop_loss": 85500.0
+    },
+    "rsi": 42.5,
+    "macd": {"macd_line": 1.07, "signal_line": 0.95, "histogram": 0.12},
+    "bollinger": {"upper": 87000.0, "middle": 86000.0, "lower": 85000.0},
+    "price_context": {
+        "recent_high": 88000.0,
+        "recent_low": 85000.0,
+        "moving_average_20": 86500.0,
+        "momentum": 2.5,
+        "volatility": 1500.0
+    },
+    "real_time_price": 86350.0
+}
+
+# Insert market data
+upsert_market_data(DEFAULT_USER_ID, symbol, timeframe, data)
+
+print(f"Market data inserted/updated for user: {DEFAULT_USER_ID}")
+
+
+================================================
+File: .env.example
+================================================
+# .env.example
+#
+# Environment variables for ggbot.
+# Replace these placeholders with actual values in your local .env (never commit real secrets!).
+
+# Default user (pre-multi-user support)
+DEFAULT_USER_ID="00000000-0000-0000-0000-000000000001"
+
+# The environment name (e.g., 'development', 'production')
+ENV="development"
+
+# Gains Network / Base L2
+GAINS_NETWORK_RPC_URL="https://base-mainnet.example-rpc"
+GAINS_DIAMOND_ADDRESS="0x0000000000000000000000000000000000000000"
+
+# Private key or seed phrase placeholder for Coinbase AgentKit
+# For prototyping only! Use secure storage in production
+WALLET_PRIVATE_KEY="YOUR_PRIVATE_KEY_HERE"
+
+# TradingView / Browser-Use credentials
+TVIEW_USERNAME="your_tradingview_username"
+TVIEW_PASSWORD="your_tradingview_password"
+
+# (Optional) If your "virtual browser" flow needs a separate vault pass or login
+BROWSER_VAULT_PASSWORD="your_browser_pass_here"
+
+# LLM credentials for each module
+EXTRACTION_LLM_API_KEY="extraction_agent_api_key_here"
+DECISION_LLM_API_KEY="decision_agent_api_key_here"
+STRUCTURING_LLM_API_KEY="structuring_agent_api_key_here"
+
+# (Optional) The old single key can be removed or commented out:
+# LLM_API_KEY="your_llm_api_key_here"
+
+# Database settings
+DB_HOST="localhost"
+DB_PORT="5432"
+DB_NAME="ggbot"
+DB_USER="ggbot_user"
+DB_PASS="ggbot_password"
+
+# Additional placeholders
+REDIS_HOST="localhost"
+REDIS_PORT="6379"
+
+
+
+================================================
+File: common/config.py
+================================================
+# common/config.py
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+# General settings
+ENV = os.getenv("ENV", "development")
+
+# Gains Network Settings
+GAINS_NETWORK_RPC_URL = os.getenv("GAINS_NETWORK_RPC_URL", "")
+GAINS_DIAMOND_ADDRESS = os.getenv("GAINS_DIAMOND_ADDRESS", "")
+
+# Database settings
+DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_PORT = os.getenv("DB_PORT", "5432")
+DB_NAME = os.getenv("DB_NAME", "ggbot")
+DB_USER = os.getenv("DB_USER", "ggbot_user")
+DB_PASS = os.getenv("DB_PASS", "ggbot123")
+
+# Logging settings
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+
+# TradingView Credentials (Optional, if using scraping)
+TVIEW_USERNAME = os.getenv("TVIEW_USERNAME", "")
+TVIEW_PASSWORD = os.getenv("TVIEW_PASSWORD", "")
+
+# LLM API Key
+LLM_API_KEY = os.getenv("LLM_API_KEY", "")
+
+# Redis (Optional)
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = os.getenv("REDIS_PORT", "6379")
+
+# Default user ID for multi-user support
+DEFAULT_USER_ID = os.getenv("DEFAULT_USER_ID", "00000000-0000-0000-0000-000000000001")
+
+
+================================================
+File: common/db.py
+================================================
+# common/db.py
+import json
+import psycopg2
+from common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+
+def upsert_market_data(user_id, symbol, timeframe, data_dict):
+    """ Inserts or updates market data for a specific user, ensuring one row per user-symbol-timeframe. """
+
+    conn = psycopg2.connect(
+        dbname=DB_NAME,
+        user=DB_USER,
+        password=DB_PASS,
+        host=DB_HOST,
+        port=DB_PORT
+    )
+    try:
+        with conn:
+            with conn.cursor() as cur:
+                # Convert Python dictionary to JSON format
+                json_data = json.dumps(data_dict)
+
+                # Insert or update the row based on (user_id, symbol, timeframe)
+                cur.execute("""
+                    INSERT INTO market_data (user_id, symbol, timeframe, data)
+                    VALUES (%s, %s, %s, %s)
+                    ON CONFLICT (user_id, symbol, timeframe)
+                    DO UPDATE SET data = EXCLUDED.data,
+                                  updated_at = NOW();
+                """, (user_id, symbol, timeframe, json_data))
+    finally:
+        conn.close()
+
+
+================================================
+File: common/logger.py
+================================================
+# common/logger.py
+import sys
+from loguru import logger
+from common.config import LOG_LEVEL, DEFAULT_USER_ID
+
+# Remove the default handler to customize our logging format
+logger.remove()
+
+# Configure Loguru logging with user_id context
+logger.add(
+    sys.stdout,
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+           "<level>{level: <8}</level> | "
+           "User: {extra[user_id]} | "
+           "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+           "<level>{message}</level>",
+    level=LOG_LEVEL
+)
+
+logger.add(
+    "logs/ggbot.log",
+    rotation="10 MB",
+    level=LOG_LEVEL,
+    compression="zip",
+    format="<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
+           "<level>{level: <8}</level> | "
+           "User: {extra[user_id]} | "
+           "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+           "<level>{message}</level>"
+)
+
+if __name__ == "__main__":
+    # Bind default user_id if none is provided during logging.
+    logger.bind(user_id=DEFAULT_USER_ID).info("Logger initialized successfully.")
+
+
+================================================
+File: db_migrations/0001_create_tables.sql
+================================================
+-- db_migrations/0001_create_tables.sql
+-- Schema creation script for ggbot.
+
+-- 1. sessions table
+CREATE TABLE IF NOT EXISTS sessions (
+    session_id UUID PRIMARY KEY,
+    user_id UUID,
+    cookie_data JSONB,
+    created_at TIMESTAMP,
+    expires_at TIMESTAMP
+);
+
+-- Index on sessions.expires_at
+CREATE INDEX IF NOT EXISTS idx_sessions_expires_at
+    ON sessions (expires_at);
+
+-- 2. trades table
+CREATE TABLE IF NOT EXISTS trades (
+    trade_id UUID PRIMARY KEY,
+    pair_index VARCHAR,
+    timeframe VARCHAR,
+    collateral_amount NUMERIC,
+    leverage INTEGER,
+    stop_loss NUMERIC,
+    take_profit NUMERIC,
+    confidence_score NUMERIC,
+    reasoning_log TEXT,
+    trade_status VARCHAR,
+    created_at TIMESTAMP
+);
+
+-- Indexes on trades.created_at, pair_index, timeframe
+CREATE INDEX IF NOT EXISTS idx_trades_created_at
+    ON trades (created_at);
+
+CREATE INDEX IF NOT EXISTS idx_trades_pair_index
+    ON trades (pair_index);
+
+CREATE INDEX IF NOT EXISTS idx_trades_timeframe
+    ON trades (timeframe);
+
+-- 3. logs table
+CREATE TABLE IF NOT EXISTS logs (
+    log_id SERIAL PRIMARY KEY,
+    module VARCHAR,
+    log_level VARCHAR,
+    message TEXT,
+    timestamp TIMESTAMP
+);
+
+-- Additional indexes for logs if you prefer, e.g. timestamp
+
+
+================================================
+File: db_migrations/0002_add_user_id.sql
+================================================
+-- db_migrations/0002_add_user_id.sql
+-- Create a placeholder users table for multi-user support.
+CREATE TABLE IF NOT EXISTS users (
+    user_id UUID PRIMARY KEY,
+    username VARCHAR NOT NULL,
+    created_at TIMESTAMP DEFAULT NOW()
+);
+
+-- Add foreign key constraint to trades table.
+ALTER TABLE trades
+ADD CONSTRAINT fk_trades_user_id
+    FOREIGN KEY (user_id) REFERENCES users (user_id);
+
+-- Add foreign key constraint to sessions table.
+ALTER TABLE sessions
+ADD CONSTRAINT fk_sessions_user_id
+    FOREIGN KEY (user_id) REFERENCES users (user_id);
+
+
+
+================================================
+File: db_migrations/0003_create_market_data.sql
+================================================
+-- db_migrations/0002_create_market_data.sql
+-- Creates the market_data table with user_id for multi-user support
+
+CREATE TABLE IF NOT EXISTS market_data (
+    id SERIAL PRIMARY KEY,
+    user_id UUID NOT NULL,
+    symbol VARCHAR NOT NULL,
+    timeframe VARCHAR NOT NULL,
+    data JSONB NOT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT NOW(),
+
+    -- Unique constraint per user-symbol-timeframe (prevents duplicates)
+    UNIQUE (user_id, symbol, timeframe),
+
+    -- Foreign key linking user_id to the users table
+    CONSTRAINT fk_market_data_user_id FOREIGN KEY (user_id) REFERENCES users(user_id)
+);
+
+
+================================================
+File: extraction/extraction.py
+================================================
+# extraction/extraction.py
+import asyncio
+import os
+import sys
+from dotenv import load_dotenv
+from steel import Steel
+from browser_use import Agent
+from langchain_openai import ChatOpenAI
+from browser_use.browser.browser import Browser, BrowserConfig
+from browser_use.browser.context import BrowserContext
+
+# Adjust sys.path to include parent directory for common imports
+sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
+# Import custom logger (assuming it exists in common/)
+from common.logger import logger
+
+# Load environment variables
+load_dotenv()
+
+# Bind user_id to logger to avoid KeyError
+logger = logger.bind(user_id="test_user")
+
+# Initialize Steel client with API key
+client = Steel(steel_api_key=os.getenv("STEEL_API_KEY"))
+
+# Create a Steel session with proxy and CAPTCHA-solving enabled
+logger.info("Creating Steel session...")
+session = client.sessions.create(
+    use_proxy=True,
+    solve_captcha=True,
+    dimensions={"width": 1280, "height": 720}  # Set resolution for headful mode
+)
+logger.info(f"Session created at {session.session_viewer_url}")
+
+# Connect Browser-Use to Steel via CDP URL
+cdp_url = f"wss://connect.steel.dev?apiKey={os.getenv('STEEL_API_KEY')}&sessionId={session.id}"
+browser = Browser(config=BrowserConfig(cdp_url=cdp_url))
+browser_context = BrowserContext(browser=browser)
+
+# Define sensitive data for TradingView login
+sensitive_data = {
+    "tv_username": os.getenv("TVIEW_USERNAME"),
+    "tv_password": os.getenv("TVIEW_PASSWORD")
+}
+
+# Configure ChatGPT 4o as the AI model
+model = ChatOpenAI(
+    model="gpt-4o",
+    temperature=0.3,
+    api_key=os.getenv("EXTRACTION_LLM_API_KEY")
+)
+
+# Define the test task
+TEST_TASK = (
+    "Go to https://www.tradingview.com and log in with username 'tv_username' and password 'tv_password'. "
+    "If a CAPTCHA appears, solve it to proceed. "
+    "Then, navigate to https://www.tradingview.com/chart/HiWAe2vQ/?symbol=COINBASE%3ABTCUSD. "
+    "Confirm the page is loaded by checking the current price of BTC/USD."
+)
+
+# Create the AI agent with the task, model, and browser setup
+agent = Agent(
+    task=TEST_TASK,
+    llm=model,
+    browser=browser,
+    browser_context=browser_context,
+    sensitive_data=sensitive_data,
+    use_vision=True,  # Enable vision for chart interpretation
+    save_conversation_path="/root/ggbot/extraction/logs/conversation"  # Debug logs
+)
+
+async def run_test():
+    """Run the test to confirm the TradingView chart loads and price is visible."""
+    try:
+        logger.info("Running the agent...")
+        result = await agent.run(max_steps=20)  # Increased steps for login/navigation
+        logger.info(f"Test Result: {result}")
+        # Access the current page to verify
+        if browser_context.context.pages:
+            page = browser_context.context.pages[0]
+            title = await page.title()
+            logger.info(f"Page Title: {title}")
+        else:
+            logger.error("No pages found in browser context")
+    except Exception as e:
+        logger.error(f"An error occurred: {e}")
+    finally:
+        # Clean up resources
+        if browser:
+            await browser.close()
+            logger.info("Browser closed")
+        if session:
+            client.sessions.release(session.id)
+            logger.info("Session released")
+        logger.info("Done!")
+
+if __name__ == "__main__":
+    asyncio.run(run_test())
+
+================================================
+File: extraction/prompts.py
+================================================
+# extraction/prompts.py
+from pydantic import BaseModel
+
+class GgShotSignals(BaseModel):
+    signal: str                  # e.g., "LONG" or "SHORT"
+    take_profits: list[dict]     # e.g., [{"tp1": 87500.0}, {"tp2": 88000.0}]
+    trailing_stop_loss: float    # e.g., 85500.0
+
+# Full extraction task (for later use)
+EXTRACTION_TASK = (
+    "If not already logged in, go to https://www.tradingview.com and log in with username 'tv_username' and password 'tv_password'. "
+    "If a CAPTCHA appears, solve it to proceed. "
+    "Then, navigate to the chart for BTC/USD on Coinbase at https://www.tradingview.com/chart/HiWAe2vQ/?symbol=COINBASE%3ABTCUSD. "
+    "Extract the ggShot signals, including trend signals, TP levels, SL, and any additional context. "
+    "Provide the output as a JSON object matching the GgShotSignals model."
+)
+
+# Test task for login and navigation
+TEST_TASK = (
+    "Go to https://www.tradingview.com and log in with username 'tv_username' and password 'tv_password'. "
+    "If a CAPTCHA appears, solve it to proceed. "
+    "Then, navigate to the chart for BTC/USD on Coinbase at https://www.tradingview.com/chart/HiWAe2vQ/?symbol=COINBASE%3ABTCUSD. "
+    "Confirm the page is loaded by checking the current price of BTC/USD."
+)
+
+================================================
+File: models/installed_packages.txt
+================================================
+Package                     Version
+--------------------------- ---------------
+accelerate                  1.4.0
+aiohappyeyeballs            2.4.6
+aiohttp                     3.11.12
+aiosignal                   1.3.2
+annotated-types             0.7.0
+anthropic                   0.46.0
+anyio                       4.8.0
+asn1crypto                  1.5.1
+async-timeout               5.0.1
+attrs                       25.1.0
+backoff                     2.2.1
+beautifulsoup4              4.13.3
+bip-utils                   2.9.3
+bitarray                    3.1.0
+browser-use                 0.1.40
+cbor2                       5.6.5
+cdp-sdk                     0.17.0
+certifi                     2025.1.31
+cffi                        1.17.1
+charset-normalizer          3.4.1
+ckzg                        2.0.1
+coinbase-agentkit           0.1.3
+coinbase-agentkit-langchain 0.1.0
+coincurve                   20.0.0
+crcmod                      1.7
+cryptography                44.0.1
+cytoolz                     1.0.1
+dataclasses-json            0.6.7
+defusedxml                  0.7.1
+diskcache                   5.6.3
+distro                      1.9.0
+ecdsa                       0.19.0
+ed25519-blake2b             1.4.1
+eth_abi                     5.2.0
+eth-account                 0.13.5
+eth-hash                    0.7.1
+eth-keyfile                 0.8.1
+eth-keys                    0.6.1
+eth-rlp                     2.2.0
+eth-typing                  5.2.0
+eth-utils                   5.2.0
+filelock                    3.17.0
+frozendict                  2.4.6
+frozenlist                  1.5.0
+fsspec                      2025.2.0
+greenlet                    3.1.1
+h11                         0.14.0
+hexbytes                    1.3.0
+httpcore                    1.0.7
+httpx                       0.28.1
+httpx-sse                   0.4.0
+huggingface-hub             0.29.1
+idna                        3.10
+Jinja2                      3.1.5
+jiter                       0.8.2
+jsonpatch                   1.33
+jsonpointer                 3.0.0
+jsonschema                  4.23.0
+jsonschema-specifications   2024.10.1
+langchain                   0.3.19
+langchain-anthropic         0.3.3
+langchain-community         0.3.18
+langchain-core              0.3.37
+langchain-ollama            0.2.2
+langchain-openai            0.3.1
+langchain-text-splitters    0.3.6
+langsmith                   0.3.10
+llama_cpp_python            0.3.7
+loguru                      0.7.3
+markdownify                 0.14.1
+MarkupSafe                  3.0.2
+marshmallow                 3.26.1
+monotonic                   1.6
+mpmath                      1.3.0
+multidict                   6.1.0
+multitasking                0.0.11
+mypy-extensions             1.0.0
+networkx                    3.4.2
+numpy                       1.26.4
+nvidia-cublas-cu12          12.4.5.8
+nvidia-cuda-cupti-cu12      12.4.127
+nvidia-cuda-nvrtc-cu12      12.4.127
+nvidia-cuda-runtime-cu12    12.4.127
+nvidia-cudnn-cu12           9.1.0.70
+nvidia-cufft-cu12           11.2.1.3
+nvidia-curand-cu12          10.3.5.147
+nvidia-cusolver-cu12        11.6.1.9
+nvidia-cusparse-cu12        12.3.1.170
+nvidia-cusparselt-cu12      0.6.2
+nvidia-nccl-cu12            2.21.5
+nvidia-nvjitlink-cu12       12.4.127
+nvidia-nvtx-cu12            12.4.127
+ollama                      0.4.7
+openai                      1.64.0
+orjson                      3.10.15
+packaging                   24.2
+pandas                      2.2.3
+pandas_ta                   0.3.14b0
+parsimonious                0.10.0
+peewee                      3.17.9
+pillow                      11.1.0
+pip                         25.0.1
+platformdirs                4.3.6
+playwright                  1.50.0
+posthog                     3.15.1
+propcache                   0.3.0
+psutil                      7.0.0
+psycopg2-binary             2.9.10
+py-sr25519-bindings         0.2.1
+pycparser                   2.22
+pycryptodome                3.21.0
+pydantic                    2.10.6
+pydantic_core               2.27.2
+pydantic-settings           2.8.1
+pyee                        12.1.1
+PyJWT                       2.10.1
+PyNaCl                      1.5.0
+pytesseract                 0.3.13
+python-dateutil             2.9.0.post0
+python-dotenv               1.0.1
+pytz                        2025.1
+pyunormalize                16.0.0
+PyYAML                      6.0.2
+redis                       5.2.1
+referencing                 0.36.2
+regex                       2024.11.6
+requests                    2.32.3
+requests-toolbelt           1.0.0
+rlp                         4.1.0
+rpds-py                     0.23.1
+safetensors                 0.5.3
+setuptools                  75.8.0
+six                         1.17.0
+sniffio                     1.3.1
+soupsieve                   2.6
+SQLAlchemy                  2.0.38
+sympy                       1.13.1
+tenacity                    9.0.0
+tiktoken                    0.9.0
+tokenizers                  0.21.0
+toolz                       1.0.0
+torch                       2.6.0
+tqdm                        4.67.1
+transformers                4.49.0
+triton                      3.2.0
+types-requests              2.32.0.20241016
+typing_extensions           4.12.2
+typing-inspect              0.9.0
+tzdata                      2025.1
+urllib3                     2.3.0
+web3                        7.8.0
+websockets                  13.1
+yarl                        1.18.3
+yfinance                    0.2.54
+zstandard                   0.23.0
+
+
