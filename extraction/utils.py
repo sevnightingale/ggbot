@@ -1,0 +1,232 @@
+"""
+Extraction module utilities.
+
+This module provides utility functions for the extraction module, including
+database operations for storing and retrieving market data.
+"""
+import json
+from typing import Dict, List, Optional, Any
+
+from common.logger import logger
+from common.config import DEFAULT_USER_ID
+from common.db import get_db_connection
+
+
+def store_market_data_entries(data_entries: List[Dict], replace_existing: bool = False) -> int:
+    """
+    Store multiple market data entries in the database.
+    
+    Args:
+        data_entries: List of dictionaries, each representing a market data entry
+                     (as returned by DataSource.to_database_format and updated by
+                      IndicatorComputer.to_database_format)
+        replace_existing: Whether to replace existing entries or update them
+                         (default: False - update existing entries)
+        
+    Returns:
+        Number of successfully stored entries
+    """
+    if not data_entries:
+        logger.bind(user_id=DEFAULT_USER_ID).warning("No market data entries to store")
+        return 0
+    
+    success_count = 0
+    
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                for entry in data_entries:
+                    # Extract the required fields from the entry
+                    user_id = entry.get('user_id', DEFAULT_USER_ID)
+                    source = entry.get('source', 'unknown')
+                    symbol = entry.get('symbol', '')
+                    timeframe = entry.get('timeframe', '')
+                    data_type = entry.get('data_type', 'price_data')
+                    raw_data = entry.get('raw_data', {})
+                    indicators = entry.get('indicators', {})
+                    updated_at = entry.get('updated_at')
+                    
+                    # Skip entries without required fields
+                    if not symbol or not timeframe:
+                        logger.bind(user_id=user_id).warning(
+                            f"Skipping entry with missing symbol or timeframe: {entry}"
+                        )
+                        continue
+                    
+                    # Convert Python dictionaries to JSON strings
+                    raw_data_json = json.dumps(raw_data) if isinstance(raw_data, dict) else raw_data
+                    indicators_json = json.dumps(indicators) if isinstance(indicators, dict) else indicators
+                    
+                    if replace_existing:
+                        # Delete existing entry if it exists
+                        cur.execute("""
+                            DELETE FROM market_data
+                            WHERE user_id = %s AND symbol = %s AND timeframe = %s AND source = %s
+                        """, (user_id, symbol, timeframe, source))
+                    
+                    # Insert the data into the market_data table
+                    cur.execute("""
+                        INSERT INTO market_data 
+                        (user_id, symbol, timeframe, source, data_type, raw_data, indicators, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        ON CONFLICT (user_id, symbol, timeframe)
+                        DO UPDATE SET 
+                            raw_data = EXCLUDED.raw_data,
+                            indicators = EXCLUDED.indicators,
+                            updated_at = EXCLUDED.updated_at,
+                            source = EXCLUDED.source,
+                            data_type = EXCLUDED.data_type
+                        RETURNING id
+                    """, (
+                        user_id, symbol, timeframe, source, data_type, 
+                        raw_data_json, indicators_json, updated_at
+                    ))
+                    
+                    # Get the ID of the inserted/updated row
+                    result = cur.fetchone()
+                    if result:
+                        success_count += 1
+                    
+                # Commit the transaction
+                conn.commit()
+                
+                logger.bind(user_id=DEFAULT_USER_ID).info(
+                    f"Successfully stored {success_count} of {len(data_entries)} market data entries"
+                )
+                
+                return success_count
+                
+        except Exception as e:
+            conn.rollback()
+            logger.bind(user_id=DEFAULT_USER_ID).error(f"Error storing market data: {str(e)}")
+            return 0
+
+
+def get_latest_market_data(
+    symbol: str, 
+    timeframe: str,
+    user_id: str = DEFAULT_USER_ID,
+    source: Optional[str] = None
+) -> Optional[Dict[str, Any]]:
+    """
+    Get the latest market data for a specific symbol and timeframe.
+    
+    Args:
+        symbol: Trading pair symbol (e.g., 'BTC-USD')
+        timeframe: Timeframe (e.g., '15m', '1h', '4h', '1d')
+        user_id: User ID to retrieve data for (default: DEFAULT_USER_ID)
+        source: Optional source to filter by (e.g., 'yfinance', 'tradingview')
+        
+    Returns:
+        Dictionary containing the market data or None if not found
+    """
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                if source:
+                    cur.execute("""
+                        SELECT id, source, data_type, raw_data, indicators, updated_at
+                        FROM market_data
+                        WHERE user_id = %s AND symbol = %s AND timeframe = %s AND source = %s
+                        ORDER BY updated_at DESC
+                        LIMIT 1
+                    """, (user_id, symbol, timeframe, source))
+                else:
+                    cur.execute("""
+                        SELECT id, source, data_type, raw_data, indicators, updated_at
+                        FROM market_data
+                        WHERE user_id = %s AND symbol = %s AND timeframe = %s
+                        ORDER BY updated_at DESC
+                        LIMIT 1
+                    """, (user_id, symbol, timeframe))
+                
+                result = cur.fetchone()
+                if not result:
+                    return None
+                
+                # Parse the result into a dictionary
+                id, src, data_type, raw_data, indicators, updated_at = result
+                
+                return {
+                    'id': id,
+                    'user_id': user_id,
+                    'symbol': symbol,
+                    'timeframe': timeframe,
+                    'source': src,
+                    'data_type': data_type,
+                    'raw_data': raw_data,
+                    'indicators': indicators,
+                    'updated_at': updated_at
+                }
+                
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Error retrieving market data: {str(e)}")
+            return None
+
+
+def get_market_data_history(
+    symbol: str,
+    timeframe: str,
+    limit: int = 100,
+    user_id: str = DEFAULT_USER_ID,
+    source: Optional[str] = None
+) -> List[Dict[str, Any]]:
+    """
+    Get historical market data for a specific symbol and timeframe.
+    
+    Args:
+        symbol: Trading pair symbol (e.g., 'BTC-USD')
+        timeframe: Timeframe (e.g., '15m', '1h', '4h', '1d')
+        limit: Maximum number of records to retrieve (default: 100)
+        user_id: User ID to retrieve data for (default: DEFAULT_USER_ID)
+        source: Optional source to filter by (e.g., 'yfinance', 'tradingview')
+        
+    Returns:
+        List of dictionaries containing the market data, ordered by updated_at DESC
+    """
+    with get_db_connection() as conn:
+        try:
+            with conn.cursor() as cur:
+                if source:
+                    cur.execute("""
+                        SELECT id, source, data_type, raw_data, indicators, updated_at
+                        FROM market_data
+                        WHERE user_id = %s AND symbol = %s AND timeframe = %s AND source = %s
+                        ORDER BY updated_at DESC
+                        LIMIT %s
+                    """, (user_id, symbol, timeframe, source, limit))
+                else:
+                    cur.execute("""
+                        SELECT id, source, data_type, raw_data, indicators, updated_at
+                        FROM market_data
+                        WHERE user_id = %s AND symbol = %s AND timeframe = %s
+                        ORDER BY updated_at DESC
+                        LIMIT %s
+                    """, (user_id, symbol, timeframe, limit))
+                
+                results = cur.fetchall()
+                if not results:
+                    return []
+                
+                # Parse the results into a list of dictionaries
+                history = []
+                for row in results:
+                    id, src, data_type, raw_data, indicators, updated_at = row
+                    
+                    history.append({
+                        'id': id,
+                        'user_id': user_id,
+                        'symbol': symbol,
+                        'timeframe': timeframe,
+                        'source': src,
+                        'data_type': data_type,
+                        'raw_data': raw_data,
+                        'indicators': indicators,
+                        'updated_at': updated_at
+                    })
+                
+                return history
+                
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Error retrieving market data history: {str(e)}")
+            return []
