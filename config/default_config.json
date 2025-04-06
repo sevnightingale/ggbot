@@ -1,0 +1,62 @@
+{
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "extraction": {
+    "data_sources": [
+      {
+        "name": "tradingview",
+        "enabled": true,
+        "config": {
+          "pairs": ["BTC/USD"],
+          "timeframes": ["15m", "1h", "4h"],
+          "indicators": ["ggshot"]
+        }
+      },
+      {
+        "name": "yfinance",
+        "enabled": true,
+        "config": {
+          "pairs": ["BTC-USD"],
+          "timeframes": ["15m", "1h", "4h"]
+        }
+      }
+    ],
+    "indicators": [
+      {
+        "name": "rsi",
+        "enabled": true,
+        "config": {
+          "length": 14
+        }
+      },
+      {
+        "name": "macd",
+        "enabled": true,
+        "config": {
+          "fast": 12,
+          "slow": 26,
+          "signal": 9
+        }
+      },
+      {
+        "name": "bollinger_bands",
+        "enabled": true,
+        "config": {
+          "length": 20,
+          "std_dev": 2.0
+        }
+      }
+    ]
+  },
+  "decision": {
+    "strategy": "ggshot",
+    "llm_provider": "deepseek",
+    "risk_parameters": {
+      "max_position_size": 100,
+      "max_leverage": 10
+    }
+  },
+  "execution": {
+    "exchange": "gtrade",
+    "authentication": "agentkit"
+  }
+}

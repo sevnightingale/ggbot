@@ -1,3 +1,16 @@
+ggshot trading strategy feedback:
+
+> GG-Traders:
+Well you are going to use too simple methods as I think if we look at RSI MACD and Bolinger there will be almost no signals as RSI almost always contradicts GGshot as they are opposite algorithms I think it is better to use confirmation by volume and also by clusters or liquidation zones like a signal should not come if it is near a large liquidity accumulation and to place the TP to these zones and SL behind the zones.
+
+> GG-Traders:
+Like I could also add all these code inidcators as conditions for a signal but in this case there will be almost no signals there
+
+
+
+strategy:
+
+
 Overview
 
 This strategy uses ggShot as the primary signal generator, complemented by three pandas TA indicators—MACD, Bollinger Bands, and RSI—to confirm signals, filter out noise, and identify high-probability opportunities. It operates across multiple timeframes: the 4-hour (4h) chart for trend direction, the 1-hour (1h) chart for breakout identification, and the 15-minute (15m) chart for precise entry and exit timing. The focus is on medium-term trades (days to weeks), avoiding scalping, with dynamic adjustments based on market conditions.

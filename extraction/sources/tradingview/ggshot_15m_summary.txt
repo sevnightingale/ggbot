@@ -1,0 +1,13 @@
+**Technical Analysis Report**
+
+- **Current GG-Shøt Trend Color:** Red (Short signal)
+- **Presence of Blue Triangles:** Blue triangles are present near the most recent candles, indicating TP/TP2 signals or bounce signals.
+- **Yellow Take Profit Labels:**
+  - TP1: 86,373
+  - TP2: 85,720
+  - TP3: 85,067
+- **Purple Trailing Stop Loss Label:** 90,016
+- **Trend Line Label Price:** 89,125
+
+**Overall Market Structure Assessment:**
+The white candles in the center of the chart indicate a recent downward trend with a short signal from the GG-Shøt trendline, which is red. The price appears to be interacting closely with the trendline, suggesting potential resistance. The presence of blue triangles suggests recent TP/TP2 or bounce signals, indicating possible reversal points or profit-taking opportunities.
