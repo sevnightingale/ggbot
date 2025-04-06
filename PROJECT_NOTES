@@ -1,0 +1,346 @@
+Project Log for ggbot
+1. DigitalOcean Droplet Provisioning
+Droplet Setup:
+Provisioned a DigitalOcean droplet with 2 GB RAM and 1 vCPU.
+IP Address: 68.183.176.110.
+Authentication: Password-based.
+
+2. code-server Installation & Configuration
+Installation:
+Installed code-server using the official installation script.
+Configuration:
+Edited /root/.config/code-server/config.yaml to use absolute paths.
+Set bind-addr to 127.0.0.1:8080 and disabled built-in SSL (to be handled by Nginx).
+Persistent Service:
+Created a systemd service file at /etc/systemd/system/code-server.service to run code-server persistently at boot.
+Final Status:
+code-server is active and accessible securely at https://code.nightingale.business via Nginx.
+
+3. Domain & SSL Setup
+DNS Configuration:
+Configured DNS for code.nightingale.business with an A record pointing to 68.183.176.110.
+Nginx Reverse Proxy:
+Set up Nginx to forward traffic (HTTP/HTTPS) from code.nightingale.business to code-server at 127.0.0.1:8080.
+SSL Certificates:
+Installed Certbot and used Let’s Encrypt to secure the connection, eliminating the self‑signed certificate warning.
+
+4. Docker Setup
+Installation:
+Installed Docker using the official installation script.
+Verified installation by running:
+bash
+Copy
+docker run hello-world
+which printed the expected message.
+Memory Constraint Issue & Resolution:
+Initially attempted to add a memory constraint in /etc/docker/daemon.json with {"memory": "1.5g"}.
+The directive was unrecognized, causing Docker to fail.
+Inspected logs with:
+bash
+Copy
+sudo journalctl -u docker.service --no-pager -n 20
+which indicated configuration issues.
+Resolved by renaming the file:
+bash
+Copy
+sudo mv /etc/docker/daemon.json /etc/docker/daemon.json.bak
+
+
+Restarted Docker with:
+bash
+Copy
+sudo systemctl restart docker
+
+
+Verified again with docker run hello-world.
+
+5. Git & Repository Setup
+Git Installation:
+Verified Git is installed and configured with:
+bash
+Copy
+git config --global user.name "sevnightingale"
+git config --global user.email "sevnightingale@gmail.com"
+
+
+Repository Setup:
+Created a new GitHub repository named ggbot.
+Cloned the repository to the droplet into /root/ggbot.
+Project Structure:
+Created directories:
+extraction/, decision/, structuring/, trades/, onchain/, common/, along with additional folders such as docs/ and tests/.
+.gitignore & README.md:
+Created a .gitignore file to exclude unwanted files (e.g., .env, logs, caches).
+Created a README.md detailing the project overview, structure, and setup instructions.
+
+6. Python Virtual Environment Setup
+Initial venv Creation:
+Created a Python virtual environment.
+Python Upgrade:
+Upgraded from Python 3.10 to Python 3.11 (required by Browser‑Use) by installing Python 3.11 and recreating the virtual environment.
+Verified by running:
+bash
+Copy
+python --version
+which now shows Python 3.11.x.
+Activation:
+Activated the venv using:
+bash
+Copy
+source .venv/bin/activate
+
+
+Verified the active environment via echo $VIRTUAL_ENV.
+
+7. Dependencies Update (requirements.txt)
+Revised Dependencies:
+Removed TA‑Lib completely (due to build complications).
+Added yfinance and pandas‑ta to handle historical price data and technical indicator calculations.
+Final requirements.txt:
+txt
+Copy
+# requirements.txt for ggbot
+
+# Browser automation and AI agent control
+git+https://github.com/browser-use/browser-use.git
+
+# Blockchain and on-chain operations with Coinbase AgentKit
+coinbase-agentkit>=0.1.0
+coinbase-agentkit-langchain>=0.1.0
+
+# Core dependencies for ggbot functionality
+playwright>=1.35.0
+jsonschema>=4.0.0
+web3>=6.0.0
+loguru>=0.7.0
+python-dotenv>=1.0.0
+langchain>=0.0.200
+
+# Additional utilities
+psycopg2-binary>=2.9.5
+redis>=4.3.4
+pytesseract>=0.3.10  # Optional: for OCR fallback if needed
+
+# Historical price data + technical analysis
+yfinance>=0.2.26
+pandas-ta==0.3.14b0
+
+
+Installation:
+With the venv active, ran:
+bash
+Copy
+pip install --upgrade -r requirements.txt
+
+
+This installed all necessary packages for ggbot.
+
+8. Revised Technical Approach
+Extraction Module:
+Real-Time Price Monitoring:
+Query gTrade’s price feed every 5 minutes using Web3.py for current trade execution and monitoring.
+Historical Data & Technical Analysis:
+Fetch historical price data using yfinance and calculate technical indicators (e.g., RSI, MACD, EMA, Bollinger Bands) using pandas‑ta.
+Spec Sheet Revisions:
+Technical Stack Update:
+TA‑Lib has been removed in favor of yfinance and pandas‑ta for historical data analysis, while gTrade remains the source for real-time price data.
+Multi-User Preparedness:
+Database Schema: Updated the schema to include a user_id column in both the trades and sessions tables, with corresponding foreign key constraints linking to a placeholder users table. This prepares the system for future multi-user support.
+Codebase & Logging:
+Modules and logging have been updated to accept and log a user_id parameter, ensuring that the backend is structured for a scalable, multi-user platform.
+These changes lay the groundwork for transitioning from a single-user bot to a full platform (ggbots.ai) for building and managing AI Trading Agents without incurring significant technical debt.
+
+
+
+9. Implementation of Browser-Use & Local LLM for Automated TradingView Extraction
+Research & Strategic Decisions
+Conducted research on Browser-Use (Playwright-based) and confirmed its feasibility for TradingView data extraction.
+Evaluated two approaches:
+Full GPT-4o API for both login and extraction.
+Hybrid Approach (Chosen):
+Headful login using TinyLlama-1.1B-Chat for secure, local credential handling.
+Headless extraction using GPT-4o API for TradingView chart parsing.
+Automated session re-login on expiry.
+The hybrid approach was selected for security (local credential handling), cost reduction, and scalability (multi-user future-proofing).
+
+Browser-Use Setup & Xvfb Configuration
+Installed Browser-Use & Playwright inside the virtual environment:
+bash
+CopyEdit
+source /root/ggbot/.venv/bin/activate
+pip install playwright
+pip install git+https://github.com/browser-use/browser-use.git
+
+
+Installed Xvfb globally to support headful browsing on the headless VM:
+bash
+CopyEdit
+sudo apt install xvfb -y
+
+
+Configured a virtual display for Playwright headful browsing:
+bash
+CopyEdit
+Xvfb :1 -screen 0 1920x1080x24 &
+export DISPLAY=:1
+
+
+Planned TightVNC installation for debugging headful sessions (status TBD).
+
+TradingView Session Handling & Login Strategy
+Headful login strategy:
+TinyLlama auto-enters credentials.
+Session cookies are saved for reuse in headless extraction.
+Headless extraction strategy:
+Uses saved session cookies.
+GPT-4o API parses chart data (ggShot signals, TP/SL, trend).
+Auto-relogin logic:
+If TradingView logs out, TinyLlama re-runs login and updates cookies.
+No manual intervention required.
+
+
+Installed tigervnc-standalone-server:
+Installed as an alternative to vnc4server (unavailable in your Ubuntu version).
+
+ Confirmed installation by accepting the package configuration prompt to restart services.
+
+
+
+
+ Configured and started the VNC server:
+Set the VNC password to ggbot123 and skipped the view-only password option.
+
+ Launched the server with vncserver :1 to establish the session.
+
+
+
+
+ Integrated noVNC for browser access:
+Cloned the noVNC repository to /root/noVNC.
+
+ Started the WebSocket proxy with novnc_proxy to enable browser-based VNC access.
+
+
+
+
+ Adjusted firewall settings:
+Opened port 6080 using ufw allow 6080 for external noVNC access.
+
+ Verified the firewall was active and correctly configured with sudo ufw status.
+
+
+
+
+ Accessed the VNC session via browser:
+Connected to http://<your_vm_ip>:6080/vnc.html and entered the VNC password.
+
+ Confirmed the Fluxbox desktop appeared, validating the noVNC setup.
+
+
+
+
+ Enhanced Fluxbox with xterm:
+Installed xterm and edited /root/.fluxbox/menu to add it as a menu option.
+
+ Restarted Fluxbox and launched xterm successfully from the menu.
+
+
+
+
+ Launched Chromium in the VNC session:
+Set export DISPLAY=:1 and ran Chromium with flags --no-sandbox --disable-gpu --disable-software-rasterizer &.
+
+ Resolved clipboard issues by manually typing commands when needed.
+
+
+
+
+ Logged into TradingView:
+Navigated to TradingView in Chromium, signed in manually, and accessed the dashboard.
+
+
+
+
+ Extracted and saved TradingView cookies:
+Used Chromium Developer Tools to copy session cookies.
+
+ Formatted and saved them as tv_cookies.json in /root/ggbot/extraction/.
+
+
+
+
+ Planned for future automation:
+Discussed using Playwright for automated cookie extraction to support multiple users.
+
+ Kept the manual process as a learning step for now.
+
+
+
+
+ Evaluated Google account usage:
+Noted potential risks of using a personal Google account for extensions.
+
+ Proceeded with manual cookie extraction to simplify the current setup.
+
+
+
+
+ Verified tv_cookies.json:
+Confirmed the file was saved correctly and is ready for the next project phase.
+
+
+Scrapped using 
+
+
+Both SPEC_SHEET.md and ACTION_PLAN.md
+  have been successfully updated to align
+   with the new vision from
+  MASTER_PLAN.md and IMPROVEMENTS.md.
+
+  The key changes include:
+
+  1. SPEC_SHEET.md changes:
+    - Reframed the introduction to
+  present ggbot as a customizable
+  platform
+    - Added interface definitions for all
+   modules
+    - Updated the database schema to
+  include users and configurations tables
+    - Restructured the codebase to
+  include interfaces directories within
+  each module
+    - Added the Configuration Management
+  Layer
+    - Updated security considerations for
+   multi-user support
+    - Added new sections for frontend
+  technologies
+    - Enhanced the conclusion to
+  highlight customization and multi-user
+  capabilities
+  2. ACTION_PLAN.md changes:
+    - Added new tasks for creating
+  interfaces in each module
+    - Renamed "onchain" to "execution"
+  for broader exchange support
+    - Added Configuration Management
+  Layer tasks
+    - Enhanced database schema with
+  user_id associations
+    - Added tasks for implementing
+  various providers and adapters
+    - Added a new section for platform
+  development preparation (future phase)
+    - Updated testing tasks to cover
+  interfaces and multi-exchange scenarios
+    - Added tasks for multi-user data
+  isolation
+
+  These updates create a comprehensive
+  roadmap for transforming ggbot from a
+  single-purpose agent to a customizable,
+   multi-user trading agent platform
+  while maintaining a practical approach
+  with an MVP phase focused on personal
+  use.

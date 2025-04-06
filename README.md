@@ -1,4 +1,10 @@
-# ggbot Spec Sheet
+ACTION_PLAN.md
+SPEC_SHEET.md
+PROJECT_NOTES.md
+IMPROVEMENTS.md
+MASTER_PLAN.md
+ERROR.md
+CONTEXT.md
 
 ## Overview
 

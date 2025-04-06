@@ -11,7 +11,7 @@ from langchain_openai import ChatOpenAI
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 from common.logger import logger
-from prompts import TEST_TASK
+from prompts import EXTRACTION_TASK
 
 # Bind logger with user_id
 logger = logger.bind(user_id="test_user")
@@ -74,10 +74,10 @@ async def main():
         api_key=os.getenv("EXTRACTION_LLM_API_KEY")
     )
 
-    # Use TEST_TASK from prompts.py
-    task = TEST_TASK
+    # Use EXTRACTION_TASK from prompts.py
+    task = EXTRACTION_TASK
 
-    # Initialize and run the agent
+    # Initialize and run the agent with Controller
     agent = Agent(
         task=task,
         llm=llm,
@@ -89,8 +89,17 @@ async def main():
 
     try:
         logger.info("Running the agent...")
-        history = await agent.run(max_steps=7)
+        history = await agent.run(max_steps=20)
         logger.info(f"Task Result: {history}")
+        
+        # Save the output as plaintext
+        result = history.final_result()
+        if result and history.is_done():
+            with open("extraction/ggshot_15m_summary.txt", "w") as f:
+                f.write(result)
+            logger.info("Summary saved to extraction/ggshot_15m_summary.txt")
+        else:
+            logger.warning("No valid result found in agent history")
     except Exception as e:
         logger.error(f"An error occurred: {e}")
     finally:
