@@ -37,8 +37,8 @@ def preprocess_cookies(cookies):
         processed_cookies.append(processed_cookie)
     return processed_cookies
 
-async def main():
-    logger.info("Starting extraction script...")
+async def main(symbol='BTCUSD', timeframe='15m'):
+    logger.info(f"Starting extraction script for {symbol} {timeframe}...")
 
     # Load and preprocess cookies
     if os.path.exists(COOKIES_FILE):
@@ -74,8 +74,8 @@ async def main():
         api_key=os.getenv("EXTRACTION_LLM_API_KEY")
     )
 
-    # Use EXTRACTION_TASK from prompts.py
-    task = EXTRACTION_TASK
+    # Use EXTRACTION_TASK from prompts.py but update it with the symbol and timeframe
+    task = EXTRACTION_TASK.replace("BTCUSD", symbol).replace("15-minute", f"{timeframe}")
 
     # Initialize and run the agent with Controller
     agent = Agent(
@@ -84,27 +84,41 @@ async def main():
         browser=browser,
         browser_context=context,
         use_vision=True,  # Added for visual inspection of GG-Shot indicator
-        save_conversation_path="/root/ggbot/logs/extraction_conversation.json",  # For debugging
+        save_conversation_path=f"/root/ggbot/logs/extraction_{symbol}_{timeframe}_conversation.json",  # For debugging
     )
 
     try:
-        logger.info("Running the agent...")
+        logger.info(f"Running the agent for {symbol} {timeframe}...")
         history = await agent.run(max_steps=20)
         logger.info(f"Task Result: {history}")
         
         # Save the output as plaintext
         result = history.final_result()
         if result and history.is_done():
-            with open("extraction/ggshot_15m_summary.txt", "w") as f:
+            output_file = f"extraction/sources/tradingview/ggshot_{timeframe}_summary.txt"
+            with open(output_file, "w") as f:
                 f.write(result)
-            logger.info("Summary saved to extraction/ggshot_15m_summary.txt")
+            logger.info(f"Summary saved to {output_file}")
+            return result
         else:
             logger.warning("No valid result found in agent history")
+            return None
     except Exception as e:
         logger.error(f"An error occurred: {e}")
+        return None
     finally:
         await browser.close()
         logger.info("Browser closed.")
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    import argparse
+    
+    parser = argparse.ArgumentParser(description='Extract ggShot data from TradingView')
+    parser.add_argument('symbol', nargs='?', default='BTCUSD', 
+                        help='Trading pair symbol (default: BTCUSD)')
+    parser.add_argument('timeframe', nargs='?', default='15m',
+                        help='Timeframe (default: 15m)')
+    
+    args = parser.parse_args()
+    
+    asyncio.run(main(args.symbol, args.timeframe))

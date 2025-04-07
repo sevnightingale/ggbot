@@ -97,21 +97,23 @@ Stores market data including indicators and price data for different pairs and t
 
 | Column     | Type            | Description                            |
 |------------|-----------------|----------------------------------------|
-| data_id    | UUID            | Primary Key                            |
+| id         | SERIAL          | Primary Key                            |
 | user_id    | UUID            | Foreign Key to users table             |
 | source     | VARCHAR         | Data source (e.g., 'tradingview', 'yfinance') |
 | symbol     | VARCHAR         | Trading pair symbol                    |
 | timeframe  | VARCHAR         | Timeframe (e.g., '15m', '1h', '4h')    |
-| data_type  | VARCHAR         | Type of data (e.g., 'indicator_values', 'report', 'sentiment') |
+| data_type  | VARCHAR         | Type of data (e.g., 'price_data', 'report', 'sentiment') |
 | indicators | JSONB           | Technical indicators in JSON format    |
 | raw_data   | JSONB           | Raw price/chart data in JSON format    |
-| updated_at | TIMESTAMP       | Last update timestamp                  |
+| updated_at | TIMESTAMP       | Timestamp of the data point            |
 
 **Indexes:**
-- Primary Key on `data_id`
-- Unique constraint on `(user_id, symbol, timeframe)`
+- Primary Key on `id`
+- Unique constraint on `(user_id, symbol, timeframe, updated_at)` to allow multiple data points per timeframe
 - Index on `(user_id, symbol, timeframe, updated_at)` for efficient retrieval
 - Foreign Key constraint on `user_id` referencing users table
+
+**Important Note**: Migration `0008_update_market_data_constraint.sql` changes the unique constraint to allow multiple entries per user-symbol-timeframe combination with different timestamps. This is necessary for storing historical data points needed for calculating technical indicators like MACD and Bollinger Bands that require multiple data points.
 
 ### logs
 Stores application logs with user context for debugging and monitoring.

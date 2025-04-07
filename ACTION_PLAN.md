@@ -40,17 +40,21 @@
 [x] Install yfinance and pandas-ta packages
 [x] Define DataSource interface in extraction/interfaces/ directory
 [x] Define IndicatorComputer interface in extraction/interfaces/ directory
-[ ] Implement YFinanceDataSource as the primary testing data source
-[ ] Fetch BTC-USD historical data for multiple timeframes (15m, 1h, 4h, 1d)
-[ ] Implement logic to fetch only new data since last update
-[ ] Store raw price data (OHLCV) in the market_data table
-[ ] Implement PandasTAIndicators for technical analysis
-[ ] Calculate common indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
-[ ] Store calculated indicators in JSON format in the database
-[ ] Create a data extraction scheduler to update data every 15 minutes
-[ ] Add function to store extraction output in database with user_id association
-[ ] Implement database queries to retrieve latest market data for decision module
-[ ] Create simple monitoring to verify data extraction is working correctly
+[x] Implement YFinanceDataSource as the primary testing data source
+[x] Fetch BTC-USD historical data for multiple timeframes (15m, 1h, 4h, 1d)
+[x] Implement logic to fetch only new data since last update
+[x] Update market_data table schema to support storing raw data and indicators
+[x] Store raw price data (OHLCV) in the market_data table
+[x] Implement PandasTAIndicators for technical analysis
+[x] Calculate common indicators (SMA, EMA, RSI, MACD, Bollinger Bands)
+[x] Store calculated indicators in JSON format in the database
+[x] Create a data extraction scheduler to update data every 15 minutes
+[x] Create extraction_main.py and scheduled_extraction.py for automated data collection
+[x] Add function to store extraction output in database with user_id association
+[x] Implement database queries to retrieve latest market data for decision module
+[x] Create shell script for running scheduled extraction through cron jobs
+[x] Implement initialization and incremental update modes for efficient data collection
+[] test and fix any bugs with extraction process
 
 5. Implement TradingView Extraction (Defer for Production)
 [ ] Refactor existing TradingView extraction code to follow the interface architecture
@@ -113,9 +117,9 @@
 [ ] Implement basic monitoring to verify data flow between modules
 
 11. Testing and Validation
-[ ] Write unit tests for the YFinanceDataSource implementation
-[ ] Write unit tests for the PandasTAIndicators implementation
-[ ] Create test fixtures for market data in different timeframes
+[x] Write basic tests for the YFinanceDataSource implementation
+[x] Test the PandasTAIndicators implementation with sample data
+[x] Create test fixtures for market data in different timeframes
 [ ] Test the Decision Module with sample market data inputs
 [ ] Validate Structuring Module command generation and validation
 [ ] Test Trades Module CRUD operations
@@ -132,7 +136,7 @@
 [ ] Test with simulated market conditions (trending, ranging, volatile)
 
 13. MVP Deployment and Configuration
-[ ] Create baseline configuration files for personal use
+[x] Create baseline configuration files for personal use
 [ ] Implement basic environment settings for production
 [ ] Deploy the application on the DigitalOcean VM
 [ ] Set up monitoring for system performance and resource usage

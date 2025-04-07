@@ -44,7 +44,16 @@ class PandasTAIndicators(IndicatorComputer):
             'ema': {'windows': [9, 21, 55]},
             'rsi': {'length': 14},
             'macd': {'fast': 12, 'slow': 26, 'signal': 9},
-            'bbands': {'length': 20, 'std': 2}
+            'bbands': {'length': 20, 'std': 2},
+            'min_periods': {
+                # Minimum number of periods needed for each timeframe to calculate indicators
+                # This helps avoid NaN results when there's not enough data
+                '1d': 200,   # For daily data we need at least 200 days (for SMA 200)
+                '4h': 300,   # For 4h we need more periods
+                '1h': 400,   # For hourly even more
+                '15m': 500,  # For 15min data we need the most periods
+                'default': 250  # Default minimum periods
+            }
         }
         
         # Use provided config or default
@@ -126,51 +135,65 @@ class PandasTAIndicators(IndicatorComputer):
             # Calculate MACD
             macd_config = self._config['macd']
             try:
-                macd_result = ta.macd(
-                    result_df['Close'],
-                    fast=macd_config['fast'],
-                    slow=macd_config['slow'],
-                    signal=macd_config['signal']
-                )
-                
-                # Check if macd_result is not None
-                if macd_result is not None and not macd_result.empty:
-                    # Rename MACD columns for clarity
-                    macd_result.columns = [
-                        f"MACD_{macd_config['fast']}_{macd_config['slow']}",
-                        f"MACDh_{macd_config['fast']}_{macd_config['slow']}",
-                        f"MACDs_{macd_config['fast']}_{macd_config['slow']}"
-                    ]
-                    result_df = pd.concat([result_df, macd_result], axis=1)
+                # Make sure we have enough data for MACD calculation
+                min_periods_needed = macd_config['slow'] * 3  # Need at least 3x the slow period
+                if len(result_df) >= min_periods_needed:
+                    macd_result = ta.macd(
+                        result_df['Close'],
+                        fast=macd_config['fast'],
+                        slow=macd_config['slow'],
+                        signal=macd_config['signal']
+                    )
+                    
+                    # Check if macd_result is not None and not empty
+                    if macd_result is not None and not macd_result.empty:
+                        # Rename MACD columns for clarity
+                        macd_result.columns = [
+                            f"MACD_{macd_config['fast']}_{macd_config['slow']}",
+                            f"MACDh_{macd_config['fast']}_{macd_config['slow']}",
+                            f"MACDs_{macd_config['fast']}_{macd_config['slow']}"
+                        ]
+                        result_df = pd.concat([result_df, macd_result], axis=1)
+                    else:
+                        logger.bind(user_id=DEFAULT_USER_ID).warning("MACD calculation returned empty result")
                 else:
-                    logger.bind(user_id=DEFAULT_USER_ID).warning("MACD calculation returned empty result")
+                    logger.bind(user_id=DEFAULT_USER_ID).warning(
+                        f"Not enough data for MACD calculation. Need at least {min_periods_needed} periods, but got {len(result_df)}"
+                    )
             except Exception as e:
                 logger.bind(user_id=DEFAULT_USER_ID).warning(f"Error calculating MACD: {str(e)}")
             
             # Calculate Bollinger Bands
             bbands_config = self._config['bbands']
             try:
-                bbands_result = ta.bbands(
-                    result_df['Close'],
-                    length=bbands_config['length'],
-                    std=bbands_config['std']
-                )
-                
-                # Check if bbands_result is not None
-                if bbands_result is not None and not bbands_result.empty:
-                    # Rename Bollinger Bands columns for clarity
-                    bb_length = bbands_config['length']
-                    bb_std = bbands_config['std']
-                    bbands_result.columns = [
-                        f"BBL_{bb_length}_{bb_std}",
-                        f"BBM_{bb_length}_{bb_std}",
-                        f"BBU_{bb_length}_{bb_std}",
-                        f"BBB_{bb_length}_{bb_std}",
-                        f"BBP_{bb_length}_{bb_std}"
-                    ]
-                    result_df = pd.concat([result_df, bbands_result], axis=1)
+                # Make sure we have enough data for Bollinger Bands calculation
+                min_periods_needed = bbands_config['length'] * 2  # Need at least 2x the length
+                if len(result_df) >= min_periods_needed:
+                    bbands_result = ta.bbands(
+                        result_df['Close'],
+                        length=bbands_config['length'],
+                        std=bbands_config['std']
+                    )
+                    
+                    # Check if bbands_result is not None and not empty
+                    if bbands_result is not None and not bbands_result.empty:
+                        # Rename Bollinger Bands columns for clarity
+                        bb_length = bbands_config['length']
+                        bb_std = bbands_config['std']
+                        bbands_result.columns = [
+                            f"BBL_{bb_length}_{bb_std}",
+                            f"BBM_{bb_length}_{bb_std}",
+                            f"BBU_{bb_length}_{bb_std}",
+                            f"BBB_{bb_length}_{bb_std}",
+                            f"BBP_{bb_length}_{bb_std}"
+                        ]
+                        result_df = pd.concat([result_df, bbands_result], axis=1)
+                    else:
+                        logger.bind(user_id=DEFAULT_USER_ID).warning("Bollinger Bands calculation returned empty result")
                 else:
-                    logger.bind(user_id=DEFAULT_USER_ID).warning("Bollinger Bands calculation returned empty result")
+                    logger.bind(user_id=DEFAULT_USER_ID).warning(
+                        f"Not enough data for Bollinger Bands calculation. Need at least {min_periods_needed} periods, but got {len(result_df)}"
+                    )
             except Exception as e:
                 logger.bind(user_id=DEFAULT_USER_ID).warning(f"Error calculating Bollinger Bands: {str(e)}")
             
