@@ -58,22 +58,22 @@ def store_market_data_entries(data_entries: List[Dict], replace_existing: bool =
                     indicators_json = json.dumps(indicators) if isinstance(indicators, dict) else indicators
                     
                     if replace_existing:
-                        # Delete existing entry if it exists
+                        # Delete existing entry only if it has the same timestamp
+                        # This ensures we don't delete historical data when updating
                         cur.execute("""
                             DELETE FROM market_data
-                            WHERE user_id = %s AND symbol = %s AND timeframe = %s AND source = %s
-                        """, (user_id, symbol, timeframe, source))
+                            WHERE user_id = %s AND symbol = %s AND timeframe = %s AND source = %s AND updated_at = %s
+                        """, (user_id, symbol, timeframe, source, updated_at))
                     
-                    # Insert the data into the market_data table
+                    # Insert the data into the market_data table with the updated schema
                     cur.execute("""
                         INSERT INTO market_data 
                         (user_id, symbol, timeframe, source, data_type, raw_data, indicators, updated_at)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
-                        ON CONFLICT (user_id, symbol, timeframe)
+                        ON CONFLICT (user_id, symbol, timeframe, updated_at)
                         DO UPDATE SET 
                             raw_data = EXCLUDED.raw_data,
                             indicators = EXCLUDED.indicators,
-                            updated_at = EXCLUDED.updated_at,
                             source = EXCLUDED.source,
                             data_type = EXCLUDED.data_type
                         RETURNING id
@@ -208,7 +208,7 @@ def get_market_data_history(
                 if not results:
                     return []
                 
-                # Parse the results into a list of dictionaries
+                # Parse the results into a list of dictionaries  
                 history = []
                 for row in results:
                     id, src, data_type, raw_data, indicators, updated_at = row

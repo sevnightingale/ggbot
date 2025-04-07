@@ -4,6 +4,12 @@
 - Setup: `pip install -r requirements.txt`
 - Run test: `python -m tests.test_name`
 - Run extraction: `python extraction/run_extraction.py`
+- Note: When running Python commands for the ggbot project, always activate the virtual environment first. Use this sequence in the terminal as user 'sev' on the VM:
+  1. Navigate to the project directory: cd /home/sev/ggbot
+  2. Activate the virtual environment: source /home/sev/ggbot/.venv/bin/activate
+  3. Run Python commands within the (.venv) prompt, e.g., 'python -m extraction.scheduled_extraction --update'
+  The prompt should look like: (.venv) sev@ggbot-vm:~/ggbot$
+  This ensures the correct Python interpreter and dependencies (e.g., yfinance, pandas-ta) are used.
 
 ## Code Style
 - Imports: stdlib → third-party → local modules
@@ -26,3 +32,6 @@
 ## Browser Automation
 - Playwright for browser automation
 - Handle cookies properly (see extraction/run_extraction.py)
+
+## Testing
+- When creating test scripts, add them to the ggbot/tests/ directory.

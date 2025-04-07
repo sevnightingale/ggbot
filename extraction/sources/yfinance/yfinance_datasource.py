@@ -23,33 +23,41 @@ class YFinanceDataSource(DataSource):
     internal timeframe format and handles data validation and transformation.
     """
     
-    # Mapping from our timeframe format to yfinance intervals
-    TIMEFRAME_MAP = {
-        '1m': '1m',
-        '5m': '5m',
-        '15m': '15m',
-        '30m': '30m',
-        '1h': '1h',
-        '2h': '2h',
-        '4h': '4h',
-        '1d': '1d',
-        '1w': '1wk',
-        '1mo': '1mo'
-    }
+# This section removed as it was duplicated and replaced with TIMEFRAME_TO_INTERVAL
     
     # Maximum historical data periods for different timeframes
     # Based on yfinance limitations
     MAX_PERIODS = {
         '1m': 7,      # 7 days
+        '2m': 60,     # 60 days
         '5m': 60,     # 60 days
         '15m': 60,    # 60 days
         '30m': 60,    # 60 days
+        '60m': 730,   # 730 days
+        '90m': 730,   # 730 days
         '1h': 730,    # 730 days (2 years)
         '2h': 730,    # 730 days
         '4h': 730,    # 730 days
         '1d': 10000,  # Max available
-        '1w': 10000,  # Max available
-        '1mo': 10000  # Max available
+        '5d': 10000,  # Max available
+        '1wk': 10000, # Max available
+        '1mo': 10000, # Max available
+        '3mo': 10000  # Max available
+    }
+    
+    # Mapping between our timeframe format and yfinance interval format
+    TIMEFRAME_TO_INTERVAL = {
+        '1m': '1m',
+        '2m': '2m',
+        '5m': '5m',
+        '15m': '15m',
+        '30m': '30m',
+        '1h': '60m',
+        '2h': '2h',
+        '4h': '4h',
+        '1d': '1d',
+        '1w': '1wk',
+        '1mo': '1mo'
     }
     
     def __init__(self):
@@ -87,7 +95,7 @@ class YFinanceDataSource(DataSource):
             raise ValueError(f"Timeframe '{timeframe}' is not supported")
         
         # Convert our timeframe to yfinance interval
-        interval = self.TIMEFRAME_MAP[timeframe]
+        interval = self.TIMEFRAME_TO_INTERVAL.get(timeframe, timeframe)
         
         # Calculate start and end dates if not provided
         if not end_date:
@@ -118,9 +126,18 @@ class YFinanceDataSource(DataSource):
                 elif timeframe == '1mo':
                     start_date = end_date - timedelta(days=30 * limit)
             else:
-                # Use max period based on timeframe
-                days = self.MAX_PERIODS.get(timeframe, 60)
+                # Use default values for days of history
+                days_of_history = 60  # Default to 60 days
+                
+                # Respect yfinance limitations by timeframe
+                # Override days_of_history if it exceeds yfinance limits
+                max_days = self.MAX_PERIODS.get(timeframe, 60)
+                days = min(days_of_history, max_days)
                 start_date = end_date - timedelta(days=days)
+                
+                logger.bind(user_id=DEFAULT_USER_ID).info(
+                    f"Using {days} days for {timeframe} data (max allowed: {max_days})"
+                )
         
         try:
             logger.bind(user_id=DEFAULT_USER_ID).info(f"Fetching {symbol} {timeframe} data from {start_date} to {end_date}")
@@ -239,7 +256,7 @@ class YFinanceDataSource(DataSource):
         Returns:
             A list of supported timeframe strings
         """
-        return list(self.TIMEFRAME_MAP.keys())
+        return list(self.TIMEFRAME_TO_INTERVAL.keys())
     
     def get_supported_symbols(self) -> List[str]:
         """

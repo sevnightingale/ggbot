@@ -344,3 +344,128 @@ Both SPEC_SHEET.md and ACTION_PLAN.md
   while maintaining a practical approach
   with an MVP phase focused on personal
   use.
+
+● Now we've created a comprehensive hybrid
+   architecture for our extraction module:
+
+  1. Interfaces & Base Components:
+    - Defined DataSource and
+  IndicatorComputer interfaces
+    - Implemented YFinanceDataSource and
+  PandasTAIndicators as standard
+  implementations
+  2. Hybrid Architecture:
+    - Standard data sources implement a
+  common interface
+    - Complex sources (like TradingView)
+  have specialized extraction scripts
+    - The ExtractionManager coordinates
+  all sources and provides a unified
+  interface
+  3. Database Integration:
+    - Added utilities to store extracted
+  data in the PostgreSQL database
+    - Standardized data format across
+  different sources
+  4. Command-Line Functionality:
+    - Added command-line arguments to both
+   main extraction script and TradingView
+  script
+    - Allows for flexible usage in
+  different scenarios
+  5. Documentation:
+    - Updated README to explain the
+  architecture and usage
+    - Provided clear examples for
+  extending the system
+
+  This implementation strikes a good
+  balance between flexibility and
+  standardization. It allows us to handle
+  both simple data sources (like YFinance)
+   and complex ones (like TradingView)
+  within a unified framework, while still
+  taking advantage of specialized
+  capabilities when needed.
+
+ I've updated the system to separate extraction from indicator
+  computation, which solves your concern about calculating
+  indicators properly:
+
+  Key Changes:
+
+  1. Separation of Concerns:
+    - Data Extraction: We now just fetch and store raw price data
+   from yfinance without calculating indicators
+    - Indicator Calculation: Added a separate step that retrieves
+   all historical data from the database and computes indicators
+  on the complete dataset
+  2. New Components:
+    - Added compute_indicators_from_stored_data() function that:
+        - Retrieves all stored data for a symbol and timeframe
+      - Constructs a complete DataFrame with all historical data
+      - Computes indicators on the entire dataset
+      - Updates each record in the database with its indicators
+    - Added run_indicator_calculation() function that runs
+  indicator computation for all symbols and timeframes
+  3. Command-line Arguments:
+    - Added --indicators flag to scheduled_extraction.py
+    - Added --indicators flag to extraction_main.py
+    - Updated the shell script to always run indicator
+  calculation after updates
+  4. Process Flow:
+    - Initialization: Fetch all historical data → Store raw data
+  → Calculate indicators on all data
+    - Updates: Fetch only new data → Store raw data → Calculate
+  indicators on ALL data (not just the new data)
+
+  How to Use:
+
+  1. For initial setup:
+  python -m extraction.scheduled_extraction --init
+  2. For regular updates:
+  python -m extraction.scheduled_extraction --update
+  3. To just recalculate indicators:
+  python -m extraction.scheduled_extraction --indicators
+  4. The shell script handles the entire workflow:
+  bash extraction/run_scheduled_extraction.sh
+
+  This approach ensures that indicators like MACD and Bollinger
+  Bands are calculated correctly using the complete historical
+  dataset, not just fragments of new data.
+
+    Let's summarize what we found and fixed:
+
+  1. Problem Identified:
+    - In the store_market_data_entries function in extraction/utils.py,
+  when replace_existing=True was set, it was deleting all existing data
+  for a symbol and timeframe, regardless of the timestamp.
+    - This was causing the system to keep only one data point per symbol
+  and timeframe, making it impossible to calculate indicators like MACD
+  and Bollinger Bands which require more data points.
+  2. Solution:
+    - We modified the store_market_data_entries function to only delete
+  existing data with the same timestamp, rather than all data for a symbol
+   and timeframe.
+    - This ensures that historical data is preserved while still allowing
+  for updates to existing data points.
+  3. Validation:
+    - After our fix, initializing and updating the data now works
+  correctly.
+    - The system is now storing all historical data points (28,291 records
+   for BTC-USD across different timeframes).
+    - The indicators are being calculated correctly on this historical
+  data.
+  4. Scheduled Execution:
+    - A shell script (run_scheduled_extraction.sh) is in place for
+  scheduled extraction.
+    - It's already set up as a cron job and logs output to
+  /home/sev/ggbot/logs/extraction.log.
+    - With our fix, the next scheduled run will properly maintain
+  historical data and calculate indicators.
+
+  This fix addresses the exact issue described in CONTEXT.md, where data
+  was not being properly stored with unique timestamps. The system can now
+   keep multiple historical data points per symbol and timeframe, enabling
+   proper calculation of technical indicators that require significant
+  historical data.
