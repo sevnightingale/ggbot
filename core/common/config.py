@@ -4,8 +4,9 @@ import json
 from pathlib import Path
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file at project root
+dotenv_path = Path(__file__).parent.parent.parent / ".env"
+load_dotenv(dotenv_path=dotenv_path)
 
 # General settings
 ENV = os.getenv("ENV", "development")

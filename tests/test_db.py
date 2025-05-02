@@ -1,8 +1,8 @@
 import uuid
 import psycopg2
 import os
-from common.db import upsert_market_data
-from common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DEFAULT_USER_ID
+from core.common.db import upsert_market_data
+from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DEFAULT_USER_ID
 
 # Database connection function
 def get_db_connection():

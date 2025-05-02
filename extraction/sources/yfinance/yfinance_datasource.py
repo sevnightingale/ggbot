@@ -9,8 +9,8 @@ from typing import Dict, List, Optional, Union, Any
 import pandas as pd
 import yfinance as yf
 
-from common.logger import logger
-from common.config import DEFAULT_USER_ID
+from core.common.logger import logger
+from core.common.config import DEFAULT_USER_ID
 from extraction.interfaces import DataSource
 
 

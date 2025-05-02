@@ -1,9 +1,9 @@
 # config/import_config.py
 # Script to import default configuration into the database
 
-from config.config_main import import_default_config_to_db
-from common.logger import logger
-from common.config import DEFAULT_USER_ID
+from core.config.config_main import import_default_config_to_db
+from core.common.logger import logger
+from core.common.config import DEFAULT_USER_ID
 
 if __name__ == "__main__":
     log = logger.bind(user_id=DEFAULT_USER_ID)

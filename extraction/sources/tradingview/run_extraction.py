@@ -10,7 +10,7 @@ from langchain_openai import ChatOpenAI
 # Add parent directory to sys.path for module imports
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
-from common.logger import logger
+from core.common.logger import logger
 from prompts import EXTRACTION_TASK
 
 # Bind logger with user_id

@@ -2,7 +2,7 @@
 import json
 import psycopg2
 from contextlib import contextmanager
-from common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
 
 @contextmanager
 def get_db_connection():

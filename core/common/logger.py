@@ -1,7 +1,7 @@
 # common/logger.py
 import sys
 from loguru import logger
-from common.config import LOG_LEVEL, DEFAULT_USER_ID
+from core.common.config import LOG_LEVEL, DEFAULT_USER_ID
 
 # Remove the default handler to customize our logging format
 logger.remove()
