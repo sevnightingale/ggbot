@@ -5,8 +5,8 @@ import os
 from pathlib import Path
 from typing import Dict, Any
 
-from config.interfaces.configuration_provider import ConfigurationProvider
-from common.logger import logger
+from core.config.interfaces.configuration_provider import ConfigurationProvider
+from core.common.logger import logger
 
 class FileConfigProvider(ConfigurationProvider):
     """

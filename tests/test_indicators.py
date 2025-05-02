@@ -6,7 +6,7 @@ for the decision module.
 """
 import json
 from datetime import datetime
-from common.db import get_db_connection
+from core.common.db import get_db_connection
 
 def extract_indicator_test_data():
     """Extract recent indicators for multiple timeframes and save as JSON."""

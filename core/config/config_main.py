@@ -3,9 +3,9 @@
 import json
 import uuid
 from pathlib import Path
-from common.config import DEFAULT_USER_ID
-from common.db import get_db_connection, save_configuration
-from common.logger import logger
+from core.common.config import DEFAULT_USER_ID
+from core.common.db import get_db_connection, save_configuration
+from core.common.logger import logger
 
 def get_configuration(user_id=None, config_type=None, config_name=None):
     """

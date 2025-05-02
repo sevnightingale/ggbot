@@ -18,8 +18,8 @@ import subprocess
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any
 
-from common.logger import logger
-from common.config import DEFAULT_USER_ID
+from core.common.logger import logger
+from core.common.config import DEFAULT_USER_ID
 
 from extraction.sources import YFinanceDataSource
 from extraction.indicators import PandasTAIndicators

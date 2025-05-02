@@ -1,20 +1,57 @@
-ggbot Spec Sheet
+ggbots Platform Spec Sheet
 Overview
 Purpose:
-ggbot is an autonomous AI trading agent platform that enables users to configure and deploy trading agents for cryptocurrency pairs across multiple exchanges, including Gains Network's gTrade platform. The system provides a modular architecture where users can customize data extraction sources, trading strategies, risk parameters, and target exchanges. It automates data extraction, trade decision‑making, JSON structuring, trade execution, and lifecycle management in a resource‑constrained environment (2 GB RAM, 1 vCPU) for the MVP, with plans to scale for multi-user deployment. This Spec Sheet outlines the technical architecture, codebase structure, database design, dependencies, and recommended development practices.
+ggbots is a platform for creating, customizing, and deploying autonomous AI trading agents for cryptocurrency pairs across multiple exchanges, with a primary focus on centralized exchanges (CEXs) for the MVP. The platform utilizes a hybrid architecture combining Bubble.io for frontend/user management and a dedicated backend for agent operations, providing users with an intuitive no-code interface to configure their trading agents while maintaining powerful backend processing capabilities.
+
+The system provides a modular architecture where users can customize data extraction sources, trading strategies, risk parameters, and target exchanges, leveraging Model Context Protocols (MCPs) for standardized indicator calculations and exchange interactions. It automates data extraction, trade decision‑making, JSON structuring, trade execution, and lifecycle management, with separate scaling considerations for the Bubble.io frontend and the agent processing backend.
+
+The first milestone in development is a reference agent implementation that demonstrates core functionality, followed by the Platform MVP that integrates Bubble.io for user management and configuration. This Spec Sheet outlines the technical architecture, codebase structure, database design, API integration, dependencies, and recommended development practices, with particular emphasis on the hybrid Bubble.io architecture and MCP integration for improved efficiency and scalability.
 
 1. Technical Architecture
-1.1 Modules
+1.1 Hybrid Architecture Overview
+The ggbots platform employs a hybrid architecture with two main components:
+
+Frontend (Bubble.io):
+- User interface and dashboard
+- User registration and authentication
+- Agent configuration interface
+- Trading agent monitoring
+- Strategy marketplace (future)
+- Subscription and billing management
+
+Backend (Custom Server):
+- REST API endpoints for Bubble.io integration
+- User authentication and ID validation
+- Core agent processing modules
+- Database for agent data and trade records
+- MCP integrations for technical analysis and exchange interactions
+
+This hybrid approach leverages Bubble.io's strengths in rapid UI development, user management, and permissions, while maintaining a powerful custom backend for the compute-intensive agent operations.
+
+1.2 API Integration
+API Layer:
+- RESTful API: JSON-based API endpoints for all backend functionality
+- Authentication: JWT or token-based authentication using Bubble-generated user IDs
+- Endpoints: Configuration, monitoring, execution, and data retrieval
+- Versioning: API version control to ensure backward compatibility
+
+User ID Flow:
+- Bubble.io generates unique user IDs during registration
+- These IDs are passed with all API requests to the backend
+- Backend uses these IDs for data isolation and user-specific operations
+- All database records are associated with the appropriate user ID
+
+1.3 Core Modules
 Extraction Module
 Purpose:
-Automate data gathering from multiple sources including TradingView (ggShot signals), fetch and compute historical indicators using yfinance + pandas‑ta, and retrieve real‑time prices from configured exchanges for precise trade entries.
+Automate data gathering from multiple sources including TradingView (ggShot signals), leverage the Crypto Indicators MCP for comprehensive technical analysis, and retrieve real‑time prices from configured exchanges for precise trade entries.
 Key Components:
 DataSource Interface:
 Abstract interface that all data providers implement, allowing users to select their preferred data sources.
-Implementations: TradingViewDataSource, ExchangeAPIDataSource, ThirdPartyDataSource
+Implementations: TradingViewDataSource, CryptoIndicatorsMCPDataSource, CCXTMCPDataSource, YFinanceDataSource (as fallback)
 IndicatorComputer Interface:
-Abstraction for technical indicator calculation with implementations for different libraries.
-Implementations: PandasTAIndicators, CustomIndicators
+Abstraction for technical indicator calculation with implementations for different providers.
+Implementations: CryptoIndicatorsMCP, PandasTAIndicators (as fallback)
 
 Key Points:
 Browser‑Use (Playwright):
@@ -23,11 +60,11 @@ Session Persistence: Maintains a persistent BrowserContext to reduce CAPTCHA tri
 Uses TinyLlama-1.1B-Chat with Browser-use for headful login to TradingView
 ChatGPT 4o (Vision):
 Primary method for ggShot signal extraction via screenshot parsing of canvas-based chart data, with DOM parsing as a fallback if Vision is inefficient.
-Historical Price Data & Technical Analysis:
-yfinance: Fetch historical market data for multiple timeframes.
-pandas‑ta: Computes technical indicators (RSI, MACD, EMA, Bollinger Bands, etc.) on DataFrames returned by yfinance.
+MCP-Powered Technical Analysis:
+Crypto Indicators MCP: Provides 50+ technical indicators and trading strategies through a standardized interface.
+Fallback Systems: yfinance and pandas-ta maintained as fallback options and for validation during MCP testing.
 Real‑Time Price Monitoring:
-Query exchange APIs or contracts every 5 minutes for current market prices.
+Query exchange APIs via CCXT MCP every 5 minutes for current market prices.
 Ensures final trade decisions use fresh prices.
 Timeframe‑Aligned Extraction:
 Triggers data extraction immediately after each candle closes (e.g., every 15m).
@@ -35,21 +72,24 @@ Multi‑Timeframe Capability:
 Even within a single‑pair MVP, code allows referencing multiple timeframes (e.g., 4h, 1h, 15m).
 Resource Management:
 Limit Playwright browser contexts to 1 for memory efficiency on a 2 GB/1 vCPU VM.
+Leverage MCPs to reduce computational load on the VM.
 
 Decision Module
 Purpose:
-Analyze extracted data, maintain active trade oversight, and decide on opening, adjusting, or closing positions using configurable trading strategies and reasoning LLMs.
+Analyze extracted data from all sources (including MCP-provided indicators), maintain active trade oversight, and decide on opening, adjusting, or closing positions using configurable trading strategies and reasoning LLMs.
 Key Components:
 Strategy Interface:
 Abstract base class for all trading strategies.
-Implementations: GGShotStrategy, MovingAverageStrategy, RSIStrategy, CustomStrategy
+Implementations: MCPIndicatorsStrategy, GGShotStrategy, MovingAverageStrategy, RSIStrategy, CustomStrategy
 LLMProvider Interface:
 Abstraction for different LLM services.
 Implementations: DeepSeekProvider, GPT4oProvider, Claude3Provider, LocalLLMProvider
 
 Key Points:
 LLM Integration:
-Processes signals from configured data sources, computed indicators, and trade history.
+Processes signals from configured data sources, MCP-computed indicators, and trade history.
+MCP Indicator Integration:
+Incorporates Crypto Indicators MCP signals into strategy decision-making.
 Strategy Selection:
 Users can select from pre-built strategies or create custom ones via configuration.
 Ongoing Monitoring:
@@ -61,101 +101,147 @@ If the LLM is unavailable, revert to a minimal "no new trade" or "hold" strategy
 
 Structuring Module
 Purpose:
-Convert high‑level trade actions into validated JSON commands suitable for the target exchange API or contract.
+Convert high‑level trade actions into validated JSON commands suitable for the target exchange API, leveraging the CCXT MCP for CEX-specific formatting.
 Key Components:
 ExchangeCommand Interface:
 Abstract interface for different exchange-specific command formats.
-Implementations: GTradeCommand, BinanceCommand, CustomExchangeCommand
+Implementations: CCXTMCPCommand (primary for CEXs), GTradeCommand (for future DEX support)
+CCXT MCP Integration:
+Routes commands through the CCXT MCP for standardized exchange interactions.
 
 Key Points:
+Intent Translation:
+Converts high-level LLM decisions into standardized intent objects compatible with CCXT MCP.
+CCXT MCP Processing:
+Offloads exchange-specific command formatting to the CCXT MCP.
 Schema Enforcement:
-Uses jsonschema to validate fields specific to each exchange format.
+Uses jsonschema to validate fields before and after MCP processing.
 Risk Filtering:
-Dynamically queries exchange APIs for limits (e.g., max leverage); falls back to local config for limits if retrieval fails.
+Dynamically queries exchange APIs via CCXT for limits (e.g., max leverage); falls back to local config for limits if retrieval fails.
 User-Specific Risk Parameters:
 Applies risk limits based on user configuration.
 Final Command Output:
-Produces exchange-compatible objects in the format required by the target exchange.
+Produces exchange-compatible objects in the format required by the target exchange via CCXT MCP.
 
 Trades Module
 Purpose:
-Maintain a detailed record of trades—both active and closed—including chat logs, confidence scores, partial closes, and final outcomes, with proper user data isolation.
+Maintain a detailed record of trades—both active and closed—including chat logs, confidence scores, partial closes, and final outcomes, with proper user data isolation and source attribution for MCP-initiated trades.
 Key Components:
 TradeRecord Interface:
 Abstraction for different trade record formats.
-Implementations: GtradeTrade, BinanceTrade, GenericTrade
+Implementations: CEXTrade (via CCXT MCP), GtradeTrade (for future DEX support), GenericTrade
 
 Key Points:
 Trade Records & History:
 Creates a new record when a trade opens, logs adjustments, and stores final results upon closure.
+Source Attribution:
+Tags trades with their source (e.g., 'ccxt-mcp', 'indicators-mcp') for performance tracking.
 User Isolation:
 Associates all records with user_id for multi-tenant support.
 Chat History Management:
 Appends the LLM's reasoning to a reasoning_log field.
 Database Fields:
-Includes user_id, confidence_score, timeframe, reasoning_log, and partial_close events.
+Includes user_id, confidence_score, timeframe, reasoning_log, source_tag, and partial_close events.
 
 Execution Module
 Purpose:
-Securely interact with configured exchange APIs or contracts, handling wallet management, transaction signing, and event monitoring.
+Securely interact with configured exchange APIs, primarily using the CCXT MCP for CEX interactions in the MVP phase, with future support for DEXs.
 Key Components:
 Exchange Interface:
 Abstract base class for all exchange adapters.
-Implementations: GTradeExchange, BinanceExchange, CustomExchange
+Implementations: CCXTExchange (primary for CEXs), GTradeExchange (for future DEX support)
 AuthenticationStrategy Interface:
 Abstraction for different authentication methods.
-Implementations: AgentKitStrategy, APIKeyStrategy, CustomAuthStrategy
+Implementations: CCXTAuthStrategy (for CEXs), AgentKitStrategy (for future DEX support)
 
 Key Points:
+CCXT MCP Integration:
+Primary method for interacting with CEX APIs, handling dozens of exchanges through a standardized interface.
+CEX Prioritization:
+Routes trading commands primarily through the CCXT MCP for the MVP phase.
 Coinbase AgentKit:
-Handles wallet integration for blockchain-based exchanges.
-Exchange SDK Integration:
-Uses appropriate SDKs or APIs for each supported exchange.
-Event Monitoring:
+Reserved for future DEX support, handling wallet integration for blockchain-based exchanges.
+Exchange Event Monitoring:
 Listens for confirmations, liquidations; includes fallback polling if websockets fail.
 Batch API Calls:
-Minimizes overhead by grouping exchange queries.
+Minimizes overhead by grouping exchange queries through CCXT.
 
 Configuration Management Layer
 Purpose:
-Manage user-specific settings for each module, enabling customization without code changes.
+Manage user-specific settings for each module, enabling customization without code changes, including MCP-specific configuration.
 Key Components:
 ConfigurationProvider Interface:
 Abstract interface for configuration sources.
 Implementations: FileConfigProvider, DatabaseConfigProvider, UIConfigProvider
 ConfigurationValidator:
 Ensures user configurations meet system requirements and are secure.
+MCPConfigurationManager:
+Handles MCP-specific settings and connections.
 
 Key Points:
 MVP Implementation:
-Simple config.json file defining settings for each module.
+Simple config.json file defining settings for each module, including MCP server connections.
 Future Implementation:
 Web-based UI for adjusting configurations, stored in database.
 Configuration Categories:
-Data Sources, Trading Strategies, Risk Parameters, Exchange Connections, LLM Settings.
+Data Sources, Trading Strategies, Risk Parameters, Exchange Connections, LLM Settings, MCP Connections.
+MCP-Specific Configuration:
+Crypto Indicators MCP settings (exchange, timeframes, indicator selections)
+CCXT MCP settings (exchange selection, API keys, authentication)
 
-1.2 Inter‑Module Interactions
-Data Flow:
-Extraction Module → Stores extracted data in the database, associating with user_id.
-Decision Module → Pulls relevant data for the specified user to generate trade actions.
-Structuring Module → Validates and formats the action into exchange-specific commands.
-Execution Module → Executes commands on the target exchange, updating trade statuses.
-Trades Module → Logs trade creation, updates, closures, and final summaries.
+1.4 Inter‑Module Interactions & Data Flow
+Bubble.io to Backend Flow:
+- User Configuration: User configures agent via Bubble.io interface → Configuration sent to backend API → Configuration Manager processes and applies settings
+- Data Retrieval: User requests data via dashboard → API request to backend → Backend retrieves and returns data → Bubble.io displays results
+- Authentication: User logs in via Bubble.io → Auth token generated → Token used for all subsequent API requests
+
+Backend Core Modules Flow:
+- Extraction Module → Stores extracted data from ggShot, TradingView, and Indicators MCP in the database, associating with Bubble-generated user_id
+- Decision Module → Pulls relevant data for the specified user, including MCP-calculated indicators, to generate trade actions
+- Structuring Module → Sends LLM intent to CCXT MCP for exchange-specific command formatting, then validates the resulting commands
+- Execution Module → Routes commands to CCXT MCP for CEX execution, updating trade statuses
+- Trades Module → Logs trade creation, updates, closures, and final summaries, tagging trades with their source (e.g., 'ccxt-mcp')
+
 Configuration Flow:
-Each module queries the Configuration Management Layer for user-specific settings.
-Communication:
-PostgreSQL is the primary data store for signals, trades, logs, etc.
-In‑memory caching (Redis or Python dictionaries) for frequently accessed data.
+- Bubble.io UI: User configures agent settings via intuitive interface
+- API Transfer: Configuration sent to backend via API with user ID
+- Backend Processing: Configuration Management Layer validates and applies settings
+- Module Distribution: Each module queries the Configuration Management Layer for user-specific settings, including MCP-specific configurations
+
+MCP Communication:
+- Standardized interface for communication with Crypto Indicators MCP and CCXT MCP
+- Consistent data format for indicators regardless of source (direct calculation or MCP-provided)
+
+Data Storage and Security:
+- Bubble.io: Stores user account data, preferences, and UI configurations with built-in security
+- Backend Database: PostgreSQL is the primary data store for signals, trades, logs, etc.
+- User Isolation: All data is associated with Bubble-generated user IDs for strict isolation
+- Caching: In‑memory caching (Redis or Python dictionaries) for frequently accessed data
+
 Resource Management:
-Constrain concurrency to maintain stability on the small VM during MVP phase.
+- Backend Scaling: Initially constrained concurrency during reference implementation, expanding for platform MVP
+- Load Distribution: Separate considerations for Bubble.io scaling and backend processing
+- Efficiency: Leverage MCPs to reduce computational load for technical analysis and exchange interactions
 
 2. Codebase Structure 
-ggbot/
+2.1 Backend Structure
+ggbots-backend/
 ├── .env                      # Environment configuration (sensitive, ignored in Git)
 ├── .env.example              # Example environment config (safe for Git)
 ├── .gitignore                # Git ignore rules
 ├── .venv/                    # Python virtual environment (for dependency isolation)
 ├── README.md                 # Project overview & setup instructions
+│
+├── api/                      # API Layer for Bubble.io Integration
+│   ├── auth.py               # Authentication and user validation
+│   ├── routes/               # API endpoint routes
+│   │   ├── config_routes.py  # Configuration API endpoints
+│   │   ├── data_routes.py    # Data retrieval endpoints
+│   │   ├── agent_routes.py   # Agent control endpoints
+│   │   └── status_routes.py  # Status and monitoring endpoints
+│   ├── serializers/          # Request/response serialization
+│   ├── validators/           # Input validation
+│   └── api_main.py           # API server entry point
 │
 ├── common/                   # Shared utilities
 │   ├── config.py             # Configuration management
@@ -174,6 +260,8 @@ ggbot/
 │   └── decision_main.py      # Entry point
 │
 ├── docs/                     # Documentation (architecture diagrams, design docs, logs)
+│   ├── api/                  # API documentation
+│   └── bubble/               # Bubble.io integration documentation
 │
 ├── extraction/               # Data Extraction Module
 │   ├── interfaces/           # DataSource and IndicatorComputer interfaces
@@ -184,19 +272,21 @@ ggbot/
 │   ├── indicators/           # Technical indicator implementations
 │   └── extraction_main.py    # Entry point for extraction process
 │
-├── frontend/                 # Future React frontend for user configuration
-│
 ├── logs/                     # Log files (e.g., from loguru)
-│   └── ggbot.log
+│   └── ggbots.log
+│
+├── mcp/                      # MCP Integration
+│   ├── crypto_indicators/    # Crypto Indicators MCP integration
+│   ├── ccxt/                 # CCXT MCP integration
+│   └── mcp_base.py           # Base MCP communication utilities
 │
 ├── models/                   # Local LLM model files (if used)
 │   ├── tinyllama-quantized.gguf  # Quantized GGUF model for login
 │
-├── execution/                # Execution Module (renamed from onchain)
+├── execution/                # Execution Module
 │   ├── interfaces/           # Exchange and Authentication interfaces
 │   ├── exchanges/            # Exchange adapter implementations
-│   │   ├── gtrade/           # Gains Network gTrade integration
-│   │   ├── binance/          # Binance exchange integration
+│   │   ├── ccxt/             # CCXT MCP integration for CEXs
 │   │   └── custom/           # Template for custom exchange adapters
 │   ├── auth/                 # Authentication strategy implementations
 │   └── execution_main.py     # Entry point
@@ -215,6 +305,7 @@ ggbot/
 │   ├── structuring_tests.py  # Structuring module tests
 │   ├── trades_tests.py       # Trades module tests
 │   ├── execution_tests.py    # Execution module tests
+│   ├── api_tests.py          # API integration tests
 │   └── config_tests.py       # Configuration tests
 │
 ├── trades/                   # Trades Module
@@ -225,8 +316,44 @@ ggbot/
 └── config/                   # Configuration Management Layer
     ├── interfaces/           # ConfigurationProvider interface
     ├── providers/            # Configuration provider implementations
+    ├── bubble_sync/          # Bubble.io configuration synchronization
     ├── validators/           # Configuration validation logic
     └── config_main.py        # Configuration management entry point
+
+2.2 Bubble.io Application Structure
+ggbots-bubble/
+├── pages/                    # Main application pages
+│   ├── dashboard/            # User dashboard
+│   ├── agent-config/         # Agent configuration interface
+│   ├── monitoring/           # Trade monitoring and performance
+│   ├── account/              # User account management
+│   └── admin/                # Admin interface (for platform operators)
+│
+├── api-connections/          # Backend API connection configurations
+│   ├── auth/                 # Authentication endpoints
+│   ├── config/               # Configuration endpoints
+│   ├── data/                 # Data retrieval endpoints
+│   └── control/              # Agent control endpoints
+│
+├── workflows/                # Bubble workflow configurations
+│   ├── user-management/      # Registration, login, account management
+│   ├── agent-creation/       # Trading agent setup and configuration
+│   ├── monitoring/           # Performance monitoring and notifications
+│   └── billing/              # Subscription and payment processing
+│
+├── database/                 # Bubble database schema
+│   ├── users/                # User data structure
+│   ├── agents/               # Agent configurations
+│   ├── subscriptions/        # Subscription data
+│   └── preferences/          # User preferences
+│
+└── plugins/                  # Bubble plugins used
+    ├── api-connector/        # API integration plugins
+    ├── charting/             # Trading chart visualization
+    ├── payments/             # Payment processing
+    └── notifications/        # User notifications
+
+Note: The Bubble.io structure is conceptual and will be implemented within the Bubble.io platform's visual editor rather than as physical files.
 
 File Naming:
 snake_case for Python files (e.g., extraction_main.py).
@@ -234,32 +361,67 @@ PascalCase for classes (e.g., TradeRecord).
 Lowercase directory names with underscores if needed (e.g., exchange_api).
 
 3. Database Design
-3.1 Schema Definition
-users
-user_id (UUID, PK)
-username (VARCHAR)
-email (VARCHAR)
+3.1 Hybrid Data Architecture
+
+Bubble.io Database:
+- User accounts and authentication
+- User profile information
+- Subscription and billing data
+- UI preferences and settings
+- Agent configuration metadata
+- Access control and permissions
+
+Backend PostgreSQL Database:
+- Technical data for agent operations
+- Market data and indicators
+- Trade records and performance
+- Operational logs and monitoring
+- Agent execution details
+
+3.2 Backend Schema Definition
+Using Existing Schema with Bubble.io Integration:
+
+users (Existing - Updated)
+user_id (UUID, PK) - Will use Bubble-generated UUID
+username (VARCHAR) - Username from Bubble.io
+email (VARCHAR) - Email from Bubble.io
 created_at (TIMESTAMP)
 last_login (TIMESTAMP)
+bubble_data (JSONB) - Additional user data from Bubble.io (new field)
 
-sessions
-session_id (UUID, PK)
+api_tokens (New)
+token_id (UUID, PK)
 user_id (UUID, FK to users table)
-cookie_data (JSONB)
+token (VARCHAR)
 created_at (TIMESTAMP)
 expires_at (TIMESTAMP)
+last_used (TIMESTAMP)
 
-configurations
-config_id (UUID, PK)
+agents (New)
+agent_id (UUID, PK)
 user_id (UUID, FK to users table)
-config_type (VARCHAR) - 'extraction', 'decision', 'execution', etc.
-config_data (JSONB)
+agent_name (VARCHAR)
+agent_description (TEXT)
+status (VARCHAR) - 'active', 'paused', etc.
 created_at (TIMESTAMP)
 updated_at (TIMESTAMP)
 
-trades
+configurations (Existing - Updated)
+config_id (UUID, PK)
+user_id (UUID, FK to users table)
+agent_id (UUID, FK to agents table) - For users with multiple agents
+config_type (VARCHAR) - 'extraction', 'decision', 'execution', etc.
+config_name (VARCHAR)
+config_data (JSONB)
+created_at (TIMESTAMP)
+updated_at (TIMESTAMP)
+sync_status (VARCHAR) - Status of synchronization with Bubble (new field)
+
+trades (Existing - Updated)
 trade_id (UUID, PK)
 user_id (UUID, FK to users table)
+agent_id (UUID, FK to agents table) - For users with multiple agents (new field)
+config_id (UUID, FK to configurations table)
 exchange (VARCHAR)
 pair (VARCHAR)
 timeframe (VARCHAR)
@@ -269,73 +431,159 @@ stop_loss (NUMERIC)
 take_profit (NUMERIC)
 confidence_score (NUMERIC)
 reasoning_log (TEXT)
+source_tag (VARCHAR) - e.g., 'ccxt-mcp', 'indicators-mcp' (new field)
 trade_status (VARCHAR)
 created_at (TIMESTAMP)
 closed_at (TIMESTAMP)
 profit_loss (NUMERIC)
 
-market_data
-data_id (UUID, PK)
+market_data (Existing - Updated)
+data_id (SERIAL, PK)
 user_id (UUID, FK to users table)
+agent_id (UUID, FK to agents table) - For users with multiple agents (new field)
 source (VARCHAR)
-pair (VARCHAR)
+symbol (VARCHAR)
 timeframe (VARCHAR)
+data_type (VARCHAR)
 indicators (JSONB)
 raw_data (JSONB)
-timestamp (TIMESTAMP)
+updated_at (TIMESTAMP)
 
-logs
+logs (Existing - Updated)
 log_id (SERIAL, PK)
 user_id (UUID, FK to users table)
+agent_id (UUID, FK to agents table) - For users with multiple agents (new field)
 module (VARCHAR)
 log_level (VARCHAR)
 message (TEXT)
 timestamp (TIMESTAMP)
 
-3.2 Indexing & Optimization
-Indexes:
-users.email for quick user lookup.
-sessions.expires_at for session cleanup.
+api_requests (New)
+request_id (UUID, PK)
+user_id (UUID, FK to users table)
+endpoint (VARCHAR)
+method (VARCHAR)
+status_code (INTEGER)
+response_time (INTEGER) - in milliseconds
+timestamp (TIMESTAMP)
+
+3.3 Indexing & Optimization
+Backend Indexes:
+users.user_id for quick user lookup.
+api_tokens.user_id + api_tokens.expires_at for efficient token validation.
+api_tokens.token for token lookup during authentication.
+agents.user_id for filtering user's agents.
 trades.user_id + trades.created_at for quick access to a user's recent trades.
-market_data.user_id + market_data.pair + market_data.timeframe + market_data.timestamp for efficient data retrieval.
+trades.agent_id for filtering by specific agent.
+market_data.user_id + market_data.symbol + market_data.timeframe + market_data.updated_at for efficient data retrieval.
+logs.user_id + logs.timestamp for user-specific log retrieval.
+api_requests.user_id + api_requests.timestamp for API usage monitoring.
+
+Bubble.io Optimization:
+Use Bubble's built-in indexing for frequently queried fields.
+Implement efficient data loading strategies for dashboards.
+Leverage Bubble's caching capabilities for frequently accessed data.
+
 Database Strategy:
-Partitioning if logs or market_data grow large.
-Potential JSONB indexing on configuration_data and indicators for complex queries.
+Backend-Bubble Synchronization:
+- Minimize data duplication between systems
+- Store technical data in PostgreSQL and user-facing data in Bubble
+- Implement efficient data synchronization strategies
+
+Partitioning:
+- Time-based partitioning for logs and market_data as they grow
+- User-based partitioning for multi-tenant isolation at scale
+
+Optimization:
+- JSONB indexing on configuration_data and indicators for complex queries
+- Materialized views for frequently accessed aggregate data
+- Connection pooling for efficient API request handling
+- Caching layer for frequently accessed data
 
 4. Dependencies & Libraries
 4.1 External Libraries
+
+Backend Components:
+API Framework:
+- FastAPI for high-performance API development
+- uvicorn for ASGI server
+- pydantic for data validation and serialization
+- python-jose for JWT authentication
+
 Browser Automation:
-Browser‑Use (Playwright)
+- Browser‑Use (Playwright)
+
 Image Processing/OCR:
-ChatGPT 4o (Vision); fallback to Tesseract if needed
-Historical Data & TA:
-yfinance for fetching historical market data
-pandas‑ta for computing technical indicators (RSI, MACD, Bollinger Bands, etc.)
+- ChatGPT 4o (Vision); fallback to Tesseract if needed
+
+Model Context Protocols (MCPs):
+- Crypto Indicators MCP for technical analysis and indicators
+- CCXT MCP for exchange interactions and trade execution
+
+Historical Data & TA (Fallback/Validation):
+- yfinance for fetching historical market data
+- pandas‑ta for computing technical indicators (as fallback and validation)
+
 LLM Integration:
-DeepSeek R1, GPT-4o, Claude 3, or equivalent reasoning models
+- DeepSeek R1, GPT-4o, Claude 3, or equivalent reasoning models
+
 JSON Validation:
-jsonschema
-Blockchain Interaction:
-Coinbase AgentKit for secure wallet management/signing
-Web3.py or Ethers.js for blockchain contract calls
+- jsonschema
+
+Blockchain Interaction (Future Phase):
+- Coinbase AgentKit for secure wallet management/signing (reserved for DEX support)
+- Web3.py or Ethers.js for blockchain contract calls (reserved for DEX support)
+
 Centralized Exchange APIs:
-ccxt library for unified exchange API access
+- CCXT MCP for unified exchange API access
+
 Logging & Monitoring:
-loguru (Python) or similar
+- loguru (Python) for structured logging
+- prometheus_client for metrics collection
+- Grafana for visualization (optional)
+
 Environment Management:
-python‑dotenv or equivalent
+- python‑dotenv for environment variables
+
 Database:
-PostgreSQL
-Redis (optional) for caching
+- PostgreSQL for backend data storage
+- SQLAlchemy for ORM
+- Alembic for migrations
+- Redis for caching and rate limiting
+
 Containerization:
-Docker
+- Docker for deployment
+- Docker Compose for local development
+
 Development Tools:
-code‑server
-Git
-Frontend (Future):
-React
-Next.js
-TailwindCSS
+- code‑server
+- Git
+
+Frontend Components (Bubble.io):
+Bubble.io Core:
+- Bubble.io platform
+- Responsive Design plugin
+
+API Integration:
+- API Connector plugin
+- Toolbox plugin for advanced data manipulation
+
+Data Visualization:
+- Chart.js plugin
+- Data Visualization plugin
+
+Payment Processing:
+- Stripe plugin
+- PayPal plugin (optional)
+
+User Management:
+- Auth0 plugin (optional, for advanced authentication needs)
+- Email plugin for notifications
+
+Design Elements:
+- Bootstrap for UI components (optional)
+- Custom CSS for styling
+- Icon sets for visual elements
 
 4.2 Versioning & Compatibility
 Semantic Versioning:
@@ -418,12 +666,35 @@ Versioning:
 Maintain a changelog, adopt feature branches, and merge to main when stable.
 
 Conclusion
-This Spec Sheet outlines a modular, customizable architecture for ggbot as a trading agent platform. The system is designed with clear interfaces in each module to support plugin-based customization, allowing users to select different data sources, trading strategies, and target exchanges. Key points include:
+This Spec Sheet outlines a comprehensive hybrid architecture for the ggbots platform, combining Bubble.io for frontend/user management with a custom backend for agent operations. The platform leverages Model Context Protocols (MCPs) for standardized indicator calculations and exchange interactions, providing users with an intuitive no-code interface to configure their trading agents while maintaining powerful backend processing capabilities.
 
-Multi-user support with proper data isolation
-Flexible interface-based architecture for customization
-Support for multiple exchanges beyond just Gains Network's gTrade
-Configuration management for user-specific settings
-Clear development roadmap from MVP to scalable platform
+Key architectural features include:
 
-The MVP will focus on a single user (personal use) on a small VM, while establishing the architectural foundation for future scaling to a multi-user platform with a web-based configuration interface.
+Hybrid Architecture:
+- Bubble.io frontend for user management, configuration, and monitoring
+- Custom backend for agent processing, data storage, and exchange interactions
+- RESTful API integration between Bubble.io and backend services
+
+Multi-user Platform from Day One:
+- Built-in user management and authentication via Bubble.io
+- Secure data isolation using Bubble-generated user IDs throughout the system
+- Scalable infrastructure supporting multiple concurrent users
+
+Flexible Agent Customization:
+- Modular architecture with clear interfaces for each component
+- Integration of Crypto Indicators MCP for technical analysis
+- CCXT MCP for standardized CEX interactions
+- User-configurable trading strategies and risk parameters
+
+Technical Innovations:
+- Trade source attribution for performance tracking and analysis
+- Unified data format across different indicator sources
+- Optimized database schema for efficient data retrieval and storage
+- Comprehensive API layer for seamless Bubble-backend integration
+
+Development Approach:
+- First milestone: Reference agent implementation to validate core functionality
+- Platform MVP: Integration with Bubble.io for user management and configuration
+- Growth phase: Expanded features, exchange support, and strategy marketplace
+
+The platform's development starts with a reference agent implementation to validate the core modules, followed by the Platform MVP with Bubble.io integration, focusing on centralized exchanges (CEXs) initially with plans for decentralized exchange (DEX) support in future phases. This approach accelerates time-to-market while ensuring the platform can scale with user needs and evolve with market conditions.

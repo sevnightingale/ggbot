@@ -8,8 +8,8 @@ from typing import Dict, List, Any
 import pandas as pd
 import pandas_ta as ta
 
-from common.logger import logger
-from common.config import DEFAULT_USER_ID
+from core.common.logger import logger
+from core.common.config import DEFAULT_USER_ID
 from extraction.interfaces import IndicatorComputer
 
 
