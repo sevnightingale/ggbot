@@ -73,8 +73,11 @@ class MCPClient:
         self._log.info(f"Connecting to {self.server_name} MCP server")
         
         try:
+            # Convert command list to string if it's a list
+            command_str = self.command if isinstance(self.command, str) else " ".join(self.command)
+            
             params = StdioServerParameters(
-                command=self.command,
+                command=command_str,
                 env=self.env
             )
             
