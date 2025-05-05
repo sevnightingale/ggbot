@@ -1,4 +1,20 @@
 {
-    "accounts": []
-    
-  }
+  "accounts": [
+    {
+      "id": "binance-demo",
+      "exchangeId": "binance",
+      "apiKey": "",
+      "secret": "",
+      "description": "Binance Demo Account",
+      "tag": "demo"
+    },
+    {
+      "id": "kucoin-demo",
+      "exchangeId": "kucoin",
+      "apiKey": "",
+      "secret": "",
+      "description": "KuCoin Demo Account",
+      "tag": "demo"
+    }
+  ]
+}
