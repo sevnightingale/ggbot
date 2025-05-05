@@ -1,0 +1,12 @@
+# Ignore the crypto-indicators-mcp directory
+mcp/servers/crypto-indicators-mcp/
+
+# Also ignore common Node.js related files
+**/node_modules/
+**/.npm/
+**/.yarn/
+**/npm-debug.log*
+**/yarn-debug.log*
+**/yarn-error.log*
+**/.pnp.*
+**/.cache/
