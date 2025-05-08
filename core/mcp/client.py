@@ -31,7 +31,8 @@ class MCPClient:
     def __init__(
         self,
         server_name: str,
-        command: List[str],
+        command: Union[str, List[str]],
+        args: Optional[List[str]] = None,
         env: Optional[Dict[str, str]] = None,
         config_path: Optional[str] = None,
         user_id: Optional[str] = None,
@@ -42,7 +43,8 @@ class MCPClient:
         
         Args:
             server_name: Name of the MCP server, used for logging and identification
-            command: Command list to launch the MCP server
+            command: Command string or path to launch the MCP server
+            args: Optional list of arguments for the command
             env: Optional environment variables for the server process
             config_path: Optional path to a configuration file
             user_id: Optional user ID to associate with this client
@@ -50,6 +52,7 @@ class MCPClient:
         """
         self.server_name = server_name
         self.command = command
+        self.args = args or []
         self.env = env or {}
         self.config_path = config_path
         self.user_id = user_id
@@ -73,11 +76,18 @@ class MCPClient:
         self._log.info(f"Connecting to {self.server_name} MCP server")
         
         try:
-            # Convert command list to string if it's a list
-            command_str = self.command if isinstance(self.command, str) else " ".join(self.command)
+            # Ensure command is a string
+            if isinstance(self.command, list) and len(self.command) > 0:
+                command = self.command[0]
+                # Combine any args from the list with self.args
+                args = self.command[1:] + self.args
+            else:
+                command = self.command
+                args = self.args
             
             params = StdioServerParameters(
-                command=command_str,
+                command=command,
+                args=args,
                 env=self.env
             )
             
