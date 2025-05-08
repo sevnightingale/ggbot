@@ -68,12 +68,14 @@ class IndicatorsMCPClient(MCPClient):
                 f"Crypto Indicators MCP script not found at {self.script_path}"
             )
         
-        command = ['node', self.script_path]
+        command = 'node'
+        args = [self.script_path]
         env = {'EXCHANGE_NAME': exchange_name}
         
         super().__init__(
             server_name='Crypto Indicators',
             command=command,
+            args=args,
             env=env,
             user_id=self.user_id,
             connection_timeout=connection_timeout

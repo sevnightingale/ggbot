@@ -16,6 +16,9 @@ from core.mcp.client import MCPClient
 from core.mcp.exceptions import MCPError
 from core.mcp.session import MCPSession
 from core.mcp.config import get_mcp_config, get_ccxt_mcp_exchange_id
+from core.mcp.dynamic_account import DynamicAccountManager
+from core.config.providers.env_credential_provider import EnvCredentialProvider
+from core.config.interfaces.credential_provider import CredentialProvider
 
 
 class CCXTMCPClient(MCPClient):
@@ -32,7 +35,9 @@ class CCXTMCPClient(MCPClient):
         self,
         config_path: Optional[str] = None,
         user_id: Optional[str] = None,
-        connection_timeout: int = 30
+        connection_timeout: int = 30,
+        credential_provider: Optional[CredentialProvider] = None,
+        exchange_id: Optional[str] = None
     ):
         """
         Initialize the CCXT MCP client.
@@ -41,27 +46,47 @@ class CCXTMCPClient(MCPClient):
             config_path: Path to the CCXT accounts configuration file
             user_id: User ID to associate with this client
             connection_timeout: Timeout in seconds for connection attempts
+            credential_provider: Provider for exchange credentials
+            exchange_id: Specific exchange ID to use credentials for
         """
         self.user_id = user_id or DEFAULT_USER_ID
+        self.exchange_id = exchange_id
+        self.credential_provider = credential_provider or EnvCredentialProvider()
+        self.account_manager = DynamicAccountManager(self.credential_provider)
         
-        # Get config from configuration system
-        mcp_config = get_mcp_config('ccxt', self.user_id)
+        # Get config from configuration system if no specific path provided
+        if not config_path:
+            mcp_config = get_mcp_config('ccxt', self.user_id)
+            self.config_path = mcp_config.get('config_path')
+            
+            # If still not set, use default
+            if not self.config_path:
+                self.config_path = os.path.join(
+                    str(Path(__file__).parents[2]),  # ggbot root directory
+                    'core', 'config', 'ccxt-accounts.json'
+                )
+        else:
+            self.config_path = config_path
         
-        # Use provided config_path or get from configuration
-        self.config_path = config_path or mcp_config.get('config_path')
+        # If exchange_id is provided, create dynamic config with credentials
+        if self.exchange_id:
+            try:
+                self.config_path = self.account_manager.create_config_file(
+                    self.exchange_id, 
+                    self.user_id
+                )
+            except Exception as e:
+                logger.error(f"Failed to create dynamic config for {self.exchange_id}: {str(e)}")
+                # Fall back to the static config
+                logger.warning(f"Falling back to static config file: {self.config_path}")
         
-        # If still not set, use default
-        if not self.config_path:
-            self.config_path = os.path.join(
-                str(Path(__file__).parents[2]),  # ggbot root directory
-                'core', 'config', 'ccxt-accounts.json'
-            )
-        
-        command = ['ccxt-mcp', '--config', self.config_path]
+        command = 'ccxt-mcp'
+        args = ['--config', self.config_path]
         
         super().__init__(
             server_name='CCXT',
             command=command,
+            args=args,
             user_id=self.user_id,
             config_path=self.config_path,
             connection_timeout=connection_timeout
