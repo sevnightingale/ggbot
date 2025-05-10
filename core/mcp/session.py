@@ -48,34 +48,81 @@ class MCPSession:
     ) -> Any:
         """
         Call an MCP tool with the given inputs.
-        
+
         Args:
             tool_name: Name of the tool to call
             inputs: Dictionary of input parameters
             timeout: Optional timeout in seconds
-            
+
         Returns:
             Tool response
-            
+
         Raises:
             MCPError: If the tool call fails
         """
         self._log.info(f"Calling {self.server_name} MCP tool: {tool_name}")
-        
+
         try:
             result = await asyncio.wait_for(
                 self.raw_session.call_tool(tool_name, inputs),
                 timeout=timeout
             )
-            
-            self._log.debug(f"Tool call result: {json.dumps(result)[:200]}...")
+
+            # Handle CallToolResult objects from FastMCP
+            # Extract the actual result value to avoid serialization issues
+            if hasattr(result, 'result'):
+                self._log.debug(f"Received CallToolResult object, extracting result")
+                result = result.result
+
+            # Verify the result is JSON serializable
+            try:
+                # Test serialization - this will fail if result isn't serializable
+                json.dumps(result)
+                self._log.debug(f"Tool call result: {json.dumps(result)[:200]}...")
+            except TypeError:
+                # If result is not serializable, convert to a string representation
+                self._log.warning(f"Tool call result is not JSON serializable, converting to string")
+                if isinstance(result, dict):
+                    # Create a clean dictionary with string representations of non-serializable values
+                    clean_result = {}
+                    for k, v in result.items():
+                        try:
+                            json.dumps({k: v})
+                            clean_result[k] = v
+                        except TypeError:
+                            clean_result[k] = str(v)
+                    result = clean_result
+                elif isinstance(result, list):
+                    # Create a clean list with string representations of non-serializable values
+                    clean_result = []
+                    for item in result:
+                        if isinstance(item, dict):
+                            clean_dict = {}
+                            for k, v in item.items():
+                                try:
+                                    json.dumps({k: v})
+                                    clean_dict[k] = v
+                                except TypeError:
+                                    clean_dict[k] = str(v)
+                            clean_result.append(clean_dict)
+                        else:
+                            try:
+                                json.dumps(item)
+                                clean_result.append(item)
+                            except TypeError:
+                                clean_result.append(str(item))
+                    result = clean_result
+                else:
+                    # For other types, convert to string
+                    result = str(result)
+
             return result
-            
+
         except asyncio.TimeoutError:
             error_msg = f"Tool call to {tool_name} timed out after {timeout} seconds"
             self._log.error(error_msg)
             raise MCPError(error_msg)
-            
+
         except Exception as e:
             error_msg = f"Error calling {tool_name}: {str(e)}"
             self._log.error(error_msg)
@@ -92,8 +139,22 @@ class MCPSession:
             MCPError: If getting tools fails
         """
         try:
-            tools = await self.raw_session.get_tools()
-            self._log.info(f"Retrieved {len(tools)} tools from {self.server_name} MCP server")
+            # Use list_tools method which is the correct method name in the MCP SDK
+            result = await self.raw_session.list_tools()
+            
+            # Handle different return types from the MCP SDK
+            # In newer versions, list_tools returns a ListToolsResult object
+            if hasattr(result, 'tools'):
+                tools = result.tools
+            else:
+                # Handle the case where it's iterable but not a list
+                try:
+                    tools = list(result)
+                except TypeError:
+                    # If all else fails, just return the object itself
+                    tools = result
+                    
+            self._log.info(f"Retrieved tools from {self.server_name} MCP server")
             return tools
             
         except Exception as e:

@@ -23,127 +23,113 @@ core/mcp/
 ├── dynamic_account.py   # Dynamic account configuration manager
 ├── README.md            # This file
 └── servers/             # Directory containing MCP server code
-    └── crypto-indicators-mcp/  # Crypto Indicators MCP server
+    ├── ccxt_mcp_server.py         # CCXT MCP server implementation
+    ├── indicators_mcp_server.py   # Indicators MCP server implementation
+    └── crypto-indicators-mcp/     # Crypto Indicators MCP dependencies
 ```
+
+## Current Testing Configuration
+
+For testing and development, we use a simplified credential management approach:
+
+1. **Environment Variables**: Primary source for exchange credentials
+   - EXCHANGE_NAME: Name of the exchange (e.g., "bitmex")
+   - EXCHANGE_API: API key
+   - EXCHANGE_SECRET: API secret
+   - EXCHANGE_PASSWORD: Password (required for some exchanges)
+
+2. **Configuration Files**: Used for non-credential settings
+   - User Configuration: Located in `core/config/users/{user_id}.json`
+   - Default Configuration: Located in `core/config/default_config.json`
+
+This configuration system is suitable for testing and development but will be replaced with a database-backed system for production.
 
 ## Setup and Dependencies
 
 To use the MCP integration, you'll need:
 
-1. **Node.js and npm**: Required for running MCP servers
-2. **Python MCP SDK**: Install with `pip install mcp`
-3. **CCXT MCP**: Install globally with `npm install -g @lazydino/ccxt-mcp`
-4. **Crypto Indicators MCP**: Clone from GitHub and install dependencies:
+1. **Python Dependencies**:
+   ```bash
+   pip install mcp ccxt
    ```
+
+2. **Node.js and npm**: Required for running MCP servers
+
+3. **Crypto Indicators MCP**: Clone from GitHub and install dependencies:
+   ```bash
    git clone https://github.com/kukapay/crypto-indicators-mcp.git ~/ggbot/core/mcp/servers/crypto-indicators-mcp
    cd ~/ggbot/core/mcp/servers/crypto-indicators-mcp
    npm install
    ```
 
+## Trading Pair Conventions
+
+Different exchanges use different naming conventions for trading pairs. We handle this with a mapping system in `ccxt_mcp_server.py`:
+
+```python
+EXCHANGE_SYMBOL_MAP = {
+    'bitmex': {
+        'BTC/USD': 'XBT/USD',
+        'BTC/USDT': 'XBT/USDT',
+        'ETH/USD': 'ETH/USDT:USDT'
+    }
+}
+```
+
+This allows the LLM to use standardized pair names (e.g., "BTC/USD") while ensuring the correct exchange-specific format is used when making API calls.
+
 ## Credential Management
 
-The system uses a flexible credential provider architecture for exchange API credentials:
+The system uses a simplified credential management approach for development:
 
-### Credential Providers
+### Credential Sources
 
-- **EnvCredentialProvider**: Uses environment variables (for development)
+- **Environment Variables**: Primary source for development/testing
   - EXCHANGE_NAME: Name of the exchange (e.g., "bitmex")
   - EXCHANGE_API: API key
   - EXCHANGE_SECRET: API secret
+  - EXCHANGE_PASSWORD: Password (required for some exchanges)
 
-- **DbCredentialProvider**: Will use encrypted database storage (for production - future implementation)
+- **Fallback Values**: Hardcoded test credentials as a last resort (BitMEX testnet only)
 
-### Dynamic Account Configuration
+### Production Credential Management (Future)
 
-Rather than hardcoding API credentials in configuration files, we dynamically generate temporary configuration files with the necessary credentials at runtime. This approach:
+For production, we'll implement proper secure credential management:
 
-1. Improves security by not storing API keys in configuration files
-2. Allows for per-user credentials in a multi-user environment
-3. Simplifies credential rotation and management
+1. **Database Storage**: Store encrypted credentials in PostgreSQL
+2. **Encryption**: Use Fernet symmetric encryption for API keys/secrets
+3. **User Isolation**: Maintain separate credentials per user
+4. **Key Rotation**: Regular rotation of encryption keys
 
-## Configuration
+## Configuration System
 
-MCP configuration is stored in the central configuration system. Example configuration:
+The configuration system follows a layered approach:
+
+1. **Environment Variables**: Primary source for credentials (for development)
+2. **User JSON Files**: Used for non-credential settings
+3. **Default Configuration**: Used when user-specific config is not available
+
+### Setting Up User Configuration
+
+For testing with specific exchanges, configure the user file as follows:
 
 ```json
-{
-  "mcp": {
-    "ccxt": {
-      "enabled": true,
-      "config_path": "core/config/ccxt-accounts.json",
-      "default_exchange": "binance"
-    },
-    "indicators": {
-      "enabled": true,
-      "script_path": "core/mcp/servers/crypto-indicators-mcp/index.js",
-      "exchange_name": "binance"
-    }
+"mcp": {
+  "ccxt": {
+    "enabled": true,
+    "default_exchange": "bitmex"
+  },
+  "indicators": {
+    "enabled": true,
+    "script_path": "core/mcp/servers/crypto-indicators-mcp/index.js",
+    "exchange_name": "bitmex"
   }
 }
 ```
 
-## Exploring MCP Capabilities
-
-### Discovering Available Indicators
-
-To explore the available tools/indicators in the Crypto Indicators MCP:
-
-```python
-import asyncio
-from core.mcp.indicators import IndicatorsMCPClient
-
-async def explore_indicators():
-    client = IndicatorsMCPClient()
-    await client.connect()
-    
-    # Get all tools from the MCP
-    tools = await client.session.get_tools()
-    
-    # Print the names and descriptions
-    for tool in tools:
-        print(f"Name: {tool['name']}")
-        print(f"Description: {tool.get('description', 'No description')}")
-        print(f"Parameters: {tool.get('parameters', {})}")
-        print("-" * 50)
-    
-    await client.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(explore_indicators())
-```
-
-### Finding Exchange Capabilities
-
-To explore the CCXT MCP and available exchanges:
-
-```python
-import asyncio
-from core.mcp.ccxt import CCXTMCPClient
-
-async def explore_exchanges():
-    client = CCXTMCPClient()
-    await client.connect()
-    
-    # Get all available exchanges
-    exchanges = await client.get_exchange_ids()
-    print(f"Total exchanges: {len(exchanges)}")
-    print(f"Examples: {', '.join(exchanges[:10])}")
-    
-    # Get available tools
-    tools = await client.session.get_tools()
-    print("\nAvailable operations:")
-    for tool in tools:
-        print(f"- {tool['name']}")
-    
-    await client.disconnect()
-
-if __name__ == "__main__":
-    asyncio.run(explore_exchanges())
-```
-
 ## Usage Examples
 
-### CCXT MCP with Dynamic Credentials
+### CCXT MCP with Direct Credentials
 
 ```python
 from core.mcp.ccxt import CCXTMCPClient
@@ -160,12 +146,28 @@ async def example():
     ticker = await client.fetch_ticker('bitmex', 'BTC/USDT')
     print(f"BTC/USDT price: {ticker['last']}")
     
-    # Fetch OHLCV data
-    ohlcv = await client.fetch_ohlcv('bitmex', 'BTC/USDT', timeframe='1h', limit=10)
-    print(f"Got {len(ohlcv)} candles")
-    
     # Disconnect when done
     await client.disconnect()
+```
+
+### Using MCP Clients as Context Managers
+
+```python
+async def example():
+    # Use as a context manager for automatic connection management
+    async with CCXTMCPClient() as session:
+        # Fetch ticker using the session directly
+        ticker = await session.call_tool(
+            'fetch_ticker',
+            {
+                'exchange_id': 'binance',
+                'symbol': 'BTC/USDT'
+            }
+        )
+        
+        print(f"BTC/USDT price: {ticker['last']}")
+    
+    # No need to call disconnect() - context manager handles it
 ```
 
 ### CCXT DataSource Integration
@@ -203,11 +205,7 @@ async def example():
     # Calculate RSI
     prices = [100.0, 102.0, 104.0, 103.0, 105.0, 107.0, 108.0]
     rsi = await client.calculate_rsi(prices, period=14)
-    print(f"RSI: {rsi['values'][-1]}")
-    
-    # Calculate MACD
-    macd = await client.calculate_macd(prices)
-    print(f"MACD line: {macd['macdLine'][-1]}")
+    print(f"RSI: {rsi['rsi'][-1]}")
     
     # Disconnect when done
     await client.disconnect()
@@ -234,28 +232,31 @@ All MCP operations include proper error handling with custom exception classes:
 
 ## Testing
 
-Two test scripts are provided to verify the functionality of both MCPs:
+Several test scripts are provided to verify the functionality of both MCPs:
+
+### Testing MCP Connection Management
+
+To test the base MCP connection functionality:
+
+```bash
+cd /home/sev/ggbot
+python -m tests.minimal_mcp_test
+```
 
 ### Testing CCXT MCP
 
-To test the CCXT MCP with your exchange credentials:
+To test the CCXT MCP client:
 
 ```bash
-# Set environment variables 
+# Set environment variables
 export EXCHANGE_NAME="bitmex"
 export EXCHANGE_API="your_api_key"
 export EXCHANGE_SECRET="your_api_secret"
 
 # Run the test
 cd /home/sev/ggbot
-python -m tests.test_ccxt_mcp
+python -m tests.test_ccxt_mcp_simple
 ```
-
-This test will verify:
-- Connection to the CCXT MCP server
-- Dynamic credential management
-- Basic operations (fetch ticker, OHLCV data)
-- Error handling
 
 ### Testing Crypto Indicators MCP
 
@@ -263,14 +264,73 @@ To test the Crypto Indicators MCP:
 
 ```bash
 cd /home/sev/ggbot
-python -m tests.test_indicators_mcp
+python -m tests.test_indicators_mcp_simple
 ```
 
-This test will verify:
-- Connection to the Crypto Indicators MCP server
-- Available indicators
-- Core indicator calculations (RSI, MACD, Bollinger Bands)
-- Comparison with pandas-ta implementations
+### Testing LLM-MCP Integration
+
+To test the LLM integration with MCP:
+
+```bash
+cd /home/sev/ggbot
+python -m tests.test_llm_mcp_integration
+```
+
+This integration test demonstrates:
+- LLM deciding which CCXT MCP tools to call based on user questions
+- Making API calls to cryptocurrency exchanges via CCXT MCP
+- Handling exchange-specific trading pair formatting
+- Processing and interpreting the results
+
+## Implementation Status
+
+The MCP integration has been significantly improved with a streamlined approach. Here's the current status:
+
+### Completed
+- [x] Dedicated MCP server files for both Indicators and CCXT
+- [x] Consistent snake_case naming conventions for all tools and parameters
+- [x] Improved client implementations with proper async context management
+- [x] Robust error handling and reconnection strategies
+- [x] Enhanced test scripts to verify functionality
+- [x] Support for user-specific configurations
+- [x] Clean separation of server and client components
+- [x] Proper context manager support with async __aenter__ and __aexit__
+- [x] Resource cleanup in error scenarios
+- [x] Simplified credential management for development
+- [x] Trading pair name mapping for exchange-specific formats
+- [x] Working LLM-MCP integration for question answering
+
+### Next Implementation Steps
+- [ ] Test Crypto Indicators MCP with market data
+- [ ] Implement Decision Agent with basic trading strategy
+- [ ] Test complete end-to-end flow: Extraction → Decision → Trading
+- [ ] Execute test trades on BitMEX testnet
+
+### Technical Debt and Production Improvements
+- [ ] **Server Lifecycle Management**: Run MCP servers as persistent processes with PM2
+- [ ] **Credential Security**: Implement DbCredentialProvider with proper encryption
+- [ ] **Transport Mechanism**: Switch to "Streamable HTTP" transport for production
+- [ ] **Error Handling and Resilience**: Implement exponential backoff and circuit breakers
+- [ ] **Monitoring and Observability**: Add structured logging and metrics collection
+- [ ] **Resource Management**: Implement connection pooling and query throttling
+- [ ] **Caching Layer**: Add Redis for frequently accessed data
+- [ ] **Multi-User Isolation**: Implement proper multi-tenancy with resource isolation
+
+## Development Guidelines
+
+When working with the MCP integration, follow these guidelines:
+
+1. **Naming Conventions**: Always use `snake_case` for tool names and parameters.
+
+2. **Error Handling**: Use the `call_with_retry` pattern to handle transient connection issues.
+
+3. **Connection Management**: Use async context managers (`async with client as ...`) to ensure proper connection cleanup.
+
+4. **Testing**: Run the test scripts before making changes and after implementation to ensure compatibility.
+
+5. **Server Scripts**: If you modify server scripts, make sure to update the corresponding client methods.
+
+6. **Resource Cleanup**: Always ensure resources are properly cleaned up, especially when errors occur.
 
 ## Troubleshooting
 
@@ -281,101 +341,11 @@ If you encounter issues with MCP connectivity:
 3. Check that environment variables are set correctly (EXCHANGE_NAME, EXCHANGE_API, EXCHANGE_SECRET)
 4. Check configuration paths are correct
 5. Look for error logs from MCP servers
+6. Check for proper connection handling in the client code
 
-## Implementation Status and TODO Items
+Common connection issues and solutions:
 
-The MCP integration is partially implemented. Here's the current status and remaining tasks:
-
-### Completed
-- [x] Basic MCP client infrastructure with connection management
-- [x] CCXT MCP client with core functionality (ticker, OHLCV)
-- [x] Crypto Indicators MCP client with basic indicators (RSI, MACD, Bollinger Bands)
-- [x] Credential provider architecture with environment-based implementation
-- [x] Dynamic account configuration for CCXT MCP
-- [x] Basic DataSource implementations for both MCPs
-- [x] Test scripts for verifying functionality
-
-### TODO Items for Developers
-
-1. **Expand Indicator Methods**
-   - [ ] Analyze the Crypto Indicators MCP server to identify all available indicators
-   - [ ] Implement additional indicator methods in `indicators.py` (stochastic, ATR, etc.)
-   - [ ] Add comprehensive indicator documentation with parameters and examples
-
-   Example of how to add a new indicator method to `indicators.py`:
-   
-   ```python
-   async def calculate_stochastic(
-       self,
-       high_prices: List[float],
-       low_prices: List[float],
-       close_prices: List[float],
-       k_period: int = 14,
-       d_period: int = 3,
-       smooth_k: int = 1
-   ) -> Dict[str, Any]:
-       """
-       Calculate Stochastic Oscillator.
-       
-       Args:
-           high_prices: List of high prices
-           low_prices: List of low prices
-           close_prices: List of closing prices
-           k_period: %K period
-           d_period: %D period (moving average of %K)
-           smooth_k: Smoothing for %K
-           
-       Returns:
-           Dictionary containing k_values and d_values
-       """
-       if not self.is_connected or not self.session:
-           await self.connect()
-           
-       try:
-           result = await self.session.call_tool(
-               'calculateStochastic',
-               {
-                   'high': high_prices,
-                   'low': low_prices,
-                   'close': close_prices,
-                   'kPeriod': k_period,
-                   'dPeriod': d_period,
-                   'smoothK': smooth_k
-               }
-           )
-           return result
-       except Exception as e:
-           self._log.error(f"Error calculating Stochastic: {str(e)}")
-           raise MCPError(f"Error calculating Stochastic: {str(e)}")
-   ```
-
-2. **Complete DataSource Implementations**
-   - [ ] Implement all required DataSource methods in `indicators_mcp_datasource.py`
-   - [ ] Add `get_latest_data`, `get_current_price`, `get_supported_timeframes`, and `get_supported_symbols`
-   - [ ] Enhance error handling with proper retry mechanisms
-
-3. **Integration Enhancements**
-   - [ ] Create an integrated workflow that uses both MCPs together
-   - [ ] Implement efficient caching for MCP results to reduce API calls
-   - [ ] Build strategy integrations that leverage the indicators MCP
-
-4. **Production Readiness**
-   - [ ] Implement database schema for securely storing user credentials
-   - [ ] Complete the DbCredentialProvider implementation with proper encryption
-   - [ ] Add stress testing and performance optimization for MCP servers
-   - [ ] Create monitoring tools for MCP server health and usage
-
-5. **Documentation and Examples**
-   - [ ] Create a comprehensive API reference for both MCPs
-   - [ ] Document all available indicators with their parameters
-   - [ ] Provide end-to-end example workflows for different use cases
-
-## Future Enhancements
-
-1. Implement database credential storage with proper encryption
-2. Add support for multiple user accounts
-3. Improve error recovery and retry mechanisms
-4. Add support for additional exchanges and features
-5. Create a containerized deployment model for MCP servers
-6. Implement a caching layer to reduce redundant MCP calls
-7. Add performance metrics and monitoring for MCP servers
+- **"Error exiting session context"**: This is usually a cleanup warning that doesn't affect functionality
+- **"Failed to connect to MCP server"**: Check that the server executable exists at the specified path
+- **"Session initialization failed"**: The MCP server might be running on a different protocol version
+- **"'NoneType' object has no attribute 'get'"**: Check that credentials are properly set in environment variables

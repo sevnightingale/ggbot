@@ -62,6 +62,10 @@ class MCPClient:
         self.is_connected = False
         self._log = logger.bind(user_id=user_id) if user_id else logger
         
+        # Initialize context objects to None
+        self._client_context = None
+        self._session_context = None
+        
     async def connect(self) -> MCPSession:
         """
         Connect to the MCP server.
@@ -75,6 +79,14 @@ class MCPClient:
         """
         self._log.info(f"Connecting to {self.server_name} MCP server")
         
+        # Close existing session if one exists
+        if self.is_connected and self.session:
+            try:
+                await self.disconnect()
+            except Exception as e:
+                self._log.warning(f"Error during disconnection: {str(e)}")
+                # Continue with reconnection attempt
+        
         try:
             # Ensure command is a string
             if isinstance(self.command, list) and len(self.command) > 0:
@@ -85,27 +97,42 @@ class MCPClient:
                 command = self.command
                 args = self.args
             
-            params = StdioServerParameters(
+            self._log.debug(f"Launching command: {command} with args: {args}")
+            
+            # Create and configure server parameters
+            server_params = StdioServerParameters(
                 command=command,
                 args=args,
                 env=self.env
             )
             
-            streams = await asyncio.wait_for(
-                stdio_client(params).__aenter__(),
+            # Connect to the server using stdio transport
+            self._client_context = stdio_client(server_params)
+            read_stream, write_stream = await asyncio.wait_for(
+                self._client_context.__aenter__(),
                 timeout=self.connection_timeout
             )
             
+            # Create the session
+            self._session_context = ClientSession(read_stream, write_stream)
             raw_session = await asyncio.wait_for(
-                ClientSession(streams[0], streams[1]).__aenter__(),
+                self._session_context.__aenter__(),
                 timeout=self.connection_timeout
             )
             
-            await asyncio.wait_for(
-                raw_session.initialize(),
-                timeout=self.connection_timeout
-            )
+            # Initialize the session with timeout
+            try:
+                await asyncio.wait_for(
+                    raw_session.initialize(),
+                    timeout=self.connection_timeout
+                )
+            except Exception as e:
+                self._log.error(f"Session initialization failed: {str(e)}")
+                # Clean up resources - ensure we exit both context managers
+                await self._cleanup_contexts()
+                raise
             
+            # Create the application-level session wrapper
             self.session = MCPSession(raw_session, self.server_name, self.user_id)
             self.is_connected = True
             
@@ -114,24 +141,57 @@ class MCPClient:
             
         except asyncio.TimeoutError:
             self._log.error(f"Connection to {self.server_name} MCP server timed out")
+            await self._cleanup_contexts()
             raise MCPTimeoutError(f"Connection to {self.server_name} MCP server timed out")
         except Exception as e:
             self._log.error(f"Failed to connect to {self.server_name} MCP server: {str(e)}")
-            raise MCPConnectionError(f"Failed to connect to {self.server_name} MCP server: {str(e)}")
+            await self._cleanup_contexts()
+            if isinstance(e, MCPConnectionError) or isinstance(e, MCPTimeoutError):
+                raise
+            else:
+                raise MCPConnectionError(f"Failed to connect to {self.server_name} MCP server: {str(e)}")
+    
+    async def _cleanup_contexts(self):
+        """Helper method to clean up context managers safely."""
+        # Clean up session context
+        if self._session_context:
+            try:
+                await self._session_context.__aexit__(None, None, None)
+                self._log.debug("Exited session context")
+            except Exception as e:
+                self._log.error(f"Error exiting session context: {str(e)}")
+        
+        # Clean up client context
+        if self._client_context:
+            try:
+                await self._client_context.__aexit__(None, None, None)
+                self._log.debug("Exited client context")
+            except Exception as e:
+                self._log.error(f"Error exiting client context: {str(e)}")
     
     async def disconnect(self) -> None:
         """
         Disconnect from the MCP server.
         """
+        self._log.info(f"Disconnecting from {self.server_name} MCP server")
+        self.is_connected = False
+        
+        # Close MCPSession wrapper first (if it exists)
         if self.session:
             try:
                 await self.session.close()
-                self.is_connected = False
-                self._log.info(f"Disconnected from {self.server_name} MCP server")
+                self._log.info(f"Closed {self.server_name} MCP session")
             except Exception as e:
-                self._log.error(f"Error disconnecting from {self.server_name} MCP server: {str(e)}")
+                self._log.error(f"Error closing session: {str(e)}")
         
-    async def __aenter__(self) -> MCPSession:
+        # Clean up contexts
+        await self._cleanup_contexts()
+        
+        # Reset session
+        self.session = None
+        self._log.info(f"Disconnected from {self.server_name} MCP server")
+        
+    async def __aenter__(self) -> 'MCPSession':
         """
         Context manager entry point.
         

@@ -4,12 +4,12 @@
     "ccxt": {
       "enabled": true,
       "config_path": "core/config/ccxt-accounts.json",
-      "default_exchange": "binance"
+      "default_exchange": "bitmex"
     },
     "indicators": {
       "enabled": true,
       "script_path": "core/mcp/servers/crypto-indicators-mcp/index.js",
-      "exchange_name": "binance"
+      "exchange_name": "bitmex"
     }
   },
   "extraction": {
@@ -35,8 +35,8 @@
         "name": "ccxt_mcp",
         "enabled": true,
         "config": {
-          "exchange_id": "binance",
-          "pairs": ["BTC/USDT", "ETH/USDT"],
+          "exchange_id": "bitmex",
+          "pairs": ["BTC/USD", "ETH/USD"],
           "timeframes": ["15m", "1h", "4h"]
         }
       }
@@ -81,7 +81,7 @@
   },
   "execution": {
     "exchange": "ccxt_mcp",
-    "exchange_id": "binance",
+    "exchange_id": "bitmex",
     "authentication": "api_key"
   }
 }
