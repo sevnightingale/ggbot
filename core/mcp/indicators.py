@@ -70,7 +70,10 @@ class IndicatorsMCPClient(MCPClient):
         
         command = 'node'
         args = [self.script_path]
-        env = {'EXCHANGE_NAME': exchange_name}
+        
+        # Always use a valid string for EXCHANGE_NAME
+        # Default to 'binance' if nothing else is specified
+        env = {'EXCHANGE_NAME': self.exchange_name or 'binance'}
         
         super().__init__(
             server_name='Crypto Indicators',
@@ -94,11 +97,34 @@ class IndicatorsMCPClient(MCPClient):
             await self.connect()
             
         try:
+            # Get tools from the session
             tools = await self.session.get_tools()
-            indicator_tools = [
-                tool['name'] for tool in tools 
-                if tool.get('name') and 'calculate' in tool.get('name', '').lower()
-            ]
+            
+            # Handle different possible formats for tools
+            indicator_tools = []
+            
+            # Process the tools to extract indicator names
+            if isinstance(tools, list):
+                for tool in tools:
+                    name = None
+                    if isinstance(tool, dict):
+                        name = tool.get('name')
+                    elif hasattr(tool, 'name'):
+                        name = tool.name
+                        
+                    if name and 'calculate' in name.lower():
+                        indicator_tools.append(name)
+            else:
+                self._log.warning(f"Unexpected tools format: {type(tools)}. Attempting to extract indicators anyway.")
+                # Try to iterate through tools if possible
+                try:
+                    for tool in tools:
+                        name = getattr(tool, 'name', None) or tool.get('name', '')
+                        if name and 'calculate' in name.lower():
+                            indicator_tools.append(name)
+                except (TypeError, AttributeError) as e:
+                    self._log.error(f"Could not extract tools: {str(e)}")
+            
             return indicator_tools
         except Exception as e:
             self._log.error(f"Error getting available indicators: {str(e)}")
@@ -123,8 +149,9 @@ class IndicatorsMCPClient(MCPClient):
             await self.connect()
             
         try:
+            # Use the full name as seen in the server
             result = await self.session.call_tool(
-                'calculateRSI',
+                'calculate_relative_strength_index',
                 {
                     'prices': prices,
                     'period': period
@@ -158,13 +185,14 @@ class IndicatorsMCPClient(MCPClient):
             await self.connect()
             
         try:
+            # Use the full name as seen in the server
             result = await self.session.call_tool(
-                'calculateMACD',
+                'calculate_moving_average_convergence_divergence',
                 {
                     'prices': prices,
-                    'fastPeriod': fast_period,
-                    'slowPeriod': slow_period,
-                    'signalPeriod': signal_period
+                    'fast_period': fast_period,
+                    'slow_period': slow_period,
+                    'signal_period': signal_period
                 }
             )
             return result
@@ -194,17 +222,341 @@ class IndicatorsMCPClient(MCPClient):
             
         try:
             result = await self.session.call_tool(
-                'calculateBollingerBands',
+                'calculate_bollinger_bands',
                 {
                     'prices': prices,
                     'period': period,
-                    'stdDev': std_dev
+                    'std_dev': std_dev
                 }
             )
             return result
         except Exception as e:
             self._log.error(f"Error calculating Bollinger Bands: {str(e)}")
             raise MCPError(f"Error calculating Bollinger Bands: {str(e)}")
+    
+    async def calculate_stochastic(
+        self,
+        high_prices: List[float],
+        low_prices: List[float],
+        close_prices: List[float],
+        k_period: int = 14,
+        d_period: int = 3,
+        smooth_k: int = 1
+    ) -> Dict[str, Any]:
+        """
+        Calculate Stochastic Oscillator.
+        
+        The Stochastic Oscillator is a momentum indicator that shows the location of the close
+        relative to the high-low range over a set number of periods.
+        
+        Args:
+            high_prices: List of high prices
+            low_prices: List of low prices
+            close_prices: List of closing prices
+            k_period: %K period
+            d_period: %D period (moving average of %K)
+            smooth_k: Smoothing for %K
+            
+        Returns:
+            Dictionary containing k_values and d_values
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_stochastic_oscillator',
+                {
+                    'high': high_prices,
+                    'low': low_prices,
+                    'close': close_prices,
+                    'k_period': k_period,
+                    'd_period': d_period,
+                    'smooth_k': smooth_k
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating Stochastic: {str(e)}")
+            raise MCPError(f"Error calculating Stochastic: {str(e)}")
+    
+    async def calculate_atr(
+        self,
+        high_prices: List[float],
+        low_prices: List[float],
+        close_prices: List[float],
+        period: int = 14
+    ) -> Dict[str, Any]:
+        """
+        Calculate Average True Range (ATR).
+        
+        ATR is a volatility indicator that measures market volatility by
+        decomposing the entire range of an asset price for a given period.
+        
+        Args:
+            high_prices: List of high prices
+            low_prices: List of low prices
+            close_prices: List of closing prices
+            period: Period for calculation
+            
+        Returns:
+            Dictionary containing ATR values
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_average_true_range',
+                {
+                    'high': high_prices,
+                    'low': low_prices,
+                    'close': close_prices,
+                    'period': period
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating ATR: {str(e)}")
+            raise MCPError(f"Error calculating ATR: {str(e)}")
+    
+    async def calculate_ichimoku_cloud(
+        self,
+        high_prices: List[float],
+        low_prices: List[float],
+        close_prices: List[float],
+        conversion_period: int = 9,
+        base_period: int = 26,
+        span_period: int = 52,
+        displacement: int = 26
+    ) -> Dict[str, Any]:
+        """
+        Calculate Ichimoku Cloud.
+        
+        The Ichimoku Cloud is a comprehensive indicator that shows support and resistance,
+        momentum, and trend direction.
+        
+        Args:
+            high_prices: List of high prices
+            low_prices: List of low prices
+            close_prices: List of closing prices
+            conversion_period: Conversion line period (Tenkan-sen)
+            base_period: Base line period (Kijun-sen)
+            span_period: Span B line period
+            displacement: Displacement period
+            
+        Returns:
+            Dictionary containing Ichimoku components
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_ichimoku_cloud',
+                {
+                    'high': high_prices,
+                    'low': low_prices,
+                    'close': close_prices,
+                    'conversion_period': conversion_period,
+                    'base_period': base_period,
+                    'span_period': span_period,
+                    'displacement': displacement
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating Ichimoku Cloud: {str(e)}")
+            raise MCPError(f"Error calculating Ichimoku Cloud: {str(e)}")
+    
+    async def calculate_williams_r(
+        self,
+        high_prices: List[float],
+        low_prices: List[float],
+        close_prices: List[float],
+        period: int = 14
+    ) -> Dict[str, Any]:
+        """
+        Calculate Williams %R.
+        
+        Williams %R is a momentum indicator that measures overbought and oversold levels,
+        similar to the Stochastic oscillator.
+        
+        Args:
+            high_prices: List of high prices
+            low_prices: List of low prices
+            close_prices: List of closing prices
+            period: Period for calculation
+            
+        Returns:
+            Dictionary containing Williams %R values
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_williams_r',
+                {
+                    'high': high_prices,
+                    'low': low_prices,
+                    'close': close_prices,
+                    'period': period
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating Williams %R: {str(e)}")
+            raise MCPError(f"Error calculating Williams %R: {str(e)}")
+    
+    async def calculate_ema(
+        self,
+        prices: List[float],
+        period: int = 14
+    ) -> Dict[str, Any]:
+        """
+        Calculate Exponential Moving Average (EMA).
+        
+        EMA places a greater weight and significance on the most recent data points.
+        
+        Args:
+            prices: List of prices
+            period: Period for calculation
+            
+        Returns:
+            Dictionary containing EMA values
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_exponential_moving_average',
+                {
+                    'prices': prices,
+                    'period': period
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating EMA: {str(e)}")
+            raise MCPError(f"Error calculating EMA: {str(e)}")
+    
+    async def calculate_sma(
+        self,
+        prices: List[float],
+        period: int = 14
+    ) -> Dict[str, Any]:
+        """
+        Calculate Simple Moving Average (SMA).
+        
+        SMA calculates the average of price data over a specific period.
+        
+        Args:
+            prices: List of prices
+            period: Period for calculation
+            
+        Returns:
+            Dictionary containing SMA values
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_simple_moving_average',
+                {
+                    'prices': prices,
+                    'period': period
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating SMA: {str(e)}")
+            raise MCPError(f"Error calculating SMA: {str(e)}")
+    
+    async def calculate_parabolic_sar(
+        self,
+        high_prices: List[float],
+        low_prices: List[float],
+        acceleration: float = 0.02,
+        maximum: float = 0.2
+    ) -> Dict[str, Any]:
+        """
+        Calculate Parabolic SAR (Stop and Reverse).
+        
+        Parabolic SAR is a technical indicator used to determine the direction of an asset's
+        momentum and potential reversal points.
+        
+        Args:
+            high_prices: List of high prices
+            low_prices: List of low prices
+            acceleration: Acceleration factor
+            maximum: Maximum acceleration factor
+            
+        Returns:
+            Dictionary containing SAR values
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_parabolic_sar',
+                {
+                    'high': high_prices,
+                    'low': low_prices,
+                    'acceleration': acceleration,
+                    'maximum': maximum
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating Parabolic SAR: {str(e)}")
+            raise MCPError(f"Error calculating Parabolic SAR: {str(e)}")
+            
+    async def calculate_vwap(
+        self,
+        high_prices: List[float],
+        low_prices: List[float],
+        close_prices: List[float],
+        volume: List[float],
+        period: int = 14
+    ) -> Dict[str, Any]:
+        """
+        Calculate Volume Weighted Average Price (VWAP).
+        
+        VWAP is a trading benchmark that gives the average price a security has
+        traded at throughout the day, based on both volume and price.
+        
+        Args:
+            high_prices: List of high prices
+            low_prices: List of low prices
+            close_prices: List of closing prices
+            volume: List of volume values
+            period: Period for calculation
+            
+        Returns:
+            Dictionary containing VWAP values
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        try:
+            result = await self.session.call_tool(
+                'calculate_volume_weighted_average_price',
+                {
+                    'high': high_prices,
+                    'low': low_prices,
+                    'close': close_prices,
+                    'volume': volume,
+                    'period': period
+                }
+            )
+            return result
+        except Exception as e:
+            self._log.error(f"Error calculating VWAP: {str(e)}")
+            raise MCPError(f"Error calculating VWAP: {str(e)}")
     
     async def analyze_with_strategy(
         self,
@@ -235,11 +587,35 @@ class IndicatorsMCPClient(MCPClient):
             inputs.update(params)
             
         try:
+            # Adjust the strategy name to include the 'calculate_' prefix and '_strategy' suffix
+            strategy_tool_name = f"calculate_{strategy}_strategy"
             result = await self.session.call_tool(
-                'analyzeWithStrategy',
+                strategy_tool_name,
                 inputs
             )
             return result
         except Exception as e:
             self._log.error(f"Error analyzing with strategy {strategy}: {str(e)}")
             raise MCPError(f"Error analyzing with strategy {strategy}: {str(e)}")
+            
+    # Helper method to find the actual tool name from a partial name
+    async def find_tool_by_partial_name(self, partial_name: str) -> Optional[str]:
+        """
+        Find a tool by partial name match.
+        
+        Args:
+            partial_name: Partial name to search for
+            
+        Returns:
+            Full tool name if found, None otherwise
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        tools = await self.get_available_indicators()
+        
+        for tool in tools:
+            if partial_name.lower() in tool.lower():
+                return tool
+                
+        return None

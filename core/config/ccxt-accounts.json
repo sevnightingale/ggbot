@@ -15,6 +15,17 @@
       "secret": "",
       "description": "KuCoin Demo Account",
       "tag": "demo"
+    },
+    {
+      "id": "bitmex-test",
+      "exchangeId": "bitmex",
+      "apiKey": "",
+      "secret": "",
+      "description": "BitMEX Testnet Account",
+      "tag": "test",
+      "options": {
+        "test": true
+      }
     }
   ]
 }

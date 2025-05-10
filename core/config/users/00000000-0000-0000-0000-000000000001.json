@@ -1,5 +1,17 @@
 {
   "user_id": "00000000-0000-0000-0000-000000000001",
+  "mcp": {
+    "ccxt": {
+      "enabled": true,
+      "config_path": "core/config/ccxt-accounts.json",
+      "default_exchange": "bitmex"
+    },
+    "indicators": {
+      "enabled": true,
+      "script_path": "core/mcp/servers/crypto-indicators-mcp/index.js",
+      "exchange_name": "bitmex"
+    }
+  },
   "extraction": {
     "data_sources": [
       {
@@ -16,6 +28,15 @@
         "enabled": true,
         "config": {
           "pairs": ["BTC-USD"],
+          "timeframes": ["15m", "1h", "4h"]
+        }
+      },
+      {
+        "name": "ccxt_mcp",
+        "enabled": true,
+        "config": {
+          "exchange_id": "bitmex",
+          "pairs": ["BTC/USD", "ETH/USD"],
           "timeframes": ["15m", "1h", "4h"]
         }
       }
@@ -56,7 +77,8 @@
     }
   },
   "execution": {
-    "exchange": "gtrade",
-    "authentication": "agentkit"
+    "exchange": "ccxt_mcp",
+    "exchange_id": "bitmex",
+    "authentication": "api_key"
   }
 }
