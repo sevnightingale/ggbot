@@ -1,0 +1,42 @@
+[
+  {
+    "tool": "set_leverage",
+    "parameters": {
+      "exchange": "bitmex",
+      "symbol": "BTC/USD",
+      "leverage": 2
+    }
+  },
+  {
+    "tool": "create_order",
+    "parameters": {
+      "exchange": "bitmex",
+      "symbol": "BTC/USD",
+      "side": "sell",
+      "type": "market",
+      "amount": 1
+    }
+  },
+  {
+    "tool": "create_order",
+    "parameters": {
+      "exchange": "bitmex",
+      "symbol": "BTC/USD",
+      "side": "buy",
+      "type": "stop",
+      "amount": 1,
+      "stop_price": 70000
+    }
+  },
+  {
+    "tool": "create_order",
+    "parameters": {
+      "exchange": "bitmex",
+      "symbol": "BTC/USD",
+      "side": "buy",
+      "type": "limit",
+      "amount": 1,
+      "price": 60000
+    }
+  }
+]

@@ -88,30 +88,59 @@ class MCPClient:
                 # Continue with reconnection attempt
         
         try:
-            # Ensure command is a string
-            if isinstance(self.command, list) and len(self.command) > 0:
-                command = self.command[0]
-                # Combine any args from the list with self.args
-                args = self.command[1:] + self.args
+            # Check if we're connecting to an existing PM2-managed server
+            use_existing_server = os.environ.get("USE_PM2_MCP_SERVER", "0") == "1"
+            
+            if use_existing_server:
+                self._log.info(f"Connecting to existing {self.server_name} MCP server managed by PM2")
+                # Use the pm2 command to get the server pid
+                import subprocess
+                proc = subprocess.run(["pm2", "jlist"], capture_output=True, text=True)
+                pm2_data = json.loads(proc.stdout)
+                
+                server_pid = None
+                for app in pm2_data:
+                    if app.get("name") == "ccxt-mcp-server" and app.get("pm2_env", {}).get("status") == "online":
+                        server_pid = app.get("pid")
+                        break
+                
+                if not server_pid:
+                    raise MCPConnectionError("No running PM2-managed MCP server found")
+                
+                self._log.info(f"Found existing MCP server with PID {server_pid}")
+                
+                # Connect to the existing server using stdio redirection
+                # For simplicity, we'll just try the normal connection method
+                # but without starting a new process
+                command = "dummy"  # Will not be used as we're not starting a process
+                args = []
             else:
-                command = self.command
-                args = self.args
+                # Ensure command is a string
+                if isinstance(self.command, list) and len(self.command) > 0:
+                    command = self.command[0]
+                    # Combine any args from the list with self.args
+                    args = self.command[1:] + self.args
+                else:
+                    command = self.command
+                    args = self.args
+                
+                self._log.debug(f"Launching command: {command} with args: {args}")
             
-            self._log.debug(f"Launching command: {command} with args: {args}")
-            
-            # Create and configure server parameters
-            server_params = StdioServerParameters(
-                command=command,
-                args=args,
-                env=self.env
-            )
-            
-            # Connect to the server using stdio transport
-            self._client_context = stdio_client(server_params)
-            read_stream, write_stream = await asyncio.wait_for(
-                self._client_context.__aenter__(),
-                timeout=self.connection_timeout
-            )
+            # Only launch a new server if we're not connecting to an existing one
+            if not use_existing_server:
+                # Create and configure server parameters
+                server_params = StdioServerParameters(
+                    command=command,
+                    args=args,
+                    env=self.env
+                )
+                
+                # Connect to the server using stdio transport
+                self._client_context = stdio_client(server_params)
+                read_stream, write_stream = await asyncio.wait_for(
+                    self._client_context.__aenter__(),
+                    timeout=self.connection_timeout
+                )
             
             # Create the session
             self._session_context = ClientSession(read_stream, write_stream)

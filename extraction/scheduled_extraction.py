@@ -21,6 +21,8 @@ from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 from extraction.extraction_main import ExtractionManager
 from extraction.utils import get_latest_market_data, store_market_data_entries
+from extraction.indicators.crypto_indicators_mcp import CryptoIndicatorsMCP
+from extraction.indicators.indicators_mcp_llm import IndicatorsMCPLLM
 
 
 def get_last_update_time(symbol: str, timeframe: str, source: str = 'yfinance') -> Optional[datetime]:
@@ -41,30 +43,29 @@ def get_last_update_time(symbol: str, timeframe: str, source: str = 'yfinance') 
     return None
 
 
-def run_initialization(force: bool = False):
+def run_initialization(force: bool = False, use_mcp: bool = True, use_llm: bool = True, selected_indicators=None):
     """
     Initialize the database with historical data for all symbols and timeframes.
-    
+
     Args:
         force: Whether to force initialization even if data exists
+        use_mcp: Whether to use the Crypto Indicators MCP (default: True)
+        use_llm: Whether to use LLM for indicator selection and interpretation (default: True)
+        selected_indicators: Optional dictionary of indicators to calculate (default: None)
     """
-    manager = ExtractionManager()
-    
+    manager = ExtractionManager(use_mcp=use_mcp, use_llm=use_llm, selected_indicators=selected_indicators)
+
     # Define symbols and timeframes with appropriate history lengths for each
-    symbols = ['BTC-USD']
-    
-    # Configure days of history per timeframe based on yfinance limitations
-    # 1d, 1w, 1mo: up to 10+ years
-    # 1h, 4h: up to 730 days (2 years)
-    # 15m, 30m: up to 60 days
-    # 1m: up to 7 days
+    symbols = ['BTC-USD']  # We'll convert internally for MCP
+
+    # Configure days of history per timeframe
     timeframe_config = {
         '1d': {'days': 730},   # 2 years for daily data
         '4h': {'days': 730},   # 2 years for 4h data
         '1h': {'days': 730},   # 2 years for hourly data
-        '15m': {'days': 60}    # 60 days for 15-min data (yfinance limit)
+        '15m': {'days': 60}    # 60 days for 15-min data
     }
-    
+
     # Process each symbol
     for symbol in symbols:
         # Process each timeframe with appropriate history length
@@ -78,153 +79,204 @@ def run_initialization(force: bool = False):
                         f"Skipping initialization. Use --force to override."
                     )
                     continue
-            
+
             days = config['days']
-            
+
             logger.bind(user_id=DEFAULT_USER_ID).info(
                 f"Initializing {symbol} {timeframe} with {days} days of history..."
             )
-            
+
             # Calculate appropriate dates
             end_date = datetime.now()
             start_date = end_date - timedelta(days=days)
-            
+
             try:
-                # Get the data source
-                data_source = manager.data_sources.get('yfinance')
+                # Determine which data source to use based on the use_mcp flag
+                data_source_name = 'ccxt_mcp' if use_mcp else 'yfinance'
+                data_source = manager.data_sources.get(data_source_name)
+
                 if not data_source:
-                    logger.bind(user_id=DEFAULT_USER_ID).error("YFinance data source not found!")
-                    continue
-                
+                    # If CCXT MCP data source isn't registered, register it
+                    if use_mcp and data_source_name == 'ccxt_mcp':
+                        logger.bind(user_id=DEFAULT_USER_ID).info("Registering CCXT MCP data source")
+                        from extraction.sources.ccxt_mcp.ccxt_mcp_datasource import CCXTMCPDataSource
+                        manager.register_data_source('ccxt_mcp', CCXTMCPDataSource())
+                        data_source = manager.data_sources.get('ccxt_mcp')
+                    # Otherwise use yfinance as fallback
+                    else:
+                        logger.bind(user_id=DEFAULT_USER_ID).info(f"Data source {data_source_name} not found, using yfinance as fallback")
+                        data_source = manager.data_sources.get('yfinance')
+                        if not data_source:
+                            logger.bind(user_id=DEFAULT_USER_ID).error("YFinance data source not found!")
+                            continue
+
+                # Convert symbol for CCXT MCP if needed
+                fetch_symbol = symbol
+                if use_mcp and '-' in symbol:
+                    base, quote = symbol.split('-')
+                    quote = 'USDT' if quote == 'USD' else quote
+                    fetch_symbol = f"{base}/{quote}"
+                    logger.bind(user_id=DEFAULT_USER_ID).info(
+                        f"Using {fetch_symbol} for data fetching via {data_source_name}"
+                    )
+
                 # Fetch historical data
                 df = data_source.get_historical_data(
-                    symbol=symbol,
+                    symbol=fetch_symbol,
                     timeframe=timeframe,
                     start_date=start_date,
                     end_date=end_date
                 )
-                
+
                 if df.empty:
                     logger.bind(user_id=DEFAULT_USER_ID).warning(
-                        f"No data found for {symbol} {timeframe}"
+                        f"No data found for {fetch_symbol} {timeframe} from {data_source_name}"
                     )
                     continue
-                
+
                 # Convert to database format without computing indicators
-                # We'll just store the raw data
+                # We always store with the original symbol format in our database
                 data_entries = data_source.to_database_format(
                     df=df,
-                    symbol=symbol,
+                    symbol=symbol,  # original symbol format for consistency
                     timeframe=timeframe,
                     user_id=DEFAULT_USER_ID
                 )
-                
+
                 # Set empty indicators object for now
                 for entry in data_entries:
                     entry['indicators'] = {}
-                
+
                 # Store in database
                 stored_count = store_market_data_entries(data_entries)
-                
+
                 logger.bind(user_id=DEFAULT_USER_ID).info(
-                    f"Initialized {stored_count} {symbol} {timeframe} data entries in database"
+                    f"Initialized {stored_count} {symbol} {timeframe} data entries in database from {data_source_name}"
                 )
-                
+
                 # Add a small delay to avoid rate limiting
                 time.sleep(2)
-                
+
             except Exception as e:
                 logger.bind(user_id=DEFAULT_USER_ID).error(
                     f"Error initializing {symbol} {timeframe}: {str(e)}"
                 )
-    
+
     logger.bind(user_id=DEFAULT_USER_ID).info("Initialization complete!")
 
 
-def run_update():
+def run_update(use_mcp: bool = True, use_llm: bool = True, selected_indicators=None):
     """
     Update the database with only new data since the last update.
+
+    Args:
+        use_mcp: Whether to use the Crypto Indicators MCP (default: True)
+        use_llm: Whether to use LLM for indicator selection and interpretation (default: True)
+        selected_indicators: Optional dictionary of indicators to calculate (default: None)
     """
-    manager = ExtractionManager()
-    
+    manager = ExtractionManager(use_mcp=use_mcp, use_llm=use_llm, selected_indicators=selected_indicators)
+
     # Define symbols and timeframes to update
     symbols = ['BTC-USD']
     timeframes = ['1d', '4h', '1h', '15m']
-    
+
     update_count = 0
-    
+
     # Process each symbol
     for symbol in symbols:
         for timeframe in timeframes:
             try:
                 # Get the latest data timestamp
                 last_update = get_last_update_time(symbol, timeframe)
-                
+
                 if not last_update:
                     logger.bind(user_id=DEFAULT_USER_ID).info(
                         f"No existing data for {symbol} {timeframe}. Run initialization first."
                     )
                     continue
-                
+
                 # Add a small buffer to avoid missing data due to timing issues
                 # For example, if the last candle closed at exactly the same time as the last update
                 buffer_minutes = 5
                 start_date = last_update - timedelta(minutes=buffer_minutes)
                 end_date = datetime.now()
-                
+
                 logger.bind(user_id=DEFAULT_USER_ID).info(
                     f"Updating {symbol} {timeframe} data from {start_date} to {end_date}..."
                 )
-                
-                # Get the data source
-                data_source = manager.data_sources.get('yfinance')
+
+                # Determine which data source to use based on the use_mcp flag
+                data_source_name = 'ccxt_mcp' if use_mcp else 'yfinance'
+                data_source = manager.data_sources.get(data_source_name)
+
                 if not data_source:
-                    logger.bind(user_id=DEFAULT_USER_ID).error("YFinance data source not found!")
-                    continue
-                
+                    # If CCXT MCP data source isn't registered, register it
+                    if use_mcp and data_source_name == 'ccxt_mcp':
+                        logger.bind(user_id=DEFAULT_USER_ID).info("Registering CCXT MCP data source")
+                        from extraction.sources.ccxt_mcp.ccxt_mcp_datasource import CCXTMCPDataSource
+                        manager.register_data_source('ccxt_mcp', CCXTMCPDataSource())
+                        data_source = manager.data_sources.get('ccxt_mcp')
+                    # Otherwise use yfinance as fallback
+                    else:
+                        logger.bind(user_id=DEFAULT_USER_ID).info(f"Data source {data_source_name} not found, using yfinance as fallback")
+                        data_source = manager.data_sources.get('yfinance')
+                        if not data_source:
+                            logger.bind(user_id=DEFAULT_USER_ID).error("YFinance data source not found!")
+                            continue
+
+                # Convert symbol for CCXT MCP if needed
+                fetch_symbol = symbol
+                if use_mcp and '-' in symbol:
+                    base, quote = symbol.split('-')
+                    quote = 'USDT' if quote == 'USD' else quote
+                    fetch_symbol = f"{base}/{quote}"
+                    logger.bind(user_id=DEFAULT_USER_ID).info(
+                        f"Using {fetch_symbol} for data fetching via {data_source_name}"
+                    )
+
                 # Fetch only new data
                 df = data_source.get_historical_data(
-                    symbol=symbol,
+                    symbol=fetch_symbol,
                     timeframe=timeframe,
                     start_date=start_date,
                     end_date=end_date
                 )
-                
+
                 if df.empty:
                     logger.bind(user_id=DEFAULT_USER_ID).info(
-                        f"No new data for {symbol} {timeframe} since {last_update}"
+                        f"No new data for {fetch_symbol} {timeframe} since {last_update}"
                     )
                     continue
-                
+
                 # Convert to database format without computing indicators
-                # We'll just store the raw data
+                # We always store with the original symbol format in our database for consistency
                 data_entries = data_source.to_database_format(
                     df=df,
-                    symbol=symbol,
+                    symbol=symbol,  # Original symbol format
                     timeframe=timeframe,
                     user_id=DEFAULT_USER_ID
                 )
-                
+
                 # Set empty indicators object for now
                 for entry in data_entries:
                     entry['indicators'] = {}
-                
+
                 # Store in database - use replace_existing=True to update any overlapping data
                 stored_count = store_market_data_entries(data_entries, replace_existing=True)
                 update_count += stored_count
-                
+
                 logger.bind(user_id=DEFAULT_USER_ID).info(
-                    f"Updated {stored_count} {symbol} {timeframe} data entries in database"
+                    f"Updated {stored_count} {symbol} {timeframe} data entries in database from {data_source_name}"
                 )
-                
+
                 # Add a small delay to avoid rate limiting
                 time.sleep(1)
-                
+
             except Exception as e:
                 logger.bind(user_id=DEFAULT_USER_ID).error(
                     f"Error updating {symbol} {timeframe}: {str(e)}"
                 )
-    
+
     if update_count > 0:
         logger.bind(user_id=DEFAULT_USER_ID).info(f"Updated {update_count} data entries in total")
     else:
@@ -354,20 +406,53 @@ def compute_indicators_from_stored_data(symbol, timeframe):
                     )
                     return
                 
-                # Compute indicators
-                manager = ExtractionManager()
-                indicator_computer = manager.indicator_computers.get('pandas_ta')
-                
+                # Compute indicators - use LLM-mediated approach by default
+                manager = ExtractionManager(use_mcp=True, use_llm=True)
+
+                # Try to get the LLM-mediated indicator computer first
+                indicator_computer = manager.indicator_computers.get('indicators_mcp_llm')
+
+                # Fall back to direct MCP if LLM-mediated one is not available
                 if not indicator_computer:
-                    logger.bind(user_id=DEFAULT_USER_ID).error("PandasTA indicator computer not found!")
+                    indicator_computer = manager.indicator_computers.get('indicators_mcp')
+
+                if not indicator_computer:
+                    logger.bind(user_id=DEFAULT_USER_ID).error("Indicator computer not found!")
                     return
-                
-                df_with_indicators = indicator_computer.compute_indicators(df)
-                
-                # Extract indicators for each record and update database
-                indicators_by_timestamp = {}
-                ohlcv_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Adj Close']
-                indicator_columns = [col for col in df_with_indicators.columns if col not in ohlcv_columns]
+
+                # Add symbol and timeframe information to the DataFrame for MCP
+                # For MCP tools, we need to convert from yfinance format (BTC-USD) to exchange format (BTC/USDT)
+                mcp_symbol = symbol
+                if '-' in symbol:
+                    base, quote = symbol.split('-')
+                    # Map USD to USDT for proper exchange processing
+                    quote = 'USDT' if quote == 'USD' else quote
+                    mcp_symbol = f"{base}/{quote}"
+                    logger.bind(user_id=DEFAULT_USER_ID).info(
+                        f"Converting symbol from {symbol} to {mcp_symbol} for MCP compatibility"
+                    )
+
+                df['Symbol'] = mcp_symbol
+                df['Timeframe'] = timeframe
+
+                try:
+                    df_with_indicators = indicator_computer.compute_indicators(df)
+
+                    # Extract indicators for each record and update database
+                    indicators_by_timestamp = {}
+                    ohlcv_columns = ['Open', 'High', 'Low', 'Close', 'Volume', 'Adj Close', 'Symbol', 'Timeframe']
+                    indicator_columns = [col for col in df_with_indicators.columns if col not in ohlcv_columns]
+
+                    # Log the indicators we found
+                    logger.bind(user_id=DEFAULT_USER_ID).info(
+                        f"Extracted {len(indicator_columns)} indicators: {', '.join(indicator_columns)}"
+                    )
+                except Exception as e:
+                    logger.bind(user_id=DEFAULT_USER_ID).error(
+                        f"Error computing indicators: {str(e)}"
+                    )
+                    # Continue with next timeframe instead of completely failing
+                    return
                 
                 for timestamp, row in df_with_indicators.iterrows():
                     indicators = {}
@@ -524,38 +609,69 @@ def run_indicator_calculation():
     logger.bind(user_id=DEFAULT_USER_ID).info("Indicator calculation complete")
 
 
-def run_scheduled_extraction():
+async def run_scheduled_extraction():
     """Run scheduled extraction for standard timeframes and symbols."""
     import argparse
-    
+    import asyncio
+    import sys
+    import os
+
+    # Use the updated extract_mcp_indicators function from extraction_main
+    # which now follows the successful test pattern exactly
+    from extraction.extraction_main import extract_mcp_indicators
+
     parser = argparse.ArgumentParser(description='Run market data extraction')
-    parser.add_argument('--init', action='store_true', help='Initialize historical data')
+    parser.add_argument('--init', action='store_true', help='Initialize historical data with price data')
     parser.add_argument('--force', action='store_true', help='Force initialization even if data exists')
     parser.add_argument('--update', action='store_true', help='Update with only new data')
-    parser.add_argument('--indicators', action='store_true', help='Calculate indicators on all stored data')
+    parser.add_argument('--indicators', action='store_true', help='Calculate indicators using MCP')
     parser.add_argument('--check-db', action='store_true', help='Only check database structure')
-    
+    parser.add_argument('--symbols', type=str, nargs='+', default=['BTC/USDT'],
+                      help='Trading pair symbols to extract data for')
+    parser.add_argument('--timeframes', type=str, nargs='+', default=['1d', '4h', '1h', '15m'],
+                      help='Timeframes to extract data for')
+    parser.add_argument('--llm-model', type=str, default="gpt-4o-mini",
+                      help='LLM model to use for indicator selection and interpretation')
+
     args = parser.parse_args()
-    
-    # If no arguments provided, default to update mode
+
+    # If no arguments provided, default to indicators mode
     if not (args.init or args.update or args.indicators or args.check_db):
-        args.update = True
-    
+        args.indicators = True
+
     if args.check_db:
         # Just check the database structure
         check_database_structure()
         return
-    
+
     if args.init:
-        run_initialization(force=args.force)
-    
+        # Only run initialization if specifically requested
+        # This initializes price data for backward compatibility
+        run_initialization(force=args.force, use_mcp=True)
+
     if args.update:
-        run_update()
-    
+        # Only run update if specifically requested
+        # This updates price data for backward compatibility
+        run_update(use_mcp=True)
+
     if args.indicators or args.init or args.update:
-        # Always run indicator calculation after init or update
-        run_indicator_calculation()
+        # Run the direct MCP indicators extraction
+        # This implementation exactly follows the working pattern in test_indicators_llm_mcp.py
+        logger.bind(user_id=DEFAULT_USER_ID).info("Running simplified MCP-based indicator extraction")
+        await extract_mcp_indicators(
+            symbols=args.symbols,
+            timeframes=args.timeframes,
+            user_id=DEFAULT_USER_ID,
+            use_llm=True,
+            llm_model=args.llm_model
+        )
+
+
+def main():
+    """Entry point for the script that runs the async function."""
+    import asyncio
+    asyncio.run(run_scheduled_extraction())
 
 
 if __name__ == "__main__":
-    run_scheduled_extraction()
+    main()

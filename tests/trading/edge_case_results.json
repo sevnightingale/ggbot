@@ -1,0 +1,309 @@
+[
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "amount": 1
+    },
+    "description": "Below BTC minimum (should fail)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex amount of BTC/USD:BTC must be greater than minimum amount precision of 100\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "amount": 99
+    },
+    "description": "Just below BTC minimum (should fail)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex amount of BTC/USD:BTC must be greater than minimum amount precision of 100\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "amount": 100
+    },
+    "description": "Exactly BTC minimum (should pass)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"c270793f-5715-4393-b62c-3b0cf5efd3d0\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944683145,\\n  \"datetime\": \"2025-05-22T20:11:23.145Z\",\\n  \"lastTradeTimestamp\": 1747944683144,\\n  \"symbol\": \"BTC/USD:BTC\",\\n  \"type\": \"market\",\\n  \"timeInForce\": \"IOC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 112316.6,\\n  \"triggerPrice\": null,\\n  \"amount\": 0.000890340341498941,\\n  \"cost\": 100.0,\\n  \"average\": 112316.6,\\n  \"filled\": 0.000890340341498941,\\n  \"remaining\": 0.0,\\n  \"status\": \"closed\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "amount": 101
+    },
+    "description": "Above BTC minimum (should pass)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"6087e43a-d189-4781-b091-7552bb52434d\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944685972,\\n  \"datetime\": \"2025-05-22T20:11:25.972Z\",\\n  \"lastTradeTimestamp\": 1747944685971,\\n  \"symbol\": \"BTC/USD:BTC\",\\n  \"type\": \"market\",\\n  \"timeInForce\": \"IOC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 112316.6,\\n  \"triggerPrice\": null,\\n  \"amount\": 0.000890340341498941,\\n  \"cost\": 100.0,\\n  \"average\": 112316.6,\\n  \"filled\": 0.000890340341498941,\\n  \"remaining\": 0.0,\\n  \"status\": \"closed\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "ETH/USD",
+      "amount": 0.5
+    },
+    "description": "Below standard minimum (should fail)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex amount of ETH/USD:BTC must be greater than minimum amount precision of 1\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "ETH/USD",
+      "amount": 1
+    },
+    "description": "Standard minimum (should pass)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"0d1681da-e432-463b-870f-8a4d7dc2812c\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944691483,\\n  \"datetime\": \"2025-05-22T20:11:31.483Z\",\\n  \"lastTradeTimestamp\": 1747944691482,\\n  \"symbol\": \"ETH/USD:BTC\",\\n  \"type\": \"market\",\\n  \"timeInForce\": \"IOC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 7551.11,\\n  \"triggerPrice\": null,\\n  \"amount\": 1.0,\\n  \"cost\": 755111.0,\\n  \"average\": 7551.11,\\n  \"filled\": 1.0,\\n  \"remaining\": 0.0,\\n  \"status\": \"closed\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "ETH/USD",
+      "amount": 10
+    },
+    "description": "Normal amount (should pass)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"d808b59d-fc1e-476c-807b-914cea1957f2\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944694190,\\n  \"datetime\": \"2025-05-22T20:11:34.190Z\",\\n  \"lastTradeTimestamp\": 1747944694189,\\n  \"symbol\": \"ETH/USD:BTC\",\\n  \"type\": \"market\",\\n  \"timeInForce\": \"IOC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 7551.11,\\n  \"triggerPrice\": null,\\n  \"amount\": 10.0,\\n  \"cost\": 7551110.0,\\n  \"average\": 7551.11,\\n  \"filled\": 10.0,\\n  \"remaining\": 0.0,\\n  \"status\": \"closed\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "amount": 1000000
+    },
+    "description": "Very large order (check if allowed)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"8e9786fc-a686-4a1d-bc92-59a22ce775da\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944697034,\\n  \"datetime\": \"2025-05-22T20:11:37.034Z\",\\n  \"lastTradeTimestamp\": 1747944697033,\\n  \"symbol\": \"BTC/USD:BTC\",\\n  \"type\": \"market\",\\n  \"timeInForce\": \"IOC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 112316.6431,\\n  \"triggerPrice\": null,\\n  \"amount\": 8.903399998428194,\\n  \"cost\": 1000000.0,\\n  \"average\": 112316.6431,\\n  \"filled\": 8.903399998428194,\\n  \"remaining\": 0.0,\\n  \"status\": \"closed\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_market_buy_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "amount": 100.5
+    },
+    "description": "Decimal amount (check if rounded)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"44451b12-6506-4ad6-9d8f-86c3a37fb41e\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944699656,\\n  \"datetime\": \"2025-05-22T20:11:39.656Z\",\\n  \"lastTradeTimestamp\": 1747944699655,\\n  \"symbol\": \"BTC/USD:BTC\",\\n  \"type\": \"market\",\\n  \"timeInForce\": \"IOC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 112316.6,\\n  \"triggerPrice\": null,\\n  \"amount\": 0.000890340341498941,\\n  \"cost\": 100.0,\\n  \"average\": 112316.6,\\n  \"filled\": 0.000890340341498941,\\n  \"remaining\": 0.0,\\n  \"status\": \"closed\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_limit_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "buy",
+      "amount": 100,
+      "price": 1
+    },
+    "description": "Very low price",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Account has insufficient Available Balance, 110050000 XBt required\\\\\",\\\\\"name\\\\\":\\\\\"CodedHTTPError\\\\\",\\\\\"details\\\\\":\\\\\"19000\\\\\"}}\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_limit_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "buy",
+      "amount": 100,
+      "price": 50000
+    },
+    "description": "Normal price",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"bb231979-f108-4a0b-879c-c308c4052c07\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944705318,\\n  \"datetime\": \"2025-05-22T20:11:45.318Z\",\\n  \"lastTradeTimestamp\": 1747944705317,\\n  \"symbol\": \"BTC/USD:BTC\",\\n  \"type\": \"limit\",\\n  \"timeInForce\": \"GTC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 50000.0,\\n  \"triggerPrice\": null,\\n  \"amount\": null,\\n  \"cost\": 100.0,\\n  \"average\": null,\\n  \"filled\": null,\\n  \"remaining\": 100.0,\\n  \"status\": \"open\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_limit_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "buy",
+      "amount": 100,
+      "price": 1000000
+    },
+    "description": "Very high price",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"23281567-0c0c-4ca7-b8c7-0de0f639dd8e\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944707903,\\n  \"datetime\": \"2025-05-22T20:11:47.903Z\",\\n  \"lastTradeTimestamp\": 1747944707901,\\n  \"symbol\": \"BTC/USD:BTC\",\\n  \"type\": \"limit\",\\n  \"timeInForce\": \"GTC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 1000000.0,\\n  \"triggerPrice\": null,\\n  \"amount\": 0.000890340341498941,\\n  \"cost\": 100.0,\\n  \"average\": 112316.6,\\n  \"filled\": 0.000890340341498941,\\n  \"remaining\": 0.0,\\n  \"status\": \"closed\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_limit_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "buy",
+      "amount": 100,
+      "price": 50000.123456789
+    },
+    "description": "Many decimals",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"id\": \"f392316e-f997-4ae5-8480-27fde9ccbe76\",\\n  \"clientOrderId\": null,\\n  \"timestamp\": 1747944710631,\\n  \"datetime\": \"2025-05-22T20:11:50.631Z\",\\n  \"lastTradeTimestamp\": 1747944710630,\\n  \"symbol\": \"BTC/USD:BTC\",\\n  \"type\": \"limit\",\\n  \"timeInForce\": \"GTC\",\\n  \"postOnly\": false,\\n  \"side\": \"buy\",\\n  \"price\": 50000.1,\\n  \"triggerPrice\": null,\\n  \"amount\": null,\\n  \"cost\": 100.0,\\n  \"average\": null,\\n  \"filled\": null,\\n  \"remaining\": 100.0,\\n  \"status\": \"open\",\\n  \"fee\": null,\\n  \"trades\": [],\\n  \"fees\": [],\\n  \"lastUpdateTimestamp\": null,\\n  \"reduceOnly\": null,\\n  \"stopPrice\": null,\\n  \"takeProfitPrice\": null,\\n  \"stopLossPrice\": null\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_stop_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "sell",
+      "amount": 100
+    },
+    "description": "Missing stopPrice (should fail)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text=\"Error executing tool create_stop_order: 1 validation error for create_stop_orderArguments\\nprice\\n  Field required [type=missing, input_value={'symbol': 'BTC/USD:BTC',...4c74-b94b-202d659ab919'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.10/v/missing\", annotations=None)] isError=True",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_stop_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "sell",
+      "amount": 100,
+      "stopPrice": 45000
+    },
+    "description": "With stopPrice",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text=\"Error executing tool create_stop_order: 1 validation error for create_stop_orderArguments\\nprice\\n  Field required [type=missing, input_value={'symbol': 'BTC/USD:BTC',...4c74-b94b-202d659ab919'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.10/v/missing\", annotations=None)] isError=True",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_stop_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "sell",
+      "amount": 100,
+      "stopPrice": 45000,
+      "price": 44000
+    },
+    "description": "Stop-limit attempt (BitMEX doesn't support)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex create_stop_order() requires a stopPrice argument\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "set_leverage",
+    "params": {
+      "symbol": "BTC/USD",
+      "leverage": 0
+    },
+    "description": "Zero leverage (should fail)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex leverage should be between 0.01 and 100\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "set_leverage",
+    "params": {
+      "symbol": "BTC/USD",
+      "leverage": 1
+    },
+    "description": "Minimum leverage",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Isolated margin is not supported for multi-asset accounts\\\\\",\\\\\"name\\\\\":\\\\\"HTTPError\\\\\"}}\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "set_leverage",
+    "params": {
+      "symbol": "BTC/USD",
+      "leverage": 50
+    },
+    "description": "Medium leverage",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Isolated margin is not supported for multi-asset accounts\\\\\",\\\\\"name\\\\\":\\\\\"HTTPError\\\\\"}}\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "set_leverage",
+    "params": {
+      "symbol": "BTC/USD",
+      "leverage": 100
+    },
+    "description": "Maximum leverage",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex {\\\\\"error\\\\\":{\\\\\"message\\\\\":\\\\\"Isolated margin is not supported for multi-asset accounts\\\\\",\\\\\"name\\\\\":\\\\\"HTTPError\\\\\"}}\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "set_leverage",
+    "params": {
+      "symbol": "BTC/USD",
+      "leverage": 101
+    },
+    "description": "Above maximum (should fail)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='{\\n  \"error\": \"bitmex leverage should be between 0.01 and 100\"\\n}', annotations=None)] isError=False",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "set_leverage",
+    "params": {
+      "symbol": "BTC/USD",
+      "leverage": 2.5
+    },
+    "description": "Decimal leverage (check if allowed)",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text='Error executing tool set_leverage: 1 validation error for set_leverageArguments\\nleverage\\n  Input should be a valid integer, got a number with a fractional part [type=int_from_float, input_value=2.5, input_type=float]\\n    For further information visit https://errors.pydantic.dev/2.10/v/int_from_float', annotations=None)] isError=True",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_reduce_only_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "sell",
+      "amount": 100,
+      "order_type": "market"
+    },
+    "description": "Market reduce-only",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text=\"Error executing tool create_reduce_only_order: 1 validation error for create_reduce_only_orderArguments\\ntype\\n  Field required [type=missing, input_value={'symbol': 'BTC/USD:BTC',...4c74-b94b-202d659ab919'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.10/v/missing\", annotations=None)] isError=True",
+    "error": null,
+    "error_type": null
+  },
+  {
+    "tool": "create_reduce_only_order",
+    "params": {
+      "symbol": "BTC/USD",
+      "side": "sell",
+      "amount": 100,
+      "order_type": "limit",
+      "price": 110000
+    },
+    "description": "Limit reduce-only",
+    "success": true,
+    "response": "meta=None content=[TextContent(type='text', text=\"Error executing tool create_reduce_only_order: 1 validation error for create_reduce_only_orderArguments\\ntype\\n  Field required [type=missing, input_value={'symbol': 'BTC/USD:BTC',...4c74-b94b-202d659ab919'}, input_type=dict]\\n    For further information visit https://errors.pydantic.dev/2.10/v/missing\", annotations=None)] isError=True",
+    "error": null,
+    "error_type": null
+  }
+]
