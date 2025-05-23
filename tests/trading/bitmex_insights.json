@@ -1,0 +1,100 @@
+{
+  "supported_features": [
+    "publicAPI",
+    "privateAPI",
+    "sandbox",
+    "spot",
+    "swap",
+    "future",
+    "cancelAllOrders",
+    "cancelOrder",
+    "cancelOrders",
+    "closePosition",
+    "createLimitOrder",
+    "createMarketOrder",
+    "createMarketOrderWs",
+    "createOrder",
+    "createReduceOnlyOrder",
+    "createStopOrder",
+    "createTrailingAmountOrder",
+    "createTriggerOrder",
+    "editOrder",
+    "fetchBalance",
+    "fetchClosedOrders",
+    "fetchCurrencies",
+    "fetchCurrenciesWs",
+    "fetchDepositAddress",
+    "fetchDepositsWithdrawals",
+    "fetchDepositWithdrawFee",
+    "fetchDepositWithdrawFees",
+    "fetchFundingRate",
+    "fetchFundingRateHistory",
+    "fetchFundingRates",
+    "fetchL2OrderBook",
+    "fetchLedger",
+    "fetchLeverage",
+    "fetchLeverages",
+    "fetchLiquidations",
+    "fetchMarkets",
+    "fetchMyTrades",
+    "fetchOHLCV",
+    "fetchOpenOrders",
+    "fetchOrder",
+    "fetchOrderBook",
+    "fetchOrders",
+    "fetchPositions",
+    "fetchTicker",
+    "fetchTickers",
+    "fetchTrades",
+    "fetchTransactions",
+    "setLeverage",
+    "setMarginMode",
+    "withdraw",
+    "cancelAllOrdersAfter"
+  ],
+  "required_credentials": [
+    "apiKey",
+    "secret"
+  ],
+  "rate_limit": 100,
+  "default_limits": {
+    "leverage": {
+      "min": null,
+      "max": null
+    },
+    "amount": {
+      "min": null,
+      "max": null
+    },
+    "price": {
+      "min": null,
+      "max": null
+    },
+    "cost": {
+      "min": null,
+      "max": null
+    }
+  },
+  "options": {
+    "api-expires": 5,
+    "fetchOHLCVOpenTimestamp": true,
+    "oldPrecision": false,
+    "networks": {
+      "BTC": "btc",
+      "ERC20": "eth",
+      "BEP20": "bsc",
+      "TRC20": "tron",
+      "AVAXC": "avax",
+      "NEAR": "near",
+      "XTZ": "xtz",
+      "DOT": "dot",
+      "SOL": "sol",
+      "ADA": "ada"
+    }
+  },
+  "contract_types": [
+    "spot",
+    "future",
+    "swap"
+  ]
+}

@@ -69,7 +69,7 @@ Multi-Timeframe Capability: Supports referencing multiple timeframes (e.g., 4h, 
 Resource Management: Limits Playwright browser contexts to 1 for memory efficiency on a 2 GB/1 vCPU VM.
 
 Decision Module
-Purpose:Analyze market data from the Extraction Agent using a reasoning LLM and a trading strategy from the config to decide on opening, adjusting, or closing trades. Monitor active trades and adjust decisions based on updates from the Trading Agent.
+Purpose:Analyze market data from the Extraction Agent using a reasoning LLM and a trading strategy from the config to decide on opening, adjusting, or closing trades. Uses real-time account state data for informed risk management decisions.
 Key Components:  
 
 Strategy Interface: Abstract base class for all trading strategies.  
@@ -84,9 +84,11 @@ Implementations: DeepSeekProvider, GPT4oProvider, Claude3Provider, LocalLLMProvi
 Key Points:  
 
 LLM Integration: Processes market data, MCP-computed indicators, and trade history using a reasoning LLM (e.g., DeepSeek R1, GPT-4o).  
+Real-Time Risk Assessment: Accesses current account equity, available margin, and active positions from account_states table before making decisions.  
 MCP Indicator Integration: Incorporates Crypto Indicators MCP signals into strategy decision-making.  
 Strategy Selection: Users can select from pre-built strategies or create custom ones via configuration.  
-Ongoing Monitoring: Evaluates active positions every 5 minutes, adjusting based on Trading Agent updates.  
+Account-Aware Position Sizing: Uses current equity and available margin to determine appropriate position sizes.  
+Ongoing Monitoring: Evaluates active positions every 5 minutes, adjusting based on Trading Agent updates and current account state.  
 Confidence Scores & Reasoning: Each decision includes a numerical confidence score and textual reasoning stored in the database.  
 LLM Fallback Logic: Reverts to a minimal "no new trade" or "hold" strategy if the LLM is unavailable.
 
@@ -105,9 +107,26 @@ Key Points:
 Intent Translation: Converts high-level LLM decisions into standardized intent objects compatible with CCXT MCP.  
 CCXT MCP Integration: Routes commands and execution through the CCXT MCP for standardized exchange interactions.  
 Schema Enforcement: Uses jsonschema to validate commands before and after MCP processing.  
-Risk Filtering: Dynamically queries exchange APIs via CCXT for limits (e.g., max leverage); falls back to local config if retrieval fails.  
-Exchange Event Monitoring: Listens for confirmations and liquidations; includes fallback polling if websockets fail.  
-Batch API Calls: Minimizes overhead by grouping exchange queries through CCXT.
+Risk Filtering: Uses real-time account state data from database for position sizing and leverage validation.  
+Hybrid Monitoring Architecture: Uses CCXT MCP for trade execution and direct CCXT for reliable position monitoring.  
+Account State Management: Continuously monitors exchange account balance, positions, and margin via direct CCXT connections.
+
+Account Monitoring Layer
+Purpose:Continuously monitor exchange account state and provide real-time balance and position data for risk management and decision-making.
+Key Components:  
+
+Direct CCXT Integration: Uses direct CCXT library connections for reliable, high-frequency account monitoring.  
+Account State Storage: Stores real-time balance, position, and margin data in the database for Decision Agent access.  
+Monitoring Lifecycle: Initiated when user configuration is activated, runs continuously while configuration is active.  
+Database Integration: Updates account_states table every 30 seconds with fresh exchange data.
+
+Key Points:  
+
+Separation of Concerns: Trade execution uses CCXT MCP + LLM for flexibility; monitoring uses direct CCXT for reliability.  
+Real-Time Risk Management: Decision Agent accesses current account equity before making trade decisions.  
+Continuous Operation: Monitoring starts automatically when user activates trading configuration.  
+Data Consistency: Single source of truth (database) for account state used by both Decision and Trading modules.  
+Exchange Agnostic: Supports multiple exchanges through standardized account state data structure.
 
 Configuration Management Layer
 Purpose:Manage user-specific settings for each module, enabling customization without code changes, including MCP-specific configuration.
@@ -351,6 +370,34 @@ trade_status (VARCHAR)
 created_at (TIMESTAMP)  
 closed_at (TIMESTAMP)  
 profit_loss (NUMERIC)
+
+
+account_states:  
+
+id (SERIAL, PK)  
+user_id (UUID, FK to users)  
+config_id (UUID, FK to configurations)  
+exchange (VARCHAR)  
+balance_data (JSONB) - Full balance object from exchange  
+position_data (JSONB) - Current positions array from exchange  
+equity (NUMERIC) - Total account value  
+available_margin (NUMERIC) - Available margin for new trades  
+used_margin (NUMERIC) - Currently used margin  
+updated_at (TIMESTAMP) - Last monitoring update
+
+
+exchange_credentials:  
+
+id (SERIAL, PK)  
+user_id (UUID, FK to users)  
+config_id (UUID, FK to configurations)  
+exchange (VARCHAR)  
+api_key_encrypted (TEXT) - Encrypted API key  
+secret_encrypted (TEXT) - Encrypted secret  
+passphrase_encrypted (TEXT) - For exchanges requiring passphrase  
+testnet (BOOLEAN) - Whether to use testnet/sandbox mode  
+created_at (TIMESTAMP)  
+last_used (TIMESTAMP)
 
 
 market_data:  

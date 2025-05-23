@@ -1,49 +1,138 @@
-# trading/interfaces.py
+#!/usr/bin/env python
+"""
+Interfaces for the Trading Module.
+
+This module defines interfaces (abstract classes) that standardize
+the structure of various trading components.
+
+STATUS: IMPLEMENTED - PARTIALLY COMPLETE
+This file contains the core interface definitions for the Trading Module,
+defining the contract that concrete implementations must follow.
+Includes:
+- TradeDirection enum
+- TradeStatus enum
+- TradingInterface abstract class
+- ExchangeInterface abstract class
+
+NEXT STEPS:
+- Add TradeIntent interface for standardized Decision Module communication
+- Add TradeCompilerInterface for the compiler component
+- Add TradeManagerInterface for position tracking components
+- Update TradingInterface to match the revised architecture
+"""
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, Optional, List
-from uuid import UUID
 from datetime import datetime
+from enum import Enum
+from typing import Dict, List, Optional, Any, Union, Tuple
+from uuid import UUID
 
 
-class Exchange(ABC):
+class TradeDirection(Enum):
+    """Enum for trade direction (long or short)."""
+    LONG = 'long'
+    SHORT = 'short'
+
+
+class TradeStatus(Enum):
+    """Enum for trade status."""
+    PENDING = 'pending'  # Trade decision received but not yet executed
+    OPEN = 'open'        # Trade is active
+    CLOSED = 'closed'    # Trade has been closed
+    CANCELLED = 'cancelled'  # Trade was cancelled
+    ERROR = 'error'      # Error during trade execution or management
+
+
+class TradingInterface(ABC):
     """
-    Abstract interface for cryptocurrency exchange implementations.
+    Interface for the trading components.
     
-    This interface defines the methods that all exchange implementations must provide
-    to interact with cryptocurrency trading platforms. Implementations may use direct
-    API access or connect through MCP adaptors.
+    Defines the standard methods that must be implemented by
+    any trading component.
     """
     
     @abstractmethod
-    def __init__(self, api_key: Optional[str] = None, api_secret: Optional[str] = None, **kwargs):
+    async def process_decision(self, decision: Dict) -> Dict:
         """
-        Initialize the exchange with credentials if needed.
+        Process a trading decision from the Decision Module.
         
         Args:
-            api_key: API key for authentication (optional for MCP-based implementations)
-            api_secret: API secret for authentication (optional for MCP-based implementations)
-            **kwargs: Additional exchange-specific parameters
+            decision: Dictionary containing the trading decision
+            
+        Returns:
+            Dictionary with execution results
         """
         pass
     
     @abstractmethod
-    def get_markets(self) -> List[Dict[str, Any]]:
+    async def get_trade_status(self, trade_id: Union[str, UUID]) -> Dict:
         """
-        Get a list of available markets/trading pairs.
+        Get the current status of a trade.
+        
+        Args:
+            trade_id: Unique identifier of the trade
+            
+        Returns:
+            Dictionary with trade status information
+        """
+        pass
+    
+    @abstractmethod
+    async def get_active_trades(self) -> Dict:
+        """
+        Get a list of all active trades.
         
         Returns:
-            List of dictionaries containing market information
+            Dictionary with a list of active trade records
+        """
+        pass
+
+
+class ExchangeInterface(ABC):
+    """
+    Interface for exchange adapters.
+    
+    Defines the standard methods that must be implemented by
+    any exchange adapter.
+    """
+    
+    @abstractmethod
+    async def connect(self) -> bool:
+        """
+        Connect to the exchange.
+        
+        Returns:
+            True if connection successful, False otherwise
         """
         pass
     
     @abstractmethod
-    def get_ticker(self, symbol: str) -> Dict[str, Any]:
+    async def disconnect(self) -> bool:
         """
-        Get current ticker data for a symbol.
+        Disconnect from the exchange.
+        
+        Returns:
+            True if disconnection successful, False otherwise
+        """
+        pass
+    
+    @abstractmethod
+    async def ensure_connected(self) -> bool:
+        """
+        Ensure connection to the exchange is established.
+        
+        Returns:
+            True if connected, False otherwise
+        """
+        pass
+    
+    @abstractmethod
+    async def fetch_ticker(self, symbol: str) -> Dict:
+        """
+        Fetch current ticker data for a symbol.
         
         Args:
-            symbol: The trading pair symbol (e.g., 'BTC/USD')
+            symbol: Trading pair symbol (e.g., 'BTC/USD')
             
         Returns:
             Dictionary containing ticker data
@@ -51,151 +140,57 @@ class Exchange(ABC):
         pass
     
     @abstractmethod
-    def create_order(self, 
-                     symbol: str, 
-                     order_type: str, 
-                     side: str, 
-                     amount: float, 
-                     price: Optional[float] = None, 
-                     params: Optional[Dict[str, Any]] = None) -> Dict[str, Any]:
+    async def fetch_ohlcv(self, 
+                         symbol: str, 
+                         timeframe: str = '1h', 
+                         since: Optional[int] = None, 
+                         limit: Optional[int] = None) -> List:
         """
-        Create a new order.
+        Fetch OHLCV (candle) data for a symbol.
         
         Args:
-            symbol: The trading pair symbol (e.g., 'BTC/USD')
-            order_type: Type of order ('market', 'limit', etc.)
-            side: Order side ('buy' or 'sell')
-            amount: Order quantity
-            price: Order price (required for limit orders)
-            params: Additional order parameters (e.g., leverage, stop price)
+            symbol: Trading pair symbol (e.g., 'BTC/USD')
+            timeframe: Timeframe (e.g., '1m', '1h', '1d')
+            since: Optional timestamp in milliseconds to fetch data since
+            limit: Optional limit on number of candles to fetch
             
         Returns:
-            Dictionary containing order information
+            List of OHLCV candles [timestamp, open, high, low, close, volume]
         """
         pass
     
     @abstractmethod
-    def get_order(self, order_id: str, symbol: Optional[str] = None) -> Dict[str, Any]:
+    async def create_market_buy_order(self, 
+                                     symbol: str, 
+                                     amount: float, 
+                                     params: Optional[Dict] = None) -> Dict:
         """
-        Get information about an order.
+        Create a market buy order.
         
         Args:
-            order_id: The ID of the order to fetch
-            symbol: The trading pair symbol (may be required by some exchanges)
+            symbol: Trading pair symbol (e.g., 'BTC/USD')
+            amount: Amount to buy
+            params: Optional additional parameters
             
         Returns:
-            Dictionary containing order information
+            Dictionary containing order details
         """
         pass
     
     @abstractmethod
-    def cancel_order(self, order_id: str, symbol: Optional[str] = None) -> Dict[str, Any]:
+    async def create_market_sell_order(self, 
+                                      symbol: str, 
+                                      amount: float, 
+                                      params: Optional[Dict] = None) -> Dict:
         """
-        Cancel an open order.
+        Create a market sell order.
         
         Args:
-            order_id: The ID of the order to cancel
-            symbol: The trading pair symbol (may be required by some exchanges)
+            symbol: Trading pair symbol (e.g., 'BTC/USD')
+            amount: Amount to sell
+            params: Optional additional parameters
             
         Returns:
-            Dictionary containing cancellation result
-        """
-        pass
-
-
-class TradeRecord(ABC):
-    """
-    Abstract interface for trade record implementations.
-    
-    This interface defines methods for creating and managing trade records,
-    which track all information about trades made on behalf of users.
-    """
-    
-    @abstractmethod
-    def create_trade(self, 
-                     user_id: str, 
-                     symbol: str, 
-                     side: str, 
-                     amount: float, 
-                     entry_price: float, 
-                     stop_loss: Optional[float] = None, 
-                     take_profit: Optional[float] = None, 
-                     strategy_name: Optional[str] = None,
-                     exchange_id: Optional[str] = None) -> UUID:
-        """
-        Create a new trade record.
-        
-        Args:
-            user_id: ID of the user making the trade
-            symbol: The trading pair symbol (e.g., 'BTC/USD')
-            side: Trade direction ('long' or 'short')
-            amount: Position size
-            entry_price: Entry price
-            stop_loss: Stop loss price level (optional)
-            take_profit: Take profit price level (optional)
-            strategy_name: Name of the strategy used for the trade (optional)
-            exchange_id: ID of the exchange where the trade was executed (optional)
-            
-        Returns:
-            UUID of the created trade record
-        """
-        pass
-    
-    @abstractmethod
-    def update_trade(self, 
-                     trade_id: UUID, 
-                     status: Optional[str] = None, 
-                     exit_price: Optional[float] = None, 
-                     exit_time: Optional[datetime] = None, 
-                     pnl: Optional[float] = None,
-                     stop_loss: Optional[float] = None,
-                     take_profit: Optional[float] = None) -> bool:
-        """
-        Update an existing trade record.
-        
-        Args:
-            trade_id: UUID of the trade record to update
-            status: New trade status (e.g., 'open', 'closed', 'cancelled')
-            exit_price: Exit price (when closing the trade)
-            exit_time: Time when the trade was closed
-            pnl: Profit/Loss amount
-            stop_loss: Updated stop loss level
-            take_profit: Updated take profit level
-            
-        Returns:
-            Boolean indicating success
-        """
-        pass
-    
-    @abstractmethod
-    def get_trade(self, trade_id: UUID) -> Dict[str, Any]:
-        """
-        Get a specific trade record.
-        
-        Args:
-            trade_id: UUID of the trade record to fetch
-            
-        Returns:
-            Dictionary containing the trade record
-        """
-        pass
-    
-    @abstractmethod
-    def get_user_trades(self, 
-                        user_id: str, 
-                        status: Optional[str] = None, 
-                        symbol: Optional[str] = None,
-                        limit: int = 100) -> List[Dict[str, Any]]:
-        """
-        Get all trade records for a user.
-        
-        Args:
-            user_id: ID of the user
-            status: Filter by trade status (optional)
-            symbol: Filter by trading pair symbol (optional)
-            limit: Maximum number of records to return
-            
-        Returns:
-            List of dictionaries containing trade records
+            Dictionary containing order details
         """
         pass

@@ -51,10 +51,10 @@ class SimplifiedLLMMCPIntegrationTest:
         print(f"DEBUG: API key exists: {bool(os.environ.get('EXCHANGE_API'))}")
         print(f"DEBUG: Secret exists: {bool(os.environ.get('EXCHANGE_SECRET'))}")
 
-        # Use our simplified server implementation
-        server_path = str(Path(__file__).parent / "fixed_ccxt_mcp_server.py")
+        # Use our main server implementation
+        server_path = str(Path(__file__).parent.parent / "core" / "mcp" / "servers" / "ccxt_mcp_server.py")
         print(f"DEBUG: Using server script at: {server_path}")
-        
+
         # Create the MCP client with explicit server path
         self.mcp_client = CCXTMCPClient(
             exchange_id=self.exchange_id,

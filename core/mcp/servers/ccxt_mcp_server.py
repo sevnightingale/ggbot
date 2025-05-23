@@ -22,36 +22,8 @@ logging.basicConfig(level=logging.DEBUG,
                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 logger = logging.getLogger("ccxt_mcp_server")
 
-# Import local modules if available
-try:
-    from core.common.db import get_connection
-    from core.config.config_main import get_user_exchange_credentials
-    STANDALONE_MODE = False
-    logger.info("Imported ggbot modules. Running in integrated mode.")
-except ImportError:
-    logger.warning("Failed to import ggbot modules. Running in standalone mode.")
-    STANDALONE_MODE = True
-    # Define placeholder functions for standalone testing
-    async def get_connection():
-        return None
-        
-    async def get_user_exchange_credentials(user_id, exchange_id, conn=None):
-        # Return test credentials from environment variables in standalone mode
-        api_key = os.environ.get("EXCHANGE_API", "")
-        secret = os.environ.get("EXCHANGE_SECRET", "")
-        password = os.environ.get("EXCHANGE_PASSWORD", "")
-
-        if not api_key or not secret:
-            logger.warning(f"Missing API credentials for {exchange_id} in environment variables")
-        else:
-            logger.info(f"Found API credentials for {exchange_id} in environment variables")
-
-        return {
-            "apiKey": api_key,
-            "secret": secret,
-            "password": password,
-            "test": True  # Always use testnet in standalone mode
-        }
+# Simplified server with direct environment variable credential handling
+logger.info("Running CCXT MCP server with simplified credential handling")
 
 # Create MCP server
 mcp = FastMCP("CCXTExchange")
@@ -59,9 +31,16 @@ mcp = FastMCP("CCXTExchange")
 # Trading pair mapping for different exchanges
 EXCHANGE_SYMBOL_MAP = {
     'bitmex': {
-        'BTC/USD': 'XBT/USD',
-        'BTC/USDT': 'XBT/USDT',
-        'ETH/USD': 'ETH/USDT:USDT'  # BitMEX uses different format for ETH
+        'BTC/USD': 'XBT/USD:XBt',
+        'BTC/USDT': 'XBT/USDT:USDT',
+        'ETH/USD': 'ETH/USDT:USDT',
+        'ETH/USDT': 'ETH/USDT:USDT',
+        'XRP/USD': 'XRP/USD:XBt',
+        'XRP/USDT': 'XRP/USDT:USDT',
+        'SOL/USD': 'SOL/USD:XBt',
+        'SOL/USDT': 'SOL/USDT:USDT',
+        'DOGE/USD': 'DOGE/USD:XBt',
+        'DOGE/USDT': 'DOGE/USDT:USDT'
     }
 }
 
@@ -71,7 +50,7 @@ def map_symbol_for_exchange(exchange_id, symbol):
     return exchange_map.get(symbol, symbol)
 
 async def get_exchange_instance(exchange_id, user_id=None):
-    """Get a CCXT exchange instance with appropriate credentials."""
+    """Get a CCXT exchange instance with simplified credential handling."""
     try:
         # Dynamically import CCXT
         import ccxt.async_support as ccxt
@@ -80,8 +59,8 @@ async def get_exchange_instance(exchange_id, user_id=None):
         env_api = os.environ.get("EXCHANGE_API", "")
         env_secret = os.environ.get("EXCHANGE_SECRET", "")
         env_exchange = os.environ.get("EXCHANGE_NAME", "")
-        
-        logger.debug(f"Environment variables: EXCHANGE_NAME={env_exchange}, " 
+
+        logger.debug(f"Environment variables: EXCHANGE_NAME={env_exchange}, "
                     f"API key exists: {bool(env_api)}, Secret exists: {bool(env_secret)}")
 
         # Get the exchange class
@@ -89,59 +68,30 @@ async def get_exchange_instance(exchange_id, user_id=None):
             raise ValueError(f"Exchange {exchange_id} not supported by CCXT")
 
         exchange_class = getattr(ccxt, exchange_id)
-        
-        # Get credentials (simplified approach)
-        if STANDALONE_MODE:
-            # Standalone mode - use environment variables or fallback
-            api_key = env_api or "REDACTED_EXCHANGE_API_KEY"
-            secret = env_secret or "REDACTED_EXCHANGE_SECRET"
-            
-            credentials = {
-                "apiKey": api_key,
-                "secret": secret,
-                "enableRateLimit": True,
-                "test": True  # Always use testnet for safety
-            }
-        else:
-            # Integrated mode - try to get from user credentials
-            try:
-                if user_id is not None:
-                    credentials = await get_user_exchange_credentials(user_id, exchange_id)
-                else:
-                    # Fallback to environment variables
-                    api_key = env_api
-                    secret = env_secret
-                    credentials = {
-                        "apiKey": api_key,
-                        "secret": secret,
-                        "enableRateLimit": True,
-                        "test": True
-                    }
-            except Exception as e:
-                logger.warning(f"Failed to get credentials: {str(e)}")
-                # Fallback to environment variables
-                api_key = env_api
-                secret = env_secret
-                if not api_key or not secret:
-                    logger.error("No API credentials found")
-                    raise ValueError("No API credentials available")
-                credentials = {
-                    "apiKey": api_key,
-                    "secret": secret,
-                    "enableRateLimit": True,
-                    "test": True
-                }
-        
+
+        # Simplified credential handling - use environment variables with hardcoded fallbacks
+        # Hardcoded fallback values for testing BitMEX testnet
+        api_key = env_api or "REDACTED_EXCHANGE_API_KEY"
+        secret = env_secret or "REDACTED_EXCHANGE_SECRET"
+
+        # Create direct credentials dictionary
+        credentials = {
+            "apiKey": api_key,
+            "secret": secret,
+            "enableRateLimit": True,
+            "test": True  # Always use testnet for safety
+        }
+
         # Log the credentials (without the actual secret)
-        logger.debug(f"Creating exchange with credentials: apiKey={credentials.get('apiKey')[:4]}..., secret=****")
-        
+        logger.debug(f"Creating exchange with credentials: apiKey={api_key[:4]}..., secret=****")
+
         # Create the exchange instance
         exchange = exchange_class(credentials)
-        
+
         # Enable sandbox mode if available
         if hasattr(exchange, 'setSandboxMode'):
             exchange.setSandboxMode(True)
-        
+
         logger.info(f"Successfully created {exchange_id} exchange instance")
         return exchange
     except Exception as e:
@@ -169,22 +119,17 @@ async def get_exchange_ids() -> dict:
         return {"error": str(e)}
 
 @mcp.tool()
-async def fetch_markets(exchange_id: str = None, exchangeId: str = None, user_id: str = None) -> list:
+async def fetch_markets(exchange_id: str = None, user_id: str = None) -> list:
     """
     Fetch markets available on an exchange.
 
     Args:
         exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
-        exchangeId: Legacy parameter for exchange ID (deprecated, use exchange_id instead)
         user_id: Optional user ID for authenticated requests
 
     Returns:
         List of market data
     """
-    # Handle legacy camelCase parameter
-    if exchange_id is None and exchangeId is not None:
-        exchange_id = exchangeId
-
     if exchange_id is None:
         return {"error": "Missing required parameter: exchange_id"}
 
@@ -223,30 +168,25 @@ async def fetch_markets(exchange_id: str = None, exchangeId: str = None, user_id
         return {"error": str(e)}
 
 @mcp.tool()
-async def fetch_ticker(exchange_id: str = None, symbol: str = None, 
-                      exchangeId: str = None, user_id: str = None) -> dict:
+async def fetch_ticker(exchange_id: str = None, symbol: str = None,
+                      user_id: str = None) -> dict:
     """
     Fetch current ticker data for a symbol from an exchange.
 
     Args:
         exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
         symbol: Trading pair symbol (e.g., 'BTC/USDT')
-        exchangeId: Legacy parameter for exchange ID (deprecated, use exchange_id instead)
         user_id: Optional user ID for authenticated requests
 
     Returns:
         Dictionary containing ticker data
     """
-    # Handle legacy camelCase parameter
-    if exchange_id is None and exchangeId is not None:
-        exchange_id = exchangeId
-
     if exchange_id is None:
         return {"error": "Missing required parameter: exchange_id"}
 
     if symbol is None:
         return {"error": "Missing required parameter: symbol"}
-        
+
     # Map symbol to exchange-specific format if needed
     mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
     if mapped_symbol != symbol:
@@ -278,7 +218,7 @@ async def fetch_ticker(exchange_id: str = None, symbol: str = None,
         return {"error": str(e)}
 
 @mcp.tool()
-async def fetch_ohlcv(exchange_id: str = None, symbol: str = None, exchangeId: str = None,
+async def fetch_ohlcv(exchange_id: str = None, symbol: str = None,
                     timeframe: str = '1h', since: int = None, limit: int = None,
                     user_id: str = None) -> list:
     """
@@ -287,7 +227,6 @@ async def fetch_ohlcv(exchange_id: str = None, symbol: str = None, exchangeId: s
     Args:
         exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
         symbol: Trading pair symbol (e.g., 'BTC/USDT')
-        exchangeId: Legacy parameter for exchange ID (deprecated, use exchange_id instead)
         timeframe: Timeframe (e.g., '1m', '5m', '1h', '1d')
         since: Optional timestamp in milliseconds to fetch data since
         limit: Optional limit on the number of candles to fetch
@@ -296,16 +235,12 @@ async def fetch_ohlcv(exchange_id: str = None, symbol: str = None, exchangeId: s
     Returns:
         List of OHLCV candles [timestamp, open, high, low, close, volume]
     """
-    # Handle legacy camelCase parameter
-    if exchange_id is None and exchangeId is not None:
-        exchange_id = exchangeId
-
     if exchange_id is None:
         return {"error": "Missing required parameter: exchange_id"}
 
     if symbol is None:
         return {"error": "Missing required parameter: symbol"}
-        
+
     # Map symbol to exchange-specific format if needed
     mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
     if mapped_symbol != symbol:
@@ -341,31 +276,25 @@ async def fetch_ohlcv(exchange_id: str = None, symbol: str = None, exchangeId: s
 
 @mcp.tool()
 async def fetch_order_book(exchange_id: str = None, symbol: str = None,
-                          exchangeId: str = None, limit: int = None,
-                          user_id: str = None) -> dict:
+                          limit: int = None, user_id: str = None) -> dict:
     """
     Fetch order book for a symbol from an exchange.
 
     Args:
         exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
         symbol: Trading pair symbol (e.g., 'BTC/USDT')
-        exchangeId: Legacy parameter for exchange ID (deprecated, use exchange_id instead)
         limit: Optional limit on the number of orders to fetch
         user_id: Optional user ID for authenticated requests
 
     Returns:
         Dictionary containing order book data
     """
-    # Handle legacy camelCase parameter
-    if exchange_id is None and exchangeId is not None:
-        exchange_id = exchangeId
-
     if exchange_id is None:
         return {"error": "Missing required parameter: exchange_id"}
 
     if symbol is None:
         return {"error": "Missing required parameter: symbol"}
-        
+
     # Map symbol to exchange-specific format if needed
     mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
     if mapped_symbol != symbol:
@@ -404,24 +333,20 @@ async def fetch_order_book(exchange_id: str = None, symbol: str = None,
 
 @mcp.tool()
 async def create_market_buy_order(exchange_id: str = None, symbol: str = None, amount: float = None,
-                                 exchangeId: str = None, user_id: str = None, params: dict = None) -> dict:
+                                 user_id: str = None, params: dict = None) -> dict:
     """
     Create a market buy order on an exchange.
-    
+
     Args:
         exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
         symbol: Trading pair symbol (e.g., 'BTC/USDT')
         amount: Amount to buy
         user_id: User ID for authenticated request
         params: Optional additional parameters for the exchange
-        
+
     Returns:
         Dictionary containing order details
     """
-    # Handle legacy camelCase parameter
-    if exchange_id is None and exchangeId is not None:
-        exchange_id = exchangeId
-        
     if exchange_id is None:
         return {"error": "Missing required parameter: exchange_id"}
 
@@ -627,6 +552,600 @@ async def fetch_orders(exchange_id: str, symbol: str, user_id: str,
             
     except Exception as e:
         logger.error(f"Error fetching orders: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def fetch_positions(exchange_id: str, symbol: str = None, user_id: str = None) -> list:
+    """
+    Fetch current positions from an exchange.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        symbol: Optional trading pair symbol to filter positions
+        user_id: User ID for authenticated request
+        
+    Returns:
+        List of position objects with details like size, unrealized PnL, etc.
+    """
+    logger.info(f"Executing fetch_positions on {exchange_id}")
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports fetching positions
+            if not exchange.has['fetchPositions']:
+                return {"error": f"Exchange {exchange_id} does not support fetching positions"}
+            
+            # Map symbol to exchange-specific format if provided
+            mapped_symbol = None
+            if symbol:
+                mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+                if mapped_symbol != symbol:
+                    logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+            
+            # Fetch positions (with or without symbol filter)
+            if mapped_symbol:
+                positions = await exchange.fetch_positions(mapped_symbol)
+            else:
+                positions = await exchange.fetch_positions()
+            
+            # Clean result for serialization
+            cleaned_positions = []
+            for position in positions:
+                cleaned_position = {}
+                for k, v in position.items():
+                    if k != 'info':  # Skip raw exchange data
+                        if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                            cleaned_position[k] = v
+                        else:
+                            cleaned_position[k] = str(v)
+                cleaned_positions.append(cleaned_position)
+            
+            return cleaned_positions
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error fetching positions: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def close_position(exchange_id: str, symbol: str, user_id: str, params: dict = None) -> dict:
+    """
+    Close an open position for a specific symbol.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        symbol: Trading pair symbol (e.g., 'BTC/USDT')
+        user_id: User ID for authenticated request
+        params: Optional additional parameters for the exchange
+        
+    Returns:
+        Dictionary containing the result of closing the position
+    """
+    if symbol is None:
+        return {"error": "Missing required parameter: symbol"}
+        
+    # Map symbol to exchange-specific format if needed
+    mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+    if mapped_symbol != symbol:
+        logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+    
+    logger.info(f"Executing close_position for {mapped_symbol} on {exchange_id}")
+    
+    if params is None:
+        params = {}
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports closing positions
+            if not exchange.has['closePosition']:
+                return {"error": f"Exchange {exchange_id} does not support direct position closing"}
+            
+            # Close the position
+            result = await exchange.close_position(mapped_symbol, params=params)
+            
+            # Clean result for serialization
+            cleaned_result = {}
+            for k, v in result.items():
+                if k != 'info':  # Skip the raw exchange info
+                    if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                        cleaned_result[k] = v
+                    else:
+                        # Convert non-serializable types to string
+                        cleaned_result[k] = str(v)
+            
+            return cleaned_result
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error closing position: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def set_leverage(exchange_id: str, leverage: int, symbol: str, user_id: str, params: dict = None) -> dict:
+    """
+    Set leverage for a specific trading pair symbol.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        leverage: Leverage value (e.g., 2, 10, 50, 100)
+        symbol: Trading pair symbol (e.g., 'BTC/USDT')
+        user_id: User ID for authenticated request
+        params: Optional additional parameters for the exchange
+        
+    Returns:
+        Dictionary containing the result of setting leverage
+    """
+    if leverage is None:
+        return {"error": "Missing required parameter: leverage"}
+        
+    if symbol is None:
+        return {"error": "Missing required parameter: symbol"}
+        
+    # Map symbol to exchange-specific format if needed
+    mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+    if mapped_symbol != symbol:
+        logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+    
+    logger.info(f"Executing set_leverage for {mapped_symbol} on {exchange_id}, leverage={leverage}")
+    
+    if params is None:
+        params = {}
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports setting leverage
+            if not exchange.has['setLeverage']:
+                return {"error": f"Exchange {exchange_id} does not support setting leverage"}
+            
+            # Set leverage
+            result = await exchange.set_leverage(leverage, mapped_symbol, params=params)
+            
+            # Clean result for serialization
+            if isinstance(result, dict):
+                cleaned_result = {}
+                for k, v in result.items():
+                    if k != 'info':  # Skip the raw exchange info
+                        if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                            cleaned_result[k] = v
+                        else:
+                            # Convert non-serializable types to string
+                            cleaned_result[k] = str(v)
+                return cleaned_result
+            else:
+                # Some exchanges may return a boolean or other type
+                return {"success": True, "leverage": leverage, "symbol": symbol, "result": str(result)}
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error setting leverage: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def create_limit_order(exchange_id: str, symbol: str, side: str, amount: float, price: float, user_id: str, params: dict = None) -> dict:
+    """
+    Create a limit order on an exchange.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        symbol: Trading pair symbol (e.g., 'BTC/USDT')
+        side: Order side ('buy' or 'sell')
+        amount: Order quantity
+        price: Order price
+        user_id: User ID for authenticated request
+        params: Optional additional parameters for the exchange
+        
+    Returns:
+        Dictionary containing order details
+    """
+    if symbol is None:
+        return {"error": "Missing required parameter: symbol"}
+    
+    if side is None:
+        return {"error": "Missing required parameter: side"}
+    
+    if side not in ['buy', 'sell']:
+        return {"error": "Invalid side parameter: must be 'buy' or 'sell'"}
+        
+    if amount is None:
+        return {"error": "Missing required parameter: amount"}
+        
+    if price is None:
+        return {"error": "Missing required parameter: price"}
+        
+    # Map symbol to exchange-specific format if needed
+    mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+    if mapped_symbol != symbol:
+        logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+    
+    logger.info(f"Executing create_limit_order for {mapped_symbol} on {exchange_id}, side={side}, amount={amount}, price={price}")
+    
+    if params is None:
+        params = {}
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports creating limit orders
+            if not exchange.has['createLimitOrder']:
+                return {"error": f"Exchange {exchange_id} does not support creating limit orders directly"}
+            
+            # Create the order
+            order = await exchange.create_limit_order(mapped_symbol, side, amount, price, params)
+            
+            # Clean result for serialization
+            cleaned_order = {}
+            for k, v in order.items():
+                if k != 'info':  # Skip the raw exchange info
+                    if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                        cleaned_order[k] = v
+                    else:
+                        # Convert non-serializable types to string
+                        cleaned_order[k] = str(v)
+            
+            return cleaned_order
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error creating limit order: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def create_stop_order(exchange_id: str, symbol: str, side: str, amount: float, price: float, 
+                           user_id: str, params: dict = None) -> dict:
+    """
+    Create a stop order on an exchange.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        symbol: Trading pair symbol (e.g., 'BTC/USDT')
+        side: Order side ('buy' or 'sell')
+        amount: Order quantity
+        price: Trigger price
+        user_id: User ID for authenticated request
+        params: Optional additional parameters for the exchange
+        
+    Returns:
+        Dictionary containing order details
+    """
+    if symbol is None:
+        return {"error": "Missing required parameter: symbol"}
+    
+    if side is None:
+        return {"error": "Missing required parameter: side"}
+    
+    if side not in ['buy', 'sell']:
+        return {"error": "Invalid side parameter: must be 'buy' or 'sell'"}
+        
+    if amount is None:
+        return {"error": "Missing required parameter: amount"}
+        
+    if price is None:
+        return {"error": "Missing required parameter: price"}
+        
+    # Map symbol to exchange-specific format if needed
+    mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+    if mapped_symbol != symbol:
+        logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+    
+    logger.info(f"Executing create_stop_order for {mapped_symbol} on {exchange_id}, side={side}, amount={amount}, price={price}")
+    
+    if params is None:
+        params = {}
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports creating stop orders
+            if not exchange.has['createStopOrder']:
+                return {"error": f"Exchange {exchange_id} does not support creating stop orders directly"}
+            
+            # Create the stop order
+            order = await exchange.create_stop_order(mapped_symbol, side, amount, price, params)
+            
+            # Clean result for serialization
+            cleaned_order = {}
+            for k, v in order.items():
+                if k != 'info':  # Skip the raw exchange info
+                    if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                        cleaned_order[k] = v
+                    else:
+                        # Convert non-serializable types to string
+                        cleaned_order[k] = str(v)
+            
+            return cleaned_order
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error creating stop order: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def create_reduce_only_order(exchange_id: str, symbol: str, type: str, side: str, 
+                                   amount: float, price: float = None, user_id: str = None, 
+                                   params: dict = None) -> dict:
+    """
+    Create a reduce-only order on an exchange, which will only reduce an existing position.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        symbol: Trading pair symbol (e.g., 'BTC/USDT')
+        type: Order type ('limit' or 'market')
+        side: Order side ('buy' or 'sell')
+        amount: Order quantity
+        price: Order price (required for limit orders)
+        user_id: User ID for authenticated request
+        params: Optional additional parameters for the exchange
+        
+    Returns:
+        Dictionary containing order details
+    """
+    if symbol is None:
+        return {"error": "Missing required parameter: symbol"}
+    
+    if type is None:
+        return {"error": "Missing required parameter: type"}
+    
+    if type not in ['limit', 'market']:
+        return {"error": "Invalid type parameter: must be 'limit' or 'market'"}
+    
+    if side is None:
+        return {"error": "Missing required parameter: side"}
+    
+    if side not in ['buy', 'sell']:
+        return {"error": "Invalid side parameter: must be 'buy' or 'sell'"}
+        
+    if amount is None:
+        return {"error": "Missing required parameter: amount"}
+        
+    if type == 'limit' and price is None:
+        return {"error": "Price is required for limit orders"}
+        
+    # Map symbol to exchange-specific format if needed
+    mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+    if mapped_symbol != symbol:
+        logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+    
+    logger.info(f"Executing create_reduce_only_order for {mapped_symbol} on {exchange_id}, type={type}, side={side}, amount={amount}")
+    
+    if params is None:
+        params = {}
+    
+    # Add the reduce-only flag
+    params['reduceOnly'] = True
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports creating reduce-only orders
+            if not exchange.has['createReduceOnlyOrder']:
+                return {"error": f"Exchange {exchange_id} does not support creating reduce-only orders directly"}
+            
+            # Create the reduce-only order based on the order type
+            if type == 'limit':
+                order = await exchange.create_limit_order(mapped_symbol, side, amount, price, params)
+            else:  # market order
+                if side == 'buy':
+                    order = await exchange.create_market_buy_order(mapped_symbol, amount, params)
+                else:  # sell
+                    order = await exchange.create_market_sell_order(mapped_symbol, amount, params)
+            
+            # Clean result for serialization
+            cleaned_order = {}
+            for k, v in order.items():
+                if k != 'info':  # Skip the raw exchange info
+                    if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                        cleaned_order[k] = v
+                    else:
+                        # Convert non-serializable types to string
+                        cleaned_order[k] = str(v)
+            
+            return cleaned_order
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error creating reduce-only order: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def cancel_order(exchange_id: str, id: str, symbol: str, user_id: str, params: dict = None) -> dict:
+    """
+    Cancel an existing order on an exchange.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        id: Order ID to cancel
+        symbol: Trading pair symbol (e.g., 'BTC/USDT')
+        user_id: User ID for authenticated request
+        params: Optional additional parameters for the exchange
+        
+    Returns:
+        Dictionary containing the result of canceling the order
+    """
+    if id is None:
+        return {"error": "Missing required parameter: id"}
+        
+    if symbol is None:
+        return {"error": "Missing required parameter: symbol"}
+        
+    # Map symbol to exchange-specific format if needed
+    mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+    if mapped_symbol != symbol:
+        logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+    
+    logger.info(f"Executing cancel_order for order ID {id} on {exchange_id}, symbol={mapped_symbol}")
+    
+    if params is None:
+        params = {}
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports canceling orders
+            if not exchange.has['cancelOrder']:
+                return {"error": f"Exchange {exchange_id} does not support canceling orders"}
+            
+            # Cancel the order
+            result = await exchange.cancel_order(id, mapped_symbol, params)
+            
+            # Clean result for serialization
+            cleaned_result = {}
+            for k, v in result.items():
+                if k != 'info':  # Skip the raw exchange info
+                    if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                        cleaned_result[k] = v
+                    else:
+                        # Convert non-serializable types to string
+                        cleaned_result[k] = str(v)
+            
+            return cleaned_result
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error canceling order: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def fetch_open_orders(exchange_id: str, symbol: str = None, since: int = None, 
+                            limit: int = None, user_id: str = None) -> list:
+    """
+    Fetch open orders from an exchange.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        symbol: Optional trading pair symbol to filter orders
+        since: Optional timestamp in milliseconds to fetch orders since
+        limit: Optional limit on the number of orders to fetch
+        user_id: User ID for authenticated request
+        
+    Returns:
+        List of open order objects
+    """
+    logger.info(f"Executing fetch_open_orders on {exchange_id}")
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports fetching open orders
+            if not exchange.has['fetchOpenOrders']:
+                return {"error": f"Exchange {exchange_id} does not support fetching open orders"}
+            
+            # Map symbol to exchange-specific format if provided
+            mapped_symbol = None
+            if symbol:
+                mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+                if mapped_symbol != symbol:
+                    logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+            
+            # Fetch open orders
+            orders = await exchange.fetch_open_orders(mapped_symbol, since, limit)
+            
+            # Clean result for serialization
+            cleaned_orders = []
+            for order in orders:
+                cleaned_order = {}
+                for k, v in order.items():
+                    if k != 'info':  # Skip the raw exchange info
+                        if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                            cleaned_order[k] = v
+                        else:
+                            # Convert non-serializable types to string
+                            cleaned_order[k] = str(v)
+                cleaned_orders.append(cleaned_order)
+            
+            return cleaned_orders
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error fetching open orders: {str(e)}")
+        return {"error": str(e)}
+
+@mcp.tool()
+async def edit_order(exchange_id: str, id: str, symbol: str, type: str = None, 
+                     side: str = None, amount: float = None, price: float = None, 
+                     user_id: str = None, params: dict = None) -> dict:
+    """
+    Edit an existing order on an exchange.
+    
+    Args:
+        exchange_id: ID of the exchange (e.g., 'binance', 'bitmex')
+        id: Order ID to edit
+        symbol: Trading pair symbol (e.g., 'BTC/USDT')
+        type: Optional new order type
+        side: Optional new order side ('buy' or 'sell')
+        amount: Optional new order amount
+        price: Optional new order price
+        user_id: User ID for authenticated request
+        params: Optional additional parameters for the exchange
+        
+    Returns:
+        Dictionary containing the updated order details
+    """
+    if id is None:
+        return {"error": "Missing required parameter: id"}
+        
+    if symbol is None:
+        return {"error": "Missing required parameter: symbol"}
+        
+    # At least one parameter to edit must be provided
+    if amount is None and price is None and not params:
+        return {"error": "At least one parameter to edit (amount, price, or params) must be provided"}
+    
+    # Map symbol to exchange-specific format if needed
+    mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)
+    if mapped_symbol != symbol:
+        logger.info(f"Mapped {symbol} to {mapped_symbol} for {exchange_id}")
+    
+    logger.info(f"Executing edit_order for order ID {id} on {exchange_id}, symbol={mapped_symbol}")
+    
+    if params is None:
+        params = {}
+    
+    try:
+        exchange = await get_exchange_instance(exchange_id, user_id=user_id)
+        
+        try:
+            # Check if the exchange supports editing orders
+            if not exchange.has['editOrder']:
+                return {"error": f"Exchange {exchange_id} does not support editing orders"}
+            
+            # Edit the order
+            order = await exchange.edit_order(id, mapped_symbol, type, side, amount, price, params)
+            
+            # Clean result for serialization
+            cleaned_order = {}
+            for k, v in order.items():
+                if k != 'info':  # Skip the raw exchange info
+                    if isinstance(v, (int, float, str, bool, list, dict)) or v is None:
+                        cleaned_order[k] = v
+                    else:
+                        # Convert non-serializable types to string
+                        cleaned_order[k] = str(v)
+            
+            return cleaned_order
+        finally:
+            await exchange.close()
+            
+    except Exception as e:
+        logger.error(f"Error editing order: {str(e)}")
         return {"error": str(e)}
 
 if __name__ == "__main__":
