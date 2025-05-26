@@ -1,10 +1,12 @@
 """
 Technical Indicators package.
 
-This package contains implementations of the IndicatorComputer interface
-for calculating various technical indicators based on price data.
+This package contains implementations for calculating technical indicators.
+Primary implementation uses the Crypto Indicators MCP for standardized
+indicator calculations.
 """
 
-from .pandas_ta_indicators import PandasTAIndicators
+# MCP-based indicators are imported directly when needed
+# No default exports as we're using MCP clients directly
 
-__all__ = ['PandasTAIndicators']
+__all__ = []

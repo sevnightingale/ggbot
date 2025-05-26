@@ -15,10 +15,10 @@ import random
 from typing import Dict, List, Optional, Any, Union, Tuple
 
 from core.common.logger import logger
-from trading.engine.model.config import EngineConfig, LLMConfig
-from trading.engine.model.intent import Intent
-from trading.engine.model.tool_call import ToolCall
-from trading.engine.model.event import Event, EventType
+from trading.engine_services.model.config import EngineConfig, LLMConfig
+from trading.engine_services.model.intent import Intent
+from trading.engine_services.model.tool_call import ToolCall
+from trading.engine_services.model.event import Event, EventType
 
 
 class LLMService:

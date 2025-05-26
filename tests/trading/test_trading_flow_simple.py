@@ -30,9 +30,9 @@ os.environ["EXCHANGE_NAME"] = "bitmex"
 load_dotenv()
 
 from core.common.logger import logger
-from trading.engine.model.config import EngineConfig
-from trading.engine.service.llm_service import LLMService
-from trading.engine.service.validation_service import ValidationService
+from trading.engine_services.model.config import EngineConfig
+from trading.engine_services.service.llm_service import LLMService
+from trading.engine_services.service.validation_service import ValidationService
 from trading.compiler import TradeCompiler
 from trading.exchanges.ccxt_mcp import CCXTMCPAdapter
 from core.mcp.ccxt import CCXTMCPClient
