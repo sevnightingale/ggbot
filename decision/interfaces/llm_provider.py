@@ -6,7 +6,7 @@ LLM providers handle communication with different LLM APIs and process their res
 """
 
 from abc import ABC, abstractmethod
-from typing import Dict, Any, List, Optional, Tuple, Union
+from typing import Dict, Any, List, Optional, Tuple
 
 
 class LLMProvider(ABC):
@@ -18,86 +18,42 @@ class LLMProvider(ABC):
     to send prompts and receive responses for trading decisions.
     """
     
-    @abstractmethod
-    def __init__(self, api_key: str, **kwargs):
+    def __init__(self, api_key: str, model: str = None, **kwargs):
         """
         Initialize the LLM provider with necessary credentials and settings.
         
         Args:
             api_key (str): API key for authentication with the LLM service
+            model (str): Model name to use (e.g., 'gpt-4', 'deepseek-chat')
             **kwargs: Additional provider-specific settings
         """
-        pass
+        self.api_key = api_key
+        self.model = model
+        self.kwargs = kwargs
     
     @abstractmethod
-    def generate_response(self, 
-                         system_prompt: str,
-                         user_prompt: str,
-                         conversation_history: Optional[List[Dict[str, str]]] = None) -> Tuple[str, Dict[str, Any]]:
+    async def generate_response(self, 
+                              prompt: str,
+                              conversation_history: Optional[List[Dict[str, str]]] = None,
+                              temperature: float = 0.7) -> Tuple[str, Dict[str, Any]]:
         """
         Send a prompt to the LLM and get a response.
         
-        The system_prompt should include instructions for the LLM to format its 
-        response in a semi-structured format like:
-        
-        Decision: buy
-        Confidence: 0.85
-        Position Size: 0.05
-        Stop Loss: 74200
-        Take Profit: 76500
-        Reasoning: RSI is oversold and MACD shows bullish crossover...
-        
-        This minimal structure ensures consistency while allowing free-form reasoning.
-        The raw response will be passed to the Structuring Module for further processing.
-        
         Args:
-            system_prompt (str): Initial system instructions to guide the LLM's behavior
-                and establish the expected response format
-            user_prompt (str): The main prompt containing market data and questions
+            prompt (str): The complete prompt containing all context and instructions
             conversation_history (Optional[List[Dict[str, str]]]): Previous conversation
-                messages for maintaining context, especially for active trade management.
-                Each message should have 'role' and 'content' keys.
+                messages for maintaining context. Each message should have 'role' and 'content' keys.
+            temperature (float): Controls randomness (0.0 = deterministic, 1.0 = creative)
         
         Returns:
             Tuple[str, Dict[str, Any]]: A tuple containing:
-                - The raw text response from the LLM (semi-structured)
-                - Metadata about the request/response (tokens used, latency, etc.)
+                - The raw text response from the LLM
+                - Metadata about the request/response (tokens used, latency, model, etc.)
         """
         pass
     
     @abstractmethod
-    def format_market_data(self, 
-                          market_data: Dict[str, Dict[str, Any]], 
-                          live_price: Union[float, Dict[str, float]],
-                          symbol: str = "BTC-USD",
-                          active_trade: Optional[Dict[str, Any]] = None) -> str:
-        """
-        Format market data into a prompt that the LLM can process effectively.
-        
-        Args:
-            market_data (Dict[str, Dict[str, Any]]): Market data by timeframe
-            live_price (Union[float, Dict[str, float]]): Current price(s)
-            symbol (str): The trading symbol/pair
-            active_trade (Optional[Dict[str, Any]]): Information about any active trade
-            
-        Returns:
-            str: A formatted prompt string ready to send to the LLM
-        """
-        pass
-    
-    @property
-    @abstractmethod
-    def max_tokens(self) -> int:
-        """
-        Get the maximum context length in tokens that this LLM supports.
-        
-        Returns:
-            int: Maximum number of tokens the LLM can process in one request
-        """
-        pass
-    
-    @abstractmethod
-    def health_check(self) -> bool:
+    async def health_check(self) -> bool:
         """
         Check if the LLM API is accessible and functioning.
         
@@ -108,3 +64,25 @@ class LLMProvider(ABC):
             bool: True if the API is accessible, False otherwise
         """
         pass
+    
+    def _prepare_messages(self, prompt: str, conversation_history: Optional[List[Dict[str, str]]] = None) -> List[Dict[str, str]]:
+        """
+        Helper method to prepare messages in the format expected by most LLM APIs.
+        
+        Args:
+            prompt (str): The current prompt
+            conversation_history (Optional[List[Dict[str, str]]]): Previous messages
+            
+        Returns:
+            List[Dict[str, str]]: Formatted messages list
+        """
+        messages = []
+        
+        # Add conversation history if provided
+        if conversation_history:
+            messages.extend(conversation_history)
+        
+        # Add current prompt as user message
+        messages.append({"role": "user", "content": prompt})
+        
+        return messages

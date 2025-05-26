@@ -1,8 +1,8 @@
 """
-DeepSeek LLM Provider Implementation.
+OpenAI LLM Provider Implementation.
 
-This module implements the LLMProvider interface for DeepSeek's API.
-DeepSeek provides powerful reasoning capabilities ideal for trading decisions.
+This module implements the LLMProvider interface for OpenAI's API.
+Supports GPT-4, GPT-3.5, and other OpenAI models.
 """
 
 import aiohttp
@@ -13,30 +13,30 @@ from core.common.logger import logger
 from decision.interfaces.llm_provider import LLMProvider
 
 
-class DeepSeekProvider(LLMProvider):
+class OpenAIProvider(LLMProvider):
     """
-    DeepSeek implementation of the LLMProvider interface.
+    OpenAI implementation of the LLMProvider interface.
     
-    Uses DeepSeek's chat API for generating trading decisions with
-    strong reasoning capabilities.
+    Uses OpenAI's chat completions API for generating trading decisions.
     """
     
-    def __init__(self, api_key: str, model: str = "deepseek-chat", **kwargs):
+    def __init__(self, api_key: str, model: str = "gpt-4o-mini", **kwargs):
         """
-        Initialize the DeepSeek provider.
+        Initialize the OpenAI provider.
         
         Args:
-            api_key (str): DeepSeek API key
-            model (str): Model to use (default: 'deepseek-chat')
-            **kwargs: Additional settings like base_url, timeout, etc.
+            api_key (str): OpenAI API key
+            model (str): Model to use (default: 'gpt-4o-mini')
+            **kwargs: Additional settings like base_url, organization, timeout, etc.
         """
         super().__init__(api_key, model, **kwargs)
-        self.base_url = kwargs.get('base_url', 'https://api.deepseek.com/v1')
+        self.base_url = kwargs.get('base_url', 'https://api.openai.com/v1')
+        self.organization = kwargs.get('organization', None)
         self.timeout = kwargs.get('timeout', 30)
         self.max_retries = kwargs.get('max_retries', 3)
         
-        logger.bind(module="decision.deepseek").info(
-            f"Initialized DeepSeek provider with model: {self.model}"
+        logger.bind(module="decision.openai").info(
+            f"Initialized OpenAI provider with model: {self.model}"
         )
     
     async def generate_response(self, 
@@ -44,7 +44,7 @@ class DeepSeekProvider(LLMProvider):
                               conversation_history: Optional[List[Dict[str, str]]] = None,
                               temperature: float = 0.7) -> Tuple[str, Dict[str, Any]]:
         """
-        Generate a response from DeepSeek.
+        Generate a response from OpenAI.
         
         Args:
             prompt (str): The prompt to send
@@ -69,6 +69,9 @@ class DeepSeekProvider(LLMProvider):
             "Authorization": f"Bearer {self.api_key}",
             "Content-Type": "application/json"
         }
+        
+        if self.organization:
+            headers["OpenAI-Organization"] = self.organization
         
         payload = {
             "model": self.model,
@@ -104,7 +107,7 @@ class DeepSeekProvider(LLMProvider):
                                 "finish_reason": data['choices'][0].get('finish_reason', 'unknown')
                             }
                             
-                            logger.bind(module="decision.deepseek").info(
+                            logger.bind(module="decision.openai").info(
                                 f"Generated response in {metadata['latency']:.2f}s, "
                                 f"tokens: {metadata['usage'].get('total_tokens', 'unknown')}"
                             )
@@ -113,7 +116,7 @@ class DeepSeekProvider(LLMProvider):
                         
                         elif response.status == 429:  # Rate limit
                             wait_time = min(2 ** attempt, 10)
-                            logger.bind(module="decision.deepseek").warning(
+                            logger.bind(module="decision.openai").warning(
                                 f"Rate limited, waiting {wait_time}s before retry"
                             )
                             await asyncio.sleep(wait_time)
@@ -121,7 +124,7 @@ class DeepSeekProvider(LLMProvider):
                         
                         else:
                             error_text = await response.text()
-                            logger.bind(module="decision.deepseek").error(
+                            logger.bind(module="decision.openai").error(
                                 f"API error {response.status}: {error_text}"
                             )
                             
@@ -129,10 +132,10 @@ class DeepSeekProvider(LLMProvider):
                                 await asyncio.sleep(1)
                                 continue
                             else:
-                                raise Exception(f"DeepSeek API error: {error_text}")
+                                raise Exception(f"OpenAI API error: {error_text}")
             
             except asyncio.TimeoutError:
-                logger.bind(module="decision.deepseek").error(
+                logger.bind(module="decision.openai").error(
                     f"Request timeout on attempt {attempt + 1}"
                 )
                 if attempt < self.max_retries - 1:
@@ -141,7 +144,7 @@ class DeepSeekProvider(LLMProvider):
                     raise
             
             except Exception as e:
-                logger.bind(module="decision.deepseek").error(
+                logger.bind(module="decision.openai").error(
                     f"Unexpected error on attempt {attempt + 1}: {str(e)}"
                 )
                 if attempt < self.max_retries - 1:
@@ -150,11 +153,11 @@ class DeepSeekProvider(LLMProvider):
                 else:
                     raise
         
-        raise Exception("Failed to get response from DeepSeek after all retries")
+        raise Exception("Failed to get response from OpenAI after all retries")
     
     async def health_check(self) -> bool:
         """
-        Check if the DeepSeek API is accessible.
+        Check if the OpenAI API is accessible.
         
         Returns:
             bool: True if API is accessible, False otherwise
@@ -169,7 +172,7 @@ class DeepSeekProvider(LLMProvider):
             return 'OK' in response or 'ok' in response.lower()
         
         except Exception as e:
-            logger.bind(module="decision.deepseek").error(
+            logger.bind(module="decision.openai").error(
                 f"Health check failed: {str(e)}"
             )
             return False

@@ -13,14 +13,14 @@ import uuid
 from typing import Dict, List, Optional, Any, Union
 
 from core.common.logger import logger
-from trading.engine.model.intent import Intent
-from trading.engine.model.trade import Trade
-from trading.engine.model.event import Event, EventType
-from trading.engine.model.tool_call import ToolCall, ValidatedToolCall
-from trading.engine.model.config import EngineConfig
-from trading.engine.service.llm_service import LLMService
-from trading.engine.service.validation_service import ValidationService
-from trading.engine.service.execution_service import ExecutionService
+from trading.engine_services.model.intent import Intent
+from trading.engine_services.model.trade import Trade
+from trading.engine_services.model.event import Event, EventType
+from trading.engine_services.model.tool_call import ToolCall, ValidatedToolCall
+from trading.engine_services.model.config import EngineConfig
+from trading.engine_services.service.llm_service import LLMService
+from trading.engine_services.service.validation_service import ValidationService
+from trading.engine_services.service.execution_service import ExecutionService
 from trading.compiler import TradeCompiler
 from trading.exchanges.ccxt_mcp import CCXTMCPAdapter
 from trading.interfaces import TradingInterface
@@ -202,12 +202,12 @@ class TradingEngine(TradingInterface):
         )
         
         self.validation_service = ValidationService(
-            config=self.config,
+            config=self.config.validation,
             trade_compiler=self.trade_compiler
         )
         
         self.execution_service = ExecutionService(
-            config=self.config,
+            config=self.config.execution,
             ccxt_adapter=self.ccxt_adapter,
             event_bus=self.event_bus
         )
@@ -236,9 +236,9 @@ class TradingEngine(TradingInterface):
         await self.execution_service.start()
         
         # Emit started event
-        self.event_bus.emit(Event(
+        self.event_bus.emit(Event.create(
             event_type=EventType.ENGINE_STARTED,
-            data={"user_id": self.user_id}
+            user_id=self.user_id
         ))
         
         logger.info("TradingEngine services started")
@@ -254,9 +254,9 @@ class TradingEngine(TradingInterface):
         await self.ccxt_adapter.disconnect()
         
         # Emit stopped event
-        self.event_bus.emit(Event(
+        self.event_bus.emit(Event.create(
             event_type=EventType.ENGINE_STOPPED,
-            data={"user_id": self.user_id}
+            user_id=self.user_id
         ))
         
         logger.info("TradingEngine services stopped")

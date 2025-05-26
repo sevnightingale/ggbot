@@ -15,10 +15,10 @@ from decimal import Decimal, ROUND_HALF_DOWN, ROUND_HALF_UP, DecimalException
 from typing import Dict, List, Optional, Any, Union, Tuple
 
 from core.common.logger import logger
-from trading.engine.model.config import ValidationConfig
-from trading.engine.model.intent import Intent
-from trading.engine.model.tool_call import ToolCall, ValidatedToolCall
-from trading.engine.model.event import Event, EventType
+from trading.engine_services.model.config import ValidationConfig
+from trading.engine_services.model.intent import Intent
+from trading.engine_services.model.tool_call import ToolCall, ValidatedToolCall
+from trading.engine_services.model.event import Event, EventType
 
 
 class ValidationError(Exception):
