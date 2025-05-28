@@ -2,6 +2,37 @@
 
 This document provides a comprehensive overview of all API endpoints in the GGBot system.
 
+## Running the Combined API Server (Recommended for Prototype)
+
+For simplified deployment, all APIs can be run as a single service:
+
+```bash
+# Method 1: Direct Python
+cd /home/sev/ggbot
+source .venv/bin/activate
+python main_api.py
+
+# Method 2: Using uvicorn
+uvicorn main_api:app --host 0.0.0.0 --port 8000 --reload
+
+# Method 3: With custom settings
+export API_HOST=0.0.0.0
+export API_PORT=8000
+python main_api.py
+```
+
+**Combined API URLs:**
+- Main docs: http://localhost:8000/docs
+- Extraction: http://localhost:8000/extraction/...
+- Decision: http://localhost:8000/decision/...
+- Trading: http://localhost:8000/trading/...
+- Dashboard: http://localhost:8000/dashboard/...
+- Agent Control: http://localhost:8000/agent/...
+
+## Running Individual Services (For Development/Production)
+
+Alternatively, each service can be run independently on different ports:
+
 ## Trading Module API
 
 Base URL: `http://localhost:5000` (configurable via `TRADING_API_PORT`)
@@ -222,28 +253,586 @@ Close an open position for a specific symbol.
 
 ---
 
-## Future Endpoints (Planned)
+## Extraction Module API (IMPLEMENTED)
 
-### Extraction Module API
-- `POST /extract/indicators` - Extract technical indicators
-- `GET /extract/market-data` - Get latest market data
-- `POST /extract/schedule` - Schedule extraction tasks
+### Running the Extraction API
 
-### Decision Module API
-- `POST /decision/analyze` - Analyze market data and generate intents
-- `GET /decision/history` - Get decision history
-- `POST /decision/backtest` - Run strategy backtest
+```bash
+# Method 1: Direct Python
+cd /home/sev/ggbot
+source .venv/bin/activate
+python -m extraction.run_api
 
-### Configuration API
-- `GET /config/user/{user_id}` - Get user configuration
-- `PUT /config/user/{user_id}` - Update user configuration
-- `GET /config/strategies` - List available strategies
-- `POST /config/validate` - Validate configuration
+# Method 2: Using uvicorn directly
+uvicorn extraction.api:app --host 0.0.0.0 --port 5001 --reload
 
-### Monitoring API
-- `GET /monitor/account/{user_id}` - Get account monitoring data
-- `GET /monitor/performance` - Get performance metrics
-- `POST /monitor/alerts` - Configure alerts
+# Method 3: With custom settings
+export EXTRACTION_API_PORT=5001
+export EXTRACTION_API_HOST=0.0.0.0
+python -m extraction.api
+```
+
+**API Documentation URLs:**
+- Swagger UI: http://localhost:5001/docs
+- ReDoc: http://localhost:5001/redoc
+
+### Extract Market Data
+```
+POST /api/extraction/run
+```
+
+Trigger market data extraction for specified symbols and timeframes.
+
+**Request Body:**
+```json
+{
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "symbols": ["BTC/USDT", "ETH/USDT"],  // Optional, uses config if not provided
+  "timeframes": ["15m", "1h"]           // Optional, uses config if not provided
+}
+```
+
+**Response:**
+```json
+{
+  "status": "started",
+  "extraction_id": "123e4567-e89b-12d3-a456-426614174000",
+  "message": "Extraction started for 2 symbols across 2 timeframes"
+}
+```
+
+### Get Extraction Status
+```
+GET /api/extraction/status/{extraction_id}
+```
+
+**Response:**
+```json
+{
+  "extraction_id": "123e4567-e89b-12d3-a456-426614174000",
+  "status": "completed",
+  "started_at": "2024-01-10T12:00:00Z",
+  "completed_at": "2024-01-10T12:00:45Z",
+  "data_points_extracted": 8,
+  "errors": []
+}
+```
+
+### Get Latest Market Data
+```
+GET /api/extraction/latest/{user_id}
+```
+
+**Query Parameters:**
+- `symbol` (required): Trading symbol (e.g., "BTC/USDT")
+- `timeframe` (required): Timeframe (e.g., "15m")
+- `data_type` (optional): "indicator_values" or "indicator_analysis"
+
+**Response:**
+```json
+{
+  "symbol": "BTC/USDT",
+  "timeframe": "15m",
+  "data": {
+    "RSI": [45.2, 46.1, 47.3, ...],  // 100 data points
+    "MACD": {...},
+    "BB": {...}
+  },
+  "analysis": "Current RSI indicates neutral momentum...",
+  "created_at": "2024-01-10T12:00:00Z"
+}
+```
+
+---
+
+## Decision Module API (IMPLEMENTED)
+
+### Running the Decision API
+
+```bash
+# Method 1: Direct Python
+cd /home/sev/ggbot
+source .venv/bin/activate
+python -m decision.run_api
+
+# Method 2: Using uvicorn directly
+uvicorn decision.api:app --host 0.0.0.0 --port 5002 --reload
+
+# Method 3: With custom settings
+export DECISION_API_PORT=5002
+export DECISION_API_HOST=0.0.0.0
+python -m decision.api
+```
+
+**API Documentation URLs:**
+- Swagger UI: http://localhost:5002/docs
+- ReDoc: http://localhost:5002/redoc
+
+### Generate Trading Decision
+```
+POST /api/decision/analyze
+```
+
+Analyze market data and generate a trading decision.
+
+**Request Body:**
+```json
+{
+  "user_id": "550e8400-e29b-41d4-a716-446655440000",
+  "mode": "auto"  // "auto", "NEW_TRADE", or "MANAGE_TRADE"
+}
+```
+
+**Response:**
+```json
+{
+  "decision_id": "789e0123-e89b-12d3-a456-426614174000",
+  "mode": "NEW_TRADE",
+  "intent": {
+    "action": "enter_long",
+    "symbol": "BTC/USDT",
+    "confidence": 0.85,
+    "leverage": 10,
+    "stop_loss": 42000,
+    "take_profit": 48000
+  },
+  "reasoning": "Strong bullish divergence on RSI with support bounce...",
+  "created_at": "2024-01-10T12:05:00Z"
+}
+```
+
+### Get Decision History
+```
+GET /api/decision/history/{user_id}
+```
+
+**Query Parameters:**
+- `limit` (optional): Number of decisions to return (default: 10)
+- `offset` (optional): Pagination offset
+- `status` (optional): Filter by decision outcome
+
+**Response:**
+```json
+{
+  "decisions": [
+    {
+      "decision_id": "789e0123-e89b-12d3-a456-426614174000",
+      "mode": "NEW_TRADE",
+      "intent": {...},
+      "reasoning": "...",
+      "trade_id": "123e4567-e89b-12d3-a456-426614174000",
+      "outcome": "profitable",
+      "created_at": "2024-01-10T12:05:00Z"
+    }
+  ],
+  "total": 45,
+  "limit": 10,
+  "offset": 0
+}
+```
+
+### Get Current Decision
+```
+GET /api/decision/current/{user_id}
+```
+
+Get the most recent decision for active trade management.
+
+**Response:**
+```json
+{
+  "decision_id": "789e0123-e89b-12d3-a456-426614174000",
+  "mode": "MANAGE_TRADE",
+  "original_reasoning": "Bullish divergence entry",
+  "current_analysis": "Trade progressing as expected, maintaining position",
+  "active_trade": {
+    "trade_id": "123e4567-e89b-12d3-a456-426614174000",
+    "unrealized_pnl": 125.50
+  }
+}
+```
+
+---
+
+## Dashboard API (IMPLEMENTED)
+
+### Running the Dashboard API
+
+```bash
+# Method 1: Direct Python
+cd /home/sev/ggbot
+source .venv/bin/activate
+python -m core.api.dashboard_api
+
+# Method 2: Using uvicorn directly
+uvicorn core.api.dashboard_api:app --host 0.0.0.0 --port 5003 --reload
+
+# Method 3: With custom settings
+export DASHBOARD_API_PORT=5003
+export DASHBOARD_API_HOST=0.0.0.0
+python core.api.dashboard_api
+```
+
+**API Documentation URLs:**
+- Swagger UI: http://localhost:5003/docs
+- ReDoc: http://localhost:5003/redoc
+
+### Get Current Positions
+```
+GET /api/dashboard/{user_id}/positions
+```
+
+Returns all open positions with current P&L.
+
+**Response:**
+```json
+{
+  "positions": [
+    {
+      "trade_id": "123e4567-e89b-12d3-a456-426614174000",
+      "symbol": "BTC/USD",
+      "side": "long",
+      "size": 1000,
+      "entry_price": 45000,
+      "current_price": 46000,
+      "unrealized_pnl": 22.22,
+      "unrealized_pnl_percentage": 2.22,
+      "stop_loss": 44000,
+      "take_profit": 47000,
+      "duration": "2h 15m",
+      "decision_id": "789e0123-e89b-12d3-a456-426614174000"
+    }
+  ],
+  "total_positions": 1,
+  "total_unrealized_pnl": 22.22
+}
+```
+
+### Get Performance Metrics
+```
+GET /api/dashboard/{user_id}/performance?period=7d
+```
+
+Returns performance metrics for the specified period.
+
+**Query Parameters:**
+- `period`: Time period (1d, 7d, 30d, all)
+
+**Response:**
+```json
+{
+  "period": "7d",
+  "metrics": {
+    "total_pnl": 1250.50,
+    "total_pnl_percentage": 12.5,
+    "win_rate": 0.65,
+    "total_trades": 20,
+    "winning_trades": 13,
+    "losing_trades": 7,
+    "average_win": 150.25,
+    "average_loss": -75.10,
+    "profit_factor": 2.0,
+    "max_drawdown": -5.2,
+    "sharpe_ratio": 0
+  },
+  "daily_pnl": [
+    {"date": "2024-01-10", "pnl": 125.50, "trades": 3}
+  ]
+}
+```
+
+### WebSocket Real-time Updates
+```
+WS /ws/dashboard/{user_id}
+```
+
+Connect for real-time position updates.
+
+**Message Types:**
+```json
+{
+  "type": "position_update",
+  "data": {
+    "positions": [...],
+    "total_positions": 1,
+    "total_unrealized_pnl": 22.22
+  }
+}
+```
+
+---
+
+## Agent Control API (IMPLEMENTED)
+
+### Running the Agent Control API
+
+```bash
+# Method 1: Direct Python
+cd /home/sev/ggbot
+source .venv/bin/activate
+python -m core.api.agent_control_api
+
+# Method 2: Using uvicorn directly
+uvicorn core.api.agent_control_api:app --host 0.0.0.0 --port 5004 --reload
+
+# Method 3: With custom settings
+export AGENT_CONTROL_API_PORT=5004
+export AGENT_CONTROL_API_HOST=0.0.0.0
+python core.api.agent_control_api
+```
+
+**API Documentation URLs:**
+- Swagger UI: http://localhost:5004/docs
+- ReDoc: http://localhost:5004/redoc
+
+### Start Trading Bot
+```
+POST /api/agent/{user_id}/start
+```
+
+Start the trading bot for a user.
+
+**Request Body:**
+```json
+{
+  "modules": ["all"]  // or specific modules: ["extraction", "decision", "trading"]
+}
+```
+
+**Response:**
+```json
+{
+  "status": "started",
+  "modules_started": ["extraction", "decision", "trading", "monitoring"],
+  "message": "Trading bot started successfully"
+}
+```
+
+### Stop Trading Bot
+```
+POST /api/agent/{user_id}/stop
+```
+
+**Request Body:**
+```json
+{
+  "modules": ["all"],
+  "close_positions": false  // If true, closes all open positions
+}
+```
+
+**Response:**
+```json
+{
+  "status": "stopped",
+  "modules_stopped": ["extraction", "decision", "trading"],
+  "open_positions": 1,
+  "message": "Trading bot stopped. 1 position remains open."
+}
+```
+
+### Get Agent Status
+```
+GET /api/agent/{user_id}/status
+```
+
+**Response:**
+```json
+{
+  "overall_status": "running",
+  "modules": {
+    "extraction": {
+      "status": "running",
+      "last_run": "2024-01-10T12:15:00Z",
+      "next_run": "2024-01-10T12:30:00Z",
+      "errors": 0
+    },
+    "decision": {
+      "status": "running",
+      "last_run": "2024-01-10T12:20:00Z",
+      "mode": "MANAGE_TRADE",
+      "errors": 0
+    },
+    "trading": {
+      "status": "running",
+      "active_positions": 1,
+      "last_execution": "2024-01-10T11:00:00Z"
+    },
+    "monitoring": {
+      "status": "running",
+      "last_update": "2024-01-10T12:25:00Z"
+    }
+  }
+}
+```
+
+---
+
+## Configuration API (To Be Implemented)
+
+### Get Configuration
+```
+GET /api/config/{user_id}/{module}
+```
+
+Get configuration for a specific module.
+
+**Response:**
+```json
+{
+  "module": "extraction",
+  "config": {
+    "symbols": ["BTC/USDT", "ETH/USDT"],
+    "timeframes": ["15m", "1h"],
+    "indicators": ["RSI", "MACD", "BB"]
+  },
+  "last_updated": "2024-01-10T10:00:00Z"
+}
+```
+
+### Update Configuration
+```
+PUT /api/config/{user_id}/{module}
+```
+
+Update configuration for a specific module.
+
+**Request Body:**
+```json
+{
+  "config": {
+    "symbols": ["BTC/USDT"],
+    "timeframes": ["15m"],
+    "indicators": ["RSI", "MACD"]
+  }
+}
+```
+
+**Response:**
+```json
+{
+  "status": "updated",
+  "module": "extraction",
+  "config": {...},
+  "message": "Configuration updated successfully"
+}
+```
+
+---
+
+## Dashboard API (To Be Implemented)
+
+### Get Current Positions
+```
+GET /api/dashboard/{user_id}/positions
+```
+
+**Response:**
+```json
+{
+  "positions": [
+    {
+      "trade_id": "123e4567-e89b-12d3-a456-426614174000",
+      "symbol": "BTC/USD",
+      "side": "long",
+      "size": 1000,
+      "entry_price": 45000,
+      "current_price": 46000,
+      "unrealized_pnl": 22.22,
+      "unrealized_pnl_percentage": 2.22,
+      "stop_loss": 44000,
+      "take_profit": 47000,
+      "duration": "2h 15m",
+      "decision_id": "789e0123-e89b-12d3-a456-426614174000"
+    }
+  ],
+  "total_positions": 1,
+  "total_unrealized_pnl": 22.22
+}
+```
+
+### Get Performance Metrics
+```
+GET /api/dashboard/{user_id}/performance
+```
+
+**Query Parameters:**
+- `period`: Time period (1d, 7d, 30d, all)
+
+**Response:**
+```json
+{
+  "period": "7d",
+  "metrics": {
+    "total_pnl": 1250.50,
+    "total_pnl_percentage": 12.5,
+    "win_rate": 0.65,
+    "total_trades": 20,
+    "winning_trades": 13,
+    "losing_trades": 7,
+    "average_win": 150.25,
+    "average_loss": -75.10,
+    "profit_factor": 2.0,
+    "max_drawdown": -5.2,
+    "sharpe_ratio": 1.8
+  },
+  "daily_pnl": [
+    {"date": "2024-01-10", "pnl": 125.50, "trades": 3},
+    {"date": "2024-01-09", "pnl": -50.25, "trades": 2}
+  ]
+}
+```
+
+### WebSocket Real-time Updates
+```
+WS /ws/dashboard/{user_id}
+```
+
+**Connection:**
+```javascript
+const ws = new WebSocket('ws://localhost:5000/ws/dashboard/user-id');
+```
+
+**Message Types:**
+
+Position Update:
+```json
+{
+  "type": "position_update",
+  "data": {
+    "trade_id": "123e4567-e89b-12d3-a456-426614174000",
+    "current_price": 46100,
+    "unrealized_pnl": 24.44,
+    "unrealized_pnl_percentage": 2.44
+  }
+}
+```
+
+New Decision:
+```json
+{
+  "type": "new_decision",
+  "data": {
+    "decision_id": "789e0123-e89b-12d3-a456-426614174000",
+    "mode": "NEW_TRADE",
+    "action": "enter_long",
+    "symbol": "BTC/USD",
+    "confidence": 0.85
+  }
+}
+```
+
+Module Status:
+```json
+{
+  "type": "module_status",
+  "data": {
+    "module": "extraction",
+    "status": "completed",
+    "message": "Extracted data for 2 symbols"
+  }
+}
+```
 
 ---
 

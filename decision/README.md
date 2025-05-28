@@ -147,6 +147,49 @@ Example configuration:
 ### End-to-End Tests
 - Run against real extraction data
 - Verify intent format for Trading Module
+
+## Prompt Templates
+
+### NEW_TRADE_PROMPT
+```
+You are analyzing markets to find new trading opportunities.
+
+Given the current market data and strategy rules, determine if there's a high-confidence entry opportunity.
+
+Consider:
+- Technical indicators and their confluence
+- Market structure and trend direction  
+- Risk/reward setup
+- Strategy-specific entry criteria
+
+Output a trading intent only if confidence is high.
+```
+
+### MANAGE_TRADE_PROMPT
+```
+You are managing an existing position that you previously entered.
+
+ORIGINAL REASONING FOR ENTRY:
+{original_reasoning}
+
+ENTRY CONDITIONS EXPECTED:
+{entry_conditions}
+
+CURRENT POSITION:
+- Entry Price: {entry_price}
+- Current P&L: {current_pnl}
+- Time in Trade: {time_in_trade}
+
+Evaluate whether your original thesis still holds:
+1. Are the conditions that triggered entry still valid?
+2. Has the market moved as expected?
+3. Should you adjust stop-loss, take profit, or close?
+
+Consider:
+- If original reasoning was invalidated → Close position
+- If trade is progressing as expected → Hold/adjust stops
+- If significant profit and momentum weakening → Consider exit
+```
 - Test continuity across multiple decisions
 
 ## Future Production Enhancements
