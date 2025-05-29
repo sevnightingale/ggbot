@@ -490,3 +490,113 @@ These features should be implemented based on:
 4. **Technical Debt**: Ensure foundation remains solid before adding complexity
 
 The current prototype provides a solid foundation for all these future enhancements without requiring major architectural changes.
+
+
+
+  Current State vs Future Multi-Source Architecture
+
+  What We Changed (Short-term Fix):
+
+  # Current API - Direct single-source call
+  results = await extract_mcp_indicators(symbols,
+  timeframes, user_id, use_llm=True)
+
+  What We'll Need for Multi-Source (Future):
+
+  # Multi-source orchestration
+  manager = ExtractionManager(user_id)
+  await manager.initialize_sources()  # Loads all 
+  enabled sources
+  results = await manager.extract_all()  # Orchestrates
+   multiple sources
+
+  Required Updates for Multi-Source Support:
+
+  1. API Layer (extraction/api.py)
+
+  # Will need to switch back to:
+  manager = ExtractionManager(user_id=user_id)
+  await manager.initialize_sources()
+  results = await manager.extract_all()
+
+  # Instead of current direct call:
+  results = await extract_mcp_indicators(...)
+
+  2. New Data Sources (extraction/sources/)
+
+  Based on config, we'll need to implement:
+  - tradingview_source.py - TradingView data/analysis
+  - yfinance_source.py - Yahoo Finance data
+  - news_feed_source.py - News sentiment analysis
+  - telegram_source.py - Telegram channel monitoring
+
+  3. ExtractionManager._create_source() Updates
+
+  elif source_name == 'tradingview':
+      from extraction.sources.tradingview_source import
+   TradingViewSource
+      return TradingViewSource(self.user_id,
+  source_config)
+  elif source_name == 'news_feed':
+      from extraction.sources.news_feed_source import
+  NewsFeedSource
+      return NewsFeedSource(self.user_id,
+  source_config)
+  # etc...
+
+  4. Database Schema (market_data table)
+
+  Already supports this via:
+  - source column - identifies which source the data
+  came from
+  - data_type column - different types:
+  "indicator_values", "news", "sentiment", etc.
+  - raw_data JSONB - flexible structure for different
+  data types
+
+  5. Decision Module Updates
+
+  Will need to read from multiple sources:
+  # Current: Only reads indicator data
+  indicator_data = get_latest_market_data(symbol,
+  timeframe, data_type="indicator_analysis")
+
+  # Future: Reads multiple data types
+  indicator_data = get_latest_market_data(symbol,
+  timeframe, data_type="indicator_analysis")
+  news_data = get_latest_market_data(symbol, timeframe,
+   data_type="news")
+  sentiment_data = get_latest_market_data(symbol,
+  timeframe, data_type="sentiment")
+
+  Migration Strategy:
+
+  Phase 1 (Current):
+
+  ✅ Single-source working with direct API calls
+
+  Phase 2 (Add Sources):
+
+  1. Implement new source classes
+  2. Update ExtractionManager._create_source()
+  3. Test each source individually
+
+  Phase 3 (Multi-Source Integration):
+
+  1. Switch API back to ExtractionManager
+  2. Update result aggregation logic
+  3. Update decision module to handle multiple data
+  types
+
+  Phase 4 (Advanced Features):
+
+  - Data fusion algorithms
+  - Source reliability scoring
+  - Conflict resolution between sources
+
+  The Trade-off We Made:
+
+  Short-term: Simplified to single-source for immediate
+   functionality
+  Future: Easy migration path back to ExtractionManager
+   for multi-source support

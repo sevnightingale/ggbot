@@ -45,13 +45,17 @@ class TradeCompiler:
         """
         self.config = config or {}
         self.ccxt_adapter = ccxt_adapter
+        
+        # Set up logging with user context first
+        self.logger = logger.bind(user_id=ccxt_adapter.user_id) if hasattr(ccxt_adapter, 'user_id') else logger
+        
         self.risk_rules = self._load_risk_rules()
         self.exchange_info_cache = {}  # Cache for market data {exchange_id: {market_symbol: market_data}}
         self.tools_cache = {}  # Cache for available tools {exchange_id: [tools]}
         
         # Log initialization
-        logger.info(f"TradeCompiler initialized for exchange {ccxt_adapter.exchange_id}")
-        logger.info(f"Risk rules: {self.risk_rules}")
+        self.logger.info(f"TradeCompiler initialized for exchange {ccxt_adapter.exchange_id}")
+        self.logger.info(f"Risk rules: {self.risk_rules}")
 
     def _load_risk_rules(self) -> Dict:
         """
@@ -76,7 +80,7 @@ class TradeCompiler:
         rules = self.config.get('risk_rules', {})
         defaults.update(rules)
         
-        logger.info(f"Loaded risk rules: {defaults}")
+        self.logger.info(f"Loaded risk rules: {defaults}")
         return defaults
 
     async def _get_exchange_info(self, exchange_id: str) -> Optional[Dict]:
@@ -91,21 +95,21 @@ class TradeCompiler:
         """
         if exchange_id not in self.exchange_info_cache:
             try:
-                logger.info(f"Fetching market info for {exchange_id} via CCXTMCPAdapter...")
+                self.logger.info(f"Fetching market info for {exchange_id} via CCXTMCPAdapter...")
                 
                 # Using our adapter's fetch_markets method
                 markets = await self.ccxt_adapter.fetch_markets()
                 
                 if not markets:
-                    logger.warning(f"fetch_markets returned empty data for {exchange_id}")
+                    self.logger.warning(f"fetch_markets returned empty data for {exchange_id}")
                     return None
                     
                 # Cache the result
                 self.exchange_info_cache[exchange_id] = markets
-                logger.info(f"Cached market info for {exchange_id} ({len(markets)} markets)")
+                self.logger.info(f"Cached market info for {exchange_id} ({len(markets)} markets)")
                 
             except Exception as e:
-                logger.error(f"Failed to fetch market info for {exchange_id}: {e}", exc_info=True)
+                self.logger.error(f"Failed to fetch market info for {exchange_id}: {e}", exc_info=True)
                 return None
                 
         # Return the cached dict or None if fetch failed previously
@@ -128,7 +132,7 @@ class TradeCompiler:
         Raises:
             TradeCompilerValidationError: If validation fails
         """
-        logger.info(f"Validating {len(proposed_tool_calls)} tool calls for intent {intent_data.get('decision_id', 'unknown')}")
+        self.logger.info(f"Validating {len(proposed_tool_calls)} tool calls for intent {intent_data.get('decision_id', 'unknown')}")
         
         finalized_calls = []
         
@@ -158,16 +162,16 @@ class TradeCompiler:
         
         # If mapped symbol not found, try the original standard symbol
         if not market_info:
-            logger.warning(f"Market info not found for mapped symbol '{exchange_symbol}'. Trying standard symbol '{standard_symbol}'.")
+            self.logger.warning(f"Market info not found for mapped symbol '{exchange_symbol}'. Trying standard symbol '{standard_symbol}'.")
             market_info = all_markets_info.get(standard_symbol)
             
             if market_info:
                 exchange_symbol = standard_symbol
-                logger.info(f"Found market info using standard symbol '{standard_symbol}'.")
+                self.logger.info(f"Found market info using standard symbol '{standard_symbol}'.")
             else:
                 raise TradeCompilerValidationError(f"Market info not found for symbol '{standard_symbol}' or mapped symbol '{exchange_symbol}' on {exchange_id}")
         
-        logger.info(f"Compiler: Intent {intent_data.get('decision_id', 'unknown')}, Exchange: {exchange_id}, Symbol: {standard_symbol} -> {exchange_symbol}")
+        self.logger.info(f"Compiler: Intent {intent_data.get('decision_id', 'unknown')}, Exchange: {exchange_id}, Symbol: {standard_symbol} -> {exchange_symbol}")
         
         # -- 4. Perform overall risk checks --
         self._check_overall_risk(intent_data, context)
@@ -175,14 +179,14 @@ class TradeCompiler:
         # -- 5. Get available tools for validation --
         available_tools = await self._get_available_tools(exchange_id)
         if not available_tools:
-            logger.warning(f"No available tools found for {exchange_id}, schema validation will be limited")
+            self.logger.warning(f"No available tools found for {exchange_id}, schema validation will be limited")
         
         # -- 6. Process each proposed tool call --
         for call_index, call in enumerate(proposed_tool_calls):
             tool_name = call.get('tool')
             params = call.get('parameters', {})
             
-            logger.debug(f"Processing call {call_index}: {tool_name} with params {json.dumps(params)}")
+            self.logger.debug(f"Processing call {call_index}: {tool_name} with params {json.dumps(params)}")
             
             # 6.1. Basic validation
             if not tool_name:
@@ -195,11 +199,11 @@ class TradeCompiler:
             # Check for camelCase/snake_case variants of 'type'
             if 'orderType' in normalized_params and 'type' not in normalized_params:
                 normalized_params['type'] = normalized_params.pop('orderType')
-                logger.info(f"Normalized 'orderType' to 'type' in call {call_index}")
+                self.logger.info(f"Normalized 'orderType' to 'type' in call {call_index}")
                 
             if 'order_type' in normalized_params and 'type' not in normalized_params:
                 normalized_params['type'] = normalized_params.pop('order_type')
-                logger.info(f"Normalized 'order_type' to 'type' in call {call_index}")
+                self.logger.info(f"Normalized 'order_type' to 'type' in call {call_index}")
                 
             # 6.2. Schema validation with normalized parameters
             schema_valid = await self._validate_tool_schema(tool_name, normalized_params, available_tools)
@@ -221,7 +225,7 @@ class TradeCompiler:
                     (key == 'since' or key == 'limit')  # Optional parameters for fetch methods
                 )
                 if value is None and not is_none_allowed:
-                    logger.debug(f"Skipping None value for key '{key}' in tool '{tool_name}'")
+                    self.logger.debug(f"Skipping None value for key '{key}' in tool '{tool_name}'")
                     continue
                 
                 # Parameter-specific handling
@@ -269,7 +273,7 @@ class TradeCompiler:
                                 if abs(remainder) > 1e-9 and abs(remainder - tick_size) > 1e-9:
                                     # Round to nearest tick
                                     final_params[key] = round(final_params[key] / tick_size) * tick_size
-                                    logger.info(f"Adjusted {key} to {final_params[key]} to match tick size {tick_size}")
+                                    self.logger.info(f"Adjusted {key} to {final_params[key]} to match tick size {tick_size}")
                     
                     elif key == 'leverage':
                         # Convert to int and validate
@@ -328,7 +332,7 @@ class TradeCompiler:
                 
                 except (ValueError, TypeError, KeyError, IndexError) as e:
                     # Handle validation errors
-                    logger.error(f"Error processing parameter '{key}' with value '{value}' for tool '{tool_name}': {e}", exc_info=True)
+                    self.logger.error(f"Error processing parameter '{key}' with value '{value}' for tool '{tool_name}': {e}", exc_info=True)
                     raise TradeCompilerValidationError(f"Invalid value or type for parameter '{key}' ('{value}') in tool '{tool_name}': {e}")
             
             # 6.4. Add clientOrderId for order operations if missing
@@ -348,7 +352,7 @@ class TradeCompiler:
                 
                 # Create a valid clientOrderId
                 final_params['clientOrderId'] = f"ggb-{call_specific_id}".replace("-", "")[:max_len]
-                logger.debug(f"Generated clientOrderId: {final_params['clientOrderId']}")
+                self.logger.debug(f"Generated clientOrderId: {final_params['clientOrderId']}")
             
             # 6.5. Specific risk checks for order creation
             if tool_name in ['create_order', 'createOrder']:
@@ -360,12 +364,12 @@ class TradeCompiler:
             
             # Add finalized call to list
             finalized_calls.append({"tool": tool_name, "parameters": final_params})
-            logger.debug(f"Finalized call {call_index}: {tool_name} with params {json.dumps(final_params)}")
+            self.logger.debug(f"Finalized call {call_index}: {tool_name} with params {json.dumps(final_params)}")
         
         # -- 7. Post-processing validation --
         self._validate_call_sequence(finalized_calls)
         
-        logger.info(f"Compiler validation successful for intent {intent_data.get('decision_id', 'unknown')}. Finalized {len(finalized_calls)} calls.")
+        self.logger.info(f"Compiler validation successful for intent {intent_data.get('decision_id', 'unknown')}. Finalized {len(finalized_calls)} calls.")
         return finalized_calls
 
     def _map_symbol(self, exchange_id: str, standard_symbol: str) -> str:
@@ -403,9 +407,9 @@ class TradeCompiler:
         
         # Log the mapping
         if mapped_symbol != standard_symbol:
-            logger.info(f"Mapped standard symbol '{standard_symbol}' to exchange symbol '{mapped_symbol}' for {exchange_id}")
+            self.logger.info(f"Mapped standard symbol '{standard_symbol}' to exchange symbol '{mapped_symbol}' for {exchange_id}")
         else:
-            logger.debug(f"No specific mapping found for '{standard_symbol}' on {exchange_id}, using original.")
+            self.logger.debug(f"No specific mapping found for '{standard_symbol}' on {exchange_id}, using original.")
             
         return mapped_symbol
         
@@ -421,21 +425,21 @@ class TradeCompiler:
         """
         if exchange_id not in self.tools_cache:
             try:
-                logger.info(f"Fetching available tools for {exchange_id}...")
+                self.logger.info(f"Fetching available tools for {exchange_id}...")
                 
                 # Get tools from the adapter
                 tools = await self.ccxt_adapter.get_available_tools()
                 
                 if not tools:
-                    logger.warning(f"get_available_tools returned empty data for {exchange_id}")
+                    self.logger.warning(f"get_available_tools returned empty data for {exchange_id}")
                     return []
                     
                 # Cache the result
                 self.tools_cache[exchange_id] = tools
-                logger.info(f"Cached {len(tools)} tools for {exchange_id}")
+                self.logger.info(f"Cached {len(tools)} tools for {exchange_id}")
                 
             except Exception as e:
-                logger.error(f"Failed to fetch available tools for {exchange_id}: {e}", exc_info=True)
+                self.logger.error(f"Failed to fetch available tools for {exchange_id}: {e}", exc_info=True)
                 return []
                 
         # Return the cached tools
@@ -453,11 +457,11 @@ class TradeCompiler:
         Returns:
             True if schema is valid, False otherwise
         """
-        logger.debug(f"Validating schema for {tool_name}")
+        self.logger.debug(f"Validating schema for {tool_name}")
         
         # Check if parameters are a dictionary
         if not isinstance(params, dict):
-            logger.error(f"Parameters for tool {tool_name} must be a dictionary, got {type(params)}")
+            self.logger.error(f"Parameters for tool {tool_name} must be a dictionary, got {type(params)}")
             return False
             
         # Find the tool in available tools
@@ -469,7 +473,7 @@ class TradeCompiler:
                 
         # Check if tool exists
         if not tool_info:
-            logger.error(f"Tool '{tool_name}' not found in available tools")
+            self.logger.error(f"Tool '{tool_name}' not found in available tools")
             return False
             
         # Get parameter schema
@@ -478,14 +482,14 @@ class TradeCompiler:
         # Check required parameters
         for param_name, param_info in parameters_schema.items():
             if param_info.get('required', False) and param_name not in params:
-                logger.error(f"Required parameter '{param_name}' missing for tool '{tool_name}'")
+                self.logger.error(f"Required parameter '{param_name}' missing for tool '{tool_name}'")
                 return False
                 
         # Validate parameter types
         for param_name, param_value in params.items():
             # Skip validation for unknown parameters
             if param_name not in parameters_schema:
-                logger.warning(f"Parameter '{param_name}' not defined in schema for tool '{tool_name}'")
+                self.logger.warning(f"Parameter '{param_name}' not defined in schema for tool '{tool_name}'")
                 continue
                 
             # Get expected type
@@ -498,31 +502,31 @@ class TradeCompiler:
             # Validate type
             if expected_type == 'string':
                 if param_value is not None and not isinstance(param_value, str):
-                    logger.error(f"Parameter '{param_name}' should be string, got {type(param_value)}")
+                    self.logger.error(f"Parameter '{param_name}' should be string, got {type(param_value)}")
                     return False
             elif expected_type == 'number':
                 # Allow int or float for number
                 if param_value is not None and not isinstance(param_value, (int, float)):
-                    logger.error(f"Parameter '{param_name}' should be number, got {type(param_value)}")
+                    self.logger.error(f"Parameter '{param_name}' should be number, got {type(param_value)}")
                     return False
             elif expected_type == 'integer':
                 if param_value is not None and not isinstance(param_value, int):
-                    logger.error(f"Parameter '{param_name}' should be integer, got {type(param_value)}")
+                    self.logger.error(f"Parameter '{param_name}' should be integer, got {type(param_value)}")
                     return False
             elif expected_type == 'boolean':
                 if param_value is not None and not isinstance(param_value, bool):
-                    logger.error(f"Parameter '{param_name}' should be boolean, got {type(param_value)}")
+                    self.logger.error(f"Parameter '{param_name}' should be boolean, got {type(param_value)}")
                     return False
             elif expected_type == 'object':
                 if param_value is not None and not isinstance(param_value, dict):
-                    logger.error(f"Parameter '{param_name}' should be object, got {type(param_value)}")
+                    self.logger.error(f"Parameter '{param_name}' should be object, got {type(param_value)}")
                     return False
             elif expected_type == 'array':
                 if param_value is not None and not isinstance(param_value, list):
-                    logger.error(f"Parameter '{param_name}' should be array, got {type(param_value)}")
+                    self.logger.error(f"Parameter '{param_name}' should be array, got {type(param_value)}")
                     return False
                     
-        logger.debug(f"Schema validation passed for {tool_name}")
+        self.logger.debug(f"Schema validation passed for {tool_name}")
         return True
 
     def _check_required_params(self, tool_name, final_params, market_info):
@@ -541,10 +545,10 @@ class TradeCompiler:
                 # Check for common variants that might have been missed during normalization
                 if 'orderType' in final_params:
                     final_params['type'] = final_params['orderType']
-                    logger.warning(f"Auto-corrected 'orderType' to 'type' in parameters")
+                    self.logger.warning(f"Auto-corrected 'orderType' to 'type' in parameters")
                 elif 'order_type' in final_params:
                     final_params['type'] = final_params['order_type']
-                    logger.warning(f"Auto-corrected 'order_type' to 'type' in parameters")
+                    self.logger.warning(f"Auto-corrected 'order_type' to 'type' in parameters")
             
             order_type = final_params.get('type')
             if order_type in ['limit', 'stopLimit', 'takeProfitLimit']:
@@ -552,12 +556,12 @@ class TradeCompiler:
             if order_type in ['stop', 'stopLimit']:
                  # Stop price might be 'stopPrice' or 'triggerPrice' depending on exchange/CCXT version
                  if 'stopPrice' not in final_params and 'triggerPrice' not in final_params:
-                      logger.error(f"Missing 'stopPrice' or 'triggerPrice' for order type '{order_type}'")
+                      self.logger.error(f"Missing 'stopPrice' or 'triggerPrice' for order type '{order_type}'")
                       return False
             if order_type in ['takeProfit', 'takeProfitLimit']:
                  # TP often uses 'price' as the trigger, but check if 'stopPrice'/'triggerPrice' needed
                  if 'price' not in final_params:
-                      logger.error(f"Missing 'price' for order type '{order_type}'")
+                      self.logger.error(f"Missing 'price' for order type '{order_type}'")
                       return False
                       
         elif tool_name in ["setLeverage", "set_leverage"]:
@@ -567,7 +571,7 @@ class TradeCompiler:
         elif tool_name in ["cancelOrder", "cancel_order"]:
              # Usually requires 'id' (exchange order ID) or 'clientOrderId'
              if 'id' not in final_params and 'clientOrderId' not in final_params:
-                  logger.error(f"Missing 'id' or 'clientOrderId' for tool '{tool_name}'")
+                  self.logger.error(f"Missing 'id' or 'clientOrderId' for tool '{tool_name}'")
                   return False
         # Add other tools as needed...
 
@@ -581,7 +585,7 @@ class TradeCompiler:
         if requirements:
             missing = [req for req in requirements if req not in final_params]
             if missing:
-                logger.error(f"Missing required parameters for tool '{tool_name}': {missing}. Provided: {list(final_params.keys())}")
+                self.logger.error(f"Missing required parameters for tool '{tool_name}': {missing}. Provided: {list(final_params.keys())}")
                 return False
                 
         return True
@@ -616,11 +620,11 @@ class TradeCompiler:
                 elif isinstance(value, int) or value == int(value):
                     return int(value)
             except (ValueError, TypeError) as e:
-                logger.warning(f"Error calculating precision digits: {e}")
+                self.logger.warning(f"Error calculating precision digits: {e}")
         
         # Fallback defaults if precision not found or calculation failed
         default_precision = 8 if precision_type == 'amount' else 4
-        logger.warning(
+        self.logger.warning(
             f"Could not determine '{precision_type}' precision for {market_info.get('symbol')}. "
             f"Using default: {default_precision}"
         )
@@ -657,7 +661,7 @@ class TradeCompiler:
             
         except (ValueError, TypeError, DecimalException) as e:
             # Fallback to float rounding if Decimal fails
-            logger.warning(f"Decimal rounding failed, using float rounding: {e}")
+            self.logger.warning(f"Decimal rounding failed, using float rounding: {e}")
             factor = 10 ** int(precision_digits)
             return rounding_func(value * factor) / factor
 
@@ -695,7 +699,7 @@ class TradeCompiler:
         # Default position size check
         if not size_type and not size_value:
             # Not specifying size is allowed, will use default values
-            logger.info("No explicit size specified in intent, will use defaults")
+            self.logger.info("No explicit size specified in intent, will use defaults")
             return
             
         if size_type == 'percentage_equity':
@@ -725,7 +729,7 @@ class TradeCompiler:
                 
                 if size_value > max_risk_amount:
                     # Could be warning or error depending on policy
-                    logger.warning(
+                    self.logger.warning(
                         f"Fixed USD size {size_value} exceeds max risk of {max_risk_pct*100:.2f}% "
                         f"of equity {equity} (${max_risk_amount:.2f})"
                     )
@@ -754,7 +758,7 @@ class TradeCompiler:
                 f"Unsupported size_type: '{size_type}'. Supported types: percentage_equity, fixed_usd, fixed_contracts"
             )
 
-        logger.debug("Overall risk checks passed.")
+        self.logger.debug("Overall risk checks passed.")
 
 
     def _check_order_risk(self, final_params: Dict, intent_data: Dict, context: Dict, market_info: Dict) -> None:
@@ -770,7 +774,7 @@ class TradeCompiler:
         Raises:
             TradeCompilerValidationError: If risk checks fail
         """
-        logger.debug(f"Performing order-specific risk checks for: {json.dumps(final_params)}")
+        self.logger.debug(f"Performing order-specific risk checks for: {json.dumps(final_params)}")
         
         # Get order parameters
         equity = context.get('equity')
@@ -781,7 +785,7 @@ class TradeCompiler:
         
         # Skip checks if missing critical data
         if not amount:
-            logger.warning("Skipping order risk check: missing 'amount' parameter")
+            self.logger.warning("Skipping order risk check: missing 'amount' parameter")
             return
             
         try:
@@ -807,7 +811,7 @@ class TradeCompiler:
                 
             # Skip cost estimation if price is unknown
             if not current_mark_price or current_mark_price <= 0:
-                logger.warning(f"Skipping cost estimation for {symbol}: unable to determine price")
+                self.logger.warning(f"Skipping cost estimation for {symbol}: unable to determine price")
                 return
                 
             # Calculate estimated cost based on market type
@@ -817,7 +821,7 @@ class TradeCompiler:
                 # Cost in Quote currency (e.g., USDT)
                 # For USDT-M futures: cost = (amount * contract_size * price) / leverage
                 estimated_cost = (amount * contract_size * current_mark_price) / leverage
-                logger.info(f"Linear market cost estimation: {amount} * {contract_size} * {current_mark_price} / {leverage} = {estimated_cost:.2f}")
+                self.logger.info(f"Linear market cost estimation: {amount} * {contract_size} * {current_mark_price} / {leverage} = {estimated_cost:.2f}")
                 
             elif is_inverse:
                 # Cost in Base currency for inverse contracts (e.g., USD-M futures)
@@ -825,7 +829,7 @@ class TradeCompiler:
                 if current_mark_price > 0:
                     notional_value_quote = amount * contract_size  # Contracts in quote currency
                     estimated_cost = notional_value_quote / leverage
-                    logger.info(f"Inverse market cost estimation: {amount} * {contract_size} / {leverage} = {estimated_cost:.2f}")
+                    self.logger.info(f"Inverse market cost estimation: {amount} * {contract_size} / {leverage} = {estimated_cost:.2f}")
             
             # Check against equity if available
             if equity and estimated_cost > 0:
@@ -840,7 +844,7 @@ class TradeCompiler:
                     )
                 elif estimated_cost > max_usable_equity:
                     # Warning or soft failure - order uses most of available equity
-                    logger.warning(
+                    self.logger.warning(
                         f"Order cost ({estimated_cost:.2f}) exceeds {(1-min_equity_protection)*100:.0f}% of "
                         f"equity ({max_usable_equity:.2f} of {equity:.2f})"
                     )
@@ -861,9 +865,9 @@ class TradeCompiler:
                     
         except (ValueError, TypeError) as e:
             # Non-fatal warning for estimation errors
-            logger.warning(f"Error estimating order cost: {e}")
+            self.logger.warning(f"Error estimating order cost: {e}")
             
-        logger.debug("Order specific risk checks passed.")
+        self.logger.debug("Order specific risk checks passed.")
 
     def _validate_call_sequence(self, finalized_calls: List[Dict]) -> None:
         """
@@ -913,7 +917,7 @@ class TradeCompiler:
         # Check sequence ordering
         if order_index >= 0 and leverage_index >= 0 and leverage_index > order_index:
             # This is problematic - leverage is set AFTER order creation
-            logger.warning(
+            self.logger.warning(
                 f"Sequence issue: {tool_names[leverage_index]} at position {leverage_index} appears after "
                 f"{tool_names[order_index]} at position {order_index}"
             )
@@ -928,4 +932,4 @@ class TradeCompiler:
         # --- Check for other logical sequence issues ---
         # Example: cancelOrder should come before new order with same clientOrderId
         
-        logger.debug("Call sequence validation passed.")
+        self.logger.debug("Call sequence validation passed.")

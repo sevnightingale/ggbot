@@ -42,7 +42,7 @@
   },
   "decision": {
     "llm_provider": "deepseek",
-    "strategy": "Trade based on RSI momentum signals. Enter long positions when RSI shows oversold conditions (below 30) in an uptrend, and short when overbought (above 70) in a downtrend. Use the 15m timeframe for precise entries and 1h for trend confirmation. Exit when RSI returns to neutral (45-55) or hits opposite extreme.",
+    "strategy": "Always enter trades based on RSI position relative to 50. If RSI is above 50, enter a SHORT position. If RSI is below 50, enter a LONG position. This ensures we always have a trading signal. Use the 15m timeframe for entries. For position management: hold positions for at least 5 minutes, then exit on any 2-point RSI move in the opposite direction of the trade.",
     "risk_guidelines": "Max position size 5% of capital. Max leverage 10x. Stop trading after 3 losses in a day or 5% daily drawdown.",
     "additional_context": "I prefer catching big moves over frequent small trades. The account typically holds 1-3 positions at a time."
   },

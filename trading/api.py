@@ -89,6 +89,53 @@ class AccountStatus(BaseModel):
 trading_engines: Dict[str, TradingEngine] = {}
 
 
+async def get_account_state(user_id: str, exchange: str = "bitmex") -> Optional[Dict[str, Any]]:
+    """
+    Get latest account state from monitoring data.
+    
+    Args:
+        user_id: User ID
+        exchange: Exchange name (default: bitmex)
+        
+    Returns:
+        Account state dict or None if not found
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            query = """
+                SELECT balance_data, position_data, equity,
+                       available_margin, used_margin, updated_at
+                FROM account_states
+                WHERE user_id = %s AND exchange = %s
+                ORDER BY updated_at DESC
+                LIMIT 1
+            """
+            
+            cursor.execute(query, (user_id, exchange))
+            row = cursor.fetchone()
+            
+            if row:
+                balance_data, position_data, equity, available_margin, used_margin, updated_at = row
+                
+                # Parse JSONB data if stored as strings
+                import json
+                if isinstance(balance_data, str):
+                    balance_data = json.loads(balance_data)
+                if isinstance(position_data, str):
+                    position_data = json.loads(position_data)
+                
+                return {
+                    'balance_data': balance_data,
+                    'position_data': position_data,
+                    'equity': float(equity) if equity else 0,
+                    'available_margin': float(available_margin) if available_margin else 0,
+                    'used_margin': float(used_margin) if used_margin else 0,
+                    'updated_at': updated_at
+                }
+    
+    return None
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
@@ -141,11 +188,27 @@ async def create_trading_engine(user_id: str) -> TradingEngine:
     if user_id in trading_engines:
         return trading_engines[user_id]
     
+    # Get exchange guide based on configured exchange and environment
+    exchange_name = os.environ.get("EXCHANGE_NAME", "bitmex")
+    use_testnet = os.environ.get("TESTNET", "1") == "1"
+    exchange_guide = ""
+    
+    if exchange_name.lower() == "bitmex":
+        if use_testnet:
+            from trading.exchanges.bitmex.exchange_guide_testnet import get_exchange_guide_text
+        else:
+            from trading.exchanges.bitmex.exchange_guide import get_exchange_guide_text
+        exchange_guide = get_exchange_guide_text()
+    # Add other exchanges here as needed
+    # elif exchange_name.lower() == "binance":
+    #     from trading.exchanges.binance.exchange_guide import get_exchange_guide_text
+    #     exchange_guide = get_exchange_guide_text()
+    
     # Configuration for the trading engine
     config = {
         "llm": {
             "model": "gpt-4",
-            "system_prompt": "You are an expert trading assistant. Your task is to help execute trading decisions through the CCXT API.",
+            "system_prompt": f"You are an expert trading assistant. Your task is to help execute trading decisions through the CCXT API.\n\n{exchange_guide}",
             "temperature": 0.0,
             "max_retries": 2
         },
@@ -179,6 +242,7 @@ async def create_trading_engine(user_id: str) -> TradingEngine:
 async def get_trading_engine(user_id: str = DEFAULT_USER_ID) -> TradingEngine:
     """
     Dependency to get trading engine for a user.
+    Reuses existing engines like working tests do with session-wide clients.
     
     Args:
         user_id: User ID (defaults to test user)
@@ -186,6 +250,17 @@ async def get_trading_engine(user_id: str = DEFAULT_USER_ID) -> TradingEngine:
     Returns:
         TradingEngine instance
     """
+    # Reuse existing engine if available (like session-wide pattern)
+    if user_id in trading_engines:
+        engine = trading_engines[user_id]
+        # Verify engine is still active
+        if hasattr(engine, 'is_active') and engine.is_active:
+            return engine
+        else:
+            # Engine is stale, remove it
+            del trading_engines[user_id]
+    
+    # Create new engine if none exists or old one is stale
     return await create_trading_engine(user_id)
 
 
@@ -225,10 +300,50 @@ async def execute_trade(
     try:
         logger.bind(user_id=engine.user_id).info(f"Executing trade intent: {intent.decision_id}")
         
-        # Convert Pydantic model to dict for the engine
+        # Step 1: Get current account state for risk calculations
+        exchange_name = intent.exchange or "bitmex"
+        account_state = await get_account_state(engine.user_id, exchange_name)
+        
+        if not account_state:
+            logger.bind(user_id=engine.user_id).warning("No account state available - proceeding without risk adjustments")
+            account_state = {
+                'available_margin': 0,
+                'equity': 0,
+                'used_margin': 0,
+                'balance_data': {},
+                'position_data': []
+            }
+        else:
+            logger.bind(user_id=engine.user_id).info(
+                f"Account state: {account_state['available_margin']:.8f} BTC available margin, "
+                f"{account_state['equity']:.8f} BTC equity"
+            )
+        
+        # Step 2: Convert Pydantic model to dict and add account state context
         intent_data = intent.model_dump()
         
-        # Process through the trading engine
+        # Step 3: Adjust position sizing based on available margin (like working test)
+        if account_state['available_margin'] > 0 and intent_data.get('collateral_amount'):
+            # Convert BTC margin to USD (approximate conversion)
+            btc_price_estimate = 110000  # Rough estimate, could be made dynamic
+            available_margin_usd = account_state['available_margin'] * btc_price_estimate
+            
+            requested_amount = intent_data['collateral_amount']
+            max_safe_amount = available_margin_usd * 0.5  # Use max 50% of available margin
+            
+            if requested_amount > max_safe_amount:
+                adjusted_amount = max_safe_amount
+                logger.bind(user_id=engine.user_id).warning(
+                    f"Adjusting position size from ${requested_amount:.2f} to ${adjusted_amount:.2f} "
+                    f"based on available margin (${available_margin_usd:.2f})"
+                )
+                intent_data['collateral_amount'] = adjusted_amount
+                intent_data['reasoning'] += f" [Adjusted from ${requested_amount:.2f} to ${adjusted_amount:.2f} due to margin limits]"
+        
+        # Step 4: Add account state to intent for validation context
+        intent_data['_account_state'] = account_state
+        
+        # Step 5: Process through the trading engine
         result = await engine.process_decision_intent(intent_data)
         
         # Map engine response to API response
@@ -428,7 +543,7 @@ def main():
     
     # Run the server
     uvicorn.run(
-        "trading.trades_main:app",
+        "trading.api:app",
         host=host,
         port=port,
         reload=os.environ.get("DEBUG") == "1",

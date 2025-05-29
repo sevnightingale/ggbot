@@ -101,7 +101,7 @@ class DecisionEngine:
             if not result:
                 raise ValueError(f"No decision configuration found for config_id {self.config_id}")
             
-            logger.bind(module="decision.engine").info("Loaded decision configuration")
+            logger.bind(module="decision.engine", user_id=self.user_id).info("Loaded decision configuration")
             return result['config_data']
             
         finally:
@@ -152,13 +152,22 @@ class DecisionEngine:
                     if data_type == 'indicator_values' and row['indicators']:
                         timeframe_data['indicators'].update(row['indicators'])
                     
+                    elif data_type == 'indicator_analysis' and row['raw_data']:
+                        # Extract LLM interpretation from indicator analysis
+                        if 'interpretation' in row['raw_data']:
+                            timeframe_data['signals']['llm_analysis'] = row['raw_data']['interpretation']
+                        
+                        # Also extract raw indicators if needed
+                        if 'indicators' in row['raw_data']:
+                            timeframe_data['raw_data']['indicators'] = row['raw_data']['indicators']
+                    
                     elif data_type == 'report' and row['raw_data']:
                         # Extract ggshot or other signals
                         if 'report' in row['raw_data']:
                             timeframe_data['signals'][source] = row['raw_data']['report']
                     
                     elif data_type == 'llm_interpretation' and row['raw_data']:
-                        # Include LLM interpretations if available
+                        # Include LLM interpretations if available (legacy)
                         if 'interpretation' in row['raw_data']:
                             timeframe_data['signals']['llm_analysis'] = row['raw_data']['interpretation']
                     
@@ -168,7 +177,7 @@ class DecisionEngine:
                 
                 market_data[timeframe] = timeframe_data
             
-            logger.bind(module="decision.engine").info(
+            logger.bind(module="decision.engine", user_id=self.user_id).info(
                 f"Fetched market data for {symbol} across {len(timeframes)} timeframes"
             )
             return market_data
@@ -213,7 +222,7 @@ class DecisionEngine:
             if result['updated_at']:
                 age = datetime.now(timezone.utc) - result['updated_at'].replace(tzinfo=timezone.utc)
                 if age > timedelta(minutes=5):
-                    logger.bind(module="decision.engine").warning(
+                    logger.bind(module="decision.engine", user_id=self.user_id).warning(
                         f"Account state is {age.total_seconds()/60:.1f} minutes old"
                     )
             
@@ -265,7 +274,7 @@ class DecisionEngine:
                 
                 active_trades.append(trade_dict)
             
-            logger.bind(module="decision.engine").info(
+            logger.bind(module="decision.engine", user_id=self.user_id).info(
                 f"Found {len(active_trades)} active trades"
             )
             return active_trades
@@ -317,7 +326,7 @@ class DecisionEngine:
             
             conn.commit()
             
-            logger.bind(module="decision.engine").info(
+            logger.bind(module="decision.engine", user_id=self.user_id).info(
                 f"Updated trade {trade_id} with decision: {decision}"
             )
             
@@ -381,8 +390,14 @@ class DecisionEngine:
             "## Additional Context",
             self.config.get('additional_context', 'No additional context'),
             "",
+            "## IMPORTANT: Strategy Implementation Rules",
+            "You MUST follow the trading strategy exactly as written above. Do NOT use general market analysis.",
+            "If the strategy says 'Always enter trades', then you MUST generate a buy or sell decision.",
+            "Focus on the specific indicators mentioned in the strategy (e.g., RSI levels, price action).",
+            "Do not override the strategy with broader market sentiment unless explicitly instructed.",
+            "",
             "## Decision Required",
-            "Based on the above data and strategy, should we enter a new position?",
+            "Based on the above data and the EXACT strategy rules, should we enter a new position?",
             "Please provide your decision in the following format:",
             "",
             "Decision: [buy/sell/hold]",
@@ -391,7 +406,7 @@ class DecisionEngine:
             "Leverage: [1-10]",
             "Stop Loss: [price level]",
             "Take Profit: [price level]",
-            "Reasoning: [Your detailed analysis and reasoning]"
+            "Reasoning: [Your detailed analysis following the strategy rules exactly]"
         ])
         
         return "\n".join(prompt_parts)
@@ -642,7 +657,7 @@ class DecisionEngine:
         
         else:
             # New Trade Mode
-            logger.bind(module="decision.engine").info("Entering New Trade Mode")
+            logger.bind(module="decision.engine", user_id=self.user_id).info("Entering New Trade Mode")
             
             # Format prompt
             prompt = self._format_prompt_new_trade(market_data, account_state, symbol)

@@ -14,10 +14,14 @@ import uvicorn
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Set up logging before importing other modules
+from core.common.logging_config import setup_logging
+log_file = setup_logging()
+
 # Import all the API apps
 from extraction.api import app as extraction_app
 from decision.api import app as decision_app
-from trading.trades_main import app as trading_app
+from trading.api import app as trading_app
 from core.api.dashboard_api import app as dashboard_app
 from core.api.agent_control_api import app as agent_control_app
 
@@ -122,6 +126,5 @@ if __name__ == "__main__":
         app,
         host=host,
         port=port,
-        reload=True,  # Enable auto-reload for development
         log_level="info"
     )

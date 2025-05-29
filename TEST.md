@@ -188,3 +188,127 @@ The existing `test_trading_flow_simple.py` is already very close to an end-to-en
 3. How should we handle partial failures in the pipeline?
 4. Should the pipeline be user-triggered or fully automated?
 
+
+
+
+
+
+
+
+
+
+
+
+● Test Flow Walkthrough
+
+  Based on the configuration files and FLOW.md, here's what
+   the integration test will actually do:
+
+  🔧 Configuration Used
+
+  The test uses the default user
+  (00000000-0000-0000-0000-000000000001) with these
+  settings:
+
+  1. Extraction Configuration:
+    - Symbol: BTC/USDT (will be mapped to BTC/USDT:USDT for
+   BitMEX)
+    - Timeframes: 15m, 1h
+    - Indicators: Only RSI (not a full set!)
+    - LLM Model: gpt-4o-mini for interpretation
+    - Sources: Only crypto_indicators_mcp enabled
+  (TradingView disabled)
+  2. Decision Configuration:
+    - LLM Provider: deepseek
+    - Strategy: RSI-based momentum trading
+        - Enter long when RSI < 30 (oversold)
+      - Enter short when RSI > 70 (overbought)
+      - Exit when RSI returns to 45-55 (neutral)
+    - Risk Rules:
+        - Max position size: 5% of capital
+      - Max leverage: 10x
+      - Stop after 3 losses or 5% daily drawdown
+  3. Trading Configuration:
+    - Exchange: BitMEX (testnet via TESTNET=1 env var)
+    - Authentication: API keys from environment variables
+
+  📋 What Actually Happens
+
+  Scenario 1: New Trade
+
+  1. Extraction Phase (FLOW steps 6-12):
+    - API call triggers extraction for BTC/USDT on 15m and
+  1h
+    - Connects to Indicators MCP server
+    - Calculates only RSI (not full indicator set)
+    - LLM interprets RSI values
+    - Stores results in market_data table
+  2. Decision Phase (FLOW steps 13-18):
+    - Reads RSI data from database
+    - Checks if RSI is in oversold (<30) or overbought
+  (>70) territory
+    - If trading signal present, generates intent like:
+    {
+    "action": "enter_long",
+    "symbol": "BTC/USDT",
+    "leverage": 10,
+    "stop_loss_price": calculated_value,
+    "confidence": 0.7-0.9
+  }
+    - If RSI is neutral (30-70), returns no_action
+  3. Trading Phase (FLOW steps 19-27):
+    - Receives intent from Decision API
+    - Trading LLM converts intent to CCXT MCP tool calls
+    - TradeCompiler validates and maps BTC/USDT →
+  BTC/USDT:USDT
+    - YES, EXECUTES REAL TRADE ON BITMEX TESTNET:
+        - Sets leverage (e.g., 10x)
+      - Creates market order
+      - Sets stop-loss order
+    - Records trade in trades table
+
+  Scenario 2: Manage Trade
+
+  1. Position Check:
+    - If no position exists, first creates one (runs new
+  trade scenario)
+  2. Management Decision:
+    - Extracts fresh RSI data
+    - Checks if exit conditions met:
+        - RSI returned to neutral (45-55)
+      - Stop-loss or take-profit triggered
+    - Generates management intent:
+        - hold_position if conditions not met
+      - close_position if exit signal
+      - update_stops if adjustments needed
+
+  ⚠️ Important Considerations
+
+  1. Real Trading: The test WILL execute real trades on
+  BitMEX testnet with your API credentials
+  2. Limited Indicators: Only using RSI, not a
+  comprehensive set of indicators
+  3. Market Conditions: Success depends on actual BTC/USDT
+  RSI values:
+    - If RSI is 40-60, likely gets no_action
+    - Need RSI <30 or >70 for trade signals
+  4. Account Requirements:
+    - Need BitMEX testnet account
+    - Need testnet BTC balance
+    - API keys must be in .env file
+  5. Symbol Mapping: The system correctly maps BTC/USDT to
+  BitMEX format
+  6. Risk Management: Uses configured limits (5% position
+  size, 10x leverage max)
+
+  🎯 Expected Outcomes
+
+  - Best Case: RSI extreme → Trade signal → Position opened
+   → Position managed/closed
+  - Common Case: RSI neutral → No trade signal → Test
+  passes but no trades
+  - Error Cases: Missing API keys, insufficient balance,
+  connection issues
+
+  The test validates the entire pipeline working together
+  via APIs, including real exchange interaction on testnet!

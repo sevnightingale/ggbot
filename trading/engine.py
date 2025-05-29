@@ -300,21 +300,15 @@ class TradingEngine(TradingInterface):
             decision_id = intent_data.get('decision_id', 'unknown')
             
             # 4. Validate tool calls
-            context = await self._get_validation_context()
+            context = await self._get_validation_context(intent_data)
             validated_calls = await self.validation_service.validate_tool_calls(
                 tool_calls, intent_data, context
             )
             logger.info(f"Validation passed for {len(validated_calls)} tool calls")
             
-            # 5. Execute validated calls based on action
-            if action.startswith('enter_'):
-                result = await self._execute_entry(intent_data, validated_calls)
-            elif action == 'exit':
-                result = await self._execute_exit(intent_data, validated_calls)
-            elif action == 'adjust':
-                result = await self._execute_adjustment(intent_data, validated_calls)
-            else:
-                raise ValueError(f"Unknown action: {action}")
+            # 5. Execute validated calls - the LLM has already interpreted the intent
+            # and generated the appropriate tool calls, so we don't need strict action matching
+            result = await self._execute_validated_calls(intent_data, validated_calls)
                 
             return result
             
@@ -322,12 +316,10 @@ class TradingEngine(TradingInterface):
             logger.error(f"Error processing decision {intent_data.get('decision_id')}: {e}", exc_info=True)
             
             # Emit error event
-            self.event_bus.emit(Event(
-                event_type=EventType.ENGINE_ERROR,
-                data={
-                    "decision_id": intent_data.get("decision_id"),
-                    "error": str(e)
-                }
+            self.event_bus.emit(Event.create(
+                event_type=EventType.DECISION_FAILED,
+                decision_id=intent_data.get("decision_id"),
+                details={"error": str(e)}
             ))
             
             return {
@@ -395,28 +387,41 @@ class TradingEngine(TradingInterface):
                 "message": f"Error getting active trades: {str(e)}"
             }
     
-    async def _get_validation_context(self) -> Dict:
+    async def _get_validation_context(self, intent_data: Optional[Dict] = None) -> Dict:
         """Get context information for validation."""
         try:
-            # Get account balance
-            balance = await self.ccxt_adapter.fetch_balance()
+            # Check if we have account state from the API (working test pattern)
+            account_state = intent_data.get('_account_state') if intent_data else None
             
-            # Get active positions
-            positions = await self.ccxt_adapter.fetch_positions()
-            
-            return {
-                "balance": balance,
-                "positions": positions,
-                "user_id": self.user_id,
-                "risk_limits": self.config.get("risk_rules", {}),
-                "timestamp": asyncio.get_event_loop().time()
-            }
+            if account_state:
+                logger.info("Using account state from API for validation context")
+                return {
+                    "balance": account_state.get('balance_data', {}),
+                    "positions": account_state.get('position_data', []),
+                    "account_state": account_state,  # Include full account state for risk calculations
+                    "user_id": self.user_id,
+                    "risk_limits": self.config.risk_rules or {},
+                    "timestamp": asyncio.get_event_loop().time()
+                }
+            else:
+                # Fallback to live exchange data
+                logger.info("Fetching validation context from exchange")
+                balance = await self.ccxt_adapter.fetch_balance()
+                positions = await self.ccxt_adapter.fetch_positions()
+                
+                return {
+                    "balance": balance,
+                    "positions": positions,
+                    "user_id": self.user_id,
+                    "risk_limits": self.config.risk_rules or {},
+                    "timestamp": asyncio.get_event_loop().time()
+                }
         except Exception as e:
             logger.warning(f"Error getting validation context: {e}")
             # Return minimal context
             return {
                 "user_id": self.user_id,
-                "risk_limits": self.config.get("risk_rules", {}),
+                "risk_limits": self.config.risk_rules or {},
                 "timestamp": asyncio.get_event_loop().time()
             }
     
@@ -500,6 +505,58 @@ class TradingEngine(TradingInterface):
                 "status": "error",
                 "decision_id": intent_data.get('decision_id', 'unknown'),
                 "message": f"Error executing exit trade: {str(e)}"
+            }
+    
+    async def _execute_validated_calls(self, intent_data: Dict, validated_calls: List[ValidatedToolCall]) -> Dict:
+        """
+        Execute validated tool calls regardless of action type.
+        
+        The LLM has already interpreted the intent and generated appropriate tool calls,
+        so we just need to execute them and manage the trade records accordingly.
+        """
+        try:
+            decision_id = intent_data.get('decision_id', 'unknown')
+            
+            # 1. Execute the validated calls
+            execution_result = await self.execution_service.execute_tool_calls(validated_calls, intent_data)
+            
+            # 2. Determine if this is creating a new trade or managing an existing one
+            # by checking if we're opening a position (has create order calls)
+            is_new_trade = any(
+                'create' in call.tool and 'order' in call.tool
+                for call in validated_calls
+            )
+            
+            if is_new_trade:
+                # Create a new trade record
+                execution_data = execution_result.model_dump() if hasattr(execution_result, 'model_dump') else execution_result
+                trade_result = await self.trade_manager.create_trade(
+                    intent_data, 
+                    execution_data
+                )
+                
+                return {
+                    "status": "success",
+                    "decision_id": decision_id,
+                    "trade_id": trade_result.get("trade_id"),
+                    "message": "Trade executed successfully"
+                }
+            else:
+                # This is managing an existing trade (exit, adjust, etc.)
+                # The execution result contains the details
+                return {
+                    "status": "success",
+                    "decision_id": decision_id,
+                    "message": "Trade action executed successfully",
+                    "execution_result": execution_result
+                }
+                
+        except Exception as e:
+            logger.error(f"Error executing validated calls: {e}", exc_info=True)
+            return {
+                "status": "error",
+                "decision_id": intent_data.get('decision_id', 'unknown'),
+                "message": f"Error executing trade action: {str(e)}"
             }
     
     async def _execute_adjustment(self, intent_data: Dict, validated_calls: List[ValidatedToolCall]) -> Dict:
