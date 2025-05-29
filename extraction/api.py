@@ -7,6 +7,7 @@ checking extraction status, and retrieving extracted data.
 import asyncio
 import os
 import uuid
+import httpx
 from datetime import datetime, timedelta
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, BackgroundTasks
@@ -50,26 +51,77 @@ class MarketDataRequest(BaseModel):
     data_type: str = "indicator_values"
 
 
+async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes: List[str]):
+    """
+    Trigger Decision API after successful extraction (Webhook pattern).
+    """
+    try:
+        # Call Decision API to analyze the freshly extracted data
+        async with httpx.AsyncClient(timeout=60.0) as client:
+            decision_payload = {
+                "user_id": user_id,
+                "mode": "auto",  # Let decision module determine if NEW_TRADE or MANAGE_TRADE
+                "symbol": symbols[0] if symbols else None,
+                "timeframes": timeframes
+            }
+            
+            # Call the combined API endpoint
+            api_base = os.getenv("API_BASE_URL", "http://localhost:8000")
+            response = await client.post(
+                f"{api_base}/decision/api/decision/analyze",
+                json=decision_payload
+            )
+            
+            if response.status_code == 200:
+                decision_result = response.json()
+                logger.bind(user_id=user_id).info(
+                    f"Successfully triggered decision analysis: {decision_result['decision_id']}"
+                )
+                return decision_result
+            else:
+                logger.bind(user_id=user_id).warning(
+                    f"Decision webhook failed: {response.status_code} - {response.text}"
+                )
+                
+    except Exception as e:
+        logger.bind(user_id=user_id).error(f"Decision webhook error: {str(e)}")
+        # Don't fail extraction if webhook fails
+        return None
+
+
 async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optional[List[str]], timeframes: Optional[List[str]]):
     """Background task to run extraction."""
     try:
         # Update status to running
         extraction_status[extraction_id]["status"] = "running"
         
-        # Create and run extraction manager
-        manager = ExtractionManager(user_id=user_id)
+        # Use the direct function like the working test
+        from extraction.extraction_main import extract_mcp_indicators
         
-        # Override config if symbols/timeframes provided
-        if symbols:
-            manager.symbols = symbols
-        if timeframes:
-            manager.timeframes = timeframes
-            
-        # Run extraction
-        results = await manager.run()
+        # Use provided symbols/timeframes or get from config
+        if not symbols or not timeframes:
+            from core.config.config_main import get_configuration
+            extraction_config = get_configuration(user_id, 'extraction') or {}
+            symbols = symbols or extraction_config.get('symbols', ['BTC/USDT'])
+            timeframes = timeframes or extraction_config.get('timeframes', ['15m', '1h'])
         
-        # Count data points
-        data_points = sum(len(source_results) for source_results in results.values())
+        # Run extraction using the same function as working test
+        results = await extract_mcp_indicators(
+            symbols=symbols,
+            timeframes=timeframes,
+            user_id=user_id,
+            use_llm=True,
+            llm_model="gpt-4o-mini"
+        )
+        
+        # Count data points from extract_mcp_indicators structure
+        data_points = 0
+        if isinstance(results, dict) and "error" not in results:
+            for symbol, symbol_results in results.items():
+                if isinstance(symbol_results, dict):
+                    for timeframe, timeframe_result in symbol_results.items():
+                        if isinstance(timeframe_result, dict) and timeframe_result.get('status') == 'success':
+                            data_points += 1
         
         # Update status to completed
         extraction_status[extraction_id].update({
@@ -82,6 +134,11 @@ async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optiona
             user_id=user_id,
             extraction_id=extraction_id
         ).info(f"Extraction completed with {data_points} data points")
+        
+        # Trigger Decision webhook after successful extraction (Pipeline Pattern)
+        # TEMPORARILY DISABLED for testing
+        # if data_points > 0:
+        #     await trigger_decision_webhook(user_id, symbols, timeframes)
         
     except Exception as e:
         logger.bind(
@@ -165,14 +222,14 @@ async def get_latest_market_data(
         with conn.cursor() as cur:
             # Query for latest data
             cur.execute("""
-                SELECT data, created_at
+                SELECT raw_data, updated_at
                 FROM market_data
                 WHERE user_id = %s
                   AND symbol = %s
                   AND timeframe = %s
                   AND data_type = %s
-                  AND created_at > %s
-                ORDER BY created_at DESC
+                  AND updated_at > %s
+                ORDER BY updated_at DESC
                 LIMIT 1
             """, (
                 user_id,
@@ -190,7 +247,7 @@ async def get_latest_market_data(
                     detail=f"No recent data found for {symbol} {timeframe}"
                 )
             
-            data, created_at = result
+            raw_data, updated_at = result
             
             # Parse the data based on type
             if data_type == "indicator_values":
@@ -198,16 +255,20 @@ async def get_latest_market_data(
                 return {
                     "symbol": symbol,
                     "timeframe": timeframe,
-                    "data": data,
-                    "created_at": created_at.isoformat() + "Z"
+                    "data": raw_data.get("indicators", {}),
+                    "created_at": updated_at.isoformat() + "Z"
                 }
             else:
-                # Return analysis text
+                # Return analysis text including interpretation  
                 return {
                     "symbol": symbol,
                     "timeframe": timeframe,
-                    "analysis": data.get("analysis", ""),
-                    "created_at": created_at.isoformat() + "Z"
+                    "data": {
+                        "indicators": raw_data.get("indicators", {}),
+                        "interpretation": raw_data.get("interpretation", {})
+                    },
+                    "analysis": raw_data.get("interpretation", {}).get("analysis", ""),
+                    "created_at": updated_at.isoformat() + "Z"
                 }
 
 

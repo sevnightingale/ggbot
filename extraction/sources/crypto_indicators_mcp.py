@@ -330,13 +330,13 @@ Format your response as a JSON object with these fields:
                 }
             }
             
-            store_result = store_market_data_entries([market_data_entry])
+            stored_count = store_market_data_entries([market_data_entry])
             
-            if store_result.get("status") == "success":
+            if stored_count > 0:
                 self.logger.info(f"Stored indicator data for {symbol} {timeframe}")
                 return True
             else:
-                self.logger.error(f"Failed to store data: {store_result.get('error')}")
+                self.logger.error(f"Failed to store data for {symbol} {timeframe}")
                 return False
                 
         except Exception as e:

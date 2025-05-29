@@ -14,11 +14,21 @@ import json
 import asyncio
 from datetime import datetime
 from typing import Dict, List, Optional, Any
+from pathlib import Path
 
 from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
 from core.config.config_main import get_configuration
 from extraction.utils import store_market_data_entries
+from core.mcp.metadata import get_mcp_tool_name, get_tool_info
+
+# Load environment variables from .env file at project root
+try:
+    from dotenv import load_dotenv
+    env_path = Path(__file__).parents[1] / '.env'  # Go up 1 level from extraction/ to project root
+    load_dotenv(env_path)
+except ImportError:
+    pass  # dotenv not available, continue without it
 
 
 async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, use_llm=True, llm_model="gpt-4o-mini"):
@@ -74,12 +84,12 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
         logger.bind(user_id=user_id).info("Successfully connected to Indicators MCP")
 
         # Get available tools from the MCP server
-        tools = await mcp_client.get_tools()
+        tools = await mcp_client.session.get_tools()
         logger.bind(user_id=user_id).info(f"Available MCP tools: {len(tools)}")
 
         # Get indicator tools (filter out non-indicator tools)
         indicator_tools = [t for t in tools if not any(
-            keyword in t['name'] for keyword in ['fetch', 'backtest', 'analyze', 'get']
+            keyword in t.name for keyword in ['fetch', 'backtest', 'analyze', 'get']
         )]
         logger.bind(user_id=user_id).info(f"Available indicator tools: {len(indicator_tools)}")
 
@@ -92,95 +102,62 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                 logger.bind(user_id=user_id).info(f"Processing {symbol} {timeframe}")
 
                 try:
-                    # Step 1: Get indicator selection from LLM
-                    indicator_names = [tool['name'] for tool in indicator_tools]
+                    # Step 1: Get indicators from user configuration (not LLM selection)
+                    user_config = get_configuration(user_id, 'extraction') or {}
+                    mcp_source_config = user_config.get('sources', {}).get('crypto_indicators_mcp', {})
                     
-                    selection_prompt = f"""
-You are a trading expert. Select the most important technical indicators for analyzing {symbol} on the {timeframe} timeframe.
-
-Available indicators:
-{json.dumps(indicator_names, indent=2)}
-
-Consider:
-1. The timeframe ({timeframe}) - shorter timeframes need more responsive indicators
-2. Cryptocurrency volatility - indicators that work well with volatile assets
-3. A balanced mix of trend, momentum, volatility, and volume indicators
-4. Avoid redundancy - don't select multiple indicators that measure the same thing
-
-Respond with a JSON array of 8-12 indicator names that would provide comprehensive market analysis.
-Example: ["RSI", "MACD", "BollingerBands", "Volume", ...]
-"""
-
-                    logger.bind(user_id=user_id).info("Requesting indicator selection from LLM")
+                    # Get configured indicators
+                    selected_indicators = mcp_source_config.get('indicators', ['RSI'])  # Default to RSI if not configured
                     
-                    response = llm_client.chat.completions.create(
-                        model=llm_model,
-                        messages=[
-                            {"role": "system", "content": "You are a cryptocurrency trading expert who selects optimal technical indicators for market analysis."},
-                            {"role": "user", "content": selection_prompt}
-                        ],
-                        temperature=0.3,
-                        response_format={"type": "json_object"}
-                    )
-                    
-                    llm_response = response.choices[0].message.content
-                    logger.bind(user_id=user_id).info(f"LLM response: {llm_response}")
-                    
-                    # Parse the selected indicators
-                    try:
-                        selected_data = json.loads(llm_response)
-                        if isinstance(selected_data, dict):
-                            # Handle different possible response formats
-                            selected_indicators = (
-                                selected_data.get('indicators', []) or 
-                                selected_data.get('selected_indicators', []) or
-                                selected_data.get('indicator_names', []) or
-                                list(selected_data.values())[0] if len(selected_data) == 1 and isinstance(list(selected_data.values())[0], list) else []
-                            )
-                        else:
-                            selected_indicators = selected_data if isinstance(selected_data, list) else []
-                    except json.JSONDecodeError:
-                        logger.bind(user_id=user_id).error(f"Failed to parse LLM response: {llm_response}")
-                        # Use a default set of indicators
-                        selected_indicators = ["RSI", "MACD", "BollingerBands", "ATR", "OBV", "StochasticOscillator"]
-                    
-                    logger.bind(user_id=user_id).info(f"Selected indicators: {selected_indicators}")
+                    logger.bind(user_id=user_id).info(f"Using configured indicators: {selected_indicators}")
 
                     # Step 2: Calculate each selected indicator
                     indicator_results = {}
                     
                     for indicator_name in selected_indicators:
-                        # Find the tool info
-                        tool_info = next((t for t in indicator_tools if t['name'] == indicator_name), None)
-                        if not tool_info:
-                            logger.bind(user_id=user_id).warning(f"Indicator {indicator_name} not found in available tools")
-                            continue
-                        
                         try:
-                            # Call the MCP tool
-                            logger.bind(user_id=user_id).info(f"Calculating {indicator_name} for {symbol} {timeframe}")
+                            # Map user-friendly name to MCP tool name
+                            mcp_tool_name = get_mcp_tool_name(indicator_name)
+                            if not mcp_tool_name:
+                                logger.bind(user_id=user_id).warning(f"Unknown indicator: {indicator_name}")
+                                continue
                             
-                            # Build parameters based on the tool's schema
+                            # Get tool info to understand parameters
+                            tool_info = get_tool_info(mcp_tool_name)
+                            if not tool_info:
+                                logger.bind(user_id=user_id).warning(f"No tool info for: {mcp_tool_name}")
+                                continue
+                            
+                            # Call the MCP tool
+                            logger.bind(user_id=user_id).info(f"Calculating {indicator_name} ({mcp_tool_name}) for {symbol} {timeframe}")
+                            
+                            # Build parameters for the MCP tool call
                             params = {
                                 "exchange": os.environ.get("EXCHANGE_NAME", "binance"),
                                 "symbol": symbol,
                                 "timeframe": timeframe
                             }
                             
-                            # Add any required parameters from the schema
+                            # Add default parameters based on tool schema
                             if 'parameters' in tool_info and 'properties' in tool_info['parameters']:
                                 for param_name, param_info in tool_info['parameters']['properties'].items():
-                                    if param_name not in params and param_name in tool_info['parameters'].get('required', []):
-                                        # Use default values for required parameters
-                                        if param_info.get('type') == 'number':
-                                            if 'period' in param_name.lower():
-                                                params[param_name] = 14  # Default period
-                                            else:
-                                                params[param_name] = param_info.get('default', 0)
-                                        elif param_info.get('type') == 'string':
-                                            params[param_name] = param_info.get('default', '')
+                                    if param_name not in params:
+                                        # Check if user has custom parameter in config
+                                        config_param_name = f"{indicator_name}_{param_name}"
+                                        if config_param_name in mcp_source_config:
+                                            params[param_name] = mcp_source_config[config_param_name]
+                                        elif param_name in tool_info['parameters'].get('required', []):
+                                            # Use default values for required parameters
+                                            if param_info.get('type') == 'number':
+                                                if 'period' in param_name.lower():
+                                                    params[param_name] = 14  # Default period
+                                                else:
+                                                    params[param_name] = param_info.get('default', 0)
+                                            elif param_info.get('type') == 'string':
+                                                params[param_name] = param_info.get('default', '')
                             
-                            result = await mcp_client.call_tool(indicator_name, params)
+                            # Call the MCP tool through the session
+                            result = await mcp_client.session.call_tool(mcp_tool_name, params)
                             
                             if result and not isinstance(result, str) or (isinstance(result, str) and not result.startswith("Error")):
                                 indicator_results[indicator_name] = result
@@ -249,29 +226,30 @@ Format your response as a JSON object with these fields:
                             "symbol": symbol,
                             "timeframe": timeframe,
                             "data_type": "indicator_analysis",
-                            "timestamp": datetime.utcnow(),
-                            "data": {
+                            "updated_at": datetime.utcnow(),
+                            "raw_data": {
                                 "indicators": indicator_results,
                                 "selected_indicators": selected_indicators,
                                 "interpretation": interpretation_data,
                                 "llm_model": llm_model
-                            }
+                            },
+                            "indicators": indicator_results  # Also store in indicators column
                         }
                         
                         # Store in database
-                        store_result = store_market_data_entries([market_data_entry])
-                        if store_result.get("status") == "success":
+                        stored = store_market_data_entries([market_data_entry])
+                        if stored > 0:
                             stored_count += 1
                             logger.bind(user_id=user_id).info(f"Stored indicator data for {symbol} {timeframe}")
                         else:
-                            logger.bind(user_id=user_id).error(f"Failed to store data: {store_result.get('error')}")
+                            logger.bind(user_id=user_id).error(f"Failed to store data for {symbol} {timeframe}")
                         
                         # Add to results
                         results[symbol][timeframe] = {
                             "status": "success",
                             "indicators": indicator_results,
                             "interpretation": interpretation_data,
-                            "stored": store_result.get("status") == "success"
+                            "stored": stored > 0
                         }
                         
                     else:

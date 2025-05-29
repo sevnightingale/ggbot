@@ -13,7 +13,8 @@ from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
 from core.common.logger import logger
-from core.common.config import DEFAULT_USER_ID, get_configuration, save_configuration
+from core.common.config import DEFAULT_USER_ID
+from core.config.config_main import get_configuration, save_configuration
 from core.common.db import get_db_connection
 
 app = FastAPI(title="Agent Control API", version="1.0.0")
@@ -161,7 +162,7 @@ async def stop_agent(
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT COUNT(*) FROM trades
-                    WHERE user_id = %s AND status = 'open'
+                    WHERE user_id = %s AND trade_status = 'open'
                 """, (user_id,))
                 open_positions = cur.fetchone()[0]
                 
@@ -182,7 +183,7 @@ async def stop_agent(
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT COUNT(*) FROM trades
-                WHERE user_id = %s AND status = 'open'
+                WHERE user_id = %s AND trade_status = 'open'
             """, (user_id,))
             open_positions = cur.fetchone()[0]
     
@@ -205,7 +206,7 @@ async def pause_agent(user_id: str):
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT COUNT(*) FROM trades
-                    WHERE user_id = %s AND status = 'open'
+                    WHERE user_id = %s AND trade_status = 'open'
                 """, (user_id,))
                 active_positions = cur.fetchone()[0]
         

@@ -7,9 +7,10 @@ retrieving decision history, and managing the decision engine.
 import asyncio
 import os
 import uuid
+import httpx
 from datetime import datetime, timedelta
 from typing import Optional, List, Dict, Any
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
 from core.common.logger import logger
@@ -28,6 +29,7 @@ class DecisionRequest(BaseModel):
     mode: str = "auto"  # "auto", "NEW_TRADE", or "MANAGE_TRADE"
     symbol: Optional[str] = None
     timeframes: Optional[List[str]] = None
+    config_name: str = "default"  # Configuration name to use
 
 
 class DecisionResponse(BaseModel):
@@ -46,6 +48,44 @@ class DecisionHistoryItem(BaseModel):
     trade_id: Optional[str] = None
     outcome: Optional[str] = None
     created_at: str
+
+
+async def trigger_trading_webhook(user_id: str, intent: Dict[str, Any], decision_id: str):
+    """
+    Trigger Trading API after successful decision generation (Webhook pattern).
+    """
+    try:
+        # Only trigger trading for actionable intents
+        action = intent.get("action", "")
+        
+        if action in ["enter_long", "enter_short", "close_position", "adjust_position", "update_stops"]:
+            async with httpx.AsyncClient(timeout=120.0) as client:
+                # Call the combined API endpoint for trading
+                api_base = os.getenv("API_BASE_URL", "http://localhost:8000")
+                response = await client.post(
+                    f"{api_base}/trading/trade/execute",
+                    json=intent
+                )
+                
+                if response.status_code == 200:
+                    trade_result = response.json()
+                    logger.bind(user_id=user_id).info(
+                        f"Successfully triggered trade execution: {trade_result.get('trade_id', 'N/A')}"
+                    )
+                    return trade_result
+                else:
+                    logger.bind(user_id=user_id).warning(
+                        f"Trading webhook failed: {response.status_code} - {response.text}"
+                    )
+        else:
+            logger.bind(user_id=user_id).info(
+                f"No trading action needed for decision: {action}"
+            )
+                    
+    except Exception as e:
+        logger.bind(user_id=user_id).error(f"Trading webhook error: {str(e)}")
+        # Don't fail decision if webhook fails
+        return None
 
 
 async def generate_decision_task(
@@ -68,7 +108,7 @@ async def generate_decision_task(
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT COUNT(*) FROM trades 
-                        WHERE user_id = %s AND status = 'open'
+                        WHERE user_id = %s AND trade_status = 'open'
                     """, (user_id,))
                     active_trades = cur.fetchone()[0]
                     actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
@@ -83,28 +123,24 @@ async def generate_decision_task(
         # Extract reasoning from intent
         reasoning = intent.pop("reasoning", "No reasoning provided")
         
-        # Store in database
+        # Store in database - DISABLED until decisions table is created
+        # TODO: Create decisions table and uncomment this section
         decision_id_db = str(uuid.uuid4())
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # Store in account_states table (temporary until decisions table is created)
-                cur.execute("""
-                    INSERT INTO account_states (user_id, state_data, created_at)
-                    VALUES (%s, %s, %s)
-                """, (
-                    user_id,
-                    {
-                        "type": "decision",
-                        "decision_id": decision_id_db,
-                        "mode": actual_mode,
-                        "intent": intent,
-                        "reasoning": reasoning,
-                        "symbol": symbol or intent.get("symbol"),
-                        "confidence": intent.get("confidence", 0)
-                    },
-                    datetime.utcnow()
-                ))
-                conn.commit()
+        # with get_db_connection() as conn:
+        #     with conn.cursor() as cur:
+        #         # Store in decisions table
+        #         cur.execute("""
+        #             INSERT INTO decisions (decision_id, user_id, mode, intent, reasoning, created_at)
+        #             VALUES (%s, %s, %s, %s, %s, %s)
+        #         """, (
+        #             decision_id_db,
+        #             user_id,
+        #             actual_mode,
+        #             json.dumps(intent),
+        #             reasoning,
+        #             datetime.utcnow()
+        #         ))
+        #         conn.commit()
         
         # Update cache
         decision_cache[decision_id].update({
@@ -134,7 +170,7 @@ async def generate_decision_task(
 
 
 @app.post("/api/decision/analyze", response_model=DecisionResponse)
-async def analyze_market(request: DecisionRequest, background_tasks: BackgroundTasks):
+async def analyze_market(request: DecisionRequest):
     """
     Analyze market data and generate a trading decision.
     
@@ -145,34 +181,71 @@ async def analyze_market(request: DecisionRequest, background_tasks: BackgroundT
     """
     decision_id = str(uuid.uuid4())
     
-    # Initialize tracking
-    decision_cache[decision_id] = {
-        "decision_id": decision_id,
-        "status": "pending",
-        "created_at": datetime.utcnow().isoformat() + "Z",
-        "user_id": request.user_id,
-        "mode": request.mode
-    }
-    
-    # Add background task
-    background_tasks.add_task(
-        generate_decision_task,
-        decision_id,
-        request.user_id,
-        request.mode,
-        request.symbol,
-        request.timeframes
-    )
-    
-    # Return immediate response (actual decision will be generated async)
-    # For now, return a placeholder - in production, use WebSocket or polling
-    return DecisionResponse(
-        decision_id=decision_id,
-        mode=request.mode,
-        intent={"status": "pending"},
-        reasoning="Decision generation in progress...",
-        created_at=decision_cache[decision_id]["created_at"]
-    )
+    try:
+        # Determine mode automatically if set to "auto"
+        actual_mode = request.mode
+        if request.mode == "auto":
+            # Check if user has active trades
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT COUNT(*) FROM trades 
+                        WHERE user_id = %s AND trade_status = 'open'
+                    """, (request.user_id,))
+                    active_trades = cur.fetchone()[0]
+                    actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
+        
+        # Run decision process synchronously (like working test)
+        intent = await run_decision_process(
+            user_id=request.user_id,
+            config_name=request.config_name,
+            symbol=request.symbol or "BTC/USD",  # Default symbol like working test
+            timeframes=request.timeframes or ["15m", "1h", "4h"]  # Default timeframes like working test
+        )
+        
+        # Extract reasoning from intent
+        reasoning = intent.get("reasoning", "No reasoning provided")
+        
+        # Cache the decision
+        decision_cache[decision_id] = {
+            "decision_id": decision_id,
+            "status": "completed",
+            "mode": actual_mode,
+            "intent": intent,
+            "reasoning": reasoning,
+            "created_at": datetime.utcnow().isoformat() + "Z",
+            "user_id": request.user_id
+        }
+        
+        logger.bind(
+            user_id=request.user_id,
+            decision_id=decision_id
+        ).info(f"Decision generated: {actual_mode} - {intent.get('action')}")
+        
+        # Trigger Trading webhook after successful decision (Pipeline Pattern)  
+        # TEMPORARILY DISABLED for testing
+        # action = intent.get("action", "")
+        # if action != "no_action":
+        #     await trigger_trading_webhook(request.user_id, intent, decision_id)
+        
+        return DecisionResponse(
+            decision_id=decision_id,
+            mode=actual_mode,
+            intent=intent,
+            reasoning=reasoning,
+            created_at=decision_cache[decision_id]["created_at"]
+        )
+        
+    except Exception as e:
+        logger.bind(
+            user_id=request.user_id,
+            decision_id=decision_id
+        ).error(f"Decision generation failed: {str(e)}")
+        
+        raise HTTPException(
+            status_code=500,
+            detail=f"Decision generation failed: {str(e)}"
+        )
 
 
 @app.get("/api/decision/history/{user_id}")
@@ -257,7 +330,7 @@ async def get_current_decision(user_id: str):
                         id, symbol, entry_price, 
                         current_price, unrealized_pnl
                     FROM trades
-                    WHERE user_id = %s AND status = 'open'
+                    WHERE user_id = %s AND trade_status = 'open'
                     ORDER BY created_at DESC
                     LIMIT 1
                 """, (user_id,))

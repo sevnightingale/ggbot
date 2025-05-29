@@ -75,14 +75,24 @@ async def get_current_positions(user_id: str):
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT 
-                    t.id, t.symbol, t.side, t.size,
-                    t.entry_price, t.current_price,
-                    t.unrealized_pnl, t.stop_loss,
-                    t.take_profit, t.decision_id,
+                    t.trade_id, 
+                    COALESCE(t.pair, t.pair_index) as symbol,
+                    CASE 
+                        WHEN t.leverage > 0 THEN 'long'
+                        WHEN t.leverage < 0 THEN 'short'
+                        ELSE 'unknown'
+                    END as side,
+                    t.collateral_amount as size,
+                    t.entry_price,
+                    t.entry_price as current_price,  -- No current_price column yet
+                    0 as unrealized_pnl,  -- Calculate later
+                    t.stop_loss,
+                    t.take_profit,
+                    t.decision_id,
                     t.created_at
                 FROM trades t
                 WHERE t.user_id = %s 
-                  AND t.status = 'open'
+                  AND t.trade_status = 'open'
                 ORDER BY t.created_at DESC
             """, (user_id,))
             
@@ -312,7 +322,7 @@ async def get_agent_status(user_id: str):
             cur.execute("""
                 SELECT COUNT(*)
                 FROM trades
-                WHERE user_id = %s AND status = 'open'
+                WHERE user_id = %s AND trade_status = 'open'
             """, (user_id,))
             
             active_positions = cur.fetchone()[0]

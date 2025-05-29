@@ -43,12 +43,12 @@ def get_config_id_by_name(user_id: str, config_name: str) -> Optional[str]:
         
         result = cursor.fetchone()
         if result:
-            logger.bind(module="decision.utils").info(
+            logger.bind(user_id=user_id).info(
                 f"Found config_id {result['config_id']} for config_name '{config_name}'"
             )
             return result['config_id']
         else:
-            logger.bind(module="decision.utils").warning(
+            logger.bind(user_id=user_id).warning(
                 f"No configuration found for user {user_id} with name '{config_name}'"
             )
             return None
