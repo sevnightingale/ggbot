@@ -12,10 +12,12 @@ This module contains the DecisionEngine class which coordinates:
 import asyncio
 import json
 import uuid
+import os
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
 import psycopg2
 from psycopg2.extras import RealDictCursor
+import ccxt
 
 from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DECISION_LLM_API_KEY
 from core.common.logger import logger
@@ -94,15 +96,20 @@ class DecisionEngine:
                 FROM configurations 
                 WHERE user_id = %s 
                 AND config_id = %s 
-                AND config_type = 'decision'
+                AND config_type = 'user'
             """, (self.user_id, self.config_id))
             
             result = cursor.fetchone()
             if not result:
-                raise ValueError(f"No decision configuration found for config_id {self.config_id}")
+                raise ValueError(f"No user configuration found for config_id {self.config_id}")
             
-            logger.bind(module="decision.engine", user_id=self.user_id).info("Loaded decision configuration")
-            return result['config_data']
+            # Extract decision config from unified config
+            user_config = result['config_data']
+            if 'decision' not in user_config:
+                raise ValueError(f"No decision configuration in user config for config_id {self.config_id}")
+            
+            logger.bind(module="decision.engine", user_id=self.user_id).info(f"Loaded decision configuration from unified config {self.config_id}")
+            return user_config['decision']
             
         finally:
             conn.close()
@@ -145,12 +152,20 @@ class DecisionEngine:
                     'latest_update': None
                 }
                 
+                # Track what data types we've already processed to avoid overwriting newer data with older
+                processed_types = set()
+                
                 for row in results:
                     source = row['source']
                     data_type = row['data_type']
                     
+                    # Since results are ordered by updated_at DESC, only process the first occurrence of each data type
+                    if data_type in processed_types:
+                        continue
+                        
                     if data_type == 'indicator_values' and row['indicators']:
                         timeframe_data['indicators'].update(row['indicators'])
+                        processed_types.add(data_type)
                     
                     elif data_type == 'indicator_analysis' and row['raw_data']:
                         # Extract LLM interpretation from indicator analysis
@@ -160,16 +175,19 @@ class DecisionEngine:
                         # Also extract raw indicators if needed
                         if 'indicators' in row['raw_data']:
                             timeframe_data['raw_data']['indicators'] = row['raw_data']['indicators']
+                        processed_types.add(data_type)
                     
                     elif data_type == 'report' and row['raw_data']:
                         # Extract ggshot or other signals
                         if 'report' in row['raw_data']:
                             timeframe_data['signals'][source] = row['raw_data']['report']
+                        processed_types.add(data_type)
                     
                     elif data_type == 'llm_interpretation' and row['raw_data']:
                         # Include LLM interpretations if available (legacy)
                         if 'interpretation' in row['raw_data']:
                             timeframe_data['signals']['llm_analysis'] = row['raw_data']['interpretation']
+                        processed_types.add(data_type)
                     
                     # Track latest update
                     if not timeframe_data['latest_update'] or row['updated_at'] > timeframe_data['latest_update']:
@@ -282,6 +300,93 @@ class DecisionEngine:
         finally:
             conn.close()
     
+    async def _fetch_current_price(self, symbol: str) -> Optional[float]:
+        """
+        Fetch current market price for a symbol using direct CCXT connection.
+        Uses the user's configured exchange from the database.
+        
+        Args:
+            symbol (str): Trading symbol (e.g., 'BTC/USD')
+            
+        Returns:
+            float: Current price, or None if fetch fails
+        """
+        try:
+            # Get exchange configuration from user's trading config
+            exchange_name = self.config.get('exchange', 'bitmex')
+            use_testnet = self.config.get('testnet', True)
+            
+            # Get credentials from database config
+            conn = self._get_db_connection()
+            try:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT config_data 
+                    FROM configurations 
+                    WHERE user_id = %s 
+                    AND config_id = %s 
+                    AND config_type = 'user'
+                """, (self.user_id, self.config_id))
+                
+                result = cursor.fetchone()
+                if not result:
+                    raise ValueError("No configuration found")
+                
+                user_config = result['config_data']
+                credentials = user_config.get('exchanges', {}).get(exchange_name, {})
+                
+                if not credentials.get('api_key') or not credentials.get('api_secret'):
+                    # Fallback to environment variables
+                    credentials = {
+                        'api_key': os.getenv('EXCHANGE_API'),
+                        'api_secret': os.getenv('EXCHANGE_SECRET')
+                    }
+                    
+            finally:
+                conn.close()
+            
+            if not credentials.get('api_key') or not credentials.get('api_secret'):
+                logger.bind(module="decision.engine", user_id=self.user_id).warning(
+                    f"No credentials found for {exchange_name}, cannot fetch current price"
+                )
+                return None
+            
+            # Create exchange client
+            exchange_class = getattr(ccxt, exchange_name)
+            config = {
+                'apiKey': credentials['api_key'],
+                'secret': credentials['api_secret'],
+                'enableRateLimit': True,
+                'options': {}
+            }
+            
+            if use_testnet:
+                config['options']['testnet'] = True
+            
+            exchange = exchange_class(config)
+            
+            # Load markets first
+            await exchange.load_markets()
+            
+            # Fetch ticker
+            ticker = await exchange.fetch_ticker(symbol)
+            current_price = ticker['last']
+            
+            # Close exchange connection
+            await exchange.close()
+            
+            logger.bind(module="decision.engine", user_id=self.user_id).info(
+                f"Fetched current price for {symbol} from {exchange_name}: ${current_price:,.2f}"
+            )
+            
+            return current_price
+            
+        except Exception as e:
+            logger.bind(module="decision.engine", user_id=self.user_id).error(
+                f"Failed to fetch current price for {symbol}: {e}"
+            )
+            return None
+    
     def _update_trade_decision(self, trade_id: str, decision: str, confidence: float, reasoning: str) -> None:
         """
         Update a trade with a new decision in its history.
@@ -333,7 +438,7 @@ class DecisionEngine:
         finally:
             conn.close()
     
-    def _format_prompt_new_trade(self, market_data: Dict, account_state: Dict, symbol: str) -> str:
+    async def _format_prompt_new_trade(self, market_data: Dict, account_state: Dict, symbol: str) -> str:
         """
         Format prompt for new trade evaluation.
         
@@ -345,10 +450,16 @@ class DecisionEngine:
         Returns:
             str: Formatted prompt for the LLM
         """
+        # Fetch current market price
+        current_price = await self._fetch_current_price(symbol)
+        
         prompt_parts = [
             f"# Trading Decision Request - New Trade Evaluation",
             f"Symbol: {symbol}",
             f"Timestamp: {datetime.now(timezone.utc).isoformat()}",
+            "",
+            "## Current Market Price",
+            f"- {symbol}: ${current_price:,.2f}" if current_price else f"- {symbol}: Price unavailable",
             "",
             "## Account Status",
             f"- Total Equity: {account_state['equity']:.8f} BTC",
@@ -370,7 +481,18 @@ class DecisionEngine:
                     if isinstance(value, (int, float)):
                         prompt_parts.append(f"- {indicator}: {value:.2f}")
                     else:
-                        prompt_parts.append(f"- {indicator}: {value}")
+                        # Handle complex RSI data format - extract actual numeric values
+                        if indicator == 'RSI' and isinstance(value, str):
+                            # Extract numeric RSI values from the complex string format
+                            rsi_value = self._extract_current_rsi_value(value)
+                            if rsi_value is not None:
+                                prompt_parts.append(f"- {indicator}: {rsi_value:.2f} ({'ABOVE 50 = SHORT' if rsi_value > 50 else 'BELOW 50 = LONG'})")
+                                logger.info(f"🎯 EXTRACTED RSI for {timeframe}: {rsi_value:.2f} -> {'SHORT' if rsi_value > 50 else 'LONG'}")
+                            else:
+                                prompt_parts.append(f"- {indicator}: [Error extracting value from: {str(value)[:100]}...]")
+                                logger.error(f"❌ Failed to extract RSI from: {str(value)[:200]}...")
+                        else:
+                            prompt_parts.append(f"- {indicator}: {value}")
             
             # Add signals
             if data['signals']:
@@ -390,26 +512,85 @@ class DecisionEngine:
             "## Additional Context",
             self.config.get('additional_context', 'No additional context'),
             "",
-            "## IMPORTANT: Strategy Implementation Rules",
-            "You MUST follow the trading strategy exactly as written above. Do NOT use general market analysis.",
-            "If the strategy says 'Always enter trades', then you MUST generate a buy or sell decision.",
-            "Focus on the specific indicators mentioned in the strategy (e.g., RSI levels, price action).",
-            "Do not override the strategy with broader market sentiment unless explicitly instructed.",
+            "## CRITICAL: MANDATORY TRADING RULES",
+            "🚨 YOU MUST ALWAYS GENERATE A TRADING DECISION - NEVER 'no_action' 🚨",
+            "",
+            "The strategy states: 'Always enter trades based on RSI position relative to 50'",
+            "- RSI > 50 = MANDATORY SHORT position",  
+            "- RSI < 50 = MANDATORY LONG position",
+            "- You MUST examine the RSI values above and determine if they are above or below 50",
+            "- Generate 'short' if RSI > 50, 'long' if RSI < 50",
+            "- 'no_action' is NEVER allowed per the strategy requirements",
+            "",
+            "FOLLOW THE STRATEGY EXACTLY - Do NOT use broader market analysis to override this.",
             "",
             "## Decision Required",
             "Based on the above data and the EXACT strategy rules, should we enter a new position?",
+            "",
+            "IMPORTANT: Use the current market price shown above for all calculations.",
+            "",
             "Please provide your decision in the following format:",
             "",
-            "Decision: [buy/sell/hold]",
-            "Confidence: [0.0-1.0]",
-            "Position Size: [percentage of capital, e.g., 0.02 for 2%]",
-            "Leverage: [1-10]",
-            "Stop Loss: [price level]",
-            "Take Profit: [price level]",
-            "Reasoning: [Your detailed analysis following the strategy rules exactly]"
+            "Action: [long/short/no_action]",
+            "Confidence: [0.0-1.0] (REQUIRED - your confidence level in this decision)",
+            "Risk_Percentage: [percentage of account to risk, e.g., '2%']",
+            "Collateral_USD: [REQUIRED - USD amount of collateral based on current price, e.g., '$200']",
+            "Leverage: [REQUIRED - leverage multiplier as number, e.g., '10']",
+            "Total_Position_USD: [total position size in USD, e.g., '$2,000']",
+            "Stop_Loss: [price level and reasoning, e.g., '$108,000 - below key support']",
+            "Take_Profit: [price level(s) and reasoning, e.g., '$115,000 - 3:1 risk/reward at resistance']",
+            "Reasoning: [REQUIRED - Your detailed analysis following the strategy rules exactly, including:",
+            "  - Why this entry based on the strategy (RSI above/below 50)",
+            "  - What you expect to happen",
+            "  - Risk management rationale",
+            "  - Exit plan and timeline]",
+            "",
+            "IMPORTANT: You MUST include ALL fields above. Each field should be on its own line.",
+            "Example calculation: If current BTC price is $67,000 and risking 2% of available margin = $200 collateral. With 10x leverage = $2,000 total position."
         ])
         
         return "\n".join(prompt_parts)
+    
+    def _extract_current_rsi_value(self, rsi_raw_data: str) -> float:
+        """
+        Extract the current RSI value from the complex MCP response format.
+        
+        Args:
+            rsi_raw_data (str): Raw RSI data string from MCP
+            
+        Returns:
+            float: Current RSI value or None if extraction fails
+        """
+        try:
+            # The RSI data comes in format: "meta=None content=[TextContent(type='text', text='[0,0,56.93411542892993,...]')]"
+            # We need to extract the last value from the array
+            
+            # Find the text content array
+            if 'text=\'[' in rsi_raw_data:
+                start_idx = rsi_raw_data.find('text=\'[') + 7  # Skip "text='["
+                end_idx = rsi_raw_data.find(']\'', start_idx)
+                if end_idx != -1:
+                    array_str = rsi_raw_data[start_idx:end_idx]
+                    # Split by comma and get last non-zero value
+                    values = [float(x.strip()) for x in array_str.split(',') if x.strip()]
+                    # Return the last value (most recent RSI)
+                    if values:
+                        current_rsi = values[-1]
+                        logger.bind(module="decision.engine", user_id=self.user_id).info(
+                            f"Successfully extracted current RSI: {current_rsi}"
+                        )
+                        return current_rsi
+            
+            logger.bind(module="decision.engine", user_id=self.user_id).warning(
+                f"Failed to extract RSI from: {rsi_raw_data[:200]}..."
+            )
+            return None
+            
+        except Exception as e:
+            logger.bind(module="decision.engine", user_id=self.user_id).error(
+                f"Error extracting RSI value: {e}"
+            )
+            return None
     
     def _format_prompt_manage_trade(self, market_data: Dict, account_state: Dict, 
                                    active_trade: Dict, symbol: str) -> str:
@@ -494,100 +675,133 @@ class DecisionEngine:
             "",
             "Please provide your decision in the following format:",
             "",
-            "Decision: [hold/adjust/close]",
-            "Confidence: [0.0-1.0]",
-            "Action Details: [if adjust: new stop loss/take profit; if close: market or limit]",
-            "Reasoning: [Your analysis considering the trade history and current conditions]"
+            "Action: [hold/add/reduce/close/adjust_stops]",
+            "Confidence: [0.0-1.0] (REQUIRED - your confidence level in this decision)",
+            "Position Size: [ONLY if 'add' or 'reduce' action:",
+            "  - For 'add': Additional position details like new trade entry",
+            "  - For 'reduce': Percentage to close (e.g., 'Close 50% of position')]",
+            "Stop Loss: [ONLY if 'adjust_stops': New stop loss level and reasoning]",
+            "Take Profit: [ONLY if 'adjust_stops': New take profit level and reasoning]",
+            "Reasoning: [REQUIRED - Your analysis including:",
+            "  - Current position status and P&L",
+            "  - Why this action based on strategy",
+            "  - Risk management considerations",
+            "  - Updated market outlook]",
+            "",
+            "IMPORTANT: You MUST include both Confidence and Reasoning fields. These are required."
         ])
         
         return "\n".join(prompt_parts)
     
     def _parse_llm_response(self, response: str, mode: str = 'new_trade') -> Dict[str, Any]:
         """
-        Parse the LLM response into a structured format.
+        Minimal parsing of LLM response - extract only confidence and reasoning.
+        The Trading Module's LLM will handle the actual trading instructions.
         
         Args:
             response (str): Raw LLM response
             mode (str): 'new_trade' or 'manage_trade'
             
         Returns:
-            Dict[str, Any]: Parsed decision data
+            Dict[str, Any]: Decision data with confidence, reasoning, and raw response
         """
-        # Initialize result
+        # Initialize result with defaults
         result = {
-            'decision': 'hold',
-            'confidence': 0.0,
-            'reasoning': '',
-            'raw_response': response
+            'decision': 'trading_llm_will_parse',  # Placeholder - Trading Module will determine
+            'confidence': 0.5,  # Default moderate confidence if not found
+            'reasoning': '',  # Will be extracted
+            'raw_response': response,
+            'mode': mode
         }
         
-        # Parse line by line
+        # Parse line by line for confidence, leverage, collateral, and reasoning
         lines = response.strip().split('\n')
-        reasoning_lines = []
         capture_reasoning = False
+        reasoning_lines = []
+        import re
         
         for line in lines:
-            line = line.strip()
+            line_stripped = line.strip()
             
-            if line.startswith('Decision:'):
-                decision = line.replace('Decision:', '').strip().lower()
-                result['decision'] = decision
-            
-            elif line.startswith('Confidence:'):
+            # Look for confidence in various formats
+            if 'confidence:' in line_stripped.lower():
+                # Try to extract confidence value
+                # Handle formats like "Confidence: 0.65" or "**Confidence:** 0.8"
                 try:
-                    confidence = float(line.replace('Confidence:', '').strip())
-                    result['confidence'] = max(0.0, min(1.0, confidence))
-                except:
-                    pass
+                    # Remove markdown formatting
+                    clean_line = line_stripped.replace('**', '').replace('*', '')
+                    # Split by colon and get the number
+                    parts = clean_line.split(':')
+                    if len(parts) >= 2:
+                        confidence_str = parts[1].strip()
+                        # Extract first number found
+                        numbers = re.findall(r'\d*\.?\d+', confidence_str)
+                        if numbers:
+                            confidence = float(numbers[0])
+                            result['confidence'] = max(0.0, min(1.0, confidence))
+                            logger.bind(module="decision.engine").info(f"Parsed confidence: {result['confidence']}")
+                except Exception as e:
+                    logger.bind(module="decision.engine").warning(f"Failed to parse confidence: {e}")
             
-            elif mode == 'new_trade' and line.startswith('Position Size:'):
+            # Look for leverage
+            elif 'leverage:' in line_stripped.lower():
                 try:
-                    size = float(line.replace('Position Size:', '').strip().rstrip('%'))
-                    result['position_size'] = size / 100 if size > 1 else size
-                except:
-                    pass
+                    clean_line = line_stripped.replace('**', '').replace('*', '')
+                    parts = clean_line.split(':')
+                    if len(parts) >= 2:
+                        leverage_str = parts[1].strip()
+                        # Extract number, handle "10x" or "10" format
+                        numbers = re.findall(r'\d+', leverage_str)
+                        if numbers:
+                            result['leverage'] = int(numbers[0])
+                            logger.bind(module="decision.engine").info(f"Parsed leverage: {result['leverage']}")
+                except Exception as e:
+                    logger.bind(module="decision.engine").warning(f"Failed to parse leverage: {e}")
             
-            elif mode == 'new_trade' and line.startswith('Leverage:'):
+            # Look for collateral USD
+            elif 'collateral_usd:' in line_stripped.lower():
                 try:
-                    result['leverage'] = int(float(line.replace('Leverage:', '').strip().rstrip('x')))
-                except:
-                    pass
+                    clean_line = line_stripped.replace('**', '').replace('*', '')
+                    parts = clean_line.split(':')
+                    if len(parts) >= 2:
+                        collateral_str = parts[1].strip()
+                        # Extract number, handle "$200" or "200" format
+                        numbers = re.findall(r'\d+\.?\d*', collateral_str)
+                        if numbers:
+                            result['collateral_usd'] = float(numbers[0])
+                            logger.bind(module="decision.engine").info(f"Parsed collateral_usd: {result['collateral_usd']}")
+                except Exception as e:
+                    logger.bind(module="decision.engine").warning(f"Failed to parse collateral_usd: {e}")
             
-            elif line.startswith('Stop Loss:'):
-                try:
-                    result['stop_loss'] = float(line.replace('Stop Loss:', '').strip())
-                except:
-                    pass
-            
-            elif line.startswith('Take Profit:'):
-                try:
-                    result['take_profit'] = float(line.replace('Take Profit:', '').strip())
-                except:
-                    pass
-            
-            elif mode == 'manage_trade' and line.startswith('Action Details:'):
-                result['action_details'] = line.replace('Action Details:', '').strip()
-            
-            elif line.startswith('Reasoning:'):
-                capture_reasoning = True
-                reasoning_lines.append(line.replace('Reasoning:', '').strip())
-            
-            elif capture_reasoning and line:
-                reasoning_lines.append(line)
+            # Look for reasoning section
+            elif 'reasoning:' in line_stripped.lower() or capture_reasoning:
+                if 'reasoning:' in line_stripped.lower():
+                    capture_reasoning = True
+                    # Get any text after "Reasoning:" on the same line
+                    parts = line.split(':', 1)
+                    if len(parts) > 1:
+                        reasoning_text = parts[1].strip()
+                        if reasoning_text:
+                            reasoning_lines.append(reasoning_text)
+                elif capture_reasoning and line_stripped:
+                    # Continue capturing reasoning until we hit another section
+                    if any(line_stripped.lower().startswith(x) for x in ['action:', 'confidence:', 'position size:', 'stop loss:', 'take profit:', '**action:', '**confidence:', '**position']):
+                        capture_reasoning = False
+                    else:
+                        reasoning_lines.append(line)
         
-        result['reasoning'] = ' '.join(reasoning_lines)
-        
-        # Validate required fields
-        if mode == 'new_trade' and result['decision'] in ['buy', 'sell']:
-            # Ensure we have required fields for a new trade
-            if 'position_size' not in result:
-                result['position_size'] = 0.02  # Default 2%
-            if 'leverage' not in result:
-                result['leverage'] = 5  # Default 5x
+        # Join reasoning lines
+        if reasoning_lines:
+            result['reasoning'] = '\n'.join(reasoning_lines).strip()
+        else:
+            # Fallback: use the entire response as reasoning if we couldn't parse it
+            result['reasoning'] = response
         
         logger.bind(module="decision.engine").info(
-            f"Parsed LLM response: decision={result['decision']}, "
-            f"confidence={result['confidence']}"
+            f"Parsed LLM response: confidence={result['confidence']}, "
+            f"leverage={result.get('leverage', 'Not found')}, "
+            f"collateral_usd={result.get('collateral_usd', 'Not found')}, "
+            f"reasoning_length={len(result['reasoning'])}, passing full response to Trading Module"
         )
         
         return result
@@ -629,11 +843,23 @@ class DecisionEngine:
                     market_data, account_state, trade, symbol
                 )
                 
+                # DEBUG: Log the full prompt
+                logger.bind(module="decision.engine", user_id=self.user_id).info(
+                    "📝 DECISION LLM USER PROMPT (MANAGE):\n{prompt}",
+                    prompt=prompt
+                )
+                
                 # Get decision from LLM
                 response, metadata = await self.llm_provider.generate_response(
                     prompt=prompt,
                     conversation_history=trade.get('decision_history', []),
                     temperature=0.7
+                )
+                
+                # DEBUG: Log the full response
+                logger.bind(module="decision.engine", user_id=self.user_id).info(
+                    "🤖 DECISION LLM RESPONSE (MANAGE):\n{response}",
+                    response=response
                 )
                 
                 # Parse response
@@ -660,12 +886,24 @@ class DecisionEngine:
             logger.bind(module="decision.engine", user_id=self.user_id).info("Entering New Trade Mode")
             
             # Format prompt
-            prompt = self._format_prompt_new_trade(market_data, account_state, symbol)
+            prompt = await self._format_prompt_new_trade(market_data, account_state, symbol)
+            
+            # DEBUG: Log the full prompt
+            logger.bind(module="decision.engine", user_id=self.user_id).info(
+                "📝 DECISION LLM USER PROMPT:\n{prompt}",
+                prompt=prompt
+            )
             
             # Get decision from LLM
             response, metadata = await self.llm_provider.generate_response(
                 prompt=prompt,
                 temperature=0.7
+            )
+            
+            # DEBUG: Log the full response
+            logger.bind(module="decision.engine", user_id=self.user_id).info(
+                "🤖 DECISION LLM RESPONSE:\n{response}",
+                response=response
             )
             
             # Parse response
@@ -677,57 +915,52 @@ class DecisionEngine:
     def _create_intent(self, decision: Dict[str, Any], mode: str) -> Dict[str, Any]:
         """
         Create a trading intent for the Trading Module.
+        Includes parsed confidence/reasoning and raw LLM decision.
         
         Args:
-            decision (Dict): Parsed decision from LLM
+            decision (Dict): Decision data with parsed fields and raw response
             mode (str): 'new' or 'manage'
             
         Returns:
-            Dict[str, Any]: Trading intent
+            Dict[str, Any]: Trading intent with both parsed metadata and raw decision
         """
         # Generate a unique decision ID
         decision_id = str(uuid.uuid4())
         
-        # Base intent structure
+        # Create intent with parsed metadata and raw LLM decision
         intent = {
             'decision_id': decision_id,
             'user_id': self.user_id,
             'config_id': self.config_id,
             'timestamp': datetime.now(timezone.utc).isoformat(),
+            'mode': mode,
+            'symbol': 'BTC/USD',  # TODO: Make this dynamic
+            'exchange': 'bitmex',  # TODO: Make this configurable
+            
+            # Include parsed confidence and reasoning for Decision Module use
             'confidence': decision['confidence'],
             'reasoning': decision['reasoning'],
-            'metadata': decision.get('metadata', {})
+            
+            # Include parsed trading parameters if found
+            'leverage': decision.get('leverage'),  # Will be None if not parsed
+            'collateral_amount': decision.get('collateral_usd'),  # Will be None if not parsed
+            
+            # Pass the ENTIRE raw LLM response - Trading Module's LLM will understand it
+            'llm_decision': decision['raw_response'],
+            
+            # Include metadata
+            'metadata': decision.get('metadata', {}),
+            
+            # Signal to Trading Module that this needs LLM processing
+            'action': 'process_llm_decision',
+            
+            # Include any additional context
+            'decision_mode': mode,
+            'trade_id': decision.get('trade_id') if mode == 'manage' else None
         }
         
-        # Add mode-specific fields
-        if mode == 'new' and decision['decision'] in ['buy', 'sell']:
-            intent.update({
-                'action': 'open_position',
-                'side': 'long' if decision['decision'] == 'buy' else 'short',
-                'symbol': 'BTC/USD',  # TODO: Make this dynamic
-                'position_size': decision.get('position_size', 0.02),
-                'leverage': decision.get('leverage', 5),
-                'stop_loss': decision.get('stop_loss'),
-                'take_profit': decision.get('take_profit')
-            })
-        
-        elif mode == 'manage':
-            intent['trade_id'] = decision.get('trade_id')
-            
-            if decision['decision'] == 'close':
-                intent['action'] = 'close_position'
-            elif decision['decision'] == 'adjust':
-                intent['action'] = 'adjust_position'
-                intent['adjustments'] = decision.get('action_details', {})
-            else:  # hold
-                intent['action'] = 'hold_position'
-        
-        else:
-            # No action needed
-            intent['action'] = 'no_action'
-        
         logger.bind(module="decision.engine").info(
-            f"Created intent: {intent['action']} with confidence {intent['confidence']}"
+            f"Created intent with raw LLM decision for Trading Module processing"
         )
         
         return intent

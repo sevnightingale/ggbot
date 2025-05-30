@@ -200,6 +200,53 @@ The current per-user extraction design has a scalability problem:
 - Ensemble methods
 - Market regime detection
 
+## Account Monitoring Service
+
+### Production Deployment
+The account monitoring service should run as a separate background process in production:
+
+1. **Scheduled Service Setup**
+   ```python
+   # monitoring/run_scheduled.py
+   async def main():
+       # Initialize monitoring for all active users
+       users = get_active_users_from_db()
+       monitors = {}
+       
+       for user in users:
+           monitor = HybridMonitoringService(user.id)
+           await monitor.start_scheduled_monitoring(interval=30)
+           monitors[user.id] = monitor
+       
+       # Keep running until shutdown
+       await asyncio.Event().wait()
+   ```
+
+2. **Deployment Options**
+   - **Docker Container**: Separate container for monitoring
+   - **Kubernetes CronJob**: For periodic updates
+   - **Systemd Service**: For VPS deployments
+   - **Celery Beat**: For task queue integration
+
+3. **Benefits**
+   - **Fresh Data**: Account states always up-to-date
+   - **Reduced Latency**: No need to fetch during trades
+   - **Better Risk Management**: Real-time margin monitoring
+   - **Position Tracking**: Immediate awareness of fills
+
+4. **Monitoring Service Features**
+   - Auto-restart on failure
+   - Per-user update intervals
+   - Rate limit handling
+   - Error alerting
+   - Performance metrics
+
+5. **Integration with Trading**
+   - Trading/Decision modules query DB for latest state
+   - Hybrid service provides both scheduled and triggered updates
+   - Triggered updates for immediate trade confirmation
+   - Scheduled updates for background freshness
+
 ## Frontend Integration Features
 
 ### User Dashboard
@@ -480,6 +527,114 @@ Currently, the prototype runs all APIs in a single combined service for simplici
    - Custom indicator overlays
    - Multi-timeframe analysis
    - Drawing tools integration
+
+## Multi-Symbol Trading Architecture
+
+### Current State: Single-Symbol Pipeline
+The current system processes one symbol at a time through the pipeline:
+```
+Extraction → Decision → Trading
+   ↓           ↓         ↓
+BTC/USDT   BTC/USDT   BTC/USDT
+```
+
+### Production Multi-Symbol Strategy
+
+#### Phase 1: Parallel Single-Symbol Pipelines
+For production, implement independent parallel flows for each symbol:
+
+```
+User Config: symbols: ["BTC/USDT", "ETH/USDT", "SOL/USDT"]
+
+Pipeline 1: Extraction → Decision → Trading (BTC/USDT)
+Pipeline 2: Extraction → Decision → Trading (ETH/USDT)  
+Pipeline 3: Extraction → Decision → Trading (SOL/USDT)
+```
+
+**Benefits:**
+- Clean separation and isolation
+- Independent decision making per asset
+- Easy horizontal scaling
+- Simple risk management per symbol
+- Fault tolerance (one symbol failure doesn't affect others)
+
+**Implementation Requirements:**
+
+1. **API Layer Updates**
+   ```python
+   # extraction/api.py - spawn parallel extraction tasks
+   async def run_multi_symbol_extraction(user_id: str, symbols: List[str]):
+       tasks = []
+       for symbol in symbols:
+           task = asyncio.create_task(
+               extract_single_symbol(user_id, symbol, timeframes)
+           )
+           tasks.append(task)
+       return await asyncio.gather(*tasks)
+   ```
+
+2. **Process Management**
+   - Container orchestration for parallel pipelines
+   - Resource allocation per symbol
+   - Independent scheduling and monitoring
+
+3. **Database Design** (Already Ready)
+   ```sql
+   -- Current schema already supports multi-symbol
+   market_data(user_id, symbol, timeframe, ...)
+   decisions(user_id, symbol, ...)
+   trades(user_id, symbol, ...)
+   ```
+
+4. **Configuration Management**
+   ```json
+   {
+     "extraction": {
+       "symbols": ["BTC/USDT", "ETH/USDT", "SOL/USDT"],
+       "parallel_processing": true,
+       "max_concurrent_symbols": 5
+     },
+     "decision": {
+       "per_symbol_strategy": "...",
+       "risk_per_symbol_pct": 0.02
+     }
+   }
+   ```
+
+#### Phase 2: Portfolio-Aware Decision Engine (Future)
+Later enhancement for cross-asset strategies:
+
+```
+Extraction(ALL) → Decision(Portfolio) → Trading(Multiple)
+     ↓               ↓                    ↓
+  BTC,ETH,SOL    Analyze all +        Execute best
+   indicators    current positions     opportunities
+```
+
+**Advanced Features:**
+- Cross-asset correlation analysis
+- Portfolio optimization
+- Dynamic allocation based on market conditions
+- Risk parity strategies
+
+#### Phase 3: Advanced Multi-Symbol Features
+- Cross-pair arbitrage opportunities
+- Sector rotation strategies
+- Market regime detection across assets
+- Dynamic symbol inclusion/exclusion based on volatility
+
+### Implementation Priority
+1. ✅ **Current**: Single-symbol foundation (solid base)
+2. 🎯 **Phase 1**: Parallel single-symbol pipelines (production ready)
+3. 🔮 **Phase 2**: Portfolio-aware strategies (advanced features)
+
+### Resource Considerations
+- **CPU**: Linear scaling with symbol count
+- **Memory**: Per-symbol data caching
+- **Network**: Parallel API calls to data sources
+- **Database**: Symbol-partitioned queries for performance
+
+The current architecture is **multi-symbol ready** and requires minimal changes for parallel symbol processing.
 
 ## Note on Implementation
 

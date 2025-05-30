@@ -7,7 +7,7 @@ from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection, save_configuration
 from core.common.logger import logger
 
-def get_configuration(user_id=None, config_type=None, config_name=None):
+def get_configuration(user_id=None, config_type=None, config_name=None, config_id=None):
     """
     Get configuration for a user from the database.
     Falls back to file-based configuration if not found in database.
@@ -16,6 +16,7 @@ def get_configuration(user_id=None, config_type=None, config_name=None):
         user_id: The user ID to get configuration for (defaults to DEFAULT_USER_ID)
         config_type: Optional type of configuration to retrieve (e.g., 'extraction', 'decision')
         config_name: Optional name of the configuration
+        config_id: Optional specific config ID to retrieve
         
     Returns:
         Dictionary containing the configuration
@@ -27,23 +28,40 @@ def get_configuration(user_id=None, config_type=None, config_name=None):
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                query = "SELECT config_data FROM configurations WHERE user_id = %s"
-                params = [user_id]
+                # First try to get unified user config
+                if config_id:
+                    cur.execute("""
+                        SELECT config_data 
+                        FROM configurations 
+                        WHERE user_id = %s AND config_id = %s AND config_type = 'user'
+                    """, [user_id, config_id])
+                else:
+                    cur.execute("""
+                        SELECT config_data 
+                        FROM configurations 
+                        WHERE user_id = %s AND config_type = 'user'
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """, [user_id])
                 
-                if config_type:
-                    query += " AND config_type = %s"
-                    params.append(config_type)
-                
-                if config_name:
-                    query += " AND config_name = %s"
-                    params.append(config_name)
-                
-                cur.execute(query, params)
                 result = cur.fetchone()
                 
                 if result:
-                    log.info(f"Retrieved configuration from database for user {user_id}")
-                    return result[0]
+                    # Found unified config
+                    unified_config = result[0]
+                    log.info(f"Retrieved unified configuration from database for user {user_id}")
+                    
+                    # If a specific module config_type was requested, extract it
+                    if config_type and config_type != 'user':
+                        if config_type in unified_config:
+                            return unified_config[config_type]
+                        else:
+                            log.error(f"Config type '{config_type}' not found in unified config")
+                            return {}
+                    return unified_config
+                else:
+                    log.error(f"No unified configuration found for user {user_id}")
+                    return {}
     except Exception as e:
         log.error(f"Error retrieving configuration from database: {e}")
     

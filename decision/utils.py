@@ -33,11 +33,12 @@ def get_config_id_by_name(user_id: str, config_name: str) -> Optional[str]:
     
     try:
         cursor = conn.cursor()
+        # Look for unified user config
         cursor.execute("""
             SELECT config_id 
             FROM configurations 
             WHERE user_id = %s 
-            AND config_type = 'decision'
+            AND config_type = 'user'
             AND config_name = %s
         """, (user_id, config_name))
         

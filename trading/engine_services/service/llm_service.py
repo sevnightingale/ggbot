@@ -169,12 +169,23 @@ class LLMService:
         try:
             # Generate response from LLM
             logger.info(f"Generating LLM response for intent {decision_id}")
+            
+            # DEBUG: Log the prompt being sent to Trading LLM
+            logger.info(f"📝 TRADING LLM USER PROMPT:\n{prompt}")
+            
             llm_response_text = await self._generate_response(prompt)
             logger.info(f"LLM response received for intent {decision_id}")
+            
+            # DEBUG: Log the raw LLM response
+            logger.info(f"🤖 TRADING LLM RAW RESPONSE:\n{llm_response_text}")
             
             # Parse response into tool calls
             tool_calls = await self._parse_response(llm_response_text)
             logger.info(f"Parsed {len(tool_calls)} tool calls from LLM response")
+            
+            # DEBUG: Log the parsed tool calls
+            for i, tool_call in enumerate(tool_calls):
+                logger.info(f"🔧 PARSED TOOL CALL {i+1}: {json.dumps(tool_call.model_dump(), indent=2)}")
             
             # Emit success event
             if self.event_bus:
@@ -370,6 +381,10 @@ Which tool(s) would you use to execute this trading intent and with what paramet
                     {"role": "system", "content": self.config.system_prompt},
                     {"role": "user", "content": prompt}
                 ]
+                
+                # DEBUG: Log the system prompt (only on first call to avoid spam)
+                if retries == 0:
+                    logger.info(f"📋 TRADING LLM SYSTEM PROMPT:\n{self.config.system_prompt}")
                 
                 logger.info(f"Making OpenAI API call with model {self.config.model}")
                 

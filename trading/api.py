@@ -30,6 +30,7 @@ from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 from core.mcp.exceptions import MCPError
+from core.monitoring.hybrid_service import HybridMonitoringService
 from trading.engine import TradingEngine
 
 
@@ -92,6 +93,7 @@ trading_engines: Dict[str, TradingEngine] = {}
 async def get_account_state(user_id: str, exchange: str = "bitmex") -> Optional[Dict[str, Any]]:
     """
     Get latest account state from monitoring data.
+    Uses the same pattern as the working test script.
     
     Args:
         user_id: User ID
@@ -127,7 +129,7 @@ async def get_account_state(user_id: str, exchange: str = "bitmex") -> Optional[
                 return {
                     'balance_data': balance_data,
                     'position_data': position_data,
-                    'equity': float(equity) if equity else 0,
+                    'equity': float(equity) if equity else float(available_margin) if available_margin else 0,
                     'available_margin': float(available_margin) if available_margin else 0,
                     'used_margin': float(used_margin) if used_margin else 0,
                     'updated_at': updated_at
@@ -175,7 +177,7 @@ app = FastAPI(
 )
 
 
-async def create_trading_engine(user_id: str) -> TradingEngine:
+async def create_trading_engine(user_id: str, config_id: Optional[str] = None) -> TradingEngine:
     """
     Create or retrieve a trading engine for a user.
     
@@ -204,6 +206,49 @@ async def create_trading_engine(user_id: str) -> TradingEngine:
     #     from trading.exchanges.binance.exchange_guide import get_exchange_guide_text
     #     exchange_guide = get_exchange_guide_text()
     
+    # Load unified user configuration from database
+    user_config = None
+    risk_rules = {}
+    
+    with get_db_connection() as conn:
+        with conn.cursor() as cursor:
+            if config_id:
+                # Use specific config_id if provided
+                cursor.execute("""
+                    SELECT config_data 
+                    FROM configurations 
+                    WHERE user_id = %s 
+                    AND config_id = %s
+                    AND config_type = 'user'
+                """, (user_id, config_id))
+            else:
+                # Otherwise get latest config
+                cursor.execute("""
+                    SELECT config_data 
+                    FROM configurations 
+                    WHERE user_id = %s AND config_type = 'user'
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                """, (user_id,))
+            
+            result = cursor.fetchone()
+            if result:
+                user_config = result[0]
+                # Extract trading config and risk rules from unified config
+                if 'trading' in user_config and 'risk_rules' in user_config['trading']:
+                    risk_rules = user_config['trading']['risk_rules']
+                    logger.info(f"Loaded risk rules from unified config for {user_id}" + 
+                               (f" (config_id: {config_id})" if config_id else ""))
+    
+    # Extract risk parameters with defaults
+    max_leverage = risk_rules.get('max_leverage', 10)
+    max_position_pct = risk_rules.get('max_position_size_pct', 0.05)
+    max_risk_pct = risk_rules.get('max_risk_per_trade_pct', 0.05)
+    min_equity_protection = risk_rules.get('min_equity_protection', 0.80)
+    max_contracts = risk_rules.get('max_contracts_per_trade', 1000000)
+    
+    logger.info(f"Using risk rules: max_leverage={max_leverage}, max_position_pct={max_position_pct}")
+    
     # Configuration for the trading engine
     config = {
         "llm": {
@@ -213,8 +258,8 @@ async def create_trading_engine(user_id: str) -> TradingEngine:
             "max_retries": 2
         },
         "validation": {
-            "max_leverage": 10,
-            "max_position_pct": 0.05
+            "max_leverage": max_leverage,
+            "max_position_pct": max_position_pct
         },
         "execution": {
             "polling_interval": 5,
@@ -226,6 +271,13 @@ async def create_trading_engine(user_id: str) -> TradingEngine:
         "credentials": {
             "apiKey": os.environ.get("EXCHANGE_API"),
             "secret": os.environ.get("EXCHANGE_SECRET")
+        },
+        "risk_rules": {
+            "max_leverage": max_leverage,
+            "max_position_size_pct": max_position_pct,
+            "max_risk_per_trade_pct": max_risk_pct,
+            "min_equity_protection": min_equity_protection,
+            "max_contracts_per_trade": max_contracts
         }
     }
     
@@ -343,11 +395,56 @@ async def execute_trade(
         # Step 4: Add account state to intent for validation context
         intent_data['_account_state'] = account_state
         
+        # Add context for risk validation (pass both equity and available_margin)
+        validation_context = {
+            "equity": account_state.get('equity', 0),
+            "available_margin": account_state.get('available_margin', 0),
+            "used_margin": account_state.get('used_margin', 0),
+            "timestamp": datetime.utcnow().timestamp()
+        }
+        
         # Step 5: Process through the trading engine
         result = await engine.process_decision_intent(intent_data)
         
         # Map engine response to API response
         if result.get("status") == "success":
+            # Step 6: Trigger monitoring update to confirm execution
+            try:
+                monitoring = HybridMonitoringService(engine.user_id)
+                
+                # Get expected trade details from intent
+                expected_symbol = intent_data.get('symbol', 'BTC/USD')
+                expected_side = intent_data.get('side', '')
+                
+                if intent.action == 'open_position' and expected_side:
+                    logger.bind(user_id=engine.user_id).info(
+                        f"Triggering position verification for {expected_symbol} {expected_side}"
+                    )
+                    
+                    # Verify trade execution with monitoring
+                    position = await monitoring.verify_trade_execution(
+                        expected_symbol=expected_symbol,
+                        expected_side=expected_side,
+                        timeout=15.0
+                    )
+                    
+                    if position:
+                        logger.bind(user_id=engine.user_id).info(
+                            f"Trade confirmed: {position.get('symbol')} "
+                            f"{position.get('contracts', 0)} contracts"
+                        )
+                        result['confirmed'] = True
+                        result['position'] = position
+                    else:
+                        logger.bind(user_id=engine.user_id).warning(
+                            "Trade executed but position not confirmed in time"
+                        )
+                        result['confirmed'] = False
+                        
+            except Exception as e:
+                logger.bind(user_id=engine.user_id).error(f"Monitoring verification failed: {e}")
+                # Don't fail the trade response, just log the monitoring error
+            
             return ExecutionResponse(
                 status="success",
                 trade_id=result.get("trade_id"),

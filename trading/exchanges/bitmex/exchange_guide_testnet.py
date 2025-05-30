@@ -38,6 +38,12 @@ def get_exchange_guide_text(symbol: Optional[str] = None) -> str:
     guide_text = f"""
 === BitMEX Testnet Trading Guide ===
 
+ACCOUNT BALANCE STRUCTURE:
+- Available Margin: Your actual usable balance for trading (use this for position sizing)
+- Equity: May show small/weird values due to BitMEX's calculation method
+- Position Sizing: Base position sizes on AVAILABLE MARGIN, not equity
+- Risk Management: The system will auto-adjust positions to stay within 5% of available margin
+
 MINIMUM ORDER SIZES:
 - Default: 1 contract for most symbols
 - Exception: BTC/USD requires 100 contract minimum due to precision settings{min_amount_note}

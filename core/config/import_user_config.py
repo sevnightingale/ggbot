@@ -59,41 +59,20 @@ def import_user_config_to_db():
             )
             logger.info(f"Deleted existing configurations for user {DEFAULT_USER_ID}")
             
-            # Now insert each config type
-            config_types = ['extraction', 'decision', 'execution']
-            
-            for config_type in config_types:
-                if config_type in user_config:
-                    # Insert configuration with generated UUID
-                    config_id = str(uuid.uuid4())
-                    cursor.execute("""
-                        INSERT INTO configurations 
-                        (config_id, user_id, config_type, config_name, config_data, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-                    """, (
-                        config_id,
-                        DEFAULT_USER_ID,
-                        config_type,
-                        'default',
-                        Json(user_config[config_type])
-                    ))
-                    logger.info(f"Inserted {config_type} configuration")
-            
-            # Also insert the MCP config as a separate type
-            if 'mcp' in user_config:
-                config_id = str(uuid.uuid4())
-                cursor.execute("""
-                    INSERT INTO configurations 
-                    (config_id, user_id, config_type, config_name, config_data, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
-                """, (
-                    config_id,
-                    DEFAULT_USER_ID,
-                    'mcp',
-                    'default',
-                    Json(user_config['mcp'])
-                ))
-                logger.info("Inserted MCP configuration")
+            # Insert unified user configuration
+            config_id = str(uuid.uuid4())
+            cursor.execute("""
+                INSERT INTO configurations 
+                (config_id, user_id, config_type, config_name, config_data, created_at, updated_at)
+                VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+            """, (
+                config_id,
+                DEFAULT_USER_ID,
+                'user',  # Unified config type
+                'default',
+                Json(user_config)  # Store entire config as one
+            ))
+            logger.info(f"Inserted unified user configuration with id {config_id}")
             
             # Commit the transaction
             conn.commit()

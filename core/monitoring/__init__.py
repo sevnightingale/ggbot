@@ -8,5 +8,6 @@ account state for use by the Decision and Trading modules.
 
 from .service import AccountMonitoringService
 from .adapters import ExchangeAdapter, BitMEXAdapter
+from .hybrid_service import HybridMonitoringService
 
-__all__ = ['AccountMonitoringService', 'ExchangeAdapter', 'BitMEXAdapter']
+__all__ = ['AccountMonitoringService', 'ExchangeAdapter', 'BitMEXAdapter', 'HybridMonitoringService']

@@ -68,6 +68,7 @@ class TradeCompiler:
         defaults = {
             'max_leverage': 50,  # Maximum allowed leverage
             'max_risk_per_trade_pct': 0.05,  # Maximum position size as % of equity
+            'max_position_size_pct': 0.05,  # Maximum position size as % of account balance (5%)
             'allowed_order_types': [
                 'market', 'limit', 'stop', 'stopLimit', 
                 'takeProfit', 'takeProfitLimit'
@@ -777,7 +778,12 @@ class TradeCompiler:
         self.logger.debug(f"Performing order-specific risk checks for: {json.dumps(final_params)}")
         
         # Get order parameters
-        equity = context.get('equity')
+        equity = context.get('equity', 0)
+        available_margin = context.get('available_margin', 0)
+        
+        # For BitMEX, use available_margin as the account balance for risk calculations
+        account_balance = available_margin if available_margin > 0 else equity
+        
         symbol = final_params.get('symbol')
         amount = final_params.get('amount')
         price = final_params.get('price')  # Limit price or None for market
@@ -831,8 +837,39 @@ class TradeCompiler:
                     estimated_cost = notional_value_quote / leverage
                     self.logger.info(f"Inverse market cost estimation: {amount} * {contract_size} / {leverage} = {estimated_cost:.2f}")
             
-            # Check against equity if available
-            if equity and estimated_cost > 0:
+            # Check against account balance if available
+            if account_balance and estimated_cost > 0:
+                # SAFETY CHECK: Cap position size at configured percentage of account balance
+                max_position_pct = self.risk_rules.get('max_position_size_pct', 0.05)  # Default 5%
+                max_position_cost = account_balance * max_position_pct
+                
+                if estimated_cost > max_position_cost:
+                    # AUTO-ADJUST: Reduce position size to stay within limit
+                    adjustment_ratio = max_position_cost / estimated_cost
+                    original_amount = amount
+                    
+                    # Adjust the amount parameter
+                    adjusted_amount = amount * adjustment_ratio
+                    precision_digits = self._get_precision_digits(market_info, 'amount')
+                    adjusted_amount = self._round_value(adjusted_amount, precision_digits, math.floor)
+                    
+                    # Update the parameter
+                    final_params['amount'] = adjusted_amount
+                    
+                    # Recalculate estimated cost with adjusted amount
+                    if is_linear:
+                        estimated_cost = (adjusted_amount * contract_size * current_mark_price) / leverage
+                    elif is_inverse:
+                        notional_value_quote = adjusted_amount * contract_size
+                        estimated_cost = notional_value_quote / leverage
+                    
+                    self.logger.warning(
+                        f"AUTO-ADJUSTED position size from {original_amount} to {adjusted_amount} contracts "
+                        f"to stay within {max_position_pct*100:.0f}% of account balance. "
+                        f"Original cost: {estimated_cost/adjustment_ratio:.2f}, Adjusted cost: {estimated_cost:.2f}, "
+                        f"Account balance: {account_balance:.2f}, Max allowed: {max_position_cost:.2f}"
+                    )
+                
                 # Get minimum equity protection threshold (e.g., 80% of equity)
                 min_equity_protection = self.risk_rules.get('min_equity_protection', 0.80)
                 max_usable_equity = equity * (1 - min_equity_protection)

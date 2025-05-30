@@ -9,7 +9,7 @@
     "indicators": {
       "enabled": true,
       "script_path": "core/mcp/servers/crypto-indicators-mcp/index.js",
-      "exchange_name": "bitmex"
+      "exchange_name": "binance"
     }
   },
   "extraction": {
@@ -50,5 +50,14 @@
     "exchange": "ccxt_mcp",
     "exchange_id": "bitmex",
     "authentication": "api_key"
+  },
+  "trading": {
+    "risk_rules": {
+      "max_leverage": 10,
+      "max_position_size_pct": 0.05,
+      "max_risk_per_trade_pct": 0.05,
+      "min_equity_protection": 0.80,
+      "max_contracts_per_trade": 1000000
+    }
   }
 }
