@@ -159,6 +159,11 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                             # Call the MCP tool through the session
                             result = await mcp_client.session.call_tool(mcp_tool_name, params)
                             
+                            # DEBUG: Log raw indicator data
+                            logger.bind(user_id=user_id).info(
+                                f"🔍 RAW {indicator_name} DATA for {symbol} {timeframe}: {str(result)[:500]}..."
+                            )
+                            
                             if result and not isinstance(result, str) or (isinstance(result, str) and not result.startswith("Error")):
                                 indicator_results[indicator_name] = result
                                 logger.bind(user_id=user_id).info(f"Successfully calculated {indicator_name}")
@@ -172,35 +177,45 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                     # Step 3: Get LLM interpretation of the results
                     if indicator_results:
                         interpretation_prompt = f"""
-Analyze the following technical indicators for {symbol} on the {timeframe} timeframe:
+Analyze the raw indicator data for {symbol} on the {timeframe} timeframe:
 
 {json.dumps(indicator_results, indent=2)}
 
-Provide a comprehensive analysis including:
-1. Overall market sentiment (bullish/bearish/neutral)
-2. Key signals from each indicator
-3. Confluences or divergences between indicators
-4. Recommended trading stance
-5. Risk level assessment
+Your task is to extract and summarize the key information from this raw data:
+1. For each indicator, identify the CURRENT VALUE (the most recent data point)
+2. Describe the RECENT TREND based on the historical data
+3. Note any significant levels or patterns in the data
 
-Format your response as a JSON object with these fields:
+Focus only on objective data analysis. Do NOT make trading recommendations or sentiment assessments.
+
+Format your response as a JSON object:
 {{
-    "sentiment": "bullish/bearish/neutral",
-    "strength": "strong/moderate/weak",
-    "key_signals": ["signal1", "signal2", ...],
-    "analysis": "detailed analysis text",
-    "recommendation": "trading recommendation",
-    "risk_level": "high/medium/low",
-    "confidence": 0.0-1.0
+    "indicators": {{
+        "indicator_name": {{
+            "current_value": numeric_value,
+            "trend": "description of recent trend",
+            "key_observations": "notable patterns or levels"
+        }}
+    }},
+    "summary": "brief objective summary of the data"
 }}
 """
 
                         logger.bind(user_id=user_id).info("Requesting interpretation from LLM")
                         
+                        # DEBUG: Log the prompt being sent to LLM
+                        system_prompt = "You are a technical analysis assistant. Your task is to analyze raw indicator data and extract key information: current values, trends, and patterns. Provide objective data analysis only, without trading recommendations."
+                        logger.bind(user_id=user_id).info(
+                            f"📋 EXTRACTION LLM SYSTEM PROMPT:\n{system_prompt}"
+                        )
+                        logger.bind(user_id=user_id).info(
+                            f"📝 EXTRACTION LLM USER PROMPT:\n{interpretation_prompt}"
+                        )
+                        
                         interpretation_response = llm_client.chat.completions.create(
                             model=llm_model,
                             messages=[
-                                {"role": "system", "content": "You are a cryptocurrency trading expert who interprets technical indicators to provide actionable trading insights."},
+                                {"role": "system", "content": system_prompt},
                                 {"role": "user", "content": interpretation_prompt}
                             ],
                             temperature=0.3,
@@ -208,6 +223,11 @@ Format your response as a JSON object with these fields:
                         )
                         
                         interpretation = interpretation_response.choices[0].message.content
+                        
+                        # DEBUG: Log the LLM response
+                        logger.bind(user_id=user_id).info(
+                            f"🤖 EXTRACTION LLM RESPONSE:\n{interpretation}"
+                        )
                         
                         try:
                             interpretation_data = json.loads(interpretation)

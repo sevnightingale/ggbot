@@ -1,23 +1,16 @@
 """
 Centralized logging configuration for GGBot.
 
-This module configures logging to write to both console and file,
-making it easier to debug issues and review logs after runs.
+Simple logging to ggbot.log file for easy review.
 """
 import os
 import sys
 from pathlib import Path
-from datetime import datetime
 from loguru import logger
 
 def setup_logging():
     """
-    Configure logging for the entire application.
-    
-    Sets up:
-    - Console output with colored formatting
-    - File output with detailed JSON formatting for analysis
-    - Automatic log rotation at 100MB
+    Configure simple logging to ggbot.log file.
     """
     # Remove default logger
     logger.remove()
@@ -26,14 +19,10 @@ def setup_logging():
     log_dir = Path(__file__).parent.parent.parent / "logs"
     log_dir.mkdir(exist_ok=True)
     
-    # Generate log filename with timestamp
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_file = log_dir / f"ggbot_{timestamp}.log"
+    # Simple log file
+    log_file = log_dir / "ggbot.log"
     
-    # Also create a "latest" symlink for easy access
-    latest_log = log_dir / "ggbot_latest.log"
-    
-    # Console handler - simplified format, no user_id binding required
+    # Console handler - simple format (safe for tests)
     console_format = (
         "<green>{time:YYYY-MM-DD HH:mm:ss}</green> | "
         "<level>{level: <8}</level> | "
@@ -41,12 +30,11 @@ def setup_logging():
         "<level>{message}</level>"
     )
     
-    # File handler - detailed format with all available context
+    # File handler - simple format without extra context
     file_format = (
-        "{time:YYYY-MM-DD HH:mm:ss.SSS} | "
+        "{time:YYYY-MM-DD HH:mm:ss} | "
         "{level: <8} | "
-        "{name}:{function}:{line} | "
-        "{extra} | "
+        "{name}:{function}:{line} - "
         "{message}"
     )
     
@@ -55,32 +43,15 @@ def setup_logging():
         sys.stdout,
         format=console_format,
         level="INFO",
-        colorize=True,
-        filter=lambda record: record["level"].no >= 20  # INFO and above
+        colorize=True
     )
     
-    # Add file handler with JSON serialization for structured logs
+    # Add file handler
     logger.add(
         str(log_file),
         format=file_format,
-        level="DEBUG",  # Capture everything in file
-        rotation="100 MB",  # Rotate when file reaches 100MB
-        retention="7 days",  # Keep logs for 7 days
-        compression="zip",  # Compress rotated logs
-        serialize=False,  # Human-readable format
-        enqueue=True,  # Thread-safe logging
-        backtrace=True,  # Include traceback on errors
-        diagnose=True  # Include variable values in tracebacks
+        level="DEBUG"
     )
-    
-    # Create/update the latest symlink
-    if latest_log.exists():
-        latest_log.unlink()
-    latest_log.symlink_to(log_file.name)
-    
-    # Log the startup
-    logger.info(f"Logging initialized. Writing to: {log_file}")
-    logger.info(f"Latest log symlink: {latest_log}")
     
     return str(log_file)
 

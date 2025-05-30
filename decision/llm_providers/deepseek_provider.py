@@ -64,6 +64,11 @@ class DeepSeekProvider(LLMProvider):
                 "Format your response with clear sections for Decision, Confidence, and Reasoning."
             )
             messages.insert(0, {"role": "system", "content": system_prompt})
+            
+            # DEBUG: Log the system prompt
+            logger.bind(module="decision.deepseek").info(
+                f"📋 DECISION LLM SYSTEM PROMPT:\n{system_prompt}"
+            )
         
         headers = {
             "Authorization": f"Bearer {self.api_key}",
