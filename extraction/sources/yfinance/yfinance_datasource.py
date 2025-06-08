@@ -8,6 +8,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any
 import pandas as pd
 import yfinance as yf
+import time
 
 from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
@@ -66,6 +67,20 @@ class YFinanceDataSource(DataSource):
             'BTC-USD', 'ETH-USD', 'BNB-USD', 'XRP-USD', 'ADA-USD',
             'SOL-USD', 'DOGE-USD', 'MATIC-USD', 'DOT-USD', 'AVAX-USD'
         ]
+        self._last_request_time = 0
+        self._rate_limit_delay = 10.0  # 10 second delay between requests for testing to avoid rate limits
+    
+    def _apply_rate_limit(self):
+        """Apply rate limiting between API requests."""
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+        
+        if time_since_last_request < self._rate_limit_delay:
+            sleep_time = self._rate_limit_delay - time_since_last_request
+            logger.bind(user_id=DEFAULT_USER_ID).debug(f"Rate limiting: sleeping for {sleep_time:.2f} seconds")
+            time.sleep(sleep_time)
+        
+        self._last_request_time = time.time()
     
     def get_historical_data(self, symbol: str, timeframe: str,
                            start_date: Optional[datetime] = None,
@@ -140,7 +155,11 @@ class YFinanceDataSource(DataSource):
                 )
         
         try:
-            logger.bind(user_id=DEFAULT_USER_ID).info(f"Fetching {symbol} {timeframe} data from {start_date} to {end_date}")
+            logger.bind(user_id=DEFAULT_USER_ID).info(f"Fetching {symbol} {timeframe} data from {start_date.strftime('%Y-%m-%d %H:%M:%S')} to {end_date.strftime('%Y-%m-%d %H:%M:%S')}")
+            
+            # Apply rate limiting before making the request
+            self._apply_rate_limit()
+            
             df = yf.download(
                 symbol,
                 start=start_date,
@@ -229,21 +248,30 @@ class YFinanceDataSource(DataSource):
             raise ValueError(f"Symbol '{symbol}' is not supported")
         
         try:
+            # Apply rate limiting before making the request
+            self._apply_rate_limit()
+            
             ticker = yf.Ticker(symbol)
-            # todays_data = ticker.history(period='1d')
             
-            # Check if we have data for today
-            # if not todays_data.empty:
-            #     return float(todays_data['Close'].iloc[-1])
+            # Use history instead of info to avoid rate limits - it's generally more reliable
+            # Get the most recent day's data
+            history_data = ticker.history(period='1d', interval='1m')
             
-            # If no data for today, get the last available price
+            if not history_data.empty:
+                # Return the most recent close price
+                return float(history_data['Close'].iloc[-1])
+            
+            # Fallback to daily data if minute data fails
+            daily_data = ticker.history(period='2d')
+            if not daily_data.empty:
+                return float(daily_data['Close'].iloc[-1])
+            
+            # Last resort: try info API
             last_quote = ticker.info.get('regularMarketPrice')
             if last_quote:
                 return float(last_quote)
             
-            # Fallback to last closing price if quote not available
-            last_close = ticker.history(period='1d')['Close'].iloc[-1]
-            return float(last_close)
+            raise ValueError(f"No price data available for {symbol}")
         
         except Exception as e:
             logger.bind(user_id=DEFAULT_USER_ID).error(f"Error fetching current price for {symbol}: {str(e)}")

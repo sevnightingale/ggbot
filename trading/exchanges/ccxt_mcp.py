@@ -457,6 +457,54 @@ class CCXTMCPAdapter:
         self.logger.error(f"All {retry_count} attempts to call {tool_name} failed")
         return {"error": f"Tool call failed after {retry_count} attempts: {last_error}"}
     
+    def _parse_textcontent_response(self, response_str: str) -> List[Dict]:
+        """
+        Parse a stringified TextContent response from MCP into a list of dictionaries.
+        
+        This handles cases where FastMCP wraps each item in TextContent objects
+        which can't be JSON serialized, resulting in a stringified response.
+        
+        CRITICAL FIX: The JSON strings extracted from TextContent contain literal escape
+        sequences (like \n) that must be decoded before JSON parsing. This was causing
+        "Expecting property name enclosed in double quotes" errors.
+        
+        Args:
+            response_str: Stringified TextContent response
+            
+        Returns:
+            List of parsed dictionaries
+        """
+        import re
+        
+        if not isinstance(response_str, str) or 'TextContent' not in response_str:
+            return response_str
+        
+        # Extract all the JSON objects from TextContent text fields
+        markets = []
+        
+        # CRITICAL FIX: Updated pattern to handle multi-line JSON with newlines
+        # The previous pattern r"text='({[^']+})'" failed because [^'] doesn't match newlines
+        # Using DOTALL flag makes . match newlines, and we use lazy matching with .*?
+        pattern = r"text='({.*?})'"
+        matches = re.findall(pattern, response_str, re.DOTALL)
+        
+        for match in matches:
+            try:
+                # CRITICAL FIX: Decode escape sequences before JSON parsing
+                # The extracted JSON strings contain literal \n escape sequences that need decoding
+                decoded_match = match.encode().decode('unicode_escape')
+                
+                # Parse the JSON string
+                market = json.loads(decoded_match)
+                markets.append(market)
+            except json.JSONDecodeError as e:
+                self.logger.warning(f"Failed to parse market JSON: {match[:100]}... Error: {e}")
+            except UnicodeDecodeError as e:
+                self.logger.warning(f"Failed to decode escape sequences in market JSON: {match[:100]}... Error: {e}")
+                
+        self.logger.info(f"Parsed {len(markets)} markets from TextContent response")
+        return markets
+    
     async def _suggest_symbols(self, attempted_symbol: str) -> List[str]:
         """
         Suggest alternative symbols when a symbol is not found.
@@ -759,6 +807,49 @@ class CCXTMCPAdapter:
         }
         
         return await self.call_tool('set_leverage', params)
+    
+    async def fetch_position(self, symbol: str) -> Optional[Dict]:
+        """
+        Fetch position for a specific symbol.
+        
+        This is a convenience method that calls fetch_positions and filters
+        for the specific symbol, handling symbol mapping properly.
+        
+        Args:
+            symbol: Trading pair symbol (e.g., 'BTC/USD')
+            
+        Returns:
+            Position object or None if not found
+        """
+        try:
+            # Get all positions
+            positions = await self.fetch_positions()
+            
+            if not positions:
+                return None
+            
+            # Map symbol to exchange-specific format for comparison
+            exchange_symbol = self.map_symbol(symbol)
+            
+            # Find matching position by symbol
+            for position in positions:
+                if isinstance(position, dict):
+                    pos_symbol = position.get('symbol')
+                    
+                    # Check both original symbol and mapped symbol
+                    if pos_symbol == symbol or pos_symbol == exchange_symbol:
+                        # Check if position has actual size (not zero)
+                        size = float(position.get('contracts', 0) or position.get('size', 0) or 0)
+                        if abs(size) > 0:
+                            self.logger.debug(f"Found position for {symbol} ({exchange_symbol}): size={size}")
+                            return position
+            
+            self.logger.debug(f"No active position found for {symbol} ({exchange_symbol})")
+            return None
+            
+        except Exception as e:
+            self.logger.error(f"Error fetching position for {symbol}: {e}")
+            return None
         
     async def fetch_markets(self, cache: bool = True) -> Dict[str, Dict]:
         """
@@ -773,6 +864,11 @@ class CCXTMCPAdapter:
         try:
             # Call the fetch_markets tool
             markets_list = await self.call_tool('fetch_markets', {}, map_symbols=False)
+            
+            # Handle stringified TextContent response from MCP
+            if isinstance(markets_list, str) and 'TextContent' in markets_list:
+                self.logger.info("Received stringified TextContent response, parsing...")
+                markets_list = self._parse_textcontent_response(markets_list)
             
             # Convert list to dictionary keyed by symbol for easier access
             markets_dict = {}

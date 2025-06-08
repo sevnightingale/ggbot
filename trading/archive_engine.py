@@ -57,10 +57,10 @@ class MockDb:
         logger.debug(f"DB: Logging error {data}")
         return True
     
-    async def get_active_trades(self, user_id, status='open'):
+    async def get_active_trades(self, user_id, trade_status='open'):
         """Get all active trades for a user."""
-        logger.debug(f"DB: Getting active trades for user {user_id} with status {status}")
-        return [{'trade_id': f'mock_trade_{i}', 'trade_status': status, 'user_id': user_id} for i in range(3)]
+        logger.debug(f"DB: Getting active trades for user {user_id} with trade_status {trade_status}")
+        return [{'trade_id': f'mock_trade_{i}', 'trade_status': trade_status, 'user_id': user_id} for i in range(3)]
 
 db = MockDb()
 
@@ -1395,7 +1395,7 @@ Which tool(s) would you use to execute this trading intent and with what paramet
             "config_id": self.config.get('config_id'), # Assuming config has an ID
             "decision_id": intent_data.get('decision_id'),
             "exchange": intent_data.get('exchange', self.config.get('default_exchange')),
-            "pair": intent_data.get('symbol'),
+            "symbol": intent_data.get('symbol'),
             "direction": 'long' if intent_data.get('action') == 'enter_long' else 'short',
             "timeframe": intent_data.get('timeframe'),
             "entry_price": trade_details.get('entry_price'), # From execution
@@ -1406,7 +1406,7 @@ Which tool(s) would you use to execute this trading intent and with what paramet
             "take_profit": intent_data.get('take_profit_price'), # Initial intent TP
             "confidence_score": intent_data.get('confidence'),
             "reasoning_log": intent_data.get('reasoning'),
-            "trade_status": status,
+            "trade_status": trade_status,
             "risk_rejected": False, # Assuming this function only called on success
             "risk_reason": None,
             "entry_order_id": trade_details.get('entry_order_id'),
@@ -1423,7 +1423,7 @@ Which tool(s) would you use to execute this trading intent and with what paramet
     async def _update_trade_record(self, trade_id, status, details, execution_results, validated_calls, is_adjustment=False):
         # Update an existing record in the 'trades' database table
         update_data = {
-            "trade_status": status,
+            "trade_status": trade_status,
             "last_updated": datetime.utcnow().isoformat() + 'Z'
         }
         if status == 'closed':
@@ -1587,7 +1587,7 @@ class TradeManager:
         # Add to active trades dictionary
         self.active_trades[trade_id] = {
             "trade_id": trade_id,
-            "symbol": trade_data.get("pair"),
+            "symbol": trade_data.get("symbol"),
             "exchange": trade_data.get("exchange"),
             "direction": trade_data.get("direction"),
             "entry_price": trade_data.get("entry_price"),
@@ -1596,7 +1596,7 @@ class TradeManager:
             "position_size": trade_data.get("position_size"),
             "leverage": trade_data.get("leverage"),
             "last_update": datetime.utcnow().isoformat() + 'Z',
-            "status": trade_data.get("trade_status", "open"),
+            "trade_status": trade_data.get("trade_status", "open"),
             "entry_order_id": trade_data.get("entry_order_id"),
             "exit_triggered": False,
             "current_price": None,
@@ -1661,7 +1661,7 @@ class TradeManager:
         self.logger.info("Loading active trades from database")
         
         # Fetch active trades from database
-        active_trades = await db.get_active_trades(user_id=self.user_id, status="open")
+        active_trades = await db.get_active_trades(user_id=self.user_id, trade_status="open")
         
         # Register each trade
         for trade_data in active_trades:
@@ -1858,7 +1858,7 @@ class TradeManager:
         
         # Update trade status
         trade_data.update({
-            "status": "closed",
+            "trade_status": "closed",
             "current_price": None,
             "position_size": 0,
             "unrealized_pnl": 0,
@@ -1990,13 +1990,13 @@ class TradeManager:
             force_closed: If True, force status to "closed"
         """
         # Prepare database update
-        status = "closed" if force_closed else trade_data.get("status", "open")
+        trade_status = "closed" if force_closed else trade_data.get("trade_status", "open")
         current_price = trade_data.get("current_price")
         position_size = trade_data.get("position_size")
         unrealized_pnl = trade_data.get("unrealized_pnl")
         
         update_data = {
-            "trade_status": status,
+            "trade_status": trade_status,
             "current_price": current_price,
             "position_size": position_size,
             "unrealized_pnl": unrealized_pnl,
@@ -2008,7 +2008,7 @@ class TradeManager:
             update_data["liquidation_price"] = trade_data["liquidation_price"]
             
         # Handle closed trades
-        if status == "closed":
+        if trade_status == "closed":
             update_data["closed_at"] = datetime.utcnow().isoformat() + 'Z'
             
             # Calculate final P/L if available
@@ -2018,7 +2018,7 @@ class TradeManager:
         try:
             # Update database
             # await db.update_trade(trade_id, update_data)
-            self.logger.debug(f"Updated database for trade {trade_id} with status {status}")
+            self.logger.debug(f"Updated database for trade {trade_id} with status {trade_status}")
             
             # Create trade_updates record for history
             trade_update = {

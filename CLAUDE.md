@@ -35,6 +35,7 @@
 
 ## Testing
 - When creating test scripts, add them to the ggbot/tests/ directory.
+- ALWAYS check in with user before running tests. NEVER run a test without checking in with the user first, incase we need to restart servers or just for any reason at all.
 
 ## IMPORTANT
 - You need to be methodical. Slow. Think hard. Ask questions. Don't make assumptions. We're working with very new tools with changing documentation. ANY TIME you think it might be helpful to look at the latest documenation, just say so! We'll find it for you and provide it.

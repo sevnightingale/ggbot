@@ -23,16 +23,45 @@ class HybridMonitoringService:
     Hybrid monitoring service that supports both scheduled and triggered updates.
     """
     
-    def __init__(self, user_id: str = DEFAULT_USER_ID):
+    def __init__(
+        self,
+        user_id: str = DEFAULT_USER_ID,
+        config_id: str = None,
+        exchange_name: str = "bitmex",
+        credentials: Dict[str, str] = None,
+        testnet: bool = True
+    ):
         """
         Initialize the hybrid monitoring service.
         
         Args:
             user_id: User ID to monitor
+            config_id: Configuration ID (optional, will query from DB if not provided)
+            exchange_name: Exchange name (default: bitmex)
+            credentials: Exchange credentials (optional, will query from env if not provided)
+            testnet: Use testnet mode (default: True)
         """
         self.user_id = user_id
+        self.config_id = config_id
+        self.exchange_name = exchange_name
+        self.testnet = testnet
         self.logger = logger.bind(user_id=user_id, service="hybrid_monitoring")
-        self.monitoring_service = AccountMonitoringService(user_id)
+        
+        # Get credentials if not provided
+        if credentials is None:
+            credentials = self._get_credentials()
+        
+        # Get config_id if not provided
+        if config_id is None:
+            config_id = self._get_config_id()
+        
+        self.monitoring_service = AccountMonitoringService(
+            user_id=user_id,
+            config_id=config_id,
+            exchange_name=exchange_name,
+            credentials=credentials,
+            testnet=testnet
+        )
         
         # Scheduled monitoring state
         self.scheduled_task: Optional[asyncio.Task] = None
@@ -42,6 +71,30 @@ class HybridMonitoringService:
         # Triggered update tracking
         self.last_triggered_update = None
         self.triggered_callbacks: List[Callable] = []
+        
+    def _get_credentials(self) -> Dict[str, str]:
+        """Get exchange credentials from environment."""
+        import os
+        return {
+            'apiKey': os.getenv('EXCHANGE_API', ''),
+            'secret': os.getenv('EXCHANGE_SECRET', '')
+        }
+    
+    def _get_config_id(self) -> str:
+        """Get config ID from database."""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cursor:
+                    cursor.execute("""
+                        SELECT config_id FROM configurations 
+                        WHERE user_id = %s AND config_name = 'default'
+                        LIMIT 1
+                    """, (self.user_id,))
+                    result = cursor.fetchone()
+                    return result[0] if result else "a93de31b-9b8a-42e3-827d-c31e580f5f36"
+        except Exception as e:
+            self.logger.warning(f"Could not get config_id from DB: {e}")
+            return "a93de31b-9b8a-42e3-827d-c31e580f5f36"  # Fallback
         
     async def start_scheduled_monitoring(self, interval: int = 30):
         """
@@ -161,9 +214,9 @@ class HybridMonitoringService:
                     return {
                         'balance_data': balance_data,
                         'position_data': position_data,
-                        'equity': float(equity) if equity else 0,
-                        'available_margin': float(available_margin) if available_margin else 0,
-                        'used_margin': float(used_margin) if used_margin else 0,
+                        'equity': float(equity) if equity is not None else 0,
+                        'available_margin': float(available_margin) if available_margin is not None else 0,
+                        'used_margin': float(used_margin) if used_margin is not None else 0,
                         'updated_at': updated_at,
                         'positions': position_data if isinstance(position_data, list) else []
                     }

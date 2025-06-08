@@ -8,11 +8,14 @@ services: LLM interpretation, validation, and execution.
 """
 
 import asyncio
+import json
 import logging
 import uuid
+from datetime import datetime
 from typing import Dict, List, Optional, Any, Union
 
 from core.common.logger import logger
+from core.common.db import get_db_connection
 from trading.engine_services.model.intent import Intent
 from trading.engine_services.model.trade import Trade
 from trading.engine_services.model.event import Event, EventType
@@ -26,49 +29,11 @@ from trading.exchanges.ccxt_mcp import CCXTMCPAdapter
 from trading.interfaces import TradingInterface
 
 
-# Mock DB implementation - this will be replaced with a real DB in production
-class MockDb:
-    """Temporary mock database for prototype implementation."""
-    
-    async def get_trade(self, trade_id, user_id):
-        """Get a trade record by ID."""
-        logger.debug(f"DB: Getting trade {trade_id} for user {user_id}")
-        return {'trade_id': trade_id, 'trade_status': 'open', 'user_id': user_id}
-    
-    async def create_trade(self, data):
-        """Create a new trade record."""
-        trade_id = data.get('trade_id', str(uuid.uuid4()))
-        logger.info(f"DB: Creating trade record {trade_id}")
-        logger.info(f"Trade data: {data}")
-        return trade_id
-    
-    async def update_trade(self, trade_id, data):
-        """Update an existing trade record."""
-        logger.info(f"DB: Updating trade {trade_id}")
-        logger.info(f"Update data: {data}")
-        return True
-    
-    async def log_rejection(self, data):
-        """Log a trade rejection."""
-        logger.info(f"DB: Logging rejection")
-        logger.info(f"Rejection data: {data}")
-        return True
-        
-    async def log_error(self, data):
-        """Log a trade error."""
-        logger.info(f"DB: Logging error")
-        logger.info(f"Error data: {data}")
-        return True
-    
-    async def get_active_trades(self, user_id, status='open'):
-        """Get all active trades for a user."""
-        logger.debug(f"DB: Getting active trades for user {user_id} with status {status}")
-        return []  # Empty list since we're starting fresh
+# Import the real database implementation
+from trading.db import get_trade_db
 
-
-# Global mock db instance for testing
-# Will be replaced with proper injection in production
-db = MockDb()
+# Get the database instance
+db = get_trade_db()
 
 
 class EventBus:
@@ -113,36 +78,197 @@ class TradeManager:
         # Create a new trade ID if one doesn't exist
         trade_id = str(uuid.uuid4())
         
+        # Extract entry price from successful market order in execution results
+        entry_price = self._extract_entry_price_from_execution(execution_result)
+        if entry_price is None:
+            logger.error(f"Cannot create trade record for {trade_id}: no valid entry_price in execution result")
+            logger.error(f"Execution result: {execution_result}")
+            raise ValueError("Cannot create trade record without valid entry_price - main order likely failed")
+        
         # Prepare trade data
         trade_data = {
             'trade_id': trade_id,
             'user_id': self.user_id,
             'decision_id': decision_data.get('decision_id'),
+            'config_id': decision_data.get('config_id'),
             'symbol': decision_data.get('symbol'),
             'exchange': decision_data.get('exchange'),
             'action': decision_data.get('action'),
-            'entry_price': execution_result.get('entry_price'),
+            'entry_price': entry_price,
             'position_size': execution_result.get('position_size'),
             'leverage': decision_data.get('leverage', 1.0),
             'stop_loss_price': decision_data.get('stop_loss_price'),
             'take_profit_price': decision_data.get('take_profit_price'),
+            'collateral_amount': decision_data.get('collateral_amount'),
+            'confidence': decision_data.get('confidence'),
+            'reasoning': decision_data.get('reasoning'),
             'status': 'open',
-            'execution_result': execution_result
+            'execution_result': execution_result,
+            'direction': 'long',  # Default to long for market buy orders
+            'created_at': datetime.utcnow().isoformat()
         }
         
         # Create trade in DB
         await db.create_trade(trade_data)
         
+        # Create strategy_runs entry for TRADE_ENTRY scenario
+        await self._create_strategy_run(
+            trade_id=trade_id,
+            config_id=decision_data.get('config_id'),
+            decision_id=decision_data.get('decision_id'),
+            scenario='TRADE_ENTRY',
+            leverage=decision_data.get('leverage'),
+            confidence_score=decision_data.get('confidence'),
+            reasoning_log=decision_data.get('reasoning'),
+            decision_data={
+                'action': decision_data.get('action'),
+                'symbol': decision_data.get('symbol'),
+                'entry_conditions': {
+                    'price': trade_data.get('entry_price'),
+                    'stop_loss': decision_data.get('stop_loss_price'),
+                    'take_profit': decision_data.get('take_profit_price'),
+                    'collateral_amount': decision_data.get('collateral_amount')
+                },
+                'market_context': decision_data.get('market_context', {}),
+                'execution_details': execution_result
+            }
+        )
+        
         # Register with execution service for monitoring
         trade = Trade.model_validate(trade_data)
         if hasattr(self.engine, 'execution_service'):
-            await self.engine.execution_service.register_trade(trade)
+            await self.engine.execution_service.register_trade(trade_id, trade_data)
         
         return {
             'trade_id': trade_id,
             'status': 'success',
             'message': 'Trade created successfully'
         }
+    
+    def _extract_entry_price_from_execution(self, execution_result: Dict) -> Optional[float]:
+        """
+        Extract entry price from execution result, looking for successful market buy/sell orders.
+        
+        Args:
+            execution_result: The execution result containing order details
+            
+        Returns:
+            Entry price as float, or None if not found
+        """
+        try:
+            # Look for results in the execution result
+            results = execution_result.get('results', {})
+            
+            if isinstance(results, dict) and 'results' in results:
+                order_results = results['results']
+            else:
+                return None
+                
+            # Look for market buy or sell orders (main position orders)
+            for result in order_results:
+                tool = result.get('tool', '')
+                if 'market' in tool.lower() and ('buy' in tool.lower() or 'sell' in tool.lower()):
+                    # Extract price from the order result
+                    result_text = result.get('result', '')
+                    if isinstance(result_text, str):
+                        # Parse the JSON content from the text - handle MCP TextContent format
+                        import json
+                        import re
+                        
+                        # First try to extract JSON from MCP TextContent format
+                        # Format: "meta=None content=[TextContent(type='text', text='{...}', annotations=None)] isError=False"
+                        logger.info(f"🔍 DEBUG: Checking MCP format for {tool}")
+                        logger.info(f"🔍 DEBUG: Result text (first 200 chars): {result_text[:200]}")
+                        
+                        if "TextContent(type='text', text='" in result_text:
+                            # Extract the JSON from the text field - improved parsing
+                            text_start = result_text.find("text='") + 6
+                            text_end = result_text.find("', annotations=", text_start)
+                            
+                            if text_start > 5 and text_end > text_start:
+                                json_str = result_text[text_start:text_end]
+                                logger.info(f"🔍 DEBUG: Extracted raw JSON string (first 200 chars): {json_str[:200]}")
+                                
+                                # Handle escaped characters properly - improved unescaping
+                                # The JSON is double-escaped: \\n becomes \n, \\\" becomes \"
+                                json_str = json_str.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                                logger.info(f"🔍 DEBUG: After unescaping (first 200 chars): {json_str[:200]}")
+                                
+                                try:
+                                    order_data = json.loads(json_str)
+                                    logger.info(f"🔍 DEBUG: Successfully parsed JSON, keys: {list(order_data.keys())}")
+                                    
+                                    # BitMEX market orders usually have 'average' or 'price' fields
+                                    entry_price = order_data.get('average') or order_data.get('price')
+                                    logger.info(f"🔍 DEBUG: Found average={order_data.get('average')}, price={order_data.get('price')}")
+                                    
+                                    if entry_price:
+                                        logger.info(f"✅ Extracted entry price: {entry_price} from {tool} (MCP format)")
+                                        return float(entry_price)
+                                        
+                                except json.JSONDecodeError as e:
+                                    logger.warning(f"Failed to parse JSON from MCP TextContent in {tool}: {e}")
+                                    logger.warning(f"JSON string was: {json_str[:500]}...")
+                            else:
+                                logger.warning(f"Could not find proper text boundaries in MCP format for {tool}")
+                        
+                        # Fallback: Look for JSON in the text content (original approach)
+                        json_match = re.search(r'\{.*\}', result_text, re.DOTALL)
+                        if json_match:
+                            try:
+                                order_data = json.loads(json_match.group(0))
+                                
+                                # BitMEX market orders usually have 'average' or 'price' fields
+                                entry_price = order_data.get('average') or order_data.get('price')
+                                if entry_price:
+                                    logger.info(f"Extracted entry price: {entry_price} from {tool} (fallback regex)")
+                                    return float(entry_price)
+                                    
+                            except json.JSONDecodeError:
+                                logger.warning(f"Failed to parse JSON from {tool} result (fallback)")
+                                
+            logger.warning("No entry price found in execution results")
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error extracting entry price from execution result: {e}")
+            return None
+    
+    def _parse_mcp_textcontent(self, result_text: str) -> Optional[Dict]:
+        """
+        Parse MCP TextContent format to extract JSON data.
+        
+        Args:
+            result_text: Raw MCP result string
+            
+        Returns:
+            Parsed JSON data as dict, or None if parsing fails
+        """
+        try:
+            import json
+            
+            if "TextContent(type='text', text='" in result_text:
+                # Extract the JSON from the text field
+                text_start = result_text.find("text='") + 6
+                text_end = result_text.find("', annotations=", text_start)
+                
+                if text_start > 5 and text_end > text_start:
+                    json_str = result_text[text_start:text_end]
+                    
+                    # Handle escaped characters properly
+                    json_str = json_str.replace('\\n', '\n').replace('\\"', '"').replace('\\\\', '\\')
+                    
+                    try:
+                        return json.loads(json_str)
+                    except json.JSONDecodeError as e:
+                        logger.warning(f"Failed to parse JSON from MCP TextContent: {e}")
+                        return None
+            
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error parsing MCP TextContent: {e}")
+            return None
         
     async def update_trade(self, trade_id: str, update_data: Dict) -> Dict:
         """Update an existing trade record."""
@@ -171,6 +297,48 @@ class TradeManager:
     async def get_active_trades(self) -> List:
         """Get a list of active trades for the user."""
         return await db.get_active_trades(self.user_id, 'open')
+    
+    async def _create_strategy_run(self, trade_id: str, config_id: Optional[str], 
+                                   decision_id: Optional[str], scenario: str,
+                                   leverage: Optional[int] = None, 
+                                   confidence_score: Optional[float] = None,
+                                   reasoning_log: Optional[str] = None,
+                                   decision_data: Optional[Dict] = None,
+                                   parent_strategy_run_id: Optional[str] = None) -> str:
+        """Create a strategy_runs entry for decision tracking."""
+        
+        strategy_run_id = str(uuid.uuid4())
+        
+        with get_db_connection() as conn:
+            cursor = conn.cursor()
+            
+            query = """
+                INSERT INTO strategy_runs (
+                    strategy_run_id, trade_id, config_id, decision_id, leverage,
+                    confidence_score, reasoning_log, decision_data, scenario,
+                    parent_strategy_run_id, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            values = (
+                strategy_run_id,
+                trade_id,
+                config_id,
+                decision_id,
+                leverage,
+                confidence_score,
+                reasoning_log,
+                json.dumps(decision_data) if decision_data else None,
+                scenario,
+                parent_strategy_run_id,
+                datetime.now()
+            )
+            
+            cursor.execute(query, values)
+            conn.commit()
+            
+            logger.info(f"Created strategy_run {strategy_run_id} for trade {trade_id} (scenario: {scenario})")
+            return strategy_run_id
 
 
 class TradingEngine(TradingInterface):
@@ -209,7 +377,9 @@ class TradingEngine(TradingInterface):
         self.execution_service = ExecutionService(
             config=self.config.execution,
             ccxt_adapter=self.ccxt_adapter,
-            event_bus=self.event_bus
+            event_bus=self.event_bus,
+            db=db,
+            user_id=user_id
         )
         
         # Create the trade manager
@@ -313,7 +483,9 @@ class TradingEngine(TradingInterface):
             return result
             
         except Exception as e:
-            logger.error(f"Error processing decision {intent_data.get('decision_id')}: {e}", exc_info=True)
+            import traceback
+            logger.error(f"Error processing decision {intent_data.get('decision_id')}: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             
             # Emit error event
             self.event_bus.emit(Event.create(
@@ -386,6 +558,33 @@ class TradingEngine(TradingInterface):
                 "status": "error",
                 "message": f"Error getting active trades: {str(e)}"
             }
+    
+    async def _get_original_strategy_run_id(self, trade_id: str) -> Optional[str]:
+        """Get the original TRADE_ENTRY strategy_run_id for a trade."""
+        try:
+            with get_db_connection() as conn:
+                cursor = conn.cursor()
+                
+                query = """
+                    SELECT strategy_run_id 
+                    FROM strategy_runs 
+                    WHERE trade_id = %s AND scenario = 'TRADE_ENTRY'
+                    ORDER BY created_at ASC 
+                    LIMIT 1
+                """
+                
+                cursor.execute(query, (trade_id,))
+                result = cursor.fetchone()
+                
+                if result:
+                    return result[0]
+                    
+                logger.warning(f"No original TRADE_ENTRY strategy_run found for trade {trade_id}")
+                return None
+                
+        except Exception as e:
+            logger.error(f"Error getting original strategy_run_id for trade {trade_id}: {e}")
+            return None
     
     async def _get_validation_context(self, intent_data: Optional[Dict] = None) -> Dict:
         """Get context information for validation."""
@@ -492,6 +691,27 @@ class TradingEngine(TradingInterface):
                 "exit_reason": reasoning
             })
             
+            # Create strategy_runs entry for TRADE_EXIT scenario
+            # Find the original TRADE_ENTRY strategy_run to link to
+            original_strategy_run_id = await self._get_original_strategy_run_id(trade_id)
+            
+            await self.trade_manager._create_strategy_run(
+                trade_id=trade_id,
+                config_id=intent_data.get('config_id'),
+                decision_id=decision_id,
+                scenario='TRADE_EXIT',
+                reasoning_log=reasoning,
+                decision_data={
+                    'action': 'exit',
+                    'exit_conditions': {
+                        'exit_price': exec_results.get("average_price"),
+                        'exit_reason': reasoning
+                    },
+                    'execution_details': execution_result
+                },
+                parent_strategy_run_id=original_strategy_run_id
+            )
+            
             # 3. Return success with trade ID
             return {
                 "status": "success",
@@ -517,10 +737,13 @@ class TradingEngine(TradingInterface):
         try:
             decision_id = intent_data.get('decision_id', 'unknown')
             
-            # 1. Execute the validated calls
+            # 1. Generate trade ID for database record
+            trade_id = str(uuid.uuid4())
+            
+            # 2. Execute the validated calls
             execution_result = await self.execution_service.execute_tool_calls(validated_calls, intent_data)
             
-            # 2. Determine if this is creating a new trade or managing an existing one
+            # 3. Determine if this is creating a new trade or managing an existing one
             # by checking if we're opening a position (has create order calls)
             is_new_trade = any(
                 'create' in call.tool and 'order' in call.tool
@@ -528,8 +751,11 @@ class TradingEngine(TradingInterface):
             )
             
             if is_new_trade:
-                # Create a new trade record
-                execution_data = execution_result.model_dump() if hasattr(execution_result, 'model_dump') else execution_result
+                # Store order details for trade lifecycle tracking
+                await self._store_order_details(trade_id, execution_result, intent_data)
+                
+                # Create a new trade record (existing logic)
+                execution_data = execution_result.to_dict() if hasattr(execution_result, 'to_dict') else execution_result
                 trade_result = await self.trade_manager.create_trade(
                     intent_data, 
                     execution_data
@@ -552,7 +778,9 @@ class TradingEngine(TradingInterface):
                 }
                 
         except Exception as e:
-            logger.error(f"Error executing validated calls: {e}", exc_info=True)
+            import traceback
+            logger.error(f"Error executing validated calls: {e}")
+            logger.error(f"Full traceback:\n{traceback.format_exc()}")
             return {
                 "status": "error",
                 "decision_id": intent_data.get('decision_id', 'unknown'),
@@ -597,6 +825,27 @@ class TradingEngine(TradingInterface):
                 "adjustment_reason": reasoning
             })
             
+            # Create strategy_runs entry for TRADE_MANAGEMENT scenario
+            # Find the original TRADE_ENTRY strategy_run to link to
+            original_strategy_run_id = await self._get_original_strategy_run_id(trade_id)
+            
+            await self.trade_manager._create_strategy_run(
+                trade_id=trade_id,
+                config_id=intent_data.get('config_id'),
+                decision_id=decision_id,
+                scenario='TRADE_MANAGEMENT',
+                reasoning_log=reasoning,
+                decision_data={
+                    'action': 'adjust',
+                    'adjustments': {
+                        'stop_loss_price': stop_loss_price,
+                        'take_profit_price': take_profit_price
+                    },
+                    'execution_details': execution_result
+                },
+                parent_strategy_run_id=original_strategy_run_id
+            )
+            
             # 3. Return success with trade ID
             return {
                 "status": "success",
@@ -611,6 +860,85 @@ class TradingEngine(TradingInterface):
                 "decision_id": intent_data.get('decision_id', 'unknown'),
                 "message": f"Error executing trade adjustment: {str(e)}"
             }
+    
+    async def _store_order_details(self, trade_id: str, execution_result: Any, intent_data: Dict):
+        """
+        Store order details in trade_orders table for trade lifecycle tracking.
+        
+        This enables VWAP calculation and precise P&L tracking when positions are synced.
+        """
+        try:
+            
+            # Extract order information from execution result
+            # Handle nested structure: execution_result['results']['results']
+            results_data = execution_result.get('results', {}) if isinstance(execution_result, dict) else {}
+            if isinstance(results_data, dict) and 'results' in results_data:
+                results = results_data['results']
+            else:
+                results = []
+            
+            for result in results:
+                if isinstance(result, dict) and result.get('result') and not result.get('error'):
+                    result_text = result['result']
+                    
+                    # Parse MCP TextContent format to extract JSON
+                    order_data = self._parse_mcp_textcontent(result_text)
+                    if not order_data:
+                        continue
+                    
+                    # Extract order details
+                    order_id = order_data.get('id')
+                    if not order_id:
+                        continue
+                    
+                    # Store in trade_orders table
+                    await self._insert_trade_order(
+                        trade_id=trade_id,
+                        exchange=intent_data.get('exchange', 'bitmex'),
+                        symbol=intent_data.get('symbol', ''),
+                        exchange_order_id=str(order_id),
+                        client_order_id=order_data.get('clientOrderId'),
+                        order_type=order_data.get('type', 'market'),
+                        side=order_data.get('side', 'buy'),
+                        price=order_data.get('price'),
+                        size=order_data.get('amount'),
+                        status=order_data.get('status', 'open')
+                    )
+                    
+            logger.info(f"Stored order details for trade {trade_id}")
+            
+        except Exception as e:
+            logger.error(f"Error storing order details: {e}")
+    
+    async def _insert_trade_order(self, trade_id: str, exchange: str, symbol: str, 
+                                 exchange_order_id: str, client_order_id: Optional[str],
+                                 order_type: str, side: str, price: Optional[float],
+                                 size: Optional[float], status: str):
+        """Insert order record into trade_orders table."""
+        
+        from core.common.db import get_db_connection
+        
+        conn = await get_db_connection()
+        try:
+            cursor = conn.cursor()
+            
+            query = """
+                INSERT INTO trade_orders (
+                    trade_id, exchange, symbol, exchange_order_id, client_order_id,
+                    order_type, side, price, size, status, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+            """
+            
+            values = (
+                trade_id, exchange, symbol, exchange_order_id, client_order_id,
+                order_type, side, price, size, status, datetime.now()
+            )
+            
+            cursor.execute(query, values)
+            conn.commit()
+            
+        finally:
+            conn.close()
 
 
 # Debug helper for tests

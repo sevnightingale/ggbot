@@ -111,7 +111,8 @@ class ExecutionService:
         config: ExecutionConfig, 
         ccxt_adapter,
         event_bus=None,
-        mock_db=None
+        db=None,
+        user_id=None
     ):
         """
         Initialize the execution service.
@@ -120,12 +121,14 @@ class ExecutionService:
             config: Configuration for the execution service
             ccxt_adapter: CCXT MCP adapter for exchange interaction
             event_bus: Optional event bus for emitting events
-            mock_db: Optional mock database for testing
+            db: Database connection for trade persistence
+            user_id: User ID for trade queries
         """
         self.config = config
         self.ccxt_adapter = ccxt_adapter
         self.event_bus = event_bus or EventBus()
-        self.db = mock_db  # Will be replaced with real DB in production
+        self.db = db  # Real database connection
+        self.user_id = user_id
         
         # Active trades tracking
         self.active_trades = {}
@@ -328,7 +331,7 @@ class ExecutionService:
         # If trade data is not provided, load it from the database
         if not trade_data and self.db:
             try:
-                trade_data = await self.db.get_trade(trade_id=trade_id, user_id=None)
+                trade_data = await self.db.get_trade(trade_id)
             except Exception as e:
                 logger.error(f"Error loading trade {trade_id} from database: {e}", exc_info=True)
                 return False
@@ -347,9 +350,9 @@ class ExecutionService:
                 user_id=trade_data.get("user_id", "unknown"),
                 decision_id=trade_data.get("decision_id", "unknown"),
                 exchange=trade_data.get("exchange", "unknown"),
-                symbol=trade_data.get("pair", "unknown"),
+                symbol=trade_data.get("symbol", "unknown"),
                 direction=trade_data.get("direction", "long"),
-                status=TradeStatus.OPEN,
+                trade_status=TradeStatus.OPEN,
                 created_at=datetime.utcnow().isoformat()
             )
             
@@ -475,8 +478,8 @@ class ExecutionService:
         try:
             logger.info("Loading active trades from database")
             
-            # Query database for active trades - this will depend on your DB schema
-            active_trades = await self.db.get_active_trades(user_id=None, status="open")
+            # Query database for active trades - use the engine's user_id
+            active_trades = await self.db.get_active_trades(user_id=self.user_id, trade_status="open")
             
             # Register each trade
             count = 0
@@ -744,7 +747,7 @@ class ExecutionService:
         ))
         
         # Update trade status to CLOSED
-        trade.status = TradeStatus.CLOSED
+        trade.trade_status = TradeStatus.CLOSED
         trade.closed_at = datetime.utcnow().isoformat()
         
         # Update database if available
@@ -866,7 +869,7 @@ class ExecutionService:
                 logger.info(f"Successfully executed {exit_reason} exit for trade {trade_id}")
                 
                 # Update trade in memory
-                trade.status = TradeStatus.CLOSED
+                trade.trade_status = TradeStatus.CLOSED
                 trade.closed_at = datetime.utcnow().isoformat()
                 trade.exit_order_id = execution_result["id"]
                 

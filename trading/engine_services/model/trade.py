@@ -51,7 +51,7 @@ class Trade(BaseModel):
     direction: TradeDirection = Field(description="Trade direction (long or short)")
     
     # Status & timeline
-    status: TradeStatus = Field(description="Current status of the trade")
+    trade_status: TradeStatus = Field(description="Current status of the trade")
     created_at: str = Field(description="Timestamp when the trade was created")
     entry_time: Optional[str] = Field(default=None, description="Timestamp when the trade was entered")
     last_updated: Optional[str] = Field(default=None, description="Timestamp when the trade was last updated")
@@ -112,9 +112,9 @@ class Trade(BaseModel):
             'user_id': 'user_id',
             'decision_id': 'decision_id',
             'exchange': 'exchange',
-            'pair': 'symbol',  # DB uses 'pair', model uses 'symbol'
+            'symbol': 'symbol',  # Both DB and model use 'symbol'
             'direction': 'direction',
-            'trade_status': 'status',  # DB uses 'trade_status', model uses 'status'
+            'trade_status': 'trade_status',  # Both DB and model should use 'trade_status'
             'created_at': 'created_at',
             'entry_time': 'entry_time',
             'last_updated': 'last_updated',
@@ -148,12 +148,12 @@ class Trade(BaseModel):
                 mapped_data[model_field] = record[db_field]
                 
         # Handle special fields
-        if 'status' in mapped_data:
+        if 'trade_status' in mapped_data:
             try:
-                mapped_data['status'] = TradeStatus(mapped_data['status'])
+                mapped_data['trade_status'] = TradeStatus(mapped_data['trade_status'])
             except ValueError:
-                # Default to PENDING if status is invalid
-                mapped_data['status'] = TradeStatus.PENDING
+                # Default to PENDING if trade_status is invalid
+                mapped_data['trade_status'] = TradeStatus.PENDING
                 
         if 'direction' in mapped_data:
             try:
@@ -176,11 +176,8 @@ class Trade(BaseModel):
         data = self.model_dump()
         
         # Map fields from Trade model to DB record
-        # Convert model fields to snake_case DB fields
-        mapping = {
-            'symbol': 'pair',  # Model uses 'symbol', DB uses 'pair'
-            'status': 'trade_status',  # Model uses 'status', DB uses 'trade_status'
-        }
+        # Both model and DB use the same field names now, so no mapping needed
+        mapping = {}
         
         # Apply mapping
         for model_field, db_field in mapping.items():

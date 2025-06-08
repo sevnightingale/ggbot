@@ -2,7 +2,7 @@ module.exports = {
   apps : [{
     name   : "ccxt-mcp-server",
     script : "/home/sev/ggbot/core/mcp/servers/ccxt_mcp_server.py",
-    interpreter: "python",
+    interpreter: "/home/sev/ggbot/.venv/bin/python",
     env: {
       "EXCHANGE_NAME": "bitmex",
       "TESTNET": "1",

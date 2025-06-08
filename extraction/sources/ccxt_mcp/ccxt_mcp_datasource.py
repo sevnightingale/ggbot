@@ -227,3 +227,82 @@ class CCXTMCPDataSource(DataSource):
             data_entries.append(entry)
         
         return data_entries
+    
+    def get_latest_data(self, symbol: str, timeframe: str, limit: int = 1) -> pd.DataFrame:
+        """
+        Fetch the most recent OHLCV data points.
+        
+        Args:
+            symbol: The trading pair symbol (e.g., 'BTC/USDT')
+            timeframe: The timeframe for the data (e.g., '15m', '1h', '4h', '1d')
+            limit: Number of most recent data points to fetch (default: 1)
+            
+        Returns:
+            A pandas DataFrame with the most recent OHLCV data
+        """
+        # Get data for the last day to ensure we have recent data
+        end_date = datetime.now()
+        start_date = end_date - timedelta(days=2)  # Get 2 days to ensure we have enough data
+        
+        df = self.get_historical_data(symbol, timeframe, start_date, end_date)
+        
+        # Return the most recent 'limit' rows
+        if not df.empty and len(df) > limit:
+            return df.tail(limit)
+        return df
+    
+    def get_current_price(self, symbol: str) -> float:
+        """
+        Get the current price for a symbol.
+        
+        Args:
+            symbol: The trading pair symbol (e.g., 'BTC/USDT')
+            
+        Returns:
+            The current price as a float
+        """
+        # Since fetch_ticker is not available, use latest OHLCV data to get current price
+        try:
+            # Get the most recent 15m candle
+            latest_data = self.get_latest_data(symbol, '15m', limit=1)
+            
+            if not latest_data.empty:
+                # Return the latest close price
+                return float(latest_data['close'].iloc[-1])
+            else:
+                raise ValueError(f"No recent price data available for {symbol}")
+                
+        except Exception as e:
+            self._log.error(f"Error fetching current price for {symbol}: {str(e)}")
+            raise ValueError(f"Unable to fetch current price for {symbol}: {str(e)}")
+    
+    def get_supported_timeframes(self) -> List[str]:
+        """
+        Get a list of timeframes supported by this data source.
+        
+        Returns:
+            A list of supported timeframe strings
+        """
+        return list(self.timeframe_ms.keys())
+    
+    def get_supported_symbols(self) -> List[str]:
+        """
+        Get a list of symbols supported by this data source.
+        
+        Returns:
+            A list of supported symbol strings
+        """
+        # For testing purposes, return some common crypto pairs
+        return [
+            'BTC/USDT', 'ETH/USDT', 'BNB/USDT', 'XRP/USDT', 'ADA/USDT',
+            'SOL/USDT', 'DOGE/USDT', 'MATIC/USDT', 'DOT/USDT', 'AVAX/USDT'
+        ]
+    
+    def get_source_name(self) -> str:
+        """
+        Get the name of this data source.
+        
+        Returns:
+            The name of the data source
+        """
+        return f'ccxt_mcp_{self.exchange_id}'

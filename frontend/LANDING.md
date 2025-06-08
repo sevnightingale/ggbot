@@ -1,43 +1,103 @@
-# Landing Page Design Plan
+# ggbots Landing Page Design Plan
+
+This design plan outlines the infrastructure, tech stack, and styling guidelines for the ggbots landing page. It’s crafted to embody the brand’s essence—adaptability, empowerment, precision, and innovation—while appealing to tech-savvy traders. The vibe is sleek, futuristic, and trader-ready, with a subtle edge speaking equally to analytical pros and degen traders.
+
+---
 
 ## Infrastructure & Tech Stack
-- **Language & Framework**: TypeScript + Next.js for SSR/SSG performance and a great developer experience  
-- **Styling**: Tailwind CSS for utility-first rapid development, easy dark-mode toggles, and high-contrast support  
-- **Hosting & CDN**: Vercel for global edge caching, instant Git-based deploys, and built-in analytics  
-- **CI/CD**: GitHub Actions → Vercel Previews for auto-deploys on PRs, visual QA, and instant rollbacks  
-- **Asset Pipeline**: Next.js `<Image>` optimization and SVGR for lazy-loaded images and crisp inline SVGs  
-- **Environment**: `.env.local` / Vercel Secrets for secure storage of API keys, analytics IDs, and feature flags  
-- **Monitoring & Performance**: Vercel Analytics plus Lighthouse CI for Core Web Vitals tracking and accessibility budgets  
+
+- **Language & Framework:** TypeScript + Next.js for robust SSR/SSG performance and streamlined development.
+- **Styling:** Tailwind CSS for rapid, utility-first styling; seamless dark-mode toggles; and excellent accessibility.
+- **Hosting & CDN:** Vercel for global edge caching, instant Git-based deploys, and built-in analytics.
+- **CI/CD Pipeline:** GitHub Actions → Vercel Previews for automatic deploys, visual QA, and instant rollbacks.
+- **Asset Pipeline:** Next.js `<Image>` component optimization and SVGR for lazy-loaded images and crisp inline SVG assets.
+- **Environment Management:** `.env.local` and Vercel Secrets for secure handling of API keys, analytics IDs, and feature flags.
+- **Monitoring & Performance:** Vercel Analytics coupled with Lighthouse CI to rigorously track Core Web Vitals, accessibility, and performance budgets.
+
+---
 
 ## Design & Styling Guidelines
 
-### Styling Aesthetic: Neo-Samurai / Cyber-Samurai
-- **Palette**: Monochrome foundation (black → dark-gray → mid-gray → white) with icy-cyan accents for hover/active glows  
-- **Minimalist Brutalism**: Bold, clean panels aligned on strict grids; abundant negative space and quiet intensity  
-- **Ceremonial Precision**: Edges echo katana curves; subtle Japanese motifs (kamon, sakura) only in icons or background patterns  
-- **Armor-like Textures**: Very faint grid or plating overlays, harsh shadows for depth, glowing accents reminiscent of cyberpunk neon  
+### Styling Aesthetic: Sleek & Futuristic
 
-### AI-Driven Personalization
-- Use Vercel Edge Functions or serverless APIs to tailor hero content, CTAs, and imagery based on user data or A/B tests  
+**Color Palette:**
+- **Core Colors:**  
+  - Charcoal (#161618) for all backgrounds  
+  - Bone (#e3e5e6) for primary text, borders, and interface elements
+- **Rare Accents (Agent-Specific):**
+  - Extraction Agent Blue: #38a1c7  
+  - Decision Agent Green: #2cbe77  
+  - Trading Agent Orange: #be6a47  
 
-### Hero Video & Full-Screen Media
-- Integrate an immersive background video or animated loop in the hero section, with optimized fallback poster for mobile  
+**Typography:**
+- **Headlines:** Kanit (Bold, impactful, futuristic clarity)
+- **Body & UI:** Inter (Highly readable, clean, and versatile)
 
-### Collage & Mixed Media
-- Layer SVG illustrations, CSS masks, and subtle parallax scrolling to achieve a dynamic, controlled-chaos collage effect  
+**Design Elements:**
+- Minimalist precision with bold, clean panels aligned on strict grids.
+- Generous negative space for clarity, focus, and quiet intensity.
+- Digital textures (faint grids, metallic overlays) providing subtle depth.
+- Soft neon glows offering an understated, tech-forward edge.
+- Trader-centric visuals: abstract data flows, neural networks, and sleek candlestick charts that evoke trading sophistication without clutter.
 
-### Micro-Interactions & Motion
-- Implement hover glows, loading skeletons, and “blade-slice” panel reveals using Framer Motion or CSS keyframes  
+---
 
-### Kinetic Typography
-- Apply scroll-triggered text animations and morphing effects to bring headlines to life and reinforce brand voice  
+## AI-Driven Personalization
 
-### Dynamic Block Layouts & Parallax
-- Structure content in bold, contrasting blocks with parallax-scrolling sections to guide the eye through digestible segments  
+Utilize Vercel Edge Functions or serverless APIs to dynamically personalize hero content, CTAs, and imagery based on user context, behavior data, or A/B test variations.
 
-### Accessibility & Performance Testing
-- Enforce WCAG AA contrast ratios, mobile-first responsive layouts, and integrate Lighthouse CI for continuous monitoring  
+---
 
-### AI-First Prototyping Tools
-- Leverage ClaudeCode MAX or similar AI design assistants to rapidly generate, iterate, and A/B test layout variants in code  
+## Hero Section & Full-Screen Media
 
+Integrate an immersive video or animated background loop in the hero section, conveying adaptability and precision. Optimize for performance with a static fallback image on mobile devices.
+
+---
+
+## Collage & Mixed Media
+
+Layer SVG illustrations, CSS masks, and subtle parallax scrolling to create a dynamic, visually engaging flow. This controlled visual narrative guides users intuitively through the landing page.
+
+---
+
+## Micro-Interactions & Motion
+
+Employ hover glows, elegant loading skeletons, and smooth panel transitions via Framer Motion or carefully designed CSS keyframes, providing a responsive and polished interactive experience.
+
+---
+
+## Kinetic Typography
+
+Incorporate scroll-triggered text animations and gentle morphing effects into headlines, reinforcing the brand’s futuristic, empowering voice without compromising readability or clarity.
+
+---
+
+## Dynamic Block Layouts & Parallax
+
+Organize content into bold, contrasting sections with subtle parallax scrolling. This structure creates digestible, trader-focused content segments guiding attention smoothly down the page.
+
+---
+
+## Accessibility & Performance Testing
+
+Prioritize WCAG AA contrast ratios, mobile-first responsive designs, and continuous performance monitoring. Integrate Lighthouse CI to ensure consistently high accessibility standards and site reliability.
+
+---
+
+## AI-First Prototyping Tools
+
+Leverage AI-driven design tools (e.g., ClaudeCode MAX) to quickly prototype, iterate, and perform rapid A/B testing of layout and interface variations directly in code.
+
+---
+
+## Key Alignments with the Vibe Guide
+
+- **Visual Identity:** The Charcoal and Bone palette with selective agent-specific accent colors aligns precisely with the brand's sleek, tech-forward aesthetic.
+- **Design Elements:** Clean grid structures, subtle digital textures, and minimalist neon accents reflect the brand’s precision, innovation, and modern trader-centric approach.
+- **Hero & Media:** Dynamic hero sections and engaging media underscore the brand’s core values of adaptability and futurism.
+- **Typography & Motion:** Kinetic typography and refined animations embody the bold, confident personality of ggbots, maintaining clarity and trader-centric focus.
+- **Accessibility & Performance:** Emphasizing reliability and precision, accessibility and performance standards reinforce the trustworthiness and dependability integral to the ggbots brand.
+
+---
+
+Use this comprehensive landing page design plan to ensure all visual and interactive elements cohesively embody the brand’s identity—sleek, adaptive, precise, and authentically trader-focused.

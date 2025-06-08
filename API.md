@@ -454,7 +454,7 @@ Get the most recent decision for active trade management.
 
 ---
 
-## Dashboard API (IMPLEMENTED)
+## Dashboard API (IMPLEMENTED - Updated for Universal Trade Lifecycle)
 
 ### Running the Dashboard API
 
@@ -477,12 +477,25 @@ python core.api.dashboard_api
 - Swagger UI: http://localhost:5003/docs
 - ReDoc: http://localhost:5003/redoc
 
-### Get Current Positions
+### Schema Migration Notes (Phase 3)
+
+The Dashboard API has been updated to work with the new Universal Trade Lifecycle system while maintaining full backward compatibility:
+
+- **Database Access**: All queries now use `trades_legacy` view instead of direct `trades` table access
+- **Field Mapping**: Automatic translation between new and old field names:
+  - `symbol` ↔ `pair`
+  - `status` ↔ `trade_status` 
+  - `unrealized_pnl` ↔ `profit_loss`
+  - `opened_at` ↔ `created_at`
+- **API Compatibility**: All endpoints maintain identical request/response formats
+- **Enhanced Data**: Improved trade tracking with TP/SL order monitoring and automated closure
+
+### Get Current Positions (Legacy Compatibility)
 ```
 GET /api/dashboard/{user_id}/positions
 ```
 
-Returns all open positions with current P&L.
+Returns all open positions via `trades_legacy` view for backward compatibility. Uses field mappings to maintain API compatibility while accessing new Universal Trade Lifecycle schema.
 
 **Response:**
 ```json
@@ -508,12 +521,41 @@ Returns all open positions with current P&L.
 }
 ```
 
+### Get Current Trades (Universal Trade Lifecycle)
+```
+GET /api/dashboard/{user_id}/trades
+```
+
+Returns all trades from the Universal Trade Lifecycle system via `trades_legacy` view. Includes automatic field mapping and backward compatibility support.
+
+**Response:**
+```json
+{
+  "trades": [
+    {
+      "trade_id": "123e4567-e89b-12d3-a456-426614174000",
+      "symbol": "BTC/USD",
+      "side": null,
+      "status": "open",
+      "size_contracts": 4000,
+      "entry_price": 45000,
+      "mark_price": 46000,
+      "unrealized_pnl": 0.0217,
+      "opened_at": "2024-01-10T11:00:00Z",
+      "closed_at": null,
+      "last_updated": "2024-01-10T12:00:00Z"
+    }
+  ],
+  "total_trades": 1
+}
+```
+
 ### Get Performance Metrics
 ```
 GET /api/dashboard/{user_id}/performance?period=7d
 ```
 
-Returns performance metrics for the specified period.
+Returns performance metrics for the specified period. Now uses `trades_legacy` view to access closed trades with proper field mapping (`profit_loss` → `realized_pnl`).
 
 **Query Parameters:**
 - `period`: Time period (1d, 7d, 30d, all)
