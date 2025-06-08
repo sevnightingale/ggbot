@@ -10,13 +10,18 @@ import ccxt.async_support as ccxt
 from typing import Dict, Any, Optional, List
 from datetime import datetime
 import json
+import uuid
 from decimal import Decimal
+from dataclasses import dataclass
 
 from core.common.logger import logger
 from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
 import psycopg2
 from psycopg2.extras import RealDictCursor
 from .adapters import create_exchange_adapter, ExchangeAdapter
+
+
+# ReconciliationResult dataclass removed - no longer needed with simple trade lifecycle system
 
 
 class AccountMonitoringService:
@@ -172,7 +177,12 @@ class AccountMonitoringService:
                         logger.error(f"Failed to recreate connection: {conn_error}")
     
     async def _update_account_state(self):
-        """Fetch and store current account state."""
+        """
+        Fetch and store current account state, then reconcile trades.
+        
+        Returns:
+            Dict with update results including reconciliation info
+        """
         timestamp = datetime.utcnow()
         
         # Fetch balance
@@ -190,6 +200,24 @@ class AccountMonitoringService:
             if normalized:  # Skip None (e.g., 0-contract positions)
                 normalized_positions.append(normalized)
         
+        # Fetch open orders for TP/SL tracking
+        logger.debug("Fetching open orders...")
+        raw_open_orders = []
+        normalized_orders = []
+        try:
+            raw_open_orders = await self.exchange.fetch_open_orders()
+            logger.debug(f"Fetched {len(raw_open_orders)} open orders")
+            
+            # Normalize orders for risk tracking
+            normalized_orders = self.adapter.normalize_open_orders(raw_open_orders)
+            risk_orders = [order for order in normalized_orders if order.get('is_risk_order')]
+            logger.debug(f"Identified {len(risk_orders)} risk orders (TP/SL) out of {len(normalized_orders)} total orders")
+            
+        except Exception as e:
+            logger.warning(f"Failed to fetch open orders: {e}")
+            raw_open_orders = []
+            normalized_orders = []
+        
         # Calculate metrics
         metrics = self._calculate_metrics(normalized_balance, normalized_positions)
         
@@ -201,12 +229,60 @@ class AccountMonitoringService:
             timestamp=timestamp
         )
         
+        # Sync orders to trade_orders table
+        if normalized_orders:
+            await self._sync_orders_to_database(normalized_orders)
+        
+        # NEW: Simple position sync using trade lifecycle manager
+        logger.debug("Syncing trades with exchange positions...")
+        lifecycle_positions = await self.adapter.get_positions_for_lifecycle(self.exchange)
+        
+        # Import and use the trade lifecycle manager
+        from trading.lifecycle_manager import TradeLifecycleManager
+        lifecycle_manager = TradeLifecycleManager(self.user_id, self.exchange_name, self.config_id)
+        sync_results = await lifecycle_manager.sync_positions_to_trades(lifecycle_positions, self.adapter)
+        
+        # NEW: Sync TP/SL order status and close trades when orders are filled
+        logger.debug("Checking TP/SL order status...")
+        tp_sl_results = await lifecycle_manager.sync_tp_sl_orders()
+        
+        # Log sync results
+        position_changes = sync_results['trades_opened'] > 0 or sync_results['trades_closed'] > 0
+        tp_sl_changes = tp_sl_results['trades_closed_by_tp'] > 0 or tp_sl_results['trades_closed_by_sl'] > 0
+        
+        if position_changes or tp_sl_changes:
+            logger.info(f"Trade sync completed: {sync_results['trades_opened']} opened, {sync_results['trades_updated']} updated, {sync_results['trades_closed']} closed, TP/SL: {tp_sl_results['trades_closed_by_tp']} TP hits, {tp_sl_results['trades_closed_by_sl']} SL hits")
+        else:
+            logger.debug("Trade sync completed: no changes needed")
+        
+        # Count risk orders for logging
+        risk_orders_count = len([order for order in normalized_orders if order.get('is_risk_order')])
+        
         logger.info(
             f"Updated account state: "
             f"BTC={normalized_balance['total_btc']:.8f}, "
             f"Positions={len(normalized_positions)}, "
-            f"Equity={metrics['equity_btc']:.8f}"
+            f"Orders={len(normalized_orders)} ({risk_orders_count} TP/SL), "
+            f"Equity={metrics['equity_btc']:.8f}, "
+            f"Trade sync: {sync_results['trades_opened']} opened, {sync_results['trades_updated']} updated, {sync_results['trades_closed']} closed"
         )
+        
+        return {
+            "account_updated": True,
+            "position_sync_performed": True,
+            "tp_sl_sync_performed": True,
+            "trades_opened": sync_results['trades_opened'],
+            "trades_updated": sync_results['trades_updated'],
+            "trades_closed": sync_results['trades_closed'],
+            "trades_closed_by_tp": tp_sl_results['trades_closed_by_tp'],
+            "trades_closed_by_sl": tp_sl_results['trades_closed_by_sl'],
+            "tp_sl_orders_checked": tp_sl_results['orders_checked'],
+            "sync_errors": len(sync_results['errors']) + len(tp_sl_results['errors']),
+            "total_positions": len(normalized_positions),
+            "total_orders": len(normalized_orders),
+            "risk_orders": risk_orders_count,
+            "timestamp": timestamp.isoformat()
+        }
     
     def _calculate_metrics(
         self,
@@ -362,3 +438,145 @@ class AccountMonitoringService:
             
         finally:
             conn.close()
+    
+    async def _sync_orders_to_database(self, normalized_orders: List[Dict[str, Any]]):
+        """
+        Sync normalized orders to the trade_orders table.
+        
+        This method:
+        1. Updates existing orders if they already exist
+        2. Inserts new orders
+        3. Marks orders as filled/canceled if they no longer exist in open orders
+        4. Associates risk orders (TP/SL) with existing trades
+        """
+        if not normalized_orders:
+            return
+        
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS
+        )
+        
+        try:
+            with conn.cursor() as cursor:
+                orders_processed = 0
+                orders_inserted = 0
+                orders_updated = 0
+                
+                for order in normalized_orders:
+                    # Try to find matching trade for all orders
+                    trade_id = await self._find_trade_for_risk_order(cursor, order)
+                    
+                    # Upsert order into trade_orders table
+                    query = """
+                        INSERT INTO trade_orders (
+                            trade_id, exchange, symbol, exchange_order_id,
+                            order_type, side, price, size, status,
+                            is_risk_order, risk_type, created_at
+                        )
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW())
+                        ON CONFLICT (exchange, exchange_order_id)
+                        DO UPDATE SET
+                            trade_id = EXCLUDED.trade_id,
+                            price = EXCLUDED.price,
+                            size = EXCLUDED.size,
+                            status = EXCLUDED.status,
+                            is_risk_order = EXCLUDED.is_risk_order,
+                            risk_type = EXCLUDED.risk_type
+                        RETURNING (xmax = 0) AS inserted
+                    """
+                    
+                    cursor.execute(
+                        query,
+                        (
+                            trade_id,
+                            self.exchange_name,
+                            order['symbol'],
+                            order['exchange_order_id'],
+                            order['order_type'],
+                            order['side'],
+                            order['price'],
+                            order['size'],
+                            order['status'],
+                            order['is_risk_order'],
+                            order['risk_type']
+                        )
+                    )
+                    
+                    # Check if this was an insert or update
+                    result = cursor.fetchone()
+                    if result and result[0]:  # inserted = True
+                        orders_inserted += 1
+                    else:
+                        orders_updated += 1
+                    
+                    orders_processed += 1
+                
+                conn.commit()
+                logger.debug(f"Order sync completed: {orders_processed} processed, {orders_inserted} inserted, {orders_updated} updated")
+                
+        except Exception as e:
+            logger.error(f"Failed to sync orders to database: {e}")
+            conn.rollback()
+            raise
+        
+        finally:
+            conn.close()
+    
+    async def _find_trade_for_risk_order(self, cursor, order: Dict[str, Any]) -> Optional[str]:
+        """
+        Find the trade_id that this risk order (TP/SL) belongs to.
+        
+        Args:
+            cursor: Database cursor
+            order: Normalized order data
+            
+        Returns:
+            trade_id if found, None otherwise
+        """
+        try:
+            # Look for open trades with matching symbol and exchange
+            query = """
+                SELECT trade_id FROM trades
+                WHERE symbol = %s AND exchange = %s AND trade_status = 'open'
+                AND user_id = %s
+                ORDER BY opened_at DESC
+                LIMIT 1
+            """
+            
+            cursor.execute(
+                query,
+                (order['symbol'], self.exchange_name, self.user_id)
+            )
+            
+            result = cursor.fetchone()
+            if result:
+                return result[0]
+            
+            logger.debug(f"No matching trade found for risk order {order['exchange_order_id']} on {order['symbol']}")
+            return None
+            
+        except Exception as e:
+            logger.warning(f"Error finding trade for risk order: {e}")
+            return None
+    
+    # =================================================================
+    # SIMPLIFIED MONITORING SERVICE
+    # =================================================================
+    
+    # This monitoring service has been simplified to use the new trade lifecycle system.
+    # 
+    # OLD APPROACH: Complex phantom-trade reconciliation with aggregation logic
+    # NEW APPROACH: Simple position sync using TradeLifecycleManager
+    #
+    # Key benefits:
+    # - No phantom trades
+    # - Exchange positions drive trade state  
+    # - Simple and reliable
+    # - Universal exchange support
+    #
+    # The removed reconciliation methods (~600 lines) have been replaced by
+    # TradeLifecycleManager.sync_positions_to_trades() (~200 lines).

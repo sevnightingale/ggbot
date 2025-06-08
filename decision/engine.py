@@ -15,14 +15,16 @@ import uuid
 import os
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, List, Optional, Tuple
+from decimal import Decimal
 import psycopg2
 from psycopg2.extras import RealDictCursor
-import ccxt
+import ccxt.async_support as ccxt
 
 from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS, DECISION_LLM_API_KEY
 from core.common.logger import logger
 from decision.llm_providers import get_llm_provider
 from decision.interfaces.llm_provider import LLMProvider
+from decision.services.price_service import PriceService
 
 
 class DecisionEngine:
@@ -45,6 +47,7 @@ class DecisionEngine:
         self.config_id = config_id
         self.llm_provider: Optional[LLMProvider] = None
         self.config: Optional[Dict[str, Any]] = None
+        self.price_service: Optional[PriceService] = None
         
         logger.bind(module="decision.engine", user_id=user_id).info(
             f"Initialized DecisionEngine for config {config_id}"
@@ -61,6 +64,51 @@ class DecisionEngine:
             cursor_factory=RealDictCursor
         )
     
+    def _sanitize_for_json(self, obj: Any) -> Any:
+        """
+        Recursively convert Decimal objects to float for JSON serialization.
+        Also handles datetime objects by converting to ISO format strings.
+        
+        Args:
+            obj: The object to sanitize
+            
+        Returns:
+            JSON-serializable version of the object
+        """
+        if isinstance(obj, Decimal):
+            return float(obj)
+        elif isinstance(obj, datetime):
+            return obj.isoformat()
+        elif isinstance(obj, dict):
+            return {k: self._sanitize_for_json(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [self._sanitize_for_json(item) for item in obj]
+        elif isinstance(obj, tuple):
+            return tuple(self._sanitize_for_json(item) for item in obj)
+        else:
+            return obj
+    
+    def _calculate_time_in_trade(self, opened_at):
+        """Calculate hours since trade was opened, handling both datetime and string formats."""
+        if not opened_at:
+            return "N/A"
+        
+        try:
+            # If it's already a datetime object
+            if isinstance(opened_at, datetime):
+                if opened_at.tzinfo is None:
+                    opened_at = opened_at.replace(tzinfo=timezone.utc)
+                return f"{(datetime.now(timezone.utc) - opened_at).total_seconds() / 3600:.1f}"
+            # If it's a string (ISO format)
+            else:
+                opened_dt = datetime.fromisoformat(str(opened_at).replace('Z', '+00:00'))
+                if opened_dt.tzinfo is None:
+                    opened_dt = opened_dt.replace(tzinfo=timezone.utc)
+                return f"{(datetime.now(timezone.utc) - opened_dt).total_seconds() / 3600:.1f}"
+        except Exception as e:
+            logger.warning(f"Failed to calculate time in trade: {e}")
+            return "N/A"
+    
     async def initialize(self) -> None:
         """
         Initialize the engine by loading configuration and setting up LLM provider.
@@ -75,10 +123,21 @@ class DecisionEngine:
             api_key=DECISION_LLM_API_KEY
         )
         
-        # Health check
+        # Initialize price service
+        price_config = self.config.get('price_service', {})
+        self.price_service = PriceService(price_config)
+        
+        # Health checks
         if not await self.llm_provider.health_check():
             logger.bind(module="decision.engine").warning(
                 f"LLM provider {provider_name} health check failed"
+            )
+        
+        # Check price service health
+        price_health = await self.price_service.health_check()
+        if price_health['overall_status'] != 'healthy':
+            logger.bind(module="decision.engine").warning(
+                f"Price service health check: {price_health['overall_status']}"
             )
     
     def _load_configuration(self) -> Dict[str, Any]:
@@ -198,7 +257,8 @@ class DecisionEngine:
             logger.bind(module="decision.engine", user_id=self.user_id).info(
                 f"Fetched market data for {symbol} across {len(timeframes)} timeframes"
             )
-            return market_data
+            # Sanitize any Decimal values in market data
+            return self._sanitize_for_json(market_data)
             
         finally:
             conn.close()
@@ -268,115 +328,104 @@ class DecisionEngine:
             cursor = conn.cursor()
             
             cursor.execute("""
-                SELECT trade_id, pair, entry_price, leverage, collateral_amount,
-                       stop_loss, take_profit, created_at, execution_details
+                SELECT trade_id, symbol, entry_price, leverage, collateral_amount,
+                       stop_loss, take_profit, opened_at, '{}'::jsonb AS execution_details
                 FROM trades
-                WHERE user_id = %s
-                AND config_id = %s
+                WHERE user_id = %s AND config_id = %s
                 AND trade_status IN ('open', 'active', 'pending')
-                ORDER BY created_at DESC
+                ORDER BY opened_at DESC
             """, (self.user_id, self.config_id))
             
             trades = cursor.fetchall()
             
-            # Convert to list of dicts and parse decision history
+            # Convert to list of dicts and parse decision history from strategy_runs
             active_trades = []
             for trade in trades:
                 trade_dict = dict(trade)
                 
-                # Extract decision history from execution_details
-                if trade_dict.get('execution_details') and 'decision_history' in trade_dict['execution_details']:
-                    trade_dict['decision_history'] = trade_dict['execution_details']['decision_history']
-                else:
-                    trade_dict['decision_history'] = []
+                # Fetch decision history from strategy_runs table
+                trade_dict['decision_history'] = self._get_trade_decision_history(cursor, trade_dict['trade_id'])
                 
                 active_trades.append(trade_dict)
             
             logger.bind(module="decision.engine", user_id=self.user_id).info(
                 f"Found {len(active_trades)} active trades"
             )
-            return active_trades
+            # Sanitize Decimal values before returning
+            return self._sanitize_for_json(active_trades)
             
         finally:
             conn.close()
     
-    async def _fetch_current_price(self, symbol: str) -> Optional[float]:
+    def _get_trade_decision_history(self, cursor, trade_id: str) -> List[Dict[str, Any]]:
         """
-        Fetch current market price for a symbol using direct CCXT connection.
-        Uses the user's configured exchange from the database.
+        Fetch decision history for a trade from strategy_runs table.
         
         Args:
-            symbol (str): Trading symbol (e.g., 'BTC/USD')
+            cursor: Database cursor
+            trade_id: Trade ID to fetch history for
             
         Returns:
-            float: Current price, or None if fetch fails
+            List of decision history entries
         """
         try:
-            # Get exchange configuration from user's trading config
-            exchange_name = self.config.get('exchange', 'bitmex')
-            use_testnet = self.config.get('testnet', True)
+            cursor.execute("""
+                SELECT scenario, confidence_score, reasoning_log, decision_data, created_at
+                FROM strategy_runs
+                WHERE trade_id = %s
+                ORDER BY created_at ASC
+            """, (trade_id,))
             
-            # Get credentials from database config
-            conn = self._get_db_connection()
-            try:
-                cursor = conn.cursor()
-                cursor.execute("""
-                    SELECT config_data 
-                    FROM configurations 
-                    WHERE user_id = %s 
-                    AND config_id = %s 
-                    AND config_type = 'user'
-                """, (self.user_id, self.config_id))
+            strategy_runs = cursor.fetchall()
+            decision_history = []
+            
+            for run in strategy_runs:
+                # Convert strategy_run to legacy decision history format
+                decision_data = run['decision_data'] or {}
                 
-                result = cursor.fetchone()
-                if not result:
-                    raise ValueError("No configuration found")
+                history_entry = {
+                    'timestamp': run['created_at'].isoformat() if run['created_at'] else None,
+                    'action': decision_data.get('action', run['scenario'].lower()),
+                    'confidence': run['confidence_score'],
+                    'reasoning': run['reasoning_log'],
+                    'scenario': run['scenario']  # Keep scenario for enhanced context
+                }
                 
-                user_config = result['config_data']
-                credentials = user_config.get('exchanges', {}).get(exchange_name, {})
-                
-                if not credentials.get('api_key') or not credentials.get('api_secret'):
-                    # Fallback to environment variables
-                    credentials = {
-                        'api_key': os.getenv('EXCHANGE_API'),
-                        'api_secret': os.getenv('EXCHANGE_SECRET')
-                    }
-                    
-            finally:
-                conn.close()
+                decision_history.append(history_entry)
             
-            if not credentials.get('api_key') or not credentials.get('api_secret'):
-                logger.bind(module="decision.engine", user_id=self.user_id).warning(
-                    f"No credentials found for {exchange_name}, cannot fetch current price"
-                )
-                return None
+            # Sanitize any Decimal values before returning
+            return self._sanitize_for_json(decision_history)
             
-            # Create exchange client
-            exchange_class = getattr(ccxt, exchange_name)
-            config = {
-                'apiKey': credentials['api_key'],
-                'secret': credentials['api_secret'],
-                'enableRateLimit': True,
-                'options': {}
-            }
+        except Exception as e:
+            logger.warning(f"Failed to fetch decision history for trade {trade_id}: {e}")
+            return []
+    
+    async def _fetch_current_price(self, symbol: str) -> float:
+        """
+        Fetch current market price using the reliable PriceService.
+        
+        This method now uses the PriceService which provides consensus pricing
+        from multiple reliable sources (YFinance + CCXT) instead of unreliable
+        testnet data.
+        
+        Args:
+            symbol (str): Trading symbol (e.g., 'BTC/USD', 'BTC/USDT')
             
-            if use_testnet:
-                config['options']['testnet'] = True
+        Returns:
+            float: Current market price from consensus of reliable sources
             
-            exchange = exchange_class(config)
-            
-            # Load markets first
-            await exchange.load_markets()
-            
-            # Fetch ticker
-            ticker = await exchange.fetch_ticker(symbol)
-            current_price = ticker['last']
-            
-            # Close exchange connection
-            await exchange.close()
+        Raises:
+            ValueError: If price service fails or prices are inconsistent
+        """
+        if not self.price_service:
+            raise ValueError("Price service not initialized - call initialize() first")
+        
+        try:
+            # Use reliable price service instead of testnet exchange
+            current_price = await self.price_service.get_current_price(symbol)
             
             logger.bind(module="decision.engine", user_id=self.user_id).info(
-                f"Fetched current price for {symbol} from {exchange_name}: ${current_price:,.2f}"
+                f"Fetched reliable market price for {symbol}: ${current_price:,.2f}"
             )
             
             return current_price
@@ -385,7 +434,7 @@ class DecisionEngine:
             logger.bind(module="decision.engine", user_id=self.user_id).error(
                 f"Failed to fetch current price for {symbol}: {e}"
             )
-            return None
+            raise  # Re-raise to fail the decision process instead of using bad data
     
     def _update_trade_decision(self, trade_id: str, decision: str, confidence: float, reasoning: str) -> None:
         """
@@ -401,9 +450,9 @@ class DecisionEngine:
         try:
             cursor = conn.cursor()
             
-            # First fetch current execution_details
+            # First fetch current execution_details  
             cursor.execute("""
-                SELECT execution_details
+                SELECT '{}'::jsonb as execution_details
                 FROM trades
                 WHERE trade_id = %s
             """, (trade_id,))
@@ -422,12 +471,28 @@ class DecisionEngine:
                 'reasoning': reasoning
             })
             
-            # Update the trade
+            # Store decision history in strategy_runs table for audit trail
+            # Create a TRADE_MANAGEMENT strategy_run entry
+            strategy_run_id = str(uuid.uuid4())
             cursor.execute("""
-                UPDATE trades
-                SET execution_details = %s
-                WHERE trade_id = %s
-            """, (json.dumps(execution_details), trade_id))
+                INSERT INTO strategy_runs (
+                    strategy_run_id, trade_id, config_id, scenario,
+                    confidence_score, reasoning_log, decision_data, created_at
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+            """, (
+                strategy_run_id,
+                trade_id,
+                self.config_id,
+                'TRADE_MANAGEMENT',
+                confidence,
+                reasoning,
+                json.dumps({
+                    'action': decision,
+                    'decision_type': 'trade_management',
+                    'legacy_decision_history_entry': True
+                }),
+                datetime.now(timezone.utc)
+            ))
             
             conn.commit()
             
@@ -466,6 +531,7 @@ class DecisionEngine:
             f"- Available Margin: {account_state['available_margin']:.8f} BTC",
             f"- Used Margin: {account_state['used_margin']:.8f} BTC",
             f"- Open Positions: {len(account_state['positions'])}",
+            f"- Account Balance (USD): ~${account_state['available_margin'] * (current_price or 104000):,.0f}" if current_price else f"- Account Balance (USD): ~${account_state['available_margin'] * 104000:,.0f}",
             ""
         ]
         
@@ -509,44 +575,36 @@ class DecisionEngine:
             "## Risk Guidelines",
             self.config.get('risk_guidelines', 'No risk guidelines defined'),
             "",
-            "## Additional Context",
+            "## Additional Context", 
             self.config.get('additional_context', 'No additional context'),
             "",
-            "## CRITICAL: MANDATORY TRADING RULES",
-            "🚨 YOU MUST ALWAYS GENERATE A TRADING DECISION - NEVER 'no_action' 🚨",
+            "## How to Use This Information",
+            "The Trading Strategy section above contains the user-defined rules for making trading decisions.",
+            "The Market Data section contains various technical indicators, price action, and other data points about the symbol.",
             "",
-            "The strategy states: 'Always enter trades based on RSI position relative to 50'",
-            "- RSI > 50 = MANDATORY SHORT position",  
-            "- RSI < 50 = MANDATORY LONG position",
-            "- You MUST examine the RSI values above and determine if they are above or below 50",
-            "- Generate 'short' if RSI > 50, 'long' if RSI < 50",
-            "- 'no_action' is NEVER allowed per the strategy requirements",
-            "",
-            "FOLLOW THE STRATEGY EXACTLY - Do NOT use broader market analysis to override this.",
+            "Your task is to analyze the Market Data through the lens of the Trading Strategy to make a decision.",
+            "The strategy may include specific rules, patterns to look for, or confidence scoring guidelines.",
             "",
             "## Decision Required",
-            "Based on the above data and the EXACT strategy rules, should we enter a new position?",
+            "Based on the market data and trading strategy, should we enter a new position?",
             "",
-            "IMPORTANT: Use the current market price shown above for all calculations.",
+            "Please provide your decision in this EXACT format:",
             "",
-            "Please provide your decision in the following format:",
+            "ACTION: [long/short/no_action]",
+            "CONFIDENCE: [0.00-1.00]",
+            "STOP_LOSS: [price as number only, e.g. X.XX]",
+            "TAKE_PROFIT: [price as number only, e.g. X.XX]",
             "",
-            "Action: [long/short/no_action]",
-            "Confidence: [0.0-1.0] (REQUIRED - your confidence level in this decision)",
-            "Risk_Percentage: [percentage of account to risk, e.g., '2%']",
-            "Collateral_USD: [REQUIRED - USD amount of collateral based on current price, e.g., '$200']",
-            "Leverage: [REQUIRED - leverage multiplier as number, e.g., '10']",
-            "Total_Position_USD: [total position size in USD, e.g., '$2,000']",
-            "Stop_Loss: [price level and reasoning, e.g., '$108,000 - below key support']",
-            "Take_Profit: [price level(s) and reasoning, e.g., '$115,000 - 3:1 risk/reward at resistance']",
-            "Reasoning: [REQUIRED - Your detailed analysis following the strategy rules exactly, including:",
-            "  - Why this entry based on the strategy (RSI above/below 50)",
-            "  - What you expect to happen",
-            "  - Risk management rationale",
-            "  - Exit plan and timeline]",
+            "REASONING:",
+            "Your detailed analysis including:",
+            "- How the current market conditions align with the trading strategy",
+            "- Key factors influencing your confidence score", 
+            "- Exit plan and expected timeline",
             "",
-            "IMPORTANT: You MUST include ALL fields above. Each field should be on its own line.",
-            "Example calculation: If current BTC price is $67,000 and risking 2% of available margin = $200 collateral. With 10x leverage = $2,000 total position."
+            "IMPORTANT:",
+            "- Express your true confidence level - avoid defaulting to middle values unless your uncertainty is genuine",
+            "- Use the current market price shown above for stop loss and take profit calculations",
+            "- Your confidence score should reflect how strongly the current setup matches the strategy criteria"
         ])
         
         return "\n".join(prompt_parts)
@@ -626,12 +684,12 @@ class DecisionEngine:
             "",
             "## Current Position",
             f"- Trade ID: {active_trade['trade_id']}",
-            f"- Direction: {'Long' if active_trade.get('pair', '').endswith('buy') else 'Short'}",
+            f"- Direction: {'Long' if active_trade.get('side') == 'long' else 'Short' if active_trade.get('side') == 'short' else 'Net'}",
             f"- {position_info}",
             f"- Leverage: {active_trade.get('leverage', 'N/A')}x",
             f"- Stop Loss: {active_trade.get('stop_loss', 'N/A')}",
             f"- Take Profit: {active_trade.get('take_profit', 'N/A')}",
-            f"- Time in Trade: {(datetime.now(timezone.utc) - active_trade['created_at'].replace(tzinfo=timezone.utc)).total_seconds() / 3600:.1f} hours",
+            f"- Time in Trade: {self._calculate_time_in_trade(active_trade.get('opened_at'))} hours",
             ""
         ]
         
@@ -641,7 +699,7 @@ class DecisionEngine:
             for i, decision in enumerate(active_trade['decision_history'][-3:]):  # Last 3 decisions
                 prompt_parts.append(
                     f"{i+1}. {decision['timestamp']}: {decision['action']} "
-                    f"(confidence: {decision['confidence']}) - {decision['reasoning'][:100]}..."
+                    f"(confidence: {decision['confidence']}) - {decision['reasoning']}"
                 )
             prompt_parts.append("")
         
@@ -666,37 +724,38 @@ class DecisionEngine:
         # Add strategy reminder and decision request
         prompt_parts.extend([
             "",
-            "## Strategy Reminder",
+            "## Trading Strategy",
             self.config.get('strategy', 'No strategy defined')[:200] + "...",
             "",
             "## Decision Required",
             "Should we continue holding this position, adjust it, or close it?",
             "Consider the original entry reasoning and how market conditions have changed.",
             "",
-            "Please provide your decision in the following format:",
+            "Please provide your decision in this EXACT format:",
             "",
-            "Action: [hold/add/reduce/close/adjust_stops]",
-            "Confidence: [0.0-1.0] (REQUIRED - your confidence level in this decision)",
-            "Position Size: [ONLY if 'add' or 'reduce' action:",
-            "  - For 'add': Additional position details like new trade entry",
-            "  - For 'reduce': Percentage to close (e.g., 'Close 50% of position')]",
-            "Stop Loss: [ONLY if 'adjust_stops': New stop loss level and reasoning]",
-            "Take Profit: [ONLY if 'adjust_stops': New take profit level and reasoning]",
-            "Reasoning: [REQUIRED - Your analysis including:",
-            "  - Current position status and P&L",
-            "  - Why this action based on strategy",
-            "  - Risk management considerations",
-            "  - Updated market outlook]",
+            "ACTION: [hold/add/reduce/close/adjust_stops]",
+            "CONFIDENCE: [0.00-1.00]",
+            "STOP_LOSS: [ONLY if 'adjust_stops': price as number only, e.g. X.XX]",
+            "TAKE_PROFIT: [ONLY if 'adjust_stops': price as number only, e.g. X.XX]",
             "",
-            "IMPORTANT: You MUST include both Confidence and Reasoning fields. These are required."
+            "REASONING:",
+            "Your analysis including:",
+            "- Current position status and P&L",
+            "- Why this action based on strategy", 
+            "- Risk management considerations",
+            "- Updated market outlook",
+            "",
+            "IMPORTANT:",
+            "- Express your true confidence level - avoid defaulting to middle values unless your uncertainty is genuine",
+            "- Your confidence should reflect how strongly you believe in the action based on current conditions"
         ])
         
         return "\n".join(prompt_parts)
     
     def _parse_llm_response(self, response: str, mode: str = 'new_trade') -> Dict[str, Any]:
         """
-        Minimal parsing of LLM response - extract only confidence and reasoning.
-        The Trading Module's LLM will handle the actual trading instructions.
+        Parse LLM response focusing on confidence, stop/take profit, and reasoning.
+        Position sizing will be handled by the Trading Module based on confidence.
         
         Args:
             response (str): Raw LLM response
@@ -714,7 +773,7 @@ class DecisionEngine:
             'mode': mode
         }
         
-        # Parse line by line for confidence, leverage, collateral, and reasoning
+        # Parse line by line for confidence, stop/take profit, and reasoning
         lines = response.strip().split('\n')
         capture_reasoning = False
         reasoning_lines = []
@@ -722,19 +781,30 @@ class DecisionEngine:
         
         for line in lines:
             line_stripped = line.strip()
+            line_upper = line_stripped.upper()
             
-            # Look for confidence in various formats
-            if 'confidence:' in line_stripped.lower():
-                # Try to extract confidence value
-                # Handle formats like "Confidence: 0.65" or "**Confidence:** 0.8"
+            # Look for ACTION: (uppercase format)
+            if line_upper.startswith('ACTION:'):
                 try:
-                    # Remove markdown formatting
-                    clean_line = line_stripped.replace('**', '').replace('*', '')
-                    # Split by colon and get the number
-                    parts = clean_line.split(':')
+                    parts = line_stripped.split(':', 1)
+                    if len(parts) >= 2:
+                        action_str = parts[1].strip().lower()
+                        # Clean common formatting
+                        action_str = action_str.replace('**', '').replace('*', '').strip()
+                        if action_str in ['long', 'short', 'no_action', 'hold', 'add', 'reduce', 'close', 'adjust_stops']:
+                            result['action'] = action_str
+                            logger.bind(module="decision.engine").info(f"Parsed action: {result['action']}")
+                except Exception as e:
+                    logger.bind(module="decision.engine").warning(f"Failed to parse action: {e}")
+            
+            # Look for CONFIDENCE: (uppercase format)
+            elif line_upper.startswith('CONFIDENCE:'):
+                try:
+                    parts = line_stripped.split(':', 1)
                     if len(parts) >= 2:
                         confidence_str = parts[1].strip()
-                        # Extract first number found
+                        # Clean formatting and extract number
+                        confidence_str = confidence_str.replace('**', '').replace('*', '').replace('%', '')
                         numbers = re.findall(r'\d*\.?\d+', confidence_str)
                         if numbers:
                             confidence = float(numbers[0])
@@ -743,41 +813,41 @@ class DecisionEngine:
                 except Exception as e:
                     logger.bind(module="decision.engine").warning(f"Failed to parse confidence: {e}")
             
-            # Look for leverage
-            elif 'leverage:' in line_stripped.lower():
+            # Look for STOP_LOSS: (uppercase format)
+            elif line_upper.startswith('STOP_LOSS:') or line_upper.startswith('STOP LOSS:'):
                 try:
-                    clean_line = line_stripped.replace('**', '').replace('*', '')
-                    parts = clean_line.split(':')
+                    parts = line_stripped.split(':', 1)
                     if len(parts) >= 2:
-                        leverage_str = parts[1].strip()
-                        # Extract number, handle "10x" or "10" format
-                        numbers = re.findall(r'\d+', leverage_str)
+                        stop_loss_str = parts[1].strip()
+                        # Extract number, avoid example values like "X.XX"
+                        stop_loss_str = stop_loss_str.replace(',', '').replace('$', '').replace('X.XX', '').strip()
+                        numbers = re.findall(r'\d+\.?\d*', stop_loss_str)
                         if numbers:
-                            result['leverage'] = int(numbers[0])
-                            logger.bind(module="decision.engine").info(f"Parsed leverage: {result['leverage']}")
+                            result['stop_loss_price'] = float(numbers[0])
+                            logger.bind(module="decision.engine").info(f"Parsed stop_loss_price: {result['stop_loss_price']}")
                 except Exception as e:
-                    logger.bind(module="decision.engine").warning(f"Failed to parse leverage: {e}")
+                    logger.bind(module="decision.engine").warning(f"Failed to parse stop_loss_price: {e}")
             
-            # Look for collateral USD
-            elif 'collateral_usd:' in line_stripped.lower():
+            # Look for TAKE_PROFIT: (uppercase format)
+            elif line_upper.startswith('TAKE_PROFIT:') or line_upper.startswith('TAKE PROFIT:'):
                 try:
-                    clean_line = line_stripped.replace('**', '').replace('*', '')
-                    parts = clean_line.split(':')
+                    parts = line_stripped.split(':', 1)
                     if len(parts) >= 2:
-                        collateral_str = parts[1].strip()
-                        # Extract number, handle "$200" or "200" format
-                        numbers = re.findall(r'\d+\.?\d*', collateral_str)
+                        take_profit_str = parts[1].strip()
+                        # Extract number, avoid example values like "X.XX"
+                        take_profit_str = take_profit_str.replace(',', '').replace('$', '').replace('X.XX', '').strip()
+                        numbers = re.findall(r'\d+\.?\d*', take_profit_str)
                         if numbers:
-                            result['collateral_usd'] = float(numbers[0])
-                            logger.bind(module="decision.engine").info(f"Parsed collateral_usd: {result['collateral_usd']}")
+                            result['take_profit_price'] = float(numbers[0])
+                            logger.bind(module="decision.engine").info(f"Parsed take_profit_price: {result['take_profit_price']}")
                 except Exception as e:
-                    logger.bind(module="decision.engine").warning(f"Failed to parse collateral_usd: {e}")
+                    logger.bind(module="decision.engine").warning(f"Failed to parse take_profit_price: {e}")
             
-            # Look for reasoning section
-            elif 'reasoning:' in line_stripped.lower() or capture_reasoning:
-                if 'reasoning:' in line_stripped.lower():
+            # Look for REASONING: section (uppercase format)
+            elif line_upper.startswith('REASONING:') or capture_reasoning:
+                if line_upper.startswith('REASONING:'):
                     capture_reasoning = True
-                    # Get any text after "Reasoning:" on the same line
+                    # Get any text after "REASONING:" on the same line
                     parts = line.split(':', 1)
                     if len(parts) > 1:
                         reasoning_text = parts[1].strip()
@@ -785,7 +855,7 @@ class DecisionEngine:
                             reasoning_lines.append(reasoning_text)
                 elif capture_reasoning and line_stripped:
                     # Continue capturing reasoning until we hit another section
-                    if any(line_stripped.lower().startswith(x) for x in ['action:', 'confidence:', 'position size:', 'stop loss:', 'take profit:', '**action:', '**confidence:', '**position']):
+                    if any(line_upper.startswith(x) for x in ['ACTION:', 'CONFIDENCE:', 'STOP_LOSS:', 'TAKE_PROFIT:', 'STOP LOSS:', 'TAKE PROFIT:']):
                         capture_reasoning = False
                     else:
                         reasoning_lines.append(line)
@@ -797,11 +867,17 @@ class DecisionEngine:
             # Fallback: use the entire response as reasoning if we couldn't parse it
             result['reasoning'] = response
         
+        # Validate confidence is present
+        if result['confidence'] == 0.5:
+            logger.bind(module="decision.engine").warning(
+                "Confidence not found in response, using default 0.5. This may indicate parsing issues."
+            )
+        
         logger.bind(module="decision.engine").info(
             f"Parsed LLM response: confidence={result['confidence']}, "
-            f"leverage={result.get('leverage', 'Not found')}, "
-            f"collateral_usd={result.get('collateral_usd', 'Not found')}, "
-            f"reasoning_length={len(result['reasoning'])}, passing full response to Trading Module"
+            f"stop_loss={result.get('stop_loss_price', 'Not found')}, "
+            f"take_profit={result.get('take_profit_price', 'Not found')}, "
+            f"reasoning_length={len(result['reasoning'])}"
         )
         
         return result
@@ -824,10 +900,22 @@ class DecisionEngine:
         if not timeframes:
             timeframes = ['15m', '1h', '4h']
         
-        # Fetch all required data
-        market_data = self._fetch_market_data(symbol, timeframes)
-        account_state = self._fetch_account_state()
-        active_trades = self._fetch_active_trades()
+        try:
+            # Fetch all required data
+            market_data = self._fetch_market_data(symbol, timeframes)
+            account_state = self._fetch_account_state()
+            active_trades = self._fetch_active_trades()
+        except Exception as e:
+            logger.bind(module="decision.engine", user_id=self.user_id).error(
+                f"Failed to fetch required data: {e}"
+            )
+            return {
+                'action': 'error',
+                'error': f'Data fetch failure: {str(e)}',
+                'user_id': self.user_id,
+                'config_id': self.config_id,
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
         
         # Determine mode and process accordingly
         if active_trades:
@@ -879,71 +967,87 @@ class DecisionEngine:
             
             # For now, return the first decision (in future, could handle multiple)
             if decisions:
-                return self._create_intent(decisions[0], mode='manage')
+                return self._create_intent(decisions[0], mode='manage', symbol=symbol)
         
         else:
             # New Trade Mode
             logger.bind(module="decision.engine", user_id=self.user_id).info("Entering New Trade Mode")
             
-            # Format prompt
-            prompt = await self._format_prompt_new_trade(market_data, account_state, symbol)
-            
-            # DEBUG: Log the full prompt
-            logger.bind(module="decision.engine", user_id=self.user_id).info(
-                "📝 DECISION LLM USER PROMPT:\n{prompt}",
-                prompt=prompt
-            )
-            
-            # Get decision from LLM
-            response, metadata = await self.llm_provider.generate_response(
-                prompt=prompt,
-                temperature=0.7
-            )
-            
-            # DEBUG: Log the full response
-            logger.bind(module="decision.engine", user_id=self.user_id).info(
-                "🤖 DECISION LLM RESPONSE:\n{response}",
-                response=response
-            )
-            
-            # Parse response
-            decision = self._parse_llm_response(response, mode='new_trade')
-            decision['metadata'] = metadata
-            
-            return self._create_intent(decision, mode='new')
+            try:
+                # Format prompt (this may fail if price service fails)
+                prompt = await self._format_prompt_new_trade(market_data, account_state, symbol)
+                
+                # DEBUG: Log the full prompt
+                logger.bind(module="decision.engine", user_id=self.user_id).info(
+                    "📝 DECISION LLM USER PROMPT:\n{prompt}",
+                    prompt=prompt
+                )
+                
+                # Get decision from LLM
+                response, metadata = await self.llm_provider.generate_response(
+                    prompt=prompt,
+                    temperature=0.7
+                )
+                
+                # DEBUG: Log the full response
+                logger.bind(module="decision.engine", user_id=self.user_id).info(
+                    "🤖 DECISION LLM RESPONSE:\n{response}",
+                    response=response
+                )
+                
+                # Parse response
+                decision = self._parse_llm_response(response, mode='new_trade')
+                decision['metadata'] = metadata
+                
+                return self._create_intent(decision, mode='new', symbol=symbol)
+                
+            except Exception as e:
+                logger.bind(module="decision.engine", user_id=self.user_id).error(
+                    f"Failed to generate decision for {symbol}: {e}"
+                )
+                return {
+                    'action': 'error',
+                    'error': f'Decision generation failure: {str(e)}',
+                    'user_id': self.user_id,
+                    'config_id': self.config_id,
+                    'symbol': symbol,
+                    'timestamp': datetime.now(timezone.utc).isoformat()
+                }
     
-    def _create_intent(self, decision: Dict[str, Any], mode: str) -> Dict[str, Any]:
+    def _create_intent(self, decision: Dict[str, Any], mode: str, symbol: str) -> Dict[str, Any]:
         """
         Create a trading intent for the Trading Module.
-        Includes parsed confidence/reasoning and raw LLM decision.
+        Includes confidence score, stop/take profit, and reasoning.
+        Position sizing will be calculated by Trading Module based on confidence.
         
         Args:
             decision (Dict): Decision data with parsed fields and raw response
             mode (str): 'new' or 'manage'
+            symbol (str): Trading symbol to use in intent
             
         Returns:
-            Dict[str, Any]: Trading intent with both parsed metadata and raw decision
+            Dict[str, Any]: Trading intent with confidence and trade parameters
         """
         # Generate a unique decision ID
         decision_id = str(uuid.uuid4())
         
-        # Create intent with parsed metadata and raw LLM decision
+        # Create intent with confidence-based approach
         intent = {
             'decision_id': decision_id,
             'user_id': self.user_id,
             'config_id': self.config_id,
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'mode': mode,
-            'symbol': 'BTC/USD',  # TODO: Make this dynamic
+            'symbol': symbol,  # Use dynamic symbol from make_decision parameter
             'exchange': 'bitmex',  # TODO: Make this configurable
             
-            # Include parsed confidence and reasoning for Decision Module use
+            # Core fields for confidence-based risk management
             'confidence': decision['confidence'],
             'reasoning': decision['reasoning'],
             
-            # Include parsed trading parameters if found
-            'leverage': decision.get('leverage'),  # Will be None if not parsed
-            'collateral_amount': decision.get('collateral_usd'),  # Will be None if not parsed
+            # Include stop/take profit if parsed
+            'stop_loss_price': decision.get('stop_loss_price'),
+            'take_profit_price': decision.get('take_profit_price'),
             
             # Pass the ENTIRE raw LLM response - Trading Module's LLM will understand it
             'llm_decision': decision['raw_response'],
@@ -951,8 +1055,8 @@ class DecisionEngine:
             # Include metadata
             'metadata': decision.get('metadata', {}),
             
-            # Signal to Trading Module that this needs LLM processing
-            'action': 'process_llm_decision',
+            # Use the parsed action from LLM response
+            'action': decision.get('action', 'process_llm_decision'),
             
             # Include any additional context
             'decision_mode': mode,
@@ -960,7 +1064,7 @@ class DecisionEngine:
         }
         
         logger.bind(module="decision.engine").info(
-            f"Created intent with raw LLM decision for Trading Module processing"
+            f"Created intent with confidence={decision['confidence']} for Trading Module risk calculation"
         )
         
         return intent

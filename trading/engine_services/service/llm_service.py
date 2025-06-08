@@ -281,13 +281,21 @@ IMPORTANT INSTRUCTIONS:
 2. You MUST use the exchange "{exchange}" for all tool calls that require an exchange.
 3. Based on the trading intent to {action_phrase}, determine the correct sequence of tool calls.
 4. CRITICAL: The system prompt above contains an EXCHANGE GUIDE with specific rules - you MUST follow ALL rules in that guide.
-5. For position sizing: If the intent specifies collateral and leverage, calculate position size as: collateral × leverage = total position value.
-6. Check the exchange guide for:
+
+🚨 CRITICAL POSITION SIZING RULES:
+5. Position sizing has been AUTOMATICALLY calculated based on the confidence score from the Decision Module
+6. The intent contains TWO key values: 'position_size_usd' (total position) and 'collateral_amount' (margin used)
+7. Use 'position_size_usd' to calculate contract amounts - this is the TOTAL position size you should trade
+8. For BitMEX BTC/USD: contracts = position_size_usd (since 1 contract = $1 position value)
+9. DO NOT use 'collateral_amount' for contract calculations - it's only the margin/collateral amount
+10. NEVER multiply position_size_usd by leverage - it's already the total position size!
+
+11. Check the exchange guide for:
    - Whether you need to set leverage or if it's already configured
    - Minimum order sizes and how to handle them
    - Required parameter formats for each tool
    - Error messages to expect and how to handle them
-7. Do NOT attempt operations that the exchange guide says will fail or are not supported.
+12. Do NOT attempt operations that the exchange guide says will fail or are not supported.
 
 When you want to use a tool, format your response as a JSON object with this structure:
 ```

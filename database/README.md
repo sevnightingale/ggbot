@@ -19,6 +19,13 @@ The ggbots platform uses a hybrid architecture with Bubble.io for frontend/user 
 - `0004_update_schema_for_platform.sql`: Updates schema to support platform architecture (configurations table, additional fields)
 - `0005_additional_improvements.sql`: Adds data_type column to market_data, config_name to configurations, and config_id to trades
 - `0006_update_configuration_constraint.sql`: Updates unique constraint on configurations table to support multiple named configurations
+- `0007_update_market_data_schema.sql`: Updates market_data schema for better data organization
+- `0008_update_market_data_constraint.sql`: Changes unique constraint to allow historical data storage
+- `0009_add_account_monitoring.sql`: Adds account_states table for exchange account monitoring
+- `0010_add_constraints_and_indexes.sql`: Adds position reconciliation and performance indexes
+- `0011_add_data_integrity_constraints.sql`: Adds comprehensive data integrity constraints and reconciliation logging
+- `0012_universal_trade_lifecycle.sql`: **MAJOR MIGRATION** - Transforms phantom-trade system to universal position-based trade lifecycle system
+- `0013_enhanced_trade_lifecycle.sql`: Adds config_id integration, TP/SL tracking, strategy metadata, and backward compatibility
 
 ## Database Schema
 
@@ -72,34 +79,146 @@ Stores user-specific configurations for each module of the platform.
 - Foreign Key constraint on `user_id` referencing users table
 
 ### trades
-Stores information about trades executed by the platform.
+**ENHANCED SCHEMA (Migration 0012 + 0013)**: Position-based trade tracking with decision module compatibility.
 
 | Column             | Type            | Description                            |
 |--------------------|-----------------|----------------------------------------|
 | trade_id           | UUID            | Primary Key                            |
 | user_id            | UUID            | Foreign Key to users table             |
-| config_id          | UUID            | Foreign Key to configurations table    |
-| exchange           | VARCHAR         | Exchange where trade was executed      |
-| pair               | VARCHAR         | Trading pair (e.g., 'BTC/USD')         |
-| timeframe          | VARCHAR         | Timeframe used for analysis            |
-| collateral_amount  | NUMERIC         | Amount of collateral for the trade     |
-| leverage           | INTEGER         | Leverage used for the trade            |
-| stop_loss          | NUMERIC         | Stop loss price                        |
-| take_profit        | NUMERIC         | Take profit price                      |
-| confidence_score   | NUMERIC         | Confidence score from the LLM          |
-| reasoning_log      | TEXT            | Reasoning from the LLM for the trade   |
-| trade_status       | VARCHAR         | Status of the trade                    |
-| created_at         | TIMESTAMP       | Trade creation timestamp               |
-| closed_at          | TIMESTAMP       | Trade closure timestamp                |
-| profit_loss        | NUMERIC         | Profit or loss from the trade          |
+| account_id         | VARCHAR         | Account identifier (default: 'main')   |
+| exchange           | VARCHAR         | Exchange name (e.g., 'bitmex')         |
+| symbol             | VARCHAR         | Trading pair (e.g., 'BTC/USD')         |
+| side               | VARCHAR         | Position side: 'long'/'short' (NULL for net exchanges like BitMEX) |
+| trade_status       | VARCHAR         | Trade status: 'open' or 'closed'       |
+| size_contracts     | DECIMAL(20,8)   | Position size in contracts (single source of truth) |
+| entry_price        | DECIMAL(20,8)   | VWAP entry price (calculated from trade_orders) |
+| mark_price         | DECIMAL(20,8)   | Current market price (updated frequently) |
+| unrealized_pnl     | DECIMAL(20,8)   | Current unrealized P&L                 |
+| realized_pnl       | DECIMAL(20,8)   | Final P&L when closed                  |
+| total_fees         | DECIMAL(20,8)   | Sum of fees from trade_orders          |
+| opened_at          | TIMESTAMP       | Trade open timestamp                   |
+| closed_at          | TIMESTAMP       | Trade close timestamp                  |
+| last_updated       | TIMESTAMP       | Last position update timestamp         |
+| config_id          | UUID            | Foreign Key to configurations table (Migration 0013) |
+| leverage           | INTEGER         | Leverage used for this trade (Migration 0013) |
+| collateral_amount  | DECIMAL(20,8)   | Collateral amount in base currency (Migration 0013) |
+| stop_loss          | DECIMAL(20,8)   | Stop loss price level (Migration 0013) |
+| take_profit        | DECIMAL(20,8)   | Take profit price level (Migration 0013) |
+| confidence_score   | NUMERIC(3,2)    | Decision confidence score 0.0-1.0 (Migration 0013) |
+| reasoning_log      | TEXT            | Decision reasoning for audit trail (Migration 0013) |
+
+**Key Design Principles:**
+- **Position-driven lifecycle**: Exchange position changes drive trade state (open/update/close)
+- **Universal exchange support**: Configurable position keys (net vs hedge mode)
+- **Order precision**: Detailed order tracking in separate `trade_orders` table
+- **Single source of truth**: `size_contracts` is authoritative position size
 
 **Indexes:**
 - Primary Key on `trade_id`
-- Index on `created_at`
-- Index on `(user_id, created_at)` for user-specific trade history
-- Index on `(user_id, config_id)` for configuration-specific trade history
+- Index on `(user_id, exchange, trade_status)` for active trades (partial index WHERE trade_status = 'open')
+- Index on `(user_id, exchange, symbol, side, trade_status)` for position key lookups
+- Unique constraint on `(user_id, account_id, exchange, symbol, side)` for position uniqueness
 - Foreign Key constraint on `user_id` referencing users table
-- Foreign Key constraint on `config_id` referencing configurations table
+
+**Position Key Strategy:**
+- **Net exchanges (BitMEX)**: key = `(user_id, account_id, exchange, symbol)` (side = NULL)
+- **Hedge exchanges (Binance)**: key = `(user_id, account_id, exchange, symbol, side)`
+
+### trade_orders
+**ENHANCED TABLE (Migration 0012 + 0013)**: Order-level details with TP/SL tracking.
+
+| Column             | Type            | Description                            |
+|--------------------|-----------------|----------------------------------------|
+| id                 | SERIAL          | Primary Key                            |
+| trade_id           | UUID            | Foreign Key to trades table            |
+| exchange           | VARCHAR         | Exchange name for better joins         |
+| symbol             | VARCHAR         | Trading pair for better joins          |
+| exchange_order_id  | VARCHAR         | Exchange-assigned order ID             |
+| client_order_id    | VARCHAR         | Our trade_id when exchange supports it |
+| order_type         | VARCHAR         | Order type: 'market', 'limit', 'stop' |
+| side               | VARCHAR         | Order side: 'buy', 'sell'              |
+| price              | DECIMAL(20,8)   | Order price                            |
+| size               | DECIMAL(20,8)   | Order size                             |
+| filled_size        | DECIMAL(20,8)   | Actually filled size                   |
+| fee                | DECIMAL(20,8)   | Trading fee                            |
+| fee_currency       | VARCHAR         | Fee currency                           |
+| status             | VARCHAR         | Order status: 'open', 'filled', 'canceled' |
+| filled_at          | TIMESTAMP       | Fill timestamp                         |
+| created_at         | TIMESTAMP       | Order creation timestamp               |
+| is_risk_order      | BOOLEAN         | True if this is a TP/SL order (Migration 0013) |
+| risk_type          | VARCHAR(10)     | 'TP' or 'SL' for risk orders (Migration 0013) |
+
+**Purpose:**
+- Enables precise VWAP calculation from multiple fills
+- Tracks fees for accurate P&L computation
+- Supports partial fill scenarios and order tracking
+- Maintains order history for audit and analysis
+
+**Indexes:**
+- Primary Key on `id`
+- Index on `trade_id` for joining with trades
+- Index on `(exchange, exchange_order_id)` for order lookups
+- Unique constraint on `(exchange, exchange_order_id)` to prevent duplicates
+- Foreign Key constraint on `trade_id` referencing trades table
+
+### strategy_runs
+**NEW TABLE (Migration 0013)**: Tracks decision context and strategy metadata for trades.
+
+| Column                 | Type            | Description                            |
+|------------------------|-----------------|----------------------------------------|
+| strategy_run_id        | UUID            | Primary Key                            |
+| trade_id               | UUID            | Foreign Key to trades table            |
+| config_id              | UUID            | Foreign Key to configurations table    |
+| decision_id            | UUID            | Link to decision that triggered this   |
+| leverage               | INTEGER         | Leverage setting for this strategy run |
+| confidence_score       | NUMERIC(3,2)    | Strategy confidence score (0.0-1.0)    |
+| reasoning_log          | TEXT            | Detailed reasoning for the decision    |
+| decision_data          | JSONB           | Full decision context and parameters   |
+| scenario               | VARCHAR(50)     | 'TRADE_ENTRY', 'TRADE_MANAGEMENT', 'TRADE_EXIT' |
+| parent_strategy_run_id | UUID            | Links management decisions to original entry |
+| created_at             | TIMESTAMP       | Strategy run creation timestamp        |
+
+**Purpose:**
+- Captures the "why" behind trading decisions
+- Enables decision audit trails and performance analysis
+- Provides context for trade management scenarios
+- Links related decisions (entry → management → exit)
+
+**Indexes:**
+- Primary Key on `strategy_run_id`
+- Index on `trade_id` for trade lookups
+- Index on `config_id` for configuration analysis
+- Index on `scenario` for decision type queries
+- Index on `parent_strategy_run_id` for decision chains
+- Foreign Key constraints on `trade_id` and `config_id`
+
+### instrument_metadata
+**NEW TABLE (Migration 0012)**: Exchange-specific contract specifications.
+
+| Column                | Type            | Description                            |
+|-----------------------|-----------------|----------------------------------------|
+| id                    | SERIAL          | Primary Key                            |
+| exchange              | VARCHAR         | Exchange name                          |
+| symbol                | VARCHAR         | Trading pair symbol                    |
+| contract_value        | DECIMAL(20,8)   | Contract value (1.0 for BitMEX BTC/USD) |
+| contract_currency     | VARCHAR         | Contract currency ('USD', 'BTC', etc.) |
+| tick_size             | DECIMAL(20,8)   | Minimum price increment                |
+| lot_size              | DECIMAL(20,8)   | Minimum size increment                 |
+| supports_hedge_mode   | BOOLEAN         | Whether exchange supports hedge mode   |
+| default_position_mode | VARCHAR         | Default mode: 'net' or 'hedge'        |
+| active                | BOOLEAN         | Whether instrument is active           |
+| updated_at            | TIMESTAMP       | Last update timestamp                  |
+
+**Purpose:**
+- Normalizes contract specifications across exchanges
+- Enables universal position calculations
+- Supports exchange adapter configuration
+- Pre-populated with BitMEX BTC/USD metadata for testing
+
+**Indexes:**
+- Primary Key on `id`
+- Index on `(exchange, symbol)` for lookups
+- Unique constraint on `(exchange, symbol)` to prevent duplicates
 
 ### market_data
 Stores market data including indicators and price data for different pairs and timeframes.
@@ -123,6 +242,27 @@ Stores market data including indicators and price data for different pairs and t
 - Foreign Key constraint on `user_id` referencing users table
 
 **Important Note**: Migration `0008_update_market_data_constraint.sql` changes the unique constraint to allow multiple entries per user-symbol-timeframe combination with different timestamps. This is necessary for storing historical data points needed for calculating technical indicators like MACD and Bollinger Bands that require multiple data points.
+
+### account_states
+Stores real-time account state from exchange monitoring for each user.
+
+| Column           | Type            | Description                            |
+|------------------|-----------------|----------------------------------------|
+| id               | SERIAL          | Primary Key                            |
+| user_id          | UUID            | Foreign Key to users table             |
+| exchange         | VARCHAR         | Exchange name (e.g., 'bitmex')         |
+| balance_data     | JSONB           | Account balance information            |
+| position_data    | JSONB           | Current open positions                 |
+| equity           | NUMERIC         | Total account equity                   |
+| available_margin | NUMERIC         | Available margin for trading           |
+| used_margin      | NUMERIC         | Currently used margin                  |
+| updated_at       | TIMESTAMP       | Last update timestamp                  |
+
+**Indexes:**
+- Primary Key on `id`
+- Index on `(user_id, updated_at)` for efficient latest state retrieval
+- Foreign Key constraint on `user_id` referencing users table
+
 
 ### logs
 Stores application logs with user context for debugging and monitoring.
@@ -195,3 +335,108 @@ For the platform phase:
 5. The API layer ensures that users can only access their own data
 
 This approach allows for seamless integration with Bubble.io while maintaining the database's existing structure and foreign key relationships. No additional tables or fields are needed beyond the existing schema, as it was originally designed with multi-user support in mind.
+
+## Database Views and Helper Functions
+
+### Schema Alignment (Post-Migration)
+**COMPLETED**: All modules now use the direct trades table schema.
+
+The database schema has been fully aligned across all modules:
+
+| Database Field     | Purpose                                    |
+|--------------------|-------------------------------------------|
+| trade_status       | Trade status ('open', 'closed')          |
+| symbol             | Trading pair symbol (e.g., 'BTC/USD')    |
+| opened_at          | Trade creation timestamp                  |
+| unrealized_pnl     | Current P&L                              |
+| decision_id        | Stored in strategy_runs (not trades)     |
+
+**Changes Applied:**
+- Removed `trades_legacy` compatibility view 
+- All code updated to use direct trades table
+- `decision_id` moved to strategy_runs for proper audit trail
+- Field naming standardized across all modules
+
+**Usage:**
+```sql
+-- All modules now query trades table directly
+SELECT * FROM trades 
+WHERE user_id = %s AND trade_status = 'open';
+```
+
+## Universal Trade Lifecycle System (Migration 0012)
+
+The database now implements a **universal trade lifecycle management system** that replaced the previous phantom-trade reconciliation approach. Key features:
+
+### Core Principles
+- **Exchange as Single Source of Truth**: Position data from exchange drives all trade state changes
+- **Position-Based Lifecycle**: One trade record per exchange position (eliminates phantom trades)
+- **Universal Exchange Support**: Configurable adapters for net vs hedge positioning modes
+- **Order-Level Precision**: Separate order tracking for accurate VWAP and P&L calculation
+
+### Trade Lifecycle Flow
+1. **Position Detection**: Monitoring service detects new exchange position
+2. **Trade Creation**: New trade record created automatically (trade_status='open')
+3. **Position Updates**: Size/price changes update existing trade record
+4. **Position Closure**: When position size=0, trade marked as closed with final P&L
+
+### Schema Transformation
+- **Old System**: Complex trades table with phantom trade reconciliation
+- **New System**: Simple position-based trades + detailed trade_orders + instrument_metadata
+- **Migration Impact**: Complete schema replacement (clean slate approach)
+
+## Data Integrity Features
+
+### Nuclear Reset Capability
+For development and testing phases, the database supports complete data reset via the `nuclear_reset.sql` script, which safely removes all trading data while preserving the schema and constraints.
+
+### Position-Based Trade Synchronization
+The new system eliminates phantom trades through position-driven lifecycle management:
+- **Real-time Position Sync**: Monitoring service polls exchange positions every 30 seconds
+- **Automatic Trade Creation**: New positions automatically create trade records
+- **Automatic Trade Updates**: Position size/price changes update existing trades
+- **Automatic Trade Closure**: When position disappears, trade marked closed with final P&L
+- **No Phantom Trades**: System only tracks actual exchange positions
+
+### Universal Exchange Compatibility
+The schema supports multiple exchange types through configurable position keys:
+- **Net Positioning (BitMEX)**: Single position per symbol, side=NULL
+- **Hedge Positioning (Binance)**: Separate long/short positions, side required
+- **Instrument Metadata**: Exchange-specific contract specifications
+- **Adapter Pattern**: Normalized position interface across all exchanges
+
+### Performance Optimizations
+Migration 0012 includes specialized indexes for:
+- **Active Trade Queries**: Partial index on open trades for fast lookups
+- **Position Key Lookups**: Composite index for finding trades by exchange position
+- **Order Tracking**: Indexes for efficient order-to-trade mapping
+- **Instrument Lookups**: Fast metadata retrieval for position calculations
+
+## Recovery and Maintenance
+
+### Trade Lifecycle Monitoring
+Query current system state:
+```sql
+-- Active trades by exchange
+SELECT exchange, symbol, COUNT(*) as active_trades 
+FROM trades WHERE trade_status = 'open' GROUP BY exchange, symbol;
+
+-- Recent trade activity
+SELECT trade_id, exchange, symbol, size_contracts, trade_status, last_updated 
+FROM trades ORDER BY last_updated DESC LIMIT 10;
+
+-- Order tracking for a trade
+SELECT exchange_order_id, side, price, filled_size, status, filled_at 
+FROM trade_orders WHERE trade_id = 'your-trade-id' ORDER BY created_at;
+```
+
+### Data Integrity Verification
+```sql
+-- Check for orphaned orders (should be empty)
+SELECT COUNT(*) FROM trade_orders 
+WHERE trade_id NOT IN (SELECT trade_id FROM trades);
+
+-- Verify instrument metadata coverage
+SELECT exchange, symbol FROM trades 
+WHERE (exchange, symbol) NOT IN (SELECT exchange, symbol FROM instrument_metadata);
+```

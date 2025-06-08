@@ -26,10 +26,11 @@ decision_cache: Dict[str, Dict] = {}
 
 class DecisionRequest(BaseModel):
     user_id: str = DEFAULT_USER_ID
+    config_id: Optional[str] = None  # Config ID for universal trade lifecycle
     mode: str = "auto"  # "auto", "NEW_TRADE", or "MANAGE_TRADE"
     symbol: Optional[str] = None
     timeframes: Optional[List[str]] = None
-    config_name: str = "default"  # Configuration name to use
+    config_name: str = "default"  # Configuration name to use (legacy)
 
 
 class DecisionResponse(BaseModel):
@@ -106,6 +107,8 @@ async def generate_decision_task(
             # Check if user has active trades
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    # Note: For mode determination, we check all configs for the user
+                    # since mode should be determined by any open positions
                     cur.execute("""
                         SELECT COUNT(*) FROM trades 
                         WHERE user_id = %s AND trade_status = 'open'
@@ -182,23 +185,33 @@ async def analyze_market(request: DecisionRequest):
     decision_id = str(uuid.uuid4())
     
     try:
+        # Use provided config_id or resolve from config_name
+        if request.config_id:
+            config_id = request.config_id
+        else:
+            # Fallback to config_name resolution for backward compatibility
+            from decision.utils import get_config_id_by_name
+            config_id = get_config_id_by_name(request.user_id, request.config_name)
+            if not config_id:
+                raise HTTPException(status_code=404, detail=f"Configuration '{request.config_name}' not found")
+        
         # Determine mode automatically if set to "auto"
         actual_mode = request.mode
         if request.mode == "auto":
-            # Check if user has active trades
+            # Check if user has active trades for this specific config
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT COUNT(*) FROM trades 
-                        WHERE user_id = %s AND trade_status = 'open'
-                    """, (request.user_id,))
+                        WHERE user_id = %s AND config_id = %s AND trade_status = 'open'
+                    """, (request.user_id, config_id))
                     active_trades = cur.fetchone()[0]
                     actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
         
         # Run decision process synchronously (like working test)
         intent = await run_decision_process(
             user_id=request.user_id,
-            config_name=request.config_name,
+            config_id=config_id,  # Use resolved config_id
             symbol=request.symbol or "BTC/USD",  # Default symbol like working test
             timeframes=request.timeframes or ["15m", "1h", "4h"]  # Default timeframes like working test
         )
@@ -223,10 +236,10 @@ async def analyze_market(request: DecisionRequest):
         ).info(f"Decision generated: {actual_mode} - {intent.get('action')}")
         
         # Trigger Trading webhook after successful decision (Pipeline Pattern)  
-        # TEMPORARILY DISABLED for testing
-        # action = intent.get("action", "")
-        # if action != "no_action":
-        #     await trigger_trading_webhook(request.user_id, intent, decision_id)
+        # Only trigger for actionable decisions, skip no_action
+        action = intent.get("action", "")
+        if action != "no_action":
+            await trigger_trading_webhook(request.user_id, intent, decision_id)
         
         return DecisionResponse(
             decision_id=decision_id,
@@ -325,24 +338,26 @@ async def get_current_decision(user_id: str):
             # Get active trade info if in MANAGE_TRADE mode
             active_trade = None
             if state_data.get("mode") == "MANAGE_TRADE":
+                # Note: This shows the most recent active trade across all configs for the user
+                # Could be enhanced to filter by specific config if needed
                 cur.execute("""
                     SELECT 
-                        id, symbol, entry_price, 
-                        current_price, unrealized_pnl
+                        trade_id, symbol, entry_price, 
+                        unrealized_pnl
                     FROM trades
                     WHERE user_id = %s AND trade_status = 'open'
-                    ORDER BY created_at DESC
+                    ORDER BY opened_at DESC
                     LIMIT 1
                 """, (user_id,))
                 
                 trade_result = cur.fetchone()
                 if trade_result:
-                    trade_id, symbol, entry_price, current_price, pnl = trade_result
+                    trade_id, symbol, entry_price, pnl = trade_result
                     active_trade = {
                         "trade_id": str(trade_id),
                         "symbol": symbol,
                         "entry_price": float(entry_price) if entry_price else None,
-                        "current_price": float(current_price) if current_price else None,
+                        "current_price": None,  # Current price can be fetched from mark_price if needed
                         "unrealized_pnl": float(pnl) if pnl else 0
                     }
     

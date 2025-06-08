@@ -144,7 +144,7 @@ async def fetch_markets(exchange_id: str = None, user_id: str = None) -> list:
 
             # Clean the data for return
             cleaned_markets = []
-            for market in markets[:20]:  # Limit to 20 markets for manageable output
+            for market in markets:  # Return all markets
                 cleaned_market = {
                     "symbol": market.get('symbol'),
                     "base": market.get('base'),
@@ -759,7 +759,7 @@ async def create_limit_order(exchange_id: str, symbol: str, side: str, amount: f
         return {"error": "Missing required parameter: amount"}
         
     if price is None:
-        return {"error": "Missing required parameter: price"}
+        return {"error": "Missing required parameter: price - use create_market_buy_order or create_market_sell_order for market orders"}
         
     # Map symbol to exchange-specific format if needed
     mapped_symbol = map_symbol_for_exchange(exchange_id, symbol)

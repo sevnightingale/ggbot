@@ -67,14 +67,15 @@ class TradeCompiler:
         # Default risk rules
         defaults = {
             'max_leverage': 50,  # Maximum allowed leverage
-            'max_risk_per_trade_pct': 0.05,  # Maximum position size as % of equity
+            'max_risk_per_trade_pct': 0.05,  # Maximum risk as % of account balance (5%)
             'max_position_size_pct': 0.05,  # Maximum position size as % of account balance (5%)
             'allowed_order_types': [
                 'market', 'limit', 'stop', 'stopLimit', 
                 'takeProfit', 'takeProfitLimit'
             ],
             'min_equity_protection': 0.80,  # Protect 80% of equity from being used
-            'max_contracts_per_trade': 1000000  # Upper limit on contract size
+            'max_contracts_per_trade': 10000,  # REDUCED: Upper limit on contract size
+            'emergency_max_position_usd': 10000  # CRITICAL: Emergency circuit breaker ($10k max)
         }
         
         # Override defaults with any configured rules
@@ -344,9 +345,12 @@ class TradeCompiler:
             ]
             
             if is_order_tool and 'clientOrderId' not in final_params:
+                import uuid
+                
                 decision_id_str = str(intent_data.get('decision_id', ''))
-                timestamp = int(datetime.now().timestamp())
-                call_specific_id = f"{decision_id_str}-{call_index}-{timestamp}"
+                # Use UUID fragment for guaranteed uniqueness - prevents TP/SL collision issues
+                uuid_fragment = str(uuid.uuid4()).replace('-', '')[:12]
+                call_specific_id = f"{decision_id_str[:8]}-{call_index}-{uuid_fragment}"
                 
                 # Get max length from exchange info
                 max_len = market_info.get('limits', {}).get('order', {}).get('clientOrderIdMaxLength', 36)
@@ -692,75 +696,152 @@ class TradeCompiler:
                 f"Requested leverage {leverage} exceeds max allowed {max_leverage} by rule."
             )
 
-        # --- 2. Check position size against risk limits ---
+        # --- 2. Validate confidence score if provided ---
+        confidence = intent_data.get('confidence')
+        if confidence is not None:
+            try:
+                confidence = float(confidence)
+                if not (0.0 <= confidence <= 1.0):
+                    raise TradeCompilerValidationError(
+                        f"Confidence score {confidence} must be between 0.0 and 1.0"
+                    )
+                self.logger.info(f"✅ Confidence validation passed: {confidence:.2f}")
+            except (ValueError, TypeError):
+                raise TradeCompilerValidationError(
+                    f"Invalid confidence value: {confidence}. Must be a number between 0.0 and 1.0"
+                )
+        
+        # --- 3. Validate position size against risk limits (calculated by Trading API) ---
+        # The Trading API has already calculated safe position sizes based on confidence
+        # Here we just validate the final values don't exceed emergency limits
+        
+        # Extract account balance in USD for risk calculations
+        account_balance_usd = self._get_standardized_account_balance_usd(context)
+        
+        # Get calculated position size from Trading API
+        position_size_usd = intent_data.get('position_size_usd', 0)
+        collateral_amount = intent_data.get('collateral_amount', 0)
+        
+        if position_size_usd > 0:
+            # EMERGENCY CIRCUIT BREAKER: Absolute maximum position size
+            emergency_max_position = self.risk_rules.get('emergency_max_position_usd', 10000)
+            if position_size_usd > emergency_max_position:
+                raise TradeCompilerValidationError(
+                    f"🚨 EMERGENCY STOP: Position size ${position_size_usd:,.2f} exceeds emergency limit "
+                    f"${emergency_max_position:,.2f}. This is an unsafe position size!"
+                )
+            
+            # Check if position size is reasonable relative to account
+            if position_size_usd > account_balance_usd:
+                raise TradeCompilerValidationError(
+                    f"🚨 CRITICAL: Position size ${position_size_usd:,.2f} exceeds account balance "
+                    f"${account_balance_usd:,.2f}. This would risk more than the entire account!"
+                )
+            
+            self.logger.info(
+                f"✅ Position size validation passed: ${position_size_usd:,.2f} position "
+                f"({position_size_usd/account_balance_usd*100:.1f}% of account) within emergency limits"
+            )
+
+        # Legacy size validation for backward compatibility (optional)
         size_type = intent_data.get('size_type')
         size_value = intent_data.get('size_value')
-        equity = context.get('equity')  # Get equity from context
         
-        # Default position size check
-        if not size_type and not size_value:
-            # Not specifying size is allowed, will use default values
-            self.logger.info("No explicit size specified in intent, will use defaults")
-            return
+        if size_type or size_value:
+            self.logger.info("Legacy size parameters detected - confidence-based sizing takes precedence")
             
-        if size_type == 'percentage_equity':
-            # Position size as a percentage of equity
-            if not isinstance(size_value, (int, float)) or not 0 < size_value <= 1:
-                raise TradeCompilerValidationError(
-                    f"Invalid size_value '{size_value}' for percentage_equity. Must be a number between 0 and 1."
-                )
-                
-            max_risk_pct = self.risk_rules.get('max_risk_per_trade_pct', 0.05)
-            if size_value > max_risk_pct:
-                raise TradeCompilerValidationError(
-                    f"Requested size {size_value*100:.2f}% exceeds max risk per trade {max_risk_pct*100:.2f}%"
-                )
-                
-        elif size_type == 'fixed_usd':
-            # Fixed USD position size
-            if not isinstance(size_value, (int, float)) or size_value <= 0:
-                raise TradeCompilerValidationError(
-                    f"Invalid size_value '{size_value}' for fixed_usd. Must be a positive number."
-                )
-                
-            # Check against equity if available
-            if equity and isinstance(equity, (int, float)) and equity > 0:
-                max_risk_pct = self.risk_rules.get('max_risk_per_trade_pct', 0.05)
-                max_risk_amount = equity * max_risk_pct
-                
-                if size_value > max_risk_amount:
-                    # Could be warning or error depending on policy
-                    self.logger.warning(
-                        f"Fixed USD size {size_value} exceeds max risk of {max_risk_pct*100:.2f}% "
-                        f"of equity {equity} (${max_risk_amount:.2f})"
-                    )
-                    # Uncomment to enforce as error
-                    # raise TradeCompilerValidationError(
-                    #    f"Fixed USD size ${size_value} exceeds max risk of ${max_risk_amount:.2f}"
-                    # )
-                    
-        elif size_type == 'fixed_contracts':
-            # Fixed number of contracts
-            if not isinstance(size_value, (int, float)) or size_value <= 0:
-                raise TradeCompilerValidationError(
-                    f"Invalid size_value '{size_value}' for fixed_contracts. Must be a positive number."
-                )
-                
-            # Check against max contracts limit
-            max_contracts = self.risk_rules.get('max_contracts_per_trade', 1000000)
-            if size_value > max_contracts:
-                raise TradeCompilerValidationError(
-                    f"Requested contracts {size_value} exceeds max allowed {max_contracts}"
-                )
-                
-        elif size_type:
-            # Unknown size type
-            raise TradeCompilerValidationError(
-                f"Unsupported size_type: '{size_type}'. Supported types: percentage_equity, fixed_usd, fixed_contracts"
-            )
+        # Log successful completion of risk checks
+        self.logger.info("Risk validation completed successfully")
 
         self.logger.debug("Overall risk checks passed.")
 
+    def _get_standardized_account_balance_usd(self, context: Dict) -> float:
+        """
+        Extract standardized account balance in USD from context data.
+        
+        This method handles different exchange account structures and provides
+        a unified account balance for risk calculations.
+        
+        Args:
+            context: Context dictionary containing account state
+            
+        Returns:
+            Account balance in USD
+        """
+        try:
+            # Check if we have account state from the API
+            account_state = context.get('account_state')
+            
+            if account_state:
+                # Try different balance representations
+                
+                # 1. Look for direct USD balance
+                if 'balance_data' in account_state:
+                    balance_data = account_state['balance_data']
+                    
+                    # Check for total_usd_value (preferred)
+                    if 'total_usd_value' in balance_data:
+                        usd_balance = float(balance_data['total_usd_value'])
+                        self.logger.info(f"Using total_usd_value as account balance: ${usd_balance:,.2f}")
+                        return usd_balance
+                    
+                    # Check for available_btc and convert to USD (BitMEX style)
+                    if 'available_btc' in balance_data:
+                        available_btc = float(balance_data['available_btc'])
+                        # Use a conservative BTC price if we don't have current price
+                        # This should be improved to use real-time price
+                        btc_price = 104000  # Conservative estimate, should be updated
+                        usd_balance = available_btc * btc_price
+                        self.logger.info(f"Converted available_btc to USD: {available_btc} BTC × ${btc_price:,} = ${usd_balance:,.2f}")
+                        return usd_balance
+                
+                # 2. Look for available_margin in BTC and convert
+                if 'available_margin' in account_state:
+                    available_margin_btc = float(account_state['available_margin'])
+                    btc_price = 104000  # Conservative estimate
+                    usd_balance = available_margin_btc * btc_price
+                    self.logger.info(f"Using available_margin as account balance: {available_margin_btc} BTC × ${btc_price:,} = ${usd_balance:,.2f}")
+                    return usd_balance
+                
+                # 3. Look for equity
+                if 'equity' in account_state:
+                    equity_btc = float(account_state['equity'])
+                    btc_price = 104000  # Conservative estimate  
+                    usd_balance = equity_btc * btc_price
+                    self.logger.info(f"Using equity as account balance: {equity_btc} BTC × ${btc_price:,} = ${usd_balance:,.2f}")
+                    return usd_balance
+            
+            # Fallback: Look for equity in context (legacy)
+            equity = context.get('equity', 0)
+            if equity > 0:
+                # If equity is already in USD, use it
+                if equity > 1000:  # Assume values > 1000 are in USD
+                    self.logger.info(f"Using context equity as USD balance: ${equity:,.2f}")
+                    return float(equity)
+                else:
+                    # Assume it's in BTC, convert to USD
+                    btc_price = 104000  # Conservative estimate
+                    usd_balance = equity * btc_price
+                    self.logger.info(f"Converting context equity to USD: {equity} BTC × ${btc_price:,} = ${usd_balance:,.2f}")
+                    return usd_balance
+            
+            # Last resort: Use available_margin from context
+            available_margin = context.get('available_margin', 0)
+            if available_margin > 0:
+                if available_margin > 1000:  # Assume USD
+                    return float(available_margin)
+                else:  # Assume BTC
+                    btc_price = 104000
+                    return available_margin * btc_price
+            
+            # Emergency fallback: Use a safe minimum
+            self.logger.warning("Could not determine account balance from context, using emergency minimum of $1000")
+            return 1000.0
+            
+        except Exception as e:
+            self.logger.error(f"Error extracting standardized account balance: {e}")
+            # Emergency fallback
+            return 1000.0
 
     def _check_order_risk(self, final_params: Dict, intent_data: Dict, context: Dict, market_info: Dict) -> None:
         """
@@ -798,6 +879,49 @@ class TradeCompiler:
             # Convert parameters to correct types
             amount = float(amount)
             leverage = float(leverage)
+            
+            # 🚨 CRITICAL: CONTRACT COUNT VALIDATION
+            # This prevents the 375k contract catastrophe
+            
+            # Get standardized account balance for validation
+            account_balance_usd = self._get_standardized_account_balance_usd(context)
+            
+            # EMERGENCY CONTRACT COUNT LIMITS
+            max_contracts_absolute = self.risk_rules.get('max_contracts_per_trade', 100000)  # 100k absolute max
+            
+            if amount > max_contracts_absolute:
+                raise TradeCompilerValidationError(
+                    f"🚨 EMERGENCY STOP: Contract amount {amount:,.0f} exceeds absolute safety limit "
+                    f"{max_contracts_absolute:,.0f}. This is an unsafe order size!"
+                )
+            
+            # CRITICAL: Estimate USD value of contracts
+            # For BTC/USD on BitMEX: 1 contract ≈ $1 USD
+            estimated_usd_value = amount * 1.0  # Conservative $1 per contract estimate
+            
+            # Check if estimated USD value exceeds account balance
+            if estimated_usd_value > account_balance_usd:
+                raise TradeCompilerValidationError(
+                    f"🚨 CRITICAL: Contract value ~${estimated_usd_value:,.0f} ({amount:,.0f} contracts) "
+                    f"exceeds account balance ${account_balance_usd:,.2f}. "
+                    f"This would risk {estimated_usd_value/account_balance_usd*100:.1f}% of your account!"
+                )
+            
+            # Check against position size limits
+            max_position_pct = self.risk_rules.get('max_position_size_pct', 0.05)
+            max_position_usd = account_balance_usd * max_position_pct
+            
+            if estimated_usd_value > max_position_usd:
+                raise TradeCompilerValidationError(
+                    f"🚨 CRITICAL: Contract value ~${estimated_usd_value:,.0f} exceeds max position limit "
+                    f"${max_position_usd:,.2f} ({max_position_pct*100:.1f}% of account balance). "
+                    f"Reduce to max {max_position_usd:,.0f} contracts."
+                )
+            
+            self.logger.info(
+                f"✅ Contract validation passed: {amount:,.0f} contracts (~${estimated_usd_value:,.0f}) "
+                f"within {estimated_usd_value/account_balance_usd*100:.1f}% of account limit"
+            )
             
             # Get market information
             contract_size = market_info.get('contractSize', 1)

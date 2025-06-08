@@ -70,30 +70,30 @@ class AgentStatus(BaseModel):
 
 @app.get("/api/dashboard/{user_id}/positions")
 async def get_current_positions(user_id: str):
-    """Get current open positions for a user."""
+    """Get current open positions for a user (legacy API - kept for backward compatibility)."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT 
                     t.trade_id, 
-                    COALESCE(t.pair, t.pair_index) as symbol,
+                    t.symbol,
                     CASE 
-                        WHEN t.leverage > 0 THEN 'long'
-                        WHEN t.leverage < 0 THEN 'short'
+                        WHEN t.size_contracts > 0 THEN 'long'
+                        WHEN t.size_contracts < 0 THEN 'short'
                         ELSE 'unknown'
                     END as side,
                     t.collateral_amount as size,
                     t.entry_price,
-                    t.entry_price as current_price,  -- No current_price column yet
-                    0 as unrealized_pnl,  -- Calculate later
+                    COALESCE(t.mark_price, t.entry_price) as current_price,
+                    COALESCE(t.unrealized_pnl, 0) as unrealized_pnl,
                     t.stop_loss,
                     t.take_profit,
-                    t.decision_id,
-                    t.created_at
+                    t.config_id as decision_id,  -- Map config_id to decision_id for compatibility
+                    t.opened_at as created_at
                 FROM trades t
                 WHERE t.user_id = %s 
                   AND t.trade_status = 'open'
-                ORDER BY t.created_at DESC
+                ORDER BY t.opened_at DESC
             """, (user_id,))
             
             results = cur.fetchall()
@@ -143,6 +143,57 @@ async def get_current_positions(user_id: str):
     }
 
 
+@app.get("/api/dashboard/{user_id}/trades")
+async def get_current_trades(user_id: str):
+    """Get current trades via trade lifecycle system."""
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT 
+                    trade_id,
+                    symbol,
+                    side,
+                    trade_status as status,
+                    size_contracts,
+                    entry_price,
+                    COALESCE(mark_price, entry_price) as mark_price,
+                    unrealized_pnl,
+                    opened_at,
+                    closed_at,
+                    last_updated
+                FROM trades
+                WHERE user_id = %s
+                ORDER BY opened_at DESC
+            """, (user_id,))
+            
+            results = cur.fetchall()
+            trades = []
+            
+            for row in results:
+                (trade_id, symbol, side, status, size_contracts, 
+                 entry_price, mark_price, unrealized_pnl, 
+                 opened_at, closed_at, last_updated) = row
+                
+                trades.append({
+                    "trade_id": str(trade_id),
+                    "symbol": symbol,
+                    "side": side,
+                    "status": status,
+                    "size_contracts": float(size_contracts) if size_contracts else 0,
+                    "entry_price": float(entry_price) if entry_price else 0,
+                    "mark_price": float(mark_price) if mark_price else 0,
+                    "unrealized_pnl": float(unrealized_pnl) if unrealized_pnl else 0,
+                    "opened_at": opened_at.isoformat() + "Z" if opened_at else None,
+                    "closed_at": closed_at.isoformat() + "Z" if closed_at else None,
+                    "last_updated": last_updated.isoformat() + "Z" if last_updated else None
+                })
+            
+    return {
+        "trades": trades,
+        "total_trades": len(trades)
+    }
+
+
 @app.get("/api/dashboard/{user_id}/performance")
 async def get_performance_metrics(user_id: str, period: str = "7d"):
     """Get performance metrics for a user."""
@@ -165,7 +216,7 @@ async def get_performance_metrics(user_id: str, period: str = "7d"):
                     closed_at::date as date
                 FROM trades
                 WHERE user_id = %s
-                  AND status = 'closed'
+                  AND trade_status = 'closed'
                   AND closed_at >= %s
                 ORDER BY closed_at
             """, (user_id, start_date))
@@ -328,10 +379,10 @@ async def get_agent_status(user_id: str):
             active_positions = cur.fetchone()[0]
             
             cur.execute("""
-                SELECT created_at
+                SELECT opened_at as created_at
                 FROM trades
                 WHERE user_id = %s
-                ORDER BY created_at DESC
+                ORDER BY opened_at DESC
                 LIMIT 1
             """, (user_id,))
             

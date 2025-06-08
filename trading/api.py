@@ -37,22 +37,19 @@ from trading.engine import TradingEngine
 # Request/Response Models
 class TradingIntent(BaseModel):
     """
-    Semi-structured trading intent from Decision Module.
+    Confidence-based trading intent from Decision Module.
     
-    Note: We use flexible typing here because the Trading LLM will interpret
-    variations in field values. Strict validation happens at the tool call level,
-    not at the intent input level.
+    The Decision Module outputs market analysis with a confidence score,
+    and the Trading Module calculates position sizing based on that confidence.
     """
     decision_id: Optional[str] = Field(default_factory=lambda: str(uuid.uuid4()))
     action: str = Field(..., description="Trading action (e.g., 'enter_long', 'go long', 'buy')")
     symbol: str = Field(..., description="Trading symbol (e.g., 'BTC/USD', 'Bitcoin')")
     exchange: Optional[str] = Field(default="bitmex", description="Exchange name")
     timeframe: Optional[str] = Field(default="15m", description="Timeframe for analysis")
-    collateral_amount: Optional[float] = Field(None, description="Collateral amount in USD")
-    leverage: Optional[float] = Field(None, description="Leverage to use")
+    confidence: float = Field(..., description="Confidence score (0.0-1.0) from Decision Module")
     stop_loss_price: Optional[float] = Field(None, description="Stop loss price")
     take_profit_price: Optional[float] = Field(None, description="Take profit price")
-    confidence: Optional[float] = Field(None, description="Confidence score (0-1)")
     reasoning: Optional[str] = Field(None, description="Reasoning for the trade")
     
     class Config:
@@ -374,25 +371,53 @@ async def execute_trade(
         # Step 2: Convert Pydantic model to dict and add account state context
         intent_data = intent.model_dump()
         
-        # Step 3: Adjust position sizing based on available margin (like working test)
-        if account_state['available_margin'] > 0 and intent_data.get('collateral_amount'):
-            # Convert BTC margin to USD (approximate conversion)
-            btc_price_estimate = 110000  # Rough estimate, could be made dynamic
-            available_margin_usd = account_state['available_margin'] * btc_price_estimate
-            
-            requested_amount = intent_data['collateral_amount']
-            max_safe_amount = available_margin_usd * 0.5  # Use max 50% of available margin
-            
-            if requested_amount > max_safe_amount:
-                adjusted_amount = max_safe_amount
-                logger.bind(user_id=engine.user_id).warning(
-                    f"Adjusting position size from ${requested_amount:.2f} to ${adjusted_amount:.2f} "
-                    f"based on available margin (${available_margin_usd:.2f})"
-                )
-                intent_data['collateral_amount'] = adjusted_amount
-                intent_data['reasoning'] += f" [Adjusted from ${requested_amount:.2f} to ${adjusted_amount:.2f} due to margin limits]"
+        # Step 3: Standardize account balance
+        standardized_balance = _standardize_account_balance(account_state)
+        account_balance_usd = standardized_balance['account_balance_usd']
         
-        # Step 4: Add account state to intent for validation context
+        # Step 4: Calculate position size based on confidence
+        if intent_data.get('confidence') is not None:
+            confidence = intent_data['confidence']
+            
+            # Get risk configuration from user config or use defaults
+            # TODO: Load from user configuration when available
+            default_leverage = 10
+            min_position_usd = 100.0
+            max_position_usd = 10000.0
+            
+            # Calculate position based on confidence
+            position_calc = calculate_position_from_confidence(
+                confidence=confidence,
+                account_balance_usd=account_balance_usd,
+                default_leverage=default_leverage,
+                min_position_usd=min_position_usd,
+                max_position_usd=max_position_usd
+            )
+            
+            # Add calculated values to intent data
+            intent_data['collateral_amount'] = position_calc['collateral_amount']
+            intent_data['leverage'] = position_calc['leverage']
+            intent_data['risk_percentage'] = position_calc['risk_percentage']
+            intent_data['position_size_usd'] = position_calc['position_size_usd']
+            
+            logger.bind(user_id=engine.user_id).info(
+                f"📊 Position sized from confidence {confidence:.2f}: "
+                f"${position_calc['collateral_amount']:.2f} collateral "
+                f"({position_calc['risk_percentage']:.1f}% risk) "
+                f"@ {position_calc['leverage']}x leverage"
+            )
+        else:
+            # Fallback if confidence not provided
+            logger.bind(user_id=engine.user_id).warning(
+                "No confidence score provided, using minimal position"
+            )
+            intent_data['confidence'] = 0.5  # Default moderate confidence
+            intent_data['collateral_amount'] = 100.0  # Minimum position
+            intent_data['leverage'] = 10
+            intent_data['risk_percentage'] = 0.1
+            intent_data['position_size_usd'] = 1000.0
+        
+        # Step 5: Add account state to intent for validation context
         intent_data['_account_state'] = account_state
         
         # Add context for risk validation (pass both equity and available_margin)
@@ -403,12 +428,12 @@ async def execute_trade(
             "timestamp": datetime.utcnow().timestamp()
         }
         
-        # Step 5: Process through the trading engine
+        # Step 6: Process through the trading engine
         result = await engine.process_decision_intent(intent_data)
         
         # Map engine response to API response
         if result.get("status") == "success":
-            # Step 6: Trigger monitoring update to confirm execution
+            # Step 7: Trigger monitoring update to confirm execution
             try:
                 monitoring = HybridMonitoringService(engine.user_id)
                 
@@ -445,10 +470,19 @@ async def execute_trade(
                 logger.bind(user_id=engine.user_id).error(f"Monitoring verification failed: {e}")
                 # Don't fail the trade response, just log the monitoring error
             
+            # Serialize execution_result to dict if it's an object
+            execution_result = result.get("execution_result")
+            if execution_result and hasattr(execution_result, '__dict__'):
+                execution_data = execution_result.__dict__
+            elif execution_result and hasattr(execution_result, 'model_dump'):
+                execution_data = execution_result.model_dump()
+            else:
+                execution_data = execution_result
+            
             return ExecutionResponse(
                 status="success",
                 trade_id=result.get("trade_id"),
-                data=result.get("execution_result"),
+                data=execution_data,
                 details=result.get("details")
             )
         elif result.get("status") == "rejected":
@@ -646,6 +680,209 @@ def main():
         reload=os.environ.get("DEBUG") == "1",
         log_level="info"
     )
+
+
+def confidence_to_risk_percentage(confidence: float) -> float:
+    """
+    Map confidence score to risk percentage using tiered system.
+    
+    0.0-0.1 = 0.5%
+    0.1-0.2 = 1.0%
+    0.2-0.3 = 1.5%
+    ...
+    0.9-1.0 = 5.0%
+    
+    Args:
+        confidence: Confidence score from 0.0 to 1.0
+        
+    Returns:
+        Risk percentage (0.5 to 5.0)
+    """
+    # Ensure confidence is within bounds
+    confidence = max(0.0, min(1.0, confidence))
+    
+    # Calculate tier (0-9)
+    tier = min(9, int(confidence * 10))
+    
+    # Map to risk percentage (0.5% increments)
+    risk_percentage = (tier + 1) * 0.5
+    
+    logger.info(f"Confidence {confidence:.2f} → Tier {tier} → Risk {risk_percentage}%")
+    return risk_percentage
+
+
+def calculate_position_from_confidence(
+    confidence: float,
+    account_balance_usd: float,
+    default_leverage: int = 10,
+    min_position_usd: float = 100.0,
+    max_position_usd: float = 10000.0
+) -> Dict[str, float]:
+    """
+    Calculate position size based on confidence score and account balance.
+    
+    Args:
+        confidence: Confidence score from Decision module (0.0-1.0)
+        account_balance_usd: Account balance in USD
+        default_leverage: Default leverage to use (default: 10x)
+        min_position_usd: Minimum position size in USD
+        max_position_usd: Maximum position size (emergency cap)
+        
+    Returns:
+        Dictionary with position calculations:
+        {
+            'risk_percentage': float,      # Percentage of account to risk
+            'risk_amount_usd': float,      # USD amount to risk (collateral)
+            'leverage': int,               # Leverage multiplier
+            'position_size_usd': float,    # Total position size
+            'contracts': float             # Estimated contracts (if applicable)
+        }
+    """
+    # Get risk percentage from confidence
+    risk_percentage = confidence_to_risk_percentage(confidence)
+    
+    # Calculate risk amount (collateral)
+    risk_amount_usd = account_balance_usd * (risk_percentage / 100.0)
+    
+    # Calculate total position size
+    position_size_usd = risk_amount_usd * default_leverage
+    
+    # Apply minimum position size
+    if position_size_usd < min_position_usd:
+        logger.warning(
+            f"Position size ${position_size_usd:.2f} below minimum ${min_position_usd:.2f}, "
+            f"adjusting to minimum"
+        )
+        position_size_usd = min_position_usd
+        risk_amount_usd = position_size_usd / default_leverage
+        risk_percentage = (risk_amount_usd / account_balance_usd) * 100.0
+    
+    # Apply maximum position size (emergency cap)
+    if position_size_usd > max_position_usd:
+        logger.warning(
+            f"Position size ${position_size_usd:.2f} exceeds maximum ${max_position_usd:.2f}, "
+            f"capping at maximum"
+        )
+        position_size_usd = max_position_usd
+        risk_amount_usd = position_size_usd / default_leverage
+        risk_percentage = (risk_amount_usd / account_balance_usd) * 100.0
+    
+    # For BitMEX, estimate contracts (1 contract ≈ $1)
+    estimated_contracts = risk_amount_usd
+    
+    logger.info(
+        f"Position calculation: Confidence {confidence:.2f} → "
+        f"Risk {risk_percentage:.1f}% (${risk_amount_usd:.2f}) → "
+        f"Position ${position_size_usd:.2f} @ {default_leverage}x leverage"
+    )
+    
+    return {
+        'risk_percentage': risk_percentage,
+        'risk_amount_usd': risk_amount_usd,
+        'collateral_amount': risk_amount_usd,  # Same as risk amount
+        'leverage': default_leverage,
+        'position_size_usd': position_size_usd,
+        'contracts': estimated_contracts
+    }
+
+
+def _standardize_account_balance(account_state: Dict) -> Dict:
+    """
+    Standardize account balance from various exchange formats to unified USD format.
+    
+    This function handles different exchange account structures (BitMEX, Binance, etc.)
+    and provides a unified account balance representation for risk calculations.
+    
+    Args:
+        account_state: Raw account state from exchange
+        
+    Returns:
+        Dictionary with standardized balance information:
+        {
+            'account_balance_usd': float,     # Primary balance for risk calculations
+            'available_margin_usd': float,    # Available for new positions
+            'equity_usd': float,             # Net account value
+            'used_margin_usd': float,        # Currently used margin
+            'btc_price_used': float          # BTC price used for conversion
+        }
+    """
+    try:
+        # Use current BTC price (conservative estimate)
+        # TODO: Get real-time price from market data
+        btc_price = 104000  # Conservative estimate based on recent market price
+        
+        result = {
+            'account_balance_usd': 0.0,
+            'available_margin_usd': 0.0,
+            'equity_usd': 0.0,
+            'used_margin_usd': 0.0,
+            'btc_price_used': btc_price
+        }
+        
+        # Handle BitMEX account structure
+        if 'balance_data' in account_state:
+            balance_data = account_state['balance_data']
+            
+            # Prefer total_usd_value if available (most accurate)
+            if 'total_usd_value' in balance_data:
+                result['account_balance_usd'] = float(balance_data['total_usd_value'])
+                result['available_margin_usd'] = result['account_balance_usd']  # Assume fully available
+                result['equity_usd'] = result['account_balance_usd']
+                logger.info(f"Using total_usd_value: ${result['account_balance_usd']:,.2f}")
+                return result
+            
+            # Convert BTC balances to USD
+            if 'available_btc' in balance_data:
+                available_btc = float(balance_data['available_btc'])
+                result['account_balance_usd'] = available_btc * btc_price
+                result['available_margin_usd'] = result['account_balance_usd']
+                result['equity_usd'] = result['account_balance_usd']
+                logger.info(f"Converted available_btc: {available_btc:.8f} BTC × ${btc_price:,} = ${result['account_balance_usd']:,.2f}")
+                return result
+        
+        # Handle direct BTC fields (BitMEX style)
+        if 'available_margin' in account_state:
+            available_margin_btc = float(account_state['available_margin'])
+            result['account_balance_usd'] = available_margin_btc * btc_price
+            result['available_margin_usd'] = result['account_balance_usd']
+            
+            # Handle equity separately if available
+            if 'equity' in account_state:
+                equity_btc = float(account_state['equity'])
+                result['equity_usd'] = equity_btc * btc_price
+            else:
+                result['equity_usd'] = result['account_balance_usd']
+            
+            logger.info(f"Converted available_margin: {available_margin_btc:.8f} BTC × ${btc_price:,} = ${result['account_balance_usd']:,.2f}")
+            return result
+        
+        # Handle direct equity field
+        if 'equity' in account_state:
+            equity_btc = float(account_state['equity'])
+            result['account_balance_usd'] = equity_btc * btc_price
+            result['available_margin_usd'] = result['account_balance_usd']
+            result['equity_usd'] = result['account_balance_usd']
+            logger.info(f"Converted equity: {equity_btc:.8f} BTC × ${btc_price:,} = ${result['account_balance_usd']:,.2f}")
+            return result
+        
+        # Emergency fallback
+        logger.warning("Could not extract account balance from account_state, using emergency minimum")
+        result['account_balance_usd'] = 1000.0  # Emergency minimum
+        result['available_margin_usd'] = 1000.0
+        result['equity_usd'] = 1000.0
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Error standardizing account balance: {e}")
+        # Emergency fallback
+        return {
+            'account_balance_usd': 1000.0,
+            'available_margin_usd': 1000.0,
+            'equity_usd': 1000.0,
+            'used_margin_usd': 0.0,
+            'btc_price_used': 104000
+        }
 
 
 if __name__ == "__main__":

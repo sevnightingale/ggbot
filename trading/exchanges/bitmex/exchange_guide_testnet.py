@@ -49,10 +49,14 @@ MINIMUM ORDER SIZES:
 - Exception: BTC/USD requires 100 contract minimum due to precision settings{min_amount_note}
 - Decimal amounts: Automatically rounded down to nearest whole contract
 
-SUPPORTED ORDER TYPES:
+SUPPORTED ORDER TYPES AND TOOLS:
 - market: Immediate execution at current market price
+  → Use create_market_buy_order or create_market_sell_order
+  → NEVER use create_limit_order with null/empty price
 - limit: Orders at specific price levels  
+  → Use create_limit_order with valid price parameter
 - stop: Stop orders - use create_limit_order with params={{"stopPx": trigger_price, "execInst": "Close"}}
+  → Use create_limit_order with both price and stopPx parameters
 - Note: stopLimit orders are NOT supported
 - Note: reduce_only orders use regular orders with params={{"reduceOnly": true}}
 - IMPORTANT: Do NOT use create_stop_order - it's not properly implemented in the MCP
@@ -80,14 +84,25 @@ TESTNET LIMITATIONS:
 - set_leverage may fail with "Isolated margin not supported" error
 - Account balances are test funds only
 
+TOOL SELECTION RULES:
+1. For MARKET ORDERS (immediate execution):
+   - Buy position: Use create_market_buy_order  
+   - Sell position: Use create_market_sell_order
+   - NEVER use create_limit_order with price=null/empty
+2. For LIMIT ORDERS (specific price):
+   - Use create_limit_order with valid price parameter
+3. For STOP ORDERS (triggered orders):
+   - Use create_limit_order with both price and stopPx parameters
+
 COMMON PATTERNS:
 1. For new positions: Skip set_leverage call - testnet uses cross margin at 100x by default
 2. For stop losses: Use create_limit_order with price=stop_price and params={{"stopPx": stop_price, "execInst": "Close", "triggerDirection": "below"}}
-3. Position closing: Use create_market_order with params={{"reduceOnly": true}}
+3. Position closing: Use create_market_sell_order with params={{"reduceOnly": true}}
 4. Contract sizing: All amounts are in contracts, not USD values
 5. Position sizing with leverage intent:
-   - If intent says "$1000 collateral at 10x leverage" = $10,000 position
-   - For BTC/USD: $10,000 position = 10,000 contracts (since 1 contract = $1)
+   - Use 'position_size_usd' directly from intent for contract calculation
+   - For BTC/USD: contracts = position_size_usd (since 1 contract = $1)
+   - Formula: BTC/USD contracts = position_size_usd value
 
 ERROR HANDLING:
 - "amount...must be greater than minimum": Increase to minimum (100 for BTC, 1 for others)

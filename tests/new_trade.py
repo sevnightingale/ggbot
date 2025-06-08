@@ -1,12 +1,12 @@
 #!/usr/bin/env python
 """
-End-to-End Pipeline Integration Test
+New Trade Pipeline Test
 
-This test exercises the complete GGBot pipeline via API calls:
+This test exercises the complete GGBot pipeline for new trade entry:
 1. Extraction API - Fetch market data and indicators
-2. Decision API - Analyze data and generate trading intent
+2. Decision API - Analyze data and generate trading intent (NEW_TRADE mode)
 3. Trading API - Execute trade on exchange
-4. Monitoring - Verify position updates
+4. Monitoring - Verify position updates and strategy_runs creation
 
 This uses the combined API server (main_api.py) running on port 8000.
 """
@@ -17,6 +17,7 @@ import asyncio
 import time
 import json
 import requests
+import psycopg2
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, List
@@ -29,29 +30,28 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from core.common.logging_config import setup_logging, logger
 log_file = setup_logging()
 
+# Import database configuration for strategy_runs verification
+from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+
 # Load environment variables from .env file
 load_dotenv()
 
-# Import monitoring service
+# Import monitoring service and trade lifecycle manager
 from core.monitoring.service import AccountMonitoringService
+from trading.lifecycle_manager import TradeLifecycleManager
 
 # Configuration
 API_BASE_URL = "http://localhost:8000"
 DEFAULT_USER_ID = "00000000-0000-0000-0000-000000000001"
+DEFAULT_CONFIG_ID = "a93de31b-9b8a-42e3-827d-c31e580f5f36"  # Config ID for universal trade lifecycle
 TEST_SYMBOL = "BTC/USDT"  # Standard symbol - will be mapped to BTC/USDT:USDT for BitMEX
 TEST_TIMEFRAMES = ["15m", "1h"]
 TEST_EXCHANGE = "bitmex"
 
-# Test scenarios
-SCENARIOS = {
-    "new_trade": {
-        "description": "No positions → Entry signal → Execute trade",
-        "expected_flow": ["extraction", "decision", "trading", "position_created"]
-    },
-    "manage_trade": {
-        "description": "Existing position → Monitor → Adjust/Close",
-        "expected_flow": ["extraction", "decision", "trading", "position_updated"]
-    }
+# Test scenario
+SCENARIO = {
+    "description": "No positions → Entry signal → Execute trade",
+    "expected_flow": ["extraction", "decision", "trading", "position_created"]
 }
 
 
@@ -182,6 +182,7 @@ def trigger_decision_analysis(user_id: str = DEFAULT_USER_ID, mode: str = "auto"
     
     payload = {
         "user_id": user_id,
+        "config_id": DEFAULT_CONFIG_ID,  # Add config_id for universal trade lifecycle
         "mode": mode,
         "symbol": TEST_SYMBOL,
         "timeframes": TEST_TIMEFRAMES
@@ -208,6 +209,10 @@ def execute_trade(intent: Dict[str, Any], user_id: str = DEFAULT_USER_ID) -> Dic
     """Execute trade via Trading API."""
     log(f"Executing trade: {intent['action']}...")
     
+    # Ensure config_id is included in the intent for universal trade lifecycle
+    if 'config_id' not in intent:
+        intent['config_id'] = DEFAULT_CONFIG_ID
+    
     response = requests.post(
         f"{API_BASE_URL}/trading/trade/execute",
         json=intent,
@@ -224,31 +229,167 @@ def execute_trade(intent: Dict[str, Any], user_id: str = DEFAULT_USER_ID) -> Dic
         raise Exception(f"Trade execution failed: {response.text}")
 
 
-def check_positions(user_id: str = DEFAULT_USER_ID) -> List[Dict[str, Any]]:
-    """Check current positions via Dashboard API."""
-    log("Checking positions...")
+def check_trades(user_id: str = DEFAULT_USER_ID) -> List[Dict[str, Any]]:
+    """Check current trades via Dashboard API (trade lifecycle system)."""
+    log("Checking trades via Dashboard API (trade lifecycle system)...")
     
     response = requests.get(
-        f"{API_BASE_URL}/dashboard/api/dashboard/{user_id}/positions",
+        f"{API_BASE_URL}/dashboard/api/dashboard/{user_id}/trades",
         timeout=10
     )
     
     if response.status_code == 200:
         data = response.json()
-        # The dashboard API returns a dict with 'positions' key
-        positions = data.get('positions', [])
-        log(f"✓ Found {len(positions)} positions")
+        trades = data.get('trades', [])
+        log(f"✓ Found {len(trades)} trades in database")
         
-        for pos in positions:
-            log(f"  {pos['symbol']}: {pos.get('size', pos.get('contracts', 0))} contracts @ {pos.get('entry_price', 'N/A')}")
+        for trade in trades:
+            log(f"  {trade['symbol']}: {trade.get('size_contracts', 0)} contracts, status: {trade.get('status', 'unknown')}")
         
-        return positions
+        return trades
     else:
-        log(f"✗ Failed to get positions: {response.text}", "ERROR")
+        log(f"✗ Failed to get trades: {response.text}", "ERROR")
         return []
 
 
-def run_new_trade_scenario():
+def verify_strategy_runs(trade_id: str) -> bool:
+    """
+    Verify strategy_runs entries were created for the trade in the universal lifecycle system.
+    
+    Args:
+        trade_id: The trade ID to verify
+        
+    Returns:
+        True if strategy_runs entries exist, False otherwise
+    """
+    log(f"Verifying strategy_runs entries for trade {trade_id}...")
+    
+    try:
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT scenario, confidence_score, reasoning_log, created_at
+                FROM strategy_runs
+                WHERE trade_id = %s AND config_id = %s
+                ORDER BY created_at
+            """, (trade_id, DEFAULT_CONFIG_ID))
+            
+            results = cursor.fetchall()
+            
+            if results:
+                log(f"✓ Found {len(results)} strategy_runs entries:")
+                for scenario, confidence, reasoning, created_at in results:
+                    log(f"  - {scenario}: confidence={confidence}, created={created_at}")
+                    if reasoning:
+                        log(f"    Reasoning: {reasoning[:100]}...")
+                return True
+            else:
+                log("✗ No strategy_runs entries found", "WARN")
+                return False
+                
+    except Exception as e:
+        log(f"✗ Error checking strategy_runs: {e}", "ERROR")
+        return False
+    finally:
+        if 'conn' in locals():
+            conn.close()
+
+
+async def verify_exchange_sync(user_id: str = DEFAULT_USER_ID) -> Dict[str, Any]:
+    """Verify exchange positions and sync with trade lifecycle system."""
+    log("Verifying exchange positions and syncing trade lifecycle...")
+    
+    try:
+        # Get credentials from environment (consistent with setup_monitoring)
+        api_key = os.getenv('EXCHANGE_API')
+        secret = os.getenv('EXCHANGE_SECRET')
+        
+        if not api_key or not secret:
+            log("⚠️ Exchange credentials not found - cannot verify real positions", "WARN")
+            log("  Set EXCHANGE_API and EXCHANGE_SECRET environment variables")
+            return {
+                'total_positions': 0,
+                'trades_opened': 0,
+                'trades_updated': 0,
+                'trades_closed': 0,
+                'sync_errors': 0,
+                'account_updated': False,
+                'position_sync_performed': False,
+                'error': 'No credentials available'
+            }
+        
+        credentials = {
+            'apiKey': api_key,
+            'secret': secret
+        }
+        
+        # Create monitoring service
+        monitor = AccountMonitoringService(
+            user_id=user_id,
+            config_id=DEFAULT_CONFIG_ID,
+            exchange_name="bitmex",
+            credentials=credentials,
+            testnet=True
+        )
+        
+        # Create exchange connection and get fresh state
+        try:
+            monitor.exchange = await monitor._create_exchange_client()
+            result = await monitor._update_account_state()
+            
+            # Also verify trade lifecycle sync separately
+            lifecycle_positions = await monitor.adapter.get_positions_for_lifecycle(monitor.exchange)
+            lifecycle_manager = TradeLifecycleManager(user_id, "bitmex", DEFAULT_CONFIG_ID)
+            sync_results = await lifecycle_manager.sync_positions_to_trades(lifecycle_positions, monitor.adapter)
+            
+            # Update with lifecycle sync results
+            result.update({
+                'trades_opened': sync_results['trades_opened'],
+                'trades_updated': sync_results['trades_updated'], 
+                'trades_closed': sync_results['trades_closed'],
+                'sync_errors': len(sync_results['errors'])
+            })
+            
+            # Log results including trade lifecycle sync
+            log(f"✓ Exchange verification and trade lifecycle sync complete:")
+            log(f"  - Live positions on exchange: {result['total_positions']}")
+            log(f"  - Trade lifecycle: {result['trades_opened']} opened, {result['trades_updated']} updated, {result['trades_closed']} closed")
+            log(f"  - Sync errors: {result['sync_errors']}")
+            log(f"  - Account state updated: {result['account_updated']}")
+            
+            return result
+            
+        finally:
+            # Always ensure exchange connection is closed
+            if hasattr(monitor, 'exchange') and monitor.exchange:
+                try:
+                    await monitor.exchange.close()
+                    monitor.exchange = None
+                except Exception as cleanup_error:
+                    log(f"⚠️ Error closing exchange connection: {cleanup_error}", "WARN")
+        
+    except Exception as e:
+        log(f"✗ Exchange verification failed: {e}", "ERROR")
+        return {
+            'total_positions': 0,
+            'trades_opened': 0,
+            'trades_updated': 0,
+            'trades_closed': 0,
+            'sync_errors': 1,
+            'account_updated': False,
+            'position_sync_performed': False,
+            'error': str(e)
+        }
+
+
+async def run_new_trade_scenario():
     """Test scenario: No positions → Entry signal → Execute trade."""
     log("\n" + "="*60)
     log("Running NEW TRADE scenario")
@@ -283,101 +424,63 @@ def run_new_trade_scenario():
             return True
         
         # Step 5: Execute trade if we have an entry signal
-        # Our new architecture uses 'process_llm_decision' action
-        if intent.get("action") in ["open_position", "process_llm_decision"]:
+        # Check for actual trading actions (not no_action)
+        if intent.get("action") in ["long", "short", "add", "reduce", "close", "adjust_stops", "process_llm_decision"]:
             trade_result = execute_trade(intent)
             
             # Step 6: Wait for position to be created
             time.sleep(5)
             
-            # Step 7: Verify position exists
-            positions = check_positions()
+            # Step 7: Verify trade success AND final system state via exchange
+            log("\n🔍 Verifying trade success and final system state via exchange...")
+            exchange_result = await verify_exchange_sync()
             
-            if positions:
+            # Check database trades via trade lifecycle system
+            db_trades = check_trades()
+            
+            # Verify strategy_runs entries for universal trade lifecycle
+            strategy_runs_verified = False
+            # Check both old and new field names for compatibility
+            trade_status = trade_result.get('trade_status') or trade_result.get('status')
+            trade_id = trade_result.get('trade_id')
+            
+            if trade_status == 'success' and trade_id:
+                strategy_runs_verified = verify_strategy_runs(trade_id)
+            else:
+                log(f"⚠️ Trade execution had issues: status={trade_status}, trade_id={trade_id}", "WARN")
+                log(f"Full trade result: {trade_result}", "DEBUG")
+            
+            # Add rate limiting delay before any future calls
+            await asyncio.sleep(2)
+            
+            # Success criteria: Real position exists on exchange AND trade lifecycle synced AND strategy_runs created
+            if exchange_result['total_positions'] > 0 and strategy_runs_verified:
                 log("✅ NEW TRADE scenario completed successfully!")
+                log(f"  - Real exchange positions: {exchange_result['total_positions']}")
+                log(f"  - Database trades: {len(db_trades)}")
+                log(f"  - Trade lifecycle: {exchange_result['trades_opened']} opened, {exchange_result['trades_updated']} updated")
+                log(f"  - Strategy runs: VERIFIED ✓")
+                log(f"  - Sync errors: {exchange_result['sync_errors']}")
+                log("📊 Final system state: CLEAN - database matches exchange reality via universal trade lifecycle")
                 return True
             else:
-                log("⚠️ Trade executed but no position found", "WARN")
+                log("❌ NEW TRADE scenario failed")
+                log(f"  - Exchange positions: {exchange_result['total_positions']}")
+                log(f"  - Database trades: {len(db_trades)}")
+                log(f"  - Strategy runs verified: {strategy_runs_verified}")
+                log(f"  - Trade lifecycle sync performed: {exchange_result['position_sync_performed']}")
+                if len(db_trades) > 0 and not strategy_runs_verified:
+                    log("  ⚠️ Database shows trades but no strategy_runs - missing decision audit trail")
                 return False
         else:
             log(f"Unexpected intent action: {intent.get('action')}")
+            log("Valid actions are: long, short, add, reduce, close, adjust_stops, no_action, process_llm_decision")
             return False
             
     except Exception as e:
         log(f"❌ NEW TRADE scenario failed: {e}", "ERROR")
         return False
 
-
-def run_manage_trade_scenario():
-    """Test scenario: Existing position → Monitor → Adjust/Close."""
-    log("\n" + "="*60)
-    log("Running MANAGE TRADE scenario")
-    log("="*60)
-    
-    try:
-        # First check if we have any positions
-        positions = check_positions()
-        
-        if not positions:
-            log("No existing positions to manage.")
-            log("⚠️ MANAGE TRADE scenario requires an existing position", "WARN")
-            log("Skipping this scenario - no retry logic to avoid duplicate trades")
-            return False
-        
-        # Now we have a position to manage
-        log(f"Managing {len(positions)} existing positions")
-        
-        # Step 1: Trigger extraction for latest data
-        extraction_result = trigger_extraction()
-        
-        # Step 2: Wait for extraction
-        if not wait_for_extraction(extraction_result["extraction_id"]):
-            raise Exception("Extraction failed or timed out")
-        
-        # Step 3: Trigger decision analysis in MANAGE mode
-        decision_result = trigger_decision_analysis(mode="MANAGE_TRADE")
-        
-        intent = decision_result.get("intent", {})
-        log(f"Management decision: {intent.get('action')}")
-        
-        # Step 4: Execute management action if needed
-        if intent.get("action") in ["adjust_position", "close_position", "update_stops", "open_position"]:
-            trade_result = execute_trade(intent)
-            
-            # Step 5: Wait for execution
-            time.sleep(5)
-            
-            # Step 6: Verify position changes
-            new_positions = check_positions()
-            
-            if intent.get("action") == "close_position" and not new_positions:
-                log("✅ Position successfully closed")
-            elif intent.get("action") in ["adjust_position", "update_stops"] and new_positions:
-                log("✅ Position successfully adjusted")
-            
-            log("✅ MANAGE TRADE scenario completed successfully!")
-            return True
-        
-        elif intent.get("action") == "hold_position":
-            log("✅ Decision: Hold position - no changes needed")
-            return True
-        
-        else:
-            log(f"Unexpected management action: {intent.get('action')}")
-            return False
-            
-    except Exception as e:
-        log(f"❌ MANAGE TRADE scenario failed: {e}", "ERROR")
-        return False
-
-
-async def run_error_scenario():
-    """Skip error handling tests to avoid spawning background processes."""
-    log("\n" + "="*60)
-    log("SKIPPING ERROR HANDLING scenario")
-    log("="*60)
-    log("Skipping error tests to avoid spawning background extraction processes")
-    return True  # Just mark as passed
 
 
 async def setup_monitoring():
@@ -402,7 +505,7 @@ async def setup_monitoring():
         
         monitor = AccountMonitoringService(
             user_id=DEFAULT_USER_ID,
-            config_id="a93de31b-9b8a-42e3-827d-c31e580f5f36",  # From database
+            config_id=DEFAULT_CONFIG_ID,
             exchange_name="bitmex",
             credentials=credentials,
             testnet=True
@@ -411,11 +514,13 @@ async def setup_monitoring():
         # Create exchange client (required for _update_account_state)
         monitor.exchange = await monitor._create_exchange_client()
         
-        # Update account state once to populate database
+        # Update account state and reconcile trades
         log("Updating account state from exchange...")
-        await monitor._update_account_state()
+        result = await monitor._update_account_state()
         
-        log("✓ Account monitoring initialized and database updated")
+        log(f"✓ Account monitoring initialized and database updated")
+        log(f"  - Position sync performed: {result['position_sync_performed']}")
+        log(f"  - Trade lifecycle: {result['trades_opened']} opened, {result['trades_updated']} updated, {result['trades_closed']} closed")
         
         # Close the exchange connection (we only needed one update)
         if monitor.exchange:
@@ -431,10 +536,12 @@ async def setup_monitoring():
 
 
 async def async_main():
-    """Run all integration test scenarios."""
-    log("🚀 Starting GGBot Pipeline Integration Tests")
+    """Run the new trade pipeline test."""
+    log("🚀 Starting New Trade Pipeline Test")
     log(f"API Base URL: {API_BASE_URL}")
     log(f"Test User ID: {DEFAULT_USER_ID}")
+    log(f"Test Config ID: {DEFAULT_CONFIG_ID}")
+    log(f"Test Scenario: {SCENARIO['description']}")
     
     # Check API health first
     if not check_api_health():
@@ -447,26 +554,24 @@ async def async_main():
     if monitor:
         log("Account monitoring ready for test execution")
     
-    # Small delay to ensure data is committed
-    await asyncio.sleep(2)
+    # Rate limiting delay to avoid overwhelming exchange API
+    log("⏱️ Rate limiting delay...")
+    await asyncio.sleep(3)
     
-    # Run ONLY the new trade scenario - ONE TIME ONLY
-    log("\n🎯 RUNNING SINGLE TEST: New Trade Scenario\n")
+    # Run the new trade scenario
+    log("\n🎯 RUNNING NEW TRADE TEST\n")
     
-    # Run the test ONCE
-    new_trade_passed = run_new_trade_scenario()
-    
-    # That's it. No more tests. No retries. No loops. DONE.
+    new_trade_passed = await run_new_trade_scenario()
     
     # Summary
     log("\n" + "="*60)
-    log("TEST COMPLETE")
+    log("NEW TRADE TEST COMPLETE")
     log("="*60)
     
     if new_trade_passed:
-        log("\n🎉 Pipeline test PASSED!")
+        log("\n🎉 New trade test PASSED!")
     else:
-        log("\n❌ Pipeline test FAILED!")
+        log("\n❌ New trade test FAILED!")
     
     log("\nTest execution complete. Exiting.")
 

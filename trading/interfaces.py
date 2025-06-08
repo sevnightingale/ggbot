@@ -43,6 +43,23 @@ class TradeStatus(Enum):
     ERROR = 'error'      # Error during trade execution or management
 
 
+# Enhanced position dictionary format for trade lifecycle:
+# {
+#     "exchange": str,                    # 'bitmex', 'binance', etc.
+#     "account_id": str,                  # 'main' or sub-account id
+#     "symbol": str,                      # 'BTC/USD' (standardized)
+#     "side": Optional[str],              # None for net exchanges (BitMEX), 'long'/'short' for hedge
+#     "size_contracts": float,            # Primary field - raw contract count
+#     "mark_price": float,                # Current market price
+#     "entry_price": float,               # Average entry price from exchange
+#     "unrealized_pnl": float,            # Current unrealized P&L
+#     "leverage": Optional[float],        # Leverage multiplier
+#     "liquidation_price": Optional[float], # Liquidation price
+#     "margin_mode": str,                 # 'cross' or 'isolated'
+#     "timestamp": float,                 # Unix timestamp in milliseconds
+# }
+
+
 class TradingInterface(ABC):
     """
     Interface for the trading components.

@@ -77,6 +77,13 @@ The central facade that orchestrates the overall trading flow:
 - Monitors for stop-loss and take-profit conditions
 - Maintains trade history and statistics
 
+#### TradeLifecycleManager
+- **Position-Based Trade Sync**: Automatically creates/updates/closes trades based on exchange positions
+- **TP/SL Order Tracking**: Monitors reduce-only orders and closes trades when they execute
+- **Complete Trade Lifecycle**: Manages trades from entry through TP/SL exit with full audit trails
+- **Config-ID Integration**: Associates all trades with specific trading configurations
+- **Real-time Order Status**: Tracks order fills and automatically updates trade exit prices
+
 ### 4. Models
 
 Structured data models using Pydantic for typed validation:
@@ -186,6 +193,202 @@ The Trading Module implements an exchange-agnostic architecture:
 
 This approach allows adding new exchanges with minimal code changes, primarily by updating the symbol mapping dictionaries. The hybrid approach (MCP+LLM for execution, direct CCXT for monitoring) provides an optimal balance of flexibility and reliability.
 
+## Strategy Metadata Tracking
+
+The Trading Module implements a comprehensive **decision audit trail** system through the `strategy_runs` table, capturing the complete context of every trading decision from entry to exit.
+
+### Decision Lifecycle Tracking
+
+Every decision made by the Decision Module is tracked through three key scenarios:
+
+#### 1. TRADE_ENTRY
+- **When**: New trade is opened
+- **Captures**: 
+  - Original decision reasoning and confidence score
+  - Entry conditions (price, stop loss, take profit)
+  - Market context at time of entry
+  - Execution details and order information
+- **Links**: Associates with config_id and decision_id
+
+#### 2. TRADE_MANAGEMENT  
+- **When**: Active trade is adjusted (moving stops, taking partial profits)
+- **Captures**:
+  - Adjustment reasoning and new parameters
+  - Current market conditions vs original thesis
+  - Execution details of adjustment orders
+- **Links**: References original TRADE_ENTRY strategy_run as parent
+
+#### 3. TRADE_EXIT
+- **When**: Trade is closed (TP hit, SL triggered, manual exit)
+- **Captures**:
+  - Exit reasoning and final outcome
+  - Exit price and P&L details
+  - Whether original thesis was validated
+- **Links**: References original TRADE_ENTRY strategy_run as parent
+
+### Data Structure
+
+```sql
+strategy_runs:
+- strategy_run_id (UUID): Unique identifier
+- trade_id (UUID): Links to trades table
+- config_id (UUID): Links to trading configuration
+- decision_id (UUID): Links to specific decision
+- scenario ('TRADE_ENTRY'|'TRADE_MANAGEMENT'|'TRADE_EXIT')
+- parent_strategy_run_id (UUID): Links to original entry decision
+- confidence_score (0.0-1.0): AI confidence level
+- reasoning_log (TEXT): Natural language reasoning
+- decision_data (JSONB): Structured decision context
+- created_at (TIMESTAMP): Decision timestamp
+```
+
+### Example Decision Chain
+
+```
+Initial Decision: "90% confident BTC will bounce from support"
+├── TRADE_ENTRY strategy_run
+│   ├── reasoning: "Strong bullish divergence on RSI"
+│   ├── confidence: 0.90
+│   └── decision_data: {entry_conditions, market_context}
+│
+├── TRADE_MANAGEMENT strategy_run (parent → TRADE_ENTRY)
+│   ├── reasoning: "Moving SL to breakeven as target approached"
+│   └── decision_data: {adjustments, current_thesis_status}
+│
+└── TRADE_EXIT strategy_run (parent → TRADE_ENTRY)
+    ├── reasoning: "Take profit hit, thesis validated"
+    └── decision_data: {exit_conditions, final_outcome}
+```
+
+### Benefits
+
+1. **Learning & Optimization**: Analyze which decision patterns lead to successful trades
+2. **Strategy Validation**: Track whether AI confidence scores correlate with outcomes
+3. **Trade Management Context**: Decision Module can review original reasoning when managing trades
+4. **Performance Analytics**: Rich data for backtesting and strategy refinement
+5. **Audit Trail**: Complete record of all trading decisions for compliance and analysis
+
+### Implementation
+
+Strategy metadata is automatically created by the `TradeManager` class:
+- **Entry**: When `create_trade()` is called after successful execution
+- **Management**: When `_execute_adjustment()` processes trade modifications
+- **Exit**: When `_execute_exit()` closes positions
+
+The system maintains parent-child relationships between decisions, enabling analysis of complete trade lifecycles and decision chains.
+
+## TP/SL Order Tracking & Automated Trade Management
+
+The Trading Module implements **comprehensive TP/SL order tracking** that automatically manages trade lifecycles from entry through exit.
+
+### Real-Time Order Monitoring
+
+The monitoring system continuously tracks all orders associated with active trades:
+
+#### **1. Order Detection & Classification**
+- **Fetches open orders** from exchanges every monitoring cycle (30s default)
+- **Identifies reduce-only orders** automatically based on exchange-specific patterns
+- **Classifies TP vs SL orders** using order type, trigger prices, and execution instructions
+- **Links orders to trades** automatically for complete lifecycle tracking
+
+#### **2. Exchange-Specific Detection**
+
+**BitMEX Order Detection:**
+- `reduceOnly: true` flag detection
+- `execInst: "Close"` instruction recognition
+- `stopPx` trigger price identification
+- Stop order type classification
+
+**Binance Order Detection:**
+- `reduceOnly: true` flag detection
+- `take_profit` and `stop_market` order types
+- Exchange-specific order characteristics
+
+### Automated Trade Closure
+
+When TP/SL orders are filled, trades are automatically closed with complete details:
+
+#### **Exit Price & P&L Calculation**
+```sql
+-- Automatic trade closure when TP/SL hits
+UPDATE trades SET
+    status = 'closed',
+    exit_price = 105500.0,           -- Actual fill price
+    exit_reason = 'Take Profit hit',  -- TP/SL classification
+    realized_pnl = 1500.0,          -- Calculated P&L
+    closed_at = '2025-01-22 15:30:45' -- Actual fill time
+```
+
+#### **Trade Lifecycle Example**
+```
+1. Entry: Market buy 1000 contracts BTC/USD at $104000
+   └── Trade created with entry_price = 104000
+
+2. TP/SL Placement: 
+   ├── TP order: Sell 1000 contracts at $106000 (reduceOnly: true)
+   └── SL order: Sell 1000 contracts at $102000 (reduceOnly: true)
+
+3. Monitoring: Orders tracked in trade_orders table
+   ├── is_risk_order = true
+   ├── risk_type = 'TP' / 'SL'
+   └── status = 'open'
+
+4. Order Fill: TP order executes at $105500
+   └── Order status updated to 'filled'
+
+5. Trade Closure: Automatically triggered
+   ├── exit_price = 105500
+   ├── exit_reason = "Take Profit hit"  
+   ├── realized_pnl = (105500 - 104000) * 1000 = $1,500,000
+   └── status = 'closed'
+```
+
+### Database Schema Integration
+
+The TP/SL tracking leverages the enhanced trade lifecycle schema:
+
+#### **trade_orders Table**
+```sql
+- is_risk_order BOOLEAN        -- true for TP/SL orders
+- risk_type VARCHAR(10)        -- 'TP', 'SL', or NULL
+- status VARCHAR               -- 'open', 'filled', 'canceled'
+- filled_at TIMESTAMP          -- Actual execution time
+```
+
+#### **trades Table**
+```sql
+- exit_price DECIMAL(20,8)     -- Actual exit price from order fill
+- exit_reason VARCHAR          -- "Take Profit hit" / "Stop Loss hit"
+- realized_pnl DECIMAL(20,8)   -- Calculated profit/loss
+- closed_at TIMESTAMP          -- Trade closure time
+```
+
+### Performance & Reliability
+
+#### **Monitoring Cycle Integration**
+The TP/SL tracking is seamlessly integrated into the monitoring service:
+
+1. **Position Sync** (30s): `sync_positions_to_trades()`
+2. **Order Sync** (30s): `_sync_orders_to_database()`  
+3. **TP/SL Check** (30s): `sync_tp_sl_orders()`
+
+#### **Error Handling & Resilience**
+- **Graceful API failures**: Order fetching errors don't break monitoring
+- **Database consistency**: Transaction-based updates ensure data integrity
+- **Missing data handling**: Robust logic for incomplete order information
+- **Duplicate protection**: Upsert logic prevents duplicate order records
+
+### Benefits
+
+1. **Fully Automated**: No manual intervention required for trade management
+2. **Accurate P&L**: Uses actual execution prices, not estimates
+3. **Complete Audit Trail**: Every order and trade closure is logged
+4. **Real-Time Updates**: 30-second monitoring cycle ensures rapid response
+5. **Exchange Agnostic**: Works across BitMEX, Binance, and future exchanges
+6. **Performance Optimized**: Efficient queries only check trades with active orders
+
+This system enables **hands-off trade management** where the AI makes entry decisions and the system automatically handles exits according to the original TP/SL plan.
+
 ## Testing Strategy
 
 The Trading Module follows a comprehensive testing approach:
@@ -208,10 +411,11 @@ The Trading Module follows a comprehensive testing approach:
 - ⏳ LLM integration with MCP tools
 - ⏳ Full pipeline testing with real trading scenarios
 
-**Phase 4: Production Integration** 📋 **PLANNED**
-- 📋 Database integration for trade persistence
-- 📋 API endpoint development
-- 📋 Direct CCXT monitoring implementation
+**Phase 4: Production Integration** ✅ **COMPLETED**
+- ✅ Database integration for trade persistence with Universal Trade Lifecycle
+- ✅ TP/SL order tracking and automated trade closure
+- ✅ Direct CCXT monitoring implementation with order status sync
+- ✅ Config-ID based multi-strategy support
 
 ### Testing Approach
 
@@ -224,10 +428,12 @@ The Trading Module follows a comprehensive testing approach:
    - Tests the actual execution on testnet
    - Focuses primarily on the trade execution pathway
 
-3. **Monitoring Testing**: Separate testing for position monitoring
+3. **Monitoring Testing**: Comprehensive trade lifecycle testing
    - Tests direct CCXT adapter for position data retrieval
    - Validates proper data collection and formatting
    - Ensures reliable notification of position changes
+   - **TP/SL Order Tracking**: Tests reduce-only order detection and trade closure
+   - **Order Status Sync**: Validates real-time order status updates
 
 4. **Integration Testing**: Tests the entire module's integration with other modules
    - Verifies proper data flow between Decision and Trading modules

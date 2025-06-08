@@ -124,13 +124,74 @@ Example configuration:
 - **market_data**: Source for latest indicators and signals
 - **account_states**: Current equity, margin, and positions
 - **configurations**: User's strategy and risk settings
-- **trades**: Store and retrieve decision history
+- **trades_legacy**: Backward-compatible view for accessing trade data
+- **strategy_runs**: Primary storage for all trading decisions and audit trail
 
 ### Key Queries:
 1. Get latest market data for a symbol/timeframe
 2. Get current account state
-3. Get active trades with decision history
-4. Update trade with new decision
+3. Get active trades with decision history from strategy_runs
+4. Store new decisions as TRADE_MANAGEMENT strategy_runs entries
+5. Filter all queries by config_id for multi-strategy isolation
+
+## Decision Tracking
+
+Every decision made by this module is automatically tracked through the **strategy_runs** system managed by the Trading Module. This creates a complete audit trail linking decisions to their outcomes:
+
+### Decision Lifecycle
+- **Decision Created**: Module generates trade intent with reasoning and confidence
+- **TRADE_ENTRY**: Trading Module logs initial decision when trade opens
+- **TRADE_MANAGEMENT**: Subsequent adjustments reference original decision
+- **TRADE_EXIT**: Final outcome links back to original reasoning
+
+### Benefits
+- **Learning Loop**: Analyze which decision patterns lead to successful trades
+- **Strategy Validation**: Track whether confidence scores correlate with outcomes  
+- **Context Preservation**: Future decisions can review original reasoning for active trades
+- **Performance Analytics**: Rich data for strategy refinement and backtesting
+
+This tracking happens automatically - the Decision Module simply needs to include `decision_id` and `config_id` in its trade intents for full audit trail functionality.
+
+## Enhanced Decision Storage (Phase 3 Updates)
+
+The Decision Module has been updated to use the new Universal Trade Lifecycle system:
+
+### **Strategy-Runs Integration**
+- **Decision history** is now stored in the `strategy_runs` table instead of `execution_details`
+- **TRADE_MANAGEMENT entries** are created for each subsequent decision on active trades
+- **Full audit trail** with confidence scores, reasoning, and decision data
+- **Parent-child relationships** link management decisions to original trade entries
+
+### **Config-Centric Architecture**
+- **Multi-strategy support**: Each config represents an independent trading strategy
+- **Config-ID filtering**: All queries filter by `config_id` for proper isolation
+- **True parallelization**: Users can run multiple strategies simultaneously
+- **Independent decision making**: Each config maintains its own trade context
+
+### **Backward Compatibility**
+- **trades_legacy view**: Provides seamless access to trade data with old field names
+- **Field mapping**: `symbol` ↔ `pair`, `status` ↔ `trade_status`, etc.
+- **Decision history format**: Maintains existing format while using new storage backend
+- **API compatibility**: Existing decision APIs continue to work unchanged
+
+### **Database Query Updates**
+```sql
+-- OLD: Direct trades table access
+SELECT * FROM trades WHERE user_id = %s AND status = 'open'
+
+-- NEW: Config-filtered legacy view access  
+SELECT * FROM trades_legacy WHERE user_id = %s AND config_id = %s AND trade_status = 'open'
+
+-- NEW: Decision storage in strategy_runs
+INSERT INTO strategy_runs (scenario='TRADE_MANAGEMENT', reasoning_log=..., config_id=...)
+```
+
+### **Decision History Retrieval**
+The module now fetches decision history from `strategy_runs` and converts it to the legacy format:
+- **Enhanced context**: Includes scenario information (TRADE_ENTRY, TRADE_MANAGEMENT, TRADE_EXIT)
+- **Structured data**: decision_data JSONB field for rich decision context
+- **Confidence tracking**: Precise confidence scores for each decision
+- **Temporal ordering**: Decisions ordered by creation time for proper sequence
 
 ## Testing Strategy
 

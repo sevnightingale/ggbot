@@ -21,9 +21,9 @@ class MockDb:
         # In real DB, filter by user_id too
         return trade.copy() if trade and trade.get('user_id') == user_id else None
 
-    async def get_active_trades(self, user_id, status='open'):
-         logger.debug(f"DB: Getting active trades for user {user_id} with status {status}")
-         active = [t.copy() for t in self._trades.values() if t.get('user_id') == user_id and t.get('trade_status') == status]
+    async def get_active_trades(self, user_id, trade_status='open'):
+         logger.debug(f"DB: Getting active trades for user {user_id} with trade_status {trade_status}")
+         active = [t.copy() for t in self._trades.values() if t.get('user_id') == user_id and t.get('trade_status') == trade_status]
          logger.debug(f"DB: Found {len(active)} active trades")
          return active
 
@@ -96,7 +96,7 @@ class TradeManager:
     async def _load_active_trades_from_db(self):
         logger.info(f"Loading active trades from database for user {self.user_id}...")
         try:
-            active_db_trades = await db.get_active_trades(user_id=self.user_id, status='open')
+            active_db_trades = await db.get_active_trades(user_id=self.user_id, trade_status='open')
             count = 0
             new_active_trades = {}
             for trade in active_db_trades:
@@ -155,8 +155,8 @@ class TradeManager:
                 logger.info(f"Registered/Updated trade {trade_id} for tracking.")
                 return True
             else:
-                status = trade_info.get('trade_status') if trade_info else 'Not Found'
-                logger.warning(f"Could not register trade {trade_id}. DB Status: '{status}'")
+                trade_status = trade_info.get('trade_status') if trade_info else 'Not Found'
+                logger.warning(f"Could not register trade {trade_id}. DB Status: '{trade_status}'")
                 # Ensure it's removed if status is not open
                 if trade_id in self.active_trades:
                      del self.active_trades[trade_id]

@@ -1,6 +1,6 @@
 # Account Monitoring System
 
-The Account Monitoring System provides real-time tracking of exchange account balances, positions, and margin data. It uses direct CCXT connections (not MCP) for reliability and stores normalized data in the database for use by other modules.
+The Account Monitoring System provides real-time tracking of exchange account balances, positions, and margin data with integrated trade lifecycle management and TP/SL order tracking. It uses direct CCXT connections (not MCP) for reliability and stores normalized data in the database while syncing positions to trades via the Universal Trade Lifecycle Management System.
 
 ## Architecture Overview
 
@@ -9,6 +9,8 @@ The Account Monitoring System provides real-time tracking of exchange account ba
 - **Exchange Agnostic**: Adapter pattern handles exchange-specific quirks
 - **Real-time Risk Management**: Continuous monitoring enables informed trading decisions
 - **Data Consistency**: Single source of truth in database for account state
+- **Trade Lifecycle Integration**: Positions drive trade state via Universal Trade Lifecycle Management
+- **TP/SL Order Tracking**: Real-time monitoring of reduce-only orders with automated trade closure
 
 ### Key Components
 
@@ -69,15 +71,71 @@ class ExchangeAdapter(ABC):
 
 ```
 Exchange API → CCXT → Exchange Adapter → Normalized Data → Database
-                                                              ↓
-                                     Future Decision Module ←─┘
+                           ↓                                    ↓
+               Enhanced Position Data              Trade Lifecycle Manager
+                           ↓                                    ↓
+               Position-based Trade Sync  →→→→→→→→→→→→→  trades Table
+                           ↓                                    ↓
+                    Open Orders Data               TP/SL Order Tracking
+                           ↓                                    ↓
+                 Order Classification      →→→→→→→→→→→→→  trade_orders Table
 ```
 
-1. **Data Fetch**: Service calls `exchange.fetch_balance()` and `exchange.fetch_positions()`
-2. **Normalization**: Exchange adapter converts to standardized format
-3. **Calculation**: Service calculates equity, margins, and metrics
-4. **Storage**: Data stored in `account_states` table
-5. **Consumption**: Other modules query database for current state
+### Primary Monitoring Cycle (30s default)
+
+1. **Account Data Fetch**: Service calls `exchange.fetch_balance()` and `exchange.fetch_positions()`
+2. **Order Data Fetch**: Service calls `exchange.fetch_open_orders()` for TP/SL tracking
+3. **Data Normalization**: Exchange adapter converts all data to standardized formats
+4. **Calculation & Storage**: Equity/margin metrics calculated and stored in `account_states` table
+5. **Order Processing**: Open orders normalized, classified (TP/SL), and stored in `trade_orders` table
+6. **Position Sync**: Enhanced position data synced to `trades` table via TradeLifecycleManager
+7. **TP/SL Sync**: Filled TP/SL orders trigger automatic trade closure with exit prices
+8. **Consumption**: Other modules query database for current state and complete trade records
+
+### TP/SL Order Tracking
+
+The monitoring system now includes comprehensive TP/SL order tracking:
+
+#### **Order Detection & Classification**
+- **Fetches all open orders** from the exchange each monitoring cycle
+- **Identifies reduce-only orders** using exchange-specific patterns
+- **Classifies orders as TP or SL** based on order characteristics
+- **Links orders to active trades** automatically
+
+#### **Exchange-Specific Detection Logic**
+
+**BitMEX:**
+```python
+# Reduce-only detection
+is_reduce_only = (
+    order.get('reduceOnly') == True or
+    order.get('info', {}).get('execInst') == 'Close' or
+    (order.get('type') == 'stop' and order.get('triggerPrice'))
+)
+
+# TP/SL classification
+risk_type = 'SL' if order.get('info', {}).get('stopPx') else 'TP'
+```
+
+**Binance:**
+```python
+# Reduce-only detection  
+is_reduce_only = (
+    order.get('reduceOnly') == True or
+    order.get('type') in ['take_profit', 'stop_market']
+)
+
+# TP/SL classification
+risk_type = 'TP' if 'take_profit' in order.get('type', '') else 'SL'
+```
+
+#### **Automated Trade Closure**
+When TP/SL orders are filled:
+1. **Order status updated** to 'filled' with actual execution price
+2. **Trade automatically closed** in `trades` table
+3. **Realized P&L calculated** using entry vs exit prices  
+4. **Exit reason recorded** ("Take Profit hit" or "Stop Loss hit")
+5. **Complete audit trail maintained** for analysis
 
 ## Database Schema
 

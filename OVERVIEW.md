@@ -1,4 +1,4 @@
-MASTER PLAN FOR GGBOTS
+OVERVIEW OF GGBOTS
 Vision & Introduction
 A platform to enable traders to create, customize and deploy fully autonomous AI Trading Agents or "ggbots" that can analyze markets, adapt dynamically to changing conditions, and follow complex strategies the same way humans do. At the heart of ggbots are three specialized AI agents seamlessly working together: the Extraction Agent, Decision Agent, and Trading Agent. Together, these agents form an intelligent trading system that combines diverse market insights, sophisticated decision-making, and precise trade execution.
 This agentic framework integrates Browser‑Use, ChatGPT 4o (Vision), a reasoning LLM (such as DeepSeek R1), advanced technical indicators (e.g., ggShot, RSI, MACD), Model Context Protocols (MCPs), and centralized exchanges (CEXs) as the primary focus for the MVP.

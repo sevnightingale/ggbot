@@ -8,9 +8,19 @@ DeepSeek provides powerful reasoning capabilities ideal for trading decisions.
 import aiohttp
 import asyncio
 import time
+import json
+from decimal import Decimal
 from typing import Dict, Any, List, Optional, Tuple
 from core.common.logger import logger
 from decision.interfaces.llm_provider import LLMProvider
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder that handles Decimal types."""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return float(obj)
+        return super().default(obj)
 
 
 class DeepSeekProvider(LLMProvider):
@@ -88,10 +98,12 @@ class DeepSeekProvider(LLMProvider):
         for attempt in range(self.max_retries):
             try:
                 async with aiohttp.ClientSession() as session:
+                    # Serialize payload with custom encoder to handle Decimal types
+                    json_payload = json.dumps(payload, cls=DecimalEncoder)
                     async with session.post(
                         f"{self.base_url}/chat/completions",
                         headers=headers,
-                        json=payload,
+                        data=json_payload,
                         timeout=aiohttp.ClientTimeout(total=self.timeout)
                     ) as response:
                         if response.status == 200:
