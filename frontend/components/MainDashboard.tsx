@@ -9,11 +9,7 @@ import { TradeTable } from '@/components/trades/TradeTable'
 import { PerformanceChart } from '@/components/charts/PerformanceChart'
 import { AgentConfigModal } from '@/components/bot/AgentConfigModal'
 
-interface BotDashboardClientProps {
-  botId: string
-}
-
-export function BotDashboardClient({ botId }: BotDashboardClientProps) {
+export function MainDashboard() {
   const {
     loadConfigurations,
     loadTrades,
@@ -25,7 +21,7 @@ export function BotDashboardClient({ botId }: BotDashboardClientProps) {
   } = useBotStore()
 
   useEffect(() => {
-    // Load all initial data
+    // Load all initial data for default config
     const loadInitialData = async () => {
       await Promise.all([
         loadConfigurations(),
@@ -52,7 +48,7 @@ export function BotDashboardClient({ botId }: BotDashboardClientProps) {
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
             <div className="w-8 h-8 border-2 border-bone-200 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-            <p className="text-bone-300">Loading bot configuration...</p>
+            <p className="text-bone-300">Loading your ggbot...</p>
           </div>
         </div>
       </PageWrapper>
@@ -62,20 +58,12 @@ export function BotDashboardClient({ botId }: BotDashboardClientProps) {
   return (
     <PageWrapper>
       <div className="container mx-auto px-6 py-8">
-        {/* Header */}
-        <div className="mb-8">
-          <div className="flex items-center gap-2 text-sm text-bone-400 mb-2">
-            <span>My Bots</span>
-            <span>›</span>
-            <span>Bot {botId}</span>
+        {/* Error Display */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-900/20 border border-red-500/20 rounded-lg">
+            <p className="text-red-400">{error}</p>
           </div>
-          <h1 className="text-3xl font-display font-bold">Bot Dashboard</h1>
-          {error && (
-            <div className="mt-4 p-4 bg-red-900/20 border border-red-500/20 rounded-lg">
-              <p className="text-red-400">{error}</p>
-            </div>
-          )}
-        </div>
+        )}
 
         {/* Agent Visualization and Controls */}
         <div className="grid gap-8 mb-8">
@@ -98,13 +86,13 @@ export function BotDashboardClient({ botId }: BotDashboardClientProps) {
         <div className="grid lg:grid-cols-2 gap-8">
           {/* Active Trades */}
           <div className="bg-charcoal-800/50 border border-bone-200/10 rounded-lg p-6">
-            <h2 className="text-xl font-display font-bold mb-6">Active Trades</h2>
+            <h2 className="text-xl font-display font-bold mb-6">Trades</h2>
             <TradeTable />
           </div>
 
           {/* Performance Chart */}
           <div className="bg-charcoal-800/50 border border-bone-200/10 rounded-lg p-6">
-            <h2 className="text-xl font-display font-bold mb-6">Performance</h2>
+            <h2 className="text-xl font-display font-bold mb-6">Performance (Chart)</h2>
             <PerformanceChart />
           </div>
         </div>

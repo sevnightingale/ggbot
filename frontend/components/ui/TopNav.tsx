@@ -10,7 +10,7 @@ export function TopNav() {
     <nav className="relative z-50">
       <div className="flex items-center justify-between px-6 py-4 border-b border-bone-200/10">
         <div className="flex items-center gap-8">
-          <h1 className="text-2xl font-display font-bold">ggbots</h1>
+          <h1 className="text-2xl font-display font-bold">ggbots.ai</h1>
         </div>
         
         <button
