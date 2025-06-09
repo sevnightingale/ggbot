@@ -60,14 +60,6 @@ export function AgentConfigModal() {
     }
   }
 
-  const getCurrentConfig = () => {
-    switch (activeConfigAgent) {
-      case 'extraction': return extractionConfig
-      case 'decision': return decisionConfig
-      case 'trading': return tradingConfig
-      default: return null
-    }
-  }
 
   const renderConfigForm = () => {
     switch (activeConfigAgent) {
@@ -91,7 +83,9 @@ export function AgentConfigModal() {
         {/* Header */}
         <div className={cn(
           "p-6 border-b border-bone-200/10",
-          `border-l-4 border-l-${agent.color}`
+          activeConfigAgent === 'extraction' ? 'border-l-4 border-l-agents-extraction' :
+          activeConfigAgent === 'decision' ? 'border-l-4 border-l-agents-decision' :
+          activeConfigAgent === 'trading' ? 'border-l-4 border-l-agents-trading' : ''
         )}>
           <div className="flex items-center justify-between">
             <div>
@@ -117,7 +111,9 @@ export function AgentConfigModal() {
                 className={cn(
                   "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
                   activeTab === index
-                    ? `bg-${agent.color} text-charcoal-900`
+                    ? (activeConfigAgent === 'extraction' ? 'bg-agents-extraction text-charcoal-900' :
+                       activeConfigAgent === 'decision' ? 'bg-agents-decision text-charcoal-900' :
+                       activeConfigAgent === 'trading' ? 'bg-agents-trading text-charcoal-900' : '')
                     : "text-bone-300 hover:text-bone-200 hover:bg-charcoal-700"
                 )}
               >
