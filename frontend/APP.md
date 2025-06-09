@@ -2,163 +2,223 @@
 
 ## 🧠 Overview
 
-The **ggbots app interface** is a clean, immersive, single-screen control environment where users build, configure, monitor, and scale fully autonomous AI trading agents (ggbots).
+The **ggbots app interface** is a clean, performant control environment where users build, configure, monitor, and scale fully autonomous AI trading agents (ggbots).
 
-It prioritizes **clarity, agency, and visual feedback**, built around a core metaphor: your ggbot is a system composed of three intelligent agents—Extraction, Decision, and Trading—each essential, modular, and visualized as part of an animated, interactive layout.
+It prioritizes **clarity, performance, and trust**, built around a core metaphor: your ggbot is a system composed of three intelligent agents—Extraction, Decision, and Trading—each essential, modular, and visualized as part of a lightweight, functional interface.
 
-The dashboard provides complete transparency into your ggbot's intelligence, showing not just what it trades, but exactly how it thinks and why it acts.
+The dashboard provides essential transparency into your ggbot's intelligence, showing not just what it trades, but why it acted—without overwhelming detail.
 
 ---
 
 ## 🧭 Design Principles
 
-- **Everything on one screen.** All interaction is scoped to a single immersive dashboard.
-- **No sidebar. No tabs.** A minimalist top-right menu handles navigation.
-- **Cinematic flow.** A central ggbot hub with orbiting agent nodes and animated state changes.
-- **Full transparency.** Every trade reveals the complete decision-making process.
+- **Page-based navigation.** Clean routes for bot overview, individual bot details, and configuration.
+- **Performance first.** Fast loading, smooth interactions, no unnecessary complexity.
+- **Functional visualization.** Agent metaphor serves understanding, not aesthetics.
+- **Essential transparency.** Clear reasoning for trades without information overload.
 - **Test before deploy.** Manual test runs build confidence before autonomous operation.
-- **Responsive-first.** Works seamlessly across desktop and mobile.
+- **Desktop-optimized, mobile-compatible.** Built for traders who use desktop but graceful on mobile.
 
 ---
 
 ## 🧱 UI Structure
 
-### 🧠 Main View: ggbot Dashboard
+### 🧠 Main Views
 
-#### 🔝 Top Area: ggbot Configurator
+#### 📋 Bot Overview Page (`/app`)
 
-The top 2/3 of the screen contains a **central ggbot hub** with orbiting agent icons and control elements.
+List of all user ggbots with basic status and performance.
 
 ##### Components:
-- **Center Circle:** "Your ggbot"  
-  - Title/Label: customizable  
-  - Visual state: inactive (gray), active (glowing), live (pulsing)
-  - Shows current scheduler state (autonomous on/off)
-- **Orbiting Agent Circles:**
-  - Extraction Agent (Blue) - Market data & indicators
-  - Decision Agent (Green) - Strategy & analysis
-  - Trading Agent (Orange) - Execution & risk management
-  - Clickable → opens modal configuration flow
-  - Visual states: inactive (gray), configured (colored), live (pulsing/glowing)
-  - Live activity indicators during processing
-- **Connecting Lines:** Thin visual links from each agent to the center bot  
-  - Animate glow once active  
-  - Pulse during data flow between agents
+- **Bot Cards:** Simple grid showing each bot's name, status, and recent P&L
+- **Create New Bot:** Plus button to create new ggbot
+- **Quick Actions:** Start/stop scheduler from overview
 
-##### Control Elements:
-- **Deploy Button:** Appears once all agents configured
-  - "Test Run" - Execute one cycle manually (calls extraction webhook once)
-  - "Go Live" - Start autonomous operation (scheduler start)
-- **Status Indicator:** Shows scheduler state and next run time
-- **Emergency Stop:** Prominent button to halt all trading (scheduler stop)
+#### 🤖 Individual Bot Page (`/bot/:id`)
 
-##### Future: Multi-Bot Support
-- Currently single ggbot (one config_id: a93de31b-9b8a-42e3-827d-c31e580f5f36)
-- Future: carousel arrows to switch between multiple configs
-- Each bot would have independent settings and performance tracking
+##### 🔝 Top Area: Agent Status & Configuration
+
+Visual layout showing the three-agent system with subtle animation effects.
+
+##### Components:
+- **Agent Configuration Visual:**
+  - Three circular agent nodes arranged in triangle formation
+  - Each node shows agent name and status
+  - **Glow Effects**: Configured agents pulse with their color (blue/green/orange)
+  - **Flow Animation**: Animated SVG lines show data flow from agents to central ggbot
+  - Click any agent circle → opens configuration modal
+  
+- **Bot Control Panel:**
+  - Bot name and current status
+  - Start/Stop autonomous mode
+  - Manual test run button
+  - Emergency stop (prominent when live)
+
+##### Navigation:
+- **Breadcrumb:** My Bots > Bot Name
+- **Bot Selector:** Dropdown to switch between bots (when multiple exist)
+- **Top Menu:** Minimal hamburger menu for settings, docs, profile
 
 ---
 
-### 📊 Bottom Area: ggbot Intelligence Output
+### 📊 Performance Area: Bot Intelligence Output
 
-The lower 1/3 of the screen shows active outputs for the currently selected bot.
+Two-column layout below agent status showing current state and history.
 
-##### Left Panel: Trade History
-- Live trade list from `/dashboard/{user_id}/trades` endpoint
-- Columns: Symbol, Side, Entry, Current/Exit, P&L, Status, Time
-- **Click trade → Intelligence Trail Modal** (detailed breakdown)
-- Real-time updates via WebSocket (`/ws/dashboard/{user_id}`)
-- Visual indicators: green (winning), red (losing), yellow (active)
+##### Left Panel: Active Trades
+- Current positions from `/dashboard/{user_id}/trades` endpoint
+- Simple table: Symbol, Side, Entry, Current, P&L, Time
+- **Click trade → Trade Detail Modal** (lightweight reasoning view)
+- Polling updates every 30s (no WebSocket in v1)
+- Clear visual indicators: green (winning), red (losing)
 
-##### Right Panel: Performance Metrics  
+##### Right Panel: Performance Overview
 - Data from `/dashboard/{user_id}/performance` endpoint
-- Live P&L graph with daily breakdown
-- Key metrics displayed:
-  - Total P&L and percentage
-  - Win rate (winning/total trades)
-  - Average win vs average loss
-  - Profit factor
-  - Max drawdown
-- Period selector: 1d, 7d, 30d, all
-- Real-time balance updates
+- Simple P&L chart using Recharts
+- Essential metrics only:
+  - Total P&L (absolute and percentage)
+  - Win rate
+  - Total trades
+- Period selector: 1d, 7d, 30d
+- Polling updates every 60s
 
 ---
 
-## 💡 Trade Intelligence Trail
+## 💡 Trade Reasoning (Lightweight)
 
-### The Complete Story Behind Every Trade
+### Simple Trade Explanation
 
-Clicking any trade opens a modal revealing the full decision process:
+Clicking any trade opens a clean modal with essential reasoning:
 
 ```
 [BTC/USD SHORT - Entry: $105,405 | P&L: +$178]
 
-📊 EXTRACTION (What I Saw)
-└─ 2025-01-20 14:30:00
-   ├─ RSI: 72.3 (Overbought) 
-   ├─ MACD: Bearish divergence
-   └─ Analysis: "Strong overbought conditions with momentum weakening..."
-
-🧠 DECISION (What I Thought)  
-└─ Confidence: 65%
-   ├─ Strategy: "RSI > 50, entering SHORT position"
-   ├─ Risk: "Stop at resistance: $107,000"
-   └─ Target: "Support level: $104,500"
-
-⚡ EXECUTION (What I Did)
-└─ Orders Placed:
-   ├─ Market Sell: 10,000 contracts @ $105,405 ✓
-   ├─ Stop Loss: Buy 10,000 @ $107,000 (Active)
-   └─ Take Profit: Buy 10,000 @ $104,500 (Active)
+Trigger: RSI overbought (72.3) + MACD bearish divergence
+Decision: Short position, 65% confidence
+Execution: 10,000 contracts @ $105,405
+Stop Loss: $107,000 | Take Profit: $104,500
 ```
 
-This transparency builds trust and helps users understand and improve their strategies.
+Focused on answering "why did it trade?" without overwhelming detail.
 
 ---
 
-## 🔧 Agent Configuration Modals
+## 🔧 Agent Configuration System
 
-### Extraction Agent (Blue)
+### Interaction Pattern
+
+The three agent circles in the main dashboard are clickable elements that open configuration modals:
+
+**Agent Circle Design:**
+- Circular icons with agent names inside
+- Color-coded borders/glow effects (blue/green/orange)
+- Status indicators:
+  - ✓ Fully configured (green check)
+  - ⚠️ Partially configured (yellow warning)
+  - ⚙️ Not configured (gray gear)
+- Hover states for visual feedback
+- Entire circle is clickable to open configuration
+
+### Individual Agent Configuration Modals
+
+Each agent has its own modal with tabbed navigation for easy editing:
+
+#### 🔵 Extraction Agent Modal (Blue accent)
 Via `GET/PUT /agent/api/config/{user_id}/extraction`:
-- **Symbols**: Multi-select for trading pairs (BTC/USDT, ETH/USDT, etc.)
-- **Timeframes**: Checkboxes (15m, 1h, 4h, 1d)
-- **Indicators**: Toggle list (RSI, MACD, Bollinger Bands, etc.)
-- **Advanced**: LLM interpretation on/off
 
-### Decision Agent (Green)  
+**Tab 1: Symbols**
+- Multi-select dropdown with search functionality
+- Popular pairs displayed at top
+- Real-time symbol validation
+
+**Tab 2: Timeframes**
+- Checkbox grid layout (15m, 1h, 4h, 1d)
+- Visual indication of selected timeframes
+
+**Tab 3: Data Sources**
+- Toggle switches for each source type
+- Expandable configuration per source:
+  - **Indicators MCP**: Multi-select from 78 technical indicators
+  - **TradingView**: Strategy name input field (future)
+  - **News/Sentiment**: Source selection (future)
+- Source-specific settings appear when enabled
+
+#### 🟢 Decision Agent Modal (Green accent)
 Via `GET/PUT /agent/api/config/{user_id}/decision`:
-- **Strategy**: Large text area for natural language strategy
-- **Risk Guidelines**: Max position size, leverage limits, drawdown rules
-- **LLM Provider**: Dropdown (DeepSeek, OpenAI, etc.)
-- **Additional Context**: Optional preferences and style notes
 
-### Trading Agent (Orange)
+**Tab 1: Strategy**
+- Large textarea with syntax highlighting
+- Strategy template examples
+- Character/word count indicator
+
+**Tab 2: LLM Settings**
+- Provider dropdown (DeepSeek, OpenAI)
+- Model selection based on provider
+- API key validation
+
+**Tab 3: Context**
+- Additional trading preferences
+- Market behavior notes
+- Personal trading style inputs
+
+#### 🟠 Trading Agent Modal (Orange accent)
 Via `GET/PUT /agent/api/config/{user_id}/trading`:
-- **Risk Rules**: 
-  - Max leverage slider (1-100x)
-  - Position size % of capital
+
+**Tab 1: Exchange**
+- Exchange selection dropdown
+- API credential inputs
+- Connection test button with live feedback
+
+**Tab 2: Risk Management**
+- **Position Sizing**: Percentage slider with live preview
+- **Leverage Control**: Max leverage slider (1x-100x)
+- **Loss Limits**: Daily loss limit, max drawdown
+- **Safety Rules**: 
+  - Stop loss configuration
+  - Min equity protection threshold
   - Max contracts per trade
-- **Exchange**: Currently BitMEX (future: multi-exchange)
-- **Safety**: Min equity protection percentage
+- Visual risk calculator showing impact
+
+**Tab 3: Execution Rules**
+- Order type preferences
+- Timing constraints
+- Slippage tolerance
+
+### Modal UX Features
+
+**Common Elements Across All Modals:**
+- Modal header with agent name and color accent
+- Horizontal tab navigation with completion indicators
+- Progress bar showing overall configuration status
+- Contextual help tooltips on complex fields
+- Live validation with error messages
+- Save/Cancel buttons with loading states
+- Keyboard navigation support (Tab, Enter, Esc)
+
+**Smart Behaviors:**
+- Tabs show ✓ when properly configured
+- Dependencies highlighted (e.g., Decision shows selected symbols from Extraction)
+- Unsaved changes warning on modal close
+- Auto-save draft functionality
+- Configuration import/export for backup
 
 ---
 
 ## 🌐 Navigation
 
-### 📎 Top-Right Menu Icon
-- 3-bar hamburger icon
-- Expands into a clean overlay menu
+### 📎 Simple Top Navigation
+- Minimal hamburger menu
+- Clean overlay (not sidebar)
 
 **Menu Items:**
-- My ggbot (returns to dashboard)
-- Settings (API keys via environment)
-- Docs (link to documentation)
-- Profile / Logout
+- My Bots (returns to overview)
+- Settings
+- Docs
+- Profile
 
-**Future Menu Items:**
-- My ggbots (when multi-bot supported)
-- Discover (subscribe to other bots)
-- Analytics (aggregate performance)
+**Future Additions:**
+- Analytics
+- Community features
 
 ---
 
@@ -176,9 +236,9 @@ Via `GET/PUT /agent/api/config/{user_id}/trading`:
 - `GET /agent/api/scheduler/status` - Check if running
 
 **Dashboard Data:**
-- `GET /dashboard/api/dashboard/{user_id}/trades` - Trade list
+- `GET /dashboard/api/dashboard/{user_id}/trades` - Trade list  
 - `GET /dashboard/api/dashboard/{user_id}/performance` - Metrics
-- `WS /ws/dashboard/{user_id}` - Real-time updates
+- Polling every 30-60s (no WebSocket in v1)
 
 **Testing:**
 - `POST /extraction/webhooks/trigger-extraction` - Manual test run
@@ -189,44 +249,42 @@ Via `GET/PUT /agent/api/config/{user_id}/trading`:
 
 | Component               | Description | API Integration |
 |------------------------|-------------|-----------------|
-| `AgentNode`            | Visual agent circles with config state | Config API GET |
-| `GGBotCore`            | Central hub showing bot state | Scheduler status |
-| `AgentConfigModal`     | Configuration forms for each agent | Config API GET/PUT |
-| `TradeTable`           | Live trade list with click actions | Dashboard trades API |
-| `TradeDetailModal`     | Full intelligence trail view | Multiple endpoints |
-| `PerformanceChart`     | Real-time P&L and metrics | Dashboard performance API |
-| `ControlPanel`         | Test/Deploy/Stop buttons | Scheduler & webhook APIs |
-| `TopNavMenu`           | Minimal navigation overlay | N/A |
+| `AgentStatusBar`       | Three-section status display | Config API GET |
+| `BotControlPanel`      | Start/stop/test controls | Scheduler API |
+| `ConfigModal`          | Tabbed configuration interface | Config API GET/PUT |
+| `TradeTable`           | Simple trade list | Dashboard trades API |
+| `TradeDetailModal`     | Lightweight trade reasoning | Trade details |
+| `PerformanceChart`     | Basic P&L chart (Recharts) | Dashboard performance API |
+| `BotCard`              | Overview page bot cards | Dashboard summary |
+| `TopNavMenu`           | Minimal hamburger navigation | N/A |
 
 ---
 
 ## 🌀 Implementation Roadmap
 
-### Phase 1: Core Dashboard
-1. Agent visualization with configuration state
-2. Basic config modals for all three agents
-3. Deploy/Stop functionality via scheduler API
-4. Trade list with real-time updates
-5. Performance metrics display
+### Phase 1: Core Pages & Navigation
+1. Bot overview page with list/grid of bots
+2. Individual bot detail pages with agent status
+3. Basic routing and navigation
+4. Start/stop scheduler functionality
 
-### Phase 2: Intelligence Layer
-1. Trade detail modal with full decision trail
-2. Extraction data visualization
-3. Decision reasoning display
-4. Order status tracking
+### Phase 2: Configuration & Trading
+1. Single modal for agent configuration
+2. Trade list with polling updates
+3. Basic P&L chart
+4. Manual test run functionality
 
-### Phase 3: Enhanced UX
-1. Test run functionality
-2. Live activity indicators on agents
-3. Smooth animations and transitions
-4. Mobile responsive design
-5. Error handling and user feedback
+### Phase 3: Trade Intelligence
+1. Simple trade detail modal with reasoning
+2. Performance metrics and history
+3. Error handling and loading states
+4. Mobile responsive improvements
 
-### Phase 4: Future Features
-1. Multi-bot carousel support
-2. Strategy templates
-3. Advanced analytics
-4. Social/marketplace features
+### Phase 4: Enhancement & Scale
+1. Multi-bot management
+2. Advanced performance analytics
+3. Community features (if validated)
+4. Performance optimizations
 
 ---
 

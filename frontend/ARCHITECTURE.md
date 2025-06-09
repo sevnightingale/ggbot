@@ -2,52 +2,46 @@
 
 ## 🧠 Overview
 
-This document outlines the architecture, tooling, and component structure of the **ggbots** frontend. The goal is a performant, immersive, single-screen trading agent dashboard built with modern best practices and a cinematic UX flow.
+This document outlines the architecture, tooling, and component structure for the **ggbots** frontend—a high-performance, agent-based trading dashboard designed for clarity, speed, and precision.
+
+Our goal is simple: build a lightweight, modular interface for managing and monitoring autonomous trading bots—without over-engineering or visual excess.
 
 ---
 
 ## 🚀 Tech Stack
 
 ### Framework
-- **Next.js 14+ (App Router)** – App-centric, file-based routing
-- **TypeScript** – Full static typing and API contract safety
-- **Tailwind CSS** – Utility-first styling with design tokens
-- **CSS Modules** – Scoped styles for complex animations
-- **Framer Motion** – UI animation (carousel, agent glow, transitions)
+- **Next.js 14+ (App Router)** – File-based routing, great DX
+- **TypeScript** – Safer code, better autocompletion
+- **Tailwind CSS** – Utility-first styling, no CSS bloat
 
 ### State Management
-- **Zustand** – Global UI state (active bot, modal, etc.)
-- **TanStack Query** – Server state (fetching, caching, real-time)
-- **WebSocket** – Live trade updates and bot feedback
+- **Zustand** – Minimal global store for UI and bot states
+- **Native fetch + polling** – Polling every 30–60s (no WebSockets in v1)
 
 ---
 
 ## 🧱 Project Structure
 
 ggbot-frontend/
-├── app/ # Next.js App Router
-│ ├── layout.tsx # Global layout with providers
-│ ├── page.tsx # Landing page (static)
-│ ├── app/ # Main ggbot interface (default route)
-│ │ ├── page.tsx # ggbot Dashboard (single-screen)
-│ │ └── components/ # Dashboard-specific components
-│ ├── auth/ # Login/register (future)
-│ └── api/ # Optional proxy routes (if needed)
-├── components/ # Shared components
-│ ├── ui/ # Buttons, modals, typography, etc.
-│ ├── agents/ # ggbot visual interface components
-│ ├── trades/ # Trade log table + viewer
-│ ├── charts/ # Performance visualizations
+├── app/ # App Router pages
+│ ├── layout.tsx # Global layout/providers
+│ ├── page.tsx # Bot overview (default route)
+│ └── bot/
+│ └── [id]/page.tsx # Individual bot detail
+├── components/
+│ ├── ui/ # Buttons, inputs, modals
+│ ├── bot/ # Agent layout, ggbot controls
+│ ├── trades/ # Trade log components
+│ └── charts/ # Performance chart components
 ├── lib/
-│ ├── api/ # API clients (typed fetch functions)
-│ ├── hooks/ # Reusable logic + Zustand hooks
-│ ├── utils/ # Helper logic
-│ ├── constants/ # App-wide values and color maps
-│ └── schema/ # zod validation schemas
-├── public/ # Static assets
-├── styles/ # Tailwind config and globals
-├── store/ # Zustand global store
-└── types/ # TypeScript types and interfaces
+│ ├── api/ # Typed API functions
+│ ├── hooks/ # React + Zustand hooks
+│ └── utils/ # Generic helpers
+├── public/ # Assets
+├── store/ # Zustand stores
+├── types/ # TypeScript interfaces
+└── styles/ # Tailwind config / base styles
 
 yaml
 Copy
@@ -55,9 +49,10 @@ Edit
 
 ---
 
-## 🎨 Styling
+## 🎨 Styling & Tokens
 
-### Tailwind Theme Tokens (tailwind.config.js)
+Tailwind config with custom tokens:
+
 ```ts
 theme: {
   colors: {
@@ -74,140 +69,174 @@ theme: {
       decision: '#2cbe77',
       trading: '#be6a47',
     }
-  },
+  }
 }
-Usage
-Use Tailwind for layout, typography, base UI
+Use Tailwind for layout and styling
 
-Use CSS Modules for orbiting agent animation, pulsing glows, line transitions
+Simple CSS animations for visual effects (no complex libraries)
 
-📦 Key Components
-/components/agents/
-GGBotCore.tsx – Central ggbot orb + config status
+Native CSS transitions and keyframes only
 
-AgentNode.tsx – Extraction / Evaluation / Execution agent buttons
+## 🔧 Key Components
 
-AgentLines.tsx – SVG-based link lines between agents
+### components/bot/
+- **AgentCircle.tsx** – Clickable agent node with glow animations
+- **AgentFlowVisualization.tsx** – SVG container for agent layout + flow lines
+- **BotControlPanel.tsx** – Start/stop/test UI
+- **AgentConfigModal.tsx** – Tabbed agent configuration interface
 
-GGBotCarousel.tsx – Bot selector with arrow controls and + button
+### Animation Components:
+- **FlowLine.tsx** – Animated SVG path showing data flow
+- **GlowEffect.tsx** – Reusable glow animation wrapper
 
-ConfigureAgentModal.tsx – Agent config modals (one per agent type)
+components/ui/
+Button.tsx, Modal.tsx, Input.tsx – Basic primitives
 
-/components/ui/
-MenuOverlay.tsx – Slide-out top-right nav
+TopNav.tsx – Minimal top navbar w/ hamburger menu
 
-DeployButton.tsx – Appears once all agents configured
+components/trades/
+TradeTable.tsx – Tabular trade history
 
-Button.tsx, Modal.tsx, Tooltip.tsx, etc.
+TradeDetailModal.tsx – Simple insight display
 
-/components/trades/
-TradeTable.tsx – Trade log (live + closed)
+components/charts/
+PerformanceChart.tsx – Recharts line chart for PnL
 
-TradeDetailModal.tsx – Expanded trade view (LLM reasoning, data)
-
-/components/charts/
-PerformanceChart.tsx – PnL over time
-
-WinLossChart.tsx – Win rate breakdown
-
-🔗 Zustand Store Example
+🧠 Zustand Store
 ts
 Copy
 Edit
-// store/ggbot.ts
+// store/bot.ts
 import { create } from 'zustand'
 
-export const useGGBotStore = create((set) => ({
-  activeBotIndex: 0,
-  bots: [], // [{ id, config: {}, status }]
-  selectedTrade: null,
-  setBotConfig: (id, agent, config) => { /* update logic */ },
-  addNewBot: () => { /* create new ggbot */ },
-  setActiveBot: (index) => set({ activeBotIndex: index }),
+export const useBotStore = create((set) => ({
+  bots: [],
+  currentBot: null,
+  isConfigModalOpen: false,
+  setBots: (bots) => set({ bots }),
+  setCurrentBot: (bot) => set({ currentBot: bot }),
+  toggleConfigModal: () =>
+    set((s) => ({ isConfigModalOpen: !s.isConfigModalOpen })),
 }))
 📡 API Client
 ts
 Copy
 Edit
-// lib/api/client.ts
-export class GGBotAPI {
-  async getConfig(module: AgentModule) {
-    return fetch(`${API_URL}/agent/api/config/${userId}/${module}`)
-  }
+const API_URL = process.env.NEXT_PUBLIC_API_URL
+const USER_ID = process.env.NEXT_PUBLIC_USER_ID
 
+export const api = {
+  async getConfig(module: string) {
+    return fetch(`${API_URL}/agent/api/config/${USER_ID}/${module}`).then(res => res.json())
+  },
+  async updateConfig(module: string, config: any) {
+    return fetch(`${API_URL}/agent/api/config/${USER_ID}/${module}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ config }),
+    }).then(res => res.json())
+  },
   async startScheduler() {
-    return fetch(`${API_URL}/agent/api/scheduler/start`, {
-      method: 'POST'
-    })
+    return fetch(`${API_URL}/agent/api/scheduler/start`, { method: 'POST' }).then(res => res.json())
+  },
+  async stopScheduler() {
+    return fetch(`${API_URL}/agent/api/scheduler/stop`, { method: 'POST' }).then(res => res.json())
+  },
+  async getTrades() {
+    return fetch(`${API_URL}/dashboard/api/dashboard/${USER_ID}/trades`).then(res => res.json())
+  },
+  async getPerformance(period = '7d') {
+    return fetch(`${API_URL}/dashboard/api/dashboard/${USER_ID}/performance?period=${period}`).then(res => res.json())
   }
 }
-🌐 Navigation System
-Minimal top-right menu (hamburger)
+🌐 Routing
+Pages:
 
-Expands to reveal:
+/ – Bot list + create
 
-My ggbots
+/bot/[id] – Configuration + live performance
 
-Discover (soon)
+/settings – API key setup (later)
 
-Analytics (future)
+Future: /discover, /subscribe
 
-Settings
+Nav:
 
-Profile / Logout
+Top-right hamburger icon
 
-No sidebar. Entire UI lives within one immersive scene.
+Expands to basic links (simple overlay panel)
 
-📊 Charting & Visuals
-Recharts → Simple, React-native performance charts for P&L and metrics
+📊 Charting
+Library: Recharts
 
-Framer Motion → agent activation animations, carousel, modals
+Charts: Line for PnL, bar/pie optional later
 
-SVG Lines → animate agent connections + “power on” effects
+Interaction: Hover only, no animations
+
+Responsiveness: Full container width/height
 
 🐳 Deployment
-Vercel (primary)
-One-click preview deploys
+Primary: Vercel (CI/CD, previews, CDN, env management)
 
-Global CDN, auto environment management
+Vercel PR previews auto-deploy
 
-Docker (optional)
-Dockerfile
-Copy
-Edit
-FROM node:20-alpine
-WORKDIR /app
-COPY . .
-RUN npm ci && npm run build
-CMD ["npm", "start"]
-🧪 Development Workflow
-bash
-Copy
-Edit
-# Local dev
-npm run dev
-# API runs on localhost:8000
-PRs auto-deploy to Vercel
+Main → production
 
-Staging connects to staging API
-
-Main branch deploys to production
-
-📚 Libraries
+🧰 Key Libraries
 Purpose	Library
-Routing / SSR	Next.js
-State	Zustand + TanStack Query
-Styling	Tailwind CSS + CSS Modules
+Routing	Next.js App Router
+State	Zustand
+Styling	Tailwind CSS
 Forms	React Hook Form + Zod
-Animations	Framer Motion
 Charts	Recharts
 Icons	Lucide React
 Dates	date-fns
 
-✅ Summary
-This frontend is designed for focus and flow—a control panel for live trading agents, not a noisy admin dashboard. Every layer supports an immersive, performant, visual-first experience.
+## 🎨 Animation Guidelines
 
-Keep it minimal. Keep it responsive.
-Make it glow when it thinks.
+### CSS-Only Visual Effects:
+```css
+/* Agent glow effect */
+.agent-circle {
+  transition: all 0.3s ease;
+}
 
-— ggbots
+.agent-circle.configured {
+  animation: pulse-glow 2s ease-in-out infinite;
+  box-shadow: 0 0 20px var(--agent-color);
+}
+
+@keyframes pulse-glow {
+  0%, 100% { opacity: 0.8; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.02); }
+}
+
+/* Flow line animation */
+.flow-line {
+  stroke-dasharray: 5 10;
+  animation: flow 3s linear infinite;
+}
+
+@keyframes flow {
+  to { stroke-dashoffset: -15; }
+}
+```
+
+### Implementation Notes:
+- Use CSS custom properties for agent colors
+- GPU-accelerated transforms only
+- Subtle effects (2-3s duration, minimal movement)
+- Disable animations based on prefers-reduced-motion
+
+## ✅ Principles
+Build for function first – No fluff
+
+Validate as you go – Feedback before features
+
+Simple, performant animations that enhance understanding
+
+Use your own product—hard
+
+This is ggbots:
+Clean. Fast. Trader-first.
+Built to think like you.
