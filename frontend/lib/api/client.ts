@@ -10,7 +10,6 @@ import {
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 const USER_ID = process.env.NEXT_PUBLIC_USER_ID || '00000000-0000-0000-0000-000000000001'
-const DEFAULT_CONFIG_ID = 'a93de31b-9b8a-42e3-827d-c31e580f5f36'
 
 class ApiClient {
   private baseUrl: string
