@@ -23,12 +23,6 @@ const statusIcons = {
   unconfigured: Settings,
 }
 
-const statusColors = {
-  configured: 'text-status-success',
-  partial: 'text-status-warning',
-  unconfigured: 'text-bone-400',
-}
-
 export function AgentCircle({ name, type, status }: AgentCircleProps) {
   const { openConfigModal } = useBotStore()
   const StatusIcon = statusIcons[status]
