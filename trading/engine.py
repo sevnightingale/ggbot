@@ -100,9 +100,9 @@ class TradeManager:
             'stop_loss_price': decision_data.get('stop_loss_price'),
             'take_profit_price': decision_data.get('take_profit_price'),
             'collateral_amount': decision_data.get('collateral_amount'),
-            'confidence': decision_data.get('confidence'),
-            'reasoning': decision_data.get('reasoning'),
-            'status': 'open',
+            'confidence_score': decision_data.get('confidence'),
+            'reasoning_log': decision_data.get('reasoning'),
+            'trade_status': 'open',
             'execution_result': execution_result,
             'direction': 'long',  # Default to long for market buy orders
             'created_at': datetime.utcnow().isoformat()
@@ -134,8 +134,7 @@ class TradeManager:
             }
         )
         
-        # Register with execution service for monitoring
-        trade = Trade.model_validate(trade_data)
+        # Register with execution service for monitoring (using dict directly)
         if hasattr(self.engine, 'execution_service'):
             await self.engine.execution_service.register_trade(trade_id, trade_data)
         

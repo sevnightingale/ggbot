@@ -708,6 +708,95 @@ GET /api/agent/{user_id}/status
 }
 ```
 
+### Start Autonomous Scheduler
+```
+POST /api/scheduler/start
+```
+
+Start autonomous trading mode with scheduled extraction every 15 minutes.
+
+**Response:**
+```json
+{
+  "status": "started",
+  "message": "Autonomous trading mode activated",
+  "job_id": "extraction_job",
+  "interval": "15 minutes",
+  "next_run": "2024-01-10T12:30:00Z"
+}
+```
+
+**Response (Already Running):**
+```json
+{
+  "status": "already_running",
+  "message": "Autonomous mode is already active",
+  "job_id": "extraction_job"
+}
+```
+
+### Stop Autonomous Scheduler
+```
+POST /api/scheduler/stop
+```
+
+Stop autonomous trading mode (API server remains running).
+
+**Response:**
+```json
+{
+  "status": "stopped",
+  "message": "Autonomous trading mode deactivated",
+  "job_id": "extraction_job"
+}
+```
+
+**Response (Not Running):**
+```json
+{
+  "status": "already_stopped",
+  "message": "Autonomous mode is not currently running"
+}
+```
+
+### Get Scheduler Status
+```
+GET /api/scheduler/status
+```
+
+Get current scheduler status and configuration.
+
+**Response:**
+```json
+{
+  "status": "healthy",
+  "scheduler": {
+    "scheduler_state": "running",
+    "autonomous_mode": "active",
+    "job_count": 1,
+    "config_id": "a93de31b-9b8a-42e3-827d-c31e580f5f36",
+    "symbols": ["BTC/USDT"],
+    "timeframes": ["15m"],
+    "next_run": "2024-01-10T12:30:00Z"
+  }
+}
+```
+
+**Response (Inactive):**
+```json
+{
+  "status": "healthy",
+  "scheduler": {
+    "scheduler_state": "running",
+    "autonomous_mode": "inactive",
+    "job_count": 0,
+    "config_id": "a93de31b-9b8a-42e3-827d-c31e580f5f36",
+    "symbols": ["BTC/USDT"],
+    "timeframes": ["15m"]
+  }
+}
+```
+
 ---
 
 ## Configuration API (To Be Implemented)

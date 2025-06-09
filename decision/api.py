@@ -13,15 +13,73 @@ from typing import Optional, List, Dict, Any
 from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel
 
-from core.common.logger import logger
+from core.common.logging_config import logger
 from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 from decision.decision_main import run_decision_process
+from core.monitoring.service import AccountMonitoringService
+from trading.lifecycle_manager import TradeLifecycleManager
 
 app = FastAPI(title="Decision API", version="1.0.0")
 
 # In-memory storage for decision tracking (in production, use Redis or DB)
 decision_cache: Dict[str, Dict] = {}
+
+
+async def setup_account_monitoring(user_id: str, config_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Initialize account monitoring and update account state before decision.
+    Same logic as new_trade.py setup_monitoring().
+    """
+    logger.bind(user_id=user_id).info("Setting up account monitoring for decision...")
+    
+    try:
+        # Get credentials from environment
+        api_key = os.getenv('EXCHANGE_API')
+        secret = os.getenv('EXCHANGE_SECRET')
+        
+        if not api_key or not secret:
+            logger.bind(user_id=user_id).warning("Exchange credentials not found - proceeding with database-only mode")
+            return None
+        
+        # Create monitoring service with proper parameters
+        credentials = {
+            'apiKey': api_key,
+            'secret': secret
+        }
+        
+        monitor = AccountMonitoringService(
+            user_id=user_id,
+            config_id=config_id,
+            exchange_name="bitmex",
+            credentials=credentials,
+            testnet=True
+        )
+        
+        # Create exchange client and update account state
+        try:
+            monitor.exchange = await monitor._create_exchange_client()
+            
+            # Update account state and reconcile trades
+            logger.bind(user_id=user_id).info("Updating account state from exchange...")
+            result = await monitor._update_account_state()
+            
+            logger.bind(user_id=user_id).info("✓ Account monitoring completed")
+            logger.bind(user_id=user_id).info(f"  - Position sync: {result['position_sync_performed']}")
+            logger.bind(user_id=user_id).info(f"  - Trades: {result['trades_opened']} opened, {result['trades_updated']} updated, {result['trades_closed']} closed")
+            
+            return result
+            
+        finally:
+            # Close exchange connection
+            if hasattr(monitor, 'exchange') and monitor.exchange:
+                await monitor.exchange.close()
+                monitor.exchange = None
+            
+    except Exception as e:
+        logger.bind(user_id=user_id).warning(f"Account monitoring setup failed: {e}")
+        logger.bind(user_id=user_id).info("Proceeding with database-only mode")
+        return None
 
 
 class DecisionRequest(BaseModel):
@@ -31,6 +89,13 @@ class DecisionRequest(BaseModel):
     symbol: Optional[str] = None
     timeframes: Optional[List[str]] = None
     config_name: str = "default"  # Configuration name to use (legacy)
+
+
+class WebhookRequest(BaseModel):
+    user_id: str = DEFAULT_USER_ID
+    config_id: str = "a93de31b-9b8a-42e3-827d-c31e580f5f36"  # Same UUID as new_trade.py
+    symbol: Optional[str] = None
+    timeframes: Optional[List[str]] = None
 
 
 class DecisionResponse(BaseModel):
@@ -59,12 +124,12 @@ async def trigger_trading_webhook(user_id: str, intent: Dict[str, Any], decision
         # Only trigger trading for actionable intents
         action = intent.get("action", "")
         
-        if action in ["enter_long", "enter_short", "close_position", "adjust_position", "update_stops"]:
+        if action not in ["no_action", "hold", "wait"]:
             async with httpx.AsyncClient(timeout=120.0) as client:
-                # Call the combined API endpoint for trading
-                api_base = os.getenv("API_BASE_URL", "http://localhost:8000")
+                # Call the trading webhook endpoint
+                trading_webhook_url = os.getenv("TRADING_WEBHOOK_URL", "http://localhost:8000/trading/webhooks/execute-trade")
                 response = await client.post(
-                    f"{api_base}/trading/trade/execute",
+                    trading_webhook_url,
                     json=intent
                 )
                 
@@ -126,24 +191,8 @@ async def generate_decision_task(
         # Extract reasoning from intent
         reasoning = intent.pop("reasoning", "No reasoning provided")
         
-        # Store in database - DISABLED until decisions table is created
-        # TODO: Create decisions table and uncomment this section
-        decision_id_db = str(uuid.uuid4())
-        # with get_db_connection() as conn:
-        #     with conn.cursor() as cur:
-        #         # Store in decisions table
-        #         cur.execute("""
-        #             INSERT INTO decisions (decision_id, user_id, mode, intent, reasoning, created_at)
-        #             VALUES (%s, %s, %s, %s, %s, %s)
-        #         """, (
-        #             decision_id_db,
-        #             user_id,
-        #             actual_mode,
-        #             json.dumps(intent),
-        #             reasoning,
-        #             datetime.utcnow()
-        #         ))
-        #         conn.commit()
+        # Note: strategy_runs entries are created by trading engine during execution
+        # This matches new_trade.py flow where verify_strategy_runs() checks entries created by trading engine
         
         # Update cache
         decision_cache[decision_id].update({
@@ -212,12 +261,14 @@ async def analyze_market(request: DecisionRequest):
         intent = await run_decision_process(
             user_id=request.user_id,
             config_id=config_id,  # Use resolved config_id
-            symbol=request.symbol or "BTC/USD",  # Default symbol like working test
+            symbol=request.symbol or "BTC/USDT",  # Default symbol like working test
             timeframes=request.timeframes or ["15m", "1h", "4h"]  # Default timeframes like working test
         )
         
         # Extract reasoning from intent
         reasoning = intent.get("reasoning", "No reasoning provided")
+        
+        # Note: Audit trail is handled by trading engine in strategy_runs table
         
         # Cache the decision
         decision_cache[decision_id] = {
@@ -236,7 +287,7 @@ async def analyze_market(request: DecisionRequest):
         ).info(f"Decision generated: {actual_mode} - {intent.get('action')}")
         
         # Trigger Trading webhook after successful decision (Pipeline Pattern)  
-        # Only trigger for actionable decisions, skip no_action
+        # Only trigger for actionable decisions, skip no_action  
         action = intent.get("action", "")
         if action != "no_action":
             await trigger_trading_webhook(request.user_id, intent, decision_id)
@@ -414,6 +465,97 @@ async def cleanup_old_decisions():
 async def startup_event():
     """Start background cleanup task."""
     asyncio.create_task(cleanup_old_decisions())
+
+
+@app.post("/webhooks/trigger-decision")
+async def webhook_trigger_decision(request: WebhookRequest):
+    """
+    Webhook endpoint to trigger decision analysis.
+    
+    This endpoint implements the full decision logic from new_trade.py including:
+    - Fresh account monitoring and position sync
+    - Automatic mode detection (NEW_TRADE vs MANAGE_TRADE)
+    - Proper config_id handling
+    """
+    try:
+        logger.bind(user_id=request.user_id).info(
+            f"🧠 Decision webhook triggered for config {request.config_id}"
+        )
+        
+        # Step 1: Setup account monitoring to get fresh data (like new_trade.py)
+        monitoring_result = await setup_account_monitoring(request.user_id, request.config_id)
+        if monitoring_result:
+            logger.bind(user_id=request.user_id).info("Account state refreshed from exchange")
+        else:
+            logger.bind(user_id=request.user_id).info("Using database-only mode for decision")
+        
+        # Step 2: Determine mode automatically with fresh data (like new_trade.py)
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT COUNT(*) FROM trades 
+                    WHERE user_id = %s AND config_id = %s AND trade_status = 'open'
+                """, (request.user_id, request.config_id))
+                active_trades = cur.fetchone()[0]
+                actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
+        
+        logger.bind(user_id=request.user_id).info(
+            f"🎯 Mode detected: {actual_mode} (found {active_trades} active trades for config {request.config_id})"
+        )
+        
+        # Step 3: Run decision process using the webhook config_id (like new_trade.py)
+        intent = await run_decision_process(
+            user_id=request.user_id,
+            config_id=request.config_id,
+            symbol=request.symbol or "BTC/USDT",
+            timeframes=request.timeframes or ["15m", "1h", "4h"]
+        )
+        
+        # Generate decision ID for tracking
+        decision_id = str(uuid.uuid4())
+        reasoning = intent.get("reasoning", "No reasoning provided")
+        
+        logger.bind(user_id=request.user_id).info(
+            f"✅ Decision completed: {intent.get('action')} (confidence: {intent.get('confidence', 'N/A')})"
+        )
+        
+        # Note: strategy_runs entries are created by trading engine during execution (like new_trade.py)
+        # This ensures trade_id is available and creates proper audit trail
+        
+        # Note: Audit trail will be created by trading engine in strategy_runs table
+        logger.bind(user_id=request.user_id).info(f"💭 Decision completed, audit trail will be created during trade execution")
+        
+        # Rate limiting delay before triggering trading (coordination)
+        await asyncio.sleep(1)
+        
+        # Step 4: Trigger trading webhook if actionable (same logic as API endpoint)
+        action = intent.get("action", "")
+        if action not in ["no_action", "hold", "wait"]:
+            logger.bind(user_id=request.user_id).info(f"🚀 Triggering trading webhook for action: {action}")
+            await trigger_trading_webhook(request.user_id, intent, decision_id)
+        else:
+            logger.bind(user_id=request.user_id).info(f"ℹ️ No trading action needed: {action}")
+        
+        return {
+            "status": "completed",
+            "decision_id": decision_id,
+            "mode": actual_mode,
+            "action": intent.get("action"),
+            "confidence": intent.get("confidence"),
+            "message": f"Decision generated via webhook ({actual_mode} mode)",
+            "user_id": request.user_id,
+            "config_id": request.config_id,
+            "monitoring_performed": monitoring_result is not None
+        }
+        
+    except Exception as e:
+        logger.bind(user_id=request.user_id).error(
+            f"❌ Webhook decision failed: {str(e)}"
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Decision webhook failed: {str(e)}"
+        )
 
 
 if __name__ == "__main__":

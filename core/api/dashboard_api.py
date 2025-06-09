@@ -153,7 +153,7 @@ async def get_current_trades(user_id: str):
                     trade_id,
                     symbol,
                     side,
-                    trade_status as status,
+                    trade_status,
                     size_contracts,
                     entry_price,
                     COALESCE(mark_price, entry_price) as mark_price,
@@ -170,7 +170,7 @@ async def get_current_trades(user_id: str):
             trades = []
             
             for row in results:
-                (trade_id, symbol, side, status, size_contracts, 
+                (trade_id, symbol, side, trade_status, size_contracts, 
                  entry_price, mark_price, unrealized_pnl, 
                  opened_at, closed_at, last_updated) = row
                 
@@ -178,7 +178,7 @@ async def get_current_trades(user_id: str):
                     "trade_id": str(trade_id),
                     "symbol": symbol,
                     "side": side,
-                    "status": status,
+                    "trade_status": trade_status,
                     "size_contracts": float(size_contracts) if size_contracts else 0,
                     "entry_price": float(entry_price) if entry_price else 0,
                     "mark_price": float(mark_price) if mark_price else 0,

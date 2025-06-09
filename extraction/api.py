@@ -13,7 +13,7 @@ from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, HTTPException, BackgroundTasks
 from pydantic import BaseModel
 
-from core.common.logger import logger
+from core.common.logging_config import logger
 from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 from extraction.extraction_main import ExtractionManager
@@ -51,25 +51,32 @@ class MarketDataRequest(BaseModel):
     data_type: str = "indicator_values"
 
 
-async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes: List[str]):
+class WebhookRequest(BaseModel):
+    user_id: str = DEFAULT_USER_ID
+    config_id: str = "a93de31b-9b8a-42e3-827d-c31e580f5f36"  # Same UUID as new_trade.py
+    symbols: Optional[List[str]] = None
+    timeframes: Optional[List[str]] = None
+
+
+async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes: List[str], config_id: str = "default"):
     """
     Trigger Decision API after successful extraction (Webhook pattern).
     """
     try:
-        # Call Decision API to analyze the freshly extracted data
+        # Call Decision webhook to analyze the freshly extracted data
         async with httpx.AsyncClient(timeout=60.0) as client:
-            decision_payload = {
+            webhook_payload = {
                 "user_id": user_id,
-                "mode": "auto",  # Let decision module determine if NEW_TRADE or MANAGE_TRADE
-                "symbol": symbols[0] if symbols else None,
+                "config_id": config_id,  # Pass through the extraction config_id
+                "symbol": symbols[0] if symbols else "BTC/USDT",
                 "timeframes": timeframes
             }
             
-            # Call the combined API endpoint
-            api_base = os.getenv("API_BASE_URL", "http://localhost:8000")
+            # Call the decision webhook endpoint
+            decision_webhook_url = os.getenv("DECISION_WEBHOOK_URL", "http://localhost:8000/decision/webhooks/trigger-decision")
             response = await client.post(
-                f"{api_base}/decision/api/decision/analyze",
-                json=decision_payload
+                decision_webhook_url,
+                json=webhook_payload
             )
             
             if response.status_code == 200:
@@ -89,11 +96,74 @@ async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes:
         return None
 
 
-async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optional[List[str]], timeframes: Optional[List[str]]):
+async def setup_pre_extraction_monitoring(user_id: str, config_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Setup account monitoring before extraction (like new_trade.py setup_monitoring).
+    Ensures fresh account state before data extraction.
+    """
+    logger.bind(user_id=user_id).info("Setting up pre-extraction account monitoring...")
+    
+    try:
+        # Get credentials from environment
+        api_key = os.getenv('EXCHANGE_API')
+        secret = os.getenv('EXCHANGE_SECRET')
+        
+        if not api_key or not secret:
+            logger.bind(user_id=user_id).warning("Exchange credentials not found - proceeding without pre-extraction monitoring")
+            return None
+        
+        # Import monitoring service
+        from core.monitoring.service import AccountMonitoringService
+        
+        credentials = {
+            'apiKey': api_key,
+            'secret': secret
+        }
+        
+        monitor = AccountMonitoringService(
+            user_id=user_id,
+            config_id=config_id,
+            exchange_name="bitmex",
+            credentials=credentials,
+            testnet=True
+        )
+        
+        # Create exchange client and update account state
+        try:
+            monitor.exchange = await monitor._create_exchange_client()
+            
+            logger.bind(user_id=user_id).info("Updating account state before extraction...")
+            result = await monitor._update_account_state()
+            
+            logger.bind(user_id=user_id).info("✓ Pre-extraction monitoring completed")
+            logger.bind(user_id=user_id).info(f"  - Position sync: {result['position_sync_performed']}")
+            
+            return result
+            
+        finally:
+            # Close exchange connection
+            if hasattr(monitor, 'exchange') and monitor.exchange:
+                await monitor.exchange.close()
+                monitor.exchange = None
+            
+    except Exception as e:
+        logger.bind(user_id=user_id).warning(f"Pre-extraction monitoring failed: {e}")
+        logger.bind(user_id=user_id).info("Proceeding with extraction anyway")
+        return None
+
+
+async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optional[List[str]], timeframes: Optional[List[str]], config_id: Optional[str] = "default"):
     """Background task to run extraction."""
     try:
         # Update status to running
         extraction_status[extraction_id]["status"] = "running"
+        
+        # Setup pre-extraction monitoring (like new_trade.py setup_monitoring)
+        monitoring_result = await setup_pre_extraction_monitoring(user_id, config_id)
+        if monitoring_result:
+            logger.bind(user_id=user_id).info("Account state refreshed before extraction")
+        else:
+            logger.bind(user_id=user_id).info("Proceeding with extraction without fresh monitoring")
         
         # Use the direct function like the working test
         from extraction.extraction_main import extract_mcp_indicators
@@ -135,10 +205,15 @@ async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optiona
             extraction_id=extraction_id
         ).info(f"Extraction completed with {data_points} data points")
         
+        # Allow 90 seconds for all configured indicators to complete extraction
+        await asyncio.sleep(90)
+        
         # Trigger Decision webhook after successful extraction (Pipeline Pattern)
-        # TEMPORARILY DISABLED for testing
-        # if data_points > 0:
-        #     await trigger_decision_webhook(user_id, symbols, timeframes)
+        if data_points > 0:
+            logger.bind(user_id=user_id).info("⏱️ Triggering decision webhook after extraction...")
+            await trigger_decision_webhook(user_id, symbols, timeframes, config_id)
+        else:
+            logger.bind(user_id=user_id).warning("No data extracted, skipping decision webhook")
         
     except Exception as e:
         logger.bind(
@@ -178,7 +253,8 @@ async def trigger_extraction(request: ExtractionRequest, background_tasks: Backg
         extraction_id,
         request.user_id,
         request.symbols,
-        request.timeframes
+        request.timeframes,
+        "default"  # Regular API uses default config for now
     )
     
     # Calculate expected data points
@@ -306,6 +382,49 @@ async def cleanup_old_status():
 async def startup_event():
     """Start background cleanup task."""
     asyncio.create_task(cleanup_old_status())
+
+
+@app.post("/webhooks/trigger-extraction")
+async def webhook_trigger_extraction(request: WebhookRequest, background_tasks: BackgroundTasks):
+    """
+    Webhook endpoint to trigger extraction.
+    
+    This endpoint accepts a standard webhook payload and triggers market data extraction.
+    Returns immediately with status while processing happens in background.
+    """
+    extraction_id = str(uuid.uuid4())
+    
+    # Initialize status tracking
+    extraction_status[extraction_id] = {
+        "extraction_id": extraction_id,
+        "status": "pending",
+        "started_at": datetime.utcnow().isoformat() + "Z",
+        "completed_at": None,
+        "data_points_extracted": 0,
+        "errors": []
+    }
+    
+    # Add background task
+    background_tasks.add_task(
+        run_extraction_task,
+        extraction_id,
+        request.user_id,
+        request.symbols,
+        request.timeframes,
+        request.config_id  # Use the webhook config_id
+    )
+    
+    logger.bind(user_id=request.user_id).info(
+        f"Webhook triggered extraction for config {request.config_id}"
+    )
+    
+    return {
+        "status": "triggered",
+        "extraction_id": extraction_id,
+        "message": "Extraction triggered via webhook",
+        "user_id": request.user_id,
+        "config_id": request.config_id
+    }
 
 
 if __name__ == "__main__":

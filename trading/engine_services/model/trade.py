@@ -105,61 +105,35 @@ class Trade(BaseModel):
         Returns:
             Trade object
         """
-        # Map fields from DB record to Trade model
-        # Convert snake_case DB fields to model fields
-        mapping = {
-            'trade_id': 'trade_id',
-            'user_id': 'user_id',
-            'decision_id': 'decision_id',
-            'exchange': 'exchange',
-            'symbol': 'symbol',  # Both DB and model use 'symbol'
-            'direction': 'direction',
-            'trade_status': 'trade_status',  # Both DB and model should use 'trade_status'
-            'created_at': 'created_at',
-            'entry_time': 'entry_time',
-            'last_updated': 'last_updated',
-            'closed_at': 'closed_at',
-            'entry_price': 'entry_price',
-            'current_price': 'current_price',
-            'position_size': 'position_size',
-            'collateral_amount': 'collateral_amount',
-            'leverage': 'leverage',
-            'stop_loss': 'stop_loss',
-            'take_profit': 'take_profit',
-            'liquidation_price': 'liquidation_price',
-            'unrealized_pnl': 'unrealized_pnl',
-            'profit_loss': 'profit_loss',
-            'funding_paid': 'funding_paid',
-            'confidence_score': 'confidence_score',
-            'reasoning_log': 'reasoning_log',
-            'risk_rejected': 'risk_rejected',
-            'risk_reason': 'risk_reason',
-            'entry_order_id': 'entry_order_id',
-            'exit_order_id': 'exit_order_id',
-            'client_order_id': 'client_order_id',
-            'execution_details': 'execution_details',
-            'adjustments': 'adjustments',
-        }
-        
-        # Create a dictionary with mapped fields
+        # Create a dictionary with mapped fields (using consistent field names)
         mapped_data = {}
-        for db_field, model_field in mapping.items():
-            if db_field in record:
-                mapped_data[model_field] = record[db_field]
+        
+        # Direct field mapping since we use consistent field names now
+        db_fields = [
+            'trade_id', 'user_id', 'decision_id', 'exchange', 'symbol', 'direction',
+            'trade_status', 'created_at', 'entry_time', 'last_updated', 'closed_at',
+            'entry_price', 'current_price', 'position_size', 'collateral_amount',
+            'leverage', 'stop_loss', 'take_profit', 'liquidation_price',
+            'unrealized_pnl', 'profit_loss', 'funding_paid', 'confidence_score',
+            'reasoning_log', 'risk_rejected', 'risk_reason', 'entry_order_id',
+            'exit_order_id', 'client_order_id', 'execution_details', 'adjustments'
+        ]
+        
+        for field in db_fields:
+            if field in record:
+                mapped_data[field] = record[field]
                 
-        # Handle special fields
+        # Handle special fields - convert string enums back to enum types
         if 'trade_status' in mapped_data:
             try:
                 mapped_data['trade_status'] = TradeStatus(mapped_data['trade_status'])
             except ValueError:
-                # Default to PENDING if trade_status is invalid
                 mapped_data['trade_status'] = TradeStatus.PENDING
                 
         if 'direction' in mapped_data:
             try:
                 mapped_data['direction'] = TradeDirection(mapped_data['direction'])
             except ValueError:
-                # Default to LONG if direction is invalid
                 mapped_data['direction'] = TradeDirection.LONG
                 
         # Create and return the Trade object
@@ -175,16 +149,7 @@ class Trade(BaseModel):
         # Convert model to a dictionary
         data = self.model_dump()
         
-        # Map fields from Trade model to DB record
-        # Both model and DB use the same field names now, so no mapping needed
-        mapping = {}
-        
-        # Apply mapping
-        for model_field, db_field in mapping.items():
-            if model_field in data:
-                data[db_field] = data.pop(model_field)
-                
-        # Convert enum values to strings
+        # Convert enum values to strings for database storage
         if 'trade_status' in data and isinstance(data['trade_status'], TradeStatus):
             data['trade_status'] = data['trade_status'].value
             

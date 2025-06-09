@@ -49,6 +49,69 @@ Example configuration:
 }
 ```
 
+## Autonomous Webhook Integration ✅
+
+### Webhook Endpoint: `/webhooks/trigger-decision`
+
+The decision module provides a webhook endpoint for autonomous trading pipeline integration.
+
+#### **Endpoint Details**
+```
+POST /decision/webhooks/trigger-decision
+```
+
+#### **Request Payload**
+```json
+{
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "config_id": "a93de31b-9b8a-42e3-827d-c31e580f5f36",
+  "symbol": "BTC/USDT",
+  "timeframes": ["15m"]
+}
+```
+
+#### **Response Format**
+```json
+{
+  "status": "success",
+  "decision_id": "uuid-string",
+  "action": "short",
+  "confidence": 0.65
+}
+```
+
+#### **Autonomous Chain Behavior**
+
+1. **Fresh Account State**: Calls `setup_account_monitoring()` to get latest exchange positions
+2. **Mode Auto-Detection**: Automatically determines NEW_TRADE vs MANAGE_TRADE based on active database trades
+3. **Market Data Retrieval**: Fetches latest indicator data from market_data table using exact symbol from extraction
+4. **Price Validation**: Uses dual-source price validation (YFinance + CCXT) with 5% tolerance for accuracy
+5. **LLM Decision**: Generates trading intent using DeepSeek LLM with user's strategy and market context
+6. **Auto-Chaining**: If decision is actionable (not "no_action", "hold", "wait"), triggers Trading webhook
+
+#### **Price Service Integration**
+The decision module uses a sophisticated dual-source price validation system:
+- **Primary Sources**: YFinance and CCXT (multiple exchanges)
+- **Consensus Pricing**: Validates price agreement within 5% tolerance
+- **Fallback Strategy**: Can use single source if one fails
+- **Exchange Coverage**: Binance, Coinbase, Kraken, OKX, Bybit in priority order
+
+#### **Mode Detection Logic**
+```python
+# Automatic mode detection based on active trades
+with get_db_connection() as conn:
+    cur.execute("SELECT COUNT(*) FROM trades WHERE user_id = %s AND config_id = %s AND trade_status = 'open'")
+    active_trades = cur.fetchone()[0]
+    actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
+```
+
+#### **Integration with Trading Module**
+```python
+# Auto-trigger trading if actionable
+if action not in ["no_action", "hold", "wait"]:
+    await trigger_trading_webhook(user_id, intent, decision_id)
+```
+
 ## Current Implementation Status
 
 ### Completed ✅
@@ -89,14 +152,17 @@ Example configuration:
 - [x] Add logging throughout the decision process
 - [x] Ensure proper error handling and fallbacks
 - [x] Test with real market data from extraction module
+- [x] **Autonomous webhook integration**: Full webhook chain support for autonomous trading
+- [x] **Dual-source price validation**: Robust price fetching with consensus validation
+- [x] **Fresh account state integration**: Exchange state synchronization before decisions
 
 ### In Progress 🔄
 - [ ] None currently
 
 ### To Be Implemented 📋
-- [ ] Integration with API endpoints for production deployment
-- [ ] Scheduled execution via cron or similar
+- [ ] Scheduled execution via APScheduler (Phase 2)
 - [ ] Performance optimizations for batch processing
+- [ ] Multi-symbol parallel decision making
 
 ## Technical Design Decisions
 

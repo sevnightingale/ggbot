@@ -244,7 +244,7 @@ def check_trades(user_id: str = DEFAULT_USER_ID) -> List[Dict[str, Any]]:
         log(f"✓ Found {len(trades)} trades in database")
         
         for trade in trades:
-            log(f"  {trade['symbol']}: {trade.get('size_contracts', 0)} contracts, status: {trade.get('status', 'unknown')}")
+            log(f"  {trade['symbol']}: {trade.get('size_contracts', 0)} contracts, status: {trade.get('trade_status', 'unknown')}")
         
         return trades
     else:

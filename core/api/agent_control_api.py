@@ -14,8 +14,10 @@ from pydantic import BaseModel
 
 from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
-from core.config.config_main import get_configuration, save_configuration
+from core.config.config_main import get_configuration
 from core.common.db import get_db_connection
+import json
+from pathlib import Path
 
 app = FastAPI(title="Agent Control API", version="1.0.0")
 
@@ -236,7 +238,10 @@ async def resume_agent(user_id: str, background_tasks: BackgroundTasks):
 @app.get("/api/config/{user_id}/{module}")
 async def get_configuration_endpoint(user_id: str, module: str):
     """Get configuration for a specific module."""
-    config = get_configuration(user_id, module)
+    # Use the default config_id we've been using
+    default_config_id = "a93de31b-9b8a-42e3-827d-c31e580f5f36"
+    
+    config = get_configuration(user_id, config_type=module, config_id=default_config_id)
     
     if not config:
         raise HTTPException(status_code=404, detail="Configuration not found")
@@ -260,8 +265,27 @@ async def update_configuration(
         if module not in ["extraction", "decision", "trading"]:
             raise HTTPException(status_code=400, detail="Invalid module name")
         
-        # Save configuration
-        save_configuration(user_id, module, request.config)
+        # Update configuration in database using the default config_id
+        default_config_id = "a93de31b-9b8a-42e3-827d-c31e580f5f36"
+        
+        # Get current unified config from database
+        current_unified_config = get_configuration(user_id, config_id=default_config_id)
+        
+        if not current_unified_config:
+            raise HTTPException(status_code=404, detail="Base configuration not found")
+        
+        # Update the specific module section
+        current_unified_config[module] = request.config
+        
+        # Save updated unified config back to database
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE configurations 
+                    SET config_data = %s, updated_at = NOW() 
+                    WHERE config_id = %s
+                """, (json.dumps(current_unified_config), default_config_id))
+                conn.commit()
         
         # If module is running, it will pick up changes on next cycle
         module_running = is_module_running(user_id, module)
@@ -277,6 +301,53 @@ async def update_configuration(
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@app.post("/api/scheduler/start")
+async def start_scheduler():
+    """Start autonomous trading scheduler."""
+    try:
+        from core.scheduling.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        result = scheduler.start_autonomous_mode()
+        
+        logger.info("🚀 Scheduler start requested via API", result=result)
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to start scheduler: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/scheduler/stop")
+async def stop_scheduler():
+    """Stop autonomous trading scheduler."""
+    try:
+        from core.scheduling.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        result = scheduler.stop_autonomous_mode()
+        
+        logger.info("🛑 Scheduler stop requested via API", result=result)
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to stop scheduler: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/scheduler/status")
+async def get_scheduler_status():
+    """Get current scheduler status."""
+    try:
+        from core.scheduling.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        result = scheduler.get_status()
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to get scheduler status: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
@@ -285,12 +356,23 @@ async def health_check():
         len(procs) for procs in active_processes.values()
     )
     
+    # Get scheduler status
+    scheduler_status = "unknown"
+    try:
+        from core.scheduling.scheduler import get_scheduler
+        scheduler = get_scheduler()
+        status = scheduler.get_status()
+        scheduler_status = status.get("scheduler", {}).get("autonomous_mode", "unknown")
+    except:
+        pass
+    
     return {
         "status": "healthy",
         "service": "agent-control-api",
         "timestamp": datetime.utcnow().isoformat() + "Z",
         "active_users": len(active_processes),
-        "total_processes": total_processes
+        "total_processes": total_processes,
+        "scheduler_status": scheduler_status
     }
 
 

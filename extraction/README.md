@@ -286,6 +286,61 @@ Tool metadata is stored in `core/mcp/metadata/`:
 - `indicator_name_mapping.json`: Name mappings
 - `__init__.py`: Helper functions for tool lookup
 
+## Autonomous Webhook Integration ✅
+
+### Webhook Endpoint: `/webhooks/trigger-extraction`
+
+The extraction module provides a webhook endpoint for autonomous trading pipeline integration.
+
+#### **Endpoint Details**
+```
+POST /extraction/webhooks/trigger-extraction
+```
+
+#### **Request Payload**
+```json
+{
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "config_id": "a93de31b-9b8a-42e3-827d-c31e580f5f36",
+  "symbols": ["BTC/USDT"],
+  "timeframes": ["15m"]
+}
+```
+
+#### **Response Format**
+```json
+{
+  "status": "success",
+  "extraction_id": "uuid-string",
+  "message": "Extraction started in background"
+}
+```
+
+#### **Autonomous Chain Behavior**
+
+1. **Pre-Extraction Monitoring**: Refreshes account state from exchange before extraction
+2. **Background Processing**: Runs extraction asynchronously using FastAPI BackgroundTasks
+3. **Indicator Collection**: Extracts all configured indicators (e.g., RSI) via MCP
+4. **Data Storage**: Stores indicator data and LLM interpretation in market_data table
+5. **90-Second Delay**: Waits 90 seconds to ensure all indicators complete before chain continuation
+6. **Auto-Chaining**: Automatically triggers Decision webhook if data_points > 0
+
+#### **Timing Strategy**
+The 90-second delay ensures all configured indicators have time to complete:
+- Multiple timeframes (15m, 1h, 4h)
+- Multiple indicators (RSI, MACD, Bollinger Bands, etc.)
+- MCP server processing time and network latency
+- Exchange API rate limiting
+
+#### **Integration with Decision Module**
+```python
+# After extraction completion
+if data_points > 0:
+    await trigger_decision_webhook(user_id, symbols, timeframes, config_id)
+```
+
+The webhook passes the exact symbol used in extraction to ensure data compatibility with the decision module.
+
 ## Current Implementation Status
 
 - [x] **Configuration-driven architecture**: ExtractionManager reads user settings
@@ -296,6 +351,7 @@ Tool metadata is stored in `core/mcp/metadata/`:
 - [x] **Environment variable loading**: Reads from .env file at project root
 - [x] **Analytical LLM interpretation**: Focus on data analysis, not trading advice
 - [x] **Command line interface**: Both configuration-driven and legacy modes
+- [x] **Autonomous webhook integration**: Full webhook chain support for autonomous trading
 - [ ] **TradingView source**: Implementation pending
 - [ ] **YFinance source**: Implementation pending  
 - [ ] **Multi-indicator analysis**: Cross-indicator pattern recognition
