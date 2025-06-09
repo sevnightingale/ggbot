@@ -11,12 +11,6 @@ interface AgentCircleProps {
   status: AgentStatus
 }
 
-const agentColors = {
-  extraction: 'agents-extraction',
-  decision: 'agents-decision',
-  trading: 'agents-trading',
-}
-
 const statusIcons = {
   configured: Check,
   partial: AlertTriangle,
@@ -26,7 +20,6 @@ const statusIcons = {
 export function AgentCircle({ name, type, status }: AgentCircleProps) {
   const { openConfigModal } = useBotStore()
   const StatusIcon = statusIcons[status]
-  const agentColor = agentColors[type]
 
   const handleClick = () => {
     openConfigModal(type)
