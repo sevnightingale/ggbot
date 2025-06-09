@@ -10,10 +10,11 @@ import { PerformanceChart } from '@/components/charts/PerformanceChart'
 import { AgentConfigModal } from '@/components/bot/AgentConfigModal'
 
 interface BotDetailPageProps {
-  params: { id: string }
+  params: Promise<{ id: string }>
 }
 
-export default function BotDetailPage({ params }: BotDetailPageProps) {
+export default async function BotDetailPage({ params }: BotDetailPageProps) {
+  const resolvedParams = await params
   const {
     loadConfigurations,
     loadTrades,
@@ -67,7 +68,7 @@ export default function BotDetailPage({ params }: BotDetailPageProps) {
           <div className="flex items-center gap-2 text-sm text-bone-400 mb-2">
             <span>My Bots</span>
             <span>›</span>
-            <span>Bot {params.id}</span>
+            <span>Bot {resolvedParams.id}</span>
           </div>
           <h1 className="text-3xl font-display font-bold">Bot Dashboard</h1>
           {error && (
