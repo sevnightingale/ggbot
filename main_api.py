@@ -6,6 +6,8 @@ In production, these would be split into separate microservices.
 """
 import os
 import sys
+import signal
+import asyncio
 from pathlib import Path
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -17,6 +19,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 # Set up logging before importing other modules
 from core.common.logging_config import setup_logging
 log_file = setup_logging()
+
+# Import scheduler functions
+from core.scheduling.scheduler import initialize_scheduler, shutdown_scheduler
 
 # Import all the API apps
 from extraction.api import app as extraction_app
@@ -107,6 +112,34 @@ async def health_check():
         "mode": "combined"
     }
 
+
+@app.on_event("startup")
+async def startup_event():
+    """Initialize scheduler on startup."""
+    from core.common.logger import logger
+    
+    logger.info("🚀 Starting GGBot API Server with integrated scheduler")
+    
+    # Initialize the scheduler (but don't start autonomous mode)
+    success = await initialize_scheduler()
+    if success:
+        logger.info("✅ Scheduler initialized successfully (autonomous mode off)")
+    else:
+        logger.error("❌ Failed to initialize scheduler")
+
+
+@app.on_event("shutdown") 
+async def shutdown_event():
+    """Gracefully shutdown scheduler on API shutdown."""
+    from core.common.logger import logger
+    
+    logger.info("🔄 Shutting down GGBot API Server...")
+    
+    # Shutdown the scheduler
+    await shutdown_scheduler()
+    
+    logger.info("✅ Scheduler shutdown complete")
+
 if __name__ == "__main__":
     # Get configuration from environment
     host = os.environ.get("API_HOST", "0.0.0.0")
@@ -120,6 +153,10 @@ if __name__ == "__main__":
     print("  Trading:    http://localhost:8000/trading/docs")
     print("  Dashboard:  http://localhost:8000/dashboard/docs")
     print("  Agent:      http://localhost:8000/agent/docs")
+    print("\nScheduler Control:")
+    print("  Start:  POST http://localhost:8000/agent/api/scheduler/start")
+    print("  Stop:   POST http://localhost:8000/agent/api/scheduler/stop")
+    print("  Status: GET  http://localhost:8000/agent/api/scheduler/status")
     
     # Run the server
     uvicorn.run(

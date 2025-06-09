@@ -12,6 +12,81 @@ The Trading Module is responsible for executing trades based on decisions (inten
 - Executing validated trades on exchanges
 - Monitoring positions for stop-loss/take-profit conditions
 - Providing feedback on trade status and execution
+- **Autonomous webhook integration for seamless pipeline execution**
+
+## Autonomous Webhook Integration ✅
+
+### Webhook Endpoint: `/webhooks/execute-trade`
+
+The trading module provides a webhook endpoint for autonomous trading pipeline integration.
+
+#### **Endpoint Details**
+```
+POST /trading/webhooks/execute-trade
+```
+
+#### **Request Payload**
+```json
+{
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "config_id": "a93de31b-9b8a-42e3-827d-c31e580f5f36",
+  "decision_id": "uuid-string",
+  "action": "short",
+  "confidence": 0.65,
+  "symbol": "BTC/USDT",
+  "stop_loss_price": 107000.0,
+  "take_profit_price": 104500.0,
+  "reasoning": "Strategy-based decision reasoning..."
+}
+```
+
+#### **Response Format**
+```json
+{
+  "status": "success",
+  "trade_id": "uuid-string",
+  "verification_status": "fully_verified"
+}
+```
+
+#### **Autonomous Chain Behavior**
+
+1. **Fresh Account State**: Gets latest account balance for accurate position sizing calculations
+2. **Confidence-Based Position Sizing**: Converts confidence score to risk percentage and position size
+3. **Risk Validation**: Applies leverage limits, position size caps, and emergency limits
+4. **LLM Trade Execution**: Uses GPT-4 to generate specific tool calls for the exchange
+5. **Batch Execution**: Executes market order + stop-loss + take-profit orders simultaneously
+6. **Comprehensive Verification**: Complete post-trade verification including exchange sync and audit trail
+
+#### **Position Sizing Logic**
+```python
+# Confidence-based risk calculation
+def confidence_to_risk_percentage(confidence: float) -> float:
+    # Maps confidence 0.0-1.0 to risk tiers
+    # Higher confidence = higher risk allocation
+    # Capped at emergency maximum ($10,000 position)
+
+# Position calculation
+position_calc = calculate_position_from_confidence(
+    confidence=confidence,
+    account_balance_usd=account_balance_usd,
+    default_leverage=10,
+    max_position_usd=10000
+)
+```
+
+#### **Comprehensive Verification Process**
+1. **5-Second Settlement Wait**: Allows exchange position to settle
+2. **Exchange Position Sync**: Verifies real position exists on exchange via TradeLifecycleManager
+3. **Database Trade Sync**: Ensures database trade records match exchange reality
+4. **Strategy Runs Verification**: Confirms audit trail created with decision reasoning
+5. **Success Criteria**: Real exchange position + complete audit trail = fully verified trade
+
+#### **Integration Benefits**
+- **End-to-End Pipeline**: Completes autonomous chain from extraction to trade execution
+- **Risk Management**: Built-in position sizing based on decision confidence
+- **Audit Trail**: Complete strategy_runs entries link decisions to outcomes
+- **Exchange Verification**: Real position confirmation prevents phantom trades
 
 ## Architecture
 
@@ -43,7 +118,7 @@ The central facade that orchestrates the overall trading flow:
 - Executes validated tool calls on exchanges
 - Handles order creation and management
 - Provides execution results and confirmations
-- Focuses primarily on trade execution, not monitoring
+- No longer handles position monitoring (delegated to AccountMonitoringService)
 
 #### PositionMonitor
 - Uses direct CCXT connections for reliable position monitoring
@@ -406,10 +481,10 @@ The Trading Module follows a comprehensive testing approach:
 - ✅ Order Management: create_limit_order, cancel_order, edit_order
 - ✅ Real Exchange Integration: Successfully executing orders on BitMEX testnet
 
-**Phase 3: End-to-End Testing** 🔄 **IN PROGRESS**
-- ⏳ Complete trading flow from decision intent to execution
-- ⏳ LLM integration with MCP tools
-- ⏳ Full pipeline testing with real trading scenarios
+**Phase 3: End-to-End Testing** ✅ **COMPLETED**
+- ✅ Complete trading flow from decision intent to execution
+- ✅ LLM integration with MCP tools
+- ✅ Full pipeline testing with real trading scenarios
 
 **Phase 4: Production Integration** ✅ **COMPLETED**
 - ✅ Database integration for trade persistence with Universal Trade Lifecycle

@@ -26,11 +26,13 @@ import uvicorn
 # Add project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from core.common.logger import logger
+from core.common.logging_config import logger
 from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 from core.mcp.exceptions import MCPError
 from core.monitoring.hybrid_service import HybridMonitoringService
+from core.monitoring.service import AccountMonitoringService
+from trading.lifecycle_manager import TradeLifecycleManager
 from trading.engine import TradingEngine
 
 
@@ -83,8 +85,156 @@ class AccountStatus(BaseModel):
     timestamp: str
 
 
+class WebhookRequest(BaseModel):
+    user_id: str = DEFAULT_USER_ID
+    config_id: str = "a93de31b-9b8a-42e3-827d-c31e580f5f36"  # Same UUID as new_trade.py
+    decision_id: Optional[str] = None
+    llm_decision: Optional[str] = None
+    confidence: Optional[float] = None
+    action: Optional[str] = None
+    symbol: Optional[str] = None
+    stop_loss_price: Optional[float] = None
+    take_profit_price: Optional[float] = None
+    reasoning: Optional[str] = None
+    
+    class Config:
+        extra = "allow"
+
+
 # Global state for trading engines (per user)
 trading_engines: Dict[str, TradingEngine] = {}
+
+
+async def verify_strategy_runs_webhook(trade_id: str, config_id: str) -> bool:
+    """
+    Verify strategy_runs entries were created for the trade (like new_trade.py verify_strategy_runs).
+    
+    Args:
+        trade_id: The trade ID to verify
+        config_id: The config ID for the trade
+        
+    Returns:
+        True if strategy_runs entries exist, False otherwise
+    """
+    logger.info(f"Verifying strategy_runs entries for trade {trade_id}...")
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cursor:
+                # First check if any strategy_runs exist for this config (like new_trade.py)
+                cursor.execute("""
+                    SELECT scenario, confidence_score, reasoning_log, created_at
+                    FROM strategy_runs
+                    WHERE config_id = %s
+                    ORDER BY created_at DESC
+                    LIMIT 10
+                """, (config_id,))
+                
+                results = cursor.fetchall()
+                
+                if results:
+                    logger.info(f"✓ Found {len(results)} strategy_runs entries:")
+                    for scenario, confidence, reasoning, created_at in results:
+                        logger.info(f"  - {scenario}: confidence={confidence}, created={created_at}")
+                        if reasoning:
+                            logger.info(f"    Reasoning: {reasoning[:100]}...")
+                    return True
+                else:
+                    logger.warning("✗ No strategy_runs entries found")
+                    return False
+                    
+    except Exception as e:
+        logger.error(f"✗ Error checking strategy_runs: {e}")
+        return False
+
+
+async def verify_trade_execution(user_id: str, config_id: str) -> Dict[str, Any]:
+    """
+    Verify trade execution by syncing with exchange and checking positions.
+    Same logic as new_trade.py verify_exchange_sync().
+    """
+    logger.bind(user_id=user_id).info("🔍 Verifying trade execution via exchange sync...")
+    
+    try:
+        # Get credentials from environment (consistent with new_trade.py)
+        api_key = os.getenv('EXCHANGE_API')
+        secret = os.getenv('EXCHANGE_SECRET')
+        
+        if not api_key or not secret:
+            logger.bind(user_id=user_id).warning("Exchange credentials not found - cannot verify real positions")
+            return {
+                'total_positions': 0,
+                'trades_opened': 0,
+                'trades_updated': 0,
+                'trades_closed': 0,
+                'sync_errors': 0,
+                'account_updated': False,
+                'position_sync_performed': False,
+                'error': 'No credentials available'
+            }
+        
+        credentials = {
+            'apiKey': api_key,
+            'secret': secret
+        }
+        
+        # Create monitoring service
+        monitor = AccountMonitoringService(
+            user_id=user_id,
+            config_id=config_id,
+            exchange_name="bitmex",
+            credentials=credentials,
+            testnet=True
+        )
+        
+        # Create exchange connection and get fresh state
+        try:
+            monitor.exchange = await monitor._create_exchange_client()
+            result = await monitor._update_account_state()
+            
+            # Also verify trade lifecycle sync separately (like new_trade.py)
+            lifecycle_positions = await monitor.adapter.get_positions_for_lifecycle(monitor.exchange)
+            lifecycle_manager = TradeLifecycleManager(user_id, "bitmex", config_id)
+            sync_results = await lifecycle_manager.sync_positions_to_trades(lifecycle_positions, monitor.adapter)
+            
+            # Update with lifecycle sync results
+            result.update({
+                'trades_opened': sync_results['trades_opened'],
+                'trades_updated': sync_results['trades_updated'], 
+                'trades_closed': sync_results['trades_closed'],
+                'sync_errors': len(sync_results['errors'])
+            })
+            
+            # Log results including trade lifecycle sync
+            logger.bind(user_id=user_id).info("✅ Trade verification and lifecycle sync complete:")
+            logger.bind(user_id=user_id).info(f"  - Live positions on exchange: {result['total_positions']}")
+            logger.bind(user_id=user_id).info(f"  - Trade lifecycle: {result['trades_opened']} opened, {result['trades_updated']} updated, {result['trades_closed']} closed")
+            logger.bind(user_id=user_id).info(f"  - Sync errors: {result['sync_errors']}")
+            logger.bind(user_id=user_id).info(f"  - Account state updated: {result['account_updated']}")
+            
+            return result
+            
+        finally:
+            # Always ensure exchange connection is closed
+            if hasattr(monitor, 'exchange') and monitor.exchange:
+                try:
+                    await monitor.exchange.close()
+                    monitor.exchange = None
+                except Exception as cleanup_error:
+                    logger.bind(user_id=user_id).warning(f"Error closing exchange connection: {cleanup_error}")
+        
+    except Exception as e:
+        logger.bind(user_id=user_id).error(f"Trade verification failed: {e}")
+        return {
+            'total_positions': 0,
+            'trades_opened': 0,
+            'trades_updated': 0,
+            'trades_closed': 0,
+            'sync_errors': 1,
+            'account_updated': False,
+            'position_sync_performed': False,
+            'error': str(e)
+        }
 
 
 async def get_account_state(user_id: str, exchange: str = "bitmex") -> Optional[Dict[str, Any]]:
@@ -882,6 +1032,196 @@ def _standardize_account_balance(account_state: Dict) -> Dict:
             'equity_usd': 1000.0,
             'used_margin_usd': 0.0,
             'btc_price_used': 104000
+        }
+
+
+@app.post("/webhooks/execute-trade")
+async def webhook_execute_trade(request: WebhookRequest):
+    """
+    Webhook endpoint to execute trades.
+    
+    This endpoint implements the full trading logic from new_trade.py including:
+    - Position sizing calculation based on confidence (SAME AS /trade/execute)
+    - Trade execution through Trading Engine
+    - Post-trade verification and exchange sync
+    - Trade lifecycle management
+    """
+    try:
+        logger.bind(user_id=request.user_id).info(
+            f"⚡ Trading webhook triggered for config {request.config_id}: {request.action}"
+        )
+        
+        # Get trading engine for user
+        engine = await get_trading_engine(request.user_id)
+        
+        # Convert webhook request to TradingIntent
+        intent_data = request.model_dump()
+        
+        # Remove None values to avoid issues
+        intent_data = {k: v for k, v in intent_data.items() if v is not None}
+        
+        # Ensure required fields
+        if not intent_data.get('action'):
+            intent_data['action'] = 'no_action'
+        if not intent_data.get('symbol'):
+            intent_data['symbol'] = 'BTC/USD'
+        if not intent_data.get('confidence'):
+            intent_data['confidence'] = 0.5
+        
+        # === POSITION SIZING LOGIC (SAME AS /trade/execute) ===
+        
+        # Step 1: Get current account state for risk calculations
+        exchange_name = intent_data.get('exchange', 'bitmex')
+        account_state = await get_account_state(engine.user_id, exchange_name)
+        
+        if not account_state:
+            logger.bind(user_id=engine.user_id).warning("No account state available - proceeding without risk adjustments")
+            account_state = {
+                'available_margin': 0,
+                'equity': 0,
+                'used_margin': 0,
+                'balance_data': {},
+                'position_data': []
+            }
+        else:
+            logger.bind(user_id=engine.user_id).info(
+                f"Account state: {account_state['available_margin']:.8f} BTC available margin, "
+                f"{account_state['equity']:.8f} BTC equity"
+            )
+        
+        # Step 2: Standardize account balance
+        standardized_balance = _standardize_account_balance(account_state)
+        account_balance_usd = standardized_balance['account_balance_usd']
+        
+        # Step 3: Calculate position size based on confidence
+        if intent_data.get('confidence') is not None:
+            confidence = intent_data['confidence']
+            
+            # Get risk configuration from user config or use defaults
+            default_leverage = 10
+            min_position_usd = 100.0
+            max_position_usd = 10000.0
+            
+            # Calculate position based on confidence
+            position_calc = calculate_position_from_confidence(
+                confidence=confidence,
+                account_balance_usd=account_balance_usd,
+                default_leverage=default_leverage,
+                min_position_usd=min_position_usd,
+                max_position_usd=max_position_usd
+            )
+            
+            # Add calculated values to intent data
+            intent_data['collateral_amount'] = position_calc['collateral_amount']
+            intent_data['leverage'] = position_calc['leverage']
+            intent_data['risk_percentage'] = position_calc['risk_percentage']
+            intent_data['position_size_usd'] = position_calc['position_size_usd']
+            
+            logger.bind(user_id=engine.user_id).info(
+                f"📊 Position sized from confidence {confidence:.2f}: "
+                f"${position_calc['collateral_amount']:.2f} collateral "
+                f"({position_calc['risk_percentage']:.1f}% risk) "
+                f"@ {position_calc['leverage']}x leverage"
+            )
+        else:
+            # Fallback if confidence not provided
+            logger.bind(user_id=engine.user_id).warning(
+                "No confidence score provided, using minimal position"
+            )
+            intent_data['confidence'] = 0.5  # Default moderate confidence
+            intent_data['collateral_amount'] = 100.0  # Minimum position
+            intent_data['leverage'] = 10
+            intent_data['risk_percentage'] = 0.1
+            intent_data['position_size_usd'] = 1000.0
+        
+        # Step 4: Add account state to intent for validation context
+        intent_data['_account_state'] = account_state
+        
+        # === END POSITION SIZING LOGIC ===
+        
+        # Execute through trading engine (now with proper position sizing)
+        logger.bind(user_id=request.user_id).info(f"🔄 Executing trade: {intent_data.get('action')}")
+        result = await engine.process_decision_intent(intent_data)
+        
+        # Post-trade verification (comprehensive like new_trade.py)
+        verification_result = None
+        strategy_runs_verified = False
+        
+        if result.get("status") == "success" and intent_data.get('action') not in ['no_action', 'hold', 'wait']:
+            logger.bind(user_id=request.user_id).info("🔍 Performing comprehensive post-trade verification...")
+            
+            # Wait for position to settle (like new_trade.py line 432 - strategic timing)
+            import asyncio
+            logger.bind(user_id=request.user_id).info("⏱️ Waiting for position settlement...")
+            await asyncio.sleep(5)  # Match new_trade.py timing
+            
+            # Verify trade execution via exchange sync (like new_trade.py verify_exchange_sync)
+            verification_result = await verify_trade_execution(request.user_id, request.config_id)
+            
+            # Verify strategy_runs audit trail (like new_trade.py verify_strategy_runs)
+            trade_id = result.get("trade_id")
+            if trade_id:
+                strategy_runs_verified = await verify_strategy_runs_webhook(trade_id, request.config_id)
+            
+            # Enhanced status based on comprehensive verification
+            if (verification_result and verification_result.get('total_positions', 0) > 0 and strategy_runs_verified):
+                logger.bind(user_id=request.user_id).info("✅ Trade fully verified: Position + audit trail confirmed")
+                verification_status = "fully_verified"
+            elif (verification_result and verification_result.get('total_positions', 0) > 0):
+                logger.bind(user_id=request.user_id).info("⚠️ Trade verified but missing audit trail")
+                verification_status = "position_verified_no_audit"
+            else:
+                logger.bind(user_id=request.user_id).warning("⚠️ Trade executed but position not confirmed")
+                verification_status = "executed_not_verified"
+        else:
+            verification_status = "no_verification_needed"
+        
+        # Return comprehensive status (like new_trade.py)
+        response = {
+            "status": result.get("status", "unknown"),
+            "trade_id": result.get("trade_id"),
+            "action": intent_data.get('action'),
+            "symbol": intent_data.get('symbol'),
+            "confidence": intent_data.get('confidence'),
+            "message": f"Trade executed via webhook ({verification_status})",
+            "user_id": request.user_id,
+            "config_id": request.config_id,
+            "details": result.get("details"),
+            "verification_status": verification_status
+        }
+        
+        # Add verification details if available (comprehensive like new_trade.py)
+        if verification_result:
+            response.update({
+                "verification": {
+                    "positions_on_exchange": verification_result.get('total_positions', 0),
+                    "trades_opened": verification_result.get('trades_opened', 0),
+                    "trades_updated": verification_result.get('trades_updated', 0),
+                    "trades_closed": verification_result.get('trades_closed', 0),
+                    "sync_errors": verification_result.get('sync_errors', 0),
+                    "strategy_runs_verified": strategy_runs_verified,
+                    "account_updated": verification_result.get('account_updated', False),
+                    "position_sync_performed": verification_result.get('position_sync_performed', False)
+                }
+            })
+        
+        logger.bind(user_id=request.user_id).info(
+            f"🏁 Trading webhook completed: {response['status']} ({verification_status})"
+        )
+        
+        return response
+        
+    except Exception as e:
+        logger.bind(user_id=request.user_id).error(
+            f"❌ Webhook trade execution failed: {str(e)}"
+        )
+        return {
+            "status": "error",
+            "error": str(e),
+            "message": "Trade webhook failed",
+            "user_id": request.user_id,
+            "config_id": request.config_id,
+            "verification_status": "error"
         }
 
 

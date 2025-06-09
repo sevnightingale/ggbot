@@ -11,6 +11,7 @@ The Account Monitoring System provides real-time tracking of exchange account ba
 - **Data Consistency**: Single source of truth in database for account state
 - **Trade Lifecycle Integration**: Positions drive trade state via Universal Trade Lifecycle Management
 - **TP/SL Order Tracking**: Real-time monitoring of reduce-only orders with automated trade closure
+- **Centralized Monitoring**: Single monitoring service eliminates duplicate polling by Trading Module
 
 ### Key Components
 

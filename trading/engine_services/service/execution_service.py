@@ -133,12 +133,10 @@ class ExecutionService:
         # Active trades tracking
         self.active_trades = {}
         
-        # Polling task
-        self._polling_task = None
+        # Service state
         self._running = False
-        self._stop_event = asyncio.Event()
         
-        logger.info(f"ExecutionService initialized with polling interval {self.config.polling_interval}s")
+        logger.info("ExecutionService initialized")
     
     async def start(self):
         """
@@ -151,16 +149,12 @@ class ExecutionService:
             return
             
         self._running = True
-        self._stop_event.clear()
         
         # Load active trades from database
         await self._load_active_trades_from_db()
         
-        # Start position polling
-        self._polling_task = asyncio.create_task(
-            self._monitor_positions_loop(), 
-            name="ExecutionService_Monitor"
-        )
+        # Note: Position monitoring is handled by AccountMonitoringService
+        # No need for duplicate polling here
         
         # Emit event
         self.event_bus.emit(Event.create(EventType.ENGINE_STARTED))
@@ -169,27 +163,17 @@ class ExecutionService:
     
     async def stop(self):
         """
-        Stop the execution service and position monitoring.
+        Stop the execution service.
         
-        This will gracefully shut down the polling task and clean up resources.
+        This will clean up resources and mark the service as stopped.
         """
         if not self._running:
             return
             
         self._running = False
-        self._stop_event.set()
         
         logger.info("Stopping ExecutionService...")
         
-        # Cancel and wait for polling task
-        if self._polling_task:
-            self._polling_task.cancel()
-            try:
-                await self._polling_task
-            except asyncio.CancelledError:
-                pass
-            self._polling_task = None
-            
         # Emit event
         self.event_bus.emit(Event.create(EventType.ENGINE_STOPPED))
         
@@ -340,11 +324,12 @@ class ExecutionService:
             logger.error(f"Cannot register trade {trade_id}: No trade data provided or available")
             return False
             
-        # Create a Trade object from the data
+        # Create a Trade object from the data (for compatibility with existing methods)
         try:
             trade = Trade.from_db_record(trade_data)
         except Exception as e:
             logger.error(f"Error creating Trade object for {trade_id}: {e}", exc_info=True)
+            # Fallback: create minimal Trade object
             trade = Trade(
                 trade_id=trade_id,
                 user_id=trade_data.get("user_id", "unknown"),
@@ -356,7 +341,7 @@ class ExecutionService:
                 created_at=datetime.utcnow().isoformat()
             )
             
-        # Add to active trades
+        # Store Trade object
         self.active_trades[trade_id] = trade
         
         # Emit event

@@ -101,3 +101,48 @@ Leverage AI-driven design tools (e.g., ClaudeCode MAX) to quickly prototype, ite
 ---
 
 Use this comprehensive landing page design plan to ensure all visual and interactive elements cohesively embody the brand’s identity—sleek, adaptive, precise, and authentically trader-focused.
+
+
+
+
+
+
+COPY IDEAS:
+
+Headline
+Your Edge, Amplified
+Train an AI to trade like you—then let it run, 24/7.
+
+Subheadline
+ggbots is the first platform that lets you build autonomous AI trading agents that see the market like you do, adapt like you do, and execute like you should. No rigid scripts. No missed signals. Just your strategy—automated.
+
+What Makes ggbots Different
+Built Like a Trader, Not a Bot
+Most algo bots are glorified calculators. ggbots is an intelligent agent system designed to think like a real trader—yours.
+
+Sees Everything
+Charts. Custom indicators. Real-time prices. Even sentiment and news. The Extraction Agent watches it all.
+
+Thinks Strategically
+The Decision Agent analyzes the full picture, applies your strategy, and adjusts in real time. Just like you would—if you didn’t need sleep.
+
+Executes with Discipline
+The Trading Agent acts instantly, enforces your risk rules, and keeps you in the trade—or out—based on actual conditions, not old code.
+
+Why It Matters
+Markets Move Fast. Static Bots Break.
+ggbots adapts. When volatility spikes, news breaks, or signals shift, your agents respond. Not tomorrow. Not when the candle closes. Now.
+
+Trade While You Sleep—Your Way
+Your ggbot doesn’t guess. It trades the way you would, with your data, your indicators, and your risk limits.
+
+Customizable. Scalable. Built to Win.
+From niche indicators to dynamic strategies, ggbots gives you full control. Configure once. Improve over time. Let your edge scale without burnout.
+
+The Bottom Line
+This isn’t automation for automation’s sake.
+This is your trading strategy, encoded in AI—executed with discipline, 24/7.
+
+Call to Action
+Build Your First ggbot Now
+No code. No guesswork. Just your edge, on repeat.
