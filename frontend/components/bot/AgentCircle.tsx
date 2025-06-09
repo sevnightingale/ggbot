@@ -41,8 +41,12 @@ export function AgentCircle({ name, type, status }: AgentCircleProps) {
           "relative w-20 h-20 border-2 rounded-full transition-all duration-300 cursor-pointer",
           "hover:scale-105 focus:outline-none focus-visible:ring-2 focus-visible:ring-bone-300",
           status === 'configured' && [
-            `border-${agentColor}`,
-            `bg-${agentColor}/10`,
+            type === 'extraction' ? 'border-agents-extraction' :
+            type === 'decision' ? 'border-agents-decision' :
+            type === 'trading' ? 'border-agents-trading' : '',
+            type === 'extraction' ? 'bg-agents-extraction/10' :
+            type === 'decision' ? 'bg-agents-decision/10' :
+            type === 'trading' ? 'bg-agents-trading/10' : '',
             "animate-pulse-glow"
           ],
           status === 'partial' && [
@@ -77,7 +81,11 @@ export function AgentCircle({ name, type, status }: AgentCircleProps) {
       {/* Status indicator */}
       <div className={cn(
         "absolute -top-1 -right-1 w-6 h-6 rounded-full border-2 border-charcoal-900 flex items-center justify-center",
-        status === 'configured' && `bg-${agentColor}`,
+        status === 'configured' && (
+          type === 'extraction' ? 'bg-agents-extraction' :
+          type === 'decision' ? 'bg-agents-decision' :
+          type === 'trading' ? 'bg-agents-trading' : ''
+        ),
         status === 'partial' && "bg-status-warning",
         status === 'unconfigured' && "bg-bone-400"
       )}>

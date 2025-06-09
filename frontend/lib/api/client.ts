@@ -1,5 +1,4 @@
 import { 
-  UserConfig, 
   ExtractionConfig, 
   DecisionConfig, 
   TradingConfig,

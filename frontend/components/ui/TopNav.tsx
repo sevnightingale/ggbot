@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
-import { cn } from '@/lib/utils/cn'
 
 export function TopNav() {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
