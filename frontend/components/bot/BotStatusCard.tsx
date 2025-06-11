@@ -1,6 +1,6 @@
 'use client'
 
-import { Play, Square, AlertCircle } from 'lucide-react'
+import { Play, Square, AlertTriangle } from 'lucide-react'
 import { useBotStore } from '@/store/bot'
 
 interface BotStatusCardProps {
