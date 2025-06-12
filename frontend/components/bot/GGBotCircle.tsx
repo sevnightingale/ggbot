@@ -118,17 +118,19 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
           {/* Carousel Navigation */}
           <div className="flex items-center justify-between w-full max-w-lg">
             {/* Left Arrow */}
-            <button
-              onClick={handleLeftNav}
-              disabled={currentBotIndex === 0}
-              className={`p-2 transition-colors ${
-                currentBotIndex === 0 
-                  ? 'text-bone-500/30 cursor-not-allowed' 
-                  : 'text-bone-200 hover:text-bone-100'
-              }`}
-            >
-              <ChevronLeft size={32} />
-            </button>
+            <div className="flex items-center justify-center w-16 h-32">
+              <button
+                onClick={handleLeftNav}
+                disabled={currentBotIndex === 0}
+                className={`p-2 transition-colors ${
+                  currentBotIndex === 0 
+                    ? 'text-bone-500/30 cursor-not-allowed' 
+                    : 'text-bone-200 hover:text-bone-100'
+                }`}
+              >
+                <ChevronLeft size={32} />
+              </button>
+            </div>
 
             {/* Bot Emblem */}
             <div className="flex flex-col items-center space-y-3">
@@ -188,12 +190,14 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             </div>
 
             {/* Right Arrow or Plus */}
-            <button
-              onClick={handleRightNav}
-              className="p-2 text-bone-200 hover:text-bone-100 transition-colors"
-            >
-              {isLastBot ? <Plus size={32} /> : <ChevronRight size={32} />}
-            </button>
+            <div className="flex items-center justify-center w-16 h-32">
+              <button
+                onClick={handleRightNav}
+                className="p-2 text-bone-200 hover:text-bone-100 transition-colors"
+              >
+                {isLastBot ? <Plus size={32} /> : <ChevronRight size={32} />}
+              </button>
+            </div>
           </div>
 
           {/* Pagination Dots */}
