@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { PageWrapper } from '@/components/ui/PageWrapper'
 import { useBotStore } from '@/store/bot'
-import { AgentCard } from '@/components/bot/AgentCard'
+import { AgentCircle } from '@/components/bot/AgentCircle'
 import { BotStatusCard } from '@/components/bot/BotStatusCard'
 import { TradeTable } from '@/components/trades/TradeTable'
 import { PerformanceChart } from '@/components/charts/PerformanceChart'
@@ -82,12 +82,6 @@ export function MainDashboard() {
   return (
     <PageWrapper>
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
-        {/* Header */}
-        <div className="text-center">
-          <h1 className="text-4xl font-display font-bold mb-2">Your Trading Bot</h1>
-          <p className="text-bone-400">Monitor performance, configure agents, and manage trades</p>
-        </div>
-
         {/* Error Display */}
         {error && (
           <div className="p-4 bg-red-900/20 border border-red-500/20 rounded-lg">
@@ -95,21 +89,21 @@ export function MainDashboard() {
           </div>
         )}
 
-        {/* Agent Cards Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <AgentCard
+        {/* Agent Circles */}
+        <div className="flex justify-center items-center gap-12">
+          <AgentCircle
             type="extraction"
             title="Data Extraction"
             description="Collects market data and technical indicators"
             status={agentStatuses.extraction}
           />
-          <AgentCard
+          <AgentCircle
             type="decision"
             title="Decision Engine"
             description="Analyzes data and generates trading signals"
             status={agentStatuses.decision}
           />
-          <AgentCard
+          <AgentCircle
             type="trading"
             title="Trade Execution"
             description="Manages positions and executes trades"

@@ -41,7 +41,8 @@ export function AgentFlowVisualization() {
         {/* Extraction Agent - Top Left */}
         <div className="absolute" style={{ left: '60px', top: '60px' }}>
           <AgentCircle
-            name="Extraction"
+            title="Data Extraction"
+            description="Collects market data"
             type="extraction"
             status={agentStatuses.extraction}
           />
@@ -50,7 +51,8 @@ export function AgentFlowVisualization() {
         {/* Decision Agent - Top Center */}
         <div className="absolute" style={{ left: '160px', top: '20px' }}>
           <AgentCircle
-            name="Decision"
+            title="Decision Engine"
+            description="Analyzes data"
             type="decision"
             status={agentStatuses.decision}
           />
@@ -59,7 +61,8 @@ export function AgentFlowVisualization() {
         {/* Trading Agent - Top Right */}
         <div className="absolute" style={{ left: '260px', top: '60px' }}>
           <AgentCircle
-            name="Trading"
+            title="Trade Execution"
+            description="Executes trades"
             type="trading"
             status={agentStatuses.trading}
           />
