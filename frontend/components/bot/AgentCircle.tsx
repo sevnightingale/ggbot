@@ -60,7 +60,25 @@ export function AgentCircle({ type, title, description, status }: AgentCirclePro
 
   return (
     <div className="flex flex-col items-center space-y-4 group">
-      {/* Main Circle */}
+      {/* Agent Info - Moved Above Circle */}
+      <div className="text-center space-y-2 max-w-44">
+        <h3 className={`text-lg font-display font-bold ${typeColor.accent}`}>
+          {title}
+        </h3>
+        <p className="text-bone-400 text-sm leading-tight">
+          {description}
+        </p>
+        
+        {/* Status Label */}
+        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-charcoal-800/50 border ${typeColor.border} border-opacity-30`}>
+          <div className={`w-2 h-2 rounded-full ${isConfigured ? typeColor.bg.replace('/10', '') : 'bg-bone-400/50'}`} />
+          <span className={`text-sm font-medium ${config.color}`}>
+            {config.badge === '✓' ? 'Configured' : config.badge === '⚠' ? 'Partial' : 'Click to configure'}
+          </span>
+        </div>
+      </div>
+
+      {/* Main Circle - Now Below Info */}
       <div 
         className={`
           relative w-32 h-32 rounded-full bg-charcoal-800/50 border-2 
@@ -101,24 +119,6 @@ export function AgentCircle({ type, title, description, status }: AgentCirclePro
 
         {/* Hover overlay */}
         <div className="absolute inset-0 bg-bone-200/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
-      </div>
-
-      {/* Agent Info */}
-      <div className="text-center space-y-2 max-w-44">
-        <h3 className={`text-lg font-display font-bold ${typeColor.accent}`}>
-          {title}
-        </h3>
-        <p className="text-bone-400 text-sm leading-tight">
-          {description}
-        </p>
-        
-        {/* Status Label */}
-        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-charcoal-800/50 border ${typeColor.border} border-opacity-30`}>
-          <div className={`w-2 h-2 rounded-full ${isConfigured ? typeColor.bg.replace('/10', '') : 'bg-bone-400/50'}`} />
-          <span className={`text-sm font-medium ${config.color}`}>
-            {config.badge === '✓' ? 'Configured' : config.badge === '⚠' ? 'Partial' : 'Click to configure'}
-          </span>
-        </div>
       </div>
     </div>
   )
