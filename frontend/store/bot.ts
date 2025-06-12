@@ -71,7 +71,7 @@ const calculateAgentStatus = (config: any): AgentStatus => {
 export const useBotStore = create<BotState>((set, get) => ({
   availableBots: [],
   currentBotId: null,
-  currentBotName: 'BOT-01',
+  currentBotName: 'GGBOT-01',
   extractionConfig: null,
   decisionConfig: null,
   tradingConfig: null,
@@ -96,7 +96,7 @@ export const useBotStore = create<BotState>((set, get) => ({
       if (state.availableBots.length === 0) {
         const defaultBot: Bot = {
           config_id: 'default-bot-id',
-          config_name: 'BOT-01',
+          config_name: 'GGBOT-01',
           created_at: new Date().toISOString()
         }
         set({ 
@@ -217,7 +217,7 @@ export const useBotStore = create<BotState>((set, get) => ({
           // Create a new default bot
           const defaultBot: Bot = {
             config_id: `bot-${Date.now()}`,
-            config_name: 'BOT-01',
+            config_name: 'GGBOT-01',
             created_at: new Date().toISOString()
           }
           updatedBots.push(defaultBot)

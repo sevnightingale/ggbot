@@ -73,15 +73,16 @@ The interface embodies a command-center aesthetic with tactical precision:
 
 ### Color Palette
 
-Selective color usage following brutalist principles:
+Strict 5-color brutalist palette:
 
-- **Primary**: Charcoal (#161618) backgrounds with paper texture overlay
-- **Text**: Bone (#e3e5e6) for maximum contrast and readability
-- **Agent Accents** (used sparingly):
-  - Extraction: Blue (#38a1c7) - subtle glow when configured
-  - Decision: Green (#2cbe77) - subtle glow when configured  
-  - Trading: Orange (#be6a47) - subtle glow when configured
-- **GGBot Emblem**: Bone white (#e3e5e6) with paper texture fill
+- **Charcoal Black**: (#161618) - main background void, no texture
+- **Bone White**: (#e3e5e6) - text, neutral elements, emblem
+- **Agent Colors** (pure, no mixing):
+  - **Extraction Blue**: (#38a1c7) - animated glow, borders, accents
+  - **Decision Green**: (#2cbe77) - animated glow, borders, accents  
+  - **Trading Orange**: (#be6a47) - animated glow, borders, accents
+- **Paper Texture**: Applied only to containers (cards, modals, header)
+- **Enhanced Contrast**: 80%+ opacity for containers, 60%+ for UI elements
 
 ### Typography
 
@@ -232,34 +233,47 @@ npm run lint
 - [x] Responsive layout with navigation
 
 #### Agent System
-- [x] Brutalist rectangular agent cards with minimal color usage
-- [x] Subtle glow effects for configured agents only
-- [x] Tabbed configuration modals for all three agents
+- [x] Brutalist rectangular agent cards with sharp edges (no rounded corners)
+- [x] Agent-specific glow effects with pure colors (blue/green/orange) for configured agents
+- [x] Animated pulsing glow with distinct colors per agent type
+- [x] Tabbed configuration modals with sharp edges throughout
 - [x] Complete configuration forms:
   - [x] Extraction: Symbols, timeframes, indicators (78 available)
   - [x] Decision: Strategy templates, LLM settings, risk guidelines
   - [x] Trading: Exchange setup, risk sliders, execution rules
 
-#### GGBot Emblem System
-- [x] Large circular emblem with paper texture and shadow
-- [x] Smart carousel navigation with dynamic +/arrow logic
+#### Multi-Bot Management System
+- [x] Full multi-bot architecture with carousel navigation
+- [x] Bot creation via + button with auto-generated names (BOT-01, BOT-02, etc.)
+- [x] Bot switching with arrow navigation and state isolation
 - [x] Inline bot name editing with save/cancel functionality
+- [x] Bot-scoped configurations, trades, and performance data
+- [x] Independent agent states per bot
+
+#### GGBot Emblem System (Floating Design)
+- [x] Large circular emblem (128px) with paper texture and shadow
+- [x] Floating emblem design in negative space (no container borders)
+- [x] Centered carousel navigation with properly aligned arrows
+- [x] Circular icon controls (START/STOP and TEST RUN) with floating labels
 - [x] Status indicator ring for running bots
-- [x] Separate control panel with Start/Stop and Test Run
-- [x] Future-ready architecture for multiple bot management
+- [x] Command center aesthetic with tactical spacing
 
 #### Dashboard
-- [x] Live trade table with polling updates and mock data fallback
+- [x] Live trade table with scrollable container (max-height with overflow)
 - [x] Performance chart with Recharts and period selection
 - [x] Real-time status monitoring with API resilience
 - [x] Brutalist styling throughout with sharp edges and minimal colors
+- [x] Enhanced contrast borders (80%+ opacity for containers, 60%+ for elements)
 
-#### User Experience
+#### User Experience & Design System
+- [x] Pure 5-color brutalist palette (charcoal, bone, blue, green, orange)
+- [x] Paper texture on containers only (main background remains void)
+- [x] Sharp edges throughout (zero rounded corners)
+- [x] Enhanced border visibility and contrast
 - [x] Comprehensive error handling with API timeouts
 - [x] Loading states and graceful API degradation
 - [x] Form validation with real-time feedback
 - [x] Empty states for no data scenarios
-- [x] Paper texture background and tactical design language
 - [x] Respects user preferences for reduced motion
 
 ### 🔄 Partially Implemented
@@ -270,12 +284,12 @@ npm run lint
 - [x] Configuration save/load functionality
 - [ ] **Real backend testing** (ready but untested)
 
-#### Advanced Features
+#### Advanced Features (COMPLETED)
 - [x] Bot name editing with inline save/cancel
-- [x] Smart carousel navigation ready for multiple bots
-- [ ] **Multi-bot creation flow** (+ button functionality)
-- [ ] **Bot switching animations** and state persistence
-- [ ] **Advanced emblem customization** (different emblems per bot)
+- [x] Smart carousel navigation for multiple bots
+- [x] **Multi-bot creation flow** (+ button functionality)
+- [x] **Bot switching with state isolation** and data reloading
+- [x] **Advanced multi-bot management** (create, switch, rename, delete)
 
 ## 📋 TODO: Completing the Prototype
 
@@ -386,7 +400,35 @@ npm run lint
 - **Performance focused**: Minimal dependencies, efficient rendering
 - **Trader-centric**: Built for desktop use with professional trading workflow
 
-This frontend provides a solid foundation for the GGBot autonomous trading system, with room for growth as the product evolves from prototype to production.
+This frontend provides a comprehensive foundation for the GGBot autonomous trading system with full multi-bot management capabilities, brutalist design system, and floating command center aesthetic. Ready for backend integration with config_id routing for production deployment.
+
+## 🎯 Recent Major Updates (Current Session)
+
+### Multi-Bot Architecture Implemented
+- Complete bot management system with carousel navigation
+- Bot creation, switching, renaming, and deletion functionality  
+- Independent state isolation per bot (configs, trades, performance)
+- Auto-generated bot naming (BOT-01, BOT-02, etc.)
+
+### Enhanced Brutalist Design System
+- Removed all rounded corners throughout the interface
+- Implemented strict 5-color palette with pure agent colors
+- Enhanced border contrast (80%+ opacity for containers)
+- Paper texture applied strategically to containers only
+
+### Floating Command Center Redesign
+- Transformed GGBot emblem to floating design in negative space
+- Converted rectangular buttons to circular icon controls with floating labels
+- Improved carousel arrow centering with emblem midline
+- Created architectural command bridge aesthetic
+
+### Agent Glow System Overhaul
+- Implemented agent-specific animated glow effects
+- Pure color animations (blue/green/orange) without white washing
+- Distinct pulsing animations for each agent type
+- Enhanced visibility and contrast
+
+The interface now embodies a true cyber-samurai command center with tactical precision and multi-bot management capabilities.
 
 
 
@@ -437,3 +479,110 @@ This frontend provides a solid foundation for the GGBot autonomous trading syste
   - Agent Colors: border-agents-extraction/decision/trading
   - Status: border-green/yellow/red-400/20
   - Emphasis: border-2 for thicker borders
+
+
+  GGBot Central State Management Analysis
+
+  Core Architecture
+
+  The GGBotCircle component acts as the central state orchestrator for the
+  entire application through the Zustand store. Here's how:
+
+  1. Bot-as-Config-Container Model
+
+  Each bot is essentially a container for a unique config_id that links to:
+  - Database: configurations table with config_id as primary key
+  - 3 Agent Configs: Each bot has extraction, decision, and trading configs
+  stored under its config_id
+  - Trade Data: All trades are linked via config_id
+  - Performance Metrics: Calculated from trades with matching config_id
+
+  2. State Flow Architecture
+
+  User selects bot in GGBotCircle
+      ↓
+  currentBotId changes in store
+      ↓
+  selectBot() triggers cascade:
+      → Resets all agent configs to null
+      → Clears trades and performance data
+      → Calls loadConfigurations()
+          ↓
+      API calls with config_id:
+      → GET /api/config/{user_id}/extraction?config_id={currentBotId}
+      → GET /api/config/{user_id}/decision?config_id={currentBotId}
+      → GET /api/config/{user_id}/trading?config_id={currentBotId}
+          ↓
+      Components re-render with new data
+
+  3. State Dependencies
+
+  Agent Cards depend on:
+  - currentBotId → Which configs to display
+  - agentStatuses → Visual state (configured/unconfigured)
+  - extractionConfig/decisionConfig/tradingConfig → Actual configuration
+  data
+
+  Trade Container depends on:
+  - currentBotId → Filter trades by config_id
+  - trades[] → Trade data filtered for current bot
+
+  Performance Container depends on:
+  - currentBotId → Calculate metrics for specific bot
+  - performance → Aggregated data from trades with matching config_id
+
+  4. Critical State Management Issues
+
+  1. Missing config_id propagation: The store doesn't properly pass
+  config_id to API calls
+  2. Incomplete bot creation: New bots create local IDs but don't persist to
+   database
+  3. State isolation gaps: Bot switching clears data but doesn't reload with
+   new config_id
+  4. API integration incomplete: Mock data fallbacks hide the broken
+  config_id flow
+
+  5. Database Integration Points
+
+  The configurations table structure:
+  - config_id (UUID) - Links everything together
+  - user_id (UUID) - User isolation
+  - config_type (VARCHAR) - 'extraction', 'decision', 'trading'
+  - config_name (VARCHAR) - Bot display name
+  - config_data (JSONB) - Actual configuration
+
+  6. Real Implementation Flow
+
+  -- When user selects BOT-02:
+  SELECT * FROM configurations
+  WHERE user_id = '00000000-0000-0000-0000-000000000001'
+  AND config_name = 'BOT-02';
+
+  -- Returns config_id = 'abc123...'
+  -- Then load all configs:
+  SELECT * FROM configurations
+  WHERE config_id = 'abc123...'
+  AND config_type IN ('extraction', 'decision', 'trading');
+
+  -- Load trades:
+  SELECT * FROM trades
+  WHERE config_id = 'abc123...';
+
+  -- Calculate performance from those trades
+
+  7. State Management Hierarchy
+
+  GGBotCircle (UI Control)
+      ↓
+  useBotStore (Central State)
+      ↓
+  currentBotId (Master Key)
+      ↓
+  ┌─────────────┬─────────────┬──────────────┬────────────┐
+  │ Agent Cards │   Trades    │ Performance  │ Scheduler  │
+  │ (3 configs) │  Container  │  Container   │  Control   │
+  └─────────────┴─────────────┴──────────────┴────────────┘
+
+  The GGBotCircle is effectively the master control panel that drives the
+  entire application state through bot selection, making currentBotId the
+  most critical piece of state in the entire system.
