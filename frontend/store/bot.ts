@@ -81,49 +81,91 @@ export const useBotStore = create<BotState>((set, get) => ({
 
   loadConfigurations: async () => {
     set({ isLoading: true, error: null })
+    console.log('Starting loadConfigurations...')
+    
     try {
-      // Mock data for now since backend is not available
-      const mockExtraction: ExtractionConfig = {
-        symbols: ['BTCUSD', 'ETHUSD'],
-        timeframes: ['15m', '1h'],
-        sources: {
-          tradingview: {
-            enabled: true,
-            strategy: 'momentum'
-          },
-          yfinance: {
-            enabled: true
+      // First test API connection
+      const isConnected = await api.testConnection()
+      console.log('API connection test result:', isConnected)
+      
+      if (!isConnected) {
+        console.log('API not available, using mock data')
+        // Use mock data if API is not available
+        const mockExtraction: ExtractionConfig = {
+          symbols: ['BTCUSD', 'ETHUSD'],
+          timeframes: ['15m', '1h'],
+          sources: {
+            tradingview: {
+              enabled: true,
+              strategy: 'momentum'
+            },
+            yfinance: {
+              enabled: true
+            }
           }
         }
-      }
-      const mockDecision: DecisionConfig = {
-        llm_provider: 'deepseek',
-        strategy: 'momentum',
-        risk_guidelines: 'Conservative risk management',
-        additional_context: 'Focus on crypto trends'
-      }
-      const mockTrading: TradingConfig = {
-        risk_rules: {
-          max_leverage: 3,
-          max_position_size_pct: 10,
-          max_risk_per_trade_pct: 2,
-          min_equity_protection: 1000,
-          max_contracts_per_trade: 100
+        const mockDecision: DecisionConfig = {
+          llm_provider: 'deepseek',
+          strategy: 'momentum',
+          risk_guidelines: 'Conservative risk management',
+          additional_context: 'Focus on crypto trends'
         }
+        const mockTrading: TradingConfig = {
+          risk_rules: {
+            max_leverage: 3,
+            max_position_size_pct: 10,
+            max_risk_per_trade_pct: 2,
+            min_equity_protection: 1000,
+            max_contracts_per_trade: 100
+          }
+        }
+        
+        set({
+          extractionConfig: mockExtraction,
+          decisionConfig: mockDecision,
+          tradingConfig: mockTrading,
+          agentStatuses: {
+            extraction: calculateAgentStatus(mockExtraction),
+            decision: calculateAgentStatus(mockDecision),
+            trading: calculateAgentStatus(mockTrading),
+          },
+          isLoading: false,
+          error: 'Backend API not available - using demo data'
+        })
+        return
       }
-      
+
+      // Try to load real configurations if API is available
+      console.log('API available, attempting to load real configurations...')
+      const [extractionResult, decisionResult, tradingResult] = await Promise.allSettled([
+        api.getConfig('extraction'),
+        api.getConfig('decision'),
+        api.getConfig('trading')
+      ])
+
+      const extractionConfig = extractionResult.status === 'fulfilled' ? extractionResult.value.config as ExtractionConfig : null
+      const decisionConfig = decisionResult.status === 'fulfilled' ? decisionResult.value.config as DecisionConfig : null
+      const tradingConfig = tradingResult.status === 'fulfilled' ? tradingResult.value.config as TradingConfig : null
+
+      console.log('Configuration loading results:', {
+        extraction: extractionResult.status,
+        decision: decisionResult.status,
+        trading: tradingResult.status
+      })
+
       set({
-        extractionConfig: mockExtraction,
-        decisionConfig: mockDecision,
-        tradingConfig: mockTrading,
+        extractionConfig,
+        decisionConfig,
+        tradingConfig,
         agentStatuses: {
-          extraction: calculateAgentStatus(mockExtraction),
-          decision: calculateAgentStatus(mockDecision),
-          trading: calculateAgentStatus(mockTrading),
+          extraction: calculateAgentStatus(extractionConfig),
+          decision: calculateAgentStatus(decisionConfig),
+          trading: calculateAgentStatus(tradingConfig),
         },
         isLoading: false,
       })
     } catch (error) {
+      console.error('Error in loadConfigurations:', error)
       set({ 
         error: error instanceof Error ? error.message : 'Failed to load configurations',
         isLoading: false 
@@ -164,8 +206,23 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   loadTrades: async () => {
+    console.log('Loading trades...')
     try {
-      // Mock trades data
+      // Try to load from API first, fall back to mock data
+      const isConnected = await api.testConnection()
+      
+      if (isConnected) {
+        try {
+          const result = await api.getTrades()
+          console.log('Trades loaded from API:', result.trades.length)
+          set({ trades: result.trades })
+          return
+        } catch (apiError) {
+          console.warn('API trades request failed, using mock data:', apiError)
+        }
+      }
+
+      // Use mock trades data as fallback
       const mockTrades: Trade[] = [
         {
           id: '1',
@@ -196,15 +253,32 @@ export const useBotStore = create<BotState>((set, get) => ({
           decision_reasoning: 'Bearish trend detected'
         }
       ]
+      console.log('Using mock trades data')
       set({ trades: mockTrades })
     } catch (error) {
+      console.error('Error loading trades:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to load trades' })
     }
   },
 
   loadPerformance: async (period = '7d') => {
+    console.log('Loading performance data for period:', period)
     try {
-      // Mock performance data
+      // Try to load from API first, fall back to mock data
+      const isConnected = await api.testConnection()
+      
+      if (isConnected) {
+        try {
+          const result = await api.getPerformance(period)
+          console.log('Performance data loaded from API')
+          set({ performance: result })
+          return
+        } catch (apiError) {
+          console.warn('API performance request failed, using mock data:', apiError)
+        }
+      }
+
+      // Mock performance data as fallback
       const mockPerformance: PerformanceData = {
         period,
         total_pnl: 1250.50,
@@ -221,8 +295,10 @@ export const useBotStore = create<BotState>((set, get) => ({
           { date: '2024-01-07', pnl: 300 }
         ]
       }
+      console.log('Using mock performance data')
       set({ performance: mockPerformance })
     } catch (error) {
+      console.error('Error loading performance:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to load performance' })
     }
   },
@@ -262,13 +338,30 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   checkSchedulerStatus: async () => {
+    console.log('Checking scheduler status...')
     try {
-      // Mock scheduler status
+      // Try to get real status first, fall back to mock
+      const isConnected = await api.testConnection()
+      
+      if (isConnected) {
+        try {
+          const result = await api.getSchedulerStatus()
+          console.log('Scheduler status loaded from API:', result)
+          set({ schedulerStatus: result })
+          return
+        } catch (apiError) {
+          console.warn('API scheduler status request failed, using mock data:', apiError)
+        }
+      }
+
+      // Mock scheduler status as fallback
       const mockStatus: SchedulerStatus = {
         is_running: false
       }
+      console.log('Using mock scheduler status')
       set({ schedulerStatus: mockStatus })
     } catch (error) {
+      console.error('Error checking scheduler status:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to check scheduler status' })
     }
   },

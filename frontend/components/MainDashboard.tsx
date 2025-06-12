@@ -23,27 +23,47 @@ export function MainDashboard() {
   } = useBotStore()
 
   useEffect(() => {
+    console.log('MainDashboard: Starting initial data load...')
+    
     const loadInitialData = async () => {
+      console.log('MainDashboard: Loading initial data...')
+      const startTime = Date.now()
+      
       try {
-        await Promise.all([
-          loadConfigurations(),
+        // Load configurations first, then other data
+        console.log('MainDashboard: Loading configurations...')
+        await loadConfigurations()
+        console.log('MainDashboard: Configurations loaded')
+        
+        // Load other data in parallel
+        console.log('MainDashboard: Loading trades, performance, and scheduler status...')
+        await Promise.allSettled([
           loadTrades(),
           loadPerformance('7d'),
           checkSchedulerStatus()
         ])
+        
+        const endTime = Date.now()
+        console.log(`MainDashboard: All data loaded in ${endTime - startTime}ms`)
       } catch (error) {
-        console.error('Failed to load initial data:', error)
+        console.error('MainDashboard: Failed to load initial data:', error)
       }
     }
 
     loadInitialData()
 
+    // Set up periodic refresh
+    console.log('MainDashboard: Setting up periodic refresh (30s)')
     const interval = setInterval(() => {
+      console.log('MainDashboard: Periodic refresh triggered')
       loadTrades()
       checkSchedulerStatus()
     }, 30000)
 
-    return () => clearInterval(interval)
+    return () => {
+      console.log('MainDashboard: Cleaning up periodic refresh')
+      clearInterval(interval)
+    }
   }, [loadConfigurations, loadTrades, loadPerformance, checkSchedulerStatus])
 
   if (isLoading) {

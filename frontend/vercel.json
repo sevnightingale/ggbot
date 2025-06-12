@@ -1,0 +1,16 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "buildCommand": "npm run build",
+  "installCommand": "npm install",
+  "outputDirectory": ".next",
+  "functions": {
+    "app/**": {
+      "maxDuration": 10
+    }
+  },
+  "env": {
+    "NEXT_PUBLIC_API_URL": "https://ggbots-api.nightingale.business",
+    "NEXT_PUBLIC_USER_ID": "00000000-0000-0000-0000-000000000001"
+  }
+}
