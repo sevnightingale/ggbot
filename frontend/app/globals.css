@@ -110,14 +110,30 @@ a {
 }
 
 /* Agent glow animations */
-@keyframes pulse-glow {
+@keyframes agent-glow-extraction {
   0%, 100% { 
-    opacity: 0.7;
-    filter: brightness(1) drop-shadow(0 0 20px currentColor);
+    box-shadow: 0 0 25px rgba(56, 161, 199, 0.6);
   }
   50% { 
-    opacity: 1;
-    filter: brightness(1.1) drop-shadow(0 0 40px currentColor);
+    box-shadow: 0 0 35px rgba(56, 161, 199, 0.8);
+  }
+}
+
+@keyframes agent-glow-decision {
+  0%, 100% { 
+    box-shadow: 0 0 25px rgba(44, 190, 119, 0.6);
+  }
+  50% { 
+    box-shadow: 0 0 35px rgba(44, 190, 119, 0.8);
+  }
+}
+
+@keyframes agent-glow-trading {
+  0%, 100% { 
+    box-shadow: 0 0 25px rgba(190, 106, 71, 0.6);
+  }
+  50% { 
+    box-shadow: 0 0 35px rgba(190, 106, 71, 0.8);
   }
 }
 

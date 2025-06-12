@@ -47,11 +47,14 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
         hover:border-bone-200
         transition-all duration-300 cursor-pointer group
         paper-texture
-        ${isConfigured ? `hover:shadow-lg animate-pulse-glow` : ''}
+        ${isConfigured ? `hover:shadow-lg` : ''}
       `}
       style={{
         boxShadow: isConfigured 
-          ? `0 0 15px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.3)' : type === 'decision' ? 'rgba(44, 190, 119, 0.3)' : 'rgba(190, 106, 71, 0.3)'}`
+          ? `0 0 25px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.6)' : type === 'decision' ? 'rgba(44, 190, 119, 0.6)' : 'rgba(190, 106, 71, 0.6)'}`
+          : undefined,
+        animation: isConfigured 
+          ? `agent-glow-${type} 3s ease-in-out infinite`
           : undefined
       }}
       onClick={() => openConfigModal(type)}
