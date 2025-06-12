@@ -18,6 +18,14 @@
   animation: flowPulse 2s ease-in-out infinite;
 }
 
+/* Global Paper Texture Background */
+body {
+  background-image: 
+    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e3e5e6' fill-opacity='0.03'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='53' cy='53' r='1'/%3E%3Ccircle cx='23' cy='43' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E"),
+    radial-gradient(circle at 50% 50%, rgba(227, 229, 230, 0.02) 0%, transparent 70%);
+  background-blend-mode: overlay, normal;
+}
+
 :root {
   /* Base colors */
   --charcoal-900: #161618;

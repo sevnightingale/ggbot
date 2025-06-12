@@ -3,7 +3,7 @@
 import { useEffect } from 'react'
 import { PageWrapper } from '@/components/ui/PageWrapper'
 import { useBotStore } from '@/store/bot'
-import { AgentCircle } from '@/components/bot/AgentCircle'
+import { AgentCard } from '@/components/bot/AgentCard'
 import { GGBotCircle } from '@/components/bot/GGBotCircle'
 import { TradeTable } from '@/components/trades/TradeTable'
 import { PerformanceChart } from '@/components/charts/PerformanceChart'
@@ -94,67 +94,67 @@ export function MainDashboard() {
           {/* SVG for Flow Lines */}
           <svg 
             className="absolute inset-0 w-full h-full pointer-events-none z-0"
-            viewBox="0 0 800 600"
+            viewBox="0 0 1000 400"
             xmlns="http://www.w3.org/2000/svg"
           >
-            {/* Flow line from extraction agent */}
+            {/* Flow line from extraction agent card */}
             <path
-              d="M 200 280 Q 400 320 400 450"
-              stroke={agentStatuses.extraction === 'configured' ? '#38a1c7' : 'rgba(227, 229, 230, 0.2)'}
-              strokeWidth="3"
+              d="M 200 180 L 200 220 L 480 220 L 480 280"
+              stroke={agentStatuses.extraction === 'configured' ? 'rgba(56, 161, 199, 0.6)' : 'rgba(227, 229, 230, 0.2)'}
+              strokeWidth="2"
               fill="none"
               className={agentStatuses.extraction === 'configured' ? 'flow-line-active' : ''}
               style={{
                 filter: agentStatuses.extraction === 'configured' 
-                  ? 'drop-shadow(0 0 8px #38a1c7)' 
+                  ? 'drop-shadow(0 0 6px rgba(56, 161, 199, 0.4))' 
                   : undefined
               }}
             />
             
-            {/* Flow line from decision agent */}
+            {/* Flow line from decision agent card */}
             <path
-              d="M 400 280 L 400 420"
-              stroke={agentStatuses.decision === 'configured' ? '#2cbe77' : 'rgba(227, 229, 230, 0.2)'}
-              strokeWidth="3"
+              d="M 500 180 L 500 280"
+              stroke={agentStatuses.decision === 'configured' ? 'rgba(44, 190, 119, 0.6)' : 'rgba(227, 229, 230, 0.2)'}
+              strokeWidth="2"
               fill="none"
               className={agentStatuses.decision === 'configured' ? 'flow-line-active' : ''}
               style={{
                 filter: agentStatuses.decision === 'configured' 
-                  ? 'drop-shadow(0 0 8px #2cbe77)' 
+                  ? 'drop-shadow(0 0 6px rgba(44, 190, 119, 0.4))' 
                   : undefined
               }}
             />
             
-            {/* Flow line from trading agent */}
+            {/* Flow line from trading agent card */}
             <path
-              d="M 600 280 Q 400 320 400 450"
-              stroke={agentStatuses.trading === 'configured' ? '#be6a47' : 'rgba(227, 229, 230, 0.2)'}
-              strokeWidth="3"
+              d="M 800 180 L 800 220 L 520 220 L 520 280"
+              stroke={agentStatuses.trading === 'configured' ? 'rgba(190, 106, 71, 0.6)' : 'rgba(227, 229, 230, 0.2)'}
+              strokeWidth="2"
               fill="none"
               className={agentStatuses.trading === 'configured' ? 'flow-line-active' : ''}
               style={{
                 filter: agentStatuses.trading === 'configured' 
-                  ? 'drop-shadow(0 0 8px #be6a47)' 
+                  ? 'drop-shadow(0 0 6px rgba(190, 106, 71, 0.4))' 
                   : undefined
               }}
             />
           </svg>
           
-          {/* Agent Circles */}
-          <div className="relative z-10 flex justify-center items-start gap-12 mb-16">
-            <AgentCircle
+          {/* Agent Cards */}
+          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+            <AgentCard
               type="extraction"
               title="Data Extraction"
               description="Collects market data and technical indicators"
               status={agentStatuses.extraction}
             />
-            <AgentCircle
+            <AgentCard
               type="decision"
               title="Decision Engine"
               description="Analyzes data and generates trading signals"
               status={agentStatuses.decision}
             />
-            <AgentCircle
+            <AgentCard
               type="trading"
               title="Trade Execution"
               description="Manages positions and executes trades"
@@ -168,15 +168,15 @@ export function MainDashboard() {
           </div>
         </div>
 
-        {/* Trading Dashboard */}
+        {/* Trading Dashboard - Brutalist Design */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-charcoal-800/50 border border-bone-200/10 rounded-lg p-6">
-            <h2 className="text-xl font-display font-bold mb-6">Active Trades</h2>
+          <div className="bg-charcoal-800/50 border-2 border-bone-200/20 p-6">
+            <h2 className="text-xl font-display font-bold mb-6 text-bone-200">Active Trades</h2>
             <TradeTable />
           </div>
 
-          <div className="bg-charcoal-800/50 border border-bone-200/10 rounded-lg p-6">
-            <h2 className="text-xl font-display font-bold mb-6">Performance</h2>
+          <div className="bg-charcoal-800/50 border-2 border-bone-200/20 p-6">
+            <h2 className="text-xl font-display font-bold mb-6 text-bone-200">Performance</h2>
             <PerformanceChart />
           </div>
         </div>

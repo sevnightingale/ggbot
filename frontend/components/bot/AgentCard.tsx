@@ -32,25 +32,32 @@ const statusConfig = {
   }
 }
 
-const typeColors = {
-  extraction: 'border-l-blue-400',
-  decision: 'border-l-green-400', 
-  trading: 'border-l-orange-400'
-}
 
 export function AgentCard({ type, title, description, status }: AgentCardProps) {
   const { openConfigModal } = useBotStore()
   const config = statusConfig[status]
   const StatusIcon = config.icon
 
+  const isConfigured = status === 'configured'
+
   return (
     <div 
-      className={`bg-charcoal-800/50 border border-bone-200/10 ${typeColors[type]} border-l-4 rounded-lg p-6 hover:bg-charcoal-800/70 transition-colors cursor-pointer group`}
+      className={`
+        bg-charcoal-800/50 border-2 border-bone-200/20 p-6 
+        hover:bg-charcoal-800/70 hover:border-bone-200/30
+        transition-all duration-300 cursor-pointer group
+        ${isConfigured ? `hover:shadow-lg` : ''}
+      `}
+      style={{
+        boxShadow: isConfigured 
+          ? `0 0 20px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.3)' : type === 'decision' ? 'rgba(44, 190, 119, 0.3)' : 'rgba(190, 106, 71, 0.3)'}`
+          : undefined
+      }}
       onClick={() => openConfigModal(type)}
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-display font-bold text-bone-200">{title}</h3>
-        <div className={`${config.bg} border rounded-lg px-3 py-1 flex items-center gap-2`}>
+        <div className="bg-charcoal-700/50 border border-bone-200/20 px-3 py-1 flex items-center gap-2">
           <StatusIcon size={16} className={config.color} />
           <span className={`text-sm font-medium ${config.color}`}>
             {config.label}
@@ -60,8 +67,18 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
       
       <p className="text-bone-400 text-sm mb-4">{description}</p>
       
-      <div className="text-xs text-bone-500 group-hover:text-bone-400 transition-colors">
-        Click to configure →
+      {/* Minimal color accent bar */}
+      <div className="flex items-center justify-between">
+        <div className="text-xs text-bone-500 group-hover:text-bone-400 transition-colors">
+          Click to configure →
+        </div>
+        <div 
+          className={`w-8 h-1 ${
+            type === 'extraction' ? 'bg-blue-400' : 
+            type === 'decision' ? 'bg-green-400' : 
+            'bg-orange-400'
+          } ${isConfigured ? 'opacity-100' : 'opacity-30'}`}
+        />
       </div>
     </div>
   )
