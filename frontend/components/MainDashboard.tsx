@@ -4,7 +4,7 @@ import { useEffect } from 'react'
 import { PageWrapper } from '@/components/ui/PageWrapper'
 import { useBotStore } from '@/store/bot'
 import { AgentCircle } from '@/components/bot/AgentCircle'
-import { BotStatusCard } from '@/components/bot/BotStatusCard'
+import { GGBotCircle } from '@/components/bot/GGBotCircle'
 import { TradeTable } from '@/components/trades/TradeTable'
 import { PerformanceChart } from '@/components/charts/PerformanceChart'
 import { AgentConfigModal } from '@/components/bot/AgentConfigModal'
@@ -89,30 +89,84 @@ export function MainDashboard() {
           </div>
         )}
 
-        {/* Agent Circles */}
-        <div className="flex justify-center items-center gap-12">
-          <AgentCircle
-            type="extraction"
-            title="Data Extraction"
-            description="Collects market data and technical indicators"
-            status={agentStatuses.extraction}
-          />
-          <AgentCircle
-            type="decision"
-            title="Decision Engine"
-            description="Analyzes data and generates trading signals"
-            status={agentStatuses.decision}
-          />
-          <AgentCircle
-            type="trading"
-            title="Trade Execution"
-            description="Manages positions and executes trades"
-            status={agentStatuses.trading}
-          />
-        </div>
+        {/* Agent Flow Visualization */}
+        <div className="relative">
+          {/* SVG for Flow Lines */}
+          <svg 
+            className="absolute inset-0 w-full h-full pointer-events-none z-0"
+            viewBox="0 0 800 600"
+            xmlns="http://www.w3.org/2000/svg"
+          >
+            {/* Flow line from extraction agent */}
+            <path
+              d="M 200 280 Q 400 320 400 450"
+              stroke={agentStatuses.extraction === 'configured' ? '#38a1c7' : 'rgba(227, 229, 230, 0.2)'}
+              strokeWidth="3"
+              fill="none"
+              className={agentStatuses.extraction === 'configured' ? 'flow-line-active' : ''}
+              style={{
+                filter: agentStatuses.extraction === 'configured' 
+                  ? 'drop-shadow(0 0 8px #38a1c7)' 
+                  : undefined
+              }}
+            />
+            
+            {/* Flow line from decision agent */}
+            <path
+              d="M 400 280 L 400 420"
+              stroke={agentStatuses.decision === 'configured' ? '#2cbe77' : 'rgba(227, 229, 230, 0.2)'}
+              strokeWidth="3"
+              fill="none"
+              className={agentStatuses.decision === 'configured' ? 'flow-line-active' : ''}
+              style={{
+                filter: agentStatuses.decision === 'configured' 
+                  ? 'drop-shadow(0 0 8px #2cbe77)' 
+                  : undefined
+              }}
+            />
+            
+            {/* Flow line from trading agent */}
+            <path
+              d="M 600 280 Q 400 320 400 450"
+              stroke={agentStatuses.trading === 'configured' ? '#be6a47' : 'rgba(227, 229, 230, 0.2)'}
+              strokeWidth="3"
+              fill="none"
+              className={agentStatuses.trading === 'configured' ? 'flow-line-active' : ''}
+              style={{
+                filter: agentStatuses.trading === 'configured' 
+                  ? 'drop-shadow(0 0 8px #be6a47)' 
+                  : undefined
+              }}
+            />
+          </svg>
+          
+          {/* Agent Circles */}
+          <div className="relative z-10 flex justify-center items-start gap-12 mb-16">
+            <AgentCircle
+              type="extraction"
+              title="Data Extraction"
+              description="Collects market data and technical indicators"
+              status={agentStatuses.extraction}
+            />
+            <AgentCircle
+              type="decision"
+              title="Decision Engine"
+              description="Analyzes data and generates trading signals"
+              status={agentStatuses.decision}
+            />
+            <AgentCircle
+              type="trading"
+              title="Trade Execution"
+              description="Manages positions and executes trades"
+              status={agentStatuses.trading}
+            />
+          </div>
 
-        {/* Bot Status */}
-        <BotStatusCard status={schedulerStatus} />
+          {/* GGBot Central Circle */}
+          <div className="relative z-10 flex justify-center">
+            <GGBotCircle status={schedulerStatus} />
+          </div>
+        </div>
 
         {/* Trading Dashboard */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">

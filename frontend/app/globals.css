@@ -2,6 +2,22 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Agent Flow Animations */
+@keyframes flowPulse {
+  0%, 100% {
+    opacity: 0.6;
+    stroke-width: 3;
+  }
+  50% {
+    opacity: 1;
+    stroke-width: 5;
+  }
+}
+
+.flow-line-active {
+  animation: flowPulse 2s ease-in-out infinite;
+}
+
 :root {
   /* Base colors */
   --charcoal-900: #161618;
