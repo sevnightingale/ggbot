@@ -70,7 +70,7 @@ export function AgentFlowVisualization() {
 
         {/* Central GGBot */}
         <div className="absolute" style={{ left: '140px', top: '200px' }}>
-          <div className="w-24 h-24 bg-charcoal-700 border-2 border-bone-200/20 rounded-full flex items-center justify-center">
+          <div className="w-24 h-24 bg-charcoal-700 border-2 border-bone-200/80 flex items-center justify-center">
             <div className="text-center">
               <div className="text-sm font-display font-bold text-bone-200">your</div>
               <div className="text-xs font-display font-bold text-bone-300">ggbot</div>

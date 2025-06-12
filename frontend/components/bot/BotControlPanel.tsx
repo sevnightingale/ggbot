@@ -47,7 +47,7 @@ export function BotControlPanel() {
         <h3 className="text-lg font-display font-bold mb-4">Bot Status</h3>
         <div className="flex items-center gap-3">
           <div className={cn(
-            "w-3 h-3 rounded-full",
+            "w-3 h-3",
             isRunning ? "bg-status-success animate-pulse" : "bg-bone-400"
           )} />
           <span className="text-bone-200">
@@ -67,21 +67,21 @@ export function BotControlPanel() {
         <div className="space-y-1">
           <div className="flex items-center gap-2 text-sm">
             <div className={cn(
-              "w-2 h-2 rounded-full",
+              "w-2 h-2",
               agentStatuses.extraction === 'configured' ? "bg-status-success" : "bg-status-warning"
             )} />
             <span>Extraction Agent</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <div className={cn(
-              "w-2 h-2 rounded-full",
+              "w-2 h-2",
               agentStatuses.decision === 'configured' ? "bg-status-success" : "bg-status-warning"
             )} />
             <span>Decision Agent</span>
           </div>
           <div className="flex items-center gap-2 text-sm">
             <div className={cn(
-              "w-2 h-2 rounded-full",
+              "w-2 h-2",
               agentStatuses.trading === 'configured' ? "bg-status-success" : "bg-status-warning"
             )} />
             <span>Trading Agent</span>
@@ -100,7 +100,7 @@ export function BotControlPanel() {
               onClick={handleStart}
               disabled={!allConfigured || isLoading}
               className={cn(
-                "flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-colors",
+                "flex items-center gap-2 px-4 py-2 font-medium transition-colors",
                 allConfigured 
                   ? "bg-status-success hover:bg-status-success/80 text-charcoal-900"
                   : "bg-bone-400/20 text-bone-400 cursor-not-allowed"
@@ -113,7 +113,7 @@ export function BotControlPanel() {
             <button
               onClick={handleStop}
               disabled={isLoading}
-              className="flex items-center gap-2 px-4 py-2 bg-status-error hover:bg-status-error/80 text-white rounded-lg font-medium transition-colors"
+              className="flex items-center gap-2 px-4 py-2 bg-status-error hover:bg-status-error/80 text-white font-medium transition-colors"
             >
               <Pause size={16} />
               Stop Bot
@@ -125,7 +125,7 @@ export function BotControlPanel() {
         <button
           onClick={handleTestRun}
           disabled={isLoading}
-          className="flex items-center gap-2 px-4 py-2 bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/20 text-bone-200 rounded-lg font-medium transition-colors"
+          className="flex items-center gap-2 px-4 py-2 bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/80 text-bone-200 font-medium transition-colors"
         >
           <TestTube size={16} />
           Manual Test Run
@@ -133,7 +133,7 @@ export function BotControlPanel() {
 
         {/* Warning if not all configured */}
         {!allConfigured && (
-          <div className="flex items-start gap-2 p-3 bg-status-warning/10 border border-status-warning/20 rounded-lg">
+          <div className="flex items-start gap-2 p-3 bg-status-warning/10 border border-status-warning/60">
             <AlertTriangle size={16} className="text-status-warning mt-0.5 flex-shrink-0" />
             <div className="text-sm">
               <p className="text-status-warning font-medium">Configuration Required</p>

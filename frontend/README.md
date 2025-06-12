@@ -4,15 +4,16 @@ A Next.js 14 frontend application for managing autonomous AI trading agents. Bui
 
 ## 🌟 Overview
 
-The GGBot frontend provides a comprehensive dashboard for configuring, monitoring, and controlling autonomous trading agents. The interface is built around the three-agent system: **Extraction**, **Decision**, and **Trading** agents that work together to execute your trading strategy.
+The GGBot frontend provides a professional, brutalist-designed dashboard for configuring, monitoring, and controlling autonomous trading agents. The interface embodies a cyber-samurai aesthetic with sharp edges, minimal color usage, and a command center feel.
 
 ### Key Features
 
-- **Agent Configuration**: Intuitive forms for configuring each of the three trading agents
-- **Real-time Monitoring**: Live trade display and performance metrics with 30-second polling
-- **Bot Control**: Start/stop autonomous trading mode with safety controls
-- **Visual Flow**: Animated agent visualization showing data flow and configuration status
-- **Responsive Design**: Desktop-optimized with mobile compatibility
+- **Brutalist Agent Cards**: Sharp-edged rectangular cards with minimal color accents and subtle glows
+- **GGBot Emblem System**: Substantial circular emblem with paper texture representing each bot
+- **Carousel Navigation**: Smart multi-bot management with dynamic +/arrow navigation
+- **Real-time Monitoring**: Live trade display and performance metrics with API failover
+- **Bot Control Panel**: Clean start/stop and test run controls with status-aware styling
+- **Inline Name Editing**: Click-to-edit bot names with immediate feedback
 
 ## 🏗️ Architecture
 
@@ -39,10 +40,9 @@ frontend/
 │   │   ├── PageWrapper.tsx      # Layout wrapper with navigation
 │   │   └── TopNav.tsx           # Minimal hamburger navigation
 │   ├── bot/                     # Bot-specific components
-│   │   ├── AgentCircle.tsx      # Clickable agent status circles
-│   │   ├── AgentFlowVisualization.tsx  # SVG flow diagram
-│   │   ├── BotControlPanel.tsx  # Start/stop/test controls
-│   │   ├── FlowLine.tsx         # Animated SVG flow lines
+│   │   ├── AgentCard.tsx        # Brutalist rectangular agent cards
+│   │   ├── AgentCircle.tsx      # Legacy circular design (unused)
+│   │   ├── GGBotCircle.tsx      # Emblem carousel with controls
 │   │   ├── AgentConfigModal.tsx # Configuration modal container
 │   │   └── config/              # Agent configuration forms
 │   │       ├── ExtractionConfigForm.tsx  # Symbols, timeframes, indicators
@@ -62,29 +62,39 @@ frontend/
 
 ## 🎨 Design System
 
+### Brutalist Cyber-Samurai Aesthetic
+
+The interface embodies a command-center aesthetic with tactical precision:
+
+- **Sharp edges**: Zero rounded corners throughout the interface
+- **Minimal color usage**: Bone/gray dominant palette with selective accent usage
+- **Paper texture**: Subtle background texture for tactical depth
+- **High contrast**: Bold typography for readability in professional environments
+
 ### Color Palette
 
-The interface uses a brutalist design with minimal colors:
+Selective color usage following brutalist principles:
 
-- **Primary**: Charcoal (#161618) backgrounds
-- **Text**: Bone (#e3e5e6) for high contrast readability
-- **Agent Colors**:
-  - Extraction: Blue (#38a1c7)
-  - Decision: Green (#2cbe77)
-  - Trading: Orange (#be6a47)
+- **Primary**: Charcoal (#161618) backgrounds with paper texture overlay
+- **Text**: Bone (#e3e5e6) for maximum contrast and readability
+- **Agent Accents** (used sparingly):
+  - Extraction: Blue (#38a1c7) - subtle glow when configured
+  - Decision: Green (#2cbe77) - subtle glow when configured  
+  - Trading: Orange (#be6a47) - subtle glow when configured
+- **GGBot Emblem**: Bone white (#e3e5e6) with paper texture fill
 
 ### Typography
 
-- **Headlines**: Kanit Bold for impact
-- **Body**: Inter for readability
-- **UI Elements**: System fonts with careful spacing
+- **Headlines**: Kanit Bold for impact and command presence
+- **Body**: Inter for clean readability
+- **UI Elements**: Sharp, structured text hierarchy
 
-### Animation
+### Visual Language
 
-CSS-only animations for performance:
-- **Agent Glow**: Configured agents pulse with their respective colors
-- **Flow Lines**: Animated dashed lines show data movement
-- **Respects `prefers-reduced-motion`** for accessibility
+- **Rectangular geometry**: All cards and panels use sharp corners
+- **Substantial elements**: GGBot emblem is large and dignified (128px)
+- **Structured layout**: Grid-based system with generous spacing
+- **Status rewards**: Color only appears when agents are configured
 
 ## 🔧 Configuration System
 
@@ -116,11 +126,11 @@ Each agent has a dedicated configuration interface:
 
 ### Configuration Flow
 
-1. **Click agent circle** → Opens tabbed configuration modal
-2. **Navigate tabs** → Configure different aspects
-3. **Real-time validation** → Immediate feedback on settings
-4. **Save configuration** → Updates backend via API
-5. **Status indicator** → Circle shows configured/partial/unconfigured state
+1. **Click agent card** → Opens tabbed configuration modal
+2. **Navigate tabs** → Configure different aspects with real-time validation
+3. **Save configuration** → Updates backend via API with error handling
+4. **Status indicator** → Card shows subtle glow when configured
+5. **Bot readiness** → All agents must be configured before starting
 
 ## 📊 Monitoring Dashboard
 
@@ -134,11 +144,13 @@ Each agent has a dedicated configuration interface:
 - **Key metrics**: Total P&L, win rate, total trades, return percentage
 - **Visual indicators** for winning/losing positions
 
-### Bot Control
-- **Status display**: Running/stopped with last activity timestamp
-- **Configuration status**: Shows which agents are properly configured
-- **Controls**: Start/stop autonomous mode, manual test runs
-- **Safety checks**: Prevents starting with incomplete configuration
+### GGBot Emblem & Control
+- **Emblem carousel**: Substantial circular emblem with paper texture
+- **Smart navigation**: Dynamic +/arrow buttons for multi-bot management
+- **Inline name editing**: Click-to-edit bot names with immediate save/cancel
+- **Status indication**: Running bots show green pulsing ring around emblem
+- **Control panel**: Separate rectangular panel with Start/Stop and Test Run buttons
+- **Safety validation**: Prevents starting with incomplete agent configuration
 
 ## 🔌 API Integration
 
@@ -164,12 +176,13 @@ NEXT_PUBLIC_POLLING_INTERVAL=30000
 
 ### State Management
 
-Zustand store handles:
-- **Configuration state** for all three agents
-- **Live trade data** with polling updates
-- **Performance metrics** with period selection
-- **UI state** for modals and loading states
-- **Error handling** with user-friendly messages
+Zustand store with robust error handling:
+- **Configuration state** for all three agents with validation
+- **Live trade data** with 30-second polling and API fallback to mock data
+- **Performance metrics** with period selection and caching
+- **Bot management** including name editing and carousel state
+- **UI state** for modals, loading states, and error boundaries
+- **API resilience** with timeout handling and graceful degradation
 
 ## 🚀 Development
 
@@ -219,25 +232,35 @@ npm run lint
 - [x] Responsive layout with navigation
 
 #### Agent System
-- [x] Agent flow visualization with clickable circles
-- [x] Status indicators with glow animations
+- [x] Brutalist rectangular agent cards with minimal color usage
+- [x] Subtle glow effects for configured agents only
 - [x] Tabbed configuration modals for all three agents
 - [x] Complete configuration forms:
   - [x] Extraction: Symbols, timeframes, indicators (78 available)
   - [x] Decision: Strategy templates, LLM settings, risk guidelines
   - [x] Trading: Exchange setup, risk sliders, execution rules
 
+#### GGBot Emblem System
+- [x] Large circular emblem with paper texture and shadow
+- [x] Smart carousel navigation with dynamic +/arrow logic
+- [x] Inline bot name editing with save/cancel functionality
+- [x] Status indicator ring for running bots
+- [x] Separate control panel with Start/Stop and Test Run
+- [x] Future-ready architecture for multiple bot management
+
 #### Dashboard
-- [x] Bot control panel with start/stop functionality
-- [x] Live trade table with polling updates
-- [x] Performance chart with Recharts
-- [x] Real-time status monitoring
+- [x] Live trade table with polling updates and mock data fallback
+- [x] Performance chart with Recharts and period selection
+- [x] Real-time status monitoring with API resilience
+- [x] Brutalist styling throughout with sharp edges and minimal colors
 
 #### User Experience
-- [x] Loading states and error handling
-- [x] Form validation and user feedback
+- [x] Comprehensive error handling with API timeouts
+- [x] Loading states and graceful API degradation
+- [x] Form validation with real-time feedback
 - [x] Empty states for no data scenarios
-- [x] CSS animations with reduced-motion support
+- [x] Paper texture background and tactical design language
+- [x] Respects user preferences for reduced motion
 
 ### 🔄 Partially Implemented
 
@@ -247,10 +270,12 @@ npm run lint
 - [x] Configuration save/load functionality
 - [ ] **Real backend testing** (ready but untested)
 
-#### Visual Polish
-- [x] Basic animations for agent glow and flow
-- [ ] **Smooth transitions** between states
-- [ ] **Loading skeletons** for better perceived performance
+#### Advanced Features
+- [x] Bot name editing with inline save/cancel
+- [x] Smart carousel navigation ready for multiple bots
+- [ ] **Multi-bot creation flow** (+ button functionality)
+- [ ] **Bot switching animations** and state persistence
+- [ ] **Advanced emblem customization** (different emblems per bot)
 
 ## 📋 TODO: Completing the Prototype
 
@@ -362,3 +387,53 @@ npm run lint
 - **Trader-centric**: Built for desktop use with professional trading workflow
 
 This frontend provides a solid foundation for the GGBot autonomous trading system, with room for growth as the product evolves from prototype to production.
+
+
+
+  Border Inventory
+
+  1. Header/Navigation
+
+  - TopNav.tsx:11 - border-b border-bone-200/10 (main nav bottom)
+  - TopNav.tsx:32 - border border-bone-200/20 (mobile dropdown)
+
+  2. Agent Cards
+
+  - AgentCard.tsx:46 - border-2 border-bone-200/20 (main card)
+  - AgentCard.tsx:60 - border border-bone-200/20 (status badge)
+  - AgentCircle.tsx - Multiple agent-specific borders (blue/green/orange)
+
+  3. GGBot Emblem System
+
+  - GGBotCircle.tsx:76 - border-2 border-bone-200/20 (emblem card)
+  - GGBotCircle.tsx:96 - border-2 border-bone-200 (large circle)
+  - GGBotCircle.tsx:107 - border-2 border-green-400 (status ring)
+  - GGBotCircle.tsx:176 - border-2 border-bone-200/20 (control panel)
+
+  4. Trade/Performance Components
+
+  - TradeTable.tsx:32 - border-b border-bone-200/10 (table header)
+  - PerformanceChart.tsx:94 - border: '1px solid rgba(227, 229, 230, 0.2)'
+  (tooltip)
+  - MainDashboard.tsx:121,126 - border-2 border-bone-200/20 (containers)
+
+  5. Modals/Popups
+
+  - AgentConfigModal.tsx:82 - border border-bone-200/20 (main modal)
+  - AgentConfigModal.tsx:85 - border-b border-bone-200/10 (header separator)
+  - AgentConfigModal.tsx:86-88 - border-l-4 border-l-agents-* (accent
+  borders)
+
+  6. Configuration Forms
+
+  - Extensive borders in all config forms (extraction, decision, trading)
+  - Button borders, input borders, container borders
+  - All follow border-bone-200/20 or agent-specific colors
+
+  Color Scheme Patterns
+
+  - Standard: border-bone-200/20 (most common)
+  - Subtle: border-bone-200/10
+  - Agent Colors: border-agents-extraction/decision/trading
+  - Status: border-green/yellow/red-400/20
+  - Emphasis: border-2 for thicker borders

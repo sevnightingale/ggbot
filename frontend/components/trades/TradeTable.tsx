@@ -11,7 +11,7 @@ export function TradeTable() {
     return (
       <div className="space-y-3">
         {[...Array(3)].map((_, i) => (
-          <div key={i} className="h-12 bg-charcoal-700/50 rounded animate-pulse" />
+          <div key={i} className="h-12 bg-charcoal-700/50 animate-pulse" />
         ))}
       </div>
     )
@@ -29,7 +29,7 @@ export function TradeTable() {
   return (
     <div className="space-y-2">
       {/* Header */}
-      <div className="grid grid-cols-6 gap-3 px-3 py-2 text-xs font-medium text-bone-400 border-b border-bone-200/10">
+      <div className="grid grid-cols-6 gap-3 px-3 py-2 text-xs font-medium text-bone-400 border-b border-bone-200/60">
         <div>Symbol</div>
         <div>Side</div>
         <div>Entry</div>
@@ -39,18 +39,18 @@ export function TradeTable() {
       </div>
 
       {/* Trade rows */}
-      <div className="space-y-1">
+      <div className="space-y-1 max-h-96 overflow-y-auto">
         {trades.map((trade) => (
           <div
             key={trade.id}
-            className="grid grid-cols-6 gap-3 px-3 py-3 bg-charcoal-700/30 hover:bg-charcoal-700/50 rounded-lg transition-colors cursor-pointer group"
+            className="grid grid-cols-6 gap-3 px-3 py-3 bg-charcoal-700/30 hover:bg-charcoal-700/50 transition-colors cursor-pointer group"
           >
             <div className="font-medium text-bone-200">
               {trade.symbol}
             </div>
             
             <div className={cn(
-              "text-sm font-medium px-2 py-1 rounded w-fit",
+              "text-sm font-medium px-2 py-1 w-fit",
               trade.side === 'long' 
                 ? "bg-status-success/20 text-status-success" 
                 : "bg-status-error/20 text-status-error"
