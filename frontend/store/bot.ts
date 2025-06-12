@@ -1,21 +1,23 @@
 import { create } from 'zustand'
 import { 
-  UserConfig, 
   Trade, 
   PerformanceData, 
   SchedulerStatus,
   AgentStatus,
   ExtractionConfig,
   DecisionConfig,
-  TradingConfig
+  TradingConfig,
+  Bot
 } from '@/types'
 import { api } from '@/lib/api/client'
 
 interface BotState {
-  // Current bot configuration
-  currentBot: Partial<UserConfig> | null
+  // Bot management
+  availableBots: Bot[]
+  currentBotId: string | null
+  currentBotName: string
   
-  // Agent configurations
+  // Agent configurations (for current bot)
   extractionConfig: ExtractionConfig | null
   decisionConfig: DecisionConfig | null
   tradingConfig: TradingConfig | null
@@ -41,6 +43,11 @@ interface BotState {
   error: string | null
   
   // Actions
+  loadBots: () => Promise<void>
+  createBot: (name: string) => Promise<void>
+  selectBot: (botId: string) => Promise<void>
+  updateBotName: (botId: string, name: string) => Promise<void>
+  deleteBot: (botId: string) => Promise<void>
   loadConfigurations: () => Promise<void>
   updateAgentConfig: (agent: 'extraction' | 'decision' | 'trading', config: any) => Promise<void>
   loadTrades: () => Promise<void>
@@ -62,7 +69,9 @@ const calculateAgentStatus = (config: any): AgentStatus => {
 }
 
 export const useBotStore = create<BotState>((set, get) => ({
-  currentBot: null,
+  availableBots: [],
+  currentBotId: null,
+  currentBotName: 'BOT-01',
   extractionConfig: null,
   decisionConfig: null,
   tradingConfig: null,
@@ -78,6 +87,160 @@ export const useBotStore = create<BotState>((set, get) => ({
   activeConfigAgent: null,
   isLoading: false,
   error: null,
+
+  loadBots: async () => {
+    console.log('Loading available bots...')
+    try {
+      // For now, create a default bot if none exist
+      const state = get()
+      if (state.availableBots.length === 0) {
+        const defaultBot: Bot = {
+          config_id: 'default-bot-id',
+          config_name: 'BOT-01',
+          created_at: new Date().toISOString()
+        }
+        set({ 
+          availableBots: [defaultBot],
+          currentBotId: defaultBot.config_id,
+          currentBotName: defaultBot.config_name
+        })
+      }
+    } catch (error) {
+      console.error('Error loading bots:', error)
+      set({ error: error instanceof Error ? error.message : 'Failed to load bots' })
+    }
+  },
+
+  createBot: async (name: string) => {
+    console.log('Creating new bot:', name)
+    try {
+      // Generate a new bot ID (in real implementation, this would come from backend)
+      const newBot: Bot = {
+        config_id: `bot-${Date.now()}`,
+        config_name: name,
+        created_at: new Date().toISOString()
+      }
+      
+      const state = get()
+      set({
+        availableBots: [...state.availableBots, newBot],
+        currentBotId: newBot.config_id,
+        currentBotName: newBot.config_name,
+        // Reset configurations for new bot
+        extractionConfig: null,
+        decisionConfig: null,
+        tradingConfig: null,
+        agentStatuses: {
+          extraction: 'unconfigured',
+          decision: 'unconfigured',
+          trading: 'unconfigured',
+        },
+        trades: [],
+        performance: null,
+        schedulerStatus: { is_running: false }
+      })
+    } catch (error) {
+      console.error('Error creating bot:', error)
+      set({ error: error instanceof Error ? error.message : 'Failed to create bot' })
+    }
+  },
+
+  selectBot: async (botId: string) => {
+    console.log('Selecting bot:', botId)
+    try {
+      const state = get()
+      const selectedBot = state.availableBots.find(bot => bot.config_id === botId)
+      if (!selectedBot) {
+        throw new Error('Bot not found')
+      }
+      
+      set({
+        currentBotId: botId,
+        currentBotName: selectedBot.config_name,
+        // Reset data for new bot
+        extractionConfig: null,
+        decisionConfig: null,
+        tradingConfig: null,
+        agentStatuses: {
+          extraction: 'unconfigured',
+          decision: 'unconfigured',
+          trading: 'unconfigured',
+        },
+        trades: [],
+        performance: null,
+        schedulerStatus: { is_running: false }
+      })
+      
+      // Load configurations for the selected bot
+      await get().loadConfigurations()
+    } catch (error) {
+      console.error('Error selecting bot:', error)
+      set({ error: error instanceof Error ? error.message : 'Failed to select bot' })
+    }
+  },
+
+  updateBotName: async (botId: string, name: string) => {
+    console.log('Updating bot name:', botId, name)
+    try {
+      const state = get()
+      const updatedBots = state.availableBots.map(bot =>
+        bot.config_id === botId 
+          ? { ...bot, config_name: name, updated_at: new Date().toISOString() }
+          : bot
+      )
+      
+      set({
+        availableBots: updatedBots,
+        currentBotName: state.currentBotId === botId ? name : state.currentBotName
+      })
+    } catch (error) {
+      console.error('Error updating bot name:', error)
+      set({ error: error instanceof Error ? error.message : 'Failed to update bot name' })
+    }
+  },
+
+  deleteBot: async (botId: string) => {
+    console.log('Deleting bot:', botId)
+    try {
+      const state = get()
+      const updatedBots = state.availableBots.filter(bot => bot.config_id !== botId)
+      
+      // If deleting current bot, switch to first available or create default
+      let newCurrentBotId = state.currentBotId
+      let newCurrentBotName = state.currentBotName
+      
+      if (state.currentBotId === botId) {
+        if (updatedBots.length > 0) {
+          newCurrentBotId = updatedBots[0].config_id
+          newCurrentBotName = updatedBots[0].config_name
+        } else {
+          // Create a new default bot
+          const defaultBot: Bot = {
+            config_id: `bot-${Date.now()}`,
+            config_name: 'BOT-01',
+            created_at: new Date().toISOString()
+          }
+          updatedBots.push(defaultBot)
+          newCurrentBotId = defaultBot.config_id
+          newCurrentBotName = defaultBot.config_name
+        }
+      }
+      
+      set({
+        availableBots: updatedBots,
+        currentBotId: newCurrentBotId,
+        currentBotName: newCurrentBotName
+      })
+      
+      // Reload configurations if we switched bots
+      if (state.currentBotId === botId) {
+        await get().loadConfigurations()
+      }
+    } catch (error) {
+      console.error('Error deleting bot:', error)
+      set({ error: error instanceof Error ? error.message : 'Failed to delete bot' })
+    }
+  },
 
   loadConfigurations: async () => {
     set({ isLoading: true, error: null })

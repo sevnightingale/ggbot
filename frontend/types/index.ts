@@ -1,3 +1,11 @@
+// Bot management types
+export interface Bot {
+  config_id: string
+  config_name: string
+  created_at: string
+  updated_at?: string
+}
+
 // Agent configuration types
 export interface ExtractionConfig {
   symbols: string[]
