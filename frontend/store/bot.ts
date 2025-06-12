@@ -82,20 +82,44 @@ export const useBotStore = create<BotState>((set, get) => ({
   loadConfigurations: async () => {
     set({ isLoading: true, error: null })
     try {
-      const [extraction, decision, trading] = await Promise.all([
-        api.getConfig('extraction'),
-        api.getConfig('decision'),
-        api.getConfig('trading'),
-      ])
+      // Mock data for now since backend is not available
+      const mockExtraction: ExtractionConfig = {
+        symbols: ['BTCUSD', 'ETHUSD'],
+        timeframes: ['15m', '1h'],
+        sources: {
+          tradingview: {
+            enabled: true,
+            strategy: 'momentum'
+          },
+          yfinance: {
+            enabled: true
+          }
+        }
+      }
+      const mockDecision: DecisionConfig = {
+        llm_provider: 'deepseek',
+        strategy: 'momentum',
+        risk_guidelines: 'Conservative risk management',
+        additional_context: 'Focus on crypto trends'
+      }
+      const mockTrading: TradingConfig = {
+        risk_rules: {
+          max_leverage: 3,
+          max_position_size_pct: 10,
+          max_risk_per_trade_pct: 2,
+          min_equity_protection: 1000,
+          max_contracts_per_trade: 100
+        }
+      }
       
       set({
-        extractionConfig: extraction.config,
-        decisionConfig: decision.config,
-        tradingConfig: trading.config,
+        extractionConfig: mockExtraction,
+        decisionConfig: mockDecision,
+        tradingConfig: mockTrading,
         agentStatuses: {
-          extraction: calculateAgentStatus(extraction.config),
-          decision: calculateAgentStatus(decision.config),
-          trading: calculateAgentStatus(trading.config),
+          extraction: calculateAgentStatus(mockExtraction),
+          decision: calculateAgentStatus(mockDecision),
+          trading: calculateAgentStatus(mockTrading),
         },
         isLoading: false,
       })
@@ -141,8 +165,38 @@ export const useBotStore = create<BotState>((set, get) => ({
 
   loadTrades: async () => {
     try {
-      const response = await api.getTrades()
-      set({ trades: response.trades })
+      // Mock trades data
+      const mockTrades: Trade[] = [
+        {
+          id: '1',
+          symbol: 'BTCUSD',
+          side: 'long',
+          entry_price: 45000,
+          current_price: 45150,
+          quantity: 0.1,
+          pnl: 150,
+          pnl_percentage: 0.33,
+          status: 'closed',
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          decision_reasoning: 'Strong momentum indicators'
+        },
+        {
+          id: '2', 
+          symbol: 'ETHUSD',
+          side: 'short',
+          entry_price: 3200,
+          current_price: 3150,
+          quantity: 1.0,
+          pnl: 50,
+          pnl_percentage: 1.56,
+          status: 'open',
+          created_at: new Date(Date.now() - 3600000).toISOString(),
+          updated_at: new Date(Date.now() - 1800000).toISOString(),
+          decision_reasoning: 'Bearish trend detected'
+        }
+      ]
+      set({ trades: mockTrades })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to load trades' })
     }
@@ -150,8 +204,24 @@ export const useBotStore = create<BotState>((set, get) => ({
 
   loadPerformance: async (period = '7d') => {
     try {
-      const performance = await api.getPerformance(period)
-      set({ performance })
+      // Mock performance data
+      const mockPerformance: PerformanceData = {
+        period,
+        total_pnl: 1250.50,
+        total_pnl_percentage: 12.5,
+        win_rate: 0.68,
+        total_trades: 15,
+        daily_pnl: [
+          { date: '2024-01-01', pnl: 100 },
+          { date: '2024-01-02', pnl: 250 },
+          { date: '2024-01-03', pnl: -50 },
+          { date: '2024-01-04', pnl: 300 },
+          { date: '2024-01-05', pnl: 150 },
+          { date: '2024-01-06', pnl: 200 },
+          { date: '2024-01-07', pnl: 300 }
+        ]
+      }
+      set({ performance: mockPerformance })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to load performance' })
     }
@@ -160,7 +230,8 @@ export const useBotStore = create<BotState>((set, get) => ({
   startScheduler: async () => {
     set({ isLoading: true, error: null })
     try {
-      await api.startScheduler()
+      // Mock start scheduler
+      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
       set({ 
         schedulerStatus: { is_running: true },
         isLoading: false 
@@ -176,7 +247,8 @@ export const useBotStore = create<BotState>((set, get) => ({
   stopScheduler: async () => {
     set({ isLoading: true, error: null })
     try {
-      await api.stopScheduler()
+      // Mock stop scheduler
+      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
       set({ 
         schedulerStatus: { is_running: false },
         isLoading: false 
@@ -191,8 +263,11 @@ export const useBotStore = create<BotState>((set, get) => ({
 
   checkSchedulerStatus: async () => {
     try {
-      const status = await api.getSchedulerStatus()
-      set({ schedulerStatus: status })
+      // Mock scheduler status
+      const mockStatus: SchedulerStatus = {
+        is_running: false
+      }
+      set({ schedulerStatus: mockStatus })
     } catch (error) {
       set({ error: error instanceof Error ? error.message : 'Failed to check scheduler status' })
     }
