@@ -51,7 +51,7 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
       `}
       style={{
         boxShadow: isConfigured 
-          ? `0 0 30px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.6)' : type === 'decision' ? 'rgba(44, 190, 119, 0.6)' : 'rgba(190, 106, 71, 0.6)'}, 0 0 60px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.2)' : type === 'decision' ? 'rgba(44, 190, 119, 0.2)' : 'rgba(190, 106, 71, 0.2)'}`
+          ? `0 0 20px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.4)' : type === 'decision' ? 'rgba(44, 190, 119, 0.4)' : 'rgba(190, 106, 71, 0.4)'}`
           : undefined
       }}
       onClick={() => openConfigModal(type)}
