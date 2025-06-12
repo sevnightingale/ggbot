@@ -111,40 +111,10 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
 
   return (
     <div className="flex flex-col items-center space-y-8">
-      {/* Combined GGBot Emblem & Control Panel */}
-      <div className="border-2 border-bone-200/80 p-6 w-full max-w-4xl paper-texture">
-        <div className="flex items-center justify-between">
-          {/* Left: Start/Stop Button */}
-          <div className="flex-shrink-0">
-            <button
-              onClick={handleStartStop}
-              disabled={!canStart && !isRunning}
-              className={`
-                flex items-center space-x-3 px-6 py-3 border-2 font-medium transition-all duration-300
-                ${isRunning
-                  ? 'bg-red-600 hover:bg-red-700 text-white border-red-500'
-                  : canStart
-                    ? 'bg-bone-200 hover:bg-bone-300 text-charcoal-900 border-bone-200'
-                    : 'bg-charcoal-700 text-bone-500 border-bone-500/20 cursor-not-allowed'
-                }
-              `}
-            >
-              {isRunning ? (
-                <>
-                  <Square size={18} />
-                  <span>STOP</span>
-                </>
-              ) : (
-                <>
-                  <Play size={18} />
-                  <span>START</span>
-                </>
-              )}
-            </button>
-          </div>
-
-          {/* Center: Bot Emblem Section */}
-          <div className="flex flex-col items-center space-y-4 flex-1">
+      {/* Floating GGBot Emblem */}
+      <div className="p-6 w-full max-w-4xl">
+        {/* Centered Bot Emblem Section */}
+        <div className="relative flex flex-col items-center space-y-4">
             {/* Carousel Navigation */}
             <div className="flex items-center justify-between w-full max-w-sm">
               {/* Left Arrow */}
@@ -242,16 +212,49 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
               ))}
             </div>
           </div>
+        </div>
+        
+        {/* Floating Action Controls */}
+        <div className="relative flex justify-center space-x-12 mt-8">
+          {/* Start/Stop Icon */}
+          <div className="relative group">
+            <button
+              onClick={handleStartStop}
+              disabled={!canStart && !isRunning}
+              className={`
+                p-4 rounded-full transition-all duration-300 relative
+                ${isRunning
+                  ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
+                  : canStart
+                    ? 'bg-bone-200/20 hover:bg-bone-200/30 text-bone-200 hover:text-bone-100'
+                    : 'bg-charcoal-700/50 text-bone-500/50 cursor-not-allowed'
+                }
+              `}
+            >
+              {isRunning ? <Square size={24} /> : <Play size={24} />}
+            </button>
+            {/* Floating Label */}
+            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+              <div className="bg-charcoal-800 border border-bone-200/60 px-2 py-1 text-xs text-bone-200 whitespace-nowrap">
+                {isRunning ? 'STOP' : canStart ? 'START' : 'Configure agents first'}
+              </div>
+            </div>
+          </div>
 
-          {/* Right: Test Run Button */}
-          <div className="flex-shrink-0">
+          {/* Test Run Icon */}
+          <div className="relative group">
             <button
               onClick={handleTestRun}
-              className="flex items-center space-x-3 px-6 py-3 border-2 border-bone-200/60 bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 hover:text-bone-100 font-medium transition-all duration-300"
+              className="p-4 rounded-full bg-bone-200/20 hover:bg-bone-200/30 text-bone-200 hover:text-bone-100 transition-all duration-300"
             >
-              <TestTube size={18} />
-              <span>TEST RUN</span>
+              <TestTube size={24} />
             </button>
+            {/* Floating Label */}
+            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+              <div className="bg-charcoal-800 border border-bone-200/60 px-2 py-1 text-xs text-bone-200 whitespace-nowrap">
+                TEST RUN
+              </div>
+            </div>
           </div>
         </div>
       </div>
