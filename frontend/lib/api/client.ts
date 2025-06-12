@@ -14,27 +14,78 @@ const USER_ID = process.env.NEXT_PUBLIC_USER_ID || '00000000-0000-0000-0000-0000
 class ApiClient {
   private baseUrl: string
   private userId: string
+  private readonly timeout: number = 8000 // 8 second timeout
 
   constructor() {
     this.baseUrl = API_URL
     this.userId = USER_ID
+    console.log('ApiClient initialized with baseUrl:', this.baseUrl)
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${path}`
-    const response = await fetch(url, {
-      ...options,
-      headers: {
-        'Content-Type': 'application/json',
-        ...options?.headers,
-      },
-    })
+    console.log('Making API request to:', url)
+    
+    // Create AbortController for timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), this.timeout)
+    
+    try {
+      const response = await fetch(url, {
+        ...options,
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options?.headers,
+        },
+      })
 
-    if (!response.ok) {
-      throw new Error(`API Error: ${response.status} ${response.statusText}`)
+      clearTimeout(timeoutId)
+
+      if (!response.ok) {
+        console.error(`API Error: ${response.status} ${response.statusText}`)
+        throw new Error(`API Error: ${response.status} ${response.statusText}`)
+      }
+
+      const data = await response.json()
+      console.log('API request successful:', path)
+      return data
+    } catch (error) {
+      clearTimeout(timeoutId)
+      
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.error('API request timed out:', path)
+        throw new Error(`Request timeout: ${path}`)
+      }
+      
+      console.error('API request failed:', path, error)
+      throw error
     }
+  }
 
-    return response.json()
+  // Test API connection
+  async testConnection(): Promise<boolean> {
+    try {
+      console.log('Testing API connection...')
+      // Try a simple request with shorter timeout
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 3000) // 3 second timeout for connection test
+      
+      const response = await fetch(`${this.baseUrl}/health`, {
+        method: 'GET',
+        signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      })
+      
+      clearTimeout(timeoutId)
+      console.log('API connection test result:', response.ok)
+      return response.ok
+    } catch (error) {
+      console.error('API connection test failed:', error)
+      return false
+    }
   }
 
   // Configuration APIs
