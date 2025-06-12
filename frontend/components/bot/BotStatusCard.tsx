@@ -25,7 +25,7 @@ export function BotStatusCard({ status }: BotStatusCardProps) {
       <div className="flex items-center justify-between">
         <div>
           <div className="flex items-center gap-3 mb-2">
-            <div className={`w-3 h-3 ${isRunning ? 'bg-green-400' : 'bg-bone-400'}`} />
+            <div className={`w-3 h-3 ${isRunning ? 'bg-bone-200' : 'bg-bone-400'}`} />
             <h2 className="text-xl font-display font-bold">
               Bot Status: {isRunning ? 'Running' : 'Stopped'}
             </h2>
@@ -51,7 +51,7 @@ export function BotStatusCard({ status }: BotStatusCardProps) {
             className={`flex items-center gap-2 px-6 py-3 font-medium transition-colors ${
               isRunning
                 ? 'bg-red-600 hover:bg-red-700 text-white'
-                : 'bg-green-600 hover:bg-green-700 text-white'
+                : 'bg-bone-200 hover:bg-bone-300 text-charcoal-900'
             }`}
           >
             {isRunning ? (

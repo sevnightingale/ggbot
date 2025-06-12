@@ -93,19 +93,19 @@ export function MainDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
           <AgentCard
             type="extraction"
-            title="Data Extraction"
+            title="Extraction Agent"
             description="Collects market data and technical indicators"
             status={agentStatuses.extraction}
           />
           <AgentCard
             type="decision"
-            title="Decision Engine"
+            title="Decision Agent"
             description="Analyzes data and generates trading signals"
             status={agentStatuses.decision}
           />
           <AgentCard
             type="trading"
-            title="Trade Execution"
+            title="Trading Agent"
             description="Manages positions and executes trades"
             status={agentStatuses.trading}
           />

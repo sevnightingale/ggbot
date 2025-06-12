@@ -18,7 +18,7 @@ export function TopNav() {
           className="p-2 hover:bg-charcoal-800 transition-colors"
           aria-label="Toggle menu"
         >
-          {isMenuOpen ? <X size={24} /> : <Menu size={24} />}
+          {isMenuOpen ? <X size={32} /> : <Menu size={32} />}
         </button>
       </div>
 
@@ -29,7 +29,7 @@ export function TopNav() {
             className="fixed inset-0 bg-black/50 z-40"
             onClick={() => setIsMenuOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 mr-6 border border-bone-200/80 p-4 min-w-[200px] z-50 paper-texture">
+          <div className="absolute right-0 top-full mt-2 mr-6 border border-bone-200/80 p-4 w-48 z-50 paper-texture">
             <ul className="space-y-2">
               <li>
                 <a 
