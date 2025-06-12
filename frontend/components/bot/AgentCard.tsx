@@ -51,7 +51,7 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
       `}
       style={{
         boxShadow: isConfigured 
-          ? `0 0 20px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.4)' : type === 'decision' ? 'rgba(44, 190, 119, 0.4)' : 'rgba(190, 106, 71, 0.4)'}`
+          ? `0 0 15px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.3)' : type === 'decision' ? 'rgba(44, 190, 119, 0.3)' : 'rgba(190, 106, 71, 0.3)'}`
           : undefined
       }}
       onClick={() => openConfigModal(type)}

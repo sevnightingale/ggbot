@@ -116,7 +116,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
         {/* Centered Bot Emblem Section */}
         <div className="relative flex flex-col items-center space-y-4">
           {/* Carousel Navigation */}
-          <div className="flex items-center justify-between w-full max-w-sm">
+          <div className="flex items-center justify-between w-full max-w-lg">
             {/* Left Arrow */}
             <button
               onClick={handleLeftNav}
@@ -134,7 +134,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             <div className="flex flex-col items-center space-y-3">
               {/* Large Circle Emblem */}
               <div 
-                className="w-24 h-24 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative"
+                className="w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative"
                 style={{
                   backgroundImage: `
                     radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.95) 0%, rgba(227, 229, 230, 0.85) 100%),
