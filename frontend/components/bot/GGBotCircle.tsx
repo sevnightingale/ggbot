@@ -115,102 +115,101 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
       <div className="p-6 w-full max-w-4xl">
         {/* Centered Bot Emblem Section */}
         <div className="relative flex flex-col items-center space-y-4">
-            {/* Carousel Navigation */}
-            <div className="flex items-center justify-between w-full max-w-sm">
-              {/* Left Arrow */}
-              <button
-                onClick={handleLeftNav}
-                disabled={currentBotIndex === 0}
-                className={`p-2 transition-colors ${
-                  currentBotIndex === 0 
-                    ? 'text-bone-500/30 cursor-not-allowed' 
-                    : 'text-bone-200 hover:text-bone-100'
-                }`}
+          {/* Carousel Navigation */}
+          <div className="flex items-center justify-between w-full max-w-sm">
+            {/* Left Arrow */}
+            <button
+              onClick={handleLeftNav}
+              disabled={currentBotIndex === 0}
+              className={`p-2 transition-colors ${
+                currentBotIndex === 0 
+                  ? 'text-bone-500/30 cursor-not-allowed' 
+                  : 'text-bone-200 hover:text-bone-100'
+              }`}
+            >
+              <ChevronLeft size={32} />
+            </button>
+
+            {/* Bot Emblem */}
+            <div className="flex flex-col items-center space-y-3">
+              {/* Large Circle Emblem */}
+              <div 
+                className="w-24 h-24 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative"
+                style={{
+                  backgroundImage: `
+                    radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.95) 0%, rgba(227, 229, 230, 0.85) 100%),
+                    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23161618' fill-opacity='0.05'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='53' cy='53' r='1'/%3E%3Ccircle cx='23' cy='43' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")
+                  `,
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(227, 229, 230, 0.1)'
+                }}
               >
-                <ChevronLeft size={32} />
-              </button>
-
-              {/* Bot Emblem */}
-              <div className="flex flex-col items-center space-y-3">
-                {/* Large Circle Emblem */}
-                <div 
-                  className="w-24 h-24 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative"
-                  style={{
-                    backgroundImage: `
-                      radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.95) 0%, rgba(227, 229, 230, 0.85) 100%),
-                      url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23161618' fill-opacity='0.05'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='53' cy='53' r='1'/%3E%3Ccircle cx='23' cy='43' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")
-                    `,
-                    boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(227, 229, 230, 0.1)'
-                  }}
-                >
-                  {/* Status indicator ring */}
-                  {isRunning && (
-                    <div className="absolute inset-1 rounded-full border-2 border-bone-200/90 animate-pulse" />
-                  )}
-                </div>
-
-                {/* Bot Name */}
-                <div className="flex items-center space-x-2">
-                  {isEditingName ? (
-                    <div className="flex items-center space-x-2">
-                      <input
-                        type="text"
-                        value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
-                        className="bg-charcoal-700 border border-bone-200/70 px-2 py-1 text-bone-200 text-sm w-24"
-                        autoFocus
-                      />
-                      <button
-                        onClick={handleNameSave}
-                        className="text-bone-200 hover:text-bone-100"
-                      >
-                        <Check size={16} />
-                      </button>
-                      <button
-                        onClick={handleNameCancel}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <X size={16} />
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="flex items-center space-x-2">
-                      <span className="text-bone-200 font-display font-bold">{currentBotName}</span>
-                      <button
-                        onClick={handleNameEdit}
-                        className="text-bone-400 hover:text-bone-200"
-                      >
-                        <Edit3 size={14} />
-                      </button>
-                    </div>
-                  )}
-                </div>
+                {/* Status indicator ring */}
+                {isRunning && (
+                  <div className="absolute inset-1 rounded-full border-2 border-bone-200/90 animate-pulse" />
+                )}
               </div>
 
-              {/* Right Arrow or Plus */}
-              <button
-                onClick={handleRightNav}
-                className="p-2 text-bone-200 hover:text-bone-100 transition-colors"
-              >
-                {isLastBot ? <Plus size={32} /> : <ChevronRight size={32} />}
-              </button>
+              {/* Bot Name */}
+              <div className="flex items-center space-x-2">
+                {isEditingName ? (
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="text"
+                      value={editName}
+                      onChange={(e) => setEditName(e.target.value)}
+                      className="bg-charcoal-700 border border-bone-200/70 px-2 py-1 text-bone-200 text-sm w-24"
+                      autoFocus
+                    />
+                    <button
+                      onClick={handleNameSave}
+                      className="text-bone-200 hover:text-bone-100"
+                    >
+                      <Check size={16} />
+                    </button>
+                    <button
+                      onClick={handleNameCancel}
+                      className="text-red-400 hover:text-red-300"
+                    >
+                      <X size={16} />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="flex items-center space-x-2">
+                    <span className="text-bone-200 font-display font-bold">{currentBotName}</span>
+                    <button
+                      onClick={handleNameEdit}
+                      className="text-bone-400 hover:text-bone-200"
+                    >
+                      <Edit3 size={14} />
+                    </button>
+                  </div>
+                )}
+              </div>
             </div>
 
-            {/* Pagination Dots */}
-            <div className="flex justify-center space-x-2">
-              {Array.from({ length: totalBots + 1 }).map((_, index) => (
-                <div
-                  key={index}
-                  className={`w-2 h-2 rounded-full transition-colors ${
-                    index === currentBotIndex 
-                      ? 'bg-bone-200' 
-                      : index === totalBots 
-                        ? 'bg-bone-500/50' // Placeholder for new bot
-                        : 'bg-bone-500'
-                  }`}
-                />
-              ))}
-            </div>
+            {/* Right Arrow or Plus */}
+            <button
+              onClick={handleRightNav}
+              className="p-2 text-bone-200 hover:text-bone-100 transition-colors"
+            >
+              {isLastBot ? <Plus size={32} /> : <ChevronRight size={32} />}
+            </button>
+          </div>
+
+          {/* Pagination Dots */}
+          <div className="flex justify-center space-x-2">
+            {Array.from({ length: totalBots + 1 }).map((_, index) => (
+              <div
+                key={index}
+                className={`w-2 h-2 rounded-full transition-colors ${
+                  index === currentBotIndex 
+                    ? 'bg-bone-200' 
+                    : index === totalBots 
+                      ? 'bg-bone-500/50'
+                      : 'bg-bone-500'
+                }`}
+              />
+            ))}
           </div>
         </div>
         
@@ -221,15 +220,13 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             <button
               onClick={handleStartStop}
               disabled={!canStart && !isRunning}
-              className={`
-                p-4 rounded-full transition-all duration-300 relative
-                ${isRunning
+              className={`p-4 rounded-full transition-all duration-300 relative ${
+                isRunning
                   ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
                   : canStart
                     ? 'bg-bone-200/20 hover:bg-bone-200/30 text-bone-200 hover:text-bone-100'
                     : 'bg-charcoal-700/50 text-bone-500/50 cursor-not-allowed'
-                }
-              `}
+              }`}
             >
               {isRunning ? <Square size={24} /> : <Play size={24} />}
             </button>
