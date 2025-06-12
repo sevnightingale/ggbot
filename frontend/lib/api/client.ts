@@ -38,14 +38,14 @@ class ApiClient {
   }
 
   // Configuration APIs
-  async getConfig(module: 'extraction' | 'decision' | 'trading'): Promise<any> {
+  async getConfig(module: 'extraction' | 'decision' | 'trading'): Promise<{ config: ExtractionConfig | DecisionConfig | TradingConfig }> {
     return this.request(`/agent/api/config/${this.userId}/${module}`)
   }
 
   async updateConfig(
     module: 'extraction' | 'decision' | 'trading', 
     config: ExtractionConfig | DecisionConfig | TradingConfig
-  ): Promise<ApiResponse<any>> {
+  ): Promise<ApiResponse<{ config: ExtractionConfig | DecisionConfig | TradingConfig }>> {
     return this.request(`/agent/api/config/${this.userId}/${module}`, {
       method: 'PUT',
       body: JSON.stringify({ config }),
@@ -53,13 +53,13 @@ class ApiClient {
   }
 
   // Scheduler APIs
-  async startScheduler(): Promise<ApiResponse<any>> {
+  async startScheduler(): Promise<ApiResponse<{ message: string }>> {
     return this.request('/agent/api/scheduler/start', {
       method: 'POST',
     })
   }
 
-  async stopScheduler(): Promise<ApiResponse<any>> {
+  async stopScheduler(): Promise<ApiResponse<{ message: string }>> {
     return this.request('/agent/api/scheduler/stop', {
       method: 'POST',
     })
@@ -79,7 +79,7 @@ class ApiClient {
   }
 
   // Test execution
-  async triggerExtraction(): Promise<ApiResponse<any>> {
+  async triggerExtraction(): Promise<ApiResponse<{ message: string }>> {
     return this.request('/extraction/webhooks/trigger-extraction', {
       method: 'POST',
     })

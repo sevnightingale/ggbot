@@ -2,9 +2,10 @@
 
 import { Play, Square, AlertTriangle } from 'lucide-react'
 import { useBotStore } from '@/store/bot'
+import { SchedulerStatus } from '@/types'
 
 interface BotStatusCardProps {
-  status: any // Your scheduler status type
+  status: SchedulerStatus
 }
 
 export function BotStatusCard({ status }: BotStatusCardProps) {
