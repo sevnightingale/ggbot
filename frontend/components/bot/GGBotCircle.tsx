@@ -73,7 +73,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   return (
     <div className="flex flex-col items-center space-y-8">
       {/* Bot Emblem Card */}
-      <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-8 w-full max-w-md">
+      <div className="border-2 border-bone-200/80 p-8 w-full max-w-md paper-texture torn-edge-top">
         {/* Carousel Navigation */}
         <div className="flex items-center justify-between mb-8">
           {/* Left Arrow */}
@@ -173,7 +173,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
       </div>
 
       {/* Control Panel */}
-      <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-6 flex items-center space-x-6">
+      <div className="border-2 border-bone-200/80 p-6 flex items-center space-x-6 paper-texture">
         {/* Start/Stop Button */}
         <button
           onClick={handleStartStop}

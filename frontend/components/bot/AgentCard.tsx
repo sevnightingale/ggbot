@@ -43,9 +43,10 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
   return (
     <div 
       className={`
-        bg-charcoal-800/50 border-2 border-bone-200/80 p-6 
-        hover:bg-charcoal-800/70 hover:border-bone-200
+        border-2 border-bone-200/80 p-6 
+        hover:border-bone-200
         transition-all duration-300 cursor-pointer group
+        paper-texture
         ${isConfigured ? `hover:shadow-lg` : ''}
       `}
       style={{

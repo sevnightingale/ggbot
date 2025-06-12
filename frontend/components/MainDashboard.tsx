@@ -118,12 +118,12 @@ export function MainDashboard() {
 
         {/* Trading Dashboard - Brutalist Design */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-6">
+          <div className="border-2 border-bone-200/80 p-6 paper-texture">
             <h2 className="text-xl font-display font-bold mb-6 text-bone-200">Active Trades</h2>
             <TradeTable />
           </div>
 
-          <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-6">
+          <div className="border-2 border-bone-200/80 p-6 paper-texture">
             <h2 className="text-xl font-display font-bold mb-6 text-bone-200">Performance</h2>
             <PerformanceChart />
           </div>

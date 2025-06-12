@@ -79,7 +79,7 @@ export function AgentConfigModal() {
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
     >
-      <div className="bg-charcoal-800 border border-bone-200/80 w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="border border-bone-200/80 w-full max-w-4xl max-h-[90vh] overflow-hidden paper-texture">
         {/* Header */}
         <div className={cn(
           "p-6 border-b border-bone-200/60",

@@ -8,7 +8,7 @@ export function TopNav() {
 
   return (
     <nav className="relative z-50">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-bone-200/60">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-bone-200/60 paper-texture-subtle">
         <div className="flex items-center gap-8">
           <h1 className="text-2xl font-display font-bold">ggbots.ai</h1>
         </div>
@@ -29,7 +29,7 @@ export function TopNav() {
             className="fixed inset-0 bg-black/50 z-40"
             onClick={() => setIsMenuOpen(false)}
           />
-          <div className="absolute right-0 top-full mt-2 mr-6 bg-charcoal-800 border border-bone-200/80 p-4 min-w-[200px] z-50">
+          <div className="absolute right-0 top-full mt-2 mr-6 border border-bone-200/80 p-4 min-w-[200px] z-50 paper-texture">
             <ul className="space-y-2">
               <li>
                 <a 
