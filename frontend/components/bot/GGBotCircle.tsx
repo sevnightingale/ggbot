@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Play, Square, TestTube, Edit3, Check, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Play, Square, TestTube, Edit3, Check, X, Trash2 } from 'lucide-react'
 import { useBotStore } from '@/store/bot'
 import { SchedulerStatus } from '@/types'
 
@@ -20,6 +20,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
     createBot,
     selectBot,
     updateBotName,
+    deleteBot,
     loadBots
   } = useBotStore()
   const [currentBotIndex, setCurrentBotIndex] = useState(0)
@@ -68,7 +69,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   const handleRightNav = async () => {
     if (isLastBot) {
       // Create new bot
-      const newBotName = `BOT-${String(availableBots.length + 1).padStart(2, '0')}`
+      const newBotName = `GGBOT-${String(availableBots.length + 1).padStart(2, '0')}`
       await createBot(newBotName)
     } else {
       const newIndex = currentBotIndex + 1
@@ -109,6 +110,12 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
     setIsEditingName(false)
   }
 
+  const handleDelete = async () => {
+    if (currentBotId && availableBots.length > 1) {
+      await deleteBot(currentBotId)
+    }
+  }
+
   return (
     <div className="flex flex-col items-center space-y-8">
       {/* Floating GGBot Emblem */}
@@ -133,10 +140,10 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             </div>
 
             {/* Bot Emblem */}
-            <div className="flex flex-col items-center space-y-3">
+            <div className="flex flex-col items-center">
               {/* Large Circle Emblem */}
               <div 
-                className="w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative"
+                className="w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative flex items-center justify-center"
                 style={{
                   backgroundImage: `
                     radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.95) 0%, rgba(227, 229, 230, 0.85) 100%),
@@ -149,43 +156,43 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
                 {isRunning && (
                   <div className="absolute inset-1 rounded-full border-2 border-bone-200/90 animate-pulse" />
                 )}
-              </div>
-
-              {/* Bot Name */}
-              <div className="flex items-center space-x-2">
-                {isEditingName ? (
-                  <div className="flex items-center space-x-2">
-                    <input
-                      type="text"
-                      value={editName}
-                      onChange={(e) => setEditName(e.target.value)}
-                      className="bg-charcoal-700 border border-bone-200/70 px-2 py-1 text-bone-200 text-sm w-24"
-                      autoFocus
-                    />
-                    <button
-                      onClick={handleNameSave}
-                      className="text-bone-200 hover:text-bone-100"
-                    >
-                      <Check size={16} />
-                    </button>
-                    <button
-                      onClick={handleNameCancel}
-                      className="text-red-400 hover:text-red-300"
-                    >
-                      <X size={16} />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="flex items-center space-x-2">
-                    <span className="text-bone-200 font-display font-bold">{currentBotName}</span>
-                    <button
-                      onClick={handleNameEdit}
-                      className="text-bone-400 hover:text-bone-200"
-                    >
-                      <Edit3 size={14} />
-                    </button>
-                  </div>
-                )}
+                
+                {/* Bot Name Inside Circle */}
+                <div className="flex items-center space-x-1 z-10">
+                  {isEditingName ? (
+                    <div className="flex items-center space-x-1">
+                      <input
+                        type="text"
+                        value={editName}
+                        onChange={(e) => setEditName(e.target.value)}
+                        className="bg-charcoal-800/90 border border-charcoal-700 px-2 py-1 text-charcoal-900 text-sm font-bold w-20 text-center"
+                        autoFocus
+                      />
+                      <button
+                        onClick={handleNameSave}
+                        className="text-charcoal-700 hover:text-charcoal-900"
+                      >
+                        <Check size={14} />
+                      </button>
+                      <button
+                        onClick={handleNameCancel}
+                        className="text-red-600 hover:text-red-700"
+                      >
+                        <X size={14} />
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center space-x-1">
+                      <span className="text-charcoal-900 font-display font-bold text-sm">{currentBotName}</span>
+                      <button
+                        onClick={handleNameEdit}
+                        className="text-charcoal-700 hover:text-charcoal-900"
+                      >
+                        <Edit3 size={12} />
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -254,6 +261,27 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
               <div className="bg-charcoal-800 border border-bone-200/60 px-2 py-1 text-xs text-bone-200 whitespace-nowrap">
                 TEST RUN
+              </div>
+            </div>
+          </div>
+
+          {/* Delete Icon */}
+          <div className="relative group">
+            <button
+              onClick={handleDelete}
+              disabled={availableBots.length <= 1}
+              className={`p-4 rounded-full transition-all duration-300 relative ${
+                availableBots.length > 1
+                  ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
+                  : 'bg-charcoal-700/50 text-bone-500/50 cursor-not-allowed'
+              }`}
+            >
+              <Trash2 size={24} />
+            </button>
+            {/* Floating Label */}
+            <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
+              <div className="bg-charcoal-800 border border-bone-200/60 px-2 py-1 text-xs text-bone-200 whitespace-nowrap">
+                {availableBots.length > 1 ? 'DELETE BOT' : 'Cannot delete last bot'}
               </div>
             </div>
           </div>
