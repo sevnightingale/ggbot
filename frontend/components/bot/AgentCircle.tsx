@@ -70,8 +70,8 @@ export function AgentCircle({ type, title, description, status }: AgentCirclePro
         </p>
         
         {/* Status Label */}
-        <div className={`inline-flex items-center gap-2 px-3 py-1 rounded-lg bg-charcoal-800/50 border ${typeColor.border} border-opacity-30`}>
-          <div className={`w-2 h-2 rounded-full ${isConfigured ? typeColor.bg.replace('/10', '') : 'bg-bone-400/50'}`} />
+        <div className={`inline-flex items-center gap-2 px-3 py-1 bg-charcoal-800/50 border ${typeColor.border} border-opacity-80`}>
+          <div className={`w-2 h-2 ${isConfigured ? typeColor.bg.replace('/10', '') : 'bg-bone-400/50'}`} />
           <span className={`text-sm font-medium ${config.color}`}>
             {config.badge === '✓' ? 'Configured' : config.badge === '⚠' ? 'Partial' : 'Click to configure'}
           </span>
@@ -81,7 +81,7 @@ export function AgentCircle({ type, title, description, status }: AgentCirclePro
       {/* Main Circle - Now Below Info */}
       <div 
         className={`
-          relative w-32 h-32 rounded-full bg-charcoal-800/50 border-2 
+          relative w-32 h-32 bg-charcoal-800/50 border-2 
           ${typeColor.border} 
           ${isConfigured ? `${typeColor.bg} ${typeColor.glow} shadow-lg` : 'border-opacity-50'}
           hover:bg-charcoal-800/70 hover:scale-105 hover:border-opacity-100
@@ -98,7 +98,7 @@ export function AgentCircle({ type, title, description, status }: AgentCirclePro
       >
         {/* Inner glow ring for configured state */}
         {isConfigured && (
-          <div className={`absolute inset-3 rounded-full border ${typeColor.border} opacity-40`} />
+          <div className={`absolute inset-3 border ${typeColor.border} opacity-40`} />
         )}
         
         {/* Status Icon */}
@@ -110,7 +110,7 @@ export function AgentCircle({ type, title, description, status }: AgentCirclePro
         {/* Configuration Badge */}
         <div className={`
           absolute -top-2 -right-2 w-8 h-8
-          bg-charcoal-800 border-2 ${typeColor.border} rounded-full 
+          bg-charcoal-800 border-2 ${typeColor.border} 
           flex items-center justify-center text-sm font-bold ${config.color}
           transition-all duration-300
         `}>
@@ -118,7 +118,7 @@ export function AgentCircle({ type, title, description, status }: AgentCirclePro
         </div>
 
         {/* Hover overlay */}
-        <div className="absolute inset-0 bg-bone-200/10 rounded-full opacity-0 group-hover:opacity-100 transition-opacity" />
+        <div className="absolute inset-0 bg-bone-200/60 opacity-0 group-hover:opacity-100 transition-opacity" />
       </div>
     </div>
   )

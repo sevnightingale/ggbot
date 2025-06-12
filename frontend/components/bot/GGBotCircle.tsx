@@ -73,7 +73,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   return (
     <div className="flex flex-col items-center space-y-8">
       {/* Bot Emblem Card */}
-      <div className="bg-charcoal-800/50 border-2 border-bone-200/20 p-8 w-full max-w-md">
+      <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-8 w-full max-w-md">
         {/* Carousel Navigation */}
         <div className="flex items-center justify-between mb-8">
           {/* Left Arrow */}
@@ -93,7 +93,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
           <div className="flex flex-col items-center space-y-4">
             {/* Large Circle Emblem */}
             <div 
-              className="w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200 relative"
+              className="w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative"
               style={{
                 backgroundImage: `
                   radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.95) 0%, rgba(227, 229, 230, 0.85) 100%),
@@ -104,7 +104,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             >
               {/* Status indicator ring */}
               {isRunning && (
-                <div className="absolute inset-1 rounded-full border-2 border-green-400 animate-pulse" />
+                <div className="absolute inset-1 rounded-full border-2 border-green-400/90 animate-pulse" />
               )}
             </div>
 
@@ -116,7 +116,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
                     type="text"
                     value={editName}
                     onChange={(e) => setEditName(e.target.value)}
-                    className="bg-charcoal-700 border border-bone-200/30 px-2 py-1 text-bone-200 text-sm w-24"
+                    className="bg-charcoal-700 border border-bone-200/70 px-2 py-1 text-bone-200 text-sm w-24"
                     autoFocus
                   />
                   <button
@@ -173,7 +173,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
       </div>
 
       {/* Control Panel */}
-      <div className="bg-charcoal-800/50 border-2 border-bone-200/20 p-6 flex items-center space-x-6">
+      <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-6 flex items-center space-x-6">
         {/* Start/Stop Button */}
         <button
           onClick={handleStartStop}
@@ -204,7 +204,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
         {/* Test Run Button */}
         <button
           onClick={handleTestRun}
-          className="flex items-center space-x-3 px-6 py-3 border-2 border-bone-200/30 bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 hover:text-bone-100 font-medium transition-all duration-300"
+          className="flex items-center space-x-3 px-6 py-3 border-2 border-bone-200/60 bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 hover:text-bone-100 font-medium transition-all duration-300"
         >
           <TestTube size={18} />
           <span>TEST RUN</span>

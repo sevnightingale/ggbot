@@ -43,8 +43,8 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
   return (
     <div 
       className={`
-        bg-charcoal-800/50 border-2 border-bone-200/20 p-6 
-        hover:bg-charcoal-800/70 hover:border-bone-200/30
+        bg-charcoal-800/50 border-2 border-bone-200/80 p-6 
+        hover:bg-charcoal-800/70 hover:border-bone-200
         transition-all duration-300 cursor-pointer group
         ${isConfigured ? `hover:shadow-lg` : ''}
       `}
@@ -57,7 +57,7 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
     >
       <div className="flex items-center justify-between mb-4">
         <h3 className="text-lg font-display font-bold text-bone-200">{title}</h3>
-        <div className="bg-charcoal-700/50 border border-bone-200/20 px-3 py-1 flex items-center gap-2">
+        <div className="bg-charcoal-700/50 border border-bone-200/60 px-3 py-1 flex items-center gap-2">
           <StatusIcon size={16} className={config.color} />
           <span className={`text-sm font-medium ${config.color}`}>
             {config.label}

@@ -84,7 +84,7 @@ export function MainDashboard() {
       <div className="max-w-7xl mx-auto px-6 py-8 space-y-8">
         {/* Error Display */}
         {error && (
-          <div className="p-4 bg-red-900/20 border border-red-500/20 rounded-lg">
+          <div className="p-4 bg-red-900/20 border border-red-500/60">
             <p className="text-red-400 text-center">{error}</p>
           </div>
         )}
@@ -118,12 +118,12 @@ export function MainDashboard() {
 
         {/* Trading Dashboard - Brutalist Design */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <div className="bg-charcoal-800/50 border-2 border-bone-200/20 p-6">
+          <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-6">
             <h2 className="text-xl font-display font-bold mb-6 text-bone-200">Active Trades</h2>
             <TradeTable />
           </div>
 
-          <div className="bg-charcoal-800/50 border-2 border-bone-200/20 p-6">
+          <div className="bg-charcoal-800/50 border-2 border-bone-200/80 p-6">
             <h2 className="text-xl font-display font-bold mb-6 text-bone-200">Performance</h2>
             <PerformanceChart />
           </div>

@@ -65,7 +65,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
 
         <div className="space-y-3">
           {exchanges.map((exchange) => (
-            <label key={exchange.value} className="flex items-start gap-3 p-4 bg-charcoal-700/50 border border-bone-200/10 rounded-lg cursor-pointer hover:border-bone-200/30 transition-colors">
+            <label key={exchange.value} className="flex items-start gap-3 p-4 bg-charcoal-700/50 border border-bone-200/60 cursor-pointer hover:border-bone-200/90 transition-colors">
               <input
                 type="radio"
                 name="exchange"
@@ -83,13 +83,13 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
         </div>
 
         {/* Connection Status */}
-        <div className="mt-6 p-4 bg-charcoal-700/50 border border-bone-200/10 rounded-lg">
+        <div className="mt-6 p-4 bg-charcoal-700/50 border border-bone-200/60">
           <h4 className="text-sm font-medium mb-3">API Connection</h4>
           <div className="space-y-3">
             <div>
               <label className="block text-sm font-medium mb-2">API Key Status</label>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-status-success rounded-full"></div>
+                <div className="w-3 h-3 bg-status-success"></div>
                 <span className="text-sm text-bone-300">Connected (Environment Variable)</span>
               </div>
             </div>
@@ -97,7 +97,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
             <div>
               <label className="block text-sm font-medium mb-2">Environment</label>
               <div className="flex items-center gap-2">
-                <div className="w-3 h-3 bg-status-warning rounded-full"></div>
+                <div className="w-3 h-3 bg-status-warning"></div>
                 <span className="text-sm text-bone-300">Testnet Mode (Safe for Testing)</span>
               </div>
               <p className="text-xs text-bone-400 mt-1">
@@ -105,7 +105,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
               </p>
             </div>
 
-            <button className="px-4 py-2 bg-charcoal-600 hover:bg-charcoal-500 border border-bone-200/20 text-bone-200 rounded-lg text-sm transition-colors">
+            <button className="px-4 py-2 bg-charcoal-600 hover:bg-charcoal-500 border border-bone-200/80 text-bone-200 text-sm transition-colors">
               Test Connection
             </button>
           </div>
@@ -124,7 +124,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
 
         {/* Position Sizing */}
         <div className="space-y-6">
-          <div className="p-4 bg-charcoal-700/50 border border-bone-200/10 rounded-lg">
+          <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
             <div className="flex items-center gap-2 mb-4">
               <DollarSign size={16} className="text-agents-trading" />
               <h4 className="font-medium">Position Sizing</h4>
@@ -146,7 +146,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                       ...prev,
                       risk_rules: { ...prev.risk_rules, max_position_size_pct: parseFloat(e.target.value) }
                     }))}
-                    className="w-full h-2 bg-charcoal-600 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-charcoal-600 appearance-none cursor-pointer slider"
                   />
                   <div className="flex justify-between text-xs text-bone-400">
                     <span>1%</span>
@@ -173,7 +173,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                       ...prev,
                       risk_rules: { ...prev.risk_rules, max_leverage: parseInt(e.target.value) }
                     }))}
-                    className="w-full h-2 bg-charcoal-600 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-charcoal-600 appearance-none cursor-pointer slider"
                   />
                   <div className="flex justify-between text-xs text-bone-400">
                     <span>1x</span>
@@ -187,7 +187,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
             </div>
 
             {/* Position Calculator */}
-            <div className="mt-4 p-3 bg-charcoal-600/50 rounded-lg">
+            <div className="mt-4 p-3 bg-charcoal-600/50">
               <h5 className="text-sm font-medium mb-2">Position Calculator</h5>
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
@@ -204,7 +204,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
           </div>
 
           {/* Risk Limits */}
-          <div className="p-4 bg-charcoal-700/50 border border-bone-200/10 rounded-lg">
+          <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
             <div className="flex items-center gap-2 mb-4">
               <Shield size={16} className="text-agents-trading" />
               <h4 className="font-medium">Risk Limits</h4>
@@ -226,7 +226,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                       ...prev,
                       risk_rules: { ...prev.risk_rules, max_risk_per_trade_pct: parseFloat(e.target.value) }
                     }))}
-                    className="w-full h-2 bg-charcoal-600 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-charcoal-600 appearance-none cursor-pointer slider"
                   />
                   <div className="flex justify-between text-xs text-bone-400">
                     <span>0.5%</span>
@@ -256,7 +256,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                       ...prev,
                       risk_rules: { ...prev.risk_rules, min_equity_protection: parseFloat(e.target.value) }
                     }))}
-                    className="w-full h-2 bg-charcoal-600 rounded-lg appearance-none cursor-pointer slider"
+                    className="w-full h-2 bg-charcoal-600 appearance-none cursor-pointer slider"
                   />
                   <div className="flex justify-between text-xs text-bone-400">
                     <span>50%</span>
@@ -274,7 +274,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
           </div>
 
           {/* Emergency Limits */}
-          <div className="p-4 bg-red-900/20 border border-red-500/20 rounded-lg">
+          <div className="p-4 bg-red-900/20 border border-red-500/60">
             <div className="flex items-center gap-2 mb-4">
               <AlertTriangle size={16} className="text-red-400" />
               <h4 className="font-medium text-red-300">Emergency Limits</h4>
@@ -291,7 +291,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                   ...prev,
                   risk_rules: { ...prev.risk_rules, max_contracts_per_trade: parseInt(e.target.value) || 0 }
                 }))}
-                className="w-full p-3 bg-charcoal-700 border border-bone-200/20 rounded-lg text-bone-200"
+                className="w-full p-3 bg-charcoal-700 border border-bone-200/80 text-bone-200"
                 placeholder="1000000"
               />
               <p className="text-xs text-red-300 mt-1">
@@ -332,7 +332,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                       setSelectedOrderTypes(prev => prev.filter(t => t !== orderType.value))
                     }
                   }}
-                  className="mt-1 rounded border-bone-200/20 text-agents-trading focus:ring-agents-trading"
+                  className="mt-1 border-bone-200/80 text-agents-trading focus:ring-agents-trading"
                 />
                 <div className="flex-1">
                   <div className="font-medium text-bone-200">{orderType.label}</div>
@@ -353,7 +353,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="rounded border-bone-200/20 text-agents-trading focus:ring-agents-trading"
+                  className="border-bone-200/80 text-agents-trading focus:ring-agents-trading"
                 />
                 <span className="text-sm">Auto-place stop loss orders</span>
               </label>
@@ -367,7 +367,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                 <input
                   type="checkbox"
                   defaultChecked
-                  className="rounded border-bone-200/20 text-agents-trading focus:ring-agents-trading"
+                  className="border-bone-200/80 text-agents-trading focus:ring-agents-trading"
                 />
                 <span className="text-sm">Auto-place take profit orders</span>
               </label>
@@ -380,7 +380,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
               <label className="flex items-center gap-2">
                 <input
                   type="checkbox"
-                  className="rounded border-bone-200/20 text-agents-trading focus:ring-agents-trading"
+                  className="border-bone-200/80 text-agents-trading focus:ring-agents-trading"
                 />
                 <span className="text-sm">Enable position scaling</span>
               </label>
@@ -400,7 +400,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
               <label className="block text-sm font-medium mb-2">
                 Max Slippage Tolerance
               </label>
-              <select className="w-full p-3 bg-charcoal-600 border border-bone-200/20 rounded-lg text-bone-200">
+              <select className="w-full p-3 bg-charcoal-600 border border-bone-200/80 text-bone-200">
                 <option value="0.1">0.1% (Conservative)</option>
                 <option value="0.25" selected>0.25% (Balanced)</option>
                 <option value="0.5">0.5% (Aggressive)</option>
@@ -412,7 +412,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
               <label className="block text-sm font-medium mb-2">
                 Order Timeout (seconds)
               </label>
-              <select className="w-full p-3 bg-charcoal-600 border border-bone-200/20 rounded-lg text-bone-200">
+              <select className="w-full p-3 bg-charcoal-600 border border-bone-200/80 text-bone-200">
                 <option value="30">30 seconds</option>
                 <option value="60" selected>60 seconds</option>
                 <option value="120">2 minutes</option>
@@ -439,10 +439,10 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
       {renderTabContent()}
       
       {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-bone-200/10">
+      <div className="flex justify-end pt-4 border-t border-bone-200/60">
         <button
           onClick={handleSave}
-          className="px-6 py-3 bg-agents-trading hover:bg-agents-trading/80 text-charcoal-900 font-medium rounded-lg transition-colors"
+          className="px-6 py-3 bg-agents-trading hover:bg-agents-trading/80 text-charcoal-900 font-medium transition-colors"
         >
           Save Configuration
         </button>

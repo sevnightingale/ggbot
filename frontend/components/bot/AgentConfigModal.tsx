@@ -79,10 +79,10 @@ export function AgentConfigModal() {
       className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
       onClick={handleBackdropClick}
     >
-      <div className="bg-charcoal-800 border border-bone-200/20 rounded-lg w-full max-w-4xl max-h-[90vh] overflow-hidden">
+      <div className="bg-charcoal-800 border border-bone-200/80 w-full max-w-4xl max-h-[90vh] overflow-hidden">
         {/* Header */}
         <div className={cn(
-          "p-6 border-b border-bone-200/10",
+          "p-6 border-b border-bone-200/60",
           activeConfigAgent === 'extraction' ? 'border-l-4 border-l-agents-extraction' :
           activeConfigAgent === 'decision' ? 'border-l-4 border-l-agents-decision' :
           activeConfigAgent === 'trading' ? 'border-l-4 border-l-agents-trading' : ''
@@ -96,7 +96,7 @@ export function AgentConfigModal() {
             </div>
             <button
               onClick={closeConfigModal}
-              className="p-2 hover:bg-charcoal-700 rounded-lg transition-colors"
+              className="p-2 hover:bg-charcoal-700 transition-colors"
             >
               <X size={24} className="text-bone-400" />
             </button>
@@ -109,7 +109,7 @@ export function AgentConfigModal() {
                 key={tab}
                 onClick={() => setActiveTab(index)}
                 className={cn(
-                  "px-4 py-2 text-sm font-medium rounded-lg transition-colors",
+                  "px-4 py-2 text-sm font-medium transition-colors",
                   activeTab === index
                     ? (activeConfigAgent === 'extraction' ? 'bg-agents-extraction text-charcoal-900' :
                        activeConfigAgent === 'decision' ? 'bg-agents-decision text-charcoal-900' :
@@ -127,7 +127,7 @@ export function AgentConfigModal() {
         <div className="p-6 overflow-y-auto max-h-[calc(90vh-200px)]">
           {isLoading ? (
             <div className="flex items-center justify-center py-12">
-              <div className="w-8 h-8 border-2 border-bone-200 border-t-transparent rounded-full animate-spin"></div>
+              <div className="w-8 h-8 border-2 border-bone-200/80 border-t-transparent animate-spin"></div>
             </div>
           ) : (
             renderConfigForm()

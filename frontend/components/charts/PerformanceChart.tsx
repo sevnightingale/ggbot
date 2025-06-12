@@ -13,8 +13,8 @@ export function PerformanceChart() {
   if (isLoading) {
     return (
       <div className="space-y-4">
-        <div className="h-6 bg-charcoal-700/50 rounded animate-pulse w-1/3" />
-        <div className="h-64 bg-charcoal-700/50 rounded animate-pulse" />
+        <div className="h-6 bg-charcoal-700/50 animate-pulse w-1/3" />
+        <div className="h-64 bg-charcoal-700/50 animate-pulse" />
       </div>
     )
   }
@@ -37,7 +37,7 @@ export function PerformanceChart() {
             <button
               key={period}
               onClick={() => handlePeriodChange(period)}
-              className="px-3 py-1 text-sm rounded-lg bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 transition-colors"
+              className="px-3 py-1 text-sm bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 transition-colors"
             >
               {period}
             </button>
@@ -92,7 +92,7 @@ export function PerformanceChart() {
                 contentStyle={{
                   backgroundColor: '#1a1a1c',
                   border: '1px solid rgba(227, 229, 230, 0.2)',
-                  borderRadius: '8px',
+                  borderRadius: '0px',
                   color: '#e3e5e6'
                 }}
               />

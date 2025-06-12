@@ -88,7 +88,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
           <h4 className="text-sm font-medium mb-3">Quick Start Templates</h4>
           <div className="grid gap-3">
             {strategyTemplates.map((template, index) => (
-              <div key={index} className="p-4 bg-charcoal-700/50 border border-bone-200/10 rounded-lg">
+              <div key={index} className="p-4 bg-charcoal-700/50 border border-bone-200/60">
                 <div className="flex items-start justify-between">
                   <div className="flex-1">
                     <h5 className="font-medium text-bone-200 mb-1">{template.name}</h5>
@@ -96,7 +96,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
                   </div>
                   <button
                     onClick={() => applyTemplate(template)}
-                    className="ml-3 px-3 py-1 text-xs bg-agents-decision hover:bg-agents-decision/80 text-charcoal-900 rounded font-medium transition-colors"
+                    className="ml-3 px-3 py-1 text-xs bg-agents-decision hover:bg-agents-decision/80 text-charcoal-900 font-medium transition-colors"
                   >
                     Use Template
                   </button>
@@ -114,7 +114,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
             onChange={(e) => setFormData(prev => ({ ...prev, strategy: e.target.value }))}
             placeholder="Describe how you want the AI to trade. For example: 'Trade momentum breakouts using RSI position relative to 50. If RSI is above 50, enter SHORT. If RSI is below 50, enter LONG. Use 15m timeframe for entries. Hold positions for at least 5 minutes, then exit on 2-point RSI move in opposite direction.'"
             rows={8}
-            className="w-full p-4 bg-charcoal-700 border border-bone-200/20 rounded-lg text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
+            className="w-full p-4 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
           />
           <div className="flex justify-between items-center mt-2">
             <p className="text-xs text-bone-400">
@@ -127,7 +127,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
         </div>
 
         {/* Strategy Tips */}
-        <div className="p-4 bg-blue-900/20 border border-blue-500/20 rounded-lg">
+        <div className="p-4 bg-blue-900/20 border border-blue-500/60">
           <h5 className="text-sm font-medium text-blue-300 mb-2">Strategy Writing Tips</h5>
           <ul className="text-sm text-blue-200 space-y-1">
             <li>• Specify clear entry and exit conditions</li>
@@ -150,7 +150,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
 
         <div className="space-y-3">
           {llmProviders.map((provider) => (
-            <label key={provider.value} className="flex items-start gap-3 p-4 bg-charcoal-700/50 border border-bone-200/10 rounded-lg cursor-pointer hover:border-bone-200/30 transition-colors">
+            <label key={provider.value} className="flex items-start gap-3 p-4 bg-charcoal-700/50 border border-bone-200/60 cursor-pointer hover:border-bone-200/90 transition-colors">
               <input
                 type="radio"
                 name="llm_provider"
@@ -169,7 +169,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
 
         {/* Provider-specific settings */}
         {formData.llm_provider === 'openai' && (
-          <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-500/20 rounded-lg">
+          <div className="mt-4 p-4 bg-yellow-900/20 border border-yellow-500/60">
             <p className="text-sm text-yellow-200">
               <strong>Note:</strong> OpenAI GPT-4 provides excellent reasoning but has higher API costs. 
               Make sure your OpenAI API key is configured in the environment.
@@ -178,7 +178,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
         )}
 
         {formData.llm_provider === 'deepseek' && (
-          <div className="mt-4 p-4 bg-green-900/20 border border-green-500/20 rounded-lg">
+          <div className="mt-4 p-4 bg-green-900/20 border border-green-500/60">
             <p className="text-sm text-green-200">
               <strong>Recommended:</strong> DeepSeek offers strong reasoning capabilities at a fraction 
               of the cost compared to other providers. Great for frequent trading decisions.
@@ -195,7 +195,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
-                className="rounded border-bone-200/20 text-agents-decision focus:ring-agents-decision"
+                className="border-bone-200/80 text-agents-decision focus:ring-agents-decision"
               />
               <span className="text-sm">Enable decision confidence scoring</span>
             </label>
@@ -209,7 +209,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
               <input
                 type="checkbox"
                 defaultChecked
-                className="rounded border-bone-200/20 text-agents-decision focus:ring-agents-decision"
+                className="border-bone-200/80 text-agents-decision focus:ring-agents-decision"
               />
               <span className="text-sm">Include market context in decisions</span>
             </label>
@@ -235,7 +235,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
           onChange={(e) => setFormData(prev => ({ ...prev, risk_guidelines: e.target.value }))}
           placeholder="Max position size 5% of capital. Max leverage 10x. Stop trading after 3 losses in a day or 5% daily drawdown. Never risk more than 2% per trade."
           rows={4}
-          className="w-full p-4 bg-charcoal-700 border border-bone-200/20 rounded-lg text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
+          className="w-full p-4 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
         />
       </div>
 
@@ -250,7 +250,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
           onChange={(e) => setFormData(prev => ({ ...prev, additional_context: e.target.value }))}
           placeholder="I prefer catching big moves over frequent small trades. The account typically holds 1-3 positions at a time. I'm comfortable with moderate volatility and prefer trending markets over ranging conditions."
           rows={4}
-          className="w-full p-4 bg-charcoal-700 border border-bone-200/20 rounded-lg text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
+          className="w-full p-4 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
         />
       </div>
 
@@ -264,7 +264,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
               {['Scalp (minutes)', 'Short-term (hours)', 'Swing (days)', 'Position (weeks)'].map((style) => (
                 <button
                   key={style}
-                  className="p-2 text-sm bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/20 rounded transition-colors"
+                  className="p-2 text-sm bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/80 transition-colors"
                   onClick={() => {
                     const contextAddition = `\nPreferred holding time: ${style}.`
                     if (!formData.additional_context.includes(style)) {
@@ -284,7 +284,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
               {['Trending markets', 'Ranging markets', 'High volatility', 'Low volatility'].map((condition) => (
                 <button
                   key={condition}
-                  className="p-2 text-sm bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/20 rounded transition-colors"
+                  className="p-2 text-sm bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/80 transition-colors"
                   onClick={() => {
                     const contextAddition = `\nPrefers: ${condition}.`
                     if (!formData.additional_context.includes(condition)) {
@@ -316,10 +316,10 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
       {renderTabContent()}
       
       {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-bone-200/10">
+      <div className="flex justify-end pt-4 border-t border-bone-200/60">
         <button
           onClick={handleSave}
-          className="px-6 py-3 bg-agents-decision hover:bg-agents-decision/80 text-charcoal-900 font-medium rounded-lg transition-colors"
+          className="px-6 py-3 bg-agents-decision hover:bg-agents-decision/80 text-charcoal-900 font-medium transition-colors"
         >
           Save Configuration
         </button>

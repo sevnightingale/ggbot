@@ -108,10 +108,10 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
             <button
               key={symbol}
               onClick={() => toggleSymbol(symbol)}
-              className={`p-3 text-sm rounded-lg border transition-colors ${
+              className={`p-3 text-sm border transition-colors ${
                 formData.symbols.includes(symbol)
                   ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
-                  : 'bg-charcoal-700 border-bone-200/20 text-bone-300 hover:border-bone-200/40'
+                  : 'bg-charcoal-700 border-bone-200/80 text-bone-300 hover:border-bone-200/90'
               }`}
             >
               {symbol}
@@ -124,7 +124,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
           <input
             type="text"
             placeholder="e.g., DOGE/USDT"
-            className="w-full p-3 bg-charcoal-700 border border-bone-200/20 rounded-lg text-bone-200 placeholder-bone-400"
+            className="w-full p-3 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400"
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
                 const value = e.currentTarget.value.trim()
@@ -153,10 +153,10 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
             <button
               key={option.value}
               onClick={() => toggleTimeframe(option.value)}
-              className={`p-3 text-sm rounded-lg border transition-colors ${
+              className={`p-3 text-sm border transition-colors ${
                 formData.timeframes.includes(option.value)
                   ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
-                  : 'bg-charcoal-700 border-bone-200/20 text-bone-300 hover:border-bone-200/40'
+                  : 'bg-charcoal-700 border-bone-200/80 text-bone-300 hover:border-bone-200/90'
               }`}
             >
               {option.label}
@@ -177,7 +177,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
       </div>
 
       {/* Crypto Indicators MCP */}
-      <div className="p-4 bg-charcoal-700/50 border border-bone-200/10 rounded-lg">
+      <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
         <div className="flex items-center justify-between mb-4">
           <div>
             <h4 className="font-medium">Crypto Indicators MCP</h4>
@@ -199,7 +199,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
               }))}
               className="sr-only peer"
             />
-            <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-agents-extraction"></div>
+            <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:h-5 after:w-5 after:transition-all peer-checked:bg-agents-extraction"></div>
           </label>
         </div>
 
@@ -212,10 +212,10 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
                   <button
                     key={indicator}
                     onClick={() => toggleIndicator(indicator)}
-                    className={`p-2 text-xs rounded border transition-colors ${
+                    className={`p-2 text-xs border transition-colors ${
                       formData.sources.crypto_indicators_mcp!.indicators.includes(indicator)
                         ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
-                        : 'bg-charcoal-600 border-bone-200/20 text-bone-300 hover:border-bone-200/40'
+                        : 'bg-charcoal-600 border-bone-200/80 text-bone-300 hover:border-bone-200/90'
                     }`}
                   >
                     {indicator}
@@ -240,7 +240,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
                         }
                       }
                     }))}
-                    className="rounded border-bone-200/20"
+                    className="border-bone-200/80"
                   />
                   <span className="text-sm">LLM Interpretation</span>
                 </label>
@@ -260,7 +260,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
                       }
                     }
                   }))}
-                  className="w-full p-2 text-sm bg-charcoal-600 border border-bone-200/20 rounded text-bone-200"
+                  className="w-full p-2 text-sm bg-charcoal-600 border border-bone-200/80 text-bone-200"
                 >
                   <option value="gpt-4o-mini">GPT-4O Mini</option>
                   <option value="gpt-4o">GPT-4O</option>
@@ -290,10 +290,10 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
       {renderTabContent()}
       
       {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-bone-200/10">
+      <div className="flex justify-end pt-4 border-t border-bone-200/60">
         <button
           onClick={handleSave}
-          className="px-6 py-3 bg-agents-extraction hover:bg-agents-extraction/80 text-charcoal-900 font-medium rounded-lg transition-colors"
+          className="px-6 py-3 bg-agents-extraction hover:bg-agents-extraction/80 text-charcoal-900 font-medium transition-colors"
         >
           Save Configuration
         </button>
