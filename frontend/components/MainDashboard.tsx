@@ -11,6 +11,7 @@ import { AgentConfigModal } from '@/components/bot/AgentConfigModal'
 
 export function MainDashboard() {
   const {
+    loadBots,
     loadConfigurations,
     loadTrades,
     loadPerformance,
@@ -30,7 +31,11 @@ export function MainDashboard() {
       const startTime = Date.now()
       
       try {
-        // Load configurations first, then other data
+        // Load bots first, then configurations and other data
+        console.log('MainDashboard: Loading bots...')
+        await loadBots()
+        console.log('MainDashboard: Bots loaded')
+        
         console.log('MainDashboard: Loading configurations...')
         await loadConfigurations()
         console.log('MainDashboard: Configurations loaded')
@@ -64,7 +69,7 @@ export function MainDashboard() {
       console.log('MainDashboard: Cleaning up periodic refresh')
       clearInterval(interval)
     }
-  }, [loadConfigurations, loadTrades, loadPerformance, checkSchedulerStatus])
+  }, [loadBots, loadConfigurations, loadTrades, loadPerformance, checkSchedulerStatus])
 
   if (isLoading) {
     return (

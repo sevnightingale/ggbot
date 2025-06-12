@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { ChevronLeft, ChevronRight, Plus, Play, Square, TestTube, Edit3, Check, X } from 'lucide-react'
 import { useBotStore } from '@/store/bot'
 import { SchedulerStatus } from '@/types'
@@ -10,35 +10,72 @@ interface GGBotCircleProps {
 }
 
 export function GGBotCircle({ status }: GGBotCircleProps) {
-  const { startScheduler, stopScheduler, agentStatuses } = useBotStore()
+  const { 
+    startScheduler, 
+    stopScheduler, 
+    agentStatuses,
+    availableBots,
+    currentBotId,
+    currentBotName,
+    createBot,
+    selectBot,
+    updateBotName,
+    loadBots
+  } = useBotStore()
   const [currentBotIndex, setCurrentBotIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
-  const [botName, setBotName] = useState('BOT-01')
-  const [editName, setEditName] = useState(botName)
+  const [editName, setEditName] = useState(currentBotName)
   
   const isRunning = status?.is_running || false
   
-  // Mock data for multiple bots (future feature)
-  const bots = [{ id: 1, name: botName }] // Single bot for now
-  const totalBots = bots.length
+  // Load bots on component mount
+  useEffect(() => {
+    loadBots()
+  }, [loadBots])
+  
+  // Update edit name when current bot name changes
+  useEffect(() => {
+    setEditName(currentBotName)
+  }, [currentBotName])
+  
+  // Update current bot index when current bot changes
+  useEffect(() => {
+    if (currentBotId && availableBots.length > 0) {
+      const index = availableBots.findIndex(bot => bot.config_id === currentBotId)
+      if (index !== -1) {
+        setCurrentBotIndex(index)
+      }
+    }
+  }, [currentBotId, availableBots])
+  
+  const totalBots = availableBots.length
   const isLastBot = currentBotIndex === totalBots - 1
   
   // Check if all agents are configured
   const allConfigured = Object.values(agentStatuses).every(status => status === 'configured')
   const canStart = allConfigured && !isRunning
 
-  const handleLeftNav = () => {
+  const handleLeftNav = async () => {
     if (currentBotIndex > 0) {
-      setCurrentBotIndex(currentBotIndex - 1)
+      const newIndex = currentBotIndex - 1
+      const targetBot = availableBots[newIndex]
+      if (targetBot) {
+        await selectBot(targetBot.config_id)
+      }
     }
   }
 
-  const handleRightNav = () => {
+  const handleRightNav = async () => {
     if (isLastBot) {
-      // Add new bot (future feature)
-      console.log('Create new bot')
+      // Create new bot
+      const newBotName = `BOT-${String(availableBots.length + 1).padStart(2, '0')}`
+      await createBot(newBotName)
     } else {
-      setCurrentBotIndex(currentBotIndex + 1)
+      const newIndex = currentBotIndex + 1
+      const targetBot = availableBots[newIndex]
+      if (targetBot) {
+        await selectBot(targetBot.config_id)
+      }
     }
   }
 
@@ -56,17 +93,19 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   }
 
   const handleNameEdit = () => {
-    setEditName(botName)
+    setEditName(currentBotName)
     setIsEditingName(true)
   }
 
-  const handleNameSave = () => {
-    setBotName(editName)
-    setIsEditingName(false)
+  const handleNameSave = async () => {
+    if (currentBotId && editName.trim()) {
+      await updateBotName(currentBotId, editName.trim())
+      setIsEditingName(false)
+    }
   }
 
   const handleNameCancel = () => {
-    setEditName(botName)
+    setEditName(currentBotName)
     setIsEditingName(false)
   }
 
@@ -166,7 +205,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
                     </div>
                   ) : (
                     <div className="flex items-center space-x-2">
-                      <span className="text-bone-200 font-display font-bold">{botName}</span>
+                      <span className="text-bone-200 font-display font-bold">{currentBotName}</span>
                       <button
                         onClick={handleNameEdit}
                         className="text-bone-400 hover:text-bone-200"
