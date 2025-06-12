@@ -89,83 +89,31 @@ export function MainDashboard() {
           </div>
         )}
 
-        {/* Agent Flow Visualization */}
-        <div className="relative">
-          {/* SVG for Flow Lines */}
-          <svg 
-            className="absolute inset-0 w-full h-full pointer-events-none z-0"
-            viewBox="0 0 1000 400"
-            xmlns="http://www.w3.org/2000/svg"
-          >
-            {/* Flow line from extraction agent card */}
-            <path
-              d="M 200 180 L 200 220 L 480 220 L 480 280"
-              stroke={agentStatuses.extraction === 'configured' ? 'rgba(56, 161, 199, 0.6)' : 'rgba(227, 229, 230, 0.2)'}
-              strokeWidth="2"
-              fill="none"
-              className={agentStatuses.extraction === 'configured' ? 'flow-line-active' : ''}
-              style={{
-                filter: agentStatuses.extraction === 'configured' 
-                  ? 'drop-shadow(0 0 6px rgba(56, 161, 199, 0.4))' 
-                  : undefined
-              }}
-            />
-            
-            {/* Flow line from decision agent card */}
-            <path
-              d="M 500 180 L 500 280"
-              stroke={agentStatuses.decision === 'configured' ? 'rgba(44, 190, 119, 0.6)' : 'rgba(227, 229, 230, 0.2)'}
-              strokeWidth="2"
-              fill="none"
-              className={agentStatuses.decision === 'configured' ? 'flow-line-active' : ''}
-              style={{
-                filter: agentStatuses.decision === 'configured' 
-                  ? 'drop-shadow(0 0 6px rgba(44, 190, 119, 0.4))' 
-                  : undefined
-              }}
-            />
-            
-            {/* Flow line from trading agent card */}
-            <path
-              d="M 800 180 L 800 220 L 520 220 L 520 280"
-              stroke={agentStatuses.trading === 'configured' ? 'rgba(190, 106, 71, 0.6)' : 'rgba(227, 229, 230, 0.2)'}
-              strokeWidth="2"
-              fill="none"
-              className={agentStatuses.trading === 'configured' ? 'flow-line-active' : ''}
-              style={{
-                filter: agentStatuses.trading === 'configured' 
-                  ? 'drop-shadow(0 0 6px rgba(190, 106, 71, 0.4))' 
-                  : undefined
-              }}
-            />
-          </svg>
-          
-          {/* Agent Cards */}
-          <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
-            <AgentCard
-              type="extraction"
-              title="Data Extraction"
-              description="Collects market data and technical indicators"
-              status={agentStatuses.extraction}
-            />
-            <AgentCard
-              type="decision"
-              title="Decision Engine"
-              description="Analyzes data and generates trading signals"
-              status={agentStatuses.decision}
-            />
-            <AgentCard
-              type="trading"
-              title="Trade Execution"
-              description="Manages positions and executes trades"
-              status={agentStatuses.trading}
-            />
-          </div>
+        {/* Agent Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16">
+          <AgentCard
+            type="extraction"
+            title="Data Extraction"
+            description="Collects market data and technical indicators"
+            status={agentStatuses.extraction}
+          />
+          <AgentCard
+            type="decision"
+            title="Decision Engine"
+            description="Analyzes data and generates trading signals"
+            status={agentStatuses.decision}
+          />
+          <AgentCard
+            type="trading"
+            title="Trade Execution"
+            description="Manages positions and executes trades"
+            status={agentStatuses.trading}
+          />
+        </div>
 
-          {/* GGBot Central Circle */}
-          <div className="relative z-10 flex justify-center">
-            <GGBotCircle status={schedulerStatus} />
-          </div>
+        {/* GGBot Emblem Section */}
+        <div className="flex justify-center mb-16">
+          <GGBotCircle status={schedulerStatus} />
         </div>
 
         {/* Trading Dashboard - Brutalist Design */}
