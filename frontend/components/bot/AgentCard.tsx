@@ -14,8 +14,8 @@ interface AgentCardProps {
 const statusConfig = {
   configured: {
     icon: CheckCircle,
-    color: 'text-green-400',
-    bg: 'bg-green-400/10 border-green-400/20',
+    color: 'text-bone-200',
+    bg: 'bg-bone-200/10 border-bone-200/60',
     label: 'Configured'
   },
   partial: {
@@ -47,11 +47,11 @@ export function AgentCard({ type, title, description, status }: AgentCardProps) 
         hover:border-bone-200
         transition-all duration-300 cursor-pointer group
         paper-texture
-        ${isConfigured ? `hover:shadow-lg` : ''}
+        ${isConfigured ? `hover:shadow-lg animate-pulse-glow` : ''}
       `}
       style={{
         boxShadow: isConfigured 
-          ? `0 0 20px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.3)' : type === 'decision' ? 'rgba(44, 190, 119, 0.3)' : 'rgba(190, 106, 71, 0.3)'}`
+          ? `0 0 30px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.6)' : type === 'decision' ? 'rgba(44, 190, 119, 0.6)' : 'rgba(190, 106, 71, 0.6)'}, 0 0 60px ${type === 'extraction' ? 'rgba(56, 161, 199, 0.2)' : type === 'decision' ? 'rgba(44, 190, 119, 0.2)' : 'rgba(190, 106, 71, 0.2)'}`
           : undefined
       }}
       onClick={() => openConfigModal(type)}

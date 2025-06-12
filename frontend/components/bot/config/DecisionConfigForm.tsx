@@ -178,8 +178,8 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
         )}
 
         {formData.llm_provider === 'deepseek' && (
-          <div className="mt-4 p-4 bg-green-900/20 border border-green-500/60">
-            <p className="text-sm text-green-200">
+          <div className="mt-4 p-4 bg-bone-200/10 border border-bone-200/60">
+            <p className="text-sm text-bone-200">
               <strong>Recommended:</strong> DeepSeek offers strong reasoning capabilities at a fraction 
               of the cost compared to other providers. Great for frequent trading decisions.
             </p>
