@@ -35,7 +35,8 @@ class LLMProvider(ABC):
     async def generate_response(self, 
                               prompt: str,
                               conversation_history: Optional[List[Dict[str, str]]] = None,
-                              temperature: float = 0.7) -> Tuple[str, Dict[str, Any]]:
+                              temperature: float = 0.7,
+                              custom_mode: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
         """
         Send a prompt to the LLM and get a response.
         
@@ -44,6 +45,7 @@ class LLMProvider(ABC):
             conversation_history (Optional[List[Dict[str, str]]]): Previous conversation
                 messages for maintaining context. Each message should have 'role' and 'content' keys.
             temperature (float): Controls randomness (0.0 = deterministic, 1.0 = creative)
+            custom_mode (Optional[str]): Custom mode for specialized system prompts (e.g., 'ggshot')
         
         Returns:
             Tuple[str, Dict[str, Any]]: A tuple containing:

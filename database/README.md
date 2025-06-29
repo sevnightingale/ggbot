@@ -227,13 +227,21 @@ Stores market data including indicators and price data for different pairs and t
 |------------|-----------------|----------------------------------------|
 | id         | SERIAL          | Primary Key                            |
 | user_id    | UUID            | Foreign Key to users table             |
-| source     | VARCHAR         | Data source (e.g., 'tradingview', 'yfinance') |
+| source     | VARCHAR         | Data source (e.g., 'tradingview', 'yfinance', 'crypto_indicators_mcp') |
 | symbol     | VARCHAR         | Trading pair symbol                    |
 | timeframe  | VARCHAR         | Timeframe (e.g., '15m', '1h', '4h')    |
-| data_type  | VARCHAR         | Type of data (e.g., 'price_data', 'report', 'sentiment') |
+| data_type  | VARCHAR         | Type of data (e.g., 'price_data', 'report', 'sentiment', 'indicator_analysis') |
 | indicators | JSONB           | Technical indicators in JSON format    |
 | raw_data   | JSONB           | Raw price/chart data in JSON format    |
 | updated_at | TIMESTAMP       | Timestamp of the data point            |
+
+**IMPORTANT FIELD NAMING CLARIFICATION**:
+- The `indicators` field contains the actual raw indicator data from sources like MCP
+- The `raw_data` field is misleadingly named - it contains metadata like LLM interpretation and configuration, NOT the raw indicator values
+- For crypto_indicators_mcp source: 
+  - `indicators`: Contains `{"configured_indicators": [...], "results": {actual MCP indicator data}}`
+  - `raw_data`: Contains `{"interpretation": LLM analysis, "llm_model": model name, "config": {...}}`
+- The decision engine accesses raw indicator data via `row['raw_data']['indicators']` due to internal data copying
 
 **Indexes:**
 - Primary Key on `id`

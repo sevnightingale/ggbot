@@ -31,7 +31,7 @@ except ImportError:
     pass  # dotenv not available, continue without it
 
 
-async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, use_llm=True, llm_model="gpt-4o-mini"):
+async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, use_llm=True, llm_model="gpt-4o-mini", config_id=None):
     """
     Extract indicator data directly using Indicators MCP.
 
@@ -44,6 +44,7 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
         user_id: User ID to associate with the extracted data
         use_llm: Whether to use LLM for indicator selection and interpretation
         llm_model: LLM model to use (default: "gpt-4o-mini")
+        config_id: Configuration ID to use for extraction settings
 
     Returns:
         Dictionary of extraction results by symbol and timeframe
@@ -102,9 +103,16 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                 logger.bind(user_id=user_id).info(f"Processing {symbol} {timeframe}")
 
                 try:
-                    # Step 1: Get indicators from user configuration (not LLM selection)
-                    user_config = get_configuration(user_id, 'extraction') or {}
-                    mcp_source_config = user_config.get('sources', {}).get('crypto_indicators_mcp', {})
+                    # Step 1: Get indicators from configuration using config_id
+                    if config_id:
+                        # Use specific config_id
+                        user_config = get_configuration(user_id=user_id, config_id=config_id) or {}
+                        extraction_config = user_config.get('extraction', {})
+                    else:
+                        # Fallback to legacy method
+                        extraction_config = get_configuration(user_id, 'extraction') or {}
+                    
+                    mcp_source_config = extraction_config.get('sources', {}).get('crypto_indicators_mcp', {})
                     
                     # Get configured indicators
                     selected_indicators = mcp_source_config.get('indicators', ['RSI'])  # Default to RSI if not configured
@@ -114,12 +122,81 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                     # Step 2: Calculate each selected indicator
                     indicator_results = {}
                     
+                    # First, fetch current volume data for 4-pillar analysis
+                    try:
+                        # Get OHLCV data to extract current volume (last completed candle)
+                        volume_params = {
+                            "exchange": os.environ.get("EXCHANGE_NAME", "binance"),
+                            "symbol": symbol,
+                            "timeframe": timeframe,
+                            "limit": 5  # Just need a few recent candles
+                        }
+                        
+                        # Use a simple indicator call to get OHLCV data
+                        volume_result = await mcp_client.session.call_tool(
+                            'calculate_simple_moving_average',  # Any indicator that returns OHLCV
+                            {**volume_params, "period": 1}  # Minimal period
+                        )
+                        
+                        # Extract current volume from the result
+                        if volume_result and isinstance(volume_result, dict):
+                            # Look for OHLCV data in various possible formats
+                            ohlcv_data = None
+                            if 'ohlcv' in volume_result:
+                                ohlcv_data = volume_result['ohlcv']
+                            elif 'data' in volume_result and isinstance(volume_result['data'], list):
+                                ohlcv_data = volume_result['data']
+                            
+                            if ohlcv_data and len(ohlcv_data) > 0:
+                                # Get the last completed candle's volume (index 4 = volume)
+                                last_candle = ohlcv_data[-1] if isinstance(ohlcv_data[-1], list) else None
+                                if last_candle and len(last_candle) > 4:
+                                    current_volume = last_candle[4]  # Volume is at index 4
+                                    indicator_results['current_volume'] = current_volume
+                                    logger.bind(user_id=user_id).info(f"✓ Extracted current volume: {current_volume}")
+                                else:
+                                    logger.bind(user_id=user_id).warning("Could not extract volume from OHLCV candle data")
+                            else:
+                                logger.bind(user_id=user_id).warning("No OHLCV data found in volume fetch result")
+                        else:
+                            logger.bind(user_id=user_id).warning("Volume fetch returned invalid result")
+                            
+                    except Exception as e:
+                        logger.bind(user_id=user_id).warning(f"Failed to fetch current volume: {str(e)}")
+                        # Continue without volume data - this is not critical
+                    
                     for indicator_name in selected_indicators:
                         try:
+                            # Parse special indicator patterns
+                            actual_indicator = indicator_name
+                            target_timeframe = timeframe  # Default to signal timeframe
+                            custom_period = None
+                            use_volume_data = False
+                            
+                            # Check for multi-timeframe indicators (e.g., RSI_4h)
+                            if '_' in indicator_name:
+                                parts = indicator_name.split('_')
+                                if len(parts) == 2 and parts[1] in ['1m', '5m', '15m', '30m', '1h', '4h', '1d', '1w']:
+                                    actual_indicator = parts[0]
+                                    target_timeframe = parts[1]
+                                    logger.bind(user_id=user_id).info(f"Multi-timeframe indicator detected: {actual_indicator} on {target_timeframe}")
+                                elif 'Volume' in indicator_name:
+                                    # Handle volume-based indicators (e.g., SMA_Volume_30)
+                                    if len(parts) == 3 and parts[0] in ['SMA', 'EMA'] and parts[1] == 'Volume':
+                                        actual_indicator = parts[0]
+                                        use_volume_data = True
+                                        custom_period = int(parts[2])
+                                        logger.bind(user_id=user_id).info(f"Volume indicator detected: {actual_indicator} on volume with period {custom_period}")
+                                elif len(parts) == 2 and parts[1].isdigit():
+                                    # Handle indicators with custom periods (e.g., DonchianChannel_200)
+                                    actual_indicator = parts[0]
+                                    custom_period = int(parts[1])
+                                    logger.bind(user_id=user_id).info(f"Custom period indicator: {actual_indicator} with period {custom_period}")
+                            
                             # Map user-friendly name to MCP tool name
-                            mcp_tool_name = get_mcp_tool_name(indicator_name)
+                            mcp_tool_name = get_mcp_tool_name(actual_indicator)
                             if not mcp_tool_name:
-                                logger.bind(user_id=user_id).warning(f"Unknown indicator: {indicator_name}")
+                                logger.bind(user_id=user_id).warning(f"Unknown indicator: {actual_indicator}")
                                 continue
                             
                             # Get tool info to understand parameters
@@ -129,13 +206,13 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                                 continue
                             
                             # Call the MCP tool
-                            logger.bind(user_id=user_id).info(f"Calculating {indicator_name} ({mcp_tool_name}) for {symbol} {timeframe}")
+                            logger.bind(user_id=user_id).info(f"Calculating {indicator_name} ({mcp_tool_name}) for {symbol} {target_timeframe}")
                             
                             # Build parameters for the MCP tool call
                             params = {
                                 "exchange": os.environ.get("EXCHANGE_NAME", "binance"),
                                 "symbol": symbol,
-                                "timeframe": timeframe
+                                "timeframe": target_timeframe  # Use target timeframe instead of signal timeframe
                             }
                             
                             # Add default parameters based on tool schema
@@ -149,12 +226,25 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                                         elif param_name in tool_info['parameters'].get('required', []):
                                             # Use default values for required parameters
                                             if param_info.get('type') == 'number':
-                                                if 'period' in param_name.lower():
+                                                if 'period' in param_name.lower() and custom_period:
+                                                    params[param_name] = custom_period  # Use parsed custom period
+                                                elif 'period' in param_name.lower():
                                                     params[param_name] = 14  # Default period
                                                 else:
                                                     params[param_name] = param_info.get('default', 0)
                                             elif param_info.get('type') == 'string':
                                                 params[param_name] = param_info.get('default', '')
+                            
+                            # Special handling for volume-based indicators
+                            if use_volume_data and actual_indicator == 'SMA':
+                                # Use VWMA as a proxy for SMA on volume
+                                logger.bind(user_id=user_id).info(f"Using VWMA as proxy for SMA on volume")
+                                mcp_tool_name = 'calculate_volume_weighted_moving_average'
+                                # Update tool info for VWMA
+                                tool_info = get_tool_info(mcp_tool_name)
+                                if not tool_info:
+                                    logger.bind(user_id=user_id).warning(f"VWMA tool not found, skipping {indicator_name}")
+                                    continue
                             
                             # Call the MCP tool through the session
                             result = await mcp_client.session.call_tool(mcp_tool_name, params)
@@ -174,8 +264,12 @@ async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, u
                             logger.bind(user_id=user_id).error(f"Error calculating {indicator_name}: {str(e)}")
                             continue
                     
-                    # Step 3: Get LLM interpretation of the results
-                    if indicator_results:
+                    # Check if LLM interpretation is enabled in config
+                    use_llm_interpretation = mcp_source_config.get('llm_interpretation', True)
+                    
+                    # Step 3: Get LLM interpretation of the results (if enabled)
+                    interpretation_data = None
+                    if indicator_results and use_llm_interpretation:
                         interpretation_prompt = f"""
 Analyze the raw indicator data for {symbol} on the {timeframe} timeframe:
 
@@ -238,8 +332,12 @@ Format your response as a JSON object:
                                 "analysis": interpretation,
                                 "error": "Failed to parse LLM response"
                             }
+                    else:
+                        if indicator_results and not use_llm_interpretation:
+                            logger.bind(user_id=user_id).info("LLM interpretation disabled - storing raw data only")
                         
-                        # Step 4: Store the results in the database
+                    # Step 4: Store the results in the database
+                    if indicator_results:
                         market_data_entry = {
                             "user_id": user_id,
                             "source": "indicators_mcp",
@@ -251,7 +349,7 @@ Format your response as a JSON object:
                                 "indicators": indicator_results,
                                 "selected_indicators": selected_indicators,
                                 "interpretation": interpretation_data,
-                                "llm_model": llm_model
+                                "llm_model": llm_model if interpretation_data else None
                             },
                             "indicators": indicator_results  # Also store in indicators column
                         }

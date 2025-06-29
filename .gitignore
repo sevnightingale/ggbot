@@ -21,3 +21,10 @@ logs/
 .DS_Store
 Thumbs.db
 
+
+# Telegram session files
+*.session
+*.session-journal
+
+# ggShot service directory (contains sensitive configs and session data)
+ggshot/

@@ -42,7 +42,8 @@ class OpenAIProvider(LLMProvider):
     async def generate_response(self, 
                               prompt: str,
                               conversation_history: Optional[List[Dict[str, str]]] = None,
-                              temperature: float = 0.7) -> Tuple[str, Dict[str, Any]]:
+                              temperature: float = 0.7,
+                              custom_mode: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
         """
         Generate a response from OpenAI.
         

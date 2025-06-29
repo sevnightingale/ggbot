@@ -28,6 +28,8 @@ class ExtractionRequest(BaseModel):
     user_id: str = DEFAULT_USER_ID
     symbols: Optional[List[str]] = None
     timeframes: Optional[List[str]] = None
+    config_id: Optional[str] = "default"
+    custom_mode: Optional[str] = None
 
 
 class ExtractionResponse(BaseModel):
@@ -53,12 +55,14 @@ class MarketDataRequest(BaseModel):
 
 class WebhookRequest(BaseModel):
     user_id: str = DEFAULT_USER_ID
-    config_id: str = "a93de31b-9b8a-42e3-827d-c31e580f5f36"  # Same UUID as new_trade.py
+    config_id: Optional[str] = "default"  # Use "default" or specific config_id
     symbols: Optional[List[str]] = None
     timeframes: Optional[List[str]] = None
+    triggered_by: Optional[str] = None
+    custom_mode: Optional[str] = None
 
 
-async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes: List[str], config_id: str = "default"):
+async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes: List[str], config_id: str = "default", custom_mode: Optional[str] = None):
     """
     Trigger Decision API after successful extraction (Webhook pattern).
     """
@@ -71,6 +75,10 @@ async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes:
                 "symbol": symbols[0] if symbols else "BTC/USDT",
                 "timeframes": timeframes
             }
+            
+            # Add custom_mode if provided (for ggShot signal validation)
+            if custom_mode:
+                webhook_payload["custom_mode"] = custom_mode
             
             # Call the decision webhook endpoint
             decision_webhook_url = os.getenv("DECISION_WEBHOOK_URL", "http://localhost:8000/decision/webhooks/trigger-decision")
@@ -152,7 +160,7 @@ async def setup_pre_extraction_monitoring(user_id: str, config_id: str) -> Optio
         return None
 
 
-async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optional[List[str]], timeframes: Optional[List[str]], config_id: Optional[str] = "default"):
+async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optional[List[str]], timeframes: Optional[List[str]], config_id: Optional[str] = "default", custom_mode: Optional[str] = None):
     """Background task to run extraction."""
     try:
         # Update status to running
@@ -168,12 +176,27 @@ async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optiona
         # Use the direct function like the working test
         from extraction.extraction_main import extract_mcp_indicators
         
-        # Use provided symbols/timeframes or get from config
-        if not symbols or not timeframes:
-            from core.config.config_main import get_configuration
-            extraction_config = get_configuration(user_id, 'extraction') or {}
-            symbols = symbols or extraction_config.get('symbols', ['BTC/USDT'])
-            timeframes = timeframes or extraction_config.get('timeframes', ['15m', '1h'])
+        # Handle symbol/timeframe selection based on mode
+        if custom_mode == 'ggshot':
+            # For ggShot mode, ALWAYS use the symbols/timeframes from the webhook (ggShot signals)
+            # Never fall back to config for ggShot signals
+            if not symbols or not timeframes:
+                raise ValueError("ggShot mode requires explicit symbols and timeframes from signal")
+            logger.bind(user_id=user_id).info(f"ggShot mode: Using dynamic symbols={symbols}, timeframes={timeframes}")
+        else:
+            # Standard mode: Use provided symbols/timeframes or get from config
+            if not symbols or not timeframes:
+                from core.config.config_main import get_configuration
+                if config_id:
+                    # Use specific config_id
+                    user_config = get_configuration(user_id=user_id, config_id=config_id) or {}
+                    extraction_config = user_config.get('extraction', {})
+                else:
+                    # Fallback to legacy method
+                    extraction_config = get_configuration(user_id, 'extraction') or {}
+                symbols = symbols or extraction_config.get('symbols', ['BTC/USDT'])
+                timeframes = timeframes or extraction_config.get('timeframes', ['15m', '1h'])
+                logger.bind(user_id=user_id).info(f"Standard mode: Using symbols={symbols}, timeframes={timeframes}")
         
         # Run extraction using the same function as working test
         results = await extract_mcp_indicators(
@@ -181,7 +204,8 @@ async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optiona
             timeframes=timeframes,
             user_id=user_id,
             use_llm=True,
-            llm_model="gpt-4o-mini"
+            llm_model="gpt-4o-mini",
+            config_id=config_id
         )
         
         # Count data points from extract_mcp_indicators structure
@@ -205,13 +229,10 @@ async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optiona
             extraction_id=extraction_id
         ).info(f"Extraction completed with {data_points} data points")
         
-        # Allow 90 seconds for all configured indicators to complete extraction
-        await asyncio.sleep(90)
-        
-        # Trigger Decision webhook after successful extraction (Pipeline Pattern)
+        # Trigger Decision webhook immediately after successful extraction (Pipeline Pattern)
         if data_points > 0:
             logger.bind(user_id=user_id).info("⏱️ Triggering decision webhook after extraction...")
-            await trigger_decision_webhook(user_id, symbols, timeframes, config_id)
+            await trigger_decision_webhook(user_id, symbols, timeframes, config_id, custom_mode)
         else:
             logger.bind(user_id=user_id).warning("No data extracted, skipping decision webhook")
         
@@ -254,7 +275,8 @@ async def trigger_extraction(request: ExtractionRequest, background_tasks: Backg
         request.user_id,
         request.symbols,
         request.timeframes,
-        "default"  # Regular API uses default config for now
+        request.config_id,
+        request.custom_mode
     )
     
     # Calculate expected data points
@@ -411,7 +433,8 @@ async def webhook_trigger_extraction(request: WebhookRequest, background_tasks: 
         request.user_id,
         request.symbols,
         request.timeframes,
-        request.config_id  # Use the webhook config_id
+        request.config_id,  # Use the webhook config_id
+        request.custom_mode  # Pass through custom_mode for ggShot signals
     )
     
     logger.bind(user_id=request.user_id).info(

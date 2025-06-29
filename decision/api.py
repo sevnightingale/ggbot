@@ -93,9 +93,10 @@ class DecisionRequest(BaseModel):
 
 class WebhookRequest(BaseModel):
     user_id: str = DEFAULT_USER_ID
-    config_id: str = "a93de31b-9b8a-42e3-827d-c31e580f5f36"  # Same UUID as new_trade.py
+    config_id: Optional[str] = "default"  # Use "default" or specific config_id
     symbol: Optional[str] = None
     timeframes: Optional[List[str]] = None
+    custom_mode: Optional[str] = None
 
 
 class DecisionResponse(BaseModel):
@@ -116,6 +117,50 @@ class DecisionHistoryItem(BaseModel):
     created_at: str
 
 
+async def check_and_publish_ggshot_signal(intent: Dict[str, Any], reasoning: str):
+    """
+    Check if the decision was for a ggShot signal validation and publish if confidence exceeds threshold.
+    
+    Args:
+        intent (Dict[str, Any]): Decision intent containing confidence and signal data
+        reasoning (str): Decision reasoning
+    """
+    try:
+        # Check if this decision contains ggShot signal validation marker
+        if intent.get('ggshot_signal_validation'):
+            confidence = intent.get('confidence', 0)
+            threshold = float(os.getenv('GGSHOT_CONFIDENCE_THRESHOLD', '0.80'))
+            
+            logger.info(f"ggShot signal validation detected: confidence={confidence}, threshold={threshold}")
+            
+            # Always publish ALL signals with filter status (approved/rejected)
+            # Import and call publisher
+            from ggshot.ggshot_publisher import GGShotPublisher
+            
+            publisher = GGShotPublisher()
+            
+            # Extract signal data from intent
+            original_signal = intent.get('original_signal', 'Signal data not available')
+            signal_data = intent.get('signal_data', {})
+            
+            success = await publisher.publish_signal(
+                original_signal=original_signal,
+                confidence=confidence,
+                reasoning=reasoning,
+                signal_data=signal_data
+            )
+            
+            filter_status = "APPROVED" if confidence >= threshold else "REJECTED"
+            if success:
+                logger.info(f"Published ggShot signal with confidence {confidence} - Filter: {filter_status}")
+            else:
+                logger.error(f"Failed to publish ggShot signal with confidence {confidence} - Filter: {filter_status}")
+                
+    except Exception as e:
+        logger.error(f"Error in ggShot signal publishing: {str(e)}")
+        # Don't fail the decision process if publishing fails
+
+
 async def trigger_trading_webhook(user_id: str, intent: Dict[str, Any], decision_id: str):
     """
     Trigger Trading API after successful decision generation (Webhook pattern).
@@ -124,7 +169,7 @@ async def trigger_trading_webhook(user_id: str, intent: Dict[str, Any], decision
         # Only trigger trading for actionable intents
         action = intent.get("action", "")
         
-        if action not in ["no_action", "hold", "wait"]:
+        if action not in ["no_action", "hold", "wait", "validate"]:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 # Call the trading webhook endpoint
                 trading_webhook_url = os.getenv("TRADING_WEBHOOK_URL", "http://localhost:8000/trading/webhooks/execute-trade")
@@ -262,7 +307,8 @@ async def analyze_market(request: DecisionRequest):
             user_id=request.user_id,
             config_id=config_id,  # Use resolved config_id
             symbol=request.symbol or "BTC/USDT",  # Default symbol like working test
-            timeframes=request.timeframes or ["15m", "1h", "4h"]  # Default timeframes like working test
+            timeframes=request.timeframes or ["15m", "1h", "4h"],  # Default timeframes like working test
+            mode=actual_mode
         )
         
         # Extract reasoning from intent
@@ -285,6 +331,9 @@ async def analyze_market(request: DecisionRequest):
             user_id=request.user_id,
             decision_id=decision_id
         ).info(f"Decision generated: {actual_mode} - {intent.get('action')}")
+        
+        # Check if this was a ggShot signal validation and publish if confidence exceeds threshold
+        await check_and_publish_ggshot_signal(intent, reasoning)
         
         # Trigger Trading webhook after successful decision (Pipeline Pattern)  
         # Only trigger for actionable decisions, skip no_action  
@@ -504,11 +553,19 @@ async def webhook_trigger_decision(request: WebhookRequest):
         )
         
         # Step 3: Run decision process using the webhook config_id (like new_trade.py)
+        # Use custom_mode if provided (for ggShot signal validation), otherwise use detected mode
+        mode = request.custom_mode or actual_mode
+        
+        if request.custom_mode:
+            logger.bind(user_id=request.user_id).info(
+                f"🎯 Using explicit decision mode: {mode} (overriding detected mode: {actual_mode})"
+            )
         intent = await run_decision_process(
             user_id=request.user_id,
             config_id=request.config_id,
             symbol=request.symbol or "BTC/USDT",
-            timeframes=request.timeframes or ["15m", "1h", "4h"]
+            timeframes=request.timeframes or ["15m", "1h", "4h"],
+            mode=mode
         )
         
         # Generate decision ID for tracking
@@ -519,6 +576,9 @@ async def webhook_trigger_decision(request: WebhookRequest):
             f"✅ Decision completed: {intent.get('action')} (confidence: {intent.get('confidence', 'N/A')})"
         )
         
+        # Check if this was a ggShot signal validation and publish if confidence exceeds threshold
+        await check_and_publish_ggshot_signal(intent, reasoning)
+        
         # Note: strategy_runs entries are created by trading engine during execution (like new_trade.py)
         # This ensures trade_id is available and creates proper audit trail
         
@@ -528,9 +588,11 @@ async def webhook_trigger_decision(request: WebhookRequest):
         # Rate limiting delay before triggering trading (coordination)
         await asyncio.sleep(1)
         
-        # Step 4: Trigger trading webhook if actionable (same logic as API endpoint)
+        # Step 4: Trigger trading webhook if actionable (but skip for ggshot filtering mode)
         action = intent.get("action", "")
-        if action not in ["no_action", "hold", "wait"]:
+        if request.custom_mode == "ggshot":
+            logger.bind(user_id=request.user_id).info(f"📡 ggShot filtering mode: Skipping trading for {action} (signal will be published if high confidence)")
+        elif action not in ["no_action", "hold", "wait", "validate"]:
             logger.bind(user_id=request.user_id).info(f"🚀 Triggering trading webhook for action: {action}")
             await trigger_trading_webhook(request.user_id, intent, decision_id)
         else:

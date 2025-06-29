@@ -1,0 +1,81 @@
+{
+  "user_id": "",
+  "mcp": {
+    "ccxt": {
+      "enabled": true,
+      "config_path": "core/config/ccxt-accounts.json",
+      "default_exchange": ""
+    },
+    "indicators": {
+      "enabled": true,
+      "script_path": "core/mcp/servers/crypto-indicators-mcp/index.js",
+      "exchange_name": ""
+    }
+  },
+  "extraction": {
+    "symbols": [],
+    "timeframes": [],
+    "sources": {
+      "crypto_indicators_mcp": {
+        "enabled": false,
+        "indicators": [],
+        "use_llm_selection": false,
+        "llm_interpretation": false,
+        "llm_model": ""
+      },
+      "tradingview": {
+        "enabled": false,
+        "strategy": ""
+      },
+      "yfinance": {
+        "enabled": false
+      },
+      "telegram": {
+        "enabled": false,
+        "channels": [],
+        "signal_types": [],
+        "store_raw_messages": false
+      },
+      "news_feed": {
+        "enabled": false,
+        "sources": []
+      }
+    }
+  },
+  "decision": {
+    "llm_provider": "",
+    "system_prompt": "",
+    "strategy": "",
+    "additional_context": ""
+  },
+  "trading": {
+    "exchange": "",
+    "exchange_id": "",
+    "authentication": "",
+    "risk_rules": {
+      "max_leverage": 0,
+      "max_position_size_pct": 0.0,
+      "max_risk_per_trade_pct": 0.0,
+      "min_equity_protection": 0.0,
+      "max_contracts_per_trade": 0
+    }
+  },
+  "telegram_integration": {
+    "listener": {
+      "enabled": false,
+      "api_id": "",
+      "api_hash": "",
+      "session_name": "",
+      "source_channels": []
+    },
+    "publisher": {
+      "enabled": false,
+      "bot_token": "",
+      "filter_channel": "",
+      "confidence_threshold": 0.0,
+      "include_reasoning": false,
+      "include_market_context": false,
+      "message_template": ""
+    }
+  }
+}

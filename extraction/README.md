@@ -368,3 +368,239 @@ The webhook passes the exact symbol used in extraction to ensure data compatibil
 7. **Result Aggregation**: All source results combined for comprehensive market view
 
 This configuration-driven approach provides maximum flexibility while maintaining clear separation between data extraction and trading decisions.
+
+## Future Optimization: Universal Extraction System
+
+### Current Inefficiency
+The current system extracts data per-user configuration, leading to duplicate API calls and storage:
+- User A wants BTC/USDT 15m RSI → Extract & store with user_id A
+- User B wants BTC/USDT 15m RSI → Extract same data again & store with user_id B
+- Market data table grows linearly with user count even for identical data
+
+### Proposed Universal System
+Extract data once per symbol+timeframe combination with ALL available indicators, then serve filtered results based on user preferences.
+
+#### Key Files Requiring Changes
+
+1. **extraction/extraction_main.py**
+   - `ExtractionManager` class: Currently initializes with user_id, loads user-specific config
+   - `extract_mcp_indicators()` function: Accepts user_id parameter, stores with user_id
+   - Would need new `UniversalExtractionManager` class without user dependency
+
+2. **extraction/sources/crypto_indicators_mcp.py**
+   - `CryptoIndicatorsMCPSource.__init__()`: Takes user_id and user config
+   - `extract()` method: Uses user-specific indicator list from config
+   - Would need to extract ALL indicators from metadata instead of config subset
+
+3. **extraction/api.py**
+   - `run_extraction_task()`: Reads user config, passes user_id throughout
+   - `trigger_decision_webhook()`: Passes single symbol from user config
+   - Would need smart query endpoint that checks freshness before extraction
+
+4. **extraction/utils.py**
+   - `store_market_data_entries()`: Requires user_id for every entry
+   - Database queries all include user_id in WHERE clauses
+   - Would need universal storage without user_id requirement
+
+5. **core/config/config_main.py**
+   - `get_configuration()`: Returns user-specific extraction settings
+   - User configs define what to extract (symbols, indicators)
+   - Would become filter preferences rather than extraction instructions
+
+#### Architecture Changes
+
+1. **Universal Extraction Manager**
+   - Location: New class in `extraction/extraction_main.py`
+   - Purpose: Extract ALL indicators for given symbol+timeframe
+   - No user_id dependency, uses complete indicator list from MCP metadata
+   - Single source of truth for what indicators are available
+
+2. **Smart Query Service**
+   - Location: New module `extraction/smart_query.py`
+   - Purpose: Check data freshness before triggering extraction
+   - Logic: Query market_data by (symbol, timeframe), check updated_at
+   - Freshness threshold: Configurable, default 15 minutes
+   - Only triggers universal extraction if data is stale
+
+3. **User Filter Service**  
+   - Location: New module `extraction/user_filter.py`
+   - Purpose: Filter universal data based on user preferences
+   - Reads user config to determine which indicators they want
+   - Returns subset of universal data matching user preferences
+
+#### Data Flow Transformation
+
+**Current Flow:**
+```
+User Config → ExtractionManager → Extract User's Indicators → Store with user_id → Decision Module
+```
+
+**Universal Flow:**
+```
+Decision Request → Smart Query → [If Stale] → Universal Extraction (ALL indicators)
+                                ↓
+                          [If Fresh] → Filter by User Config → Decision Module
+```
+
+#### Critical Implementation Details
+
+1. **Indicator List Source**
+   - Current: `config.get('indicators', ['RSI'])` from user config
+   - Universal: `get_available_indicators()` from `core/mcp/metadata/__init__.py`
+   - Must extract ALL available indicators regardless of user preferences
+
+2. **Database Queries**
+   - Current: All queries include `WHERE user_id = %s`
+   - Universal: Query by `(symbol, timeframe, source)` only
+   - Freshness check: `WHERE symbol = %s AND timeframe = %s AND updated_at > NOW() - INTERVAL '15 minutes'`
+
+3. **Backwards Compatibility**
+   - Keep existing user_id based system during transition
+   - Use feature flag or config switch to enable universal mode
+   - Parallel tables: `market_data` (user-specific) and `universal_market_data`
+
+4. **Concurrency Handling**
+   - Multiple requests for same stale data shouldn't trigger multiple extractions
+   - Need extraction lock/queue per symbol+timeframe combination
+   - Consider Redis or database locks for coordination
+
+5. **Configuration Changes**
+   - User configs no longer drive extraction, only filtering
+   - Need global config for universal extraction behavior (timeouts, retries)
+   - Consider per-symbol extraction settings for popular vs rare pairs
+
+#### Migration Considerations
+
+1. **No Data Migration Needed** (prototype phase)
+   - Start fresh with universal schema
+   - Old user-specific data can be archived or deleted
+
+2. **API Compatibility**
+   - Existing endpoints continue working with adapter layer
+   - New endpoints for universal extraction management
+   - Gradual transition of decision module to use smart queries
+
+3. **Performance Optimization**
+   - Index on `(symbol, timeframe, updated_at DESC)` for freshness queries
+   - Consider partitioning by timeframe for large datasets
+   - Cache recent queries in Redis for sub-second responses
+
+#### Benefits Beyond Efficiency
+
+- **Data Consistency**: All users analyzing same underlying data
+- **Reduced Latency**: Fresh data served from cache, no extraction wait
+- **Better Resource Usage**: MCP server handles fewer concurrent connections
+- **Simplified Debugging**: One extraction log to review instead of per-user logs
+- **Cost Predictability**: API costs based on unique pairs, not user count
+
+#### Implementation Priority
+This optimization becomes critical when:
+- User count exceeds 10-20 active traders
+- API rate limits become a bottleneck
+- Database storage costs become significant
+- Data consistency across users becomes important
+
+For prototype validation, current per-user extraction is sufficient and simpler to reason about.
+
+
+
+
+
+
+
+
+
+
+
+Analysis: ggShot Indicator Extraction Flow
+
+  Based on my analysis of the codebase, here's the complete flow for the crypto
+   indicators MCP system:
+
+  Complete Indicator Inventory
+
+  Total Available: 58 Indicators (not 78 as initially thought)
+
+  The indicators are organized into 4 categories:
+  - Trend Indicators: 25 (SMA, EMA, MACD, Parabolic SAR, etc.)
+  - Momentum Indicators: 9 (RSI, Stochastic, Williams %R, etc.)
+  - Volatility Indicators: 11 (Bollinger Bands, ATR, Keltner Channels, etc.)
+  - Volume Indicators: 9 (OBV, VWAP, Money Flow Index, etc.)
+
+  Data Flow Architecture
+
+  1. Configuration → 2. MCP Connection → 3. CCXT Data Fetch → 4. Indicator
+  Calculation → 5. LLM Interpretation → 6. Database Storage
+
+  Key Finding: You're correct - it uses direct CCXT calls with LLM only for 
+  interpretation, not selection.
+
+  Detailed Flow Breakdown
+
+  1. Indicator Selection (extraction/extraction_main.py:106-120)
+
+  # Indicators determined by config, NOT by LLM
+  selected_indicators = mcp_source_config.get('indicators', ['RSI'])  # Default
+   to RSI
+  - Config ID e249bb49-0455-4596-9657-09bf9e14ca14 controls which indicators to
+   use
+  - Current config only specifies ['RSI']
+  - No LLM involvement in indicator selection
+
+  2. User-Friendly Name Mapping (core/mcp/metadata/__init__.py:114-141)
+
+  # Maps friendly names like "RSI" to "calculate_relative_strength_index"
+  mapping = {
+      "RSI": "calculate_relative_strength_index",
+      "MACD": "calculate_moving_average_convergence_divergence",
+      "SMA": "calculate_simple_moving_average",
+      # ... 72 total mappings
+  }
+
+  3. MCP Tool Execution (extraction/extraction_main.py:142-182)
+
+  # Direct call to MCP server for calculation
+  result = await mcp_client.session.call_tool(mcp_tool_name, params)
+  - Direct CCXT connection: MCP server uses Node.js + CCXT + indicatorts
+  library
+  - Real-time data: Fetches OHLCV from Binance (or configured exchange)
+  - Parameters: Symbol, timeframe, indicator-specific settings (period=14 for
+  RSI)
+
+  4. Raw Data Processing (crypto-indicators-mcp/indicators/*.js)
+
+  // Example: RSI calculation in momentumIndicators.js
+  const result = relativeStrengthIndex(asset.closings, { period });
+  return { content: [{ type: "text", text: JSON.stringify(result) }] };
+  - CCXT → Indicator Library: Raw OHLCV data processed by technical indicators
+  library
+  - Returns: JSON array of indicator values (not just current value)
+
+  5. LLM Interpretation Only (extraction/extraction_main.py:186-238)
+
+  interpretation_prompt = f"""
+  Analyze the raw indicator data for {symbol} on the {timeframe} timeframe:
+  {json.dumps(indicator_results, indent=2)}
+
+  Your task is to extract and summarize the key information:
+  1. For each indicator, identify the CURRENT VALUE 
+  2. Describe the RECENT TREND based on historical data
+  3. Note any significant levels or patterns
+
+  Focus only on objective data analysis. Do NOT make trading recommendations.
+  """
+  - LLM Role: Extract current values, trends, and patterns from raw data
+  - No Strategy Decisions: LLM only interprets, doesn't select or recommend
+  - Structured Output: JSON format with current_value, trend, key_observations
+
+  6. Database Storage (extraction/extraction_main.py:250-280)
+
+  market_data_entry = {
+      "raw_data": {
+          "indicators": indicator_results,        # Raw MCP output
+          "interpretation": interpretation_data,  # LLM analysis
+          "selected_indicators": selected_indicators
+      },
+      "indicators": indicator_results  # Also in indicators column
+  }
+
