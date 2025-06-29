@@ -154,13 +154,12 @@ class DecisionEngine:
                 SELECT config_data 
                 FROM configurations 
                 WHERE user_id = %s 
-                AND config_id = %s 
-                AND config_type = 'user'
+                AND config_id = %s
             """, (self.user_id, self.config_id))
             
             result = cursor.fetchone()
             if not result:
-                raise ValueError(f"No user configuration found for config_id {self.config_id}")
+                raise ValueError(f"No configuration found for config_id {self.config_id}")
             
             # Extract decision config from unified config
             user_config = result['config_data']
@@ -231,9 +230,11 @@ class DecisionEngine:
                         if 'interpretation' in row['raw_data']:
                             timeframe_data['signals']['llm_analysis'] = row['raw_data']['interpretation']
                         
-                        # Also extract raw indicators if needed
+                        # Extract raw indicators and make them available to the prompt
                         if 'indicators' in row['raw_data']:
                             timeframe_data['raw_data']['indicators'] = row['raw_data']['indicators']
+                            # IMPORTANT: Also copy to main indicators field so decision prompts can access them
+                            timeframe_data['indicators'].update(row['raw_data']['indicators'])
                         processed_types.add(data_type)
                     
                     elif data_type == 'report' and row['raw_data']:
@@ -436,6 +437,52 @@ class DecisionEngine:
             )
             raise  # Re-raise to fail the decision process instead of using bad data
     
+    def _fetch_latest_ggshot_signal(self, symbol: str) -> Optional[Dict[str, Any]]:
+        """
+        Fetch the latest ggShot signal for a symbol from the market_data table.
+        
+        Args:
+            symbol (str): Trading symbol (e.g., 'AVAX/USDT')
+            
+        Returns:
+            Optional[Dict[str, Any]]: Latest ggShot signal data or None if not found
+        """
+        try:
+            conn = self._get_db_connection()
+            with conn.cursor(cursor_factory=RealDictCursor) as cur:
+                # Get the latest ggShot signal for this symbol from market_data table
+                cur.execute("""
+                    SELECT id, symbol, source, data_type, indicators, raw_data, updated_at
+                    FROM market_data 
+                    WHERE symbol = %s 
+                    AND data_type = 'ggshot_signal'
+                    ORDER BY updated_at DESC 
+                    LIMIT 1
+                """, (symbol,))
+                
+                result = cur.fetchone()
+                if result:
+                    logger.bind(module="decision.engine", user_id=self.user_id).info(f"Found ggShot signal for {symbol}: {result['id']}")
+                    # Convert to expected format
+                    return {
+                        'signal_id': result['id'],
+                        'symbol': result['symbol'],
+                        'signal_type': 'ggshot',
+                        'parsed_data': result['indicators'],  # ggshot signals store parsed data in indicators
+                        'raw_data': result['raw_data'].get('message', '') if result['raw_data'] else '',
+                        'created_at': result['updated_at']
+                    }
+                else:
+                    logger.bind(module="decision.engine", user_id=self.user_id).warning(f"No ggShot signal found for {symbol}")
+                    return None
+                    
+        except Exception as e:
+            logger.bind(module="decision.engine", user_id=self.user_id).error(f"Error fetching ggShot signal for {symbol}: {e}")
+            return None
+        finally:
+            if conn:
+                conn.close()
+    
     def _update_trade_decision(self, trade_id: str, decision: str, confidence: float, reasoning: str) -> None:
         """
         Update a trade with a new decision in its history.
@@ -503,9 +550,188 @@ class DecisionEngine:
         finally:
             conn.close()
     
-    async def _format_prompt_new_trade(self, market_data: Dict, account_state: Dict, symbol: str) -> str:
+    async def _format_prompt_new_trade(self, market_data: Dict, account_state: Dict, symbol: str, mode: str = "dynamic_strategy") -> str:
         """
         Format prompt for new trade evaluation.
+        
+        Args:
+            market_data (Dict): Market data by timeframe
+            account_state (Dict): Current account state
+            symbol (str): Trading symbol
+            mode (str): Decision mode - "dynamic_strategy" or "ggshot"
+            
+        Returns:
+            str: Formatted prompt for the LLM
+        """
+        # Use mode to determine prompt type, not signal presence
+        if mode == "ggshot":
+            # ggShot mode - use specialized validation prompt regardless of signal presence in indicators
+            return await self._format_ggshot_validation_prompt(market_data, account_state, symbol)
+        else:
+            # Standard mode
+            return await self._format_standard_prompt(market_data, account_state, symbol)
+    
+    async def _format_ggshot_validation_prompt(self, market_data: Dict, account_state: Dict, symbol: str) -> str:
+        """
+        Format prompt for ggShot signal validation using the 4-Pillar Framework.
+        
+        Args:
+            market_data (Dict): Market data by timeframe
+            account_state (Dict): Current account state
+            symbol (str): Trading symbol
+            
+        Returns:
+            str: Formatted 4-pillar signal validation prompt
+        """
+        # Get the latest ggShot signal from database for this symbol
+        ggshot_signal = self._fetch_latest_ggshot_signal(symbol)
+        
+        if not ggshot_signal:
+            logger.bind(module="decision.engine", user_id=self.user_id).warning(f"No ggShot signal found for {symbol} - using standard prompt instead")
+            return await self._format_standard_prompt(market_data, account_state, symbol)
+        
+        # Store signal data for later use in _create_intent
+        self._current_ggshot_signal = ggshot_signal
+        
+        # Get original signal message from database raw_data
+        self._original_signal_message = ggshot_signal.get('raw_data', 'Original signal message not available')
+        
+        # Extract parsed signal details from database
+        parsed_data = ggshot_signal.get('parsed_data', {}).get('ggshot_signal', {})
+        
+        # Fetch current market price
+        current_price = await self._fetch_current_price(symbol)
+        
+        # Extract signal details from parsed_data
+        direction = parsed_data.get('direction', 'UNKNOWN')
+        entry_zone = parsed_data.get('entry_zone', {})
+        target_1 = parsed_data.get('targets', [{}])[0].get('price') if parsed_data.get('targets') else None
+        stop_loss = parsed_data.get('stop_loss')
+        
+        # Get native timeframe from the signal or default to 1h
+        native_timeframe = parsed_data.get('timeframe', '1h')
+        
+        # Extract raw indicator data from market_data
+        def get_indicator_data(indicator_name: str, timeframe: str = None) -> str:
+            """Helper to safely extract indicator data from market_data"""
+            try:
+                if timeframe:
+                    # Multi-timeframe indicator (e.g., RSI_4h)
+                    data = market_data.get(timeframe, {}).get('indicators', {})
+                else:
+                    # Use native signal timeframe
+                    data = market_data.get(native_timeframe, {}).get('indicators', {})
+                
+                indicator_data = data.get(indicator_name)
+                if indicator_data is None:
+                    return "N/A"
+                return str(indicator_data)
+            except Exception as e:
+                logger.bind(module="decision.engine", user_id=self.user_id).warning(f"Error extracting {indicator_name}: {e}")
+                return "N/A"
+        
+        # Get current volume from OHLCV data
+        current_volume_data = market_data.get(native_timeframe, {}).get('ohlcv', {}).get('volume', 'N/A')
+        
+        # Log the ggShot validation prompt details
+        logger.bind(module="decision.engine", user_id=self.user_id).info(f"🎯 4-Pillar ggShot validation for {symbol}:")
+        logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Direction: {direction}")
+        logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Entry Zone: {entry_zone}")
+        logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Current Price: ${current_price}" if current_price else "Price unavailable")
+        
+        # Build the complete 4-pillar validation prompt
+        prompt = f"""# ggShot Signal Validation Protocol v2.0
+
+## MISSION
+Validate the following ggShot signal by performing a rigorous, four-pillar analysis. Your task is to determine if the signal is firing in a favorable market regime and is supported by a confluence of evidence. Assign a confidence score based on the rubric provided.
+
+If any data point is 'null' or 'N/A' due to a calculation failure, you must explicitly state that the data was unavailable and proceed with your analysis based on the remaining data.
+
+## 1. SIGNAL & MARKET VITALS
+* **Signal to Validate:** {direction} {symbol}
+* **Native Timeframe:** {native_timeframe}
+* **Entry Zone:** {entry_zone.get('low', 'N/A')} - {entry_zone.get('high', 'N/A')}
+* **Target 1:** {target_1}
+* **Stop Loss:** {stop_loss}
+* **Current Price:** ${current_price}
+
+## 2. THE FOUR-PILLAR ANALYTICAL FRAMEWORK
+You must analyze each pillar in order and extract specific values from the raw indicator data provided.
+
+### --- PILLAR 0: MARKET REGIME ANALYSIS ---
+(First, determine the market's character. Breakout signals fail in choppy markets.)
+
+* **Aroon:** Extract current value from: {get_indicator_data('Aroon')}
+    * **Analysis:** Look at both Aroon Up and Aroon Down lines. When both are low (< 30), market is ranging/consolidating where breakout signals frequently fail. When one line is high (> 70) while the other is low, market is trending strongly and favorable for breakouts. Consider how the current market regime aligns with the signal type.
+* **Bollinger Band Width (BBW):** Extract current value from: {get_indicator_data('BollingerBandsWidth')}
+    * **Analysis:** A low or contracting BBW value indicates market consolidation (a "squeeze"). Evaluate whether the current volatility environment supports or contradicts the breakout signal.
+
+* **Market Regime Impact:** Ranging markets (low Aroon values) present significantly higher risk for breakout signals and should be weighted heavily in your confidence assessment. However, exceptional confluence in other pillars may still support the signal.
+
+### --- PILLAR 1: SIGNAL CONFIRMATION ---
+(Next, look for a confluence of evidence supporting the signal's direction.)
+
+* **Volume Analysis:**
+    * **Current Volume:** Extract from most recent candle: {current_volume_data}
+    * **30-Period Avg. Volume:** Extract current value from: {get_indicator_data('SMA_Volume_30')}
+    * **Analysis:** Compare current volume to the 30-period average. Significantly higher volume (1.5x+ above average) suggests strong conviction behind the breakout. Volume below average indicates weaker participation and higher risk of a false breakout.
+* **Vortex Indicator (VI):**
+    * **Raw Data:** {get_indicator_data('Vortex')}
+    * **Extract:** VI+ (last value from plus array) and VI- (last value from minus array)
+    * **Analysis:** Assess whether the Vortex confirms the signal direction. For LONG signals, VI+ above VI- supports upward momentum. For SHORT signals, VI- above VI+ supports downward momentum.
+* **VWAP (Volume Weighted Average Price):** Extract current value from: {get_indicator_data('VWAP')}
+    * **Analysis:** Evaluate alignment with institutional flow. For LONG signals, entry above VWAP suggests alignment with institutional buying. For SHORT signals, entry below VWAP suggests alignment with institutional selling.
+
+### --- PILLAR 2: BROADER CONTEXT ---
+(Now, zoom out to ensure the trade is well-positioned.)
+
+* **Signal Timeframe RSI:** Extract current value from: {get_indicator_data('RSI')}
+* **Higher Timeframe RSI (4h):** Extract current value from: {get_indicator_data('RSI', '4h')}
+    * **Analysis:** Evaluate whether the trade aligns with the larger timeframe trend. For LONG signals, a 4h RSI above 70 suggests the market may be overbought on the higher timeframe, indicating potential resistance to further upward movement. For SHORT signals, a 4h RSI below 30 suggests oversold conditions that could lead to a bounce. Consider how this broader context impacts the signal's probability.
+* **Donchian Channel (200-period):**
+    * **Raw Data:** {get_indicator_data('DonchianChannel_200')}
+    * **Extract:** Upper and lower band values (last values from upper/lower arrays)
+    * **Analysis:** Identify major liquidity zones and assess the trade's positioning. Evaluate the distance from the entry zone to the opposite band to determine how much room the trade has to develop. Proximity to major support/resistance levels may impact the signal's potential.
+
+### --- PILLAR 3: TACTICAL CAUTION ---
+(Finally, check for immediate risks.)
+
+* **Bollinger Bands (BB):**
+    * **Raw Data:** {get_indicator_data('BollingerBands')}
+    * **Extract:** Upper and lower band values (last values from upper/lower arrays)
+    * **Analysis:** Assess whether the signal occurs at a point of statistical overextension. Prices trading far outside the Bollinger Bands may indicate overextended conditions with higher probability of mean reversion. Consider the current price position relative to the bands.
+* **ATR (Average True Range):** Extract current value from: {get_indicator_data('ATR')}
+    * **Analysis:** Evaluate the current market volatility environment. Exceptionally high ATR values may indicate chaotic, unpredictable price action that increases the risk of stop-loss hits even on directionally correct trades. Consider how volatility conditions affect trade management.
+
+## 3. DELIBERATION & SCORING RUBRIC
+
+Synthesize your findings from all four pillars to assign a final confidence score.
+* **Method:** Consider each pillar's findings and weigh them according to their significance. Strong confluence across multiple pillars should increase confidence, while contradictions and risk factors should decrease it. The magnitude of your adjustments should reflect the strength and importance of each factor.
+* **Guidance:** Signals firing in favorable market regimes with strong momentum confirmation and minimal risk factors warrant higher confidence. Signals in challenging conditions or with significant contradictions warrant lower confidence.
+* **Dynamic Range:** Use the full spectrum from 0.00 to 1.00 to reflect your nuanced analysis. Avoid clustering around any particular value - let your assessment of the evidence drive the score.
+
+## 4. FINAL OUTPUT
+
+FORMAT YOUR RESPONSE EXACTLY AS:
+
+ACTION: validate
+CONFIDENCE: [0.00-1.00]
+STOP_LOSS: {stop_loss}
+TAKE_PROFIT: {target_1}
+
+REASONING:
+- **Regime:** (Briefly state if the market is TRENDING or RANGING based on Aroon/BBW).
+- **Confirmation:** (Summarize your findings on Volume, Vortex, and VWAP confluence).
+- **Context:** (Summarize your findings on the 4h RSI and Donchian Channel context).
+- **Caution:** (Summarize any immediate risks from Bollinger Bands or ATR).
+- **Synthesis & Score:** (A final concluding sentence explaining how these factors led to your confidence score).
+"""
+        
+        return prompt
+    
+    async def _format_standard_prompt(self, market_data: Dict, account_state: Dict, symbol: str) -> str:
+        """
+        Format standard prompt for new trade evaluation (original logic).
         
         Args:
             market_data (Dict): Market data by timeframe
@@ -524,7 +750,7 @@ class DecisionEngine:
             f"Timestamp: {datetime.now(timezone.utc).isoformat()}",
             "",
             "## Current Market Price",
-            f"- {symbol}: ${current_price:,.2f}" if current_price else f"- {symbol}: Price unavailable",
+            f"- {symbol}: ${current_price}" if current_price else f"- {symbol}: Price unavailable",
             "",
             "## Account Status",
             f"- Total Equity: {account_state['equity']:.8f} BTC",
@@ -766,7 +992,6 @@ class DecisionEngine:
         """
         # Initialize result with defaults
         result = {
-            'decision': 'trading_llm_will_parse',  # Placeholder - Trading Module will determine
             'confidence': 0.5,  # Default moderate confidence if not found
             'reasoning': '',  # Will be extracted
             'raw_response': response,
@@ -873,23 +1098,34 @@ class DecisionEngine:
                 "Confidence not found in response, using default 0.5. This may indicate parsing issues."
             )
         
+        # Add ggShot signal data if this was a signal validation
+        if hasattr(self, '_current_ggshot_signal') and self._current_ggshot_signal:
+            result['ggshot_signal_data'] = self._current_ggshot_signal
+            result['original_signal'] = getattr(self, '_original_signal_message', 'Signal message not available')
+            # Clear the temporary storage
+            self._current_ggshot_signal = None
+            self._original_signal_message = None
+        
         logger.bind(module="decision.engine").info(
             f"Parsed LLM response: confidence={result['confidence']}, "
             f"stop_loss={result.get('stop_loss_price', 'Not found')}, "
             f"take_profit={result.get('take_profit_price', 'Not found')}, "
-            f"reasoning_length={len(result['reasoning'])}"
+            f"reasoning_length={len(result['reasoning'])}, "
+            f"ggshot_signal={'Yes' if result.get('ggshot_signal_data') else 'No'}"
         )
         
         return result
     
     async def make_decision(self, symbol: str = "BTC/USD", 
-                          timeframes: List[str] = None) -> Dict[str, Any]:
+                          timeframes: List[str] = None,
+                          mode: str = "dynamic_strategy") -> Dict[str, Any]:
         """
         Main entry point to make a trading decision.
         
         Args:
             symbol (str): Trading symbol
             timeframes (List[str]): Timeframes to analyze
+            mode (str): Decision mode - "dynamic_strategy" or "ggshot"
             
         Returns:
             Dict[str, Any]: Trading intent ready for the Trading Module
@@ -911,6 +1147,7 @@ class DecisionEngine:
             )
             return {
                 'action': 'error',
+                'confidence': 0.0,
                 'error': f'Data fetch failure: {str(e)}',
                 'user_id': self.user_id,
                 'config_id': self.config_id,
@@ -937,11 +1174,12 @@ class DecisionEngine:
                     prompt=prompt
                 )
                 
-                # Get decision from LLM
+                # Get decision from LLM (trade management uses standard mode)
                 response, metadata = await self.llm_provider.generate_response(
                     prompt=prompt,
                     conversation_history=trade.get('decision_history', []),
-                    temperature=0.7
+                    temperature=0.7,
+                    custom_mode="trade_management"  # Trade management has its own mode
                 )
                 
                 # DEBUG: Log the full response
@@ -958,7 +1196,7 @@ class DecisionEngine:
                 # Update trade history
                 self._update_trade_decision(
                     trade['trade_id'],
-                    decision['decision'],
+                    decision.get('action', 'unknown'),
                     decision['confidence'],
                     decision['reasoning']
                 )
@@ -975,7 +1213,7 @@ class DecisionEngine:
             
             try:
                 # Format prompt (this may fail if price service fails)
-                prompt = await self._format_prompt_new_trade(market_data, account_state, symbol)
+                prompt = await self._format_prompt_new_trade(market_data, account_state, symbol, mode)
                 
                 # DEBUG: Log the full prompt
                 logger.bind(module="decision.engine", user_id=self.user_id).info(
@@ -983,10 +1221,11 @@ class DecisionEngine:
                     prompt=prompt
                 )
                 
-                # Get decision from LLM
+                # Get decision from LLM (pass mode for custom system prompt)
                 response, metadata = await self.llm_provider.generate_response(
                     prompt=prompt,
-                    temperature=0.7
+                    temperature=0.7,
+                    custom_mode=mode  # Pass mode to enable custom system prompts
                 )
                 
                 # DEBUG: Log the full response
@@ -1007,6 +1246,7 @@ class DecisionEngine:
                 )
                 return {
                     'action': 'error',
+                    'confidence': 0.0,
                     'error': f'Decision generation failure: {str(e)}',
                     'user_id': self.user_id,
                     'config_id': self.config_id,
@@ -1062,6 +1302,12 @@ class DecisionEngine:
             'decision_mode': mode,
             'trade_id': decision.get('trade_id') if mode == 'manage' else None
         }
+        
+        # Add ggShot signal validation information if present
+        if decision.get('ggshot_signal_data'):
+            intent['ggshot_signal_validation'] = True
+            intent['signal_data'] = decision['ggshot_signal_data']
+            intent['original_signal'] = decision.get('original_signal', 'Signal data not available')
         
         logger.bind(module="decision.engine").info(
             f"Created intent with confidence={decision['confidence']} for Trading Module risk calculation"

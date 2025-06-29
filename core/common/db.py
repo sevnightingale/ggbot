@@ -1,8 +1,17 @@
 # common/db.py
 import json
 import psycopg2
+from decimal import Decimal
 from contextlib import contextmanager
 from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+
+
+class DecimalEncoder(json.JSONEncoder):
+    """Custom JSON encoder that preserves Decimal precision as strings."""
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)  # Convert Decimal to string to preserve precision
+        return super(DecimalEncoder, self).default(obj)
 
 @contextmanager
 def get_db_connection():
@@ -58,8 +67,8 @@ def upsert_market_data(user_id, symbol, timeframe, data_dict, data_type=None, so
     with get_db_connection() as conn:
         try:
             with conn.cursor() as cur:
-                # Convert Python dictionary to JSON format
-                json_data = json.dumps(data_dict)
+                # Convert Python dictionary to JSON format (preserving Decimal precision)
+                json_data = json.dumps(data_dict, cls=DecimalEncoder)
 
                 # Insert or update the row based on (user_id, symbol, timeframe)
                 cur.execute("""
@@ -78,39 +87,7 @@ def upsert_market_data(user_id, symbol, timeframe, data_dict, data_type=None, so
             print(f"Error in upsert_market_data: {e}")
             return False
 
-def get_configuration(user_id, config_type, config_name=None):
-    """
-    Retrieve a configuration from the database.
-    
-    Args:
-        user_id: UUID of the user
-        config_type: Type of configuration (e.g., 'extraction', 'decision')
-        config_name: Optional name of the configuration
-        
-    Returns:
-        Dictionary containing the configuration data or None if not found
-    """
-    with get_db_connection() as conn:
-        try:
-            with conn.cursor() as cur:
-                if config_name:
-                    cur.execute("""
-                        SELECT config_data FROM configurations 
-                        WHERE user_id = %s AND config_type = %s AND config_name = %s
-                    """, (user_id, config_type, config_name))
-                else:
-                    cur.execute("""
-                        SELECT config_data FROM configurations 
-                        WHERE user_id = %s AND config_type = %s
-                    """, (user_id, config_type))
-                
-                result = cur.fetchone()
-                if result:
-                    return result[0]
-                return None
-        except Exception as e:
-            print(f"Error in get_configuration: {e}")
-            return None
+# get_configuration function removed - use core.config.config_main.get_configuration instead
 
 def save_configuration(user_id, config_type, config_data, config_name=None):
     """
@@ -130,9 +107,9 @@ def save_configuration(user_id, config_type, config_data, config_name=None):
     with get_db_connection() as conn:
         try:
             with conn.cursor() as cur:
-                # Convert config_data to JSON if it's not already a string
+                # Convert config_data to JSON if it's not already a string (preserving Decimal precision)
                 if not isinstance(config_data, str):
-                    config_data = json.dumps(config_data)
+                    config_data = json.dumps(config_data, cls=DecimalEncoder)
                 
                 # Check if configuration already exists
                 if config_name:

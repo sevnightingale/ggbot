@@ -4,21 +4,27 @@ The Decision Module is the brain of the ggbot system. It analyzes market data, m
 
 ## Core Architecture
 
-### Dual-Mode Operation
+### Multi-Mode Operation
 
-The Decision Module operates in two primary modes:
+The Decision Module operates in three primary modes:
 
-1. **New Trade Mode** - When no positions are active
-   - Analyzes market conditions for entry opportunities
-   - Evaluates against user's trading strategy
-   - Considers account status and risk guidelines
-   - Makes fresh decisions without historical context
+1. **Dynamic Strategy Mode** (`dynamic_strategy`) - Standard trading operations
+   - **New Trade Mode**: When no positions are active
+     - Analyzes market conditions for entry opportunities
+     - Evaluates against user's trading strategy
+     - Considers account status and risk guidelines
+     - Makes fresh decisions without historical context
+   - **Trade Management Mode**: When positions are active
+     - Reviews original reasoning for entering positions
+     - Evaluates current market conditions against entry thesis
+     - Decides whether to hold, adjust, or exit positions
+     - Maintains continuity to avoid erratic behavior
 
-2. **Trade Management Mode** - When positions are active
-   - Reviews original reasoning for entering positions
-   - Evaluates current market conditions against entry thesis
-   - Decides whether to hold, adjust, or exit positions
-   - Maintains continuity to avoid erratic behavior
+2. **Signal Validation Mode** (`signal_validation`) - External signal analysis
+   - Validates external trading signals (e.g., ggShot signals)
+   - Analyzes signal quality against current market context
+   - Assigns confidence scores for signal filtering
+   - Does not manage active positions - focuses only on signal assessment
 
 ### Data Flow
 
@@ -66,7 +72,8 @@ POST /decision/webhooks/trigger-decision
   "user_id": "00000000-0000-0000-0000-000000000001",
   "config_id": "a93de31b-9b8a-42e3-827d-c31e580f5f36",
   "symbol": "BTC/USDT",
-  "timeframes": ["15m"]
+  "timeframes": ["15m"],
+  "decision_mode": "signal_validation"  // Optional: "dynamic_strategy" (default) or "signal_validation"
 }
 ```
 
@@ -83,10 +90,12 @@ POST /decision/webhooks/trigger-decision
 #### **Autonomous Chain Behavior**
 
 1. **Fresh Account State**: Calls `setup_account_monitoring()` to get latest exchange positions
-2. **Mode Auto-Detection**: Automatically determines NEW_TRADE vs MANAGE_TRADE based on active database trades
+2. **Mode Selection**: Uses explicit `decision_mode` if provided, otherwise auto-detects NEW_TRADE vs MANAGE_TRADE based on active database trades
 3. **Market Data Retrieval**: Fetches latest indicator data from market_data table using exact symbol from extraction
 4. **Price Validation**: Uses dual-source price validation (YFinance + CCXT) with 5% tolerance for accuracy
-5. **LLM Decision**: Generates trading intent using DeepSeek LLM with user's strategy and market context
+5. **LLM Decision**: Generates trading intent using mode-specific prompts:
+   - `dynamic_strategy`: Uses user's strategy and market context for trading decisions
+   - `signal_validation`: Uses specialized prompt to validate external signals (e.g., ggShot)
 6. **Auto-Chaining**: If decision is actionable (not "no_action", "hold", "wait"), triggers Trading webhook
 
 #### **Price Service Integration**
@@ -98,11 +107,19 @@ The decision module uses a sophisticated dual-source price validation system:
 
 #### **Mode Detection Logic**
 ```python
-# Automatic mode detection based on active trades
+# Mode selection prioritizes explicit decision_mode parameter
+mode = request.decision_mode or auto_detected_mode
+
+# Automatic mode detection based on active trades (when no explicit mode provided)
 with get_db_connection() as conn:
     cur.execute("SELECT COUNT(*) FROM trades WHERE user_id = %s AND config_id = %s AND trade_status = 'open'")
     active_trades = cur.fetchone()[0]
-    actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
+    auto_detected_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
+
+# Signal validation mode (set explicitly by external integrations like ggShot)
+if request.decision_mode == "signal_validation":
+    # Uses specialized signal validation prompt instead of trading strategy
+    mode = "signal_validation"
 ```
 
 #### **Integration with Trading Module**
@@ -217,6 +234,56 @@ Every decision made by this module is automatically tracked through the **strate
 - **Performance Analytics**: Rich data for strategy refinement and backtesting
 
 This tracking happens automatically - the Decision Module simply needs to include `decision_id` and `config_id` in its trade intents for full audit trail functionality.
+
+## ggShot Signal Validation Integration
+
+### Signal Validation Mode
+The Decision Module includes specialized support for external signal validation, particularly for ggShot trading signals:
+
+#### **How It Works**
+1. **Signal Detection**: ggShot signals are stored in `market_data` table with `data_type: 'ggshot_signal'`
+2. **Mode Trigger**: External services (like ggShot listener) set `decision_mode: 'signal_validation'` in webhook requests
+3. **Specialized Processing**: Decision engine uses signal validation prompt instead of trading strategy
+4. **Confidence Scoring**: Assigns confidence score (0.0-1.0) based on market context alignment
+5. **Publisher Integration**: High-confidence signals (>0.80 default) are published to filtered channels
+
+#### **Signal Validation Prompt**
+```
+You are validating a ggShot trading signal. Your job is to assess signal quality 
+by comparing it against current market context.
+
+SIGNAL TO VALIDATE:
+Direction: {direction}
+Entry Zone: {entry_low}-{entry_high}
+Target 1: {target_1}
+Stop Loss: {stop_loss}
+
+MARKET CONTEXT:
+{technical_indicators_and_analysis}
+
+Assign confidence (0.0-1.0) based on how well market conditions support this signal.
+
+FORMAT YOUR RESPONSE EXACTLY AS:
+ACTION: {direction.lower()}
+CONFIDENCE: [0.000-1.000]
+STOP_LOSS: {stop_loss}
+TAKE_PROFIT: {target_1}
+
+REASONING:
+{your analysis}
+```
+
+#### **Integration Flow**
+```
+ggShot Signal → Listener (decision_mode='signal_validation') 
+    → Extraction → Decision (validation prompt) 
+    → Publisher (if confidence > threshold)
+```
+
+#### **Future Integration**
+- ggShot signals can be used as regular indicators in `dynamic_strategy` mode
+- LLM will see ggShot signals alongside RSI, MACD, etc. for normal trading decisions
+- Signal validation mode remains available for pure filtering workflows
 
 ## Enhanced Decision Storage (Phase 3 Updates)
 

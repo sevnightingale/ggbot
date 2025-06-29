@@ -18,7 +18,8 @@ async def run_decision_process(
     config_id: Optional[str] = None,
     config_name: str = 'default',
     symbol: str = 'BTC/USD',
-    timeframes: Optional[list] = None
+    timeframes: Optional[list] = None,
+    mode: str = "dynamic_strategy"
 ) -> Dict[str, Any]:
     """
     Run the decision-making process for a user.
@@ -27,8 +28,9 @@ async def run_decision_process(
         user_id (str): UUID of the user
         config_id (Optional[str]): UUID of the configuration (if known)
         config_name (str): Name of the configuration to use (if config_id not provided)
-        symbol (str): Trading symbol to analyze
+        symbol (str): Trading symbol
         timeframes (Optional[list]): Timeframes to analyze
+        mode (str): Decision mode - "dynamic_strategy" or "ggshot"
         
     Returns:
         Dict[str, Any]: Trading intent or error information
@@ -46,7 +48,7 @@ async def run_decision_process(
         await engine.initialize()
         
         # Make the decision
-        intent = await engine.make_decision(symbol, timeframes)
+        intent = await engine.make_decision(symbol, timeframes, mode)
         
         logger.bind(module="decision.main").info(
             f"Decision process completed: {intent['action']} "

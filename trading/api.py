@@ -366,14 +366,13 @@ async def create_trading_engine(user_id: str, config_id: Optional[str] = None) -
                     FROM configurations 
                     WHERE user_id = %s 
                     AND config_id = %s
-                    AND config_type = 'user'
                 """, (user_id, config_id))
             else:
                 # Otherwise get latest config
                 cursor.execute("""
                     SELECT config_data 
                     FROM configurations 
-                    WHERE user_id = %s AND config_type = 'user'
+                    WHERE user_id = %s
                     ORDER BY created_at DESC 
                     LIMIT 1
                 """, (user_id,))

@@ -33,13 +33,13 @@ def get_configuration(user_id=None, config_type=None, config_name=None, config_i
                     cur.execute("""
                         SELECT config_data 
                         FROM configurations 
-                        WHERE user_id = %s AND config_id = %s AND config_type = 'user'
+                        WHERE user_id = %s AND config_id = %s
                     """, [user_id, config_id])
                 else:
                     cur.execute("""
                         SELECT config_data 
                         FROM configurations 
-                        WHERE user_id = %s AND config_type = 'user'
+                        WHERE user_id = %s
                         ORDER BY created_at DESC
                         LIMIT 1
                     """, [user_id])

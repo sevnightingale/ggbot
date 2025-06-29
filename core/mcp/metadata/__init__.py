@@ -69,6 +69,11 @@ def create_friendly_mapping() -> Dict[str, str]:
         "DonchianChannel": "calculate_donchian_channel",
         "IchimokuCloud": "calculate_ichimoku_cloud",
         "Ichimoku": "calculate_ichimoku_cloud",
+        "BollingerBandsWidth": "calculate_bollinger_bands_width",
+        "BBW": "calculate_bollinger_bands_width",
+        "Vortex": "calculate_vortex",
+        # Note: ADX is not available in current MCP tools - would need to be added to MCP server
+        "ADX": "calculate_average_directional_index",  # Placeholder for when it's implemented
     }
     
     # Also add exact tool names (without "calculate_" prefix)

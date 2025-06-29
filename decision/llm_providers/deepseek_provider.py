@@ -52,7 +52,8 @@ class DeepSeekProvider(LLMProvider):
     async def generate_response(self, 
                               prompt: str,
                               conversation_history: Optional[List[Dict[str, str]]] = None,
-                              temperature: float = 0.7) -> Tuple[str, Dict[str, Any]]:
+                              temperature: float = 0.7,
+                              custom_mode: Optional[str] = None) -> Tuple[str, Dict[str, Any]]:
         """
         Generate a response from DeepSeek.
         
@@ -60,6 +61,7 @@ class DeepSeekProvider(LLMProvider):
             prompt (str): The prompt to send
             conversation_history (Optional[List[Dict[str, str]]]): Previous messages
             temperature (float): Response randomness (0.0-1.0)
+            custom_mode (Optional[str]): Custom mode for specialized system prompts
             
         Returns:
             Tuple[str, Dict[str, Any]]: Response text and metadata
@@ -68,16 +70,12 @@ class DeepSeekProvider(LLMProvider):
         
         # Add system message at the beginning if not present
         if not messages or messages[0].get('role') != 'system':
-            system_prompt = (
-                "You are an expert cryptocurrency trader analyzing market data and making trading decisions. "
-                "Provide clear, reasoned responses about trading actions. "
-                "Format your response with clear sections for Decision, Confidence, and Reasoning."
-            )
+            system_prompt = self._get_system_prompt(custom_mode)
             messages.insert(0, {"role": "system", "content": system_prompt})
             
             # DEBUG: Log the system prompt
             logger.bind(module="decision.deepseek").info(
-                f"📋 DECISION LLM SYSTEM PROMPT:\n{system_prompt}"
+                f"📋 DECISION LLM SYSTEM PROMPT ({custom_mode or 'standard'}):\n{system_prompt}"
             )
         
         headers = {
@@ -168,6 +166,43 @@ class DeepSeekProvider(LLMProvider):
                     raise
         
         raise Exception("Failed to get response from DeepSeek after all retries")
+    
+    def _get_system_prompt(self, custom_mode: Optional[str] = None) -> str:
+        """
+        Get the appropriate system prompt based on the custom mode.
+        
+        Args:
+            custom_mode (Optional[str]): The custom mode (ggshot, trade_management, etc.)
+            
+        Returns:
+            str: The system prompt for the given mode
+        """
+        if custom_mode == "ggshot":
+            return (
+                "You are a quantitative trading analyst AI. Your sole function is to execute the "
+                "Four-Pillar Validation Framework provided in the user prompt to assess the quality "
+                "of a cryptocurrency trading signal. You must be ruthlessly objective, basing your "
+                "analysis exclusively on the provided raw market data and the rules within the "
+                "framework. Your goal is not to approve signals, but to identify and assign a precise "
+                "confidence score to only the highest quality setups that meet the framework's criteria. "
+                "You will structure your final output exactly as requested, with a detailed reasoning "
+                "section that justifies your confidence score by referencing each of the four pillars."
+            )
+        elif custom_mode == "trade_management":
+            return (
+                "You are an expert cryptocurrency trader managing active positions. Your role is to "
+                "analyze current market conditions and make decisions about existing trades: hold, "
+                "adjust, or close positions. You must be precise and disciplined in your analysis, "
+                "considering market changes, risk management, and profit optimization. Provide clear "
+                "reasoning for your decisions based on current market data and trade performance."
+            )
+        else:
+            # Standard/default system prompt
+            return (
+                "You are an expert cryptocurrency trader analyzing market data and making trading decisions. "
+                "Provide clear, reasoned responses about trading actions. "
+                "Format your response with clear sections for Decision, Confidence, and Reasoning."
+            )
     
     async def health_check(self) -> bool:
         """

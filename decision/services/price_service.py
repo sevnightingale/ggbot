@@ -6,7 +6,8 @@ current market prices with validation and consensus logic.
 """
 
 import asyncio
-from typing import Optional, List, Dict, Any
+from decimal import Decimal
+from typing import Optional, List, Dict, Any, Union
 from datetime import datetime, timezone
 
 from core.common.logger import logger
@@ -50,7 +51,7 @@ class PriceService:
             f"{self.timeout_seconds}s timeout"
         )
     
-    async def get_current_price(self, symbol: str) -> float:
+    async def get_current_price(self, symbol: str) -> Union[float, Decimal]:
         """
         Get current market price with dual-source validation.
         
@@ -58,7 +59,7 @@ class PriceService:
             symbol: Standard trading symbol (e.g., 'BTC/USDT', 'ETH/USD')
             
         Returns:
-            float: Consensus current market price
+            Union[float, Decimal]: Consensus current market price
             
         Raises:
             ValueError: If either source fails or prices disagree significantly
@@ -92,10 +93,10 @@ class PriceService:
                 # If only one source succeeded, use it
                 if yf_price and not ccxt_price:
                     self._log.warning(f"Using YFinance only for {symbol} (CCXT failed)")
-                    return float(yf_price)
+                    return yf_price  # Keep original type (float from YFinance)
                 elif ccxt_price and not yf_price:
                     self._log.warning(f"Using CCXT only for {symbol} (YFinance failed)")
-                    return float(ccxt_price)
+                    return ccxt_price  # Keep original type (Decimal from CCXT)
             
             # Check for None results (strict dual-source mode)
             if yf_price is None:
@@ -109,23 +110,29 @@ class PriceService:
             if ccxt_price <= 0:
                 raise ValueError(f"CCXT returned invalid price: {ccxt_price}")
             
-            # Calculate price difference percentage
-            price_diff_pct = abs(yf_price - ccxt_price) / min(yf_price, ccxt_price)
+            # Convert both to Decimal for precise calculations
+            yf_decimal = Decimal(str(yf_price)) if not isinstance(yf_price, Decimal) else yf_price
+            ccxt_decimal = Decimal(str(ccxt_price)) if not isinstance(ccxt_price, Decimal) else ccxt_price
+            
+            # Calculate price difference percentage using Decimals
+            price_diff = abs(yf_decimal - ccxt_decimal)
+            min_price = min(yf_decimal, ccxt_decimal)
+            price_diff_pct = float(price_diff / min_price)
             
             # Check if prices agree within tolerance
             if price_diff_pct > self.price_tolerance:
                 raise ValueError(
                     f"Price mismatch for {symbol}: "
-                    f"YFinance=${yf_price:,.2f}, CCXT=${ccxt_price:,.2f} "
+                    f"YFinance=${yf_price}, CCXT=${ccxt_price} "
                     f"({price_diff_pct*100:.1f}% difference, max allowed: {self.price_tolerance*100:.1f}%)"
                 )
             
-            # Calculate consensus price (average)
-            consensus_price = (yf_price + ccxt_price) / 2
+            # Calculate consensus price (average) - prefer Decimal precision
+            consensus_price = (yf_decimal + ccxt_decimal) / Decimal('2')
             
             self._log.info(
-                f"Price consensus for {symbol}: ${consensus_price:,.2f} "
-                f"(YF: ${yf_price:,.2f}, CCXT: ${ccxt_price:,.2f}, "
+                f"Price consensus for {symbol}: ${consensus_price} "
+                f"(YF: ${yf_price}, CCXT: ${ccxt_price}, "
                 f"diff: {price_diff_pct*100:.1f}%)"
             )
             
@@ -194,8 +201,14 @@ class PriceService:
             if (not isinstance(yf_price, Exception) and yf_price and 
                 not isinstance(ccxt_price, Exception) and ccxt_price):
                 
-                price_diff_pct = abs(yf_price - ccxt_price) / min(yf_price, ccxt_price)
-                consensus_price = (yf_price + ccxt_price) / 2
+                # Convert to Decimal for precise calculations
+                yf_decimal = Decimal(str(yf_price)) if not isinstance(yf_price, Decimal) else yf_price
+                ccxt_decimal = Decimal(str(ccxt_price)) if not isinstance(ccxt_price, Decimal) else ccxt_price
+                
+                price_diff = abs(yf_decimal - ccxt_decimal)
+                min_price = min(yf_decimal, ccxt_decimal)
+                price_diff_pct = float(price_diff / min_price)
+                consensus_price = (yf_decimal + ccxt_decimal) / Decimal('2')
                 
                 result['consensus'] = consensus_price
                 result['validation'] = {

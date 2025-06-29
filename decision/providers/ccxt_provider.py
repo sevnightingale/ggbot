@@ -6,6 +6,7 @@ using the CCXT library. It tries multiple exchanges for reliability.
 """
 
 import ccxt.async_support as ccxt
+from decimal import Decimal, ROUND_HALF_UP
 from typing import Optional, List
 from core.common.logger import logger
 from decision.interfaces.price_provider import PriceProvider
@@ -26,6 +27,7 @@ class CCXTPriceProvider(PriceProvider):
     # Symbol mappings for different exchanges
     EXCHANGE_SYMBOL_MAPS = {
         'binance': {
+            # Major pairs with USD/USDT mapping
             'BTC/USD': 'BTC/USDT',  # Binance doesn't have true USD pairs
             'BTC/USDT': 'BTC/USDT',
             'ETH/USD': 'ETH/USDT',
@@ -40,16 +42,94 @@ class CCXTPriceProvider(PriceProvider):
             'SOL/USDT': 'SOL/USDT',
             'DOGE/USD': 'DOGE/USDT',
             'DOGE/USDT': 'DOGE/USDT',
+            'AVAX/USD': 'AVAX/USDT',
+            'AVAX/USDT': 'AVAX/USDT',
+            
+            # All 141 ggShot symbols (USDT pairs on Binance - identity mappings since Binance uses slash format)
+            '1INCH/USDT': '1INCH/USDT', 'AAVE/USDT': 'AAVE/USDT', 'ACH/USDT': 'ACH/USDT', 'ADA/USDT': 'ADA/USDT',
+            'ALGO/USDT': 'ALGO/USDT', 'ALICE/USDT': 'ALICE/USDT', 'ALPHA/USDT': 'ALPHA/USDT', 'ALT/USDT': 'ALT/USDT',
+            'ANKR/USDT': 'ANKR/USDT', 'APE/USDT': 'APE/USDT', 'API3/USDT': 'API3/USDT', 'APT/USDT': 'APT/USDT',
+            'ARB/USDT': 'ARB/USDT', 'ARKM/USDT': 'ARKM/USDT', 'AR/USDT': 'AR/USDT', 'ASTR/USDT': 'ASTR/USDT',
+            'ATOM/USDT': 'ATOM/USDT', 'AUCTION/USDT': 'AUCTION/USDT', 'AXS/USDT': 'AXS/USDT', 'BAKE/USDT': 'BAKE/USDT',
+            'BAL/USDT': 'BAL/USDT', 'BAND/USDT': 'BAND/USDT', 'BAT/USDT': 'BAT/USDT', 'BCH/USDT': 'BCH/USDT',
+            'BEL/USDT': 'BEL/USDT', 'BIGTIME/USDT': 'BIGTIME/USDT', 'BNT/USDT': 'BNT/USDT', 'BOME/USDT': 'BOME/USDT',
+            'CAKE/USDT': 'CAKE/USDT', 'CELR/USDT': 'CELR/USDT', 'CETUS/USDT': 'CETUS/USDT', 'CFX/USDT': 'CFX/USDT',
+            'CHR/USDT': 'CHR/USDT', 'CHZ/USDT': 'CHZ/USDT', 'COMP/USDT': 'COMP/USDT', 'COTI/USDT': 'COTI/USDT',
+            'CRV/USDT': 'CRV/USDT', 'CYBER/USDT': 'CYBER/USDT', 'DASH/USDT': 'DASH/USDT', 'DOT/USDT': 'DOT/USDT',
+            'DYDX/USDT': 'DYDX/USDT', 'EGLD/USDT': 'EGLD/USDT', 'ENA/USDT': 'ENA/USDT', 'ENS/USDT': 'ENS/USDT',
+            'ETC/USDT': 'ETC/USDT', 'ETHFI/USDT': 'ETHFI/USDT', 'FET/USDT': 'FET/USDT', 'FIL/USDT': 'FIL/USDT',
+            'FLM/USDT': 'FLM/USDT', 'FLOW/USDT': 'FLOW/USDT', 'GALA/USDT': 'GALA/USDT', 'GMT/USDT': 'GMT/USDT',
+            'GMX/USDT': 'GMX/USDT', 'GRT/USDT': 'GRT/USDT', 'GTC/USDT': 'GTC/USDT', 'HBAR/USDT': 'HBAR/USDT',
+            'HIGH/USDT': 'HIGH/USDT', 'HOOK/USDT': 'HOOK/USDT', 'ICP/USDT': 'ICP/USDT', 'ICX/USDT': 'ICX/USDT',
+            'ID/USDT': 'ID/USDT', 'INJ/USDT': 'INJ/USDT', 'IOST/USDT': 'IOST/USDT', 'IOTX/USDT': 'IOTX/USDT',
+            'JASMY/USDT': 'JASMY/USDT', 'JTO/USDT': 'JTO/USDT', 'JUP/USDT': 'JUP/USDT', 'KAVA/USDT': 'KAVA/USDT',
+            'KNC/USDT': 'KNC/USDT', 'KSM/USDT': 'KSM/USDT', 'LDO/USDT': 'LDO/USDT', 'LEVER/USDT': 'LEVER/USDT',
+            'LINK/USDT': 'LINK/USDT', 'LPT/USDT': 'LPT/USDT', 'LQTY/USDT': 'LQTY/USDT', 'LRC/USDT': 'LRC/USDT',
+            'LTC/USDT': 'LTC/USDT', 'MAGIC/USDT': 'MAGIC/USDT', 'MANA/USDT': 'MANA/USDT', 'MASK/USDT': 'MASK/USDT',
+            'MATIC/USDT': 'MATIC/USDT', 'MKR/USDT': 'MKR/USDT', 'NEAR/USDT': 'NEAR/USDT', 'NEO/USDT': 'NEO/USDT',
+            'NKN/USDT': 'NKN/USDT', 'NMR/USDT': 'NMR/USDT', 'NOT/USDT': 'NOT/USDT', 'NTRN/USDT': 'NTRN/USDT',
+            'OGN/USDT': 'OGN/USDT', 'ONDO/USDT': 'ONDO/USDT', 'ONE/USDT': 'ONE/USDT', 'ONT/USDT': 'ONT/USDT',
+            'OP/USDT': 'OP/USDT', 'ORDI/USDT': 'ORDI/USDT', 'PENDLE/USDT': 'PENDLE/USDT', 'PEOPLE/USDT': 'PEOPLE/USDT',
+            'PYTH/USDT': 'PYTH/USDT', 'QTUM/USDT': 'QTUM/USDT', 'RARE/USDT': 'RARE/USDT', 'RENDER/USDT': 'RENDER/USDT',
+            'RLC/USDT': 'RLC/USDT', 'ROSE/USDT': 'ROSE/USDT', 'RSR/USDT': 'RSR/USDT', 'RUNE/USDT': 'RUNE/USDT',
+            'RVN/USDT': 'RVN/USDT', 'SAND/USDT': 'SAND/USDT', 'SEI/USDT': 'SEI/USDT', 'SFP/USDT': 'SFP/USDT',
+            'SKLUS/USDT': 'SKL/USDT', 'SNX/USDT': 'SNX/USDT', 'STORJ/USDT': 'STORJ/USDT', 'STRK/USDT': 'STRK/USDT',
+            'STX/USDT': 'STX/USDT', 'SUI/USDT': 'SUI/USDT', 'S/USDT': 'S/USDT', 'SUSHI/USDT': 'SUSHI/USDT',
+            'SXP/USDT': 'SXP/USDT', 'TAO/USDT': 'TAO/USDT', 'THETA/USDT': 'THETA/USDT', 'TIA/USDT': 'TIA/USDT',
+            'TRB/USDT': 'TRB/USDT', 'TRX/USDT': 'TRX/USDT', 'TURBO/USDT': 'TURBO/USDT', 'TWT/USDT': 'TWT/USDT',
+            'VANRY/USDT': 'VANRY/USDT', 'VET/USDT': 'VET/USDT', 'WIF/USDT': 'WIF/USDT', 'WLD/USDT': 'WLD/USDT',
+            'WOO/USDT': 'WOO/USDT', 'W/USDT': 'W/USDT', 'YFI/USDT': 'YFI/USDT', 'ZIL/USDT': 'ZIL/USDT',
+            'ZRO/USDT': 'ZRO/USDT', 'ZRX/USDT': 'ZRX/USDT',
         },
         'coinbase': {
+            # Major pairs with USD/USDT mapping
             'BTC/USD': 'BTC/USD',
             'BTC/USDT': 'BTC/USD',  # Use USD equivalent
             'ETH/USD': 'ETH/USD',
             'ETH/USDT': 'ETH/USD',
             'SOL/USD': 'SOL/USD',
             'SOL/USDT': 'SOL/USD',
+            'AVAX/USD': 'AVAX/USD',
+            'AVAX/USDT': 'AVAX/USD',
+            
+            # All 141 ggShot symbols (USDT pairs on Coinbase)
+            '1INCH/USDT': '1INCH/USD', 'AAVE/USDT': 'AAVE/USD', 'ACH/USDT': 'ACH/USD', 'ADA/USDT': 'ADA/USD',
+            'ALGO/USDT': 'ALGO/USD', 'ALICE/USDT': 'ALICE/USD', 'ALPHA/USDT': 'ALPHA/USD', 'ALT/USDT': 'ALT/USD',
+            'ANKR/USDT': 'ANKR/USD', 'APE/USDT': 'APE/USD', 'API3/USDT': 'API3/USD', 'APT/USDT': 'APT/USD',
+            'ARB/USDT': 'ARB/USD', 'ARKM/USDT': 'ARKM/USD', 'AR/USDT': 'AR/USD', 'ASTR/USDT': 'ASTR/USD',
+            'ATOM/USDT': 'ATOM/USD', 'AUCTION/USDT': 'AUCTION/USD', 'AXS/USDT': 'AXS/USD', 'BAKE/USDT': 'BAKE/USD',
+            'BAL/USDT': 'BAL/USD', 'BAND/USDT': 'BAND/USD', 'BAT/USDT': 'BAT/USD', 'BCH/USDT': 'BCH/USD',
+            'BEL/USDT': 'BEL/USD', 'BIGTIME/USDT': 'BIGTIME/USD', 'BNT/USDT': 'BNT/USD', 'BOME/USDT': 'BOME/USD',
+            'CAKE/USDT': 'CAKE/USD', 'CELR/USDT': 'CELR/USD', 'CETUS/USDT': 'CETUS/USD', 'CFX/USDT': 'CFX/USD',
+            'CHR/USDT': 'CHR/USD', 'CHZ/USDT': 'CHZ/USD', 'COMP/USDT': 'COMP/USD', 'COTI/USDT': 'COTI/USD',
+            'CRV/USDT': 'CRV/USD', 'CYBER/USDT': 'CYBER/USD', 'DASH/USDT': 'DASH/USD', 'DOT/USDT': 'DOT/USD',
+            'DYDX/USDT': 'DYDX/USD', 'EGLD/USDT': 'EGLD/USD', 'ENA/USDT': 'ENA/USD', 'ENS/USDT': 'ENS/USD',
+            'ETC/USDT': 'ETC/USD', 'ETHFI/USDT': 'ETHFI/USD', 'FET/USDT': 'FET/USD', 'FIL/USDT': 'FIL/USD',
+            'FLM/USDT': 'FLM/USD', 'FLOW/USDT': 'FLOW/USD', 'GALA/USDT': 'GALA/USD', 'GMT/USDT': 'GMT/USD',
+            'GMX/USDT': 'GMX/USD', 'GRT/USDT': 'GRT/USD', 'GTC/USDT': 'GTC/USD', 'HBAR/USDT': 'HBAR/USD',
+            'HIGH/USDT': 'HIGH/USD', 'HOOK/USDT': 'HOOK/USD', 'ICP/USDT': 'ICP/USD', 'ICX/USDT': 'ICX/USD',
+            'ID/USDT': 'ID/USD', 'INJ/USDT': 'INJ/USD', 'IOST/USDT': 'IOST/USD', 'IOTX/USDT': 'IOTX/USD',
+            'JASMY/USDT': 'JASMY/USD', 'JTO/USDT': 'JTO/USD', 'JUP/USDT': 'JUP/USD', 'KAVA/USDT': 'KAVA/USD',
+            'KNC/USDT': 'KNC/USD', 'KSM/USDT': 'KSM/USD', 'LDO/USDT': 'LDO/USD', 'LEVER/USDT': 'LEVER/USD',
+            'LINK/USDT': 'LINK/USD', 'LPT/USDT': 'LPT/USD', 'LQTY/USDT': 'LQTY/USD', 'LRC/USDT': 'LRC/USD',
+            'LTC/USDT': 'LTC/USD', 'MAGIC/USDT': 'MAGIC/USD', 'MANA/USDT': 'MANA/USD', 'MASK/USDT': 'MASK/USD',
+            'MATIC/USDT': 'MATIC/USD', 'MKR/USDT': 'MKR/USD', 'NEAR/USDT': 'NEAR/USD', 'NEO/USDT': 'NEO/USD',
+            'NKN/USDT': 'NKN/USD', 'NMR/USDT': 'NMR/USD', 'NOT/USDT': 'NOT/USD', 'NTRN/USDT': 'NTRN/USD',
+            'OGN/USDT': 'OGN/USD', 'ONDO/USDT': 'ONDO/USD', 'ONE/USDT': 'ONE/USD', 'ONT/USDT': 'ONT/USD',
+            'OP/USDT': 'OP/USD', 'ORDI/USDT': 'ORDI/USD', 'PENDLE/USDT': 'PENDLE/USD', 'PEOPLE/USDT': 'PEOPLE/USD',
+            'PYTH/USDT': 'PYTH/USD', 'QTUM/USDT': 'QTUM/USD', 'RARE/USDT': 'RARE/USD', 'RENDER/USDT': 'RENDER/USD',
+            'RLC/USDT': 'RLC/USD', 'ROSE/USDT': 'ROSE/USD', 'RSR/USDT': 'RSR/USD', 'RUNE/USDT': 'RUNE/USD',
+            'RVN/USDT': 'RVN/USD', 'SAND/USDT': 'SAND/USD', 'SEI/USDT': 'SEI/USD', 'SFP/USDT': 'SFP/USD',
+            'SKLUS/USDT': 'SKLUS/USD', 'SNX/USDT': 'SNX/USD', 'STORJ/USDT': 'STORJ/USD', 'STRK/USDT': 'STRK/USD',
+            'STX/USDT': 'STX/USD', 'SUI/USDT': 'SUI/USD', 'S/USDT': 'S/USD', 'SUSHI/USDT': 'SUSHI/USD',
+            'SXP/USDT': 'SXP/USD', 'TAO/USDT': 'TAO/USD', 'THETA/USDT': 'THETA/USD', 'TIA/USDT': 'TIA/USD',
+            'TRB/USDT': 'TRB/USD', 'TRX/USDT': 'TRX/USD', 'TURBO/USDT': 'TURBO/USD', 'TWT/USDT': 'TWT/USD',
+            'VANRY/USDT': 'VANRY/USD', 'VET/USDT': 'VET/USD', 'WIF/USDT': 'WIF/USD', 'WLD/USDT': 'WLD/USD',
+            'WOO/USDT': 'WOO/USD', 'W/USDT': 'W/USD', 'YFI/USDT': 'YFI/USD', 'ZIL/USDT': 'ZIL/USD',
+            'ZRO/USDT': 'ZRO/USD', 'ZRX/USDT': 'ZRX/USD',
         },
         'kraken': {
+            # Major pairs with USD/USDT mapping
             'BTC/USD': 'BTC/USD',
             'BTC/USDT': 'BTC/USDT',
             'ETH/USD': 'ETH/USD',
@@ -62,8 +142,45 @@ class CCXTPriceProvider(PriceProvider):
             'SOL/USDT': 'SOL/USDT',
             'DOGE/USD': 'DOGE/USD',
             'DOGE/USDT': 'DOGE/USDT',
+            
+            # All 141 ggShot symbols (USDT pairs on Kraken)
+            '1INCH/USDT': '1INCH/USDT', 'AAVE/USDT': 'AAVE/USDT', 'ACH/USDT': 'ACH/USDT', 'ADA/USDT': 'ADA/USDT',
+            'ALGO/USDT': 'ALGO/USDT', 'ALICE/USDT': 'ALICE/USDT', 'ALPHA/USDT': 'ALPHA/USDT', 'ALT/USDT': 'ALT/USDT',
+            'ANKR/USDT': 'ANKR/USDT', 'APE/USDT': 'APE/USDT', 'API3/USDT': 'API3/USDT', 'APT/USDT': 'APT/USDT',
+            'ARB/USDT': 'ARB/USDT', 'ARKM/USDT': 'ARKM/USDT', 'AR/USDT': 'AR/USDT', 'ASTR/USDT': 'ASTR/USDT',
+            'ATOM/USDT': 'ATOM/USDT', 'AUCTION/USDT': 'AUCTION/USDT', 'AXS/USDT': 'AXS/USDT', 'BAKE/USDT': 'BAKE/USDT',
+            'BAL/USDT': 'BAL/USDT', 'BAND/USDT': 'BAND/USDT', 'BAT/USDT': 'BAT/USDT', 'BCH/USDT': 'BCH/USDT',
+            'BEL/USDT': 'BEL/USDT', 'BIGTIME/USDT': 'BIGTIME/USDT', 'BNT/USDT': 'BNT/USDT', 'BOME/USDT': 'BOME/USDT',
+            'CAKE/USDT': 'CAKE/USDT', 'CELR/USDT': 'CELR/USDT', 'CETUS/USDT': 'CETUS/USDT', 'CFX/USDT': 'CFX/USDT',
+            'CHR/USDT': 'CHR/USDT', 'CHZ/USDT': 'CHZ/USDT', 'COMP/USDT': 'COMP/USDT', 'COTI/USDT': 'COTI/USDT',
+            'CRV/USDT': 'CRV/USDT', 'CYBER/USDT': 'CYBER/USDT', 'DASH/USDT': 'DASH/USDT', 'DOT/USDT': 'DOT/USDT',
+            'DYDX/USDT': 'DYDX/USDT', 'EGLD/USDT': 'EGLD/USDT', 'ENA/USDT': 'ENA/USDT', 'ENS/USDT': 'ENS/USDT',
+            'ETC/USDT': 'ETC/USDT', 'ETHFI/USDT': 'ETHFI/USDT', 'FET/USDT': 'FET/USDT', 'FIL/USDT': 'FIL/USDT',
+            'FLM/USDT': 'FLM/USDT', 'FLOW/USDT': 'FLOW/USDT', 'GALA/USDT': 'GALA/USDT', 'GMT/USDT': 'GMT/USDT',
+            'GMX/USDT': 'GMX/USDT', 'GRT/USDT': 'GRT/USDT', 'GTC/USDT': 'GTC/USDT', 'HBAR/USDT': 'HBAR/USDT',
+            'HIGH/USDT': 'HIGH/USDT', 'HOOK/USDT': 'HOOK/USDT', 'ICP/USDT': 'ICP/USDT', 'ICX/USDT': 'ICX/USDT',
+            'ID/USDT': 'ID/USDT', 'INJ/USDT': 'INJ/USDT', 'IOST/USDT': 'IOST/USDT', 'IOTX/USDT': 'IOTX/USDT',
+            'JASMY/USDT': 'JASMY/USDT', 'JTO/USDT': 'JTO/USDT', 'JUP/USDT': 'JUP/USDT', 'KAVA/USDT': 'KAVA/USDT',
+            'KNC/USDT': 'KNC/USDT', 'KSM/USDT': 'KSM/USDT', 'LDO/USDT': 'LDO/USDT', 'LEVER/USDT': 'LEVER/USDT',
+            'LINK/USDT': 'LINK/USDT', 'LPT/USDT': 'LPT/USDT', 'LQTY/USDT': 'LQTY/USDT', 'LRC/USDT': 'LRC/USDT',
+            'LTC/USDT': 'LTC/USDT', 'MAGIC/USDT': 'MAGIC/USDT', 'MANA/USDT': 'MANA/USDT', 'MASK/USDT': 'MASK/USDT',
+            'MATIC/USDT': 'MATIC/USDT', 'MKR/USDT': 'MKR/USDT', 'NEAR/USDT': 'NEAR/USDT', 'NEO/USDT': 'NEO/USDT',
+            'NKN/USDT': 'NKN/USDT', 'NMR/USDT': 'NMR/USDT', 'NOT/USDT': 'NOT/USDT', 'NTRN/USDT': 'NTRN/USDT',
+            'OGN/USDT': 'OGN/USDT', 'ONDO/USDT': 'ONDO/USDT', 'ONE/USDT': 'ONE/USDT', 'ONT/USDT': 'ONT/USDT',
+            'OP/USDT': 'OP/USDT', 'ORDI/USDT': 'ORDI/USDT', 'PENDLE/USDT': 'PENDLE/USDT', 'PEOPLE/USDT': 'PEOPLE/USDT',
+            'PYTH/USDT': 'PYTH/USDT', 'QTUM/USDT': 'QTUM/USDT', 'RARE/USDT': 'RARE/USDT', 'RENDER/USDT': 'RENDER/USDT',
+            'RLC/USDT': 'RLC/USDT', 'ROSE/USDT': 'ROSE/USDT', 'RSR/USDT': 'RSR/USDT', 'RUNE/USDT': 'RUNE/USDT',
+            'RVN/USDT': 'RVN/USDT', 'SAND/USDT': 'SAND/USDT', 'SEI/USDT': 'SEI/USDT', 'SFP/USDT': 'SFP/USDT',
+            'SKLUS/USDT': 'SKL/USDT', 'SNX/USDT': 'SNX/USDT', 'STORJ/USDT': 'STORJ/USDT', 'STRK/USDT': 'STRK/USDT',
+            'STX/USDT': 'STX/USDT', 'SUI/USDT': 'SUI/USDT', 'S/USDT': 'S/USDT', 'SUSHI/USDT': 'SUSHI/USDT',
+            'SXP/USDT': 'SXP/USDT', 'TAO/USDT': 'TAO/USDT', 'THETA/USDT': 'THETA/USDT', 'TIA/USDT': 'TIA/USDT',
+            'TRB/USDT': 'TRB/USDT', 'TRX/USDT': 'TRX/USDT', 'TURBO/USDT': 'TURBO/USDT', 'TWT/USDT': 'TWT/USDT',
+            'VANRY/USDT': 'VANRY/USDT', 'VET/USDT': 'VET/USDT', 'WIF/USDT': 'WIF/USDT', 'WLD/USDT': 'WLD/USDT',
+            'WOO/USDT': 'WOO/USDT', 'W/USDT': 'W/USDT', 'YFI/USDT': 'YFI/USDT', 'ZIL/USDT': 'ZIL/USDT',
+            'ZRO/USDT': 'ZRO/USDT', 'ZRX/USDT': 'ZRX/USDT',
         },
         'okx': {
+            # Major pairs with USD/USDT mapping
             'BTC/USD': 'BTC/USDT',  # OKX uses USDT
             'BTC/USDT': 'BTC/USDT',
             'ETH/USD': 'ETH/USDT',
@@ -78,14 +195,87 @@ class CCXTPriceProvider(PriceProvider):
             'SOL/USDT': 'SOL/USDT',
             'DOGE/USD': 'DOGE/USDT',
             'DOGE/USDT': 'DOGE/USDT',
+            
+            # All 141 ggShot symbols (USDT pairs on OKX)
+            '1INCH/USDT': '1INCH/USDT', 'AAVE/USDT': 'AAVE/USDT', 'ACH/USDT': 'ACH/USDT', 'ADA/USDT': 'ADA/USDT',
+            'ALGO/USDT': 'ALGO/USDT', 'ALICE/USDT': 'ALICE/USDT', 'ALPHA/USDT': 'ALPHA/USDT', 'ALT/USDT': 'ALT/USDT',
+            'ANKR/USDT': 'ANKR/USDT', 'APE/USDT': 'APE/USDT', 'API3/USDT': 'API3/USDT', 'APT/USDT': 'APT/USDT',
+            'ARB/USDT': 'ARB/USDT', 'ARKM/USDT': 'ARKM/USDT', 'AR/USDT': 'AR/USDT', 'ASTR/USDT': 'ASTR/USDT',
+            'ATOM/USDT': 'ATOM/USDT', 'AUCTION/USDT': 'AUCTION/USDT', 'AXS/USDT': 'AXS/USDT', 'BAKE/USDT': 'BAKE/USDT',
+            'BAL/USDT': 'BAL/USDT', 'BAND/USDT': 'BAND/USDT', 'BAT/USDT': 'BAT/USDT', 'BCH/USDT': 'BCH/USDT',
+            'BEL/USDT': 'BEL/USDT', 'BIGTIME/USDT': 'BIGTIME/USDT', 'BNT/USDT': 'BNT/USDT', 'BOME/USDT': 'BOME/USDT',
+            'CAKE/USDT': 'CAKE/USDT', 'CELR/USDT': 'CELR/USDT', 'CETUS/USDT': 'CETUS/USDT', 'CFX/USDT': 'CFX/USDT',
+            'CHR/USDT': 'CHR/USDT', 'CHZ/USDT': 'CHZ/USDT', 'COMP/USDT': 'COMP/USDT', 'COTI/USDT': 'COTI/USDT',
+            'CRV/USDT': 'CRV/USDT', 'CYBER/USDT': 'CYBER/USDT', 'DASH/USDT': 'DASH/USDT', 'DOT/USDT': 'DOT/USDT',
+            'DYDX/USDT': 'DYDX/USDT', 'EGLD/USDT': 'EGLD/USDT', 'ENA/USDT': 'ENA/USDT', 'ENS/USDT': 'ENS/USDT',
+            'ETC/USDT': 'ETC/USDT', 'ETHFI/USDT': 'ETHFI/USDT', 'FET/USDT': 'FET/USDT', 'FIL/USDT': 'FIL/USDT',
+            'FLM/USDT': 'FLM/USDT', 'FLOW/USDT': 'FLOW/USDT', 'GALA/USDT': 'GALA/USDT', 'GMT/USDT': 'GMT/USDT',
+            'GMX/USDT': 'GMX/USDT', 'GRT/USDT': 'GRT/USDT', 'GTC/USDT': 'GTC/USDT', 'HBAR/USDT': 'HBAR/USDT',
+            'HIGH/USDT': 'HIGH/USDT', 'HOOK/USDT': 'HOOK/USDT', 'ICP/USDT': 'ICP/USDT', 'ICX/USDT': 'ICX/USDT',
+            'ID/USDT': 'ID/USDT', 'INJ/USDT': 'INJ/USDT', 'IOST/USDT': 'IOST/USDT', 'IOTX/USDT': 'IOTX/USDT',
+            'JASMY/USDT': 'JASMY/USDT', 'JTO/USDT': 'JTO/USDT', 'JUP/USDT': 'JUP/USDT', 'KAVA/USDT': 'KAVA/USDT',
+            'KNC/USDT': 'KNC/USDT', 'KSM/USDT': 'KSM/USDT', 'LDO/USDT': 'LDO/USDT', 'LEVER/USDT': 'LEVER/USDT',
+            'LINK/USDT': 'LINK/USDT', 'LPT/USDT': 'LPT/USDT', 'LQTY/USDT': 'LQTY/USDT', 'LRC/USDT': 'LRC/USDT',
+            'LTC/USDT': 'LTC/USDT', 'MAGIC/USDT': 'MAGIC/USDT', 'MANA/USDT': 'MANA/USDT', 'MASK/USDT': 'MASK/USDT',
+            'MATIC/USDT': 'MATIC/USDT', 'MKR/USDT': 'MKR/USDT', 'NEAR/USDT': 'NEAR/USDT', 'NEO/USDT': 'NEO/USDT',
+            'NKN/USDT': 'NKN/USDT', 'NMR/USDT': 'NMR/USDT', 'NOT/USDT': 'NOT/USDT', 'NTRN/USDT': 'NTRN/USDT',
+            'OGN/USDT': 'OGN/USDT', 'ONDO/USDT': 'ONDO/USDT', 'ONE/USDT': 'ONE/USDT', 'ONT/USDT': 'ONT/USDT',
+            'OP/USDT': 'OP/USDT', 'ORDI/USDT': 'ORDI/USDT', 'PENDLE/USDT': 'PENDLE/USDT', 'PEOPLE/USDT': 'PEOPLE/USDT',
+            'PYTH/USDT': 'PYTH/USDT', 'QTUM/USDT': 'QTUM/USDT', 'RARE/USDT': 'RARE/USDT', 'RENDER/USDT': 'RENDER/USDT',
+            'RLC/USDT': 'RLC/USDT', 'ROSE/USDT': 'ROSE/USDT', 'RSR/USDT': 'RSR/USDT', 'RUNE/USDT': 'RUNE/USDT',
+            'RVN/USDT': 'RVN/USDT', 'SAND/USDT': 'SAND/USDT', 'SEI/USDT': 'SEI/USDT', 'SFP/USDT': 'SFP/USDT',
+            'SKLUS/USDT': 'SKL/USDT', 'SNX/USDT': 'SNX/USDT', 'STORJ/USDT': 'STORJ/USDT', 'STRK/USDT': 'STRK/USDT',
+            'STX/USDT': 'STX/USDT', 'SUI/USDT': 'SUI/USDT', 'S/USDT': 'S/USDT', 'SUSHI/USDT': 'SUSHI/USDT',
+            'SXP/USDT': 'SXP/USDT', 'TAO/USDT': 'TAO/USDT', 'THETA/USDT': 'THETA/USDT', 'TIA/USDT': 'TIA/USDT',
+            'TRB/USDT': 'TRB/USDT', 'TRX/USDT': 'TRX/USDT', 'TURBO/USDT': 'TURBO/USDT', 'TWT/USDT': 'TWT/USDT',
+            'VANRY/USDT': 'VANRY/USDT', 'VET/USDT': 'VET/USDT', 'WIF/USDT': 'WIF/USDT', 'WLD/USDT': 'WLD/USDT',
+            'WOO/USDT': 'WOO/USDT', 'W/USDT': 'W/USDT', 'YFI/USDT': 'YFI/USDT', 'ZIL/USDT': 'ZIL/USDT',
+            'ZRO/USDT': 'ZRO/USDT', 'ZRX/USDT': 'ZRX/USDT',
         },
         'bybit': {
+            # Major pairs with USD/USDT mapping
             'BTC/USD': 'BTC/USDT',
             'BTC/USDT': 'BTC/USDT',
             'ETH/USD': 'ETH/USDT',
             'ETH/USDT': 'ETH/USDT',
             'SOL/USD': 'SOL/USDT',
             'SOL/USDT': 'SOL/USDT',
+            
+            # All 141 ggShot symbols (USDT pairs on Bybit)
+            '1INCH/USDT': '1INCH/USDT', 'AAVE/USDT': 'AAVE/USDT', 'ACH/USDT': 'ACH/USDT', 'ADA/USDT': 'ADA/USDT',
+            'ALGO/USDT': 'ALGO/USDT', 'ALICE/USDT': 'ALICE/USDT', 'ALPHA/USDT': 'ALPHA/USDT', 'ALT/USDT': 'ALT/USDT',
+            'ANKR/USDT': 'ANKR/USDT', 'APE/USDT': 'APE/USDT', 'API3/USDT': 'API3/USDT', 'APT/USDT': 'APT/USDT',
+            'ARB/USDT': 'ARB/USDT', 'ARKM/USDT': 'ARKM/USDT', 'AR/USDT': 'AR/USDT', 'ASTR/USDT': 'ASTR/USDT',
+            'ATOM/USDT': 'ATOM/USDT', 'AUCTION/USDT': 'AUCTION/USDT', 'AXS/USDT': 'AXS/USDT', 'BAKE/USDT': 'BAKE/USDT',
+            'BAL/USDT': 'BAL/USDT', 'BAND/USDT': 'BAND/USDT', 'BAT/USDT': 'BAT/USDT', 'BCH/USDT': 'BCH/USDT',
+            'BEL/USDT': 'BEL/USDT', 'BIGTIME/USDT': 'BIGTIME/USDT', 'BNT/USDT': 'BNT/USDT', 'BOME/USDT': 'BOME/USDT',
+            'CAKE/USDT': 'CAKE/USDT', 'CELR/USDT': 'CELR/USDT', 'CETUS/USDT': 'CETUS/USDT', 'CFX/USDT': 'CFX/USDT',
+            'CHR/USDT': 'CHR/USDT', 'CHZ/USDT': 'CHZ/USDT', 'COMP/USDT': 'COMP/USDT', 'COTI/USDT': 'COTI/USDT',
+            'CRV/USDT': 'CRV/USDT', 'CYBER/USDT': 'CYBER/USDT', 'DASH/USDT': 'DASH/USDT', 'DOT/USDT': 'DOT/USDT',
+            'DYDX/USDT': 'DYDX/USDT', 'EGLD/USDT': 'EGLD/USDT', 'ENA/USDT': 'ENA/USDT', 'ENS/USDT': 'ENS/USDT',
+            'ETC/USDT': 'ETC/USDT', 'ETHFI/USDT': 'ETHFI/USDT', 'FET/USDT': 'FET/USDT', 'FIL/USDT': 'FIL/USDT',
+            'FLM/USDT': 'FLM/USDT', 'FLOW/USDT': 'FLOW/USDT', 'GALA/USDT': 'GALA/USDT', 'GMT/USDT': 'GMT/USDT',
+            'GMX/USDT': 'GMX/USDT', 'GRT/USDT': 'GRT/USDT', 'GTC/USDT': 'GTC/USDT', 'HBAR/USDT': 'HBAR/USDT',
+            'HIGH/USDT': 'HIGH/USDT', 'HOOK/USDT': 'HOOK/USDT', 'ICP/USDT': 'ICP/USDT', 'ICX/USDT': 'ICX/USDT',
+            'ID/USDT': 'ID/USDT', 'INJ/USDT': 'INJ/USDT', 'IOST/USDT': 'IOST/USDT', 'IOTX/USDT': 'IOTX/USDT',
+            'JASMY/USDT': 'JASMY/USDT', 'JTO/USDT': 'JTO/USDT', 'JUP/USDT': 'JUP/USDT', 'KAVA/USDT': 'KAVA/USDT',
+            'KNC/USDT': 'KNC/USDT', 'KSM/USDT': 'KSM/USDT', 'LDO/USDT': 'LDO/USDT', 'LEVER/USDT': 'LEVER/USDT',
+            'LINK/USDT': 'LINK/USDT', 'LPT/USDT': 'LPT/USDT', 'LQTY/USDT': 'LQTY/USDT', 'LRC/USDT': 'LRC/USDT',
+            'LTC/USDT': 'LTC/USDT', 'MAGIC/USDT': 'MAGIC/USDT', 'MANA/USDT': 'MANA/USDT', 'MASK/USDT': 'MASK/USDT',
+            'MATIC/USDT': 'MATIC/USDT', 'MKR/USDT': 'MKR/USDT', 'NEAR/USDT': 'NEAR/USDT', 'NEO/USDT': 'NEO/USDT',
+            'NKN/USDT': 'NKN/USDT', 'NMR/USDT': 'NMR/USDT', 'NOT/USDT': 'NOT/USDT', 'NTRN/USDT': 'NTRN/USDT',
+            'OGN/USDT': 'OGN/USDT', 'ONDO/USDT': 'ONDO/USDT', 'ONE/USDT': 'ONE/USDT', 'ONT/USDT': 'ONT/USDT',
+            'OP/USDT': 'OP/USDT', 'ORDI/USDT': 'ORDI/USDT', 'PENDLE/USDT': 'PENDLE/USDT', 'PEOPLE/USDT': 'PEOPLE/USDT',
+            'PYTH/USDT': 'PYTH/USDT', 'QTUM/USDT': 'QTUM/USDT', 'RARE/USDT': 'RARE/USDT', 'RENDER/USDT': 'RENDER/USDT',
+            'RLC/USDT': 'RLC/USDT', 'ROSE/USDT': 'ROSE/USDT', 'RSR/USDT': 'RSR/USDT', 'RUNE/USDT': 'RUNE/USDT',
+            'RVN/USDT': 'RVN/USDT', 'SAND/USDT': 'SAND/USDT', 'SEI/USDT': 'SEI/USDT', 'SFP/USDT': 'SFP/USDT',
+            'SKLUS/USDT': 'SKL/USDT', 'SNX/USDT': 'SNX/USDT', 'STORJ/USDT': 'STORJ/USDT', 'STRK/USDT': 'STRK/USDT',
+            'STX/USDT': 'STX/USDT', 'SUI/USDT': 'SUI/USDT', 'S/USDT': 'S/USDT', 'SUSHI/USDT': 'SUSHI/USDT',
+            'SXP/USDT': 'SXP/USDT', 'TAO/USDT': 'TAO/USDT', 'THETA/USDT': 'THETA/USDT', 'TIA/USDT': 'TIA/USDT',
+            'TRB/USDT': 'TRB/USDT', 'TRX/USDT': 'TRX/USDT', 'TURBO/USDT': 'TURBO/USDT', 'TWT/USDT': 'TWT/USDT',
+            'VANRY/USDT': 'VANRY/USDT', 'VET/USDT': 'VET/USDT', 'WIF/USDT': 'WIF/USDT', 'WLD/USDT': 'WLD/USDT',
+            'WOO/USDT': 'WOO/USDT', 'W/USDT': 'W/USDT', 'YFI/USDT': 'YFI/USDT', 'ZIL/USDT': 'ZIL/USDT',
+            'ZRO/USDT': 'ZRO/USDT', 'ZRX/USDT': 'ZRX/USDT',
         }
     }
     
@@ -95,7 +285,7 @@ class CCXTPriceProvider(PriceProvider):
         self._log = logger.bind(provider="ccxt")
         self._exchange_clients = {}  # Cache for exchange clients
     
-    async def get_current_price(self, symbol: str) -> Optional[float]:
+    async def get_current_price(self, symbol: str) -> Optional[Decimal]:
         """
         Get current price from CCXT exchanges.
         
@@ -103,13 +293,13 @@ class CCXTPriceProvider(PriceProvider):
             symbol: Standard trading symbol (e.g., 'BTC/USDT')
             
         Returns:
-            Current price as float, or None if unable to fetch
+            Current price as Decimal, or None if unable to fetch
         """
         for exchange_name in self.EXCHANGE_PRIORITY:
             try:
                 price = await self._get_price_from_exchange(exchange_name, symbol)
                 if price:
-                    self._log.info(f"CCXT price for {symbol} from {exchange_name}: ${price:,.2f}")
+                    self._log.info(f"CCXT price for {symbol} from {exchange_name}: ${price}")
                     return price
                     
             except Exception as e:
@@ -119,7 +309,7 @@ class CCXTPriceProvider(PriceProvider):
         self._log.error(f"Failed to get price for {symbol} from all CCXT exchanges")
         return None
     
-    async def _get_price_from_exchange(self, exchange_name: str, symbol: str) -> Optional[float]:
+    async def _get_price_from_exchange(self, exchange_name: str, symbol: str) -> Optional[Decimal]:
         """
         Get price from a specific exchange.
         
@@ -128,7 +318,7 @@ class CCXTPriceProvider(PriceProvider):
             symbol: Standard trading symbol
             
         Returns:
-            Price as float or None if failed
+            Price as Decimal or None if failed
         """
         try:
             # Get or create exchange client
@@ -157,7 +347,8 @@ class CCXTPriceProvider(PriceProvider):
             # Get last price
             price = ticker.get('last')
             if price and price > 0:
-                return float(price)
+                # Convert to Decimal with high precision to preserve exact values
+                return Decimal(str(price)).quantize(Decimal('0.00000001'), rounding=ROUND_HALF_UP)
             
             self._log.warning(f"Invalid price from {exchange_name} for {exchange_symbol}: {price}")
             return None

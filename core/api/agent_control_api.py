@@ -380,19 +380,23 @@ async def health_check():
 async def cleanup_processes():
     """Remove terminated processes from tracking."""
     while True:
-        await asyncio.sleep(60)  # Check every minute
+        await asyncio.sleep(300)  # Check every 5 minutes (reduced frequency)
         
-        for user_id in list(active_processes.keys()):
-            for module in list(active_processes[user_id].keys()):
-                process = active_processes[user_id][module]
-                if process.poll() is not None:
-                    # Process has terminated
-                    del active_processes[user_id][module]
-                    logger.warning(f"Cleaned up terminated {module} for user {user_id}")
+        # Only process if there are active processes
+        if active_processes:
+            logger.info(f"Cleaning up processes for {len(active_processes)} users")
             
-            # Remove user if no processes
-            if not active_processes[user_id]:
-                del active_processes[user_id]
+            for user_id in list(active_processes.keys()):
+                for module in list(active_processes[user_id].keys()):
+                    process = active_processes[user_id][module]
+                    if process.poll() is not None:
+                        # Process has terminated
+                        del active_processes[user_id][module]
+                        logger.warning(f"Cleaned up terminated {module} for user {user_id}")
+                
+                # Remove user if no processes
+                if not active_processes[user_id]:
+                    del active_processes[user_id]
 
 
 @app.on_event("startup")

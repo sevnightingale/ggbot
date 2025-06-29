@@ -465,20 +465,24 @@ async def health_check():
 async def push_updates():
     """Push updates to connected WebSocket clients."""
     while True:
-        await asyncio.sleep(5)  # Update every 5 seconds
+        await asyncio.sleep(30)  # Update every 30 seconds
         
-        for user_id in list(manager.active_connections.keys()):
-            try:
-                # Get latest positions
-                positions = await get_current_positions(user_id)
-                
-                # Send update
-                await manager.broadcast_to_user(user_id, {
-                    "type": "position_update",
-                    "data": positions
-                })
-            except Exception as e:
-                logger.error(f"Error pushing update to {user_id}: {e}")
+        # Only process if there are active connections
+        if manager.active_connections:
+            logger.info(f"Pushing updates to {len(manager.active_connections)} active connections")
+            
+            for user_id in list(manager.active_connections.keys()):
+                try:
+                    # Get latest positions
+                    positions = await get_current_positions(user_id)
+                    
+                    # Send update
+                    await manager.broadcast_to_user(user_id, {
+                        "type": "position_update",
+                        "data": positions
+                    })
+                except Exception as e:
+                    logger.error(f"Error pushing update to {user_id}: {e}")
 
 
 @app.on_event("startup")
