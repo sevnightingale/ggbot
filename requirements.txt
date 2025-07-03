@@ -66,11 +66,11 @@ greenlet==3.1.1
 grpcio==1.71.0
 grpcio-status==1.71.0
 grpcio-tools==1.71.0
-h11==0.14.0
+h11==0.16.0
 h2==4.2.0
 hexbytes==1.3.0
 hpack==4.1.0
-httpcore==1.0.7
+httpcore==1.0.9
 httpx==0.28.1
 httpx-sse==0.4.0
 hyperframe==6.1.0
@@ -119,7 +119,7 @@ portalocker==2.10.1
 posthog==3.23.0
 propcache==0.3.1
 proto-plus==1.26.1
-protobuf==5.29.4
+protobuf==5.29.5
 psutil==7.0.0
 psycopg2-binary==2.9.10
 py-sr25519-bindings==0.2.2

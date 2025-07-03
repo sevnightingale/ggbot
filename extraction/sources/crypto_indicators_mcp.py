@@ -14,7 +14,7 @@ from pathlib import Path
 
 from core.common.logger import logger
 from core.mcp.indicators import IndicatorsMCPClient
-from core.mcp.metadata import get_mcp_tool_name, get_tool_info, get_available_indicators
+from core.mcp.metadata import get_mcp_tool_name, get_tool_info, get_available_indicators, parse_indicator_string, get_mcp_tool_name_from_string
 from extraction.utils import store_market_data_entries
 
 # Load environment variables from .env file at project root
@@ -55,19 +55,32 @@ class CryptoIndicatorsMCPSource:
         self.logger = logger.bind(user_id=user_id, source="crypto_indicators_mcp")
         self.logger.info(f"Initialized CryptoIndicatorsMCPSource with {len(self.indicators)} indicators")
     
-    async def extract(self, symbols: List[str], timeframes: List[str]) -> Dict[str, Any]:
+    async def extract(self, symbols: List[str], timeframes: List[str] = None, config_id: str = None) -> Dict[str, Any]:
         """
-        Extract indicator data for the given symbols and timeframes.
+        Extract indicator data for symbols using either legacy or new extraction pattern.
+        
+        BACKWARDS COMPATIBILITY MODE:
+        - If config_id is None: Uses legacy (symbol, timeframe) pattern
+        - If config_id provided: Uses new config-driven string-based indicators
         
         Args:
             symbols: List of trading symbols
-            timeframes: List of timeframes
+            timeframes: List of timeframes (used in legacy mode)
+            config_id: Configuration ID for new extraction pattern
             
         Returns:
-            Dictionary of extraction results by symbol and timeframe
+            Dictionary of extraction results by symbol and timeframe/config
         """
-        self.logger.info(f"Starting extraction for {len(symbols)} symbols, {len(timeframes)} timeframes")
-        
+        # Determine extraction mode
+        if config_id:
+            self.logger.info(f"NEW MODE: Extracting for {len(symbols)} symbols with config_id {config_id}")
+            return await self._extract_new_mode(symbols, config_id)
+        else:
+            self.logger.info(f"LEGACY MODE: Extracting for {len(symbols)} symbols, {len(timeframes or [])} timeframes")
+            return await self._extract_legacy_mode(symbols, timeframes or [])
+    
+    async def _extract_legacy_mode(self, symbols: List[str], timeframes: List[str]) -> Dict[str, Any]:
+        """Legacy extraction using (symbol, timeframe) pattern."""
         # Import LLM client if needed
         llm_client = None
         if self.llm_interpretation:
@@ -94,17 +107,17 @@ class CryptoIndicatorsMCPSource:
             await self.mcp_client.connect()
             self.logger.info("Connected to Indicators MCP")
             
-            # Process each symbol/timeframe combination
+            # Process each symbol/timeframe combination (LEGACY)
             for symbol in symbols:
                 if symbol not in results:
                     results[symbol] = {}
                 
                 for timeframe in timeframes:
-                    self.logger.info(f"Processing {symbol} {timeframe}")
+                    self.logger.info(f"LEGACY: Processing {symbol} {timeframe}")
                     
                     try:
-                        # Calculate indicators using metadata mapping
-                        indicator_results = await self._calculate_indicators(symbol, timeframe)
+                        # Calculate indicators using old method
+                        indicator_results = await self._calculate_indicators_legacy(symbol, timeframe)
                         
                         if indicator_results:
                             # Get LLM interpretation if enabled
@@ -114,8 +127,8 @@ class CryptoIndicatorsMCPSource:
                                     llm_client, indicator_results, symbol, timeframe
                                 )
                             
-                            # Store in database
-                            stored = await self._store_results(
+                            # Store in database using legacy pattern (no config_id)
+                            stored = await self._store_results_legacy(
                                 symbol, timeframe, indicator_results, interpretation
                             )
                             
@@ -141,6 +154,64 @@ class CryptoIndicatorsMCPSource:
             return results
             
         except Exception as e:
+            self.logger.error(f"Error in legacy MCP extraction: {str(e)}")
+            return {"error": str(e)}
+            
+        finally:
+            # Clean up MCP connection
+            if self.mcp_client:
+                try:
+                    await self.mcp_client.disconnect()
+                    self.logger.info("Disconnected from Indicators MCP")
+                except Exception as e:
+                    self.logger.error(f"Error disconnecting from MCP: {str(e)}")
+    
+    async def _extract_new_mode(self, symbols: List[str], config_id: str) -> Dict[str, Any]:
+        """New extraction using config_id + string-based indicators."""
+        results = {}
+        
+        try:
+            # Connect to MCP client
+            self.mcp_client = IndicatorsMCPClient()
+            await self.mcp_client.connect()
+            self.logger.info("Connected to Indicators MCP for NEW MODE")
+            
+            for symbol in symbols:
+                self.logger.info(f"NEW MODE: Processing {symbol} with config {config_id}")
+                
+                try:
+                    # Group indicators by timeframe for efficient extraction
+                    timeframe_groups = self._group_indicators_by_timeframe()
+                    
+                    symbol_indicators = {}
+                    
+                    for timeframe, indicator_strings in timeframe_groups.items():
+                        # Extract all indicators for this timeframe in one session
+                        timeframe_results = await self._extract_timeframe_indicators(
+                            symbol, timeframe, indicator_strings
+                        )
+                        symbol_indicators.update(timeframe_results)
+                    
+                    # Store using new pattern: config_id + symbol
+                    stored = await self._store_results_new_format(config_id, symbol, symbol_indicators)
+                    
+                    results[symbol] = {
+                        "status": "success", 
+                        "indicators": symbol_indicators,
+                        "config_id": config_id,
+                        "stored": stored
+                    }
+                    
+                except Exception as e:
+                    self.logger.error(f"Error processing {symbol} in new mode: {str(e)}")
+                    results[symbol] = {
+                        "status": "error",
+                        "error": str(e)
+                    }
+            
+            return results
+            
+        except Exception as e:
             self.logger.error(f"Error in MCP extraction: {str(e)}")
             return {"error": str(e)}
             
@@ -153,9 +224,9 @@ class CryptoIndicatorsMCPSource:
                 except Exception as e:
                     self.logger.error(f"Error disconnecting from MCP: {str(e)}")
     
-    async def _calculate_indicators(self, symbol: str, timeframe: str) -> Dict[str, Any]:
+    async def _calculate_indicators_legacy(self, symbol: str, timeframe: str) -> Dict[str, Any]:
         """
-        Calculate indicators using MCP metadata for direct tool calls.
+        Calculate indicators using MCP metadata for direct tool calls (LEGACY METHOD).
         
         Args:
             symbol: Trading symbol
@@ -293,11 +364,11 @@ Format your response as a JSON object with these fields:
             self.logger.error(f"Error getting LLM interpretation: {str(e)}")
             return None
     
-    async def _store_results(self, symbol: str, timeframe: str, 
+    async def _store_results_legacy(self, symbol: str, timeframe: str, 
                            indicator_results: Dict[str, Any], 
                            interpretation: Optional[Dict[str, Any]]) -> bool:
         """
-        Store extraction results in the database.
+        Store extraction results in the database using legacy pattern (no config_id).
         
         Args:
             symbol: Trading symbol
@@ -339,6 +410,89 @@ Format your response as a JSON object with these fields:
                 self.logger.error(f"Failed to store data for {symbol} {timeframe}")
                 return False
                 
+        except Exception as e:
+            self.logger.error(f"Error storing results: {str(e)}")
+            return False
+    
+    def _group_indicators_by_timeframe(self) -> Dict[str, List[str]]:
+        """Group string indicators by their timeframes for efficient extraction."""
+        groups = {}
+        
+        for indicator_string in self.indicators:
+            parsed = parse_indicator_string(indicator_string)
+            timeframe = parsed.get("timeframe", "1h")  # Default fallback
+            
+            if timeframe not in groups:
+                groups[timeframe] = []
+            groups[timeframe].append(indicator_string)
+        
+        return groups
+    
+    async def _extract_timeframe_indicators(self, symbol: str, timeframe: str, 
+                                          indicator_strings: List[str]) -> Dict[str, Any]:
+        """Extract multiple indicators for a specific timeframe."""
+        results = {}
+        
+        for indicator_string in indicator_strings:
+            try:
+                parsed = parse_indicator_string(indicator_string)
+                mcp_tool_name = get_mcp_tool_name(parsed["indicator"])
+                
+                if not mcp_tool_name:
+                    self.logger.warning(f"No MCP tool for {indicator_string}")
+                    continue
+                
+                # Build parameters with period override if specified
+                params = {
+                    "exchange": os.environ.get("EXCHANGE_NAME", "binance"),
+                    "symbol": symbol,
+                    "timeframe": timeframe
+                }
+                
+                # Add period if specified in string
+                if "period" in parsed:
+                    params["period"] = parsed["period"]
+                elif f"{parsed['indicator']}_period" in self.config:
+                    params["period"] = self.config[f"{parsed['indicator']}_period"]
+                
+                # Call MCP tool
+                result = await self.mcp_client.session.call_tool(mcp_tool_name, params)
+                
+                if result and not (isinstance(result, str) and result.startswith("Error")):
+                    results[indicator_string] = result  # Store with full string name
+                    self.logger.info(f"✅ Extracted {indicator_string}")
+                else:
+                    self.logger.warning(f"❌ Failed {indicator_string}: {result}")
+                    
+            except Exception as e:
+                self.logger.error(f"Error extracting {indicator_string}: {str(e)}")
+        
+        return results
+    
+    async def _store_results_new_format(self, config_id: str, symbol: str, 
+                                       indicators: Dict[str, Any]) -> bool:
+        """Store results using new config_id + symbol pattern."""
+        try:
+            market_data_entry = {
+                "user_id": self.user_id,
+                "config_id": config_id,  # NEW FIELD
+                "source": "crypto_indicators_mcp",
+                "symbol": symbol,
+                "timeframe": "mixed",  # Not used anymore
+                "data_type": "indicator_analysis",
+                "updated_at": datetime.utcnow(),
+                "indicators": indicators,  # String-based keys
+                "raw_data": {
+                    "config": {
+                        "string_indicators": self.indicators,
+                        "llm_interpretation": self.llm_interpretation
+                    }
+                }
+            }
+            
+            stored_count = store_market_data_entries([market_data_entry])
+            return stored_count > 0
+            
         except Exception as e:
             self.logger.error(f"Error storing results: {str(e)}")
             return False

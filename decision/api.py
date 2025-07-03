@@ -565,7 +565,8 @@ async def webhook_trigger_decision(request: WebhookRequest):
             config_id=request.config_id,
             symbol=request.symbol or "BTC/USDT",
             timeframes=request.timeframes or ["15m", "1h", "4h"],
-            mode=mode
+            mode=mode,
+            custom_mode=request.custom_mode
         )
         
         # Generate decision ID for tracking

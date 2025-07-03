@@ -31,18 +31,18 @@ class DeepSeekProvider(LLMProvider):
     strong reasoning capabilities.
     """
     
-    def __init__(self, api_key: str, model: str = "deepseek-chat", **kwargs):
+    def __init__(self, api_key: str, model: str = "deepseek-reasoner", **kwargs):
         """
         Initialize the DeepSeek provider.
         
         Args:
             api_key (str): DeepSeek API key
-            model (str): Model to use (default: 'deepseek-chat')
+            model (str): Model to use (default: 'deepseek-reasoner')
             **kwargs: Additional settings like base_url, timeout, etc.
         """
         super().__init__(api_key, model, **kwargs)
         self.base_url = kwargs.get('base_url', 'https://api.deepseek.com/v1')
-        self.timeout = kwargs.get('timeout', 30)
+        self.timeout = kwargs.get('timeout', 120)  # Increased for 4-Pillar analysis
         self.max_retries = kwargs.get('max_retries', 3)
         
         logger.bind(module="decision.deepseek").info(
@@ -87,7 +87,7 @@ class DeepSeekProvider(LLMProvider):
             "model": self.model,
             "messages": messages,
             "temperature": temperature,
-            "max_tokens": 1500,
+            "max_tokens": 8192,
             "stream": False
         }
         

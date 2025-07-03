@@ -36,17 +36,18 @@ def get_db_connection():
     finally:
         conn.close()
 
-def upsert_market_data(user_id, symbol, timeframe, data_dict, data_type=None, source=None):
+def upsert_market_data(user_id, symbol, config_id, data_dict, data_type=None, source=None, timeframe='mixed'):
     """
-    Inserts or updates market data for a specific user, ensuring one row per user-symbol-timeframe.
+    Inserts or updates market data for a specific user using config_id pattern.
     
     Args:
         user_id: UUID of the user
         symbol: Trading pair symbol (e.g., 'BTC/USD')
-        timeframe: Chart timeframe (e.g., '15m', '1h', '4h')
+        config_id: Configuration ID for the extraction
         data_dict: Dictionary containing the data to store
         data_type: Type of data (e.g., 'indicator_values', 'report', 'sentiment')
         source: Data source (e.g., 'tradingview', 'yfinance')
+        timeframe: Chart timeframe (default 'mixed' for new system)
         
     Returns:
         Boolean indicating success
@@ -70,16 +71,17 @@ def upsert_market_data(user_id, symbol, timeframe, data_dict, data_type=None, so
                 # Convert Python dictionary to JSON format (preserving Decimal precision)
                 json_data = json.dumps(data_dict, cls=DecimalEncoder)
 
-                # Insert or update the row based on (user_id, symbol, timeframe)
+                # Insert or update the row using config_id pattern
                 cur.execute("""
-                    INSERT INTO market_data (user_id, symbol, timeframe, indicators, source, data_type, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, %s, NOW())
-                    ON CONFLICT (user_id, symbol, timeframe)
+                    INSERT INTO market_data (user_id, symbol, config_id, timeframe, indicators, source, data_type, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
+                    ON CONFLICT (user_id, symbol, timeframe, updated_at)
                     DO UPDATE SET indicators = EXCLUDED.indicators,
                                 source = EXCLUDED.source,
                                 data_type = EXCLUDED.data_type,
+                                config_id = EXCLUDED.config_id,
                                 updated_at = NOW();
-                """, (user_id, symbol, timeframe, json_data, source, data_type))
+                """, (user_id, symbol, config_id, timeframe, json_data, source, data_type))
             conn.commit()
             return True
         except Exception as e:

@@ -33,62 +33,104 @@ except ImportError:
 
 async def extract_mcp_indicators(symbols, timeframes, user_id=DEFAULT_USER_ID, use_llm=True, llm_model="gpt-4o-mini", config_id=None):
     """
-    Extract indicator data directly using Indicators MCP.
+    Extract indicator data using the new string-based indicator system.
 
-    This function connects directly to the MCP server to calculate indicators
-    and gets LLM interpretations of the results.
+    This function uses the updated CryptoIndicatorsMCPSource with config_id support
+    for precise indicator extraction based on configuration.
 
     Args:
         symbols: List of trading pair symbols (e.g., ['BTC/USDT'])
-        timeframes: List of timeframes (e.g., ['15m', '1h', '4h', '1d'])
+        timeframes: List of timeframes (IGNORED - indicators specify their own timeframes)
         user_id: User ID to associate with the extracted data
-        use_llm: Whether to use LLM for indicator selection and interpretation
+        use_llm: Whether to use LLM for indicator interpretation
         llm_model: LLM model to use (default: "gpt-4o-mini")
-        config_id: Configuration ID to use for extraction settings
+        config_id: Configuration ID to use for extraction settings (REQUIRED for new system)
 
     Returns:
-        Dictionary of extraction results by symbol and timeframe
+        Dictionary of extraction results by symbol
     """
     logger.bind(user_id=user_id).info(
-        f"Extracting indicators via MCP for symbols={symbols}, timeframes={timeframes}"
+        f"NEW SYSTEM: Extracting indicators for symbols={symbols} with config_id={config_id}"
     )
+    
+    if not config_id:
+        logger.error("config_id is required for extraction system")
+        return {"error": "config_id is required"}
 
-    # Import necessary components
-    from openai import OpenAI
-    from core.mcp.indicators import IndicatorsMCPClient
-
-    # Make sure we're always using LLM - required for MCP integration
-    if not use_llm:
-        logger.bind(user_id=user_id).warning("LLM usage is required for MCP integration - forcing use_llm=True")
-        use_llm = True
-
-    # Get the OpenAI API key from environment
-    llm_api_key = os.environ.get("EXTRACTION_LLM_API_KEY")
-    if not llm_api_key:
-        logger.bind(user_id=user_id).error("EXTRACTION_LLM_API_KEY environment variable not set")
-        return {"error": "LLM API key not found"}
-
-    # Initialize the OpenAI client
-    llm_client = OpenAI(api_key=llm_api_key)
-    mcp_client = None
-
-    # Set default exchange for data fetching in the MCP server
-    os.environ["EXCHANGE_NAME"] = os.environ.get("EXCHANGE_NAME", "binance")
-
-    results = {}
-    stored_count = 0
+    # Use the new CryptoIndicatorsMCPSource
+    from extraction.sources.crypto_indicators_mcp import CryptoIndicatorsMCPSource
 
     try:
-        # Create and connect to the MCP client
-        mcp_client = IndicatorsMCPClient()
+        # Get configuration for this config_id
+        user_config = get_configuration(user_id=user_id, config_id=config_id) or {}
+        extraction_config = user_config.get('extraction', {})
+        mcp_source_config = extraction_config.get('sources', {}).get('crypto_indicators_mcp', {})
+        
+        if not mcp_source_config.get('enabled', False):
+            logger.error(f"crypto_indicators_mcp not enabled for config_id {config_id}")
+            return {"error": "MCP source not enabled in configuration"}
+        
+        # Create the source with configuration
+        source = CryptoIndicatorsMCPSource(user_id, mcp_source_config)
+        
+        # Call extract with config_id for new mode
+        results = await source.extract(symbols, timeframes, config_id)
+        
+        logger.bind(user_id=user_id).info(
+            f"✅ NEW SYSTEM extraction complete for {len(symbols)} symbols"
+        )
+        
+        return results
+        
+    except Exception as e:
+        logger.bind(user_id=user_id).error(f"Error in extraction: {str(e)}")
+        return {"error": str(e)}
+
+
+# ============================================================================
+# LEGACY IMPLEMENTATION - KEPT FOR FALLBACK/TESTING
+# ============================================================================
+async def extract_mcp_indicators_legacy(symbols, timeframes, user_id=DEFAULT_USER_ID, use_llm=True, llm_model="gpt-4o-mini", config_id=None):
+    """
+    LEGACY: Extract indicator data using the old cross-product approach.
+    
+    This function is kept for fallback and comparison purposes.
+    """
+    logger.bind(user_id=user_id).info(
+        f"LEGACY SYSTEM: Extracting indicators for symbols={symbols}, timeframes={timeframes}"
+    )
+    
+    # Initialize LLM client if needed
+    llm_client = None
+    if use_llm:
+        import openai
+        llm_client = openai.OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+    
+    # Initialize MCP client
+    mcp_client = None
+    
+    try:
+        # Import and initialize MCP client
+        from core.mcp.client import MCPClient
+        mcp_client = MCPClient(
+            name="indicators",
+            server_script_path="core/mcp/servers/crypto-indicators-mcp/index.js",
+            user_id=user_id
+        )
+        
+        # Connect to MCP server
         await mcp_client.connect()
-        logger.bind(user_id=user_id).info("Successfully connected to Indicators MCP")
-
-        # Get available tools from the MCP server
-        tools = await mcp_client.session.get_tools()
+        logger.bind(user_id=user_id).info("Connected to Indicators MCP")
+        
+        # Get available tools
+        tools = await mcp_client.session.list_tools()
         logger.bind(user_id=user_id).info(f"Available MCP tools: {len(tools)}")
-
-        # Get indicator tools (filter out non-indicator tools)
+        
+        # Results dictionary
+        results = {}
+        stored_count = 0
+        
+        # Filter to only indicator calculation tools (not fetch/analysis tools)
         indicator_tools = [t for t in tools if not any(
             keyword in t.name for keyword in ['fetch', 'backtest', 'analyze', 'get']
         )]

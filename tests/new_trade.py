@@ -101,8 +101,9 @@ def trigger_extraction(user_id: str = DEFAULT_USER_ID) -> Dict[str, Any]:
     
     payload = {
         "user_id": user_id,
+        "config_id": DEFAULT_CONFIG_ID,
         "symbols": [TEST_SYMBOL],
-        "timeframes": TEST_TIMEFRAMES
+        "timeframes": TEST_TIMEFRAMES  # Still needed for API compatibility
     }
     
     response = requests.post(
@@ -151,14 +152,14 @@ def wait_for_extraction(extraction_id: str, timeout: int = 300) -> bool:
 
 
 def get_latest_market_data(user_id: str = DEFAULT_USER_ID) -> Dict[str, Any]:
-    """Get the latest extracted market data."""
+    """Get the latest extracted market data using config_id."""
     log("Fetching latest market data...")
     
     response = requests.get(
         f"{API_BASE_URL}/extraction/api/extraction/latest/{user_id}",
         params={
             "symbol": TEST_SYMBOL,
-            "timeframe": TEST_TIMEFRAMES[0],
+            "config_id": DEFAULT_CONFIG_ID,
             "data_type": "indicator_analysis"  # Get the full analysis with indicators
         },
         timeout=10

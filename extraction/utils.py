@@ -45,6 +45,7 @@ def store_market_data_entries(data_entries: List[Dict], replace_existing: bool =
                     raw_data = entry.get('raw_data', {})
                     indicators = entry.get('indicators', {})
                     updated_at = entry.get('updated_at')
+                    config_id = entry.get('config_id')  # NEW FIELD
                     
                     # Skip entries without required fields
                     if not symbol or not timeframe:
@@ -68,18 +69,19 @@ def store_market_data_entries(data_entries: List[Dict], replace_existing: bool =
                     # Insert the data into the market_data table with the updated schema
                     cur.execute("""
                         INSERT INTO market_data 
-                        (user_id, symbol, timeframe, source, data_type, raw_data, indicators, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                        (user_id, symbol, timeframe, source, data_type, raw_data, indicators, updated_at, config_id)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
                         ON CONFLICT (user_id, symbol, timeframe, updated_at)
                         DO UPDATE SET 
                             raw_data = EXCLUDED.raw_data,
                             indicators = EXCLUDED.indicators,
                             source = EXCLUDED.source,
-                            data_type = EXCLUDED.data_type
+                            data_type = EXCLUDED.data_type,
+                            config_id = EXCLUDED.config_id
                         RETURNING id
                     """, (
                         user_id, symbol, timeframe, source, data_type, 
-                        raw_data_json, indicators_json, updated_at
+                        raw_data_json, indicators_json, updated_at, config_id
                     ))
                     
                     # Get the ID of the inserted/updated row
@@ -104,18 +106,20 @@ def store_market_data_entries(data_entries: List[Dict], replace_existing: bool =
 
 def get_latest_market_data(
     symbol: str, 
-    timeframe: str,
+    config_id: str,
     user_id: str = DEFAULT_USER_ID,
-    source: Optional[str] = None
+    source: Optional[str] = None,
+    timeframe: Optional[str] = None
 ) -> Optional[Dict[str, Any]]:
     """
-    Get the latest market data for a specific symbol and timeframe.
+    Get the latest market data for a specific symbol and config.
     
     Args:
         symbol: Trading pair symbol (e.g., 'BTC-USD')
-        timeframe: Timeframe (e.g., '15m', '1h', '4h', '1d')
+        config_id: Configuration ID for the extraction
         user_id: User ID to retrieve data for (default: DEFAULT_USER_ID)
         source: Optional source to filter by (e.g., 'yfinance', 'tradingview')
+        timeframe: Optional timeframe filter (for backwards compatibility)
         
     Returns:
         Dictionary containing the market data or None if not found
@@ -127,18 +131,18 @@ def get_latest_market_data(
                     cur.execute("""
                         SELECT id, source, data_type, raw_data, indicators, updated_at
                         FROM market_data
-                        WHERE user_id = %s AND symbol = %s AND timeframe = %s AND source = %s
+                        WHERE user_id = %s AND symbol = %s AND config_id = %s AND source = %s
                         ORDER BY updated_at DESC
                         LIMIT 1
-                    """, (user_id, symbol, timeframe, source))
+                    """, (user_id, symbol, config_id, source))
                 else:
                     cur.execute("""
                         SELECT id, source, data_type, raw_data, indicators, updated_at
                         FROM market_data
-                        WHERE user_id = %s AND symbol = %s AND timeframe = %s
+                        WHERE user_id = %s AND symbol = %s AND config_id = %s
                         ORDER BY updated_at DESC
                         LIMIT 1
-                    """, (user_id, symbol, timeframe))
+                    """, (user_id, symbol, config_id))
                 
                 result = cur.fetchone()
                 if not result:
@@ -166,20 +170,22 @@ def get_latest_market_data(
 
 def get_market_data_history(
     symbol: str,
-    timeframe: str,
+    config_id: str,
     limit: int = 100,
     user_id: str = DEFAULT_USER_ID,
-    source: Optional[str] = None
+    source: Optional[str] = None,
+    timeframe: Optional[str] = None
 ) -> List[Dict[str, Any]]:
     """
-    Get historical market data for a specific symbol and timeframe.
+    Get historical market data for a specific symbol and config.
     
     Args:
         symbol: Trading pair symbol (e.g., 'BTC-USD')
-        timeframe: Timeframe (e.g., '15m', '1h', '4h', '1d')
+        config_id: Configuration ID for the extraction
         limit: Maximum number of records to retrieve (default: 100)
         user_id: User ID to retrieve data for (default: DEFAULT_USER_ID)
         source: Optional source to filter by (e.g., 'yfinance', 'tradingview')
+        timeframe: Optional timeframe filter (for backwards compatibility)
         
     Returns:
         List of dictionaries containing the market data, ordered by updated_at DESC
@@ -191,18 +197,18 @@ def get_market_data_history(
                     cur.execute("""
                         SELECT id, source, data_type, raw_data, indicators, updated_at
                         FROM market_data
-                        WHERE user_id = %s AND symbol = %s AND timeframe = %s AND source = %s
+                        WHERE user_id = %s AND symbol = %s AND config_id = %s AND source = %s
                         ORDER BY updated_at DESC
                         LIMIT %s
-                    """, (user_id, symbol, timeframe, source, limit))
+                    """, (user_id, symbol, config_id, source, limit))
                 else:
                     cur.execute("""
                         SELECT id, source, data_type, raw_data, indicators, updated_at
                         FROM market_data
-                        WHERE user_id = %s AND symbol = %s AND timeframe = %s
+                        WHERE user_id = %s AND symbol = %s AND config_id = %s
                         ORDER BY updated_at DESC
                         LIMIT %s
-                    """, (user_id, symbol, timeframe, limit))
+                    """, (user_id, symbol, config_id, limit))
                 
                 results = cur.fetchall()
                 if not results:

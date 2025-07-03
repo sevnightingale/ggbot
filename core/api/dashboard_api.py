@@ -316,12 +316,12 @@ async def get_agent_status(user_id: str):
             # Get last run times for each module
             modules_status = {}
             
-            # Extraction status
+            # Extraction status (get latest from any config)
             cur.execute("""
-                SELECT created_at
+                SELECT updated_at
                 FROM market_data
                 WHERE user_id = %s
-                ORDER BY created_at DESC
+                ORDER BY updated_at DESC
                 LIMIT 1
             """, (user_id,))
             

@@ -25,6 +25,7 @@ from core.common.logger import logger
 from decision.llm_providers import get_llm_provider
 from decision.interfaces.llm_provider import LLMProvider
 from decision.services.price_service import PriceService
+from decision.providers.ccxt_provider import CCXTPriceProvider
 
 
 class DecisionEngine:
@@ -172,97 +173,112 @@ class DecisionEngine:
         finally:
             conn.close()
     
-    def _fetch_market_data(self, symbol: str, timeframes: List[str]) -> Dict[str, Dict[str, Any]]:
+    def _fetch_market_data(self, symbol: str) -> Dict[str, Dict[str, Any]]:
         """
-        Fetch latest market data from the database.
+        Fetch latest market data from the database using config_id + symbol pattern.
+        
+        This method now uses the new string-based indicator system exclusively.
         
         Args:
             symbol (str): Trading symbol (e.g., 'BTC/USD')
-            timeframes (List[str]): List of timeframes to fetch (e.g., ['15m', '1h', '4h'])
             
         Returns:
-            Dict[str, Dict[str, Any]]: Market data organized by timeframe
+            Dict[str, Dict[str, Any]]: Market data organized by indicator timeframes
         """
         conn = self._get_db_connection()
         try:
             cursor = conn.cursor()
-            market_data = {}
-            
-            for timeframe in timeframes:
-                # Get the most recent data for this symbol/timeframe
-                cursor.execute("""
-                    SELECT source, data_type, indicators, raw_data, updated_at
-                    FROM market_data
-                    WHERE user_id = %s
-                    AND symbol = %s
-                    AND timeframe = %s
-                    ORDER BY updated_at DESC
-                    LIMIT 10
-                """, (self.user_id, symbol, timeframe))
-                
-                results = cursor.fetchall()
-                
-                # Organize data by source and type
-                timeframe_data = {
-                    'indicators': {},
-                    'signals': {},
-                    'raw_data': {},
-                    'latest_update': None
-                }
-                
-                # Track what data types we've already processed to avoid overwriting newer data with older
-                processed_types = set()
-                
-                for row in results:
-                    source = row['source']
-                    data_type = row['data_type']
-                    
-                    # Since results are ordered by updated_at DESC, only process the first occurrence of each data type
-                    if data_type in processed_types:
-                        continue
-                        
-                    if data_type == 'indicator_values' and row['indicators']:
-                        timeframe_data['indicators'].update(row['indicators'])
-                        processed_types.add(data_type)
-                    
-                    elif data_type == 'indicator_analysis' and row['raw_data']:
-                        # Extract LLM interpretation from indicator analysis
-                        if 'interpretation' in row['raw_data']:
-                            timeframe_data['signals']['llm_analysis'] = row['raw_data']['interpretation']
-                        
-                        # Extract raw indicators and make them available to the prompt
-                        if 'indicators' in row['raw_data']:
-                            timeframe_data['raw_data']['indicators'] = row['raw_data']['indicators']
-                            # IMPORTANT: Also copy to main indicators field so decision prompts can access them
-                            timeframe_data['indicators'].update(row['raw_data']['indicators'])
-                        processed_types.add(data_type)
-                    
-                    elif data_type == 'report' and row['raw_data']:
-                        # Extract ggshot or other signals
-                        if 'report' in row['raw_data']:
-                            timeframe_data['signals'][source] = row['raw_data']['report']
-                        processed_types.add(data_type)
-                    
-                    elif data_type == 'llm_interpretation' and row['raw_data']:
-                        # Include LLM interpretations if available (legacy)
-                        if 'interpretation' in row['raw_data']:
-                            timeframe_data['signals']['llm_analysis'] = row['raw_data']['interpretation']
-                        processed_types.add(data_type)
-                    
-                    # Track latest update
-                    if not timeframe_data['latest_update'] or row['updated_at'] > timeframe_data['latest_update']:
-                        timeframe_data['latest_update'] = row['updated_at']
-                
-                market_data[timeframe] = timeframe_data
             
             logger.bind(module="decision.engine", user_id=self.user_id).info(
-                f"Fetched market data for {symbol} across {len(timeframes)} timeframes"
+                f"Fetching market data for {symbol} with config_id {self.config_id}"
             )
-            # Sanitize any Decimal values in market data
-            return self._sanitize_for_json(market_data)
+            
+            # Get the most recent data for this config_id + symbol
+            cursor.execute("""
+                SELECT source, data_type, indicators, raw_data, updated_at
+                FROM market_data
+                WHERE user_id = %s
+                AND config_id = %s
+                AND symbol = %s
+                ORDER BY updated_at DESC
+                LIMIT 1
+            """, (self.user_id, self.config_id, symbol))
+            
+            result = cursor.fetchone()
+            
+            if not result:
+                logger.bind(module="decision.engine", user_id=self.user_id).warning(
+                    f"No market data found for config {self.config_id}, symbol {symbol}"
+                )
+                return {}
+            
+            # Process the new format - indicators are stored as string keys
+            return self._process_string_based_indicators(result)
             
         finally:
             conn.close()
+    
+    def _process_string_based_indicators(self, db_result) -> Dict[str, Dict[str, Any]]:
+        """
+        Process string-based indicators from the new extraction format.
+        
+        Args:
+            db_result: Database row with indicators stored as string keys
+            
+        Returns:
+            Dict organized by timeframes for compatibility with existing decision logic
+        """
+        # Extract indicators from database result
+        indicators = db_result.get('indicators') or {}
+        
+        # Group string-based indicators by timeframe for decision compatibility
+        # E.g., "RSI_1h", "RSI_4h" → {1h: {RSI: ...}, 4h: {RSI: ...}}
+        timeframe_data = {}
+        
+        for indicator_string, value in indicators.items():
+            # Parse the indicator string (e.g., "RSI_1h" → {"indicator": "RSI", "timeframe": "1h"})
+            try:
+                from core.mcp.metadata import parse_indicator_string
+                parsed = parse_indicator_string(indicator_string)
+                
+                indicator_name = parsed.get("indicator")
+                timeframe = parsed.get("timeframe", "1h")  # Default to 1h
+                
+                # Initialize timeframe data structure if needed
+                if timeframe not in timeframe_data:
+                    timeframe_data[timeframe] = {
+                        'indicators': {},
+                        'signals': {},
+                        'raw_data': {},
+                        'latest_update': db_result.get('updated_at')
+                    }
+                
+                # Store indicator value
+                timeframe_data[timeframe]['indicators'][indicator_name] = value
+                
+                # Also store with full string name for compatibility with existing prompt logic
+                timeframe_data[timeframe]['indicators'][indicator_string] = value
+                
+            except Exception as e:
+                logger.bind(module="decision.engine", user_id=self.user_id).warning(
+                    f"Error parsing indicator {indicator_string}: {e}"
+                )
+                continue
+        
+        # Add any additional data from raw_data field
+        raw_data = db_result.get('raw_data') or {}
+        if 'interpretation' in raw_data:
+            # Add LLM interpretation to the primary timeframe
+            primary_tf = next(iter(timeframe_data.keys())) if timeframe_data else '1h'
+            if primary_tf not in timeframe_data:
+                timeframe_data[primary_tf] = {'indicators': {}, 'signals': {}, 'raw_data': {}, 'latest_update': db_result.get('updated_at')}
+            timeframe_data[primary_tf]['signals']['llm_analysis'] = raw_data['interpretation']
+        
+        logger.bind(module="decision.engine", user_id=self.user_id).info(
+            f"Processed {len(indicators)} string-based indicators across {len(timeframe_data)} timeframes"
+        )
+        
+        return self._sanitize_for_json(timeframe_data)
     
     def _fetch_account_state(self) -> Dict[str, Any]:
         """
@@ -594,50 +610,84 @@ class DecisionEngine:
         self._current_ggshot_signal = ggshot_signal
         
         # Get original signal message from database raw_data
-        self._original_signal_message = ggshot_signal.get('raw_data', 'Original signal message not available')
+        raw_data = ggshot_signal.get('raw_data', {})
+        if isinstance(raw_data, dict) and 'message' in raw_data:
+            self._original_signal_message = raw_data['message']
+        else:
+            self._original_signal_message = str(raw_data)
         
-        # Extract parsed signal details from database
+        # Extract parsed signal details from database (minimal parsing for symbol/timeframe only)
         parsed_data = ggshot_signal.get('parsed_data', {}).get('ggshot_signal', {})
         
         # Fetch current market price
         current_price = await self._fetch_current_price(symbol)
         
-        # Extract signal details from parsed_data
-        direction = parsed_data.get('direction', 'UNKNOWN')
-        entry_zone = parsed_data.get('entry_zone', {})
-        target_1 = parsed_data.get('targets', [{}])[0].get('price') if parsed_data.get('targets') else None
-        stop_loss = parsed_data.get('stop_loss')
-        
-        # Get native timeframe from the signal or default to 1h
+        # We only need symbol and timeframe for extraction - let LLM read the original signal
         native_timeframe = parsed_data.get('timeframe', '1h')
         
-        # Extract raw indicator data from market_data
-        def get_indicator_data(indicator_name: str, timeframe: str = None) -> str:
-            """Helper to safely extract indicator data from market_data"""
+        # Extract raw indicator data from market_data (NEW STRING-BASED FORMAT)
+        def get_indicator_data(indicator_string: str) -> str:
+            """Helper to safely extract indicator data from new string-based format"""
             try:
-                if timeframe:
-                    # Multi-timeframe indicator (e.g., RSI_4h)
-                    data = market_data.get(timeframe, {}).get('indicators', {})
-                else:
-                    # Use native signal timeframe
-                    data = market_data.get(native_timeframe, {}).get('indicators', {})
+                # NEW APPROACH: Look for the exact string-based indicator
+                # across all timeframes in the processed market_data
+                for tf_data in market_data.values():
+                    if isinstance(tf_data, dict) and 'indicators' in tf_data:
+                        if indicator_string in tf_data['indicators']:
+                            return str(tf_data['indicators'][indicator_string])
                 
-                indicator_data = data.get(indicator_name)
-                if indicator_data is None:
-                    return "N/A"
-                return str(indicator_data)
+                return "N/A"
             except Exception as e:
-                logger.bind(module="decision.engine", user_id=self.user_id).warning(f"Error extracting {indicator_name}: {e}")
+                logger.bind(module="decision.engine", user_id=self.user_id).warning(f"Error extracting {indicator_string}: {e}")
                 return "N/A"
         
-        # Get current volume from OHLCV data
-        current_volume_data = market_data.get(native_timeframe, {}).get('ohlcv', {}).get('volume', 'N/A')
+        # Check indicator availability (updated for new ggShot config)
+        def check_indicator_availability() -> tuple[bool, str, int]:
+            """Check if we have minimum required indicators for reliable analysis"""
+            required_indicators = ['Aroon', 'Vortex', 'VWAP', 'RSI', 'RSI_4h']
+            available_indicators = []
+            
+            for indicator in required_indicators:
+                if indicator == 'RSI_4h':
+                    data = get_indicator_data('RSI_4h')
+                elif indicator == 'Aroon':
+                    data = get_indicator_data('Aroon_1d')  # NEW: String-based indicator
+                elif indicator == 'Vortex':
+                    data = get_indicator_data('Vortex_1h')  # NEW: String-based indicator
+                elif indicator == 'VWAP':
+                    data = get_indicator_data('VWAP_1h')   # NEW: String-based indicator
+                elif indicator == 'RSI':
+                    data = get_indicator_data('RSI_30m')   # NEW: String-based indicator
+                else:
+                    data = get_indicator_data(indicator)
+                
+                if data != 'N/A':
+                    available_indicators.append(indicator)
+            
+            availability_count = len(available_indicators)
+            availability_ratio = availability_count / len(required_indicators)
+            
+            # Require at least 3/5 critical indicators
+            if availability_count < 3:
+                missing = set(required_indicators) - set(available_indicators)
+                warning = f"Insufficient indicators: only {availability_count}/5 available. Missing: {', '.join(missing)}"
+                return False, warning, availability_count
+            
+            return True, f"Sufficient indicators: {availability_count}/5 available", availability_count
+        
+        sufficient_data, availability_message, available_count = check_indicator_availability()
+        
+        # Log indicator availability
+        logger.bind(module="decision.engine", user_id=self.user_id).info(f"Indicator availability: {availability_message}")
+        
+        # Get current volume using CCXT provider
+        current_volume_data = await self._get_volume_confirmation(symbol)
         
         # Log the ggShot validation prompt details
         logger.bind(module="decision.engine", user_id=self.user_id).info(f"🎯 4-Pillar ggShot validation for {symbol}:")
-        logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Direction: {direction}")
-        logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Entry Zone: {entry_zone}")
+        logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Native Timeframe: {native_timeframe}")
         logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Current Price: ${current_price}" if current_price else "Price unavailable")
+        logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Original Signal: {self._original_signal_message[:100]}...")
         
         # Build the complete 4-pillar validation prompt
         prompt = f"""# ggShot Signal Validation Protocol v2.0
@@ -647,23 +697,37 @@ Validate the following ggShot signal by performing a rigorous, four-pillar analy
 
 If any data point is 'null' or 'N/A' due to a calculation failure, you must explicitly state that the data was unavailable and proceed with your analysis based on the remaining data.
 
-## 1. SIGNAL & MARKET VITALS
-* **Signal to Validate:** {direction} {symbol}
-* **Native Timeframe:** {native_timeframe}
-* **Entry Zone:** {entry_zone.get('low', 'N/A')} - {entry_zone.get('high', 'N/A')}
-* **Target 1:** {target_1}
-* **Stop Loss:** {stop_loss}
-* **Current Price:** ${current_price}
+## 1. ORIGINAL GGSHOT SIGNAL
+```
+{self._original_signal_message}
+```
 
-## 2. THE FOUR-PILLAR ANALYTICAL FRAMEWORK
+## 2. CURRENT MARKET CONDITIONS
+* **Current Price:** ${current_price}
+* **Analysis Timeframe:** {native_timeframe}
+
+### ENTRY ZONE ANALYSIS
+**CRITICAL:** Compare the current price with the signal's entry zone from the original signal above.
+* **Entry Zone Assessment:** Determine if the current price is within, above, or below the specified entry zone
+* **Risk Implication:** 
+  - **Within Entry Zone:** Optimal timing, proceed with normal analysis
+  - **Above Entry Zone (for LONG):** Late entry risk - price may have already moved, reduces signal validity
+  - **Below Entry Zone (for SHORT):** Late entry risk - price may have already moved, reduces signal validity  
+  - **Outside Entry Zone:** High risk of poor entry timing, should significantly impact confidence
+* **Entry Timing Factor:** Consider how price position relative to entry zone affects the signal's immediate viability
+
+## 3. THE FOUR-PILLAR ANALYTICAL FRAMEWORK
 You must analyze each pillar in order and extract specific values from the raw indicator data provided.
 
 ### --- PILLAR 0: MARKET REGIME ANALYSIS ---
 (First, determine the market's character. Breakout signals fail in choppy markets.)
 
-* **Aroon:** Extract current value from: {get_indicator_data('Aroon')}
-    * **Analysis:** Look at both Aroon Up and Aroon Down lines. When both are low (< 30), market is ranging/consolidating where breakout signals frequently fail. When one line is high (> 70) while the other is low, market is trending strongly and favorable for breakouts. Consider how the current market regime aligns with the signal type.
-* **Bollinger Band Width (BBW):** Extract current value from: {get_indicator_data('BollingerBandsWidth')}
+* **Aroon (Daily Regime):** Extract current value from: {get_indicator_data('Aroon_1d')}
+    * **CRITICAL:** The data contains arrays for "up" and "down". You MUST take the LAST value from each array (most recent/current). Do not take values from the beginning or middle of the arrays.
+    * **Extraction:** Current Aroon Up = last value in "up" array, Current Aroon Down = last value in "down" array
+    * **Analysis:** Look at both current Aroon Up and Aroon Down values. When both are low (< 30), market is ranging/consolidating where breakout signals frequently fail. When one line is high (> 70) while the other is low, market is trending strongly and favorable for breakouts. Consider how the current market regime aligns with the signal type.
+* **Bollinger Band Width (1h):** Extract current value from: {get_indicator_data('BollingerBandsWidth_1d')}
+    * **CRITICAL:** BBW data contains a "width" array. Take the LAST value (most recent/current BBW).
     * **Analysis:** A low or contracting BBW value indicates market consolidation (a "squeeze"). Evaluate whether the current volatility environment supports or contradicts the breakout signal.
 
 * **Market Regime Impact:** Ranging markets (low Aroon values) present significantly higher risk for breakout signals and should be weighted heavily in your confidence assessment. However, exceptional confluence in other pillars may still support the signal.
@@ -672,35 +736,48 @@ You must analyze each pillar in order and extract specific values from the raw i
 (Next, look for a confluence of evidence supporting the signal's direction.)
 
 * **Volume Analysis:**
-    * **Current Volume:** Extract from most recent candle: {current_volume_data}
-    * **30-Period Avg. Volume:** Extract current value from: {get_indicator_data('SMA_Volume_30')}
-    * **Analysis:** Compare current volume to the 30-period average. Significantly higher volume (1.5x+ above average) suggests strong conviction behind the breakout. Volume below average indicates weaker participation and higher risk of a false breakout.
-* **Vortex Indicator (VI):**
-    * **Raw Data:** {get_indicator_data('Vortex')}
+    * **Volume Confirmation Data:** {current_volume_data}
+    * **30-Period Avg. Volume (SMA):** Extract current value from: N/A (removed - using CCXT volume data above)
+    * **Analysis:** Use the volume confirmation levels provided above. The founder of ggShot provides these specific thresholds:
+        - 0-10% above average: Insignificant (weak/sluggish signal - HIGH RISK)
+        - 10-30% above average: Easy confirmation (entry with risk possible - MODERATE RISK)  
+        - 30-60% above average: Good confirmation (volume supports move - ACCEPTABLE RISK)
+        - 60-100% above average: Strong confirmation (confident entry - LOW RISK)
+        - 100%+ above average: Very strong momentum (often breakout - VERY LOW RISK)
+    * **Important:** Volume below average significantly increases false breakout risk and should heavily impact your confidence assessment.
+* **Vortex Indicator (1h):**
+    * **Raw Data:** {get_indicator_data('Vortex_1h')}
     * **Extract:** VI+ (last value from plus array) and VI- (last value from minus array)
-    * **Analysis:** Assess whether the Vortex confirms the signal direction. For LONG signals, VI+ above VI- supports upward momentum. For SHORT signals, VI- above VI+ supports downward momentum.
-* **VWAP (Volume Weighted Average Price):** Extract current value from: {get_indicator_data('VWAP')}
+    * **CRITICAL ANALYSIS:** You must determine if the Vortex Indicator supports or contradicts the signal direction from the original ggShot signal above:
+        - For a LONG signal: VI+ MUST be greater than VI- (bullish momentum required)
+        - For a SHORT signal: VI- MUST be greater than VI+ (bearish momentum required)
+        - **If this condition is NOT met, this is a DIRECT CONTRADICTION that should significantly reduce confidence**
+        - State clearly whether Vortex "SUPPORTS" or "CONTRADICTS" the signal direction
+* **VWAP (1h):** Extract current value from: {get_indicator_data('VWAP_1h')}
     * **Analysis:** Evaluate alignment with institutional flow. For LONG signals, entry above VWAP suggests alignment with institutional buying. For SHORT signals, entry below VWAP suggests alignment with institutional selling.
 
 ### --- PILLAR 2: BROADER CONTEXT ---
 (Now, zoom out to ensure the trade is well-positioned.)
 
-* **Signal Timeframe RSI:** Extract current value from: {get_indicator_data('RSI')}
-* **Higher Timeframe RSI (4h):** Extract current value from: {get_indicator_data('RSI', '4h')}
+* **Signal Context RSI (30m):** Extract current value from: {get_indicator_data('RSI_30m')}
+    * **CRITICAL:** RSI data is an array. Take the LAST value (most recent/current RSI).
+* **Higher Timeframe RSI (4h):** Extract current value from: {get_indicator_data('RSI_4h')}
+    * **CRITICAL:** RSI_4h data is an array. Take the LAST value (most recent/current RSI).
     * **Analysis:** Evaluate whether the trade aligns with the larger timeframe trend. For LONG signals, a 4h RSI above 70 suggests the market may be overbought on the higher timeframe, indicating potential resistance to further upward movement. For SHORT signals, a 4h RSI below 30 suggests oversold conditions that could lead to a bounce. Consider how this broader context impacts the signal's probability.
-* **Donchian Channel (200-period):**
-    * **Raw Data:** {get_indicator_data('DonchianChannel_200')}
+* **Donchian Channel (200-period, 1h):**
+    * **Raw Data:** {get_indicator_data('DonchianChannel_200_1h')}
     * **Extract:** Upper and lower band values (last values from upper/lower arrays)
     * **Analysis:** Identify major liquidity zones and assess the trade's positioning. Evaluate the distance from the entry zone to the opposite band to determine how much room the trade has to develop. Proximity to major support/resistance levels may impact the signal's potential.
 
 ### --- PILLAR 3: TACTICAL CAUTION ---
 (Finally, check for immediate risks.)
 
-* **Bollinger Bands (BB):**
-    * **Raw Data:** {get_indicator_data('BollingerBands')}
+* **Bollinger Bands (1h):**
+    * **Raw Data:** {get_indicator_data('BollingerBands_1h')}
     * **Extract:** Upper and lower band values (last values from upper/lower arrays)
     * **Analysis:** Assess whether the signal occurs at a point of statistical overextension. Prices trading far outside the Bollinger Bands may indicate overextended conditions with higher probability of mean reversion. Consider the current price position relative to the bands.
-* **ATR (Average True Range):** Extract current value from: {get_indicator_data('ATR')}
+* **ATR (1h):** Extract current value from: {get_indicator_data('ATR_1h')}
+    * **CRITICAL:** ATR data is an array. Take the LAST value (most recent/current ATR).
     * **Analysis:** Evaluate the current market volatility environment. Exceptionally high ATR values may indicate chaotic, unpredictable price action that increases the risk of stop-loss hits even on directionally correct trades. Consider how volatility conditions affect trade management.
 
 ## 3. DELIBERATION & SCORING RUBRIC
@@ -716,10 +793,11 @@ FORMAT YOUR RESPONSE EXACTLY AS:
 
 ACTION: validate
 CONFIDENCE: [0.00-1.00]
-STOP_LOSS: {stop_loss}
-TAKE_PROFIT: {target_1}
+STOP_LOSS: [Extract from signal]
+TAKE_PROFIT: [Extract Target 1 from signal]
 
 REASONING:
+- **Entry Zone:** (State whether current price is within, above, or below the entry zone and how this affects signal timing).
 - **Regime:** (Briefly state if the market is TRENDING or RANGING based on Aroon/BBW).
 - **Confirmation:** (Summarize your findings on Volume, Vortex, and VWAP confluence).
 - **Context:** (Summarize your findings on the 4h RSI and Donchian Channel context).
@@ -875,6 +953,74 @@ REASONING:
                 f"Error extracting RSI value: {e}"
             )
             return None
+    
+    async def _get_volume_confirmation(self, symbol: str) -> str:
+        """
+        Get volume confirmation analysis using CCXT provider.
+        Based on ggShot founder's guidance on volume thresholds.
+        
+        Args:
+            symbol: Trading symbol to analyze
+            
+        Returns:
+            Formatted string with volume analysis and confidence level
+        """
+        try:
+            # Initialize CCXT provider
+            ccxt_provider = CCXTPriceProvider()
+            
+            # Get volume data (30-period average as standard)
+            volume_data = await ccxt_provider.get_current_volume_data(symbol, period=30)
+            
+            if not volume_data:
+                return "N/A (volume data unavailable from exchanges)"
+            
+            current_volume = volume_data['current_volume']
+            average_volume = volume_data['average_volume']
+            volume_ratio = volume_data['volume_ratio']
+            
+            # Calculate percentage above average
+            volume_increase_pct = (volume_ratio - 1.0) * 100
+            
+            # Determine volume confidence level based on ggShot founder's thresholds
+            if volume_increase_pct < 10:
+                confidence_level = "Insignificant"
+                confidence_desc = "The signal is weak or 'sluggish'"
+                risk_assessment = "HIGH RISK"
+            elif volume_increase_pct < 30:
+                confidence_level = "Easy Confirmation" 
+                confidence_desc = "Entry with risk is possible"
+                risk_assessment = "MODERATE RISK"
+            elif volume_increase_pct < 60:
+                confidence_level = "Good Confirmation"
+                confidence_desc = "Volume supports the move"
+                risk_assessment = "ACCEPTABLE RISK"
+            elif volume_increase_pct < 100:
+                confidence_level = "Strong Confirmation"
+                confidence_desc = "Confident entry"
+                risk_assessment = "LOW RISK"
+            else:
+                confidence_level = "Very Strong Momentum"
+                confidence_desc = "Often indicates breakout"
+                risk_assessment = "VERY LOW RISK"
+            
+            # Format the volume analysis
+            volume_analysis = f"""Current: {current_volume:,.0f} | Average (30): {average_volume:,.0f} | Ratio: {volume_ratio:.2f}x
+Volume Above Average: {volume_increase_pct:+.1f}%
+Confirmation Level: {confidence_level} - {confidence_desc}
+Risk Assessment: {risk_assessment}"""
+            
+            logger.bind(module="decision.engine", user_id=self.user_id).info(
+                f"Volume analysis for {symbol}: {volume_increase_pct:+.1f}% above average ({confidence_level})"
+            )
+            
+            return volume_analysis
+            
+        except Exception as e:
+            logger.bind(module="decision.engine", user_id=self.user_id).warning(
+                f"Failed to get volume confirmation for {symbol}: {e}"
+            )
+            return f"N/A (volume analysis failed: {str(e)})"
     
     def _format_prompt_manage_trade(self, market_data: Dict, account_state: Dict, 
                                    active_trade: Dict, symbol: str) -> str:
@@ -1117,14 +1263,13 @@ REASONING:
         return result
     
     async def make_decision(self, symbol: str = "BTC/USD", 
-                          timeframes: List[str] = None,
-                          mode: str = "dynamic_strategy") -> Dict[str, Any]:
+                          mode: str = "dynamic_strategy",
+                          custom_mode: Optional[str] = None) -> Dict[str, Any]:
         """
         Main entry point to make a trading decision.
         
         Args:
             symbol (str): Trading symbol
-            timeframes (List[str]): Timeframes to analyze
             mode (str): Decision mode - "dynamic_strategy" or "ggshot"
             
         Returns:
@@ -1133,12 +1278,9 @@ REASONING:
         if not self.llm_provider:
             await self.initialize()
         
-        if not timeframes:
-            timeframes = ['15m', '1h', '4h']
-        
         try:
-            # Fetch all required data
-            market_data = self._fetch_market_data(symbol, timeframes)
+            # Fetch all required data using new config_id approach
+            market_data = self._fetch_market_data(symbol)
             account_state = self._fetch_account_state()
             active_trades = self._fetch_active_trades()
         except Exception as e:
@@ -1221,11 +1363,11 @@ REASONING:
                     prompt=prompt
                 )
                 
-                # Get decision from LLM (pass mode for custom system prompt)
+                # Get decision from LLM (pass custom_mode for ggShot system prompt)
                 response, metadata = await self.llm_provider.generate_response(
                     prompt=prompt,
                     temperature=0.7,
-                    custom_mode=mode  # Pass mode to enable custom system prompts
+                    custom_mode=custom_mode  # Pass custom_mode to enable ggShot system prompts
                 )
                 
                 # DEBUG: Log the full response

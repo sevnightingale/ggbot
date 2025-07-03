@@ -26,6 +26,7 @@ The ggbots platform uses a hybrid architecture with Bubble.io for frontend/user 
 - `0011_add_data_integrity_constraints.sql`: Adds comprehensive data integrity constraints and reconciliation logging
 - `0012_universal_trade_lifecycle.sql`: **MAJOR MIGRATION** - Transforms phantom-trade system to universal position-based trade lifecycle system
 - `0013_enhanced_trade_lifecycle.sql`: Adds config_id integration, TP/SL tracking, strategy metadata, and backward compatibility
+- `2025-06-30_add_config_id_to_market_data.sql`: Adds config_id column to market_data table for configuration-driven extraction system
 
 ## Database Schema
 
@@ -227,6 +228,7 @@ Stores market data including indicators and price data for different pairs and t
 |------------|-----------------|----------------------------------------|
 | id         | SERIAL          | Primary Key                            |
 | user_id    | UUID            | Foreign Key to users table             |
+| config_id  | UUID            | Foreign Key to configurations table (nullable) |
 | source     | VARCHAR         | Data source (e.g., 'tradingview', 'yfinance', 'crypto_indicators_mcp') |
 | symbol     | VARCHAR         | Trading pair symbol                    |
 | timeframe  | VARCHAR         | Timeframe (e.g., '15m', '1h', '4h')    |
@@ -247,7 +249,9 @@ Stores market data including indicators and price data for different pairs and t
 - Primary Key on `id`
 - Unique constraint on `(user_id, symbol, timeframe, updated_at)` to allow multiple data points per timeframe
 - Index on `(user_id, symbol, timeframe, updated_at)` for efficient retrieval
+- Index on `(config_id, symbol)` for config-based data retrieval (new extraction pattern)
 - Foreign Key constraint on `user_id` referencing users table
+- Foreign Key constraint on `config_id` referencing configurations table
 
 **Important Note**: Migration `0008_update_market_data_constraint.sql` changes the unique constraint to allow multiple entries per user-symbol-timeframe combination with different timestamps. This is necessary for storing historical data points needed for calculating technical indicators like MACD and Bollinger Bands that require multiple data points.
 
