@@ -19,7 +19,8 @@ async def run_decision_process(
     config_name: str = 'default',
     symbol: str = 'BTC/USD',
     timeframes: Optional[list] = None,
-    mode: str = "dynamic_strategy"
+    mode: str = "dynamic_strategy",
+    custom_mode: Optional[str] = None
 ) -> Dict[str, Any]:
     """
     Run the decision-making process for a user.
@@ -47,8 +48,8 @@ async def run_decision_process(
         engine = DecisionEngine(user_id, config_id)
         await engine.initialize()
         
-        # Make the decision
-        intent = await engine.make_decision(symbol, timeframes, mode)
+        # Make the decision (timeframes now handled by config_id)
+        intent = await engine.make_decision(symbol, mode, custom_mode)
         
         logger.bind(module="decision.main").info(
             f"Decision process completed: {intent['action']} "

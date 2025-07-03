@@ -7,7 +7,7 @@ using the CCXT library. It tries multiple exchanges for reliability.
 
 import ccxt.async_support as ccxt
 from decimal import Decimal, ROUND_HALF_UP
-from typing import Optional, List
+from typing import Optional, List, Dict
 from core.common.logger import logger
 from decision.interfaces.price_provider import PriceProvider
 
@@ -446,6 +446,138 @@ class CCXTPriceProvider(PriceProvider):
             self._log.error(f"CCXT health check failed: {e}")
             return False
     
+    async def get_current_volume_data(self, symbol: str, period: int = 30) -> Optional[Dict]:
+        """
+        Get current volume and average volume for confirmation analysis.
+        Based on ggShot founder's guidance: compare current volume to average 
+        volume over the last 20-50 candles (using 30 as standard).
+        
+        Args:
+            symbol: Standard trading symbol (e.g., 'BTC/USDT')
+            period: Number of candles for volume average calculation (default 30)
+            
+        Returns:
+            Dict with volume data:
+            {
+                'current_volume': float,
+                'average_volume': float,
+                'volume_ratio': float,  # current/average
+                'is_volume_spike': bool  # ratio > 1.5
+            }
+            Or None if unable to fetch
+        """
+        for exchange_name in self.EXCHANGE_PRIORITY:
+            try:
+                volume_data = await self._get_volume_from_exchange(exchange_name, symbol, period)
+                if volume_data:
+                    self._log.info(f"Volume data for {symbol} from {exchange_name}: "
+                                 f"current={volume_data['current_volume']:.0f}, "
+                                 f"avg={volume_data['average_volume']:.0f}, "
+                                 f"ratio={volume_data['volume_ratio']:.2f}")
+                    return volume_data
+                    
+            except Exception as e:
+                self._log.warning(f"Failed to get volume from {exchange_name}: {e}")
+                continue
+        
+        self._log.error(f"Failed to get volume data for {symbol} from all CCXT exchanges")
+        return None
+
+    async def _get_volume_from_exchange(self, exchange_name: str, symbol: str, period: int) -> Optional[Dict]:
+        """
+        Get volume data from a specific exchange using OHLCV data.
+        
+        Args:
+            exchange_name: Name of the exchange
+            symbol: Standard trading symbol
+            period: Number of candles for average calculation
+            
+        Returns:
+            Volume data dict or None if failed
+        """
+        try:
+            # Get or create exchange client
+            exchange = await self._get_exchange_client(exchange_name)
+            if not exchange:
+                return None
+            
+            # Map symbol to exchange-specific format
+            exchange_symbol = self._map_symbol_for_exchange(exchange_name, symbol)
+            if not exchange_symbol:
+                self._log.debug(f"Symbol {symbol} not supported on {exchange_name}")
+                return None
+            
+            # Load markets if not already loaded
+            if not hasattr(exchange, 'markets') or not exchange.markets:
+                await exchange.load_markets()
+            
+            # Check if symbol exists
+            if exchange_symbol not in exchange.markets:
+                self._log.debug(f"Symbol {exchange_symbol} not found in {exchange_name} markets")
+                return None
+            
+            # Fetch OHLCV data for volume analysis
+            # Get period + 1 candles to have enough data (current + historical)
+            ohlcv_data = await exchange.fetch_ohlcv(
+                exchange_symbol, 
+                timeframe='1h',  # Use 1h timeframe for volume analysis
+                limit=period + 1
+            )
+            
+            if not ohlcv_data or len(ohlcv_data) < 2:
+                self._log.warning(f"Insufficient OHLCV data from {exchange_name} for {exchange_symbol}")
+                return None
+            
+            # Extract volumes from OHLCV data
+            # OHLCV format: [timestamp, open, high, low, close, volume]
+            volumes = [candle[5] for candle in ohlcv_data if candle[5] is not None]
+            
+            if len(volumes) < 2:
+                self._log.warning(f"Insufficient volume data from {exchange_name} for {exchange_symbol}")
+                return None
+            
+            # Current volume is the last candle
+            current_volume = volumes[-1]
+            
+            # Average volume over the specified period
+            # Use all available volumes up to the period (excluding current)
+            historical_volumes = volumes[:-1]  # Exclude current candle
+            if len(historical_volumes) > period:
+                historical_volumes = historical_volumes[-period:]  # Take last N candles
+            
+            if not historical_volumes:
+                self._log.warning(f"No historical volume data for {exchange_symbol}")
+                return None
+            
+            average_volume = sum(historical_volumes) / len(historical_volumes)
+            
+            # Calculate volume ratio
+            volume_ratio = current_volume / average_volume if average_volume > 0 else 0
+            
+            # Determine if this is a volume spike (using 1.5x as threshold)
+            is_volume_spike = volume_ratio > 1.5
+            
+            return {
+                'current_volume': float(current_volume),
+                'average_volume': float(average_volume),
+                'volume_ratio': float(volume_ratio),
+                'is_volume_spike': is_volume_spike,
+                'period_used': len(historical_volumes),
+                'timeframe': '1h'
+            }
+            
+        except Exception as e:
+            self._log.error(f"Error fetching volume from {exchange_name}: {e}")
+            return None
+        finally:
+            # Clean up connection
+            if exchange_name in self._exchange_clients:
+                try:
+                    await self._exchange_clients[exchange_name].close()
+                    del self._exchange_clients[exchange_name]
+                except:
+                    pass
+
     async def cleanup(self):
         """Clean up all exchange connections."""
         for exchange_name, exchange in self._exchange_clients.items():

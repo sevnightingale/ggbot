@@ -44,26 +44,28 @@ extraction/
 
 ### User Configuration Format
 
-Extraction behavior is controlled by user configuration stored in the database:
+Extraction behavior is controlled by user configuration stored in the database using **string-based indicators** with explicit timeframe specification:
 
 ```json
 {
-  "symbols": ["BTC/USDT"],
-  "timeframes": ["15m", "1h"],
-  "sources": {
-    "crypto_indicators_mcp": {
-      "enabled": true,
-      "indicators": ["RSI", "MACD", "BollingerBands"],
-      "use_llm_selection": false,
-      "llm_interpretation": true,
-      "llm_model": "gpt-4o-mini"
-    },
-    "tradingview": {
-      "enabled": false,
-      "strategy": "ggshot_15m"
-    },
-    "yfinance": {
-      "enabled": false
+  "extraction": {
+    "sources": {
+      "crypto_indicators_mcp": {
+        "enabled": true,
+        "indicators": [
+          "Aroon_1d",
+          "BollingerBandsWidth_1d", 
+          "Vortex_1h",
+          "VWAP_1h",
+          "RSI_30m",
+          "RSI_4h",
+          "DonchianChannel_200_1h",
+          "BollingerBands_1h",
+          "ATR_1h"
+        ],
+        "llm_interpretation": false,
+        "llm_model": "gpt-4o-mini"
+      }
     }
   }
 }
@@ -71,27 +73,36 @@ Extraction behavior is controlled by user configuration stored in the database:
 
 ### Configuration Options
 
-#### Global Settings
-- **symbols**: List of trading pairs to analyze (e.g., `["BTC/USDT", "ETH/USDT"]`)
-- **timeframes**: List of timeframes to extract (e.g., `["15m", "1h", "4h"]`)
+#### String-Based Indicator System
+- **config_id**: Configuration UUID that determines which indicators to extract
+- **Dynamic symbols**: Symbols are determined by the extraction request (e.g., from ggShot signals)
+- **No global timeframes**: Each indicator specifies its own timeframe
 
 #### Crypto Indicators MCP Source
 - **enabled**: Whether to use this source
-- **indicators**: List of user-friendly indicator names (e.g., `["RSI", "MACD"]`)
-- **use_llm_selection**: If true, LLM selects indicators; if false, uses configured list
+- **indicators**: List of string-based indicators with explicit timeframes (e.g., `["RSI_1h", "RSI_4h", "Aroon_1d"]`)
 - **llm_interpretation**: Whether to use LLM for analytical interpretation
 - **llm_model**: LLM model for interpretation (default: `"gpt-4o-mini"`)
 
+#### String-Based Indicator Format
+Indicators now use explicit timeframe specification:
+- `RSI_1h` - RSI on 1-hour timeframe
+- `RSI_4h` - RSI on 4-hour timeframe
+- `Aroon_1d` - Aroon on daily timeframe
+- `DonchianChannel_200_1h` - Donchian Channel with 200-period on 1-hour timeframe
+
 #### Available Indicators
-The system supports 50+ indicators through MCP metadata mapping:
-- **RSI**: Relative Strength Index
-- **MACD**: Moving Average Convergence Divergence  
-- **BollingerBands**: Bollinger Bands
-- **ATR**: Average True Range
-- **Stochastic**: Stochastic Oscillator
-- **Williams%R**: Williams %R
-- **OBV**: On Balance Volume
-- **And many more...**
+The system supports 58 indicators through MCP metadata mapping, organized by category:
+
+**Trend Indicators (25)**: SMA, EMA, MACD, Parabolic SAR, Aroon, etc.
+**Momentum Indicators (9)**: RSI, Stochastic, Williams %R, CCI, etc.
+**Volatility Indicators (11)**: Bollinger Bands, ATR, Keltner Channels, etc.
+**Volume Indicators (9)**: OBV, VWAP, Money Flow Index, etc.
+
+All indicators support string-based specification with timeframes:
+- `RSI_1h`, `RSI_4h`, `RSI_1d`
+- `BollingerBands_1h`, `BollingerBandsWidth_1d`
+- `DonchianChannel_200_1h` (with period embedded)
 
 ## Technical Analysis Focus
 
@@ -192,35 +203,27 @@ EXCHANGE_NAME=binance
 
 ## Database Storage
 
-Extracted data is stored in the `market_data` table:
+Extracted data is stored in the `market_data` table using the **config_id + symbol** pattern:
 
-### Raw Indicator Data
-Stored in `indicators.results` JSONB field:
+### String-Based Indicator Storage
+Stored in `indicators` JSONB field with string keys:
 ```json
 {
-  "results": {
-    "RSI": "[0,0,45.98,52.19,44.64,...]"  // 100-point time series
-  },
-  "configured_indicators": ["RSI"]
+  "RSI_1h": "meta=None content=[TextContent(type='text', text='[45.98,52.19,...]')]",
+  "RSI_4h": "meta=None content=[TextContent(type='text', text='[67.23,58.45,...]')]",
+  "Aroon_1d": "meta=None content=[TextContent(type='text', text='{\"up\":[100,85,...], \"down\":[25,40,...]}')]",
+  "VWAP_1h": "meta=None content=[TextContent(type='text', text='[0.0247,0.0248,...]')]"
 }
 ```
 
-### Analytical Interpretation
-Stored in `raw_data.interpretation` JSONB field:
-```json
-{
-  "interpretation": {
-    "current_state": "RSI at 64.47, moderately bullish",
-    "trend_analysis": "Upward trend with recent consolidation",
-    "analytical_insights": ["Key insight 1", "Key insight 2"],
-    "confidence_in_analysis": 0.85
-  },
-  "llm_model": "gpt-4o-mini",
-  "config": {
-    "use_llm_selection": false,
-    "llm_interpretation": true
-  }
-}
+### Database Lookup Pattern
+- **NEW**: `WHERE config_id = %s AND symbol = %s`
+- **OLD**: ~~`WHERE symbol = %s AND timeframe = %s`~~ (deprecated)
+
+### Storage Efficiency
+- Single row per (config_id, symbol) combination
+- All indicators for a symbol stored together
+- No cross-product explosion of symbol × timeframe × indicator
 ```
 
 ## Adding New Data Sources
@@ -301,11 +304,13 @@ POST /extraction/webhooks/trigger-extraction
 ```json
 {
   "user_id": "00000000-0000-0000-0000-000000000001",
-  "config_id": "a93de31b-9b8a-42e3-827d-c31e580f5f36",
-  "symbols": ["BTC/USDT"],
-  "timeframes": ["15m"]
+  "config_id": "e249bb49-0455-4596-9657-09bf9e14ca14",
+  "symbols": ["NKN/USDT"],
+  "timeframes": ["1h"]
 }
 ```
+
+**Note**: The `timeframes` field is kept for API compatibility but ignored. Indicators specify their own timeframes via string-based format.
 
 #### **Response Format**
 ```json
@@ -319,11 +324,11 @@ POST /extraction/webhooks/trigger-extraction
 #### **Autonomous Chain Behavior**
 
 1. **Pre-Extraction Monitoring**: Refreshes account state from exchange before extraction
-2. **Background Processing**: Runs extraction asynchronously using FastAPI BackgroundTasks
-3. **Indicator Collection**: Extracts all configured indicators (e.g., RSI) via MCP
-4. **Data Storage**: Stores indicator data and LLM interpretation in market_data table
-5. **90-Second Delay**: Waits 90 seconds to ensure all indicators complete before chain continuation
-6. **Auto-Chaining**: Automatically triggers Decision webhook if data_points > 0
+2. **Config-Driven Extraction**: Uses config_id to determine which string-based indicators to extract
+3. **Efficient Grouping**: Groups indicators by timeframe for batch processing (e.g., all 1h indicators together)
+4. **MCP Tool Calls**: Direct calls to crypto-indicators-mcp server for each indicator
+5. **String-Based Storage**: Stores with indicator string keys (e.g., "RSI_1h", "Aroon_1d")
+6. **Auto-Chaining**: Automatically triggers Decision webhook after successful extraction
 
 #### **Timing Strategy**
 The 90-second delay ensures all configured indicators have time to complete:

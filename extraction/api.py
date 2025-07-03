@@ -198,24 +198,58 @@ async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optiona
                 timeframes = timeframes or extraction_config.get('timeframes', ['15m', '1h'])
                 logger.bind(user_id=user_id).info(f"Standard mode: Using symbols={symbols}, timeframes={timeframes}")
         
-        # Run extraction using the same function as working test
-        results = await extract_mcp_indicators(
-            symbols=symbols,
-            timeframes=timeframes,
-            user_id=user_id,
-            use_llm=True,
-            llm_model="gpt-4o-mini",
-            config_id=config_id
-        )
+        # Run extraction using the new system (with legacy fallback)
+        try:
+            # Try new system first if config_id is provided
+            if config_id:
+                logger.bind(user_id=user_id).info("Using NEW extraction system with config_id")
+                results = await extract_mcp_indicators(
+                    symbols=symbols,
+                    timeframes=timeframes,
+                    user_id=user_id,
+                    use_llm=True,
+                    llm_model="gpt-4o-mini",
+                    config_id=config_id
+                )
+            else:
+                # Fallback to legacy system
+                logger.bind(user_id=user_id).info("Using LEGACY extraction system (no config_id)")
+                from extraction.extraction_main import extract_mcp_indicators_legacy
+                results = await extract_mcp_indicators_legacy(
+                    symbols=symbols,
+                    timeframes=timeframes,
+                    user_id=user_id,
+                    use_llm=True,
+                    llm_model="gpt-4o-mini",
+                    config_id=config_id
+                )
+        except Exception as new_system_error:
+            # If new system fails, try legacy as fallback
+            logger.bind(user_id=user_id).warning(f"New system failed: {new_system_error}")
+            logger.bind(user_id=user_id).info("Falling back to LEGACY extraction system")
+            from extraction.extraction_main import extract_mcp_indicators_legacy
+            results = await extract_mcp_indicators_legacy(
+                symbols=symbols,
+                timeframes=timeframes,
+                user_id=user_id,
+                use_llm=True,
+                llm_model="gpt-4o-mini",
+                config_id=config_id
+            )
         
         # Count data points from extract_mcp_indicators structure
         data_points = 0
         if isinstance(results, dict) and "error" not in results:
             for symbol, symbol_results in results.items():
                 if isinstance(symbol_results, dict):
-                    for timeframe, timeframe_result in symbol_results.items():
-                        if isinstance(timeframe_result, dict) and timeframe_result.get('status') == 'success':
-                            data_points += 1
+                    # NEW SYSTEM: Check if we have direct status (not nested by timeframe)
+                    if 'status' in symbol_results and symbol_results.get('status') == 'success':
+                        data_points += 1
+                    else:
+                        # LEGACY: Nested by timeframe
+                        for timeframe, timeframe_result in symbol_results.items():
+                            if isinstance(timeframe_result, dict) and timeframe_result.get('status') == 'success':
+                                data_points += 1
         
         # Update status to completed
         extraction_status[extraction_id].update({
@@ -303,28 +337,28 @@ async def get_extraction_status(extraction_id: str):
 async def get_latest_market_data(
     user_id: str,
     symbol: str,
-    timeframe: str,
-    data_type: str = "indicator_values"
+    config_id: str,
+    data_type: str = "indicator_analysis"
 ):
     """
-    Get the latest market data for a specific symbol and timeframe.
+    Get the latest market data for a specific symbol and config.
     
     Args:
         user_id: User ID
         symbol: Trading symbol (e.g., "BTC/USDT")
-        timeframe: Timeframe (e.g., "15m", "1h")
-        data_type: Type of data ("indicator_values" or "indicator_analysis")
+        config_id: Configuration ID for the extraction
+        data_type: Type of data ("indicator_analysis")
     """
     # Get database connection
     with get_db_connection() as conn:
         with conn.cursor() as cur:
-            # Query for latest data
+            # Query using config_id (NEW SYSTEM)
             cur.execute("""
-                SELECT raw_data, updated_at
+                SELECT raw_data, indicators, updated_at
                 FROM market_data
                 WHERE user_id = %s
                   AND symbol = %s
-                  AND timeframe = %s
+                  AND config_id = %s
                   AND data_type = %s
                   AND updated_at > %s
                 ORDER BY updated_at DESC
@@ -332,9 +366,9 @@ async def get_latest_market_data(
             """, (
                 user_id,
                 symbol,
-                timeframe,
+                config_id,
                 data_type,
-                datetime.utcnow() - timedelta(hours=24)  # Only last 24 hours
+                datetime.utcnow() - timedelta(hours=24)
             ))
             
             result = cur.fetchone()
@@ -342,32 +376,22 @@ async def get_latest_market_data(
             if not result:
                 raise HTTPException(
                     status_code=404,
-                    detail=f"No recent data found for {symbol} {timeframe}"
+                    detail=f"No recent data found for {symbol} with config {config_id}"
                 )
             
-            raw_data, updated_at = result
+            raw_data, indicators, updated_at = result
             
-            # Parse the data based on type
-            if data_type == "indicator_values":
-                # Return raw indicator data
-                return {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "data": raw_data.get("indicators", {}),
-                    "created_at": updated_at.isoformat() + "Z"
-                }
-            else:
-                # Return analysis text including interpretation  
-                return {
-                    "symbol": symbol,
-                    "timeframe": timeframe,
-                    "data": {
-                        "indicators": raw_data.get("indicators", {}),
-                        "interpretation": raw_data.get("interpretation", {})
-                    },
-                    "analysis": raw_data.get("interpretation", {}).get("analysis", ""),
-                    "created_at": updated_at.isoformat() + "Z"
-                }
+            # Return data in NEW SYSTEM format
+            return {
+                "symbol": symbol,
+                "config_id": config_id,
+                "data": {
+                    "indicators": indicators or {},
+                    "interpretation": raw_data.get("interpretation", {}) if raw_data else {}
+                },
+                "analysis": raw_data.get("interpretation", {}).get("analysis", "") if raw_data else "",
+                "created_at": updated_at.isoformat() + "Z"
+            }
 
 
 @app.get("/health")
