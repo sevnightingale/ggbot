@@ -276,9 +276,9 @@ class CryptoIndicatorsMCPSource:
                                 elif param_info.get('type') == 'string':
                                     params[param_name] = param_info.get('default', '')
                 
-                # Call the MCP tool through the session
+                # Call the MCP tool through the session with preprocessing (always enabled)
                 self.logger.info(f"Calling {mcp_tool_name} for {symbol} {timeframe}")
-                result = await self.mcp_client.session.call_tool(mcp_tool_name, params)
+                result = await self.mcp_client.call_indicator_tool(mcp_tool_name, params, use_preprocessing=True)
                 
                 if result and not (isinstance(result, str) and result.startswith("Error")):
                     indicator_results[indicator_name] = result
@@ -455,8 +455,8 @@ Format your response as a JSON object with these fields:
                 elif f"{parsed['indicator']}_period" in self.config:
                     params["period"] = self.config[f"{parsed['indicator']}_period"]
                 
-                # Call MCP tool
-                result = await self.mcp_client.session.call_tool(mcp_tool_name, params)
+                # Call MCP tool with preprocessing (always enabled)
+                result = await self.mcp_client.call_indicator_tool(mcp_tool_name, params, use_preprocessing=True)
                 
                 if result and not (isinstance(result, str) and result.startswith("Error")):
                     results[indicator_string] = result  # Store with full string name

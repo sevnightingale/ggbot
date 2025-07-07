@@ -54,16 +54,24 @@
 
 ## 🎯 Current Focus
 
+### Critical Issue - Indicator Value Parsing
+**Status**: 🔴 **CRITICAL BUG IDENTIFIED**
+- **Problem**: LLM misreading complex JSON arrays from MCP server
+- **Impact**: Wrong signal assessments (e.g., Aroon Down: 100→35.71, Vortex VI-: 0.072→1.164)
+- **Root Cause**: MCP returns raw arrays, LLM can't reliably extract current values
+- **Solution**: Adding smart preprocessing to crypto-indicators MCP server
+
 ### Live Production Service
 **ggShot Signal Filtering** 
-- Status: ✅ LIVE - 4-Pillar Framework Active
+- Status: ⚠️ ACTIVE but with parsing errors affecting accuracy
 - Processing: ~10-12 signals/day with 10 technical indicators
 - Publishing: High-confidence signals to Telegram (≥0.50)
-- Latest: Upgraded from RSI-only to comprehensive market analysis
+- Latest: 4-Pillar Framework deployed, but indicator parsing needs fix
 
-### Active Issues
-1. **API CPU Usage** - Fixed, pending restart to apply
-2. **Monitoring** - Need to observe 4-pillar performance with real signals
+### Active Tasks
+1. **MCP Preprocessing** - Adding intelligent preprocessing to return contextual indicator data
+2. **API CPU Usage** - Fixed, pending restart to apply
+3. **Signal Accuracy** - Fix parsing to improve 4-pillar validation accuracy
 
 ---
 

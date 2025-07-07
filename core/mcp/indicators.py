@@ -133,7 +133,8 @@ class IndicatorsMCPClient(MCPClient):
     async def calculate_rsi(
         self,
         prices: List[float],
-        period: int = 14
+        period: int = 14,
+        format: str = "preprocessed"
     ) -> Dict[str, Any]:
         """
         Calculate Relative Strength Index (RSI) for a series of prices.
@@ -141,9 +142,10 @@ class IndicatorsMCPClient(MCPClient):
         Args:
             prices: List of closing prices
             period: Period for RSI calculation
+            format: Output format ('raw' for arrays, 'preprocessed' for contextual analysis)
             
         Returns:
-            Dictionary containing RSI values
+            Dictionary containing RSI values or preprocessed analysis
         """
         if not self.is_connected or not self.session:
             await self.connect()
@@ -154,7 +156,8 @@ class IndicatorsMCPClient(MCPClient):
                 'calculate_relative_strength_index',
                 {
                     'prices': prices,
-                    'period': period
+                    'period': period,
+                    'format': format
                 }
             )
             return result
@@ -598,6 +601,49 @@ class IndicatorsMCPClient(MCPClient):
             self._log.error(f"Error analyzing with strategy {strategy}: {str(e)}")
             raise MCPError(f"Error analyzing with strategy {strategy}: {str(e)}")
             
+    async def call_indicator_tool(
+        self,
+        tool_name: str,
+        params: Dict[str, Any],
+        use_preprocessing: bool = True
+    ) -> Dict[str, Any]:
+        """
+        Call any indicator tool with optional preprocessing.
+        
+        Args:
+            tool_name: Name of the MCP tool to call
+            params: Parameters for the tool
+            use_preprocessing: Whether to use preprocessed format (default: True)
+            
+        Returns:
+            Dictionary containing indicator results
+        """
+        if not self.is_connected or not self.session:
+            await self.connect()
+            
+        # Add format parameter if not already specified
+        if 'format' not in params and use_preprocessing:
+            params['format'] = 'preprocessed'
+        elif 'format' not in params:
+            params['format'] = 'raw'
+            
+        try:
+            result = await self.session.call_tool(tool_name, params)
+            
+            # Parse JSON if the result is a string (MCP returns JSON as text)
+            if isinstance(result, str):
+                try:
+                    import json
+                    result = json.loads(result)
+                except (json.JSONDecodeError, ValueError):
+                    # If it's not valid JSON, return as-is
+                    pass
+                    
+            return result
+        except Exception as e:
+            self._log.error(f"Error calling {tool_name}: {str(e)}")
+            raise MCPError(f"Error calling {tool_name}: {str(e)}")
+    
     # Helper method to find the actual tool name from a partial name
     async def find_tool_by_partial_name(self, partial_name: str) -> Optional[str]:
         """

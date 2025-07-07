@@ -26,6 +26,7 @@ The ggbots platform uses a hybrid architecture with Bubble.io for frontend/user 
 - `0011_add_data_integrity_constraints.sql`: Adds comprehensive data integrity constraints and reconciliation logging
 - `0012_universal_trade_lifecycle.sql`: **MAJOR MIGRATION** - Transforms phantom-trade system to universal position-based trade lifecycle system
 - `0013_enhanced_trade_lifecycle.sql`: Adds config_id integration, TP/SL tracking, strategy metadata, and backward compatibility
+- `0014_create_ggshot_filter_table.sql`: Creates ggshot_filter table for logging all ggShot signal filter decisions
 - `2025-06-30_add_config_id_to_market_data.sql`: Adds config_id column to market_data table for configuration-driven extraction system
 
 ## Database Schema
@@ -442,6 +443,67 @@ SELECT exchange_order_id, side, price, filled_size, status, filled_at
 FROM trade_orders WHERE trade_id = 'your-trade-id' ORDER BY created_at;
 ```
 
+### ggshot_filter
+**NEW TABLE (Migration 0014)**: Logs all ggShot signal filter decisions for analysis and monitoring.
+
+| Column                | Type            | Description                            |
+|-----------------------|-----------------|----------------------------------------|
+| filter_id             | UUID            | Primary Key                            |
+| symbol                | VARCHAR(20)     | Trading pair symbol                    |
+| signal_direction      | VARCHAR(10)     | Signal direction: 'LONG' or 'SHORT'   |
+| confidence_score      | NUMERIC(4,3)    | LLM confidence score (0.000-1.000)    |
+| filter_status         | VARCHAR(10)     | Filter result: 'APPROVED' or 'REJECTED' |
+| reasoning_text        | TEXT            | Full LLM reasoning for the decision    |
+| entry_price          | DECIMAL(20,8)   | Signal entry price (average of zone)  |
+| stop_loss_price      | DECIMAL(20,8)   | Signal stop loss price                |
+| take_profit_price    | DECIMAL(20,8)   | Signal take profit price (Target 1)   |
+| signal_timeframe     | VARCHAR(10)     | Signal timeframe ('15m', '30m', etc.) |
+| volume_analysis      | TEXT            | Volume confirmation analysis text      |
+| original_signal_text | TEXT            | Original ggShot signal message         |
+| created_at           | TIMESTAMP       | Filter decision timestamp              |
+
+**Purpose:**
+- Tracks all ggShot filter decisions (both approved and rejected)
+- Enables confidence score distribution analysis
+- Provides audit trail for filter performance
+- Supports filter optimization and calibration
+
+**Indexes:**
+- Primary Key on `filter_id`
+- Index on `symbol` for symbol-specific analysis
+- Index on `confidence_score` for distribution analysis
+- Index on `filter_status` for approval/rejection rates
+- Index on `created_at` for time-series analysis
+
+**Usage Examples:**
+```sql
+-- Confidence score distribution
+SELECT 
+  ROUND(confidence_score, 1) as score_range,
+  COUNT(*) as count,
+  filter_status
+FROM ggshot_filter 
+GROUP BY ROUND(confidence_score, 1), filter_status 
+ORDER BY score_range;
+
+-- Filter performance by symbol
+SELECT 
+  symbol,
+  COUNT(*) as total_signals,
+  AVG(confidence_score) as avg_confidence,
+  COUNT(*) FILTER (WHERE filter_status = 'APPROVED') as approved,
+  COUNT(*) FILTER (WHERE filter_status = 'REJECTED') as rejected
+FROM ggshot_filter 
+GROUP BY symbol 
+ORDER BY total_signals DESC;
+
+-- Recent filter decisions
+SELECT symbol, signal_direction, confidence_score, filter_status, created_at
+FROM ggshot_filter 
+ORDER BY created_at DESC 
+LIMIT 10;
+```
+
 ### Data Integrity Verification
 ```sql
 -- Check for orphaned orders (should be empty)
@@ -451,4 +513,14 @@ WHERE trade_id NOT IN (SELECT trade_id FROM trades);
 -- Verify instrument metadata coverage
 SELECT exchange, symbol FROM trades 
 WHERE (exchange, symbol) NOT IN (SELECT exchange, symbol FROM instrument_metadata);
+
+-- Check ggShot filter logging health
+SELECT 
+  DATE(created_at) as date,
+  COUNT(*) as daily_signals,
+  AVG(confidence_score) as avg_confidence
+FROM ggshot_filter 
+WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
+GROUP BY DATE(created_at) 
+ORDER BY date DESC;
 ```

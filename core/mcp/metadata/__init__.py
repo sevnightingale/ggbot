@@ -72,6 +72,7 @@ def create_friendly_mapping() -> Dict[str, str]:
         "BollingerBandsWidth": "calculate_bollinger_bands_width",
         "BBW": "calculate_bollinger_bands_width",
         "Vortex": "calculate_vortex",
+        "TRIX": "calculate_triple_exponential_average",
         # Note: ADX is not available in current MCP tools - would need to be added to MCP server
         "ADX": "calculate_average_directional_index",  # Placeholder for when it's implemented
     }
