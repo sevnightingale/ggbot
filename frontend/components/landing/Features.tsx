@@ -2,13 +2,13 @@
 
 export default function Features() {
   return (
-    <section className="py-16 bg-charcoal-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-bone-200 mb-4 font-display">
+    <section className="py-20 bg-charcoal-900">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-2xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
             Built Like a Trader, Not a Bot
           </h2>
-          <p className="text-bone-200/80 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-bone-200/70 max-w-xl mx-auto leading-relaxed">
             Most algo bots are glorified calculators. ggbots is an intelligent agent system designed to think like a real trader.
           </p>
         </div>

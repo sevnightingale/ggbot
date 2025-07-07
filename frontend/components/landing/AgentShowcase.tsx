@@ -2,13 +2,13 @@
 
 export default function AgentShowcase() {
   return (
-    <section className="py-16 bg-charcoal-900 border-t-2 border-bone-200/20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl font-bold text-bone-200 mb-4 font-display">
+    <section className="py-20 bg-charcoal-900 border-t-2 border-bone-200/20">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="text-center mb-16">
+          <h2 className="text-2xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
             Why It Matters
           </h2>
-          <p className="text-bone-200/80 max-w-2xl mx-auto">
+          <p className="text-base md:text-lg text-bone-200/70 max-w-xl mx-auto leading-relaxed">
             Markets move fast. Static bots break. ggbots adapts.
           </p>
         </div>
