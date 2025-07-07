@@ -1,14 +1,12 @@
 import Hero from '@/components/landing/Hero'
 import Features from '@/components/landing/Features'
 import AgentShowcase from '@/components/landing/AgentShowcase'
-import EmailForm from '@/components/landing/EmailForm'
 import Footer from '@/components/landing/Footer'
 
 export default function LandingPage() {
   return (
     <main className="min-h-screen bg-charcoal-900">
       <Hero />
-      <EmailForm />
       <Features />
       <AgentShowcase />
       <Footer />
