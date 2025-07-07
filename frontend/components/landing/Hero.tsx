@@ -12,32 +12,10 @@ export default function Hero() {
           </h1>
 
           {/* Subheadline */}
-          <p className="text-xl md:text-2xl text-bone-200/80 mb-8 max-w-4xl mx-auto">
+          <p className="text-xl md:text-2xl text-bone-200/80 mb-12 max-w-4xl mx-auto">
             Deploy autonomous AI trading agents that analyze markets, adapt to changing conditions, 
             and execute your proven strategies 24/7 across cryptocurrency exchanges.
           </p>
-
-          {/* Three-Agent Teaser */}
-          <div className="flex justify-center gap-8 mb-12">
-            <div className="text-center">
-              <div className="w-16 h-16 border-2 border-agents-extraction bg-agents-extraction/10 flex items-center justify-center mb-2">
-                <span className="text-agents-extraction font-bold">EX</span>
-              </div>
-              <p className="text-sm text-bone-200/60">Extraction Agent</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 border-2 border-agents-decision bg-agents-decision/10 flex items-center justify-center mb-2">
-                <span className="text-agents-decision font-bold">DE</span>
-              </div>
-              <p className="text-sm text-bone-200/60">Decision Agent</p>
-            </div>
-            <div className="text-center">
-              <div className="w-16 h-16 border-2 border-agents-trading bg-agents-trading/10 flex items-center justify-center mb-2">
-                <span className="text-agents-trading font-bold">TR</span>
-              </div>
-              <p className="text-sm text-bone-200/60">Trading Agent</p>
-            </div>
-          </div>
 
           {/* Integrated Waitlist */}
           <div className="max-w-md mx-auto">
