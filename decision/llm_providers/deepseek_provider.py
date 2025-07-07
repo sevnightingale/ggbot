@@ -42,7 +42,7 @@ class DeepSeekProvider(LLMProvider):
         """
         super().__init__(api_key, model, **kwargs)
         self.base_url = kwargs.get('base_url', 'https://api.deepseek.com/v1')
-        self.timeout = kwargs.get('timeout', 120)  # Increased for 4-Pillar analysis
+        self.timeout = kwargs.get('timeout', 120)  # Standard timeout for analysis
         self.max_retries = kwargs.get('max_retries', 3)
         
         logger.bind(module="decision.deepseek").info(

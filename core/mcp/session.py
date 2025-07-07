@@ -73,6 +73,32 @@ class MCPSession:
             if hasattr(result, 'result'):
                 self._log.debug(f"Received CallToolResult object, extracting result")
                 result = result.result
+            
+            # Handle MCP content responses (extract text from content field)
+            if hasattr(result, 'content') and hasattr(result.content, '__iter__'):
+                try:
+                    # Extract text from content list
+                    text_content = []
+                    for content_item in result.content:
+                        if hasattr(content_item, 'text'):
+                            text_content.append(content_item.text)
+                        elif hasattr(content_item, 'type') and content_item.type == 'text':
+                            text_content.append(getattr(content_item, 'text', str(content_item)))
+                    
+                    if text_content:
+                        # If we have text content, try to parse as JSON first
+                        combined_text = ''.join(text_content)
+                        try:
+                            import json
+                            result = json.loads(combined_text)
+                            self._log.debug(f"Successfully parsed MCP content as JSON")
+                        except (json.JSONDecodeError, ValueError):
+                            # If not valid JSON, return the text as-is
+                            result = combined_text
+                            self._log.debug(f"MCP content is not JSON, returning as text")
+                except Exception as e:
+                    self._log.warning(f"Error processing MCP content: {str(e)}")
+                    # Fall through to normal processing
 
             # Verify the result is JSON serializable
             try:
