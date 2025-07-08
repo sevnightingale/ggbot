@@ -41,8 +41,8 @@ export default function Hero() {
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-bone-200/70 mb-16 max-w-2xl mx-auto leading-relaxed">
-            Deploy autonomous AI trading agents that analyze markets, adapt to changing conditions, 
-            and execute your proven strategies 24/7.
+            Built by a trader, for traders. Train an AI to trade like you. Deploy autonomous agents that replicate your strategies, 
+            adapt to changing conditions, and execute your proven edge 24/7.
           </p>
 
           {/* Integrated Waitlist */}
