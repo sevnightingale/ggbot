@@ -6,46 +6,79 @@ export default function AgentShowcase() {
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
           <h2 className="text-2xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
-            Why It Matters
+            The Problem With Modern Trading
           </h2>
           <p className="text-base md:text-lg text-bone-200/70 max-w-xl mx-auto leading-relaxed">
-            Markets move fast. Static bots break. ggbots adapts.
+            Traditional tools force you to choose between sleep and profits.
           </p>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-12 items-center">
-          <div>
-            <h3 className="text-2xl font-bold text-bone-200 mb-4 font-display">
-              Trade While You Sleep, Your Way
-            </h3>
-            <p className="text-bone-200/80 mb-6">
-              Your ggbot sees the full market context, adapts to changing conditions, and executes disciplined strategies with precision. It captures your system, your insights, and your edge.
+        <div className="grid md:grid-cols-3 gap-8 mb-16">
+          {/* Problem 1 */}
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 border-2 border-bone-200/40 flex items-center justify-center">
+              <span className="text-2xl">😴</span>
+            </div>
+            <h3 className="text-lg font-bold text-bone-200 mb-2 font-display">Humans Need Sleep</h3>
+            <p className="text-bone-200/70 text-sm">
+              Manual trading means constant monitoring or missed opportunities.
             </p>
-            <ul className="space-y-3 text-bone-200/80">
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-agents-extraction mr-3"></span>
-                Responds to volatility spikes instantly
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-agents-decision mr-3"></span>
-                Adapts to breaking news and sentiment shifts
-              </li>
-              <li className="flex items-center">
-                <span className="w-2 h-2 bg-agents-trading mr-3"></span>
-                Executes with your exact risk parameters
-              </li>
-            </ul>
           </div>
 
-          <div className="relative border-2 border-bone-200/20 p-8 bg-bone-200/5">
-            {/* Subtle concrete texture */}
-            <div className="absolute inset-0 bg-gradient-to-br from-bone-200/10 via-transparent to-bone-200/5 opacity-30"></div>
-            <div className="relative">
-              <h4 className="text-xl font-bold text-bone-200 mb-4 font-display">
-                Customizable. Scalable. Built to Win.
-              </h4>
-              <p className="text-bone-200/80">
-                From niche indicators to dynamic strategies, ggbots gives you full control. Configure once. Improve over time. Let your edge scale without burnout.
+          {/* Problem 2 */}
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 border-2 border-bone-200/40 flex items-center justify-center">
+              <span className="text-2xl">🤖</span>
+            </div>
+            <h3 className="text-lg font-bold text-bone-200 mb-2 font-display">Rigid Bots Break</h3>
+            <p className="text-bone-200/70 text-sm">
+              Basic rule-based automation fails when market conditions change.
+            </p>
+          </div>
+
+          {/* Problem 3 */}
+          <div className="text-center">
+            <div className="w-16 h-16 mx-auto mb-4 border-2 border-bone-200/40 flex items-center justify-center">
+              <span className="text-2xl">💸</span>
+            </div>
+            <h3 className="text-lg font-bold text-bone-200 mb-2 font-display">High Costs</h3>
+            <p className="text-bone-200/70 text-sm">
+              Advanced quant systems are inaccessible or extremely expensive.
+            </p>
+          </div>
+        </div>
+
+        {/* Solution */}
+        <div className="border-t-2 border-bone-200/20 pt-16">
+          <div className="text-center mb-12">
+            <h2 className="text-2xl md:text-4xl font-bold text-bone-200 mb-4 font-display">
+              Why ggbots Works
+            </h2>
+            <p className="text-base md:text-lg text-bone-200/70 max-w-3xl mx-auto">
+              AI has advanced significantly, while trading tools have not kept pace. Three breakthroughs make ggbots possible today.
+            </p>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            <div className="text-center">
+              <div className="w-3 h-3 bg-agents-extraction mx-auto mb-4"></div>
+              <h3 className="text-lg font-bold text-bone-200 mb-2">Reasoning AI</h3>
+              <p className="text-bone-200/70 text-sm">
+                Advanced LLMs offer adaptive, human-like thinking that understands complex market patterns.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-3 h-3 bg-agents-decision mx-auto mb-4"></div>
+              <h3 className="text-lg font-bold text-bone-200 mb-2">Browser Automation</h3>
+              <p className="text-bone-200/70 text-sm">
+                Technology now mimics trader behavior on platforms like TradingView seamlessly.
+              </p>
+            </div>
+            <div className="text-center">
+              <div className="w-3 h-3 bg-agents-trading mx-auto mb-4"></div>
+              <h3 className="text-lg font-bold text-bone-200 mb-2">24/7 Markets</h3>
+              <p className="text-bone-200/70 text-sm">
+                Crypto never sleeps. Your edge shouldn&apos;t either. AI provides continuous oversight.
               </p>
             </div>
           </div>

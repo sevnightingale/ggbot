@@ -52,7 +52,7 @@ export default function Features() {
             <h4 className="text-sm font-medium text-agents-trading mb-2 tracking-wide">TRADING AGENT</h4>
             <h3 className="text-xl font-bold text-bone-200 mb-3 font-display">Executes with Discipline</h3>
             <p className="text-bone-200/80">
-              The Trading Agent executes with precision, enforces your risk rules, and makes split-second decisions based on actual conditions, not outdated code.
+              The Trading Agent executes with precision, enforces your risk rules, and reacts to market conditions without human emotions or hesitation.
             </p>
           </div>
         </div>
