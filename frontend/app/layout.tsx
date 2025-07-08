@@ -13,8 +13,8 @@ const kanit = Kanit({
 })
 
 export const metadata: Metadata = {
-  title: "ggbots - Your Edge, Amplified",
-  description: "Build autonomous AI trading agents that trade like you",
+  title: "ggbots - your edge, amplified",
+  description: "build autonomous ai trading agents that trade like you",
 }
 
 export default function RootLayout({

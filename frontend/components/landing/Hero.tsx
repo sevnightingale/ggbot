@@ -22,39 +22,39 @@ export default function Hero() {
         <div className="text-center">
           {/* Main Headline */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-bone-200 mb-8 font-display leading-tight relative">
-            AI Trading Agents<br />
-            That <span className="inline-flex space-x-2 md:space-x-4">
+            ai trading agents<br />
+            that <span className="inline-flex space-x-2 md:space-x-4">
               <span className="text-agents-extraction relative group">
-                Trade
-                <span className="absolute inset-0 text-agents-extraction opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">Trade</span>
+                trade
+                <span className="absolute inset-0 text-agents-extraction opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">trade</span>
               </span>
               <span className="text-agents-decision relative group">
-                Like
-                <span className="absolute inset-0 text-agents-decision opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">Like</span>
+                like
+                <span className="absolute inset-0 text-agents-decision opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">like</span>
               </span>
               <span className="text-agents-trading relative group">
-                You
-                <span className="absolute inset-0 text-agents-trading opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">You</span>
+                you
+                <span className="absolute inset-0 text-agents-trading opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">you</span>
               </span>
             </span>
           </h1>
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-bone-200/70 mb-16 max-w-2xl mx-auto leading-relaxed">
-            Built by a trader, for traders. Train an AI to trade like you. Deploy autonomous agents that replicate your strategies, 
+            built by a trader, for traders. train an ai to trade like you. deploy autonomous agents that replicate your strategies, 
             adapt to changing conditions, and execute your proven edge 24/7.
           </p>
 
           {/* Integrated Waitlist */}
           <div className="max-w-sm mx-auto">
-            <p className="text-bone-200/80 font-medium mb-6 text-base">Join the waitlist for early access</p>
+            <p className="text-bone-200/80 font-medium mb-6 text-base">join the waitlist for early access</p>
             <div className="relative">
               {/* Subtle container styling */}
               <div className="absolute inset-0 bg-bone-200/5 border border-bone-200/20 -z-10"></div>
               <div className="launchlist-widget" data-key-id="8390qp" data-height="160px"></div>
             </div>
             <p className="text-bone-200/50 text-xs mt-6 leading-relaxed">
-              Refer friends to move up the waitlist.<br/>Share your unique link after signing up.
+              refer friends to move up the waitlist.<br/>share your unique link after signing up.
             </p>
           </div>
         </div>
