@@ -37,13 +37,17 @@ export default function AgentShowcase() {
             </ul>
           </div>
 
-          <div className="border-2 border-bone-200/20 p-8 bg-bone-200/5">
-            <h4 className="text-xl font-bold text-bone-200 mb-4 font-display">
-              Customizable. Scalable. Built to Win.
-            </h4>
-            <p className="text-bone-200/80">
-              From niche indicators to dynamic strategies, ggbots gives you full control. Configure once. Improve over time. Let your edge scale without burnout.
-            </p>
+          <div className="relative border-2 border-bone-200/20 p-8 bg-bone-200/5">
+            {/* Subtle concrete texture */}
+            <div className="absolute inset-0 bg-gradient-to-br from-bone-200/10 via-transparent to-bone-200/5 opacity-30"></div>
+            <div className="relative">
+              <h4 className="text-xl font-bold text-bone-200 mb-4 font-display">
+                Customizable. Scalable. Built to Win.
+              </h4>
+              <p className="text-bone-200/80">
+                From niche indicators to dynamic strategies, ggbots gives you full control. Configure once. Improve over time. Let your edge scale without burnout.
+              </p>
+            </div>
           </div>
         </div>
       </div>
