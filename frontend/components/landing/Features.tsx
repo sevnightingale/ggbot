@@ -9,7 +9,7 @@ export default function Features() {
             Built Like a Trader, Not a Bot
           </h2>
           <p className="text-base md:text-lg text-bone-200/70 max-w-xl mx-auto leading-relaxed">
-            Most algo bots are glorified calculators. ggbots is an intelligent agent system designed to think like a real trader.
+            Traditional algo bots are rigid and rule-bound. ggbots is an intelligent agent system that adapts dynamically to changing conditions like a real trader.
           </p>
         </div>
 
@@ -38,7 +38,7 @@ export default function Features() {
             <h4 className="text-sm font-medium text-agents-decision mb-2 tracking-wide">DECISION AGENT</h4>
             <h3 className="text-xl font-bold text-bone-200 mb-3 font-display">Thinks Strategically</h3>
             <p className="text-bone-200/80">
-              The Decision Agent analyzes the full picture, applies your strategy, and adjusts in real time. Just like you would if you didn&apos;t need sleep.
+              The Decision Agent analyzes the full picture, applies your strategy, and adjusts in real time. Just like you would if you never needed sleep.
             </p>
           </div>
 
@@ -52,7 +52,7 @@ export default function Features() {
             <h4 className="text-sm font-medium text-agents-trading mb-2 tracking-wide">TRADING AGENT</h4>
             <h3 className="text-xl font-bold text-bone-200 mb-3 font-display">Executes with Discipline</h3>
             <p className="text-bone-200/80">
-              The Trading Agent acts instantly, enforces your risk rules, and keeps you in the trade—or out—based on actual conditions, not old code.
+              The Trading Agent executes with precision, enforces your risk rules, and makes split-second decisions based on actual conditions, not outdated code.
             </p>
           </div>
         </div>

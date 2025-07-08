@@ -16,10 +16,10 @@ export default function AgentShowcase() {
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
             <h3 className="text-2xl font-bold text-bone-200 mb-4 font-display">
-              Trade While You Sleep—Your Way
+              Trade While You Sleep, Your Way
             </h3>
             <p className="text-bone-200/80 mb-6">
-              Your ggbot doesn&apos;t guess. It trades the way you would, with your data, your indicators, and your risk limits.
+              Your ggbot sees the full market context, adapts to changing conditions, and executes disciplined strategies with precision. It captures your system, your insights, and your edge.
             </p>
             <ul className="space-y-3 text-bone-200/80">
               <li className="flex items-center">
