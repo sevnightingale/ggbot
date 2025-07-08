@@ -15,7 +15,7 @@ export default function LandingPage() {
 }
 
 export const metadata = {
-  title: 'GGBots - AI Trading Agents That Trade Like You',
-  description: 'Deploy autonomous AI trading agents that analyze markets, adapt to conditions, and execute your strategies 24/7.',
-  keywords: 'AI trading, autonomous trading bots, cryptocurrency trading, algorithmic trading',
+  title: 'ggbots - ai trading agents that trade like you',
+  description: 'deploy autonomous ai trading agents that analyze markets, adapt to conditions, and execute your strategies 24/7.',
+  keywords: 'ai trading, autonomous trading bots, cryptocurrency trading, algorithmic trading',
 }
