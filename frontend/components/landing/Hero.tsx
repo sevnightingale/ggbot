@@ -22,12 +22,19 @@ export default function Hero() {
         <div className="text-center">
           {/* Main Headline */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-bone-200 mb-8 font-display leading-tight relative">
-            {/* Subtle text shadow for carved effect */}
-            <span className="relative">
-              AI Trading Agents<br />
-              That <span className="text-bone-200 relative">
-                <span className="absolute inset-0 text-bone-200/20 blur-sm">Trade Like You</span>
-                <span className="relative">Trade Like You</span>
+            AI Trading Agents<br />
+            That <span className="inline-flex space-x-2 md:space-x-4">
+              <span className="text-agents-extraction relative group">
+                Trade
+                <span className="absolute inset-0 text-agents-extraction opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">Trade</span>
+              </span>
+              <span className="text-agents-decision relative group">
+                Like
+                <span className="absolute inset-0 text-agents-decision opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">Like</span>
+              </span>
+              <span className="text-agents-trading relative group">
+                You
+                <span className="absolute inset-0 text-agents-trading opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">You</span>
               </span>
             </span>
           </h1>
