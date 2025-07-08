@@ -14,33 +14,36 @@ export default function Features() {
         </div>
 
         <div className="grid md:grid-cols-3 gap-8">
-          {/* Sees Everything */}
+          {/* Extraction Agent */}
           <div className="border-2 border-bone-200/20 p-6 bg-bone-200/5">
             <div className="w-12 h-12 border-2 border-agents-extraction bg-agents-extraction/10 flex items-center justify-center mb-4">
               <span className="text-agents-extraction font-bold">👁</span>
             </div>
+            <h4 className="text-sm font-medium text-agents-extraction mb-2 tracking-wide">EXTRACTION AGENT</h4>
             <h3 className="text-xl font-bold text-bone-200 mb-3 font-display">Sees Everything</h3>
             <p className="text-bone-200/80">
               Charts. Custom indicators. Real-time prices. Even sentiment and news. The Extraction Agent watches it all.
             </p>
           </div>
 
-          {/* Thinks Strategically */}
+          {/* Decision Agent */}
           <div className="border-2 border-bone-200/20 p-6 bg-bone-200/5">
             <div className="w-12 h-12 border-2 border-agents-decision bg-agents-decision/10 flex items-center justify-center mb-4">
               <span className="text-agents-decision font-bold">🧠</span>
             </div>
+            <h4 className="text-sm font-medium text-agents-decision mb-2 tracking-wide">DECISION AGENT</h4>
             <h3 className="text-xl font-bold text-bone-200 mb-3 font-display">Thinks Strategically</h3>
             <p className="text-bone-200/80">
               The Decision Agent analyzes the full picture, applies your strategy, and adjusts in real time. Just like you would if you didn&apos;t need sleep.
             </p>
           </div>
 
-          {/* Executes with Discipline */}
+          {/* Trading Agent */}
           <div className="border-2 border-bone-200/20 p-6 bg-bone-200/5">
             <div className="w-12 h-12 border-2 border-agents-trading bg-agents-trading/10 flex items-center justify-center mb-4">
               <span className="text-agents-trading font-bold">⚡</span>
             </div>
+            <h4 className="text-sm font-medium text-agents-trading mb-2 tracking-wide">TRADING AGENT</h4>
             <h3 className="text-xl font-bold text-bone-200 mb-3 font-display">Executes with Discipline</h3>
             <p className="text-bone-200/80">
               The Trading Agent acts instantly, enforces your risk rules, and keeps you in the trade—or out—based on actual conditions, not old code.
