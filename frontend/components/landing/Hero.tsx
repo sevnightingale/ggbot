@@ -22,7 +22,7 @@ export default function Hero() {
         <div className="text-center">
           {/* Main Headline */}
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-bone-200 mb-8 font-display leading-tight relative">
-            ai trading agents<br />
+            AI trading agents<br />
             that <span className="inline-flex space-x-2 md:space-x-4">
               <span className="text-agents-extraction relative group">
                 trade
@@ -41,7 +41,7 @@ export default function Hero() {
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-bone-200/70 mb-16 max-w-2xl mx-auto leading-relaxed">
-            built by a trader, for traders. train an ai to trade like you. deploy autonomous agents that replicate your strategies, 
+            built by a trader, for traders. train an AI to trade like you. deploy autonomous agents that replicate your strategies, 
             adapt to changing conditions, and execute your proven edge 24/7.
           </p>
 

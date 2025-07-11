@@ -14,7 +14,7 @@ const kanit = Kanit({
 
 export const metadata: Metadata = {
   title: "ggbots - your edge, amplified",
-  description: "build autonomous ai trading agents that trade like you",
+  description: "build autonomous AI trading agents that trade like you",
 }
 
 export default function RootLayout({
