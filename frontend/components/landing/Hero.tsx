@@ -21,7 +21,7 @@ export default function Hero() {
       <div className="relative max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-20 md:py-32">
         <div className="text-center">
           {/* Main Headline */}
-          <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-bone-200 mb-8 font-display leading-tight relative">
+          <h1 className="text-3xl md:text-4xl lg:text-5xl font-bold text-bone-200 mb-8 font-display leading-tight relative">
             AI trading agents<br />
             that <span className="inline-flex space-x-2 md:space-x-4">
               <span className="text-agents-extraction relative group">
@@ -40,20 +40,20 @@ export default function Hero() {
           </h1>
 
           {/* Subheadline */}
-          <p className="text-lg md:text-xl text-bone-200/70 mb-16 max-w-2xl mx-auto leading-relaxed">
-            built by a trader, for traders. train an AI to trade like you. deploy autonomous agents that replicate your strategies, 
-            adapt to changing conditions, and execute your proven edge 24/7.
+          <p className="text-sm md:text-base lg:text-base text-bone-200/70 mb-16 max-w-2xl mx-auto leading-relaxed">
+            Deploy autonomous AI trading agents that analyze markets, adapt to changing conditions, 
+            and execute your proven strategies 24/7.
           </p>
 
           {/* Integrated Waitlist */}
           <div className="max-w-sm mx-auto">
-            <p className="text-bone-200/80 font-medium mb-6 text-base">join the waitlist for early access</p>
+            <p className="text-xs md:text-xs lg:text-xs text-bone-200/80 font-medium mb-6">join the waitlist for early access</p>
             <div className="relative">
               {/* Subtle container styling */}
               <div className="absolute inset-0 bg-bone-200/5 border border-bone-200/20 -z-10"></div>
               <div className="launchlist-widget" data-key-id="8390qp" data-height="160px"></div>
             </div>
-            <p className="text-bone-200/50 text-xs mt-6 leading-relaxed">
+            <p className="text-xs md:text-xs lg:text-xs text-bone-200/50 mt-6 leading-relaxed">
               refer friends to move up the waitlist.<br/>share your unique link after signing up.
             </p>
           </div>
