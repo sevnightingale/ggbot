@@ -46,35 +46,49 @@ Use color like a weapon. Sparingly and with intention. Most of the UI should rem
 
 **Font Size System (4-Tier Responsive):**
 
-| Element | Mobile | Medium | Large | Usage |
-|---------|--------|--------|-------|-------|
-| **Header** | `text-3xl` (30px) | `text-4xl` (36px) | `text-5xl` (48px) | Main page titles, primary headlines |
-| **Subheader** | `text-lg` (18px) | `text-xl` (20px) | `text-2xl` (24px) | Section headings, card titles |
-| **Body** | `text-sm` (14px) | `text-base` (16px) | `text-base` (16px) | All primary content, descriptions |
-| **Footnote** | `text-xs` (12px) | `text-xs` (12px) | `text-xs` (12px) | Labels, metadata, fine print |
+| Element | Mobile | Medium | Large | Font Family | Usage |
+|---------|--------|--------|-------|-------------|-------|
+| **Header** | `text-3xl` (30px) | `text-4xl` (36px) | `text-5xl` (48px) | Kanit Bold (`font-display`) | Main page titles, primary headlines |
+| **Subheader** | `text-lg` (18px) | `text-xl` (20px) | `text-2xl` (24px) | Kanit Bold (`font-display`) | Section headings, card titles |
+| **Body** | `text-sm` (14px) | `text-base` (16px) | `text-base` (16px) | Inter (`font-sans`) | All primary content, descriptions |
+| **Footnote** | `text-xs` (12px) | `text-xs` (12px) | `text-xs` (12px) | Inter (`font-sans`) | Labels, metadata, fine print |
+
+**Special Cases:**
+- **Hero Header**: `text-4xl md:text-6xl lg:text-7xl` (36/60/72px) - Exception for maximum impact on landing page hero
 
 **Implementation:**
 ```css
 /* Header - Main titles */
-.text-header { @apply text-3xl md:text-4xl lg:text-5xl; }
+.text-header { @apply text-3xl md:text-4xl lg:text-5xl font-display; }
 
 /* Subheader - Section titles */  
-.text-subheader { @apply text-lg md:text-xl lg:text-2xl; }
+.text-subheader { @apply text-lg md:text-xl lg:text-2xl font-display; }
 
 /* Body - Primary content */
-.text-body { @apply text-sm md:text-base lg:text-base; }
+.text-body { @apply text-sm md:text-base lg:text-base font-sans; }
 
 /* Footnote - Secondary content */
-.text-footnote { @apply text-xs; }
+.text-footnote { @apply text-xs font-sans; }
+
+/* Special: Hero headline only */
+.text-hero { @apply text-4xl md:text-6xl lg:text-7xl font-display; }
 ```
 
-**Rules:**
+**Font Family Rules:**
+- **Kanit Bold** (`font-display`): All headers and subheaders
+- **Inter** (`font-sans`): All body text and footnotes
+- Always specify font family explicitly
+- Headers create bold visual hierarchy
+- Body text prioritizes readability
+
+**Sizing Rules:**
 - Always use responsive sizing with breakpoints
-- Never mix font sizes arbitrarily
+- Never mix font sizes arbitrarily  
 - Header for page/section titles only
 - Subheader for component/card titles
 - Body for all readable content
 - Footnote for labels and metadata only
+- Hero header is the only exception to standard header sizing
 
 ### Layout Principles
 
