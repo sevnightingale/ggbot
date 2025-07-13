@@ -24,17 +24,17 @@ export default function Hero() {
           <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-bone-200 mb-8 font-display leading-tight relative">
             AI trading agents<br />
             that <span className="inline-flex space-x-2 md:space-x-4">
-              <span className="text-agents-extraction relative group">
+              <span className="text-agents-extraction relative">
                 trade
-                <span className="absolute inset-0 text-agents-extraction opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">trade</span>
+                <span className="absolute inset-0 text-agents-extraction opacity-30 blur-sm">trade</span>
               </span>
-              <span className="text-agents-decision relative group">
+              <span className="text-agents-decision relative">
                 like
-                <span className="absolute inset-0 text-agents-decision opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">like</span>
+                <span className="absolute inset-0 text-agents-decision opacity-30 blur-sm">like</span>
               </span>
-              <span className="text-agents-trading relative group">
+              <span className="text-agents-trading relative">
                 you
-                <span className="absolute inset-0 text-agents-trading opacity-0 group-hover:opacity-50 blur-sm transition-opacity duration-300">you</span>
+                <span className="absolute inset-0 text-agents-trading opacity-30 blur-sm">you</span>
               </span>
             </span>
           </h1>
@@ -47,7 +47,7 @@ export default function Hero() {
 
           {/* Integrated Waitlist */}
           <div className="max-w-sm mx-auto">
-            <p className="text-sm md:text-base lg:text-base text-bone-200/80 font-medium mb-6 font-sans">join the waitlist for early access</p>
+            <p className="text-lg md:text-xl lg:text-2xl text-bone-200/80 font-medium mb-6 font-display">join the waitlist for early access</p>
             <div className="relative">
               {/* Subtle container styling */}
               <div className="absolute inset-0 bg-bone-200/5 border border-bone-200/20 -z-10"></div>
