@@ -1,5 +1,7 @@
 'use client'
 
+import { Moon, Bot, DollarSign } from 'lucide-react'
+
 export default function AgentShowcase() {
   return (
     <section className="py-20 bg-charcoal-900 border-t-2 border-bone-200/20">
@@ -16,8 +18,8 @@ export default function AgentShowcase() {
         <div className="grid md:grid-cols-3 gap-8 mb-16">
           {/* Problem 1 */}
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 border-2 border-bone-200/40 flex items-center justify-center">
-              <span className="text-2xl">😴</span>
+            <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Moon className="text-bone-200/60" size={32} />
             </div>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-2 font-display">humans need sleep</h3>
             <p className="text-sm md:text-base lg:text-base text-bone-200/70 font-sans">
@@ -27,8 +29,8 @@ export default function AgentShowcase() {
 
           {/* Problem 2 */}
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 border-2 border-bone-200/40 flex items-center justify-center">
-              <span className="text-2xl">🤖</span>
+            <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <Bot className="text-bone-200/60" size={32} />
             </div>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-2 font-display">rigid bots break</h3>
             <p className="text-sm md:text-base lg:text-base text-bone-200/70 font-sans">
@@ -38,8 +40,8 @@ export default function AgentShowcase() {
 
           {/* Problem 3 */}
           <div className="text-center">
-            <div className="w-16 h-16 mx-auto mb-4 border-2 border-bone-200/40 flex items-center justify-center">
-              <span className="text-2xl">💸</span>
+            <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
+              <DollarSign className="text-bone-200/60" size={32} />
             </div>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-2 font-display">high costs</h3>
             <p className="text-sm md:text-base lg:text-base text-bone-200/70 font-sans">
