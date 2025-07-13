@@ -40,8 +40,41 @@ Use color like a weapon. Sparingly and with intention. Most of the UI should rem
 
 ### Typography
 
+**Font Families:**
 - **Headlines:** Kanit Bold - Modern, punchy, grounded
 - **Body:** Inter - Clean, readable, stripped of excess
+
+**Font Size System (4-Tier Responsive):**
+
+| Element | Mobile | Medium | Large | Usage |
+|---------|--------|--------|-------|-------|
+| **Header** | `text-3xl` (30px) | `text-4xl` (36px) | `text-5xl` (48px) | Main page titles, primary headlines |
+| **Subheader** | `text-lg` (18px) | `text-xl` (20px) | `text-2xl` (24px) | Section headings, card titles |
+| **Body** | `text-sm` (14px) | `text-base` (16px) | `text-base` (16px) | All primary content, descriptions |
+| **Footnote** | `text-xs` (12px) | `text-xs` (12px) | `text-xs` (12px) | Labels, metadata, fine print |
+
+**Implementation:**
+```css
+/* Header - Main titles */
+.text-header { @apply text-3xl md:text-4xl lg:text-5xl; }
+
+/* Subheader - Section titles */  
+.text-subheader { @apply text-lg md:text-xl lg:text-2xl; }
+
+/* Body - Primary content */
+.text-body { @apply text-sm md:text-base lg:text-base; }
+
+/* Footnote - Secondary content */
+.text-footnote { @apply text-xs; }
+```
+
+**Rules:**
+- Always use responsive sizing with breakpoints
+- Never mix font sizes arbitrarily
+- Header for page/section titles only
+- Subheader for component/card titles
+- Body for all readable content
+- Footnote for labels and metadata only
 
 ### Layout Principles
 
