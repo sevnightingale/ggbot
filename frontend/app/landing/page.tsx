@@ -7,8 +7,8 @@ export default function LandingPage() {
   return (
     <main className="min-h-screen bg-charcoal-900">
       <Hero />
-      <Features />
       <AgentShowcase />
+      <Features />
       <Footer />
     </main>
   )

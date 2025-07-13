@@ -5,10 +5,10 @@ export default function Features() {
     <section className="py-20 bg-charcoal-900">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-6 font-display">
+          <h2 className="text-3xl md:text-4xl lg:text-5xl font-bold text-bone-200 mb-6 font-display">
             built like a trader, not a bot
           </h2>
-          <p className="text-sm md:text-base lg:text-base text-bone-200/70 max-w-xl mx-auto leading-relaxed">
+          <p className="text-sm md:text-base lg:text-base text-bone-200/70 max-w-xl mx-auto leading-relaxed font-sans">
             traditional algo bots are rigid and rule-bound. ggbots is an intelligent agent system that adapts dynamically to changing conditions like a real trader.
           </p>
         </div>
@@ -23,7 +23,7 @@ export default function Features() {
             </div>
             <h4 className="text-xs md:text-xs lg:text-xs font-medium text-agents-extraction mb-2 tracking-wide">EXTRACTION AGENT</h4>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-3 font-display">sees everything</h3>
-            <p className="text-sm md:text-base lg:text-base text-bone-200/80">
+            <p className="text-sm md:text-base lg:text-base text-bone-200/80 font-sans">
               charts. custom indicators. real-time prices. even sentiment and news. the extraction agent watches it all.
             </p>
           </div>
@@ -37,7 +37,7 @@ export default function Features() {
             </div>
             <h4 className="text-xs md:text-xs lg:text-xs font-medium text-agents-decision mb-2 tracking-wide">DECISION AGENT</h4>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-3 font-display">thinks strategically</h3>
-            <p className="text-sm md:text-base lg:text-base text-bone-200/80">
+            <p className="text-sm md:text-base lg:text-base text-bone-200/80 font-sans">
               the decision agent analyzes the full picture, applies your strategy, and adjusts in real time. just like you would if you never needed sleep.
             </p>
           </div>
@@ -51,7 +51,7 @@ export default function Features() {
             </div>
             <h4 className="text-xs md:text-xs lg:text-xs font-medium text-agents-trading mb-2 tracking-wide">TRADING AGENT</h4>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-3 font-display">executes with discipline</h3>
-            <p className="text-sm md:text-base lg:text-base text-bone-200/80">
+            <p className="text-sm md:text-base lg:text-base text-bone-200/80 font-sans">
               the trading agent executes with precision, enforces your risk rules, and reacts to market conditions without human emotions or hesitation.
             </p>
           </div>
