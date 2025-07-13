@@ -19,7 +19,7 @@ export default function AgentShowcase() {
           {/* Problem 1 */}
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Moon className="text-bone-200/60" size={32} />
+              <Moon className="text-agents-extraction" size={96} />
             </div>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-2 font-display">humans need sleep</h3>
             <p className="text-sm md:text-base lg:text-base text-bone-200/70 font-sans">
@@ -30,7 +30,7 @@ export default function AgentShowcase() {
           {/* Problem 2 */}
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <Bot className="text-bone-200/60" size={32} />
+              <Bot className="text-agents-decision" size={96} />
             </div>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-2 font-display">rigid bots break</h3>
             <p className="text-sm md:text-base lg:text-base text-bone-200/70 font-sans">
@@ -41,7 +41,7 @@ export default function AgentShowcase() {
           {/* Problem 3 */}
           <div className="text-center">
             <div className="w-16 h-16 mx-auto mb-4 flex items-center justify-center">
-              <DollarSign className="text-bone-200/60" size={32} />
+              <DollarSign className="text-agents-trading" size={96} />
             </div>
             <h3 className="text-lg md:text-xl lg:text-2xl font-bold text-bone-200 mb-2 font-display">high costs</h3>
             <p className="text-sm md:text-base lg:text-base text-bone-200/70 font-sans">
