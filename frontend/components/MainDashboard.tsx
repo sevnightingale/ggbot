@@ -69,7 +69,7 @@ export function MainDashboard() {
       console.log('MainDashboard: Cleaning up periodic refresh')
       clearInterval(interval)
     }
-  }, [loadBots, loadConfigurations, loadTrades, loadPerformance, checkSchedulerStatus])
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   if (isLoading) {
     return (
