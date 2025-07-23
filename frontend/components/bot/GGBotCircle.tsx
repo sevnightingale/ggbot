@@ -143,18 +143,25 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             <div className="flex flex-col items-center">
               {/* Large Circle Emblem */}
               <div 
-                className="w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative flex items-center justify-center"
+                className={`w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative flex items-center justify-center transition-all duration-300 ${
+                  isRunning ? 'animate-pulse' : ''
+                }`}
                 style={{
                   backgroundImage: `
                     radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.95) 0%, rgba(227, 229, 230, 0.85) 100%),
                     url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23161618' fill-opacity='0.05'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='53' cy='53' r='1'/%3E%3Ccircle cx='23' cy='43' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")
                   `,
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(227, 229, 230, 0.1)'
+                  boxShadow: isRunning 
+                    ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(227, 229, 230, 0.1), 0 0 30px rgba(44, 190, 119, 0.6), 0 0 60px rgba(44, 190, 119, 0.3)'
+                    : '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(227, 229, 230, 0.1)'
                 }}
               >
-                {/* Status indicator ring */}
+                {/* Status indicator ring - enhanced when running */}
                 {isRunning && (
-                  <div className="absolute inset-1 rounded-full border-2 border-bone-200/90 animate-pulse" />
+                  <div className="absolute inset-1 rounded-full border-2 border-green-400 animate-pulse" 
+                       style={{
+                         boxShadow: '0 0 20px rgba(44, 190, 119, 0.8), inset 0 0 20px rgba(44, 190, 119, 0.2)'
+                       }} />
                 )}
                 
                 {/* Bot Name Inside Circle */}

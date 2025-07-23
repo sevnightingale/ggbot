@@ -253,49 +253,77 @@ export const useBotStore = create<BotState>((set, get) => ({
       
       if (!isConnected) {
         console.log('API not available, using mock data')
-        // Use mock data if API is not available
-        const mockExtraction: ExtractionConfig = {
-          symbols: ['BTCUSD', 'ETHUSD'],
-          timeframes: ['15m', '1h'],
-          sources: {
-            tradingview: {
-              enabled: true,
-              strategy: 'momentum'
-            },
-            yfinance: {
-              enabled: true
+        
+        const currentBotId = get().currentBotId
+        const currentBotName = get().currentBotName
+        
+        // If this is the default/demo bot (GGBOT-01), show full configuration
+        if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
+          console.log('Loading demo bot configurations')
+          const mockExtraction: ExtractionConfig = {
+            symbols: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT'],
+            timeframes: ['15m', '1h', '4h'],
+            sources: {
+              crypto_indicators_mcp: {
+                enabled: true,
+                indicators: ['RSI', 'MACD', 'BollingerBands', 'ATR', 'EMA', 'VWAP'],
+                use_llm_selection: true,
+                llm_interpretation: true,
+                llm_model: 'deepseek-chat'
+              },
+              tradingview: {
+                enabled: false,
+                strategy: ''
+              },
+              yfinance: {
+                enabled: true
+              }
             }
           }
-        }
-        const mockDecision: DecisionConfig = {
-          llm_provider: 'deepseek',
-          strategy: 'momentum',
-          risk_guidelines: 'Conservative risk management',
-          additional_context: 'Focus on crypto trends'
-        }
-        const mockTrading: TradingConfig = {
-          risk_rules: {
-            max_leverage: 3,
-            max_position_size_pct: 10,
-            max_risk_per_trade_pct: 2,
-            min_equity_protection: 1000,
-            max_contracts_per_trade: 100
+          const mockDecision: DecisionConfig = {
+            llm_provider: 'deepseek',
+            strategy: 'Multi-timeframe momentum strategy focusing on crypto majors with strong technical confirmation and volume validation',
+            risk_guidelines: 'Maximum 2% risk per trade, strict stop losses, position sizing based on volatility',
+            additional_context: 'Focus on established cryptocurrencies with high liquidity and clear trend patterns'
           }
+          const mockTrading: TradingConfig = {
+            risk_rules: {
+              max_leverage: 3,
+              max_position_size_pct: 5,
+              max_risk_per_trade_pct: 2,
+              min_equity_protection: 2000,
+              max_contracts_per_trade: 50
+            }
+          }
+          
+          set({
+            extractionConfig: mockExtraction,
+            decisionConfig: mockDecision,
+            tradingConfig: mockTrading,
+            agentStatuses: {
+              extraction: 'configured',
+              decision: 'configured',
+              trading: 'configured',
+            },
+            isLoading: false,
+          })
+          return
+        } else {
+          // New bots start with no configuration
+          console.log('Loading empty configurations for new bot')
+          set({
+            extractionConfig: null,
+            decisionConfig: null,
+            tradingConfig: null,
+            agentStatuses: {
+              extraction: 'unconfigured',
+              decision: 'unconfigured',
+              trading: 'unconfigured',
+            },
+            isLoading: false,
+          })
+          return
         }
-        
-        set({
-          extractionConfig: mockExtraction,
-          decisionConfig: mockDecision,
-          tradingConfig: mockTrading,
-          agentStatuses: {
-            extraction: calculateAgentStatus(mockExtraction),
-            decision: calculateAgentStatus(mockDecision),
-            trading: calculateAgentStatus(mockTrading),
-          },
-          isLoading: false,
-          error: 'Backend API not available - using demo data'
-        })
-        return
       }
 
       // Try to load real configurations if API is available
@@ -385,39 +413,79 @@ export const useBotStore = create<BotState>((set, get) => ({
         }
       }
 
-      // Use mock trades data as fallback
-      const mockTrades: Trade[] = [
-        {
-          id: '1',
-          symbol: 'BTCUSD',
-          side: 'long',
-          entry_price: 45000,
-          current_price: 45150,
-          quantity: 0.1,
-          pnl: 150,
-          pnl_percentage: 0.33,
-          status: 'closed',
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          decision_reasoning: 'Strong momentum indicators'
-        },
-        {
-          id: '2', 
-          symbol: 'ETHUSD',
-          side: 'short',
-          entry_price: 3200,
-          current_price: 3150,
-          quantity: 1.0,
-          pnl: 50,
-          pnl_percentage: 1.56,
-          status: 'open',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          updated_at: new Date(Date.now() - 1800000).toISOString(),
-          decision_reasoning: 'Bearish trend detected'
-        }
-      ]
-      console.log('Using mock trades data')
-      set({ trades: mockTrades })
+      // Use mock trades data based on current bot
+      const currentBotId = get().currentBotId
+      const currentBotName = get().currentBotName
+      
+      // If this is the default/demo bot (GGBOT-01), show rich trading history
+      if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
+        const mockTrades: Trade[] = [
+          // Active profitable trades
+          {
+            id: '1',
+            symbol: 'BTCUSD',
+            side: 'long',
+            entry_price: 94500,
+            current_price: 96100,
+            quantity: 0.05,
+            pnl: 80,
+            pnl_percentage: 1.69,
+            status: 'open',
+            created_at: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
+            updated_at: new Date(Date.now() - 1800000).toISOString(),
+            decision_reasoning: 'Strong bullish momentum with volume confirmation'
+          },
+          {
+            id: '2', 
+            symbol: 'ETHUSD',
+            side: 'long',
+            entry_price: 3420,
+            current_price: 3489,
+            quantity: 0.8,
+            pnl: 55.2,
+            pnl_percentage: 2.02,
+            status: 'open',
+            created_at: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
+            updated_at: new Date(Date.now() - 900000).toISOString(),
+            decision_reasoning: 'ETH breaking key resistance with strong volume'
+          },
+          {
+            id: '3',
+            symbol: 'SOLUSD',
+            side: 'long',
+            entry_price: 185.50,
+            current_price: 192.30,
+            quantity: 2.5,
+            pnl: 17,
+            pnl_percentage: 3.67,
+            status: 'open',
+            created_at: new Date(Date.now() - 5400000).toISOString(), // 1.5 hours ago
+            updated_at: new Date(Date.now() - 600000).toISOString(),
+            decision_reasoning: 'SOL ecosystem momentum building'
+          },
+          // Recent closed profitable trades
+          {
+            id: '4',
+            symbol: 'AVAXUSD',
+            side: 'long',
+            entry_price: 42.80,
+            current_price: 44.95,
+            quantity: 8.0,
+            pnl: 172,
+            pnl_percentage: 5.02,
+            status: 'closed',
+            created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
+            updated_at: new Date(Date.now() - 21600000).toISOString(), // 6 hours ago
+            decision_reasoning: 'AVAX subnet activity increasing significantly'
+          }
+        ]
+        console.log('Using demo bot mock trades data')
+        set({ trades: mockTrades })
+      } else {
+        // New bots have no trading history
+        console.log('Using empty trades for new bot')
+        set({ trades: [] })
+      }
     } catch (error) {
       console.error('Error loading trades:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to load trades' })
@@ -441,25 +509,57 @@ export const useBotStore = create<BotState>((set, get) => ({
         }
       }
 
-      // Mock performance data as fallback
-      const mockPerformance: PerformanceData = {
-        period,
-        total_pnl: 1250.50,
-        total_pnl_percentage: 12.5,
-        win_rate: 0.68,
-        total_trades: 15,
-        daily_pnl: [
-          { date: '2024-01-01', pnl: 100 },
-          { date: '2024-01-02', pnl: 250 },
-          { date: '2024-01-03', pnl: -50 },
-          { date: '2024-01-04', pnl: 300 },
-          { date: '2024-01-05', pnl: 150 },
-          { date: '2024-01-06', pnl: 200 },
-          { date: '2024-01-07', pnl: 300 }
-        ]
+      // Mock performance data based on current bot
+      const currentBotId = get().currentBotId
+      const currentBotName = get().currentBotName
+      
+      // If this is the default/demo bot (GGBOT-01), show profitable 30-day history
+      if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
+        // Generate 30-day performance data showing steady growth
+        const generateDailyPnL = () => {
+          const data = []
+          let cumulativePnL = 0
+          const today = new Date()
+          
+          for (let i = 29; i >= 0; i--) {
+            const date = new Date(today)
+            date.setDate(date.getDate() - i)
+            
+            // Generate realistic daily P&L with some volatility but overall upward trend
+            const dayPnL = Math.random() * 200 - 50 + (29 - i) * 5 // Slight upward bias over time
+            cumulativePnL += dayPnL
+            
+            data.push({
+              date: date.toISOString().split('T')[0],
+              pnl: Math.round(dayPnL * 100) / 100
+            })
+          }
+          return data
+        }
+
+        const mockPerformance: PerformanceData = {
+          period,
+          total_pnl: 3847.25,
+          total_pnl_percentage: 38.47,
+          win_rate: 0.75,
+          total_trades: 42,
+          daily_pnl: generateDailyPnL()
+        }
+        console.log('Using demo bot mock performance data')
+        set({ performance: mockPerformance })
+      } else {
+        // New bots have no performance history
+        const emptyPerformance: PerformanceData = {
+          period,
+          total_pnl: 0,
+          total_pnl_percentage: 0,
+          win_rate: 0,
+          total_trades: 0,
+          daily_pnl: []
+        }
+        console.log('Using empty performance for new bot')
+        set({ performance: emptyPerformance })
       }
-      console.log('Using mock performance data')
-      set({ performance: mockPerformance })
     } catch (error) {
       console.error('Error loading performance:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to load performance' })

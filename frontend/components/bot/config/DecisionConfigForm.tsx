@@ -38,6 +38,8 @@ const strategyTemplates = [
 
 export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProps) {
   const { updateAgentConfig, setError } = useBotStore()
+  const [isSaving, setIsSaving] = useState(false)
+  const [justSaved, setJustSaved] = useState(false)
   
   const [formData, setFormData] = useState<DecisionConfig>({
     llm_provider: config?.llm_provider || 'deepseek',
@@ -48,6 +50,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
 
   const handleSave = async () => {
     try {
+      setIsSaving(true)
       setError(null)
       
       // Validation
@@ -61,8 +64,12 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
       }
 
       await updateAgentConfig('decision', formData)
+      setJustSaved(true)
+      setTimeout(() => setJustSaved(false), 2000)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to save configuration')
+    } finally {
+      setIsSaving(false)
     }
   }
 
@@ -319,9 +326,16 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
       <div className="flex justify-end pt-4 border-t border-bone-200/60">
         <button
           onClick={handleSave}
-          className="px-6 py-3 bg-agents-decision hover:bg-agents-decision/80 text-charcoal-900 font-medium transition-colors"
+          disabled={isSaving}
+          className={`px-6 py-3 font-medium transition-colors ${
+            justSaved
+              ? 'bg-green-500 text-white'
+              : isSaving
+                ? 'bg-agents-decision/50 text-charcoal-900/70 cursor-not-allowed'
+                : 'bg-agents-decision hover:bg-agents-decision/80 text-charcoal-900'
+          }`}
         >
-          Save Configuration
+          {justSaved ? '✓ Saved!' : isSaving ? 'Saving...' : 'Save Configuration'}
         </button>
       </div>
     </div>
