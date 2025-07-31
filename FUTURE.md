@@ -1,193 +1,230 @@
-Secure User API Keys – accept exchange credentials on the frontend, transmit via HTTPS/JWT, AES-encrypt at rest, and spin each bot in an isolated container.
+# GGBots Future Roadmap
 
-Shared Market-Data Cache – one canonical table plus pre-compute jobs eliminate duplicate API calls and rate-limit grief.
+## 🎯 Core Features Overview
 
-Multi-Exchange + Arbitrage – CCXT abstraction for spot, futures, and DEXs, with a spread-sniper that fires atomic cross-venue orders.
+- **Secure User API Keys** – Accept exchange credentials on the frontend, transmit via HTTPS/JWT, AES-encrypt at rest, and spin each bot in an isolated container
+- **Decision Engine Refactoring** – Split 1587-line monolithic decision/engine.py into focused modules for maintainability and testing
+- **Shared Market-Data Cache** – One canonical table plus pre-compute jobs eliminate duplicate API calls and rate-limit grief
+- **Multi-Exchange + Arbitrage** – CCXT abstraction for spot, futures, and DEXs, with a spread-sniper that fires atomic cross-venue orders
+- **Advanced Order & Portfolio Suite** – Iceberg, TWAP/VWAP, OCO, position-sized copy trading, draw-down guards, and global risk caps
+- **Strategy Marketplace** – User-published templates, revenue-share leaderboards, back-tester, and one-click copy trading
+- **Machine-Learning Pipeline** – Feature engineering, online A/B, RL agents, and regime detection that retunes parameters on the fly
+- **Micro-Services & Scaling** – Extraction, decision, trading, dashboard, and agent-control pods in Kubernetes with Redis, TimescaleDB, and Celery queues
+- **Monitoring & Safety Mesh** – Prometheus, Grafana, distributed tracing, order-reconciliation, circuit breakers, kill switches, and multi-channel alerts
+- **Compliance & Security Stack** – KYC/AML, audit trails, 2FA, HSM-backed key vault, IP whitelists, and multi-sig on fat trades
+- **Symbol-Specific / Multi-Asset Engine** – Per-symbol mode detection, fully parallel extraction-decision-execution loops, ready for portfolio logic
+- **Client Order-ID Reconciliation** – Bullet-proof audit trail, duplicate detection, and automatic fail/retry logic
+- **Multi-Source Extraction Manager** – Plug-in loaders for TradingView, Yahoo Finance, news, on-chain, Telegram, etc., with data-fusion hooks
+- **DevOps & CI/CD** – Git-driven tests, blue/green deploys, auto-rollbacks, and sandbox load tests
+- **Concurrent Indicator Extraction** – Fire async tasks per symbol/timeframe/indicator, slashing latency from ~18s to ~2–3s
+- **Autonomous Scheduler & Webhooks** – Cron/APS jobs chain extraction → decision → execution → monitoring 24/7 with emergency fallbacks
 
-Advanced Order & Portfolio Suite – iceberg, TWAP/VWAP, OCO, position-sized copy trading, draw-down guards, and global risk caps.
+---
 
-Strategy Marketplace – user-published templates, revenue-share leaderboards, back-tester, and one-click copy trading.
+## 📋 Detailed Implementation Plans
 
-Machine-Learning Pipeline – feature engineering, online A/B, RL agents, and regime detection that retunes parameters on the fly.
+### 🔐 Secure User API Keys
 
-Micro-Services & Scaling – extraction, decision, trading, dashboard, and agent-control pods in Kubernetes with Redis, TimescaleDB, and Celery queues.
+**Problem:** Currently using shared test keys; need secure per-user credential management.
 
-Monitoring & Safety Mesh – Prometheus, Grafana, distributed tracing, order-reconciliation, circuit breakers, kill switches, and multi-channel alerts.
+**Solution Components:**
+- **Transport:** HTTPS POST from frontend, JWT session check
+- **Encryption:** AES-256 via `cryptography.Fernet`; master key in HSM/Vault, rotated quarterly
+- **Schema:** `exchange_credentials(id, user_id, exchange, api_key_enc, secret_enc, passphrase_enc, created_at, last_used)` indexed on `user_id`
+- **Isolation:** Every ggbot gets its own container/pod, temp configs wiped on exit; no cross-tenant env-vars
+- **Regulatory:** Audit trail records who decrypted, when, and why
 
-Compliance & Security Stack – KYC/AML, audit trails, 2FA, HSM-backed key vault, IP whitelists, and multi-sig on fat trades.
+**Priority:** 🔥 **Critical** – No keys, no product
 
-Symbol-Specific / Multi-Asset Engine – per-symbol mode detection, fully parallel extraction-decision-execution loops, ready for portfolio logic.
+---
 
-Client Order-ID Reconciliation – bullet-proof audit trail, duplicate detection, and automatic fail/retry logic.
+### 📦 Decision Engine Refactoring
 
-Multi-Source Extraction Manager – plug-in loaders for TradingView, Yahoo Finance, news, on-chain, Telegram, etc., with data-fusion hooks.
+**Problem:** `decision/engine.py` is 1587 lines of mixed responsibilities: database ops, prompt generation, LLM parsing, and business logic all in one class.
 
-DevOps & CI/CD – Git-driven tests, blue/green deploys, auto-rollbacks, and sandbox load tests.
+**Solution:** Split into focused modules:
+- `decision/data_layer.py` – Database operations (market data, accounts, trades)
+- `decision/prompt_builder.py` – Prompt generation with template system
+- `decision/response_parser.py` – LLM response parsing and validation  
+- `decision/volume_analyzer.py` – Volume confirmation analysis
+- `decision/core_engine.py` – Streamlined orchestration logic
+- `decision/intent_creator.py` – Trading intent generation
 
-Concurrent Indicator Extraction – fire async tasks per symbol/timeframe/indicator, slashing latency from ~18 s to ~2–3 s.
+**Benefits:** Easier testing, cleaner separation of concerns, reduced cognitive load for maintenance
 
-Autonomous Scheduler & Webhooks – cron/APS jobs chain extraction → decision → execution → monitoring 24/7 with emergency fallbacks.
+**Priority:** 🔥 **High** – Current size makes debugging and feature additions painful
 
-🔐 Secure User API Keys
-Context & Actions
+---
 
-Transport – HTTPS POST from the frontend, JWT session check.
+### 🗃️ Shared Market-Data Cache
 
-Encryption – AES-256 via cryptography.Fernet; master key lives in an HSM or Vault, rotated quarterly.
+**Problem:** 100 users requesting RSI on BTC/USDT 1h triggered 100 identical API hits.
 
-Schema – exchange_credentials(id, user_id, exchange, api_key_enc, secret_enc, passphrase_enc, created_at, last_used); indexed on user_id.
+**Solution:**
+- Central `market_data_shared` table `(symbol, timeframe, source, extracted_at UNIQUE)` with descending index
+- Smart fetch: Query cache → if stale > 1-candle, hit vendor → store once
+- Background workers monitor hot symbols, pre-extract at each close, prune after retention window
 
-Isolation – every ggbot gets its own container/pod, temp configs wiped on exit; no cross-tenant env-vars.
+**Impact:** 🚀 Cuts paid-API cost by >80% at scale and makes indicator queries instant
 
-Regulatory tie-in – audit trail records who decrypted, when, and why.
+---
 
-👉 Opinion: Do this first—no keys, no product.
+### 🌐 Multi-Exchange + Arbitrage
 
-🗃️ Shared Market-Data Cache
-Problem – 100 users requesting RSI on BTC/USDT 1h triggered 100 identical API hits.
+**Components:**
+- **CCXT Wrapper:** Normalize symbols, decimal precisions, and special order params
+- **Venue Features:** Spot + futures (Binance), compliance flags (Coinbase), Web3 routers (Uniswap, Pancake)
+- **Cross-venue Engine:** Subscribe to price feeds, calculate latency-adjusted spread; if spread > threshold, submit atomic OCO pair
+- **Fail-safes:** Per-exchange rate-limit trackers, hedge legs if one side partially fills
 
-Solution – central market_data_shared table (symbol, timeframe, source, extracted_at UNIQUE) with a idx_market_data_shared_lookup descending index.
+---
 
-Smart fetch – query cache → if stale > 1-candle, hit the vendor → store once.
+### 🎯 Advanced Order & Portfolio Suite
 
-Background workers – monitor hot symbols, pre-extract at each close, prune after retention window.
+**Features:**
+- **Execution Algos:** Iceberg, TWAP, VWAP, smart-order routing, liquidity seekers
+- **Order Safety:** Trailing stops, portfolio-wide stop-loss, correlation caps
+- **Rebalancing:** Risk parity, target-weight, volatility scaling
+- **Copy-Trade Sizing:** Follower size = leader size × equity ratio, bounded by follower risk rules
 
-🚀 Cuts paid-API cost by >80 % at scale and makes indicator queries instant.
+**Impact:** 💪 Moves ggbots from "signal shooter" to "institution-grade execution desk"
 
-🌐 Multi-Exchange + Arbitrage
-CCXT Wrapper – normalize symbols, decimal precisions, and special order params.
+---
 
-Venue Features – spot + futures (Binance), compliance flags (Coinbase), Web3 routers (Uniswap, Pancake).
+### 🏪 Strategy Marketplace
 
-Cross-venue Engine – subscribe to price feeds, calculate latency-adjusted spread; if spread > threshold, submit atomic OCO pair.
+**Components:**
+- **Templates:** JSON-based param sets with code snippets; versioned like git
+- **Revenue Share:** 70% creator / 30% platform; enforced in-app accounting
+- **Back-test & Walk-forward:** Simulate over raw exchange data, Monte Carlo run-ups, separate in/out sample
+- **Leaderboards:** Sharpe, Sortino, max draw-down, live vs back-test delta
 
-Fail-safes – per-exchange rate-limit trackers, hedge legs if one side partially fills.
+---
 
-🎯 Advanced Order & Portfolio Suite
-Execution algos – iceberg, TWAP, VWAP, smart-order routing, liquidity seekers.
+### 🤖 Machine-Learning Pipeline
 
-Order safety – trailing stops, portfolio-wide stop-loss, correlation caps.
+**Data Flow:** Raw ticks → feature cookers → feature store → model zoo (sklearn, XGBoost, PyTorch)
 
-Rebalancing – risk parity, target-weight, volatility scaling.
+**Components:**
+- **Online A/B:** Shadow-run new models, compare live P&L before promotion
+- **Reinforcement Agents:** Policy-gradient bots trading micro-futures
+- **Regime Detector:** ATR, VIX proxies, and volume/RSI trends feed a classifier; switches strategy presets dynamically
 
-Copy-Trade sizing – follower size = leader size × equity ratio, bounded by follower risk rules.
+---
 
-💪 Moves ggbots from “signal shooter” to “institution-grade execution desk.”
+### 🏗️ Micro-Services & Scaling
 
-🏪 Strategy Marketplace
-Templates – JSON-based param sets with code snippets; versioned like git.
+**Service Split:**
+- Extraction (5001), Decision (5002), Trading (5000), Dashboard (5003), Agent-Control (5004)
 
-Revenue share – 70 % creator / 30 % platform; enforced in-app accounting.
+**Orchestration:** Kubernetes + service mesh; HPA on CPU / queue depth
 
-Back-test & Walk-forward – simulate over raw exchange data, Monte Carlo run-ups, separate in/out sample.
+**Infrastructure:** Redis cache; TimescaleDB partitions; Celery/RabbitMQ task bus; dedicated read replicas for analytics
 
-Leaderboards – Sharpe, Sortino, max draw-down, live vs back-test delta.
+**Benefit:** Strong isolation = one service crash ≠ system outage
 
-🤖 Machine-Learning Pipeline
-Data flow – raw ticks → feature cookers → feature store → model zoo (sklearn, XGBoost, PyTorch).
+---
 
-Online A/B – shadow-run new models, compare live P&L before promotion.
+### 🛡️ Monitoring & Safety Mesh
 
-Reinforcement agents – policy-gradient bots trading micro-futures.
+**Metrics:** Prometheus counters, histograms, and Grafana dashboards; per-user cut
 
-Regime detector – ATR, VIX proxies, and volume/RSI trends feed a classifier; switches strategy presets dynamically.
+**Safety Systems:**
+- **Order Reconciliation:** Poll `client_order_id`, mark stale > 5 min as failed
+- **Circuit Breakers:** Daily loss > 5%, rapid-loss cluster, API error burst
+- **Kill Switches:** Soft (block new trades), hard (pause automation), emergency (close all)
+- **Alerts:** Discord (info→critical), email (critical+), SMS (emergency)
 
-🏗️ Micro-Services & Scaling
-Service split – Extraction (5001), Decision (5002), Trading (5000), Dashboard (5003), Agent-Control (5004).
+**Warning:** ⚠️ Miss this layer and you'll blow up accounts—non-negotiable
 
-Orchestration – Kubernetes + service mesh; HPA on CPU / queue depth.
+---
 
-Infra pieces – Redis cache; TimescaleDB partitions; Celery/RabbitMQ task bus; dedicated read replicas for analytics.
+### 📜 Compliance & Security Stack
 
-Strong isolation = one service crash ≠ system outage.
+**Components:**
+- KYC/AML provider plug-in, automatic SAR reports
+- Audit-trail table joins orders ↔ decisions ↔ credentials ↔ user-sessions
+- Hardware Security Module (or Vault + KMS) for master keys
+- 2FA, IP whitelist, device fingerprint on login
+- Multi-sig policy: trades > $100k require second device confirmation
 
-🛡️ Monitoring & Safety Mesh
-Metrics – Prometheus counters, histograms, and Grafana dashboards; per-user cut.
+---
 
-Order reconciliation – poll client_order_id, mark stale > 5 min as failed, bulk UPDATE … FROM to avoid lock hell.
+### 🔄 Symbol-Specific / Multi-Asset Engine
 
-Circuit breakers – daily loss > 5 %, rapid-loss cluster, API error burst.
+**Old Bug:** Global mode detection meant BTC open = ETH stuck in MANAGE mode
 
-Kill switches – soft (block new trades), hard (pause automation), emergency (close all).
+**Fix:** API now requires symbol, queries open trades per symbol, spawns `asyncio.gather` tasks per asset
 
-Alerts – Discord (info→critical), email (critical+), SMS (emergency).
+**Future:** Portfolio-aware optimizer (cross-asset correlation, capital weighting)
 
-Miss this layer and you’ll blow up accounts—non-negotiable.
+---
 
-📜 Compliance & Security Stack
-KYC/AML provider plug-in, automatic SAR reports.
+### 🧾 Client Order-ID Reconciliation
 
-Audit-trail table joins orders ↔ decisions ↔ credentials ↔ user-sessions.
+**Components:**
+- Index on `trade_orders(client_order_id)` for O(1) look-ups
+- Reconciliation service loops: DB → exchange `fetch_order_by_client_id` → bulk-update statuses
+- Audit view `v_complete_trade_audit` links `strategy_runs` → `trades` → `orders` for forensic digs
+- Alert on duplicates, stale pending, missing TP/SL
 
-Hardware Security Module (or Vault + KMS) for master keys.
+---
 
-2FA, IP whitelist, device fingerprint on login.
+### 📡 Multi-Source Extraction Manager
 
-Multi-sig policy: trades > $100 k require second device confirmation.
+**Sources:** TradingView, Yahoo Finance, News feeds, On-chain, Telegram, plus current MCP indicators
 
-🔄 Symbol-Specific / Multi-Asset Engine
-Old bug – global mode detection meant BTC open = ETH stuck in MANAGE mode.
+**Components:**
+- `ExtractionManager` factory loads plug-ins by config; stores source tag + data_type in same `market_data` schema
+- Data fusion: weighted reliability scores, conflict resolution, feature-store write-through
+- Migration path: single-source call now but flipping to manager only requires two lines swapped
 
-Fix – API now requires symbol, queries open trades per symbol, spawns asyncio.gather tasks per asset.
+---
 
-Parallel scheduler – run_symbol_decision_process loops; CPU and rate-limit scale linearly with symbol count.
+### 🛠️ DevOps & CI/CD
 
-Future – portfolio-aware optimizer (cross-asset correlation, capital weighting).
+**Pipeline:** Lint → unit tests → integration (docker-compose) → load (Locust) → coverage gate → build image → blue/green K8s deploy
 
-🧾 Client Order-ID Reconciliation
-Index on trade_orders(client_order_id) for O(1) look-ups.
+**Features:**
+- **Rollbacks:** Health-check fail triggers automated revert within 30s
+- **Secrets:** Vault sidecar injects env-vars at pod start; never shipped in images
 
-Reconciliation service loops: DB → exchange fetch_order_by_client_id → bulk-update statuses.
+---
 
-Audit view v_complete_trade_audit links strategy_runs → trades → orders for forensic digs.
+### ⚡ Concurrent Indicator Extraction
 
-Alert on duplicates, stale pending, missing TP/SL.
+**Current State:** Sequential loop (symbol × timeframe × indicator) burns ~18s for 3×3 matrix
 
-📡 Multi-Source Extraction Manager
-Sources – TradingView, Yahoo Finance, News feeds, On-chain, Telegram, plus the current MCP indicators.
+**Solution:** Async gather shrinks to slowest request (~2–3s)
 
-ExtractionManager factory loads plug-ins by config; stores source tag + data_type in the same market_data schema.
+**Implementation:** Hybrid throttling obeys exchange rate-limits and MCP capacity caps
 
-Data fusion – weighted reliability scores, conflict resolution, and feature-store write-through.
+**Impact:** Gains matter most once multi-indicator configs arrive
 
-Migration – single-source call now but flipping back to manager only requires two lines swapped.
+---
 
-🛠️ DevOps & CI/CD
-Pipeline – lint → unit tests → integration (docker-compose) → load (Locust) → coverage gate → build image → blue/green K8s deploy.
+### ⏱️ Autonomous Scheduler & Webhooks
 
-Rollbacks – health-check fail triggers automated revert within 30 s.
+**Flow:** Cron/Scheduler → Extraction webhook → on-complete Decision webhook → on-complete Trading webhook → Monitoring update
 
-Secrets – Vault sidecar injects env-vars at pod start; never shipped in images.
+**Safety Features:**
+- **Fault Handling:** Retries with exponential back-off, dead-letter queue, idempotent handles
+- **Safety Checks:** Pre-trade confidence > 0.7, max daily trades, risk fit; else trade blocked and alert fired
+- **Monitoring Loop:** 30s account polls, TP/SL trigger checks, emergency stop logic
 
-⚡ Concurrent Indicator Extraction
-Current sequential loop (symbol × timeframe × indicator) burns ~18 s for 3 × 3 matrix.
+---
 
-Async gather shrinks to the slowest request (~2–3 s).
+## 📝 Additional Optimizations
 
-Hybrid throttling obeys exchange rate-limits and MCP capacity caps.
+### Infrastructure
+- **TimescaleDB Partitions:** Monthly partitioning + compression jobs to keep `market_data` slim
+- **Redis Decision-Cache:** TTL = 1 candle for back-testing speed-ups
+- **Geo Read Replicas:** EU + US replicas cut cross-ocean latency for global users
+- **Async DB Pooling:** SQLAlchemy QueuePool; avoid N+1 queries
 
-Gains matter most once multi-indicator configs arrive.
+### User Experience
+- **Mobile-Friendly Dashboard:** Drag-and-drop widgets, TradingView charts, live P&L feed
+- **Adaptive Learning Rollbacks:** If new model under-performs baseline by > 5% over 100 trades, auto-revert
 
-⏱️ Autonomous Scheduler & Webhooks
-Flow – Cron/Scheduler → Extraction webhook → on-complete Decision webhook → on-complete Trading webhook → Monitoring update.
-
-Fault handling – retries with exponential back-off, dead-letter queue, idempotent handles.
-
-Safety checks – pre-trade confidence > 0.7, max daily trades, risk fit; else trade is blocked and alert fired.
-
-Monitoring loop – 30 s account polls, TP/SL trigger checks, emergency stop logic.
-
-📝 Loose Ends & One-Offs (captured from file)
-TimescaleDB partitions – monthly partitioning + compression jobs to keep market_data slim.
-
-Redis decision-cache – TTL = 1 candle for back-testing speed-ups.
-
-Geo read replicas – EU + US replicas cut cross-ocean latency for global users.
-
-Async DB pooling – SQLAlchemy QueuePool; avoid N+1 queries.
-
-Mobile-friendly dashboard – drag-and-drop widgets, TradingView charts, live P&L feed.
-
-Sector-rotation & cross-pair arb – pencilled for post-MVP but schema already supports.
-
-Adaptive learning rollbacks – if new model under-performs baseline by > 5 % over 100 trades, auto-revert.
+### Advanced Features
+- **Sector-Rotation & Cross-Pair Arb:** Pencilled for post-MVP but schema already supports

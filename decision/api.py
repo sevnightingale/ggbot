@@ -142,12 +142,14 @@ async def check_and_publish_ggshot_signal(intent: Dict[str, Any], reasoning: str
             # Extract signal data from intent
             original_signal = intent.get('original_signal', 'Signal data not available')
             signal_data = intent.get('signal_data', {})
+            full_prompt = intent.get('full_prompt', '')
             
             success = await publisher.publish_signal(
                 original_signal=original_signal,
                 confidence=confidence,
                 reasoning=reasoning,
-                signal_data=signal_data
+                signal_data=signal_data,
+                full_prompt=full_prompt
             )
             
             filter_status = "APPROVED" if confidence >= threshold else "REJECTED"
@@ -169,7 +171,7 @@ async def trigger_trading_webhook(user_id: str, intent: Dict[str, Any], decision
         # Only trigger trading for actionable intents
         action = intent.get("action", "")
         
-        if action not in ["no_action", "hold", "wait", "validate"]:
+        if action not in ["no_action", "hold", "wait"]:
             async with httpx.AsyncClient(timeout=120.0) as client:
                 # Call the trading webhook endpoint
                 trading_webhook_url = os.getenv("TRADING_WEBHOOK_URL", "http://localhost:8000/trading/webhooks/execute-trade")
@@ -589,11 +591,9 @@ async def webhook_trigger_decision(request: WebhookRequest):
         # Rate limiting delay before triggering trading (coordination)
         await asyncio.sleep(1)
         
-        # Step 4: Trigger trading webhook if actionable (but skip for ggshot filtering mode)
+        # Step 4: Trigger trading webhook if actionable
         action = intent.get("action", "")
-        if request.custom_mode == "ggshot":
-            logger.bind(user_id=request.user_id).info(f"📡 ggShot filtering mode: Skipping trading for {action} (signal will be published if high confidence)")
-        elif action not in ["no_action", "hold", "wait", "validate"]:
+        if action not in ["no_action", "hold", "wait"]:
             logger.bind(user_id=request.user_id).info(f"🚀 Triggering trading webhook for action: {action}")
             await trigger_trading_webhook(request.user_id, intent, decision_id)
         else:

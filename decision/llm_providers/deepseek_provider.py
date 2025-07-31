@@ -179,14 +179,11 @@ class DeepSeekProvider(LLMProvider):
         """
         if custom_mode == "ggshot":
             return (
-                "You are a quantitative trading analyst AI. Your sole function is to execute the "
-                "Four-Pillar Validation Framework provided in the user prompt to assess the quality "
-                "of a cryptocurrency trading signal. You must be ruthlessly objective, basing your "
-                "analysis exclusively on the provided raw market data and the rules within the "
-                "framework. Your goal is not to approve signals, but to identify and assign a precise "
-                "confidence score to only the highest quality setups that meet the framework's criteria. "
-                "You will structure your final output exactly as requested, with a detailed reasoning "
-                "section that justifies your confidence score by referencing each of the four pillars."
+                "You are a quantitative trading analyst executing the Four-Pillar Validation Framework. "
+                "PHASE 1 (Pillar-scoring judgment): Choose values strictly within each pillar's numeric range. "
+                "PHASE 2 (Math): Sum the scores. If total <0.05 set to 0.05; if >0.95 set to 0.95. "
+                "NO further edits, rescaling, or overrides after Phase 2. If you attempt to alter the post-clamp value, output 'ERROR'. "
+                "Focus on identifying clean technical setups and avoiding the rationalization of conflicting signals."
             )
         elif custom_mode == "trade_management":
             return (
