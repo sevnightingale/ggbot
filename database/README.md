@@ -460,6 +460,7 @@ FROM trade_orders WHERE trade_id = 'your-trade-id' ORDER BY created_at;
 | signal_timeframe     | VARCHAR(10)     | Signal timeframe ('15m', '30m', etc.) |
 | volume_analysis      | TEXT            | Volume confirmation analysis text      |
 | original_signal_text | TEXT            | Original ggShot signal message         |
+| full_prompt_text     | TEXT            | Complete prompt sent to decision LLM including all indicator values (for backtesting) |
 | created_at           | TIMESTAMP       | Filter decision timestamp              |
 
 **Purpose:**
@@ -467,6 +468,7 @@ FROM trade_orders WHERE trade_id = 'your-trade-id' ORDER BY created_at;
 - Enables confidence score distribution analysis
 - Provides audit trail for filter performance
 - Supports filter optimization and calibration
+- Stores complete LLM prompts for backtesting and prompt analysis
 
 **Indexes:**
 - Primary Key on `filter_id`

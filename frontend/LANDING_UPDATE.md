@@ -399,4 +399,126 @@ join the experiment →
 
 ---
 
+## Phase 5: Custom Waitlist System
+
+### Switch from LaunchList to Custom Implementation
+
+**Problem with LaunchList:**
+- Webhook functionality requires paid plan
+- Limited branding control on free tier  
+- Cannot send custom welcome emails automatically
+- Dependent on third-party service for core functionality
+
+**Custom Waitlist Benefits:**
+- Full control over email automation with Resend
+- Beautiful branded welcome emails using React Email templates
+- Real-time database sync (no webhook limitations)
+- No monthly costs or subscriber limits
+- Complete customization of referral system
+- Better analytics and user management
+
+### Implementation Plan
+
+#### Database Schema (Already Exists)
+```sql
+-- From existing migration 0014_add_email_waitlist.sql
+CREATE TABLE email_waitlist (
+  id SERIAL PRIMARY KEY,
+  email VARCHAR(255) UNIQUE NOT NULL,
+  referral_code VARCHAR(50) UNIQUE,
+  signup_source VARCHAR(100),
+  signup_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  verified BOOLEAN DEFAULT FALSE,
+  referral_count INTEGER DEFAULT 0,
+  position_in_queue INTEGER,
+  metadata JSONB
+);
+```
+
+#### Frontend Components
+- **Custom EmailForm Component**: Replace LaunchList widget
+- **Referral System**: Generate unique codes, track referrals  
+- **Queue Management**: Auto-assign positions, move up with referrals
+- **Verification Flow**: Email verification with Resend
+
+#### API Endpoints
+- `POST /api/waitlist/signup` - Handle new signups
+- `GET /api/waitlist/verify` - Email verification handler  
+- `POST /api/waitlist/referral` - Process referral signups
+- `GET /api/waitlist/stats` - Admin dashboard data
+
+#### Email Automation
+- **Welcome Email**: Branded React Email template with referral link
+- **Verification Email**: Clean verification flow
+- **Position Updates**: Notify when users move up in queue
+- **Launch Announcements**: Automated campaigns for milestones
+
+#### Referral System Logic
+```javascript
+// Example referral bonus system
+const REFERRAL_BONUS = 5; // positions to move up per referral
+
+// When someone signs up with referral code:
+// 1. Add new user to queue
+// 2. Increment referrer's referral_count  
+// 3. Move referrer up {REFERRAL_BONUS} positions
+// 4. Send notification emails to both users
+```
+
+### Migration from LaunchList
+
+#### Step 1: Build Custom System
+- Implement all components and API endpoints
+- Test thoroughly in development
+- Prepare email templates
+
+#### Step 2: Export Existing Data
+- Export current LaunchList subscribers to CSV
+- Import to PostgreSQL with proper position assignments
+- Preserve referral relationships where possible
+
+#### Step 3: Cutover Process  
+- Deploy custom waitlist system
+- Update landing page to use new form
+- Send migration email to existing subscribers
+- Sunset LaunchList widget
+
+#### Step 4: Enhanced Features
+- Admin dashboard for waitlist management
+- Advanced analytics and segmentation
+- A/B testing for email campaigns
+- Integration with trading platform for user onboarding
+
+### Technical Considerations
+
+#### Security
+- Rate limiting on signup endpoint
+- Email validation and sanitization  
+- CAPTCHA or similar anti-spam measures
+- Secure referral code generation
+
+#### Performance
+- Database indexing for email lookups
+- Caching for frequently accessed data
+- Optimized email delivery queues
+- Pagination for large waitlists
+
+#### Monitoring
+- Email delivery tracking via Resend webhooks
+- Signup conversion metrics
+- Referral system effectiveness
+- Queue position analytics
+
+### Timeline Estimate
+- **Custom Form + Basic Signup**: 2-3 hours
+- **Email Templates + Automation**: 2-3 hours  
+- **Referral System**: 3-4 hours
+- **Admin Dashboard**: 2-3 hours
+- **Migration + Testing**: 2-3 hours
+- **Total**: ~12-15 hours
+
+This custom waitlist system will provide complete control over the user experience while eliminating monthly costs and third-party dependencies. It's a natural evolution from the current LaunchList implementation that unlocks the full potential of our email automation strategy.
+
+---
+
 This redesign transforms ggbots from a generic AI trading platform into Sev's personal journey and experiment, making it infinitely more compelling and authentic. The story-driven approach builds trust and credibility while demonstrating the problem and solution organically through real experience.

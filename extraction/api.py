@@ -104,6 +104,91 @@ async def trigger_decision_webhook(user_id: str, symbols: List[str], timeframes:
         return None
 
 
+async def trigger_ggshot_testing_webhook(user_id: str, symbols: List[str], timeframes: List[str], original_signal: str = None) -> Optional[Dict[str, Any]]:
+    """
+    Trigger ggShot filter testing service for parallel LLM testing.
+    """
+    try:
+        # Get the original signal from recent market data if not provided
+        if not original_signal and symbols:
+            original_signal = await get_recent_ggshot_signal(symbols[0])
+        
+        testing_payload = {
+            "user_id": user_id,
+            "symbol": symbols[0] if symbols else "BTC/USDT",
+            "timeframe": timeframes[0] if timeframes else "1h", 
+            "original_signal": original_signal or "No signal text available"
+        }
+        
+        testing_webhook_url = "http://localhost:8001/test-ggshot-signal"
+        
+        logger.bind(user_id=user_id).info(f"🧪 Triggering ggShot testing webhook for {testing_payload['symbol']}")
+        
+        async with httpx.AsyncClient(timeout=300.0) as client:
+            response = await client.post(
+                testing_webhook_url,
+                json=testing_payload
+            )
+            
+            if response.status_code == 200:
+                test_result = response.json()
+                logger.bind(user_id=user_id).info(
+                    f"✅ ggShot testing completed: {test_result.get('successful_tests', 0)}/{test_result.get('tests_run', 5)} tests successful"
+                )
+                return test_result
+            else:
+                logger.bind(user_id=user_id).warning(
+                    f"ggShot testing webhook failed: {response.status_code} - {response.text}"
+                )
+                
+    except Exception as e:
+        logger.bind(user_id=user_id).error(f"ggShot testing webhook error: {str(e)}")
+        # Don't fail extraction if testing fails
+        return None
+
+
+async def get_recent_ggshot_signal(symbol: str) -> str:
+    """Get recent ggShot signal text from database for testing"""
+    try:
+        from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+        import psycopg2
+        from psycopg2.extras import RealDictCursor
+        
+        conn = psycopg2.connect(
+            host=DB_HOST,
+            port=DB_PORT,
+            database=DB_NAME,
+            user=DB_USER,
+            password=DB_PASS,
+            cursor_factory=RealDictCursor
+        )
+        
+        with conn.cursor() as cursor:
+            cursor.execute("""
+                SELECT raw_data
+                FROM market_data 
+                WHERE symbol = %s 
+                AND data_type = 'report'
+                ORDER BY updated_at DESC 
+                LIMIT 1
+            """, (symbol,))
+            
+            row = cursor.fetchone()
+            if row and row['raw_data']:
+                raw_data = row['raw_data']
+                if isinstance(raw_data, dict) and 'message' in raw_data:
+                    return raw_data['message']
+                else:
+                    return str(raw_data)
+        
+        conn.close()
+        return "No recent signal found"
+        
+    except Exception as e:
+        logger.error(f"Error fetching ggShot signal: {str(e)}")
+        return "Error fetching signal"
+
+
 async def setup_pre_extraction_monitoring(user_id: str, config_id: str) -> Optional[Dict[str, Any]]:
     """
     Setup account monitoring before extraction (like new_trade.py setup_monitoring).
@@ -267,6 +352,11 @@ async def run_extraction_task(extraction_id: str, user_id: str, symbols: Optiona
         if data_points > 0:
             logger.bind(user_id=user_id).info("⏱️ Triggering decision webhook after extraction...")
             await trigger_decision_webhook(user_id, symbols, timeframes, config_id, custom_mode)
+            
+            # Trigger ggShot testing webhook for parallel LLM testing (when in ggshot mode)
+            if custom_mode == "ggshot":
+                logger.bind(user_id=user_id).info("🧪 Triggering ggShot testing webhook for parallel analysis...")
+                await trigger_ggshot_testing_webhook(user_id, symbols, timeframes)
         else:
             logger.bind(user_id=user_id).warning("No data extracted, skipping decision webhook")
         

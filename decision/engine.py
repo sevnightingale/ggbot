@@ -650,7 +650,7 @@ class DecisionEngine:
         # Check indicator availability (updated for new ggShot config)
         def check_indicator_availability() -> tuple[bool, str, int]:
             """Check if we have minimum required indicators for reliable analysis"""
-            required_indicators = ['Aroon', 'Aroon_long', 'Vortex', 'VWAP', 'RSI', 'RSI_4h']
+            required_indicators = ['Aroon', 'Aroon_long', 'VWAP', 'RSI', 'RSI_4h']
             available_indicators = []
             
             for indicator in required_indicators:
@@ -660,8 +660,6 @@ class DecisionEngine:
                     data = get_indicator_data('Aroon_1d')  # NEW: String-based indicator
                 elif indicator == 'Aroon_long':
                     data = get_indicator_data('Aroon_60_1d')  # NEW: Long-term Aroon
-                elif indicator == 'Vortex':
-                    data = get_indicator_data('Vortex_1h')  # NEW: String-based indicator
                 elif indicator == 'VWAP':
                     data = get_indicator_data('VWAP_1h')   # NEW: String-based indicator
                 elif indicator == 'RSI':
@@ -698,162 +696,159 @@ class DecisionEngine:
         logger.bind(module="decision.engine", user_id=self.user_id).info(f"   Original Signal: {self._original_signal_message[:100]}...")
         
         # Build the complete 4-pillar validation prompt
-        prompt = f"""# ggShot Signal Validation Protocol v3.0
+        prompt = f"""ggShot Signal Validation Protocol v4.0 (Guardrail Framework)
 
-## MISSION
-You are validating a signal from the ggShot indicator - a sophisticated TradingView tool that uses AI optimization to identify potential market breakouts and reversals. ggShot analyzes key price levels and range boundaries to provide structured signals with detailed accuracy metrics.
+MISSION
+You are validating a ggShot signal using the Four-Pillar Framework with empirically-validated boundaries.
 
-Your task is to evaluate whether this specific ggShot signal is likely to succeed given current market conditions. Use the four-pillar analytical framework to systematically assess signal quality and assign a confidence score.
+PHASE 1 (Pillar-scoring judgment): Choose values strictly within each pillar's numeric range.
+PHASE 2 (Math): Sum the scores. If total <0.05 set to 0.05; if >0.95 set to 0.95.
+NO further edits, rescaling, or overrides after Phase 2. If you attempt to alter the post-clamp value, output "ERROR".
 
-**IMPORTANT NOTE ON HISTORICAL ACCURACY:** The signal includes historical accuracy percentages. These are provided for context but should be treated as a minor data point. Your analysis must focus on current market conditions, technical indicators, and real-time confluence. Past performance statistics should not significantly influence your confidence score.
+NOTE: Avoid rationalizing conflicting signals. When red flags appear, respect their significance and adjust confidence accordingly.
 
-If any data point is 'null' or 'N/A' due to a calculation failure, explicitly note the missing data and proceed with analysis based on remaining indicators.
-
-## 1. ORIGINAL GGSHOT SIGNAL
-```
+1. ORIGINAL GGSHOT SIGNAL
 {self._original_signal_message}
-```
 
-## 2. CURRENT MARKET CONDITIONS
-* **Current Price:** ${current_price}
-* **Analysis Timeframe:** {native_timeframe}
+2. CURRENT MARKET CONDITIONS  
+Current Price: ${current_price}
+Analysis Timeframe: {native_timeframe}
 
-### ENTRY ZONE CONTEXT
-Compare current price with the signal's entry zone for timing context.
-* **Good Entry Opportunity:** If price is at favorable end of entry zone (lower for LONG, higher for SHORT), this may provide a slight confidence boost
-* **Entry Timing Note:** Entry zone position affects execution quality but doesn't invalidate the signal's directional accuracy
+3. CONFIDENCE ASSESSMENT FRAMEWORK
 
-## 3. THE FOUR-PILLAR ANALYTICAL FRAMEWORK
-Approach each pillar as a key question that must be answered to assess signal quality. Consider how the indicators interact and what story they tell together.
+Starting Baseline: 0.700 (Signal presumed valid - identify flaws to justify rejection)
 
-### --- PILLAR 0: MARKET REGIME ASSESSMENT ---
-**Core Question:** "Is the current market environment suitable for the type of breakout signal that ggShot is designed to detect?"
+Assess each pillar and determine confidence adjustments within these empirically-validated boundaries:
 
-**Available Market Regime Data:**
-- **Aroon Short-term (14-period Daily):** {get_indicator_data('Aroon_1d')} - Recent 2-week trending vs ranging behavior
-- **Aroon Long-term (60-period Daily):** {get_indicator_data('Aroon_60_1d')} - Macro 2-month trend structure
-- **Bollinger Band Width (Daily):** {get_indicator_data('BollingerBandsWidth_1d')} - Indicates volatility regime and squeeze conditions  
-- **TRIX (Daily):** {get_indicator_data('TRIX_1d')} - Reveals trend strength and momentum quality
+PILLAR 0 - MARKET REGIME ASSESSMENT
+Core Question: "Is this signal aligned with or fighting the market trend?"
 
-**Key Consideration:** ggShot signals are designed for breakout/momentum scenarios. When Aroon shows ranging behavior (especially short-term), combined with low BBW (compression) or negative TRIX (no momentum), ggShot signals face significantly higher failure rates. Consider both timeframes: immediate ranging (2 weeks) poses the highest risk, while longer-term ranging (2 months) may indicate major consolidation before a significant move.
+Available Data:
+- Aroon Short-term (14-period): {get_indicator_data('Aroon_1d')}
+- Aroon Long-term (60-period): {get_indicator_data('Aroon_60_1d')}  
+- Bollinger Band Width: {get_indicator_data('BollingerBandsWidth_1d')}
+- TRIX: {get_indicator_data('TRIX_1d')}
 
-**Critical Flags to Look For:**
-- **isCurrentlyRanging** in short-term Aroon = HIGH RISK for ggShot
-- Combination of ranging + low volatility = Dangerous consolidation
-- Short-term ranging within long-term trend = Less risky than both timeframes ranging
+Assessment Boundaries:
+- Strong trend alignment (both Aroon timeframes favor signal direction): +0.03 to +0.08
+- Moderate trend alignment (mixed signals, some consolidation): +0.00 to +0.03
+- Counter-trend setup (short-term trend opposes signal): -0.12 to -0.20
+- Ranging/consolidating markets (both timeframes ranging): -0.06 to -0.12
 
-**Your Analysis:** Based on the multi-timeframe regime data above, what type of market environment are we in? Is price currently compressing or expanding? How does the combination of short-term and long-term market structure affect the likelihood of ggShot signal success?
+Micro-adjustments within ranges:
+- BBW >75th percentile + direction aligns: bias toward upper end of positive ranges
+- BBW <25th percentile (ranging/squeeze): bias toward lower end of negative ranges (-0.10 to -0.12)
+- TRIX momentum slope aligns with signal: bias toward upper range end
+- TRIX momentum opposes signal: bias toward lower range end
 
-### --- PILLAR 1: SIGNAL CONFIRMATION ---
-**Core Question:** "Does the underlying market data support this ggShot signal's direction and strength?"
+Counter-trend setups have shown higher risk in our analysis. Consider this when assessing regime alignment.
 
-**Available Momentum & Volume Data:**
-- **Volume Analysis:** {current_volume_data} - Dynamic timeframe-matched volume analysis
-- **Vortex Indicator (1h):** {get_indicator_data('Vortex_1h')} - Shows directional momentum strength
-- **VWAP (1h):** {get_indicator_data('VWAP_1h')} - Indicates institutional money flow alignment  
-- **MFI (1h):** {get_indicator_data('MFI_1h')} - Reveals volume-based momentum patterns
+PILLAR 1 - SIGNAL CONFIRMATION  
+Core Question: "Do volume and momentum indicators strongly support this direction?"
 
-**CRITICAL VOLUME CONTEXT:**
-- Volume analysis uses the **signal's native timeframe** ({native_timeframe}) for accurate comparison
-- Period dynamically adjusts based on timeframe (20-50 candles) for optimal baseline
-- This ensures apples-to-apples comparison (e.g., 4h volume vs 4h average, not 4h vs 1h)
-- Lower timeframes use more periods for stability, higher timeframes use fewer to avoid lag
+Available Data:
+- Volume Analysis: {current_volume_data}
+- VWAP: {get_indicator_data('VWAP_1h')}
+- MFI: {get_indicator_data('MFI_1h')}
 
-**Volume Interpretation Guidelines (ggShot Founder's Thresholds):**
-- **<10% above average**: Weak momentum - breakout lacks conviction
-- **10-30% above average**: Moderate momentum - acceptable but watch for failure
-- **30-60% above average**: Good momentum - solid breakout support
-- **60-100% above average**: Strong momentum - high conviction move
-- **>100% above average**: Very strong momentum - often indicates major breakout
+Assessment Boundaries:
+- Exceptional volume (>1.5x avg) with momentum alignment: +0.05 to +0.12
+- Strong volume (1.0-1.5x avg) with momentum alignment: +0.00 to +0.04
+- Moderate volume with mixed momentum: +0.00 to +0.02
+- Weak volume (<0.75x avg): -0.08 to -0.15
+- MFI strongly opposing direction (>20 points): -0.06 to -0.12
 
-**Your Analysis:** Pay special attention to volume as it's one of the most reliable breakout confirmation tools. How does the current volume compare to the 30-period average? Does it support or contradict the ggShot signal? Consider volume alongside momentum indicators for complete picture.
+Micro-adjustments within ranges:
+- Price vs VWAP favorable side by >1%: bias toward upper end of positive ranges
+- Price vs VWAP wrong side by >1%: bias toward lower end of negative ranges
 
-### --- PILLAR 2: BROADER CONTEXT ASSESSMENT ---
-**Core Question:** "Is this trade well-positioned across multiple timeframes and near major liquidity zones?"
+Weak volume and MFI divergence have been notable risk factors. Consider their combined impact.
 
-**Available Multi-Timeframe Data:**
-- **RSI 15m:** {get_indicator_data('RSI_15m')} - Fine-grained momentum analysis
-- **RSI 30m:** {get_indicator_data('RSI_30m')} - Primary signal timeframe context
-- **RSI 1h:** {get_indicator_data('RSI_1h')} - Intermediate timeframe perspective
-- **RSI 4h:** {get_indicator_data('RSI_4h')} - Higher timeframe trend context
-- **Donchian Channel (200-period, 1h):** {get_indicator_data('DonchianChannel_200_1h')} - Major liquidity zones and breakout context
+PILLAR 2 - MULTI-TIMEFRAME CONTEXT
+Core Question: "Are we buying tops or selling bottoms across timeframes?"
 
-**Key Considerations:**
-- Give slightly more weight to the RSI timeframe closest to the signal timeframe ({native_timeframe}) for most relevant momentum context
-- Pay special attention to overheated RSI conditions, as ggShot signals can sometimes trigger late in a move, right before natural retracements occur
-- Higher timeframe overbought/oversold conditions can derail otherwise good signals
-- Proximity to major support/resistance levels affects profit potential
-- Consider how momentum aligns or conflicts across different time horizons
+Available Data:
+- RSI 15m: {get_indicator_data('RSI_15m')}
+- RSI 30m: {get_indicator_data('RSI_30m')}  
+- RSI 1h: {get_indicator_data('RSI_1h')}
+- RSI 4h: {get_indicator_data('RSI_4h')}
+- Donchian Channel: {get_indicator_data('DonchianChannel_200_1h')}
 
-**Your Analysis:** What does the multi-timeframe momentum picture tell us? Are we buying tops or selling bottoms? How much room does this trade have to develop based on major liquidity zones?
+Assessment Boundaries:
+- All timeframes aligned, RSI has room to move: +0.02 to +0.06
+- Mixed timeframe signals, some overextension: -0.02 to -0.05
+- Poor alignment, severe overextension: -0.04 to -0.10
+- Trading into RSI extremes opposing signal: -0.06 to -0.12
 
-### --- PILLAR 3: IMMEDIATE MARKET CONDITIONS ---
-**Core Question:** "What do current market conditions tell us about execution timing and environment?"
+Micro-adjustments within ranges:
+- Donchian breakout aligning with signal direction: bias toward upper end of positive ranges
+- Price at Donchian extreme opposing signal direction: bias toward lower end of negative ranges
 
-**Available Market Condition Data:**
-- **Bollinger Bands (1h):** {get_indicator_data('BollingerBands_1h')} - Price position relative to statistical bands
-- **ATR (1h):** {get_indicator_data('ATR_1h')} - Current volatility levels
+PILLAR 3 - IMMEDIATE CONDITIONS
+Core Question: "Are there immediate execution risks?"
 
-**Key Considerations:**
-- How does current price position relative to Bollinger Bands affect potential outcomes?
-- What does current volatility (ATR) suggest about market conditions?
-- Are there any immediate technical factors worth noting?
+Available Data:
+- Bollinger Bands: {get_indicator_data('BollingerBands_1h')}
+- ATR: {get_indicator_data('ATR_1h')}
 
-**Your Analysis:** What do these immediate market conditions suggest about the trading environment? How might they influence signal execution?
+Assessment Boundaries:
+- Favorable positioning, normal volatility: +0.00 to +0.04
+- Some overextension but manageable: -0.01 to -0.04
+- Severe overextension, extreme volatility: -0.03 to -0.08
+- Late entry timing (at edge of entry zone): -0.04 to -0.08
 
-## 4. HOLISTIC ANALYSIS & CONFIDENCE SCORING
+COMBINATION EFFECTS
+When multiple red flags appear together:
+- 2 red flags: -0.02 to -0.04
+- 3 red flags: -0.03 to -0.06
+- 4+ red flags: -0.04 to -0.08
 
-**Synthesize Your Findings:** Now step back and consider how all four pillars interact. What is the overall story these indicators tell about this ggShot signal's prospects?
+CONFIDENCE BOUNDARIES
+Mathematical limits ONLY - no subjective adjustments:
+- If final calculation > 0.95: set confidence to exactly 0.95
+- If final calculation < 0.05: set confidence to exactly 0.05
+- Otherwise: use exact calculated value
 
-**Consider:**
-- How do the pillars reinforce or contradict each other?
-- What factors support or challenge the signal's premise?
-- What does the overall confluence of evidence suggest?
+4. ASSESSMENT APPROACH
 
-**Confidence Score Guidelines:**
-Your confidence score should fall within one of these specific ranges based on the confluence of evidence:
+PHASE 1 (Pillar-scoring judgment): Choose values strictly within each pillar's numeric range.
+PHASE 2 (Math): Sum the scores. If total <0.05 set to 0.05; if >0.95 set to 0.95.
+NO further edits, rescaling, or overrides after Phase 2. If you attempt to alter the post-clamp value, output "ERROR".
 
-**0.00-0.05:** Signal fundamentally contradicted by all pillars
-**0.05-0.10:** Active opposition across multiple critical factors
-**0.10-0.15:** Severe misalignment with only minor supporting elements
-**0.15-0.20:** Predominantly negative confluence with isolated positives
-**0.20-0.25:** Significant structural weaknesses overwhelming few strengths
-**0.25-0.30:** Multiple major concerns with limited favorable conditions
-**0.30-0.35:** Unfavorable balance with some redeeming technical factors
-**0.35-0.40:** Below-average setup with notable headwinds present
-**0.40-0.45:** Mixed conditions leaning negative, lacking conviction
-**0.45-0.50:** Neutral setup with balanced opposing forces
-**0.50-0.55:** Neutral setup with slight positive bias emerging
-**0.55-0.60:** Above-average conditions with manageable concerns
-**0.60-0.65:** Favorable alignment offset by specific weaknesses
-**0.65-0.70:** Good confluence with isolated but notable risks
-**0.70-0.75:** Strong multi-pillar support with minor contradictions
-**0.75-0.80:** Very strong alignment with minimal concerns
-**0.80-0.85:** Exceptional confluence across most key factors
-**0.85-0.90:** Near-ideal setup with only trivial weaknesses
-**0.90-0.95:** Outstanding alignment across all major pillars
-**0.95-1.00:** Perfect or near-perfect technical confluence
+1. Start with baseline: 0.700
+2. Apply each pillar adjustment sequentially (show running total after each)
+3. Apply combination effects if multiple red flags present
+4. Apply boundary limits ONLY if calculation exceeds 0.05-0.95 range
+5. Report final confidence to 3 decimal places
 
-**Confidence Score:** Based on your analysis and these guidelines, what specific confidence level (0.00-1.00) best represents this signal's probability of success?
+5. FINAL OUTPUT
 
-**Important:** Confidence should be assigned based solely on the four pillars — do not inflate scores for 'gut feel' or unexplained bias. Every aspect of your score must be traceable to specific technical evidence from the pillars.
-
-## 5. FINAL OUTPUT
-
-FORMAT YOUR RESPONSE EXACTLY AS:
-
-ACTION: validate
-CONFIDENCE: [0.00-1.00]
-STOP_LOSS: [Extract from signal]
-TAKE_PROFIT: [Extract Target 1 from signal]
+First, provide your reasoning analysis, then output the structured results:
 
 REASONING:
-- **Entry Timing:** (Assess current price vs entry zone and timing implications)
-- **Market Regime:** (Your assessment of market environment suitability for breakouts)
-- **Signal Confirmation:** (How momentum, volume, and flow indicators align with signal direction)
-- **Multi-Timeframe Context:** (RSI analysis across timeframes, focusing on closest to signal)
-- **Risk Factors:** (Any immediate tactical risks or overextension concerns)
-- **Overall Assessment:** (Synthesize how all factors combine to justify your confidence score)
+Write your analysis in plain text format suitable for Telegram publishing. DO NOT USE ANY MARKDOWN FORMATTING - no asterisks (*), no bold (**), no underscores (_), no backticks (`), no headers (#). Use only plain text with dashes (-) for bullet points.
+
+Provide your analysis using this exact structure:
+- Baseline: 0.700
+- Pillar 0 - Market Regime: [adjustment and decisive reasoning]
+- Pillar 1 - Signal Confirmation: [adjustment and decisive reasoning]
+- Pillar 2 - Multi-Timeframe: [adjustment and decisive reasoning]
+- Pillar 3 - Immediate Conditions: [adjustment and decisive reasoning]
+- Combination Effects: [if multiple red flags present]
+- Primary Direction: [Trend-aligned / Counter-trend / Ranging market]
+- Volume Strength: [Exceptional / Strong / Moderate / Weak]
+- Critical Risks: [List any major red flags identified]
+- Confidence Rationale: [Decisive explanation of final score]
+- Final Calculation: [show math with running totals]
+
+Use exact numerical boundaries provided for each pillar. Apply adjustments systematically without subjective offsets. Show all mathematical calculations explicitly.
+
+After completing your reasoning and calculation above, provide the structured output in plain text format with NO FORMATTING:
+
+ACTION: validate
+CONFIDENCE: [use the exact result from your Final Calculation above, 3 decimal places]
+STOP_LOSS: [extract from signal]  
+TAKE_PROFIT: [extract Target 1 from signal]
 """
         
         return prompt
@@ -1231,7 +1226,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             line_upper = line_stripped.upper()
             
             # Look for ACTION: (uppercase format)
-            if line_upper.startswith('ACTION:'):
+            if 'ACTION:' in line_upper:
                 try:
                     parts = line_stripped.split(':', 1)
                     if len(parts) >= 2:
@@ -1245,7 +1240,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                     logger.bind(module="decision.engine").warning(f"Failed to parse action: {e}")
             
             # Look for CONFIDENCE: (uppercase format)
-            elif line_upper.startswith('CONFIDENCE:'):
+            elif 'CONFIDENCE:' in line_upper:
                 try:
                     parts = line_stripped.split(':', 1)
                     if len(parts) >= 2:
@@ -1261,7 +1256,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                     logger.bind(module="decision.engine").warning(f"Failed to parse confidence: {e}")
             
             # Look for STOP_LOSS: (uppercase format)
-            elif line_upper.startswith('STOP_LOSS:') or line_upper.startswith('STOP LOSS:'):
+            elif 'STOP_LOSS:' in line_upper or 'STOP LOSS:' in line_upper:
                 try:
                     parts = line_stripped.split(':', 1)
                     if len(parts) >= 2:
@@ -1276,7 +1271,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                     logger.bind(module="decision.engine").warning(f"Failed to parse stop_loss_price: {e}")
             
             # Look for TAKE_PROFIT: (uppercase format)
-            elif line_upper.startswith('TAKE_PROFIT:') or line_upper.startswith('TAKE PROFIT:'):
+            elif 'TAKE_PROFIT:' in line_upper or 'TAKE PROFIT:' in line_upper:
                 try:
                     parts = line_stripped.split(':', 1)
                     if len(parts) >= 2:
@@ -1291,8 +1286,8 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                     logger.bind(module="decision.engine").warning(f"Failed to parse take_profit_price: {e}")
             
             # Look for REASONING: section (uppercase format)
-            elif line_upper.startswith('REASONING:') or capture_reasoning:
-                if line_upper.startswith('REASONING:'):
+            elif 'REASONING:' in line_upper or capture_reasoning:
+                if 'REASONING:' in line_upper:
                     capture_reasoning = True
                     # Get any text after "REASONING:" on the same line
                     parts = line.split(':', 1)
@@ -1302,7 +1297,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                             reasoning_lines.append(reasoning_text)
                 elif capture_reasoning and line_stripped:
                     # Continue capturing reasoning until we hit another section
-                    if any(line_upper.startswith(x) for x in ['ACTION:', 'CONFIDENCE:', 'STOP_LOSS:', 'TAKE_PROFIT:', 'STOP LOSS:', 'TAKE PROFIT:']):
+                    if any(x in line_upper for x in ['ACTION:', 'CONFIDENCE:', 'STOP_LOSS:', 'TAKE_PROFIT:', 'STOP LOSS:', 'TAKE PROFIT:']):
                         capture_reasoning = False
                     else:
                         reasoning_lines.append(line)
@@ -1446,6 +1441,17 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                     custom_mode=custom_mode  # Pass custom_mode to enable ggShot system prompts
                 )
                 
+                # NEW: Fire-and-forget parallel testing for ggShot
+                if custom_mode == "ggshot":
+                    asyncio.create_task(
+                        self._fire_ggshot_parallel_testing(
+                            original_signal=getattr(self, '_original_signal_message', ''),
+                            market_data=market_data,
+                            symbol=symbol,
+                            user_id=self.user_id
+                        )
+                    )
+                
                 # DEBUG: Log the full response
                 logger.bind(module="decision.engine", user_id=self.user_id).info(
                     "🤖 DECISION LLM RESPONSE:\n{response}",
@@ -1455,6 +1461,10 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                 # Parse response
                 decision = self._parse_llm_response(response, mode='new_trade')
                 decision['metadata'] = metadata
+                
+                # For ggShot mode, store the full prompt for backtesting
+                if custom_mode == "ggshot":
+                    decision['full_prompt'] = prompt
                 
                 return self._create_intent(decision, mode='new', symbol=symbol)
                 
@@ -1526,9 +1536,54 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             intent['ggshot_signal_validation'] = True
             intent['signal_data'] = decision['ggshot_signal_data']
             intent['original_signal'] = decision.get('original_signal', 'Signal data not available')
+            # Add full prompt for ggShot backtesting if available
+            if decision.get('full_prompt'):
+                intent['full_prompt'] = decision['full_prompt']
         
         logger.bind(module="decision.engine").info(
             f"Created intent with confidence={decision['confidence']} for Trading Module risk calculation"
         )
         
         return intent
+    
+    async def _fire_ggshot_parallel_testing(self, original_signal: str, market_data: Dict, symbol: str, user_id: str):
+        """
+        Fire-and-forget parallel testing call for ggShot signals.
+        
+        Args:
+            original_signal (str): The original ggShot signal text
+            market_data (Dict): Market data already loaded by decision engine
+            symbol (str): Trading symbol
+            user_id (str): User ID
+        """
+        try:
+            import httpx
+            
+            # Extract timeframe from signal or use default
+            timeframe = "30m"  # Default, could extract from market_data keys if needed
+            
+            logger.bind(module="decision.engine", user_id=user_id).info(
+                f"🔬 Triggering parallel ggShot testing for {symbol} ({len(market_data)} timeframes of data)"
+            )
+            
+            async with httpx.AsyncClient(timeout=10.0) as client:
+                await client.post(
+                    "http://localhost:8001/test-ggshot-decision",
+                    json={
+                        "user_id": user_id,
+                        "symbol": symbol,
+                        "timeframe": timeframe,
+                        "original_signal": original_signal,
+                        "market_data": market_data
+                    }
+                )
+                
+            logger.bind(module="decision.engine", user_id=user_id).info(
+                "✅ Parallel ggShot testing triggered successfully"
+            )
+            
+        except Exception as e:
+            logger.bind(module="decision.engine", user_id=user_id).warning(
+                f"⚠️ ggShot parallel testing failed: {e} (main decision flow unaffected)"
+            )
+            # Never fail the main decision flow
