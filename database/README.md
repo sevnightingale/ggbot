@@ -2,14 +2,14 @@
 
 This directory contains database migration scripts for the ggbots platform. The database is designed to support a multi-user trading agent platform where users can configure and deploy trading agents for various cryptocurrency pairs across multiple exchanges.
 
-## Bubble.io Integration
+## Multi-User Architecture
 
-The ggbots platform uses a hybrid architecture with Bubble.io for frontend/user management and this backend for agent operations. The database schema supports this integration with the following approach:
+The ggbots platform is designed to support multiple users, each able to create and manage multiple autonomous trading bots. The database schema supports this with the following approach:
 
-- **User Management**: User accounts are created and managed in Bubble.io, with Bubble-generated UUIDs passed to the backend and stored in the `user_id` field of our tables
-- **Configuration Flow**: Trading agent configurations are created in the Bubble.io interface and sent to the backend via API, where they are stored in the `configurations` table
+- **User Management**: User accounts will be managed through the custom Next.js frontend, with UUIDs stored in the `user_id` field of our tables
+- **Configuration Flow**: Trading agent configurations are created in the frontend interface and sent to the backend via API, where they are stored in the `configurations` table
 - **Multiple Agent Support**: Users can create multiple trading agents (bots) by grouping configurations using the `config_name` field
-- **Authentication**: Authentication is handled by Bubble.io, with tokens or headers passing the user identification to our backend API
+- **Authentication**: Authentication system will be implemented to handle user identification and secure API access
 
 ## Migration Scripts
 
@@ -339,15 +339,15 @@ The database is designed with multi-user support in mind. All tables include a `
 ### Default Development User
 For the initial development phase, a default user with the UUID `00000000-0000-0000-0000-000000000001` is created. All operations during this phase are associated with this default user.
 
-### Bubble.io User Integration
-For the platform phase:
-1. Bubble.io generates a UUID for each user upon registration
-2. This UUID is passed to our backend API via secure headers or tokens
+### Future User Integration
+For the production platform phase:
+1. The authentication system will generate a UUID for each user upon registration
+2. This UUID will be passed to our backend API via secure headers or tokens
 3. Our backend uses this UUID as the `user_id` value in all database tables
-4. All database operations are associated with the user's Bubble.io UUID
+4. All database operations are associated with the user's UUID
 5. The API layer ensures that users can only access their own data
 
-This approach allows for seamless integration with Bubble.io while maintaining the database's existing structure and foreign key relationships. No additional tables or fields are needed beyond the existing schema, as it was originally designed with multi-user support in mind.
+This approach maintains the database's existing structure and foreign key relationships. No additional tables or fields are needed beyond the existing schema, as it was originally designed with multi-user support in mind.
 
 ## Database Views and Helper Functions
 

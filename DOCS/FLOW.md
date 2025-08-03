@@ -1,5 +1,5 @@
-User configures Extraction, Decision, and Trading Agents via Bubble.io frontend with crypto pairs, timeframes, trading strategy rules, and exchange details.
-Bubble.io generates UUID for user and sends configuration to backend API.
+User configures Extraction, Decision, and Trading Agents via custom Next.js frontend with crypto pairs, timeframes, trading strategy rules, and exchange details.
+Frontend generates UUID for user and sends configuration to backend API.
 Backend stores configuration in `configurations` table with `user_id`, `config_type` ('extraction', 'decision', 'trading'), and `config_name`.
 User activates ggbot via frontend.
 Backend retrieves ggbot configuration from `configurations` table using `user_id` and `config_name`.

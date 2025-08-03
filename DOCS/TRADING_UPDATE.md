@@ -1547,7 +1547,7 @@ volumes:
 ### **4. Environment Configuration**
 ```bash
 # .env file for Hummingbot integration
-HUMMINGBOT_API_HOST=http://localhost:8000
+HUMMINGBOT_API_HOST=http://localhost:15888
 HUMMINGBOT_VERSION=1.25.0
 PAPER_TRADE_ENABLED=true
 DEFAULT_CONNECTOR=binance_paper_trade
@@ -1662,3 +1662,240 @@ Signal → Custom V2 Controller → PositionExecutor
 - Deferred until core functionality proven stable
 
 This refined plan prioritizes rapid deployment of paper trading capabilities while building toward a robust, scalable execution engine that preserves the strengths of the current system while addressing its limitations through proper Hummingbot V2 architecture.
+
+---
+
+## Hummingbot Database Schema Analysis & Integration Plan
+
+### Current Status: Hummingbot as Execution Layer Only (Option C)
+
+Based on the decision to use Hummingbot purely for trade execution while maintaining our own database for user/config management and frontend display, here's the integration strategy:
+
+### **Critical Analysis Tasks**
+
+#### 1. **Hummingbot Schema Discovery**
+**IMMEDIATE ACTION REQUIRED**: Assess Hummingbot's PostgreSQL schema structure
+
+```sql
+-- Connect to Hummingbot's PostgreSQL instance (port 5433)
+-- Analysis queries to run:
+
+-- 1. Discover all tables in Hummingbot's schema
+\dt
+
+-- 2. Analyze trade tracking structure
+DESCRIBE trades; -- or equivalent
+SELECT * FROM trades LIMIT 5;
+
+-- 3. Examine position management tables
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' AND table_name LIKE '%position%';
+
+-- 4. Understand order lifecycle tracking
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' AND table_name LIKE '%order%';
+
+-- 5. Identify user/strategy isolation mechanisms
+SELECT table_name FROM information_schema.tables 
+WHERE table_schema = 'public' AND table_name LIKE '%strategy%' OR table_name LIKE '%config%';
+```
+
+#### 2. **Data Flow Architecture Assessment**
+
+**PRIMARY QUESTION**: How do we query active trades and historical performance by user_id + config_id?
+
+**Current Challenge**: 
+- Our frontend needs to display trades filtered by `user_id` + `config_id`
+- Hummingbot likely uses its own strategy/controller identification system
+- Need mapping between our config system and Hummingbot's internal IDs
+
+**Proposed Solution**:
+```python
+# Mapping table to bridge our config system with Hummingbot's
+CREATE TABLE hummingbot_strategy_mapping (
+    our_config_id UUID NOT NULL,
+    our_user_id UUID NOT NULL,
+    hummingbot_strategy_id VARCHAR NOT NULL,
+    hummingbot_controller_id VARCHAR,
+    connector_name VARCHAR, -- e.g., "binance_paper_trade"
+    created_at TIMESTAMP DEFAULT NOW(),
+    is_active BOOLEAN DEFAULT TRUE,
+    PRIMARY KEY (our_config_id, our_user_id),
+    FOREIGN KEY (our_config_id) REFERENCES configurations(config_id)
+);
+```
+
+#### 3. **Integration Architecture Decision**
+
+**Option C Implementation**: Dual Database with Real-time Sync
+
+```
+Our PostgreSQL (port 5432)                 Hummingbot PostgreSQL (port 5433)
+├── users                                   ├── strategies
+├── configurations (user_id + config_id)   ├── trades
+├── hummingbot_strategy_mapping            ├── orders
+├── aggregated_trades (user view)          ├── positions
+└── strategy_runs (decision audit)         └── controllers
+```
+
+**Data Flow**:
+1. **Trade Execution**: Decision Module → Hummingbot API → Hummingbot DB
+2. **User Queries**: Frontend → Our API → Query both databases → Joined response
+3. **Performance Metrics**: Calculated from Hummingbot data, cached in our DB
+
+#### 4. **Database Sync Service Requirements**
+
+```python
+class HummingbotSyncService:
+    """
+    Real-time synchronization between Hummingbot and our database.
+    Ensures frontend can display user-filtered trades and performance.
+    """
+    
+    async def sync_user_trades(self, user_id: str, config_id: str):
+        """Get all trades for a specific ggbot configuration"""
+        
+        # 1. Get Hummingbot strategy ID from mapping
+        hb_strategy_id = await self._get_hummingbot_strategy_id(config_id)
+        
+        # 2. Query Hummingbot database for trades
+        hb_trades = await self._query_hummingbot_trades(hb_strategy_id)
+        
+        # 3. Transform to our frontend format
+        our_trades = []
+        for hb_trade in hb_trades:
+            our_trade = {
+                'trade_id': hb_trade['id'],
+                'user_id': user_id,
+                'config_id': config_id,
+                'symbol': hb_trade['trading_pair'],
+                'side': hb_trade['side'],
+                'entry_price': hb_trade['entry_price'],
+                'current_price': hb_trade['current_price'],
+                'unrealized_pnl': hb_trade['unrealized_pnl'],
+                'trade_status': 'open' if hb_trade['is_active'] else 'closed',
+                'opened_at': hb_trade['created_at']
+            }
+            our_trades.append(our_trade)
+        
+        # 4. Cache in our database for fast frontend queries
+        await self._cache_trades_for_user(user_id, config_id, our_trades)
+        
+        return our_trades
+    
+    async def get_user_performance(self, user_id: str, config_id: str):
+        """Calculate performance metrics from Hummingbot data"""
+        
+        trades = await self.sync_user_trades(user_id, config_id)
+        
+        # Calculate metrics from Hummingbot trade data
+        total_pnl = sum(t['unrealized_pnl'] for t in trades)
+        win_rate = len([t for t in trades if t['unrealized_pnl'] > 0]) / len(trades) if trades else 0
+        total_trades = len(trades)
+        
+        performance = {
+            'total_pnl': total_pnl,
+            'win_rate': win_rate,
+            'total_trades': total_trades,
+            'return_percentage': total_pnl / 10000 * 100  # Assuming $10k base
+        }
+        
+        # Cache performance data
+        await self._cache_performance_for_user(user_id, config_id, performance)
+        
+        return performance
+```
+
+#### 5. **API Endpoint Updates Required**
+
+**Frontend Integration Points**:
+```python
+# Update existing endpoints to use Hummingbot data
+@app.get("/dashboard/api/dashboard/{user_id}/trades")
+async def get_user_trades(user_id: str, config_id: str = None):
+    """Get trades filtered by user and optionally by config"""
+    
+    if config_id:
+        # Get trades for specific ggbot
+        trades = await hummingbot_sync_service.sync_user_trades(user_id, config_id)
+    else:
+        # Get all trades for user across all configs
+        user_configs = await get_user_configurations(user_id)
+        all_trades = []
+        for config in user_configs:
+            config_trades = await hummingbot_sync_service.sync_user_trades(user_id, config.id)
+            all_trades.extend(config_trades)
+        trades = all_trades
+    
+    return {"trades": trades}
+
+@app.get("/dashboard/api/dashboard/{user_id}/performance") 
+async def get_user_performance(user_id: str, config_id: str = None):
+    """Get performance metrics by user and config"""
+    
+    if config_id:
+        performance = await hummingbot_sync_service.get_user_performance(user_id, config_id)
+    else:
+        # Aggregate performance across all configs
+        performance = await hummingbot_sync_service.get_aggregated_user_performance(user_id)
+    
+    return {"performance": performance}
+```
+
+#### 6. **Legacy Database Cleanup Plan**
+
+**SAFE CLEANUP**: Since no important trade data exists, we can clean slate the legacy schema
+
+```sql
+-- Phase 1: Backup current schema (just in case)
+pg_dump ggbot > ggbot_legacy_backup.sql
+
+-- Phase 2: Drop legacy trade-related tables (after Hummingbot integration works)
+DROP TABLE IF EXISTS trade_orders CASCADE;
+DROP TABLE IF EXISTS strategy_runs CASCADE; -- Keep decision audit trail
+DROP TABLE IF EXISTS instrument_metadata CASCADE;
+
+-- Phase 3: Clean up legacy columns in trades table
+ALTER TABLE trades DROP COLUMN IF EXISTS size_contracts CASCADE;
+ALTER TABLE trades DROP COLUMN IF EXISTS entry_price CASCADE;
+ALTER TABLE trades DROP COLUMN IF EXISTS mark_price CASCADE;
+-- ... remove other legacy columns
+
+-- Phase 4: Repurpose trades table as cache/aggregation table
+TRUNCATE trades; -- Clear any legacy data
+-- Add new columns for Hummingbot integration
+ALTER TABLE trades ADD COLUMN hummingbot_trade_id VARCHAR;
+ALTER TABLE trades ADD COLUMN hummingbot_strategy_id VARCHAR;
+ALTER TABLE trades ADD COLUMN last_synced_at TIMESTAMP;
+
+-- Phase 5: Keep essential tables for user/config management
+-- KEEP: users, configurations, market_data, account_states, logs
+-- KEEP: strategy_runs (for decision audit trail)
+```
+
+### **Critical Questions to Resolve**
+
+1. **Hummingbot Schema Structure**: What tables does Hummingbot use for trades, orders, positions?
+2. **Strategy Isolation**: How does Hummingbot isolate strategies? By strategy_id? controller_id?
+3. **Real-time Queries**: Can we query Hummingbot DB directly or do we need API-only access?
+4. **Performance Data**: How does Hummingbot calculate P&L, win rates, etc.?
+5. **Data Retention**: How long does Hummingbot keep trade history?
+
+### **Next Actions (Priority Order)**
+
+1. **IMMEDIATE**: Connect to Hummingbot PostgreSQL and run schema analysis queries
+2. **THIS WEEK**: Design and implement hummingbot_strategy_mapping table
+3. **THIS WEEK**: Build basic HummingbotSyncService with simple trade syncing
+4. **NEXT WEEK**: Update frontend API endpoints to use Hummingbot data
+5. **NEXT WEEK**: Test end-to-end: config creation → trade execution → frontend display
+6. **LATER**: Clean up legacy database schema once integration is proven stable
+
+### **Success Criteria**
+
+- [ ] Can create ggbot config and map to Hummingbot strategy
+- [ ] Frontend displays real trades from Hummingbot filtered by user_id + config_id  
+- [ ] Performance metrics calculate correctly from Hummingbot trade data
+- [ ] No data loss during legacy schema cleanup
+- [ ] All existing decision audit trail (strategy_runs) preserved
+
+This plan ensures we leverage Hummingbot's execution capabilities while maintaining our user-centric frontend and multi-bot management system.

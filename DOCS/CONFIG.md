@@ -2,6 +2,213 @@
 
 ## Priority 1: Config System & Service Management Enhancements
 
+### Immediate Improvements for Current JSON Blob System
+
+Based on analysis of the current `core/config/template.json` system, here are actionable improvements to make while the config-id migration is planned:
+
+#### 1. JSON Schema Validation
+**IMMEDIATE ACTION**: Add schema validation to prevent configuration errors:
+
+```python
+# core/config/validators.py
+import jsonschema
+from typing import Dict, Any
+
+CONFIG_SCHEMA = {
+    "type": "object",
+    "required": ["user_id", "extraction", "decision", "trading"],
+    "properties": {
+        "user_id": {"type": "string", "format": "uuid"},
+        "extraction": {
+            "type": "object",
+            "properties": {
+                "symbols": {"type": "array", "items": {"type": "string"}},
+                "timeframes": {"type": "array", "items": {"type": "string"}},
+                "sources": {"type": "object"}
+            },
+            "required": ["symbols", "timeframes", "sources"]
+        },
+        "decision": {
+            "type": "object", 
+            "properties": {
+                "llm_provider": {"type": "string", "enum": ["deepseek", "openai", "anthropic"]},
+                "strategy": {"type": "string", "minLength": 10},
+                "additional_context": {"type": "string"}
+            },
+            "required": ["llm_provider", "strategy"]
+        },
+        "trading": {
+            "type": "object",
+            "properties": {
+                "exchange": {"type": "string"},
+                "risk_rules": {"type": "object"}
+            },
+            "required": ["exchange", "risk_rules"]
+        }
+    }
+}
+
+def validate_config(config: Dict[str, Any]) -> bool:
+    """Validate configuration against schema."""
+    try:
+        jsonschema.validate(config, CONFIG_SCHEMA)
+        return True
+    except jsonschema.ValidationError as e:
+        logger.error(f"Config validation failed: {e.message}")
+        return False
+```
+
+#### 2. Environment Variable Integration
+**ISSUE RESOLVED**: Centralize scattered environment variables in config system:
+
+```python
+# core/config/env_integration.py
+import os
+from typing import Dict, Any
+
+def merge_env_vars_into_config(config: Dict[str, Any]) -> Dict[str, Any]:
+    """Merge environment variables into config template."""
+    
+    # LLM API Keys
+    if os.getenv('EXTRACTION_LLM_API_KEY'):
+        config.setdefault('extraction', {}).setdefault('sources', {}).setdefault('crypto_indicators_mcp', {})['llm_api_key'] = os.getenv('EXTRACTION_LLM_API_KEY')
+    
+    if os.getenv('DECISION_LLM_API_KEY'):
+        config.setdefault('decision', {})['llm_api_key'] = os.getenv('DECISION_LLM_API_KEY')
+    
+    # Exchange settings
+    if os.getenv('EXCHANGE_NAME'):
+        config.setdefault('trading', {})['exchange'] = os.getenv('EXCHANGE_NAME')
+        config.setdefault('mcp', {}).setdefault('indicators', {})['exchange_name'] = os.getenv('EXCHANGE_NAME')
+    
+    # Hummingbot integration
+    if os.getenv('HUMMINGBOT_API_HOST'):
+        config.setdefault('trading', {})['hummingbot_api_host'] = os.getenv('HUMMINGBOT_API_HOST')
+    
+    # ggShot configuration
+    if os.getenv('GGSHOT_CONFIG_ID'):
+        config.setdefault('ggshot', {})['config_id'] = os.getenv('GGSHOT_CONFIG_ID')
+        
+    return config
+```
+
+#### 3. Pre-populated Default Configurations
+**IMPROVEMENT**: Update template.json with working defaults:
+
+```json
+{
+  "user_id": "00000000-0000-0000-0000-000000000001",
+  "mcp": {
+    "ccxt": {
+      "enabled": true,
+      "config_path": "core/config/ccxt-accounts.json",
+      "default_exchange": "binance"
+    },
+    "indicators": {
+      "enabled": true,
+      "script_path": "core/mcp/servers/crypto-indicators-mcp/index.js",
+      "exchange_name": "binance"
+    }
+  },
+  "extraction": {
+    "symbols": ["BTC/USDT", "ETH/USDT"],
+    "timeframes": ["15m", "1h", "4h"],
+    "sources": {
+      "crypto_indicators_mcp": {
+        "enabled": true,
+        "indicators": ["RSI_1h", "MACD_1h", "BollingerBands_1h", "VWAP_1h"],
+        "llm_interpretation": false,
+        "llm_model": "gpt-4o-mini"
+      }
+    }
+  },
+  "decision": {
+    "llm_provider": "deepseek",
+    "strategy": "Conservative momentum trading using RSI and MACD confluence with strict risk management",
+    "risk_guidelines": "Max 2% risk per trade, max 3 concurrent positions",
+    "additional_context": "Focus on clear signals with good risk/reward ratio"
+  },
+  "trading": {
+    "exchange": "binance",
+    "exchange_id": "binance_perpetual_testnet", 
+    "risk_rules": {
+      "max_leverage": 10,
+      "max_position_size_pct": 5.0,
+      "max_risk_per_trade_pct": 2.0,
+      "min_equity_protection": 0.1,
+      "max_contracts_per_trade": 10000
+    }
+  }
+}
+```
+
+#### 4. Configuration Versioning
+**FUTURE-PROOFING**: Add version tracking for migrations:
+
+```json
+{
+  "_meta": {
+    "version": "1.0",
+    "created_at": "2025-01-24T10:00:00Z",
+    "updated_at": "2025-01-24T10:00:00Z",
+    "schema_version": "2025.1"
+  },
+  "user_id": "...",
+  // ... rest of config
+}
+```
+
+#### 5. Configuration Management Helper Functions
+**UTILITY**: Add helper functions for common operations:
+
+```python
+# core/config/helpers.py
+
+def create_default_config(user_id: str = None) -> Dict[str, Any]:
+    """Create a default configuration for a new user."""
+    with open('core/config/template.json', 'r') as f:
+        config = json.load(f)
+    
+    if user_id:
+        config['user_id'] = user_id
+    
+    # Merge environment variables
+    config = merge_env_vars_into_config(config)
+    
+    # Add metadata
+    config['_meta'] = {
+        'version': '1.0',
+        'created_at': datetime.utcnow().isoformat() + 'Z',
+        'schema_version': '2025.1'
+    }
+    
+    return config
+
+def update_config_safely(existing_config: Dict[str, Any], updates: Dict[str, Any]) -> Dict[str, Any]:
+    """Safely update configuration with validation."""
+    # Deep merge updates into existing config
+    updated_config = deep_merge(existing_config, updates)
+    
+    # Validate before returning
+    if not validate_config(updated_config):
+        raise ValueError("Configuration update would create invalid config")
+    
+    # Update metadata
+    updated_config.setdefault('_meta', {})['updated_at'] = datetime.utcnow().isoformat() + 'Z'
+    
+    return updated_config
+```
+
+### Recommendations for Current System
+
+1. **IMMEDIATE**: Implement JSON schema validation for all config operations
+2. **THIS WEEK**: Centralize environment variables using env_integration.py  
+3. **THIS WEEK**: Update template.json with working defaults
+4. **NEXT WEEK**: Add configuration versioning and metadata
+5. **NEXT SPRINT**: Implement the full config-id based system outlined below
+
+These improvements will make the current JSON blob system more robust while preparing for the config-id migration.
+
 ### Multi-Config Service Management
 Based on ggShot integration planning, we need a robust config-driven service management system:
 

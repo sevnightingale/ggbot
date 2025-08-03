@@ -31,11 +31,11 @@ Thumbs.db
 ggshot/
 
 # Hummingbot Integration
-# hummingbot-api is the official cloned repository - we don't need to track it
-hummingbot-api/
+# hummingbot-api is the official cloned repository - now organized under hummingbot/
+hummingbot/api/
 
-# hummingbot_client is auto-generated API client code
-hummingbot_client/
+# hummingbot_client is auto-generated API client code - now organized under hummingbot/
+hummingbot/client/
 
 # OpenAPI generation config
 openapitools.json
