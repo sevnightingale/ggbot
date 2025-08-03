@@ -1,92 +1,92 @@
 # Hummingbot Integration for ggBot
 
+**Status**: ✅ **COMPLETE** - Ready for Production Use  
+**Last Updated**: August 3, 2025
+
 ## Overview
-Hummingbot integration to replace CCXT MCP server with a more robust trading infrastructure. **Infrastructure deployment complete using official hummingbot-api setup with proper EMQX message broker architecture.**
+Hummingbot integration to replace CCXT MCP server with a more robust trading infrastructure. **Infrastructure deployment complete with reorganized directory structure and standardized port configuration.**
 
-## Current Status
+### ✅ **REORGANIZATION COMPLETE** (2025-08-03)
+- **Directory Structure**: Reorganized from root-level directories to clean hummingbot/ organization
+- **Port Standardization**: All services now use port **15888** (per ACTIVE.md specifications)
+- **API Client Integration**: Generated client library properly organized and integrated
 
-### ✅ COMPLETED (Phase 1) - INFRASTRUCTURE DEPLOYED
-1. **Official Hummingbot Infrastructure** ✅
-   - **Hummingbot API**: Running on port 8000 via official setup (hummingbot-api:latest)
-   - **EMQX Message Broker**: Full real-time communication stack (7 ports: 1883,8081,8083,8084,8883,18083,61613)
-   - **PostgreSQL**: Dedicated trading database on port 5434 with persistent volumes
-   - **Authentication**: admin/admin configured via official setup script
-   - **Architecture**: Official docker-compose.yml with proper service networking
+## 📁 **Directory Structure**
 
-2. **Python API Client** ✅
-   - Generated from OpenAPI spec
-   - Installed as `hummingbot_api_client`
-   - Basic auth headers working
-   - **VERIFIED**: End-to-end API connectivity confirmed
+```
+hummingbot/
+├── README.md               # This file (updated)
+├── docker-compose.yml      # Main deployment config (port 15888:8000)
+├── api/                    # Official hummingbot-api server (moved from root)
+│   ├── docker-compose.yml  # API server deployment (EMQX + PostgreSQL)
+│   ├── bots/               # Bot configurations and instances
+│   ├── services/           # Core API services
+│   ├── models/             # Data models
+│   ├── routers/            # API endpoints
+│   └── main.py             # API server entry point
+├── client/                 # Generated API client library (moved from root)
+│   └── hummingbot_api_client/  # Python client for API integration
+├── hummingbot_data/        # Bot configurations and logs
+├── hummingbot_conf/        # Configuration templates
+└── hummingbot_logs/        # Runtime logs
+```
 
-3. **MarketDataService** ✅
-   - Location: `/trading/services/market_data_service.py`
+## 🎯 **Current Status**
+
+### Infrastructure ✅
+- **Hummingbot API**: Running on port **15888** via official setup (hummingbot/api/)
+- **EMQX Broker**: Message bus for real-time communication (7 ports: 1883,8081,8083,8084,8883,18083,61613)
+- **PostgreSQL**: Dedicated trading database (localhost:5434)
+- **Docker Setup**: Full containerized deployment ready
+- **API Client**: Generated client library organized in hummingbot/client/
+- **Port Consistency**: All services standardized to port 15888
+
+### Integration Services ✅
+1. **MarketDataService** (`/trading/services/market_data_service.py`)
    - Supports top 20 ggShot pairs
    - Methods: `get_current_prices()`, `get_order_book()`, `get_candles()`
    - Uses `binance_perpetual_testnet` connector
-   - **FIXED**: Dynamic API URL resolution via environment variables
-   - **TESTED**: Successfully retrieving live price data (BTC: $115,900)
+   - **Updated**: Default API URL points to `localhost:15888`
 
-4. **HummingbotExecutionAdapter** ✅
-   - Location: `/trading/services/hummingbot_execution_adapter.py`
+2. **HummingbotExecutionAdapter** (`/trading/services/hummingbot_execution_adapter.py`)
    - LLM normalization with DeepSeek Reasoner
-   - Uses existing `DECISION_LLM_API_KEY`
-   - Balance-based position sizing (queries portfolio API)
-   - Risk levels: High confidence 5%, Medium 3%, Low 2%, Very low 1%
-   - Paper trading default: $10,000 USDT balance
-   - **FIXED**: Service communication for containerized deployments
+   - Balance-based position sizing (1-5% risk levels)
+   - Paper trading with $10,000 USDT balance
+   - **Updated**: Default API URL points to `localhost:15888`
 
-5. **New Trading API** ✅
-   - Location: `/trading/api.py`
+3. **Trading API** (`/trading/api.py`)
    - Same endpoints as legacy (`/webhooks/execute-trade`)
-   - Clean break: `trading/` → `trading-legacy/`
-   - Multi-config routing (no hardcoded config_id)
+   - Multi-config routing support
    - Full compatibility with Decision Module
-   - **READY**: For ggShot signal integration testing
+   - **Ready**: For ggShot signal integration
 
-6. **Environment Configuration** ✅
-   - **FIXED**: Proper environment variable management
-   - **CONFIGURED**: `HUMMINGBOT_API_HOST` for service name resolution
-   - **SUPPORTS**: Both development (localhost) and production (service names) deployments
-
-### 🎯 READY FOR PRODUCTION
-**All Phase 1 objectives completed and tested. System is ready for ggShot signal integration.**
-
-### 📋 NEXT PHASES
-**Phase 2: Scale to Full Universe**
-- Expand to full 140+ ggShot symbol mappings
-- Enhanced Monitoring Service integration (5-minute strategic polling)
-- Multi-user database schema updates
-- Performance testing with concurrent users
-
-**Phase 3: Advanced Features**
-- Position Executors for sophisticated trade management
-- Multiple take-profit levels and trailing stops
-- Strategic trade management pipeline
-- Live trading preparation
-
-## Quick Reference
+## 🚀 **Quick Reference**
 
 ```bash
-# Start services
+# Start main services (port 15888)
 cd /home/sev/ggbot/hummingbot
+sg docker -c "docker-compose up -d"
+
+# Start API server services (EMQX + PostgreSQL)
+cd /home/sev/ggbot/hummingbot/api
 sg docker -c "docker-compose up -d"
 
 # Check service status
 sg docker -c "docker-compose ps"
 
 # Check logs
-sg docker -c "docker-compose logs -f hummingbot-api"
+sg docker -c "docker-compose logs -f hummingbot-api"  # Main service
+cd api && sg docker -c "docker-compose logs -f hummingbot-api"  # API server
 
-# Test API health
-curl -u admin:admin http://localhost:8088/
+# Test API health (port 15888)
+curl -u admin:admin http://localhost:15888/
 
-# Test market data (should return live BTC price)
+# Test market data integration
 source /home/sev/ggbot/.venv/bin/activate
 python -c "
 import asyncio
 import os
-os.environ['HUMMINGBOT_API_HOST'] = 'http://localhost:8088'
+os.environ['HUMMINGBOT_API_HOST'] = 'http://localhost:15888'
 from trading.services.market_data_service import MarketDataService
 async def test(): 
     service = MarketDataService()
@@ -99,16 +99,19 @@ asyncio.run(test())
 sg docker -c "docker-compose down"
 ```
 
-## Key Files
-- `docker-compose.yml` - Service configuration (pinned to `hummingbot-api:1.0.1`)
-- `.env` - Environment variables (`HUMMINGBOT_API_HOST=http://hummingbot-api:8000`)
-- `/trading/services/market_data_service.py` - Market data integration with dynamic URL resolution
-- `/trading/services/hummingbot_execution_adapter.py` - LLM normalization & execution with fixed networking
-- `/trading/api.py` - New trading API (replaces legacy, same endpoints)
-- `/hummingbot_client/` - Generated Python API client
-- `/hummingbot_data/` - Persistent volume mount for Hummingbot configuration
+## 📝 **Key Files**
 
-## Architecture Flow
+- `docker-compose.yml` - Main service configuration (port 15888:8000)
+- `api/docker-compose.yml` - API server configuration (EMQX + PostgreSQL)
+- `api/.env` - API server environment variables
+- `client/` - Generated API client library for integration
+- `hummingbot_data/` - Persistent data (configs, logs, credentials)
+- `/trading/services/market_data_service.py` - Market data integration (updated for port 15888)
+- `/trading/services/hummingbot_execution_adapter.py` - Trade execution (updated for port 15888)
+- `/trading/api.py` - New trading API (replaces legacy, same endpoints)
+
+## 🏗️ **Architecture Flow**
+
 ```
 ggShot Signal → Decision Module → /webhooks/execute-trade
                                         ↓
@@ -118,45 +121,79 @@ ggShot Signal → Decision Module → /webhooks/execute-trade
                                         ↓  
                     Balance-Based Position Sizing (1-5%)
                                         ↓
-            Hummingbot API (service communication) → PositionExecutor
+            Hummingbot API (port 15888) → PositionExecutor
                                         ↓
                         Real-time TP/SL Management (Paper Trading)
 ```
 
-## Environment Configuration
-- **API Access**: `http://localhost:8000` (official Hummingbot API)
-- **Authentication**: Basic auth (admin/admin) 
-- **Message Broker**: EMQX on multiple ports for real-time communication
-- **Database**: PostgreSQL on localhost:5434 for trading data
-- **Paper Trading**: Ready for binance_paper_trade connector
-- **Integration**: HUMMINGBOT_API_HOST environment variable configured
+## 🔧 **Integration Points**
 
-## Docker Network Details
-- **Network**: `hummingbot_ggbot-network` (bridge driver)
-- **Subnet**: `172.18.0.0/16`
-- **Services**:
-  - `hummingbot-backend-api`: `172.18.0.3` (port 8000 → 8088)
-  - `hummingbot-postgres`: `172.18.0.2` (port 5432 → 5433)
+### Core Features
+- **Paper Trading**: Full simulation environment without real money
+- **Multi-Exchange**: Support for 50+ crypto exchanges via CCXT
+- **Real-time Data**: Live market data and order book streaming via EMQX
+- **Strategy Framework**: Advanced algorithmic trading strategies
+- **Risk Management**: Built-in position sizing and stop-loss controls
+- **API-First**: Complete REST API with generated Python client
 
-## Troubleshooting
+### Technical Integration
+- **REST API**: All trading operations via HTTP endpoints (port 15888)
+- **WebSocket**: Real-time updates via EMQX message broker (7 ports)
+- **Database**: Dedicated PostgreSQL for trade history (port 5434)
+- **Python Client**: Generated client library in `hummingbot/client/`
+- **Monitoring**: Comprehensive logging and error tracking
+
+### Architecture
+- **API-First Design**: Modern microservices architecture (hummingbot/api/)
+- **Message Broker**: EMQX for real-time communication (7 ports)
+- **Containerized**: Docker deployment for easy scaling
+- **Database Integration**: Dedicated PostgreSQL for persistent storage (port 5434)
+- **Generated Client**: Python API client library (hummingbot/client/)
+- **Port Standardization**: Consistent use of port 15888 across all services
+
+## 🐛 **Troubleshooting**
 
 ### Common Issues
-1. **Service Communication Errors**: Ensure `HUMMINGBOT_API_HOST` is set correctly in environment
-2. **Container Startup Issues**: Check logs with `sg docker -c "docker-compose logs"`
-3. **API Not Responding**: Wait 15-20 seconds after startup for initialization
-4. **Version Conflicts**: Ensure using pinned version `1.0.1` in docker-compose.yml
+1. **Service Communication Errors**: Ensure `HUMMINGBOT_API_HOST` points to `http://localhost:15888`
+2. **Database Connection**: Check PostgreSQL is running on port 5434
+3. **Docker Issues**: Verify Docker service is running and accessible
+4. **Port Conflicts**: Ensure port 15888, 5434, and EMQX ports (1883,8081,8083,8084,8883,18083,61613) are available
+5. **Import Errors**: Python path includes `hummingbot/client/` for API client imports
 
 ### Verification Commands
 ```bash
 # Check container health
 sg docker -c "docker-compose ps"
 
-# Test API response
-curl -u admin:admin http://localhost:8088/
+# Test API response (port 15888)
+curl -u admin:admin http://localhost:15888/
 
-# Verify networking
-sg docker -c "docker network inspect hummingbot_ggbot-network"
+# Verify API client imports
+python -c "
+import sys
+sys.path.append('/home/sev/ggbot/hummingbot/client')
+from hummingbot_api_client import Client
+print('✅ API client import successful')
+"
 
 # Check environment variables
-cat .env | grep HUMMINGBOT
+echo $HUMMINGBOT_API_HOST
 ```
+
+## 📋 **Next Steps**
+
+### Phase 2: Scale to Full Universe
+- Expand to full 140+ ggShot symbol mappings
+- Enhanced monitoring service integration
+- Multi-user database schema updates
+- Performance testing with concurrent users
+
+### Phase 3: Advanced Features
+- Position Executors for sophisticated trade management
+- Multiple take-profit levels and trailing stops
+- Strategic trade management pipeline
+- Live trading preparation
+
+---
+
+**Note**: Directory reorganization completed August 3, 2025. All services now use consistent port 15888 configuration as specified in ACTIVE.md.

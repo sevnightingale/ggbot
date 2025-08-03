@@ -54,7 +54,7 @@ class HummingbotExecutionAdapter:
         
         # Determine API URL - use environment variable or default
         if api_url is None:
-            api_url = os.getenv("HUMMINGBOT_API_HOST", "http://hummingbot-api:8000")
+            api_url = os.getenv("HUMMINGBOT_API_HOST", "http://localhost:15888")
         
         logger.bind(service="hummingbot_adapter").info(
             f"Connecting to Hummingbot API at: {api_url}"

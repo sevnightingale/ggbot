@@ -16,6 +16,9 @@ import uvicorn
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
+# Add hummingbot client to path for API client imports
+sys.path.insert(0, str(Path(__file__).parent / "hummingbot" / "client"))
+
 # Set up logging before importing other modules
 from core.common.logging_config import setup_logging
 log_file = setup_logging()

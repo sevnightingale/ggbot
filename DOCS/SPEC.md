@@ -1,21 +1,21 @@
 ggbots Platform Spec Sheet
 Overview
-Purpose:ggbots is a platform for creating, customizing, and deploying autonomous AI trading agents for cryptocurrency pairs across multiple exchanges, with a primary focus on centralized exchanges (CEXs) for the MVP. The platform utilizes a hybrid architecture combining Bubble.io for frontend/user management and a dedicated backend for agent operations, providing users with an intuitive no-code interface to configure their trading agents while maintaining powerful backend processing capabilities.
+Purpose:ggbots is a platform for creating, customizing, and deploying autonomous AI trading agents for cryptocurrency pairs across multiple exchanges, with a primary focus on centralized exchanges (CEXs) for the MVP. The platform utilizes a custom Next.js frontend with a dedicated backend for agent operations, providing users with an intuitive interface to configure their trading agents while maintaining powerful backend processing capabilities.
 The system provides a modular architecture where users can configure three agents: Extraction, Decision, and Trading. The Extraction Agent gathers market data from sources like TradingView (using Browser-Use), Indicators MCP, and yfinance. The Decision Agent analyzes this data using a reasoning LLM and a trading strategy from the config to make trade decisions. The Trading Agent executes these decisions via the CCXT MCP, monitors active trades, and provides updates back to the Decision Agent.
-The first milestone in development is a reference agent implementation that demonstrates core functionality, followed by the Platform MVP that integrates Bubble.io for user management and configuration. This Spec Sheet outlines the technical architecture, codebase structure, database design, API integration, dependencies, and recommended development practices, with particular emphasis on the hybrid Bubble.io architecture and MCP integration for improved efficiency and scalability.
+The first milestone in development is a reference agent implementation that demonstrates core functionality, followed by the Platform MVP with custom frontend for user management and configuration. This Spec Sheet outlines the technical architecture, codebase structure, database design, API integration, dependencies, and recommended development practices, with particular emphasis on the modular architecture and MCP integration for improved efficiency and scalability.
 
 1. Technical Architecture
-1.1 Hybrid Architecture Overview
-The ggbots platform employs a hybrid architecture with two main components:
+1.1 Architecture Overview
+The ggbots platform employs a modular architecture with two main components:
 
-Frontend (Bubble.io):  
+Frontend (Next.js):  
 
 User interface and dashboard  
-User registration and authentication  
+User registration and authentication (future)  
 Agent configuration interface  
 Trading agent monitoring  
 Strategy marketplace (future)  
-Subscription and billing management
+Subscription and billing management (future)
 
 
 Backend (Custom Server):  
