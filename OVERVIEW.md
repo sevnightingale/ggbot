@@ -34,7 +34,7 @@ Phase 1: Flagship Agent Implementation
 Complete and deploy a fully operational flagship ggbot demonstrating the capabilities of the integrated Extraction, Decision, and Trading agents.
 Validate core functionalities, refine agent interactions, and ensure robust end-to-end automation.
 Phase 2: Platform MVP Launch
-Launch user-friendly frontend powered by Bubble.io, enabling user customization and monitoring.
+Launch user-friendly custom frontend, enabling user customization and monitoring.
 Develop comprehensive backend APIs integrating the Extraction, Decision, and Trading agents seamlessly.
 Implement subscription management and scalable pricing models.
 Phase 3: Platform Expansion

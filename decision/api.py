@@ -18,7 +18,8 @@ from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 from decision.decision_main import run_decision_process
 from core.monitoring.service import AccountMonitoringService
-from trading.lifecycle_manager import TradeLifecycleManager
+# Legacy import - TradeLifecycleManager moved to trading-legacy
+# from trading.lifecycle_manager import TradeLifecycleManager
 
 app = FastAPI(title="Decision API", version="1.0.0")
 

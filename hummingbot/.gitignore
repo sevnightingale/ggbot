@@ -1,0 +1,15 @@
+# Hummingbot directory-specific .gitignore
+
+# Data directories (contain runtime data, configs, credentials)
+hummingbot_data/
+hummingbot_conf/
+hummingbot_logs/
+
+# Environment files (may contain secrets)
+.env
+.env.*
+
+# Keep documentation and configuration templates
+# README.md, HUM.md, HUMMINGBOT_DOCS.md are tracked
+# docker-compose.yml is tracked
+# hummingbot_api_spec.json is tracked

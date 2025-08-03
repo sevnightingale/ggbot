@@ -12,6 +12,7 @@ venv/
 # Local environment files
 .env
 .env.*
+docker-compose.override.yml
 
 # Logs
 logs/
@@ -28,3 +29,34 @@ Thumbs.db
 
 # ggShot service directory (contains sensitive configs and session data)
 ggshot/
+
+# Hummingbot Integration
+# hummingbot-api is the official cloned repository - we don't need to track it
+hummingbot-api/
+
+# hummingbot_client is auto-generated API client code
+hummingbot_client/
+
+# OpenAPI generation config
+openapitools.json
+
+# Note: hummingbot/ directory has its own .gitignore for data/logs/configs
+
+# Docker volumes (if created locally)
+hummingbot_postgres_data/
+**/postgres_data/
+
+# Credentials and sensitive data
+**/*credentials*
+**/*.key
+**/*.pem
+**/*.secret
+**/certs/
+**/conf/strategies/
+**/conf/connectors/
+
+# Bot instance data
+ggshot-*-*-*/
+
+# Temporary paper trading data
+**/paper_trade_data/
