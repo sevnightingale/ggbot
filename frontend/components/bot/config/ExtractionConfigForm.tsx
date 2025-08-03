@@ -14,20 +14,14 @@ const commonSymbols = [
   'MATIC/USDT', 'AVAX/USDT', 'DOT/USDT', 'LINK/USDT', 'UNI/USDT'
 ]
 
-const timeframeOptions = [
-  { value: '1m', label: '1 minute' },
-  { value: '5m', label: '5 minutes' },
-  { value: '15m', label: '15 minutes' },
-  { value: '30m', label: '30 minutes' },
-  { value: '1h', label: '1 hour' },
-  { value: '4h', label: '4 hours' },
-  { value: '1d', label: '1 day' }
+// ggShot 20 indicators with sophisticated pre-processing
+const availableIndicators = [
+  'RSI_15m', 'RSI_1h', 'MACD_15m', 'MACD_1h', 'BollingerBands_15m', 'BollingerBands_1h',
+  'ATR_15m', 'ATR_1h', 'EMA_15m', 'EMA_1h', 'VWAP_15m', 'VWAP_1h',
+  'Stochastic_15m', 'Stochastic_1h', 'Williams%R_15m', 'Williams%R_1h', 
+  'OBV_15m', 'OBV_1h', 'CCI_15m', 'CCI_1h'
 ]
 
-const availableIndicators = [
-  'RSI', 'MACD', 'BollingerBands', 'ATR', 'Stochastic', 'Williams%R',
-  'OBV', 'CCI', 'MFI', 'SMA', 'EMA', 'VWAP', 'ParabolicSAR', 'Ichimoku'
-]
 
 export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigFormProps) {
   const { updateAgentConfig, setError } = useBotStore()
@@ -36,21 +30,24 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
   
   const [formData, setFormData] = useState<ExtractionConfig>({
     symbols: config?.symbols || [],
-    timeframes: config?.timeframes || [],
+    timeframes: [], // No longer used - integrated into indicators
     sources: {
+      ggshot: {
+        enabled: config?.sources?.ggshot?.enabled ?? false
+      },
       crypto_indicators_mcp: {
         enabled: config?.sources?.crypto_indicators_mcp?.enabled ?? true,
         indicators: config?.sources?.crypto_indicators_mcp?.indicators || [],
-        use_llm_selection: config?.sources?.crypto_indicators_mcp?.use_llm_selection ?? false,
-        llm_interpretation: config?.sources?.crypto_indicators_mcp?.llm_interpretation ?? true,
-        llm_model: config?.sources?.crypto_indicators_mcp?.llm_model || 'gpt-4o-mini'
+        use_llm_selection: false, // Removed
+        llm_interpretation: false, // Removed
+        llm_model: '' // Removed
       },
       tradingview: {
-        enabled: config?.sources?.tradingview?.enabled ?? false,
-        strategy: config?.sources?.tradingview?.strategy || ''
+        enabled: false, // Hidden for now
+        strategy: ''
       },
       yfinance: {
-        enabled: config?.sources?.yfinance?.enabled ?? false
+        enabled: false // Hidden for now
       }
     }
   })
@@ -78,15 +75,6 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
     }))
   }
 
-  const toggleTimeframe = (timeframe: string) => {
-    setFormData(prev => ({
-      ...prev,
-      timeframes: prev.timeframes.includes(timeframe)
-        ? prev.timeframes.filter(t => t !== timeframe)
-        : [...prev.timeframes, timeframe]
-    }))
-  }
-
   const toggleIndicator = (indicator: string) => {
     setFormData(prev => ({
       ...prev,
@@ -100,6 +88,21 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
         }
       }
     }))
+  }
+
+  const toggleSource = (source: string) => {
+    if (source === 'ggshot') {
+      setFormData(prev => ({
+        ...prev,
+        sources: {
+          ...prev.sources,
+          ggshot: {
+            ...prev.sources.ggshot!,
+            enabled: !prev.sources.ggshot!.enabled
+          }
+        }
+      }))
+    }
   }
 
   const renderSymbolsTab = () => (
@@ -147,48 +150,49 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
     </div>
   )
 
-  const renderTimeframesTab = () => (
-    <div className="space-y-4">
-      <div>
-        <h3 className="text-lg font-medium mb-3">Timeframes</h3>
-        <p className="text-sm text-bone-400 mb-4">
-          Choose the timeframes for technical analysis. Multiple timeframes provide better market perspective.
-        </p>
-        
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-          {timeframeOptions.map(option => (
-            <button
-              key={option.value}
-              onClick={() => toggleTimeframe(option.value)}
-              className={`p-3 text-sm border transition-colors ${
-                formData.timeframes.includes(option.value)
-                  ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
-                  : 'bg-charcoal-700 border-bone-200/80 text-bone-300 hover:border-bone-200/90'
-              }`}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
 
   const renderDataSourcesTab = () => (
     <div className="space-y-6">
       <div>
         <h3 className="text-lg font-medium mb-3">Data Sources</h3>
         <p className="text-sm text-bone-400 mb-4">
-          Configure data sources and technical indicators for market analysis.
+          Configure data sources for market analysis. ggShot provides high-confidence signals, while Technical Indicators offer detailed market analysis.
         </p>
       </div>
 
-      {/* Crypto Indicators MCP */}
+      {/* ggShot Signals */}
       <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h4 className="font-medium">Crypto Indicators MCP</h4>
-            <p className="text-sm text-bone-400">78 technical indicators via MCP server</p>
+            <h4 className="font-medium">ggShot Signals</h4>
+            <p className="text-sm text-bone-400">High-confidence trading signals from ggShot Telegram channel</p>
+          </div>
+          <label className="relative inline-flex items-center cursor-pointer">
+            <input
+              type="checkbox"
+              checked={formData.sources.ggshot?.enabled}
+              onChange={() => toggleSource('ggshot')}
+              className="sr-only peer"
+            />
+            <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:h-5 after:w-5 after:transition-all peer-checked:bg-agents-extraction"></div>
+          </label>
+        </div>
+
+        {formData.sources.ggshot?.enabled && (
+          <div className="p-3 bg-blue-900/20 border border-blue-500/60">
+            <p className="text-sm text-blue-200">
+              ✅ ggShot signals will be processed for trading decisions. These are manually curated, high-confidence signals.
+            </p>
+          </div>
+        )}
+      </div>
+
+      {/* Technical Indicators */}
+      <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h4 className="font-medium">Technical Indicators</h4>
+            <p className="text-sm text-bone-400">20 pre-processed indicators with timeframe integration (15m & 1h)</p>
           </div>
           <label className="relative inline-flex items-center cursor-pointer">
             <input
@@ -213,7 +217,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
         {formData.sources.crypto_indicators_mcp?.enabled && (
           <div className="space-y-4">
             <div>
-              <label className="block text-sm font-medium mb-2">Technical Indicators</label>
+              <label className="block text-sm font-medium mb-2">Available Indicators (with timeframes)</label>
               <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
                 {availableIndicators.map(indicator => (
                   <button
@@ -231,63 +235,21 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="flex items-center gap-2">
-                  <input
-                    type="checkbox"
-                    checked={formData.sources.crypto_indicators_mcp?.llm_interpretation}
-                    onChange={(e) => setFormData(prev => ({
-                      ...prev,
-                      sources: {
-                        ...prev.sources,
-                        crypto_indicators_mcp: {
-                          ...prev.sources.crypto_indicators_mcp!,
-                          llm_interpretation: e.target.checked
-                        }
-                      }
-                    }))}
-                    className="border-bone-200/80"
-                  />
-                  <span className="text-sm">LLM Interpretation</span>
-                </label>
-              </div>
-              
-              <div>
-                <label className="block text-sm font-medium mb-1">LLM Model</label>
-                <select
-                  value={formData.sources.crypto_indicators_mcp?.llm_model}
-                  onChange={(e) => setFormData(prev => ({
-                    ...prev,
-                    sources: {
-                      ...prev.sources,
-                      crypto_indicators_mcp: {
-                        ...prev.sources.crypto_indicators_mcp!,
-                        llm_model: e.target.value
-                      }
-                    }
-                  }))}
-                  className="w-full p-2 text-sm bg-charcoal-600 border border-bone-200/80 text-bone-200"
-                >
-                  <option value="gpt-4o-mini">GPT-4O Mini</option>
-                  <option value="gpt-4o">GPT-4O</option>
-                  <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
-                </select>
-              </div>
+            <div className="p-3 bg-bone-200/10 border border-bone-200/60">
+              <p className="text-sm text-bone-200">
+                <strong>Note:</strong> All indicators include both 15-minute and 1-hour timeframes for comprehensive market analysis.
+              </p>
             </div>
           </div>
         )}
       </div>
-
-      {/* Future data sources can be added here */}
     </div>
   )
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 0: return renderSymbolsTab()
-      case 1: return renderTimeframesTab()
-      case 2: return renderDataSourcesTab()
+      case 1: return renderDataSourcesTab()
       default: return null
     }
   }
