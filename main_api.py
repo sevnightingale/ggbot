@@ -82,13 +82,14 @@ async def health_check():
     
     health_status = {}
     
-    # Check each service health endpoint
+    # Check each service health endpoint (using current API port)
+    port = int(os.environ.get("API_PORT", "8000"))
     endpoints = {
-        "extraction": "http://localhost:8000/extraction/health",
-        "decision": "http://localhost:8000/decision/health",
-        "trading": "http://localhost:8000/trading/health",
-        "dashboard": "http://localhost:8000/dashboard/health",
-        "agent": "http://localhost:8000/agent/health"
+        "extraction": f"http://localhost:{port}/extraction/health",
+        "decision": f"http://localhost:{port}/decision/health",
+        "trading": f"http://localhost:{port}/trading/health",
+        "dashboard": f"http://localhost:{port}/dashboard/health",
+        "agent": f"http://localhost:{port}/agent/health"
     }
     
     async def check_endpoint(name, url):
@@ -146,17 +147,17 @@ if __name__ == "__main__":
     port = int(os.environ.get("API_PORT", "8000"))
     
     print(f"Starting GGBot Combined API Server on {host}:{port}")
-    print("API documentation available at: http://localhost:8000/docs")
+    print(f"API documentation available at: http://localhost:{port}/docs")
     print("\nIndividual API docs:")
-    print("  Extraction: http://localhost:8000/extraction/docs")
-    print("  Decision:   http://localhost:8000/decision/docs")
-    print("  Trading:    http://localhost:8000/trading/docs")
-    print("  Dashboard:  http://localhost:8000/dashboard/docs")
-    print("  Agent:      http://localhost:8000/agent/docs")
+    print(f"  Extraction: http://localhost:{port}/extraction/docs")
+    print(f"  Decision:   http://localhost:{port}/decision/docs")
+    print(f"  Trading:    http://localhost:{port}/trading/docs")
+    print(f"  Dashboard:  http://localhost:{port}/dashboard/docs")
+    print(f"  Agent:      http://localhost:{port}/agent/docs")
     print("\nScheduler Control:")
-    print("  Start:  POST http://localhost:8000/agent/api/scheduler/start")
-    print("  Stop:   POST http://localhost:8000/agent/api/scheduler/stop")
-    print("  Status: GET  http://localhost:8000/agent/api/scheduler/status")
+    print(f"  Start:  POST http://localhost:{port}/agent/api/scheduler/start")
+    print(f"  Stop:   POST http://localhost:{port}/agent/api/scheduler/stop")
+    print(f"  Status: GET  http://localhost:{port}/agent/api/scheduler/status")
     
     # Run the server
     uvicorn.run(

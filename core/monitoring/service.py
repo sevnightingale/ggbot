@@ -238,13 +238,28 @@ class AccountMonitoringService:
         lifecycle_positions = await self.adapter.get_positions_for_lifecycle(self.exchange)
         
         # Import and use the trade lifecycle manager
-        from trading.lifecycle_manager import TradeLifecycleManager
-        lifecycle_manager = TradeLifecycleManager(self.user_id, self.exchange_name, self.config_id)
-        sync_results = await lifecycle_manager.sync_positions_to_trades(lifecycle_positions, self.adapter)
+        # TODO: Re-enable when TradeLifecycleManager is migrated from trading-legacy
+        # from trading.lifecycle_manager import TradeLifecycleManager
+        # lifecycle_manager = TradeLifecycleManager(self.user_id, self.exchange_name, self.config_id)
+        # sync_results = await lifecycle_manager.sync_positions_to_trades(lifecycle_positions, self.adapter)
+        
+        # For now, return empty results to keep the service running
+        sync_results = {
+            'trades_opened': 0,
+            'trades_updated': 0,
+            'trades_closed': 0,
+            'errors': []
+        }
         
         # NEW: Sync TP/SL order status and close trades when orders are filled
         logger.debug("Checking TP/SL order status...")
-        tp_sl_results = await lifecycle_manager.sync_tp_sl_orders()
+        # tp_sl_results = await lifecycle_manager.sync_tp_sl_orders()
+        tp_sl_results = {
+            'orders_checked': 0,
+            'trades_closed_by_tp': 0,
+            'trades_closed_by_sl': 0,
+            'errors': []
+        }
         
         # Log sync results
         position_changes = sync_results['trades_opened'] > 0 or sync_results['trades_closed'] > 0
