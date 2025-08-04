@@ -100,9 +100,15 @@ export const useBotStore = create<BotState>((set, get) => ({
       // Load all user configs from API
       const configs = await api.getUserConfigs()
       
-      // Add demo bot if not present
-      const hasDemoBot = configs.some(c => c.config_id === DEMO_CONFIG_ID)
-      if (!hasDemoBot) {
+      // Default to ggShot flagship if available, otherwise first config, otherwise create demo
+      let defaultConfigId = configs.find(c => c.config_id === GGSHOT_CONFIG_ID)?.config_id
+      
+      if (!defaultConfigId && configs.length > 0) {
+        defaultConfigId = configs[0].config_id
+      }
+      
+      // Only add demo bot if no real configs exist
+      if (!defaultConfigId) {
         const demoConfig: UnifiedConfig = {
           config_id: DEMO_CONFIG_ID,
           config_name: "Demo Bot - Showcase",
@@ -119,11 +125,9 @@ export const useBotStore = create<BotState>((set, get) => ({
           is_flagship: false,
           paper_balance: 10000
         }
-        configs.unshift(demoConfig)
+        configs.push(demoConfig)
+        defaultConfigId = DEMO_CONFIG_ID
       }
-      
-      // Default to ggShot flagship if available, otherwise first config
-      const defaultConfigId = configs.find(c => c.config_id === GGSHOT_CONFIG_ID)?.config_id || configs[0]?.config_id
       
       set({ 
         availableBots: configs,
@@ -198,16 +202,64 @@ export const useBotStore = create<BotState>((set, get) => ({
       // Load real config from API
       const config = await api.getUnifiedConfig(botId)
       
+      // Parse complex config_data structure to simplified form structure
+      const parseExtractionConfig = (configData: any, config: any): ExtractionConfig => {
+        const extraction = configData.extraction || {}
+        const cryptoMcp = extraction.sources?.crypto_indicators_mcp || {}
+        
+        return {
+          symbols: ['BTC/USDT'], // Default symbol - would need to be stored in config
+          sources: {
+            crypto_indicators_mcp: {
+              enabled: cryptoMcp.enabled || false,
+              indicators: cryptoMcp.indicators || []
+            },
+            ggshot: {
+              enabled: extraction.sources?.telegram?.enabled || config.config_type === 'ggshot'
+            }
+          }
+        }
+      }
+      
+      const parseDecisionConfig = (configData: any): DecisionConfig => {
+        const decision = configData.decision || {}
+        return {
+          llm_provider: decision.llm_provider || 'deepseek',
+          system_prompt: decision.system_prompt || '',
+          strategy: decision.strategy || '',
+          additional_context: decision.additional_context || ''
+        }
+      }
+      
+      const parseTradingConfig = (configData: any): TradingConfig => {
+        const trading = configData.trading || {}
+        return {
+          exchange: trading.exchange || '',
+          exchange_id: trading.exchange_id || '',
+          authentication: trading.authentication || '',
+          risk_rules: trading.risk_rules || {
+            max_leverage: 3,
+            max_position_size_pct: 0.05,
+            max_risk_per_trade_pct: 0.02,
+            min_equity_protection: 0.8
+          }
+        }
+      }
+      
+      const extractionConfig = parseExtractionConfig(config.config_data, config)
+      const decisionConfig = parseDecisionConfig(config.config_data)
+      const tradingConfig = parseTradingConfig(config.config_data)
+      
       set({
         currentBotId: botId,
         currentConfig: config,
-        extractionConfig: config.config_data.extraction,
-        decisionConfig: config.config_data.decision,
-        tradingConfig: config.config_data.trading,
+        extractionConfig,
+        decisionConfig,
+        tradingConfig,
         agentStatuses: {
-          extraction: calculateAgentStatus(config.config_data.extraction),
-          decision: calculateAgentStatus(config.config_data.decision),
-          trading: calculateAgentStatus(config.config_data.trading),
+          extraction: calculateAgentStatus(extractionConfig),
+          decision: calculateAgentStatus(decisionConfig),
+          trading: calculateAgentStatus(tradingConfig),
         },
         isLoading: false
       })
@@ -277,102 +329,12 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   loadCurrentConfig: async () => {
-    set({ isLoading: true, error: null })
-    console.log('Starting loadCurrentConfig...')
-    
-    try {
-      // First test API connection
-      const isConnected = await api.testConnection()
-      console.log('API connection test result:', isConnected)
-      
-      if (!isConnected) {
-        console.log('API not available, using mock data')
-        
-        const currentBotId = get().currentBotId
-        const currentConfig = get().currentConfig
-        
-        // If this is the demo bot, show full configuration
-        if (currentBotId === DEMO_CONFIG_ID || currentConfig?.config_name === 'GGBOT-01') {
-          console.log('Loading demo bot configurations')
-          const mockExtraction: ExtractionConfig = {
-            symbols: ['BTC/USDT'],
-            sources: {
-              ggshot: {
-                enabled: true // ggShot flagship has ggShot signals enabled
-              },
-              crypto_indicators_mcp: {
-                enabled: true,
-                indicators: ['RSI_15m', 'RSI_1h', 'MACD_15m', 'MACD_1h', 'BollingerBands_15m', 'BollingerBands_1h', 'ATR_15m', 'ATR_1h', 'EMA_15m', 'EMA_1h', 'VWAP_15m', 'VWAP_1h']
-              }
-            }
-          }
-          const mockDecision: DecisionConfig = {
-            llm_provider: 'deepseek',
-            system_prompt: '',
-            strategy: 'ggShot signal validation and execution using 4-Pillar framework. Process high-confidence signals from ggShot Telegram channel with technical confirmation.',
-            additional_context: 'Focus on ggShot signal quality and market alignment for optimal execution timing.'
-          }
-          const mockTrading: TradingConfig = {
-            exchange: 'bitmex',
-            exchange_id: 'paper_trading',
-            authentication: 'paper_account',
-            risk_rules: {
-              max_leverage: 3,
-              max_position_size_pct: 0.05,
-              max_risk_per_trade_pct: 0.02,
-              min_equity_protection: 0.80
-            }
-          }
-          
-          set({
-            extractionConfig: mockExtraction,
-            decisionConfig: mockDecision,
-            tradingConfig: mockTrading,
-            agentStatuses: {
-              extraction: 'configured',
-              decision: 'configured',
-              trading: 'configured',
-            },
-            isLoading: false,
-          })
-          return
-        } else {
-          // New bots start with no configuration
-          console.log('Loading empty configurations for new bot')
-          set({
-            extractionConfig: null,
-            decisionConfig: null,
-            tradingConfig: null,
-            agentStatuses: {
-              extraction: 'unconfigured',
-              decision: 'unconfigured',
-              trading: 'unconfigured',
-            },
-            isLoading: false,
-          })
-          return
-        }
-      }
-
-      // Try to load from real API - but this should not happen since selectBot handles this
-      console.log('API available but no current config loaded - loading empty state')
-      set({
-        extractionConfig: null,
-        decisionConfig: null,
-        tradingConfig: null,
-        agentStatuses: {
-          extraction: 'unconfigured',
-          decision: 'unconfigured',
-          trading: 'unconfigured',
-        },
-        isLoading: false,
-      })
-    } catch (error) {
-      console.error('Error in loadCurrentConfig:', error)
-      set({ 
-        error: error instanceof Error ? error.message : 'Failed to load configurations',
-        isLoading: false 
-      })
+    console.log('loadCurrentConfig called - this should be handled by selectBot')
+    // This function is now redundant since selectBot handles config loading
+    // Keep it for compatibility but make it a no-op
+    const currentBotId = get().currentBotId
+    if (currentBotId) {
+      await get().selectBot(currentBotId)
     }
   },
 
@@ -412,11 +374,49 @@ export const useBotStore = create<BotState>((set, get) => ({
         return
       }
       
-      // For real bots, merge with existing config and save to API
-      const updatedConfigData = {
-        ...currentConfig.config_data,
-        [agent]: config
+      // For real bots, merge form data back into complex JSONB structure
+      const mergeConfigData = (agent: string, formConfig: any, existingConfigData: any) => {
+        const updatedData = { ...existingConfigData }
+        
+        if (agent === 'extraction') {
+          // Merge extraction form data into complex structure
+          updatedData.extraction = {
+            ...updatedData.extraction,
+            sources: {
+              ...updatedData.extraction?.sources,
+              crypto_indicators_mcp: {
+                ...updatedData.extraction?.sources?.crypto_indicators_mcp,
+                enabled: formConfig.sources.crypto_indicators_mcp.enabled,
+                indicators: formConfig.sources.crypto_indicators_mcp.indicators
+              },
+              telegram: {
+                ...updatedData.extraction?.sources?.telegram,
+                enabled: formConfig.sources.ggshot?.enabled || false
+              }
+            }
+          }
+        } else if (agent === 'decision') {
+          updatedData.decision = {
+            ...updatedData.decision,
+            llm_provider: formConfig.llm_provider,
+            system_prompt: formConfig.system_prompt,
+            strategy: formConfig.strategy,
+            additional_context: formConfig.additional_context
+          }
+        } else if (agent === 'trading') {
+          updatedData.trading = {
+            ...updatedData.trading,
+            exchange: formConfig.exchange,
+            exchange_id: formConfig.exchange_id,
+            authentication: formConfig.authentication,
+            risk_rules: formConfig.risk_rules
+          }
+        }
+        
+        return updatedData
       }
+      
+      const updatedConfigData = mergeConfigData(agent, config, currentConfig.config_data)
       
       // Save to API using unified config endpoint
       await api.updateUnifiedConfig(currentBotId, { config_data: updatedConfigData })
@@ -469,77 +469,55 @@ export const useBotStore = create<BotState>((set, get) => ({
         return
       }
       
-      // Check if it's the demo bot - use mock data
-      if (currentBotId === DEMO_CONFIG_ID) {
-        console.log('Loading demo bot trading history')
+      // Try to load from API first
+      try {
+        const result = await api.getTrades(currentBotId)
+        console.log('Trades loaded from API for config:', currentBotId)
         
-        // Use rich mock data for demo bot
-        const mockTrades: Trade[] = [
-          // Active profitable trades
-          {
-            id: '1',
-            symbol: 'BTCUSD',
-            side: 'long',
-            entry_price: 94500,
-            current_price: 96100,
-            quantity: 0.05,
-            pnl: 80,
-            pnl_percentage: 1.69,
-            status: 'open',
-            created_at: new Date(Date.now() - 14400000).toISOString(), // 4 hours ago
-            updated_at: new Date(Date.now() - 1800000).toISOString(),
-            decision_reasoning: 'Strong bullish momentum with volume confirmation'
-          },
-          {
-            id: '2', 
-            symbol: 'ETHUSD',
-            side: 'long',
-            entry_price: 3420,
-            current_price: 3489,
-            quantity: 0.8,
-            pnl: 55.2,
-            pnl_percentage: 2.02,
-            status: 'open',
-            created_at: new Date(Date.now() - 7200000).toISOString(), // 2 hours ago
-            updated_at: new Date(Date.now() - 900000).toISOString(),
-            decision_reasoning: 'ETH breaking key resistance with strong volume'
-          },
-          {
-            id: '3',
-            symbol: 'SOLUSD',
-            side: 'long',
-            entry_price: 185.50,
-            current_price: 192.30,
-            quantity: 2.5,
-            pnl: 17,
-            pnl_percentage: 3.67,
-            status: 'open',
-            created_at: new Date(Date.now() - 5400000).toISOString(), // 1.5 hours ago
-            updated_at: new Date(Date.now() - 600000).toISOString(),
-            decision_reasoning: 'SOL ecosystem momentum building'
-          },
-          // Recent closed profitable trades
-          {
-            id: '4',
-            symbol: 'AVAXUSD',
-            side: 'long',
-            entry_price: 42.80,
-            current_price: 44.95,
-            quantity: 8.0,
-            pnl: 172,
-            pnl_percentage: 5.02,
-            status: 'closed',
-            created_at: new Date(Date.now() - 86400000).toISOString(), // 1 day ago
-            updated_at: new Date(Date.now() - 21600000).toISOString(), // 6 hours ago
-            decision_reasoning: 'AVAX subnet activity increasing significantly'
-          }
-        ]
-        console.log('Using demo bot mock trades data')
-        set({ trades: mockTrades })
-      } else {
-        // New bots have no trading history
-        console.log('Using empty trades for new bot')
-        set({ trades: [] })
+        // Convert backend trade format to frontend format if needed
+        const trades = result.trades || []
+        set({ trades })
+      } catch (apiError) {
+        console.warn('API trades request failed, using fallback for demo:', apiError)
+        
+        // Only use mock data for demo bot when API fails
+        if (currentBotId === DEMO_CONFIG_ID) {
+          const mockTrades: Trade[] = [
+            {
+              id: '1',
+              symbol: 'BTCUSD',
+              side: 'long',
+              entry_price: 94500,
+              current_price: 96100,
+              quantity: 0.05,
+              pnl: 80,
+              pnl_percentage: 1.69,
+              status: 'open',
+              created_at: new Date(Date.now() - 14400000).toISOString(),
+              updated_at: new Date(Date.now() - 1800000).toISOString(),
+              decision_reasoning: 'Strong bullish momentum with volume confirmation'
+            },
+            {
+              id: '2', 
+              symbol: 'ETHUSD',
+              side: 'long',
+              entry_price: 3420,
+              current_price: 3489,
+              quantity: 0.8,
+              pnl: 55.2,
+              pnl_percentage: 2.02,
+              status: 'open',
+              created_at: new Date(Date.now() - 7200000).toISOString(),
+              updated_at: new Date(Date.now() - 900000).toISOString(),
+              decision_reasoning: 'ETH breaking key resistance with strong volume'
+            }
+          ]
+          console.log('Using demo bot mock trades data')
+          set({ trades: mockTrades })
+        } else {
+          // Empty trades for real bots with API errors
+          set({ trades: [] })
+        }
       }
     } catch (error) {
       console.error('Error loading trades:', error)
@@ -557,60 +535,65 @@ export const useBotStore = create<BotState>((set, get) => ({
         return
       }
       
-      // Check if it's the demo bot - use mock data
-      if (currentBotId === DEMO_CONFIG_ID) {
-        console.log('Loading demo bot performance data')
-        
-        // Generate 30-day performance data showing steady growth
-        const generateDailyPnL = () => {
-          const data = []
-          const today = new Date()
-          
-          for (let i = 29; i >= 0; i--) {
-            const date = new Date(today)
-            date.setDate(date.getDate() - i)
-            
-            // Generate realistic daily P&L with some volatility but overall upward trend
-            const dayPnL = Math.random() * 200 - 50 + (29 - i) * 5 // Slight upward bias over time
-            
-            data.push({
-              date: date.toISOString().split('T')[0],
-              pnl: Math.round(dayPnL * 100) / 100
-            })
-          }
-          return data
-        }
-
-        const mockPerformance: PerformanceData = {
-          period,
-          total_pnl: 3847.25,
-          total_pnl_percentage: 38.47,
-          win_rate: 0.75,
-          total_trades: 42,
-          daily_pnl: generateDailyPnL()
-        }
-        console.log('Using demo bot mock performance data')
-        set({ performance: mockPerformance })
-        return
-      }
-      
-      // For real bots, load from API
+      // Try to load from API first
       try {
         const result = await api.getPerformance(period, currentBotId)
         console.log('Performance data loaded from API for config:', currentBotId)
-        set({ performance: result })
-      } catch (apiError) {
-        console.warn('API performance request failed:', apiError)
-        // Empty performance for real bots with no data
-        const emptyPerformance: PerformanceData = {
+        
+        // Convert backend format to frontend format
+        const performance: PerformanceData = {
           period,
-          total_pnl: 0,
-          total_pnl_percentage: 0,
-          win_rate: 0,
-          total_trades: 0,
-          daily_pnl: []
+          total_pnl: result.total_pnl || 0,
+          total_pnl_percentage: (result as any).total_pnl_pct || 0,
+          win_rate: result.win_rate || 0,
+          total_trades: (result as any).trade_count || 0,
+          daily_pnl: [] // Backend doesn't provide daily breakdown yet
         }
-        set({ performance: emptyPerformance })
+        
+        set({ performance })
+      } catch (apiError) {
+        console.warn('API performance request failed, using fallback for demo:', apiError)
+        
+        // Only use mock data for demo bot when API fails
+        if (currentBotId === DEMO_CONFIG_ID) {
+          const generateDailyPnL = () => {
+            const data = []
+            const today = new Date()
+            
+            for (let i = 29; i >= 0; i--) {
+              const date = new Date(today)
+              date.setDate(date.getDate() - i)
+              const dayPnL = Math.random() * 200 - 50 + (29 - i) * 5
+              
+              data.push({
+                date: date.toISOString().split('T')[0],
+                pnl: Math.round(dayPnL * 100) / 100
+              })
+            }
+            return data
+          }
+
+          const mockPerformance: PerformanceData = {
+            period,
+            total_pnl: 3847.25,
+            total_pnl_percentage: 38.47,
+            win_rate: 0.75,
+            total_trades: 42,
+            daily_pnl: generateDailyPnL()
+          }
+          set({ performance: mockPerformance })
+        } else {
+          // Empty performance for real bots with API errors
+          const emptyPerformance: PerformanceData = {
+            period,
+            total_pnl: 0,
+            total_pnl_percentage: 0,
+            win_rate: 0,
+            total_trades: 0,
+            daily_pnl: []
+          }
+          set({ performance: emptyPerformance })
+        }
       }
     } catch (error) {
       console.error('Error loading performance:', error)
