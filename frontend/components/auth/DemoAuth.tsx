@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PasswordGate } from './PasswordGate'
 import { EmailSignup } from './EmailSignup'
+import { api } from '@/lib/api/client'
 
 interface DemoAuthProps {
   children: React.ReactNode
@@ -41,6 +42,8 @@ export function DemoAuth({ children }: DemoAuthProps) {
       email,
       isLoading: false
     })
+    // Update the API client with the new user ID
+    api.setUserId(userId)
   }
 
   if (userState.isLoading) {
