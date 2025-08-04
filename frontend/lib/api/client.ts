@@ -2,6 +2,7 @@ import {
   ExtractionConfig, 
   DecisionConfig, 
   TradingConfig,
+  UnifiedConfig,
   Trade,
   PerformanceData,
   SchedulerStatus,
@@ -9,7 +10,7 @@ import {
 } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const USER_ID = process.env.NEXT_PUBLIC_USER_ID || '00000000-0000-0000-0000-000000000001'
+const DEFAULT_USER_ID = process.env.NEXT_PUBLIC_USER_ID || '00000000-0000-0000-0000-000000000001'
 
 class ApiClient {
   private baseUrl: string
@@ -18,8 +19,19 @@ class ApiClient {
 
   constructor() {
     this.baseUrl = API_URL
-    this.userId = USER_ID
-    console.log('ApiClient initialized with baseUrl:', this.baseUrl)
+    // Check for demo user ID in localStorage first, fallback to default
+    if (typeof window !== 'undefined') {
+      this.userId = localStorage.getItem('demo_user_id') || DEFAULT_USER_ID
+    } else {
+      this.userId = DEFAULT_USER_ID
+    }
+    console.log('ApiClient initialized with baseUrl:', this.baseUrl, 'userId:', this.userId)
+  }
+
+  // Method to update user ID after demo signup
+  setUserId(userId: string) {
+    this.userId = userId
+    console.log('ApiClient userId updated to:', userId)
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -89,17 +101,39 @@ class ApiClient {
   }
 
   // Configuration APIs
-  async getConfig(module: 'extraction' | 'decision' | 'trading'): Promise<{ config: ExtractionConfig | DecisionConfig | TradingConfig }> {
-    return this.request(`/agent/api/config/${this.userId}/${module}`)
+  async getUnifiedConfig(configId: string): Promise<UnifiedConfig> {
+    return this.request(`/api/configs/${configId}`)
   }
 
-  async updateConfig(
-    module: 'extraction' | 'decision' | 'trading', 
-    config: ExtractionConfig | DecisionConfig | TradingConfig
-  ): Promise<ApiResponse<{ config: ExtractionConfig | DecisionConfig | TradingConfig }>> {
-    return this.request(`/agent/api/config/${this.userId}/${module}`, {
+  async getUserConfigs(userId?: string): Promise<UnifiedConfig[]> {
+    const userIdToUse = userId || this.userId
+    return this.request(`/api/configs/user/${userIdToUse}`)
+  }
+
+  async updateUnifiedConfig(configId: string, configData: Record<string, unknown>): Promise<ApiResponse<{ status: string, message: string }>> {
+    return this.request(`/api/configs/${configId}`, {
       method: 'PUT',
-      body: JSON.stringify({ config }),
+      body: JSON.stringify(configData),
+    })
+  }
+
+  async createConfigFromTemplate(template: string, symbol?: string, configName?: string, userId?: string): Promise<UnifiedConfig> {
+    const userIdToUse = userId || this.userId
+    return this.request(`/api/configs/create-from-template`, {
+      method: 'POST',
+      body: JSON.stringify({
+        template,
+        symbol: symbol || 'BTC/USDT',
+        config_name: configName,
+        user_id: userIdToUse,
+        risk_level: 'medium'
+      }),
+    })
+  }
+
+  async deleteConfig(configId: string): Promise<ApiResponse<{ status: string, message: string }>> {
+    return this.request(`/api/configs/${configId}`, {
+      method: 'DELETE',
     })
   }
 
@@ -121,11 +155,17 @@ class ApiClient {
   }
 
   // Dashboard APIs
-  async getTrades(): Promise<{ trades: Trade[] }> {
+  async getTrades(configId?: string): Promise<{ trades: Trade[] }> {
+    if (configId) {
+      return this.request(`/dashboard/api/dashboard/trades/${configId}`)
+    }
     return this.request(`/dashboard/api/dashboard/${this.userId}/trades`)
   }
 
-  async getPerformance(period: string = '7d'): Promise<PerformanceData> {
+  async getPerformance(period: string = '7d', configId?: string): Promise<PerformanceData> {
+    if (configId) {
+      return this.request(`/dashboard/api/dashboard/performance/${configId}?period=${period}`)
+    }
     return this.request(`/dashboard/api/dashboard/${this.userId}/performance?period=${period}`)
   }
 

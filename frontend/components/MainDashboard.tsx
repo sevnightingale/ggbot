@@ -12,7 +12,6 @@ import { AgentConfigModal } from '@/components/bot/AgentConfigModal'
 export function MainDashboard() {
   const {
     loadBots,
-    loadConfigurations,
     loadTrades,
     loadPerformance,
     checkSchedulerStatus,
@@ -36,9 +35,6 @@ export function MainDashboard() {
         await loadBots()
         console.log('MainDashboard: Bots loaded')
         
-        console.log('MainDashboard: Loading configurations...')
-        await loadConfigurations()
-        console.log('MainDashboard: Configurations loaded')
         
         // Load other data in parallel
         console.log('MainDashboard: Loading trades, performance, and scheduler status...')
