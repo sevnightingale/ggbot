@@ -268,6 +268,65 @@ async def update_config(config_id: str, updates: ConfigUpdate):
         raise HTTPException(500, f"Failed to update configuration: {str(e)}")
 
 
+@router.get("/{config_id}")
+async def get_single_config(config_id: str):
+    """
+    Get a single configuration by config_id.
+    
+    Returns the complete config_data JSONB for the specified configuration.
+    """
+    try:
+        with get_db_connection() as conn:
+            cur = conn.cursor()
+            
+            cur.execute("""
+                SELECT 
+                    c.config_id,
+                    c.config_name,
+                    c.config_type,
+                    c.user_id,
+                    c.config_data,
+                    c.created_at,
+                    c.updated_at,
+                    ci.instance_name,
+                    ci.hummingbot_account,
+                    ci.paper_balance_usd
+                FROM configurations c
+                LEFT JOIN config_instances ci ON c.config_id = ci.config_id
+                WHERE c.config_id = %s
+            """, (config_id,))
+            
+            row = cur.fetchone()
+            if not row:
+                raise HTTPException(404, "Configuration not found")
+            
+            config_id, config_name, config_type, user_id, config_data, created_at, updated_at, instance_name, hummingbot_account, paper_balance = row
+            
+            # Determine if config is editable
+            is_flagship = config_type in ["ggshot", "ggshot_production"]
+            
+            return {
+                "config_id": config_id,
+                "config_name": config_name,
+                "config_type": config_type,
+                "user_id": str(user_id),
+                "config_data": config_data,
+                "created_at": created_at,
+                "updated_at": updated_at,
+                "editable": not is_flagship,
+                "is_flagship": is_flagship,
+                "instance_name": instance_name,
+                "hummingbot_account": hummingbot_account,
+                "paper_balance": float(paper_balance) if paper_balance else 10000.0
+            }
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.bind(module="config_api").error(f"Failed to get config {config_id}: {e}")
+        raise HTTPException(500, f"Failed to get configuration: {str(e)}")
+
+
 @router.get("/{config_id}/permissions", response_model=ConfigPermissions)
 async def get_config_permissions(config_id: str):
     """

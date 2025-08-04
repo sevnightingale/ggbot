@@ -14,12 +14,30 @@ const commonSymbols = [
   'MATIC/USDT', 'AVAX/USDT', 'DOT/USDT', 'LINK/USDT', 'UNI/USDT'
 ]
 
-// ggShot 20 indicators with sophisticated pre-processing
-const availableIndicators = [
-  'RSI_15m', 'RSI_1h', 'MACD_15m', 'MACD_1h', 'BollingerBands_15m', 'BollingerBands_1h',
-  'ATR_15m', 'ATR_1h', 'EMA_15m', 'EMA_1h', 'VWAP_15m', 'VWAP_1h',
-  'Stochastic_15m', 'Stochastic_1h', 'Williams%R_15m', 'Williams%R_1h', 
-  'OBV_15m', 'OBV_1h', 'CCI_15m', 'CCI_1h'
+// Technical indicators without timeframes
+const baseIndicators = [
+  { name: 'RSI', label: 'RSI (Relative Strength Index)', description: 'Momentum oscillator (0-100)' },
+  { name: 'MACD', label: 'MACD', description: 'Moving Average Convergence Divergence' },
+  { name: 'BollingerBands', label: 'Bollinger Bands', description: 'Volatility bands around moving average' },
+  { name: 'ATR', label: 'ATR (Average True Range)', description: 'Volatility measurement' },
+  { name: 'EMA', label: 'EMA (Exponential Moving Average)', description: 'Trend-following indicator' },
+  { name: 'VWAP', label: 'VWAP (Volume Weighted Average Price)', description: 'Volume-based price average' },
+  { name: 'Stochastic', label: 'Stochastic Oscillator', description: 'Momentum indicator (0-100)' },
+  { name: 'Williams%R', label: 'Williams %R', description: 'Momentum indicator (-100 to 0)' },
+  { name: 'OBV', label: 'OBV (On-Balance Volume)', description: 'Volume-based momentum' },
+  { name: 'CCI', label: 'CCI (Commodity Channel Index)', description: 'Momentum oscillator' }
+]
+
+const availableTimeframes = [
+  { value: '15m', label: '15 Minutes' },
+  { value: '1h', label: '1 Hour' },
+  { value: '4h', label: '4 Hours' },
+  { value: '1d', label: '1 Day' }
+]
+
+// Premium indicator
+const premiumIndicators = [
+  { name: 'ggshot', label: 'ggShot Signals', description: 'Premium AI-powered trading signals', premium: true }
 ]
 
 
@@ -28,29 +46,117 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
   const [isSaving, setIsSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
   
+  // Parse existing indicators to get selected indicators and timeframes
+  const parseExistingIndicators = (indicators: string[]) => {
+    const selectedIndicators = new Set<string>()
+    const indicatorTimeframes: Record<string, string[]> = {}
+    
+    indicators.forEach(indicator => {
+      const parts = indicator.split('_')
+      if (parts.length >= 2) {
+        const timeframe = parts[parts.length - 1]
+        const indicatorName = parts.slice(0, -1).join('_')
+        selectedIndicators.add(indicatorName)
+        if (!indicatorTimeframes[indicatorName]) {
+          indicatorTimeframes[indicatorName] = []
+        }
+        if (!indicatorTimeframes[indicatorName].includes(timeframe)) {
+          indicatorTimeframes[indicatorName].push(timeframe)
+        }
+      }
+    })
+    
+    return { selectedIndicators, indicatorTimeframes }
+  }
+  
+  const existingIndicators = config?.sources?.crypto_indicators_mcp?.indicators || []
+  const { selectedIndicators: initialSelected, indicatorTimeframes: initialTimeframes } = parseExistingIndicators(existingIndicators)
+  
   const [formData, setFormData] = useState<ExtractionConfig>({
     symbols: config?.symbols || [],
-    timeframes: [], // No longer used - integrated into indicators
     sources: {
-      ggshot: {
-        enabled: config?.sources?.ggshot?.enabled ?? false
-      },
       crypto_indicators_mcp: {
         enabled: config?.sources?.crypto_indicators_mcp?.enabled ?? true,
-        indicators: config?.sources?.crypto_indicators_mcp?.indicators || [],
-        use_llm_selection: false, // Removed
-        llm_interpretation: false, // Removed
-        llm_model: '' // Removed
-      },
-      tradingview: {
-        enabled: false, // Hidden for now
-        strategy: ''
-      },
-      yfinance: {
-        enabled: false // Hidden for now
+        indicators: existingIndicators
       }
     }
   })
+  
+  const [selectedIndicators, setSelectedIndicators] = useState<Set<string>>(initialSelected)
+  const [indicatorTimeframes, setIndicatorTimeframes] = useState<Record<string, string[]>>(initialTimeframes)
+  const [ggShotEnabled, setGgShotEnabled] = useState(false)
+
+  // Helper function to rebuild indicator list with timeframes
+  const rebuildIndicatorList = (currentSelected: Set<string>, currentTimeframes: Record<string, string[]>) => {
+    const indicators: string[] = []
+    
+    currentSelected.forEach(indicator => {
+      const timeframes = currentTimeframes[indicator] || []
+      timeframes.forEach(timeframe => {
+        indicators.push(`${indicator}_${timeframe}`)
+      })
+    })
+    
+    return indicators
+  }
+
+  const toggleIndicator = (indicatorName: string) => {
+    const newSelected = new Set(selectedIndicators)
+    let newTimeframes = { ...indicatorTimeframes }
+    
+    if (newSelected.has(indicatorName)) {
+      newSelected.delete(indicatorName)
+      // Remove timeframes for this indicator
+      delete newTimeframes[indicatorName]
+    } else {
+      newSelected.add(indicatorName)
+      // Add default timeframes (15m and 1h)
+      newTimeframes[indicatorName] = ['15m', '1h']
+    }
+    
+    setSelectedIndicators(newSelected)
+    setIndicatorTimeframes(newTimeframes)
+    
+    // Update form data
+    const newIndicators = rebuildIndicatorList(newSelected, newTimeframes)
+    setFormData(prev => ({
+      ...prev,
+      sources: {
+        ...prev.sources,
+        crypto_indicators_mcp: {
+          ...prev.sources.crypto_indicators_mcp,
+          indicators: newIndicators
+        }
+      }
+    }))
+  }
+
+  const toggleTimeframe = (indicatorName: string, timeframe: string) => {
+    const currentTimeframes = indicatorTimeframes[indicatorName] || []
+    const newTimeframeList = currentTimeframes.includes(timeframe)
+      ? currentTimeframes.filter(tf => tf !== timeframe)
+      : [...currentTimeframes, timeframe]
+    
+    const newTimeframes = {
+      ...indicatorTimeframes,
+      [indicatorName]: newTimeframeList
+    }
+    
+    setIndicatorTimeframes(newTimeframes)
+    
+    // Update form data
+    const newIndicators = rebuildIndicatorList(selectedIndicators, newTimeframes)
+    setFormData(prev => ({
+      ...prev,
+      sources: {
+        ...prev.sources,
+        crypto_indicators_mcp: {
+          ...prev.sources.crypto_indicators_mcp,
+          indicators: newIndicators
+        }
+      }
+    }))
+  }
 
   const handleSave = async () => {
     try {
@@ -215,30 +321,89 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
         </div>
 
         {formData.sources.crypto_indicators_mcp?.enabled && (
-          <div className="space-y-4">
+          <div className="space-y-6">
+            {/* Premium ggShot Indicator */}
             <div>
-              <label className="block text-sm font-medium mb-2">Available Indicators (with timeframes)</label>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2 max-h-48 overflow-y-auto">
-                {availableIndicators.map(indicator => (
-                  <button
-                    key={indicator}
-                    onClick={() => toggleIndicator(indicator)}
-                    className={`p-2 text-xs border transition-colors ${
-                      formData.sources.crypto_indicators_mcp!.indicators.includes(indicator)
-                        ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
-                        : 'bg-charcoal-600 border-bone-200/80 text-bone-300 hover:border-bone-200/90'
-                    }`}
-                  >
-                    {indicator}
-                  </button>
-                ))}
-              </div>
+              <h4 className="text-sm font-medium text-bone-300 mb-3 flex items-center gap-2">
+                Premium Signals
+                <span className="text-xs bg-yellow-400/20 text-yellow-400 px-2 py-1 rounded">PREMIUM</span>
+              </h4>
+              {premiumIndicators.map(indicator => (
+                <div key={indicator.name} className="p-4 bg-gradient-to-r from-yellow-400/10 to-orange-400/10 border border-yellow-400/40 rounded">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="text-yellow-400">⭐</div>
+                      <div>
+                        <h5 className="font-medium text-yellow-400">{indicator.label}</h5>
+                        <p className="text-sm text-bone-300">{indicator.description}</p>
+                      </div>
+                    </div>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={ggShotEnabled}
+                        onChange={(e) => setGgShotEnabled(e.target.checked)}
+                        className="sr-only peer"
+                      />
+                      <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
+                    </label>
+                  </div>
+                </div>
+              ))}
             </div>
 
-            <div className="p-3 bg-bone-200/10 border border-bone-200/60">
-              <p className="text-sm text-bone-200">
-                <strong>Note:</strong> All indicators include both 15-minute and 1-hour timeframes for comprehensive market analysis.
-              </p>
+            {/* Technical Indicators */}
+            <div>
+              <h4 className="text-sm font-medium text-bone-300 mb-3">Technical Indicators</h4>
+              <div className="space-y-4">
+                {baseIndicators.map(indicator => (
+                  <div key={indicator.name} className="p-4 bg-charcoal-600/50 border border-bone-200/40 rounded">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <input
+                          type="checkbox"
+                          checked={selectedIndicators.has(indicator.name)}
+                          onChange={() => toggleIndicator(indicator.name)}
+                          className="w-5 h-5 text-agents-extraction bg-charcoal-700 border-bone-200/60 rounded focus:ring-agents-extraction"
+                        />
+                        <div>
+                          <h5 className="font-medium text-bone-200">{indicator.label}</h5>
+                          <p className="text-sm text-bone-400">{indicator.description}</p>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    {selectedIndicators.has(indicator.name) && (
+                      <div className="ml-8 pl-4 border-l border-bone-200/30">
+                        <p className="text-sm text-bone-300 mb-2">Select timeframes:</p>
+                        <div className="flex flex-wrap gap-2">
+                          {availableTimeframes.map(timeframe => (
+                            <button
+                              key={timeframe.value}
+                              onClick={() => toggleTimeframe(indicator.name, timeframe.value)}
+                              className={`px-3 py-1 text-sm border rounded transition-colors ${
+                                (indicatorTimeframes[indicator.name] || []).includes(timeframe.value)
+                                  ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
+                                  : 'bg-charcoal-700 border-bone-200/60 text-bone-300 hover:border-bone-200/80'
+                              }`}
+                            >
+                              {timeframe.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+              
+              {/* Selection summary */}
+              <div className="mt-4 p-3 bg-bone-200/10 border border-bone-200/60 rounded">
+                <p className="text-sm text-bone-300">
+                  <strong>{selectedIndicators.size}</strong> indicators selected with{' '}
+                  <strong>{formData.sources.crypto_indicators_mcp!.indicators.length}</strong> total timeframe combinations
+                </p>
+              </div>
             </div>
           </div>
         )}
