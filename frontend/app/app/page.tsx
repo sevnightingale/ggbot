@@ -2,6 +2,7 @@
 
 import { useEffect } from 'react'
 import { MainDashboard } from '@/components/MainDashboard'
+import { DemoAuth } from '@/components/auth/DemoAuth'
 
 export default function AppPage() {
   useEffect(() => {
@@ -12,6 +13,10 @@ export default function AppPage() {
     })
   }, [])
 
-  console.log('App page: Rendering private dashboard...')
-  return <MainDashboard />
+  console.log('App page: Rendering demo-protected dashboard...')
+  return (
+    <DemoAuth>
+      <MainDashboard />
+    </DemoAuth>
+  )
 }

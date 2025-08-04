@@ -9,47 +9,30 @@ export interface Bot {
 // Agent configuration types
 export interface ExtractionConfig {
   symbols: string[]
-  timeframes: string[]
   sources: {
-    crypto_indicators_mcp?: {
+    crypto_indicators_mcp: {
       enabled: boolean
       indicators: string[]
-      use_llm_selection: boolean
-      llm_interpretation: boolean
-      llm_model: string
-    }
-    tradingview?: {
-      enabled: boolean
-      strategy: string
-    }
-    yfinance?: {
-      enabled: boolean
-    }
-    telegram?: {
-      enabled: boolean
-      channels: string[]
-    }
-    news_feed?: {
-      enabled: boolean
-      sources: string[]
     }
   }
 }
 
 export interface DecisionConfig {
   llm_provider: string
+  system_prompt: string
   strategy: string
-  risk_guidelines: string
   additional_context: string
 }
 
 export interface TradingConfig {
+  exchange: string
+  exchange_id: string
+  authentication: string
   risk_rules: {
     max_leverage: number
     max_position_size_pct: number
     max_risk_per_trade_pct: number
     min_equity_protection: number
-    max_contracts_per_trade: number
   }
 }
 
@@ -59,24 +42,24 @@ export interface ExecutionConfig {
   authentication: string
 }
 
-export interface UserConfig {
+// Unified config interface matching backend response
+export interface UnifiedConfig {
+  config_id: string
+  config_name: string
+  config_type: string
   user_id: string
-  mcp: {
-    ccxt: {
-      enabled: boolean
-      config_path: string
-      default_exchange: string
-    }
-    indicators: {
-      enabled: boolean
-      script_path: string
-      exchange_name: string
-    }
+  config_data: {
+    extraction: ExtractionConfig
+    decision: DecisionConfig
+    trading: TradingConfig
   }
-  extraction: ExtractionConfig
-  decision: DecisionConfig
-  execution: ExecutionConfig
-  trading: TradingConfig
+  created_at: string
+  updated_at: string
+  editable: boolean
+  is_flagship: boolean
+  instance_name?: string
+  hummingbot_account?: string
+  paper_balance: number
 }
 
 // Trade types
