@@ -172,52 +172,30 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   selectBot: async (botId: string) => {
-    console.log('Selecting bot:', botId)
-    try {
-      set({ isLoading: true, error: null })
-      
-      const state = get()
-      
-      // Check if it's the demo bot
-      if (botId === DEMO_CONFIG_ID) {
-        const demoBot = state.availableBots.find(bot => bot.config_id === DEMO_CONFIG_ID)
-        if (demoBot) {
-          set({
-            currentBotId: botId,
-            currentConfig: demoBot,
-            extractionConfig: demoBot.config_data.extraction,
-            decisionConfig: demoBot.config_data.decision,
-            tradingConfig: demoBot.config_data.trading,
-            agentStatuses: {
-              extraction: calculateAgentStatus(demoBot.config_data.extraction),
-              decision: calculateAgentStatus(demoBot.config_data.decision),
-              trading: calculateAgentStatus(demoBot.config_data.trading),
-            },
-            isLoading: false
-          })
-          return
-        }
-      }
-      
-      // Load real config from API
-      const config = await api.getUnifiedConfig(botId)
-      
+    console.log('Selecting bot - MOCK MODE:', botId)
+    
+    // PURE MOCK MODE - NO API CALLS
+    const state = get()
+    const selectedBot = state.availableBots.find(bot => bot.config_id === botId)
+    
+    if (selectedBot) {
       set({
         currentBotId: botId,
-        currentConfig: config,
-        extractionConfig: config.config_data.extraction,
-        decisionConfig: config.config_data.decision,
-        tradingConfig: config.config_data.trading,
+        currentConfig: selectedBot,
+        extractionConfig: selectedBot.config_data.extraction,
+        decisionConfig: selectedBot.config_data.decision,
+        tradingConfig: selectedBot.config_data.trading,
         agentStatuses: {
-          extraction: calculateAgentStatus(config.config_data.extraction),
-          decision: calculateAgentStatus(config.config_data.decision),
-          trading: calculateAgentStatus(config.config_data.trading),
+          extraction: calculateAgentStatus(selectedBot.config_data.extraction),
+          decision: calculateAgentStatus(selectedBot.config_data.decision),
+          trading: calculateAgentStatus(selectedBot.config_data.trading),
         },
         isLoading: false
       })
-    } catch (error) {
-      console.error('Error selecting bot:', error)
-      set({ error: error instanceof Error ? error.message : 'Failed to select bot', isLoading: false })
+      console.log('Bot selected instantly:', selectedBot.config_name)
+    } else {
+      console.error('Bot not found:', botId)
+      set({ isLoading: false })
     }
   },
 
