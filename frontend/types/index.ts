@@ -11,6 +11,9 @@ export interface ExtractionConfig {
   symbols: string[]
   timeframes: string[]
   sources: {
+    ggshot?: {
+      enabled: boolean
+    }
     crypto_indicators_mcp?: {
       enabled: boolean
       indicators: string[]
@@ -38,12 +41,15 @@ export interface ExtractionConfig {
 
 export interface DecisionConfig {
   llm_provider: string
+  system_prompt: string
   strategy: string
-  risk_guidelines: string
   additional_context: string
 }
 
 export interface TradingConfig {
+  exchange: string
+  exchange_id: string
+  authentication: string
   risk_rules: {
     max_leverage: number
     max_position_size_pct: number
