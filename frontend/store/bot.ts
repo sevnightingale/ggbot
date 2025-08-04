@@ -93,114 +93,56 @@ export const useBotStore = create<BotState>((set, get) => ({
   error: null,
 
   loadBots: async () => {
-    console.log('Loading available bots...')
-    try {
-      set({ isLoading: true, error: null })
-      
-      // Try to load from API first
-      let configs: UnifiedConfig[] = []
-      let useApiData = false
-      
-      try {
-        configs = await api.getUserConfigs()
-        useApiData = true
-        console.log('Successfully loaded configs from API:', configs.length)
-      } catch (apiError) {
-        console.warn('API failed, using demo mode:', apiError)
-        // If API fails, use demo-only mode
-        useApiData = false
-      }
-      
-      // Create demo bot
-      const demoConfig: UnifiedConfig = {
-        config_id: DEMO_CONFIG_ID,
-        config_name: "Demo Bot - Showcase",
-        config_type: "demo",
-        user_id: api.currentUserId,
-        config_data: {
-          extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
-          decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
-          trading: { exchange: 'demo', exchange_id: '', authentication: '', risk_rules: { max_leverage: 3, max_position_size_pct: 0.05, max_risk_per_trade_pct: 0.02, min_equity_protection: 0.8 } }
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        editable: true,
-        is_flagship: false,
-        paper_balance: 10000
-      }
-      
-      // Create ggShot flagship demo
-      const ggShotConfig: UnifiedConfig = {
-        config_id: GGSHOT_CONFIG_ID,
-        config_name: "ggShot Flagship - Demo",
-        config_type: "ggshot",
-        user_id: api.currentUserId,
-        config_data: {
-          extraction: { symbols: ['BTC/USDT', 'ETH/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: ['RSI_15m', 'MACD_1h'] } } },
-          decision: { llm_provider: 'gpt-4', system_prompt: 'Premium ggShot trading strategy', strategy: 'AI-powered momentum trading', additional_context: 'High-confidence signals only' },
-          trading: { exchange: 'binance', exchange_id: '', authentication: '', risk_rules: { max_leverage: 5, max_position_size_pct: 0.08, max_risk_per_trade_pct: 0.03, min_equity_protection: 0.75 } }
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        editable: false,
-        is_flagship: true,
-        paper_balance: 15000
-      }
-      
-      if (useApiData) {
-        // Add demo bot if not present in API data
-        const hasDemoBot = configs.some(c => c.config_id === DEMO_CONFIG_ID)
-        if (!hasDemoBot) {
-          configs.unshift(demoConfig)
-        }
-      } else {
-        // API failed - use demo configs only
-        configs = [ggShotConfig, demoConfig]
-        console.log('Using demo-only mode with flagship and demo bots')
-      }
-      
-      // Default to ggShot flagship if available, otherwise first config
-      const defaultConfigId = configs.find(c => c.config_id === GGSHOT_CONFIG_ID)?.config_id || configs[0]?.config_id
-      
-      set({ 
-        availableBots: configs,
-        currentBotId: defaultConfigId || null,
-        isLoading: false
-      })
-      
-      // Load the default config
-      if (defaultConfigId) {
-        await get().selectBot(defaultConfigId)
-      }
-    } catch (error) {
-      console.error('Critical error in loadBots:', error)
-      // Final fallback - just demo mode
-      const demoConfig: UnifiedConfig = {
-        config_id: DEMO_CONFIG_ID,
-        config_name: "Demo Bot - Showcase",
-        config_type: "demo",
-        user_id: api.currentUserId,
-        config_data: {
-          extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
-          decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
-          trading: { exchange: 'demo', exchange_id: '', authentication: '', risk_rules: { max_leverage: 3, max_position_size_pct: 0.05, max_risk_per_trade_pct: 0.02, min_equity_protection: 0.8 } }
-        },
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        editable: true,
-        is_flagship: false,
-        paper_balance: 10000
-      }
-      
-      set({ 
-        availableBots: [demoConfig],
-        currentBotId: DEMO_CONFIG_ID,
-        isLoading: false,
-        error: null // Clear error to show demo mode
-      })
-      
-      await get().selectBot(DEMO_CONFIG_ID)
+    console.log('Loading available bots - MOCK MODE ONLY...')
+    set({ isLoading: true, error: null })
+    
+    // PURE MOCK MODE - NO API CALLS
+    const demoConfig: UnifiedConfig = {
+      config_id: DEMO_CONFIG_ID,
+      config_name: "Demo Bot - Showcase",
+      config_type: "demo",
+      user_id: api.currentUserId,
+      config_data: {
+        extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
+        decision: { llm_provider: 'deepseek', system_prompt: 'Conservative trading approach with risk management', strategy: 'RSI momentum with volume confirmation', additional_context: 'Focus on major crypto pairs during high volume periods' },
+        trading: { exchange: 'demo', exchange_id: '', authentication: '', risk_rules: { max_leverage: 3, max_position_size_pct: 0.05, max_risk_per_trade_pct: 0.02, min_equity_protection: 0.8 } }
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      editable: true,
+      is_flagship: false,
+      paper_balance: 10000
     }
+    
+    // Create ggShot flagship demo
+    const ggShotConfig: UnifiedConfig = {
+      config_id: GGSHOT_CONFIG_ID,
+      config_name: "ggShot Flagship",
+      config_type: "ggshot",
+      user_id: api.currentUserId,
+      config_data: {
+        extraction: { symbols: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: ['RSI_15m', 'MACD_1h', 'BollingerBands_4h'] } } },
+        decision: { llm_provider: 'gpt-4', system_prompt: 'Premium ggShot AI trading strategy with advanced risk management', strategy: 'AI-powered momentum trading with multi-timeframe analysis', additional_context: 'High-confidence signals only, institutional-grade execution' },
+        trading: { exchange: 'uniswap_scroll', exchange_id: '', authentication: '', risk_rules: { max_leverage: 5, max_position_size_pct: 0.08, max_risk_per_trade_pct: 0.03, min_equity_protection: 0.75 } }
+      },
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+      editable: false,
+      is_flagship: true,
+      paper_balance: 15000
+    }
+    
+    const configs = [ggShotConfig, demoConfig]
+    console.log('Using PURE MOCK MODE with flagship and demo bots')
+    
+    set({ 
+      availableBots: configs,
+      currentBotId: GGSHOT_CONFIG_ID,
+      isLoading: false
+    })
+    
+    // Load the ggShot config immediately
+    await get().selectBot(GGSHOT_CONFIG_ID)
   },
 
   createBot: async (template: string, name?: string) => {
@@ -618,32 +560,13 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   checkSchedulerStatus: async () => {
-    console.log('Checking scheduler status...')
-    try {
-      // Try to get real status first, fall back to mock
-      const isConnected = await api.testConnection()
-      
-      if (isConnected) {
-        try {
-          const result = await api.getSchedulerStatus()
-          console.log('Scheduler status loaded from API:', result)
-          set({ schedulerStatus: result })
-          return
-        } catch (apiError) {
-          console.warn('API scheduler status request failed, using mock data:', apiError)
-        }
-      }
-
-      // Mock scheduler status as fallback
-      const mockStatus: SchedulerStatus = {
-        is_running: false
-      }
-      console.log('Using mock scheduler status')
-      set({ schedulerStatus: mockStatus })
-    } catch (error) {
-      console.error('Error checking scheduler status:', error)
-      set({ error: error instanceof Error ? error.message : 'Failed to check scheduler status' })
+    console.log('Checking scheduler status - MOCK MODE...')
+    // Pure mock - no API calls
+    const mockStatus: SchedulerStatus = {
+      is_running: true // Show as running for demo
     }
+    console.log('Using mock scheduler status (running)')
+    set({ schedulerStatus: mockStatus })
   },
 
   openConfigModal: (agent) => {
