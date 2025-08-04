@@ -7,8 +7,7 @@ import {
   ExtractionConfig,
   DecisionConfig,
   TradingConfig,
-  UnifiedConfig,
-  Bot
+  UnifiedConfig
 } from '@/types'
 import { api } from '@/lib/api/client'
 
@@ -108,7 +107,7 @@ export const useBotStore = create<BotState>((set, get) => ({
           config_id: DEMO_CONFIG_ID,
           config_name: "Demo Bot - Showcase",
           config_type: "demo",
-          user_id: api.userId,
+          user_id: api.currentUserId,
           config_data: {
             extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
             decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
@@ -229,9 +228,15 @@ export const useBotStore = create<BotState>((set, get) => ({
       )
       
       set({
-        availableBots: updatedBots,
-        currentBotName: state.currentBotId === botId ? name : state.currentBotName
+        availableBots: updatedBots
       })
+      
+      // Update currentConfig if it's the current bot
+      if (state.currentBotId === botId && state.currentConfig) {
+        set({
+          currentConfig: { ...state.currentConfig, config_name: name }
+        })
+      }
     } catch (error) {
       console.error('Error updating bot name:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to update bot name' })
@@ -246,34 +251,24 @@ export const useBotStore = create<BotState>((set, get) => ({
       
       // If deleting current bot, switch to first available or create default
       let newCurrentBotId = state.currentBotId
-      let newCurrentBotName = state.currentBotName
       
       if (state.currentBotId === botId) {
         if (updatedBots.length > 0) {
           newCurrentBotId = updatedBots[0].config_id
-          newCurrentBotName = updatedBots[0].config_name
         } else {
-          // Create a new default bot
-          const defaultBot: Bot = {
-            config_id: `bot-${Date.now()}`,
-            config_name: 'GGBOT-01',
-            created_at: new Date().toISOString()
-          }
-          updatedBots.push(defaultBot)
-          newCurrentBotId = defaultBot.config_id
-          newCurrentBotName = defaultBot.config_name
+          newCurrentBotId = null
         }
       }
       
       set({
         availableBots: updatedBots,
         currentBotId: newCurrentBotId,
-        currentBotName: newCurrentBotName
+        currentConfig: null // Clear current config
       })
       
-      // Reload configurations if we switched bots
-      if (state.currentBotId === botId) {
-        await get().loadConfigurations()
+      // Load the new bot if we switched
+      if (state.currentBotId === botId && newCurrentBotId) {
+        await get().selectBot(newCurrentBotId)
       }
     } catch (error) {
       console.error('Error deleting bot:', error)
@@ -283,7 +278,7 @@ export const useBotStore = create<BotState>((set, get) => ({
 
   loadCurrentConfig: async () => {
     set({ isLoading: true, error: null })
-    console.log('Starting loadConfigurations...')
+    console.log('Starting loadCurrentConfig...')
     
     try {
       // First test API connection
@@ -294,31 +289,20 @@ export const useBotStore = create<BotState>((set, get) => ({
         console.log('API not available, using mock data')
         
         const currentBotId = get().currentBotId
-        const currentBotName = get().currentBotName
+        const currentConfig = get().currentConfig
         
-        // If this is the default/demo bot (GGBOT-01), show full configuration
-        if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
+        // If this is the demo bot, show full configuration
+        if (currentBotId === DEMO_CONFIG_ID || currentConfig?.config_name === 'GGBOT-01') {
           console.log('Loading demo bot configurations')
           const mockExtraction: ExtractionConfig = {
             symbols: ['BTC/USDT'],
-            timeframes: [], // No longer used
             sources: {
               ggshot: {
                 enabled: true // ggShot flagship has ggShot signals enabled
               },
               crypto_indicators_mcp: {
                 enabled: true,
-                indicators: ['RSI_15m', 'RSI_1h', 'MACD_15m', 'MACD_1h', 'BollingerBands_15m', 'BollingerBands_1h', 'ATR_15m', 'ATR_1h', 'EMA_15m', 'EMA_1h', 'VWAP_15m', 'VWAP_1h'],
-                use_llm_selection: false,
-                llm_interpretation: false,
-                llm_model: ''
-              },
-              tradingview: {
-                enabled: false,
-                strategy: ''
-              },
-              yfinance: {
-                enabled: false
+                indicators: ['RSI_15m', 'RSI_1h', 'MACD_15m', 'MACD_1h', 'BollingerBands_15m', 'BollingerBands_1h', 'ATR_15m', 'ATR_1h', 'EMA_15m', 'EMA_1h', 'VWAP_15m', 'VWAP_1h']
               }
             }
           }
@@ -336,8 +320,7 @@ export const useBotStore = create<BotState>((set, get) => ({
               max_leverage: 3,
               max_position_size_pct: 0.05,
               max_risk_per_trade_pct: 0.02,
-              min_equity_protection: 0.80,
-              max_contracts_per_trade: 1000000
+              min_equity_protection: 0.80
             }
           }
           
@@ -371,38 +354,21 @@ export const useBotStore = create<BotState>((set, get) => ({
         }
       }
 
-      // Try to load real configurations if API is available
-      console.log('API available, attempting to load real configurations...')
-      const currentBotId = get().currentBotId
-      const [extractionResult, decisionResult, tradingResult] = await Promise.allSettled([
-        api.getConfig('extraction', currentBotId || undefined),
-        api.getConfig('decision', currentBotId || undefined),
-        api.getConfig('trading', currentBotId || undefined)
-      ])
-
-      const extractionConfig = extractionResult.status === 'fulfilled' ? extractionResult.value.config as ExtractionConfig : null
-      const decisionConfig = decisionResult.status === 'fulfilled' ? decisionResult.value.config as DecisionConfig : null
-      const tradingConfig = tradingResult.status === 'fulfilled' ? tradingResult.value.config as TradingConfig : null
-
-      console.log('Configuration loading results:', {
-        extraction: extractionResult.status,
-        decision: decisionResult.status,
-        trading: tradingResult.status
-      })
-
+      // Try to load from real API - but this should not happen since selectBot handles this
+      console.log('API available but no current config loaded - loading empty state')
       set({
-        extractionConfig,
-        decisionConfig,
-        tradingConfig,
+        extractionConfig: null,
+        decisionConfig: null,
+        tradingConfig: null,
         agentStatuses: {
-          extraction: calculateAgentStatus(extractionConfig),
-          decision: calculateAgentStatus(decisionConfig),
-          trading: calculateAgentStatus(tradingConfig),
+          extraction: 'unconfigured',
+          decision: 'unconfigured',
+          trading: 'unconfigured',
         },
         isLoading: false,
       })
     } catch (error) {
-      console.error('Error in loadConfigurations:', error)
+      console.error('Error in loadCurrentConfig:', error)
       set({ 
         error: error instanceof Error ? error.message : 'Failed to load configurations',
         isLoading: false 

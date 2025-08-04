@@ -102,16 +102,17 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
 
   const toggleIndicator = (indicatorName: string) => {
     const newSelected = new Set(selectedIndicators)
-    let newTimeframes = { ...indicatorTimeframes }
     
+    let newTimeframes: Record<string, string[]>
     if (newSelected.has(indicatorName)) {
       newSelected.delete(indicatorName)
       // Remove timeframes for this indicator
+      newTimeframes = { ...indicatorTimeframes }
       delete newTimeframes[indicatorName]
     } else {
       newSelected.add(indicatorName)
       // Add default timeframes (15m and 1h)
-      newTimeframes[indicatorName] = ['15m', '1h']
+      newTimeframes = { ...indicatorTimeframes, [indicatorName]: ['15m', '1h'] }
     }
     
     setSelectedIndicators(newSelected)

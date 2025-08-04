@@ -289,24 +289,6 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
               <h4 className="font-medium text-red-300">Emergency Limits</h4>
             </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-2">
-                Max Contracts Per Trade
-              </label>
-              <input
-                type="number"
-                value={formData.risk_rules.max_contracts_per_trade}
-                onChange={(e) => setFormData(prev => ({
-                  ...prev,
-                  risk_rules: { ...prev.risk_rules, max_contracts_per_trade: parseInt(e.target.value) || 0 }
-                }))}
-                className="w-full p-3 bg-charcoal-700 border border-bone-200/80 text-bone-200"
-                placeholder="1000000"
-              />
-              <p className="text-xs text-red-300 mt-1">
-                Hard limit to prevent runaway position sizes
-              </p>
-            </div>
           </div>
         </div>
       </div>
