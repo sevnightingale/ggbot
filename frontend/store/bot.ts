@@ -7,8 +7,7 @@ import {
   ExtractionConfig,
   DecisionConfig,
   TradingConfig,
-  UnifiedConfig,
-  Bot
+  UnifiedConfig
 } from '@/types'
 import { api } from '@/lib/api/client'
 
@@ -108,7 +107,7 @@ export const useBotStore = create<BotState>((set, get) => ({
           config_id: DEMO_CONFIG_ID,
           config_name: "Demo Bot - Showcase",
           config_type: "demo",
-          user_id: api.userId,
+          user_id: api.currentUserId,
           config_data: {
             extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
             decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
@@ -229,8 +228,7 @@ export const useBotStore = create<BotState>((set, get) => ({
       )
       
       set({
-        availableBots: updatedBots,
-        currentBotName: state.currentBotId === botId ? name : state.currentBotName
+        availableBots: updatedBots
       })
     } catch (error) {
       console.error('Error updating bot name:', error)
@@ -244,36 +242,25 @@ export const useBotStore = create<BotState>((set, get) => ({
       const state = get()
       const updatedBots = state.availableBots.filter(bot => bot.config_id !== botId)
       
-      // If deleting current bot, switch to first available or create default
+      // If deleting current bot, switch to first available  
       let newCurrentBotId = state.currentBotId
-      let newCurrentBotName = state.currentBotName
       
       if (state.currentBotId === botId) {
         if (updatedBots.length > 0) {
           newCurrentBotId = updatedBots[0].config_id
-          newCurrentBotName = updatedBots[0].config_name
         } else {
-          // Create a new default bot
-          const defaultBot: Bot = {
-            config_id: `bot-${Date.now()}`,
-            config_name: 'GGBOT-01',
-            created_at: new Date().toISOString()
-          }
-          updatedBots.push(defaultBot)
-          newCurrentBotId = defaultBot.config_id
-          newCurrentBotName = defaultBot.config_name
+          newCurrentBotId = null
         }
       }
       
       set({
         availableBots: updatedBots,
-        currentBotId: newCurrentBotId,
-        currentBotName: newCurrentBotName
+        currentBotId: newCurrentBotId
       })
       
-      // Reload configurations if we switched bots
-      if (state.currentBotId === botId) {
-        await get().loadConfigurations()
+      // If we switched bots, load the new config
+      if (state.currentBotId === botId && newCurrentBotId) {
+        await get().selectBot(newCurrentBotId)
       }
     } catch (error) {
       console.error('Error deleting bot:', error)
@@ -282,22 +269,15 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   loadCurrentConfig: async () => {
-    set({ isLoading: true, error: null })
-    console.log('Starting loadConfigurations...')
+    // This method is no longer needed since selectBot handles config loading
+    // Keeping for backward compatibility but making it a no-op
+    console.log('loadCurrentConfig called - delegating to selectBot')
     
-    try {
-      // First test API connection
-      const isConnected = await api.testConnection()
-      console.log('API connection test result:', isConnected)
-      
-      if (!isConnected) {
-        console.log('API not available, using mock data')
-        
-        const currentBotId = get().currentBotId
-        const currentBotName = get().currentBotName
-        
-        // If this is the default/demo bot (GGBOT-01), show full configuration
-        if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
+    const currentBotId = get().currentBotId
+    if (currentBotId) {
+      await get().selectBot(currentBotId)
+    }
+  },
           console.log('Loading demo bot configurations')
           const mockExtraction: ExtractionConfig = {
             symbols: ['BTC/USDT'],

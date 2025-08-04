@@ -1536,6 +1536,17 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             intent['ggshot_signal_validation'] = True
             intent['signal_data'] = decision['ggshot_signal_data']
             intent['original_signal'] = decision.get('original_signal', 'Signal data not available')
+            
+            # For ggShot signals, ensure we have a valid action for trading
+            # If no action was parsed but confidence >= 0.50, extract from signal direction
+            if not intent.get('action') or intent.get('action') == 'no_action':
+                signal_direction = decision['ggshot_signal_data'].get('parsed_data', {}).get('ggshot_signal', {}).get('direction', '').lower()
+                if signal_direction in ['long', 'short'] and decision['confidence'] >= 0.50:
+                    intent['action'] = signal_direction
+                    logger.bind(module="decision.engine", user_id=self.user_id).info(
+                        f"🎯 ggShot: Set action={signal_direction} from signal direction (confidence={decision['confidence']})"
+                    )
+            
             # Add full prompt for ggShot backtesting if available
             if decision.get('full_prompt'):
                 intent['full_prompt'] = decision['full_prompt']
@@ -1544,7 +1555,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             f"Created intent with confidence={decision['confidence']} for Trading Module risk calculation"
         )
         
-        return intent
+        return self._sanitize_for_json(intent)
     
     async def _fire_ggshot_parallel_testing(self, original_signal: str, market_data: Dict, symbol: str, user_id: str):
         """
