@@ -23,35 +23,15 @@ export function MainDashboard() {
   } = useBotStore()
 
   useEffect(() => {
-    console.log('MainDashboard: Starting initial data load...')
+    console.log('MainDashboard: INSTANT MOCK LOAD')
     
-    const loadInitialData = async () => {
-      console.log('MainDashboard: Loading initial data...')
-      const startTime = Date.now()
-      
-      try {
-        // Load bots first, then configurations and other data
-        console.log('MainDashboard: Loading bots...')
-        await loadBots()
-        console.log('MainDashboard: Bots loaded')
-        
-        
-        // Load other data in parallel
-        console.log('MainDashboard: Loading trades, performance, and scheduler status...')
-        await Promise.allSettled([
-          loadTrades(),
-          loadPerformance('7d'),
-          checkSchedulerStatus()
-        ])
-        
-        const endTime = Date.now()
-        console.log(`MainDashboard: All data loaded in ${endTime - startTime}ms`)
-      } catch (error) {
-        console.error('MainDashboard: Failed to load initial data:', error)
-      }
-    }
-
-    loadInitialData()
+    // INSTANT MOCK LOAD - NO ASYNC WAITS
+    loadBots()
+    loadTrades()
+    loadPerformance('7d')
+    checkSchedulerStatus()
+    
+    console.log('MainDashboard: All mock data triggered instantly')
 
     // Set up periodic refresh
     console.log('MainDashboard: Setting up periodic refresh (30s)')
