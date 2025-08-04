@@ -14,6 +14,9 @@ export interface ExtractionConfig {
       enabled: boolean
       indicators: string[]
     }
+    ggshot?: {
+      enabled: boolean
+    }
   }
 }
 
