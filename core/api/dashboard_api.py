@@ -16,6 +16,12 @@ from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 
+# Import performance tracker
+import sys
+from pathlib import Path
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from trading.services.performance_tracker import get_performance_tracker
+
 app = FastAPI(title="Dashboard API", version="1.0.0")
 
 # WebSocket connection manager
@@ -427,6 +433,74 @@ async def get_agent_status(user_id: str):
         overall_status=overall_status,
         modules=modules_status
     )
+
+
+@app.get("/api/dashboard/strategies/{user_id}")
+async def get_user_strategies(user_id: str):
+    """
+    Get all strategies for a user with performance summary.
+    
+    Returns list of all user's configurations with basic P&L metrics.
+    """
+    try:
+        tracker = get_performance_tracker()
+        strategies = await tracker.get_all_active_configs(user_id)
+        
+        logger.bind(module="dashboard_api").info(
+            f"Retrieved {len(strategies)} strategies for user {user_id}"
+        )
+        
+        return strategies
+        
+    except Exception as e:
+        logger.bind(module="dashboard_api").error(f"Failed to get strategies: {e}")
+        raise HTTPException(500, f"Failed to get strategies: {str(e)}")
+
+
+@app.get("/api/dashboard/performance/{config_id}")
+async def get_strategy_performance(config_id: str):
+    """
+    Get detailed performance metrics for a specific strategy.
+    
+    Returns comprehensive P&L, trade history, and real-time balance.
+    """
+    try:
+        tracker = get_performance_tracker()
+        performance = await tracker.get_config_performance(config_id)
+        
+        logger.bind(module="dashboard_api").info(
+            f"Retrieved performance for config {config_id}: "
+            f"P&L=${performance['total_pnl']:.2f}, "
+            f"Trades={performance['trade_count']}"
+        )
+        
+        return performance
+        
+    except Exception as e:
+        logger.bind(module="dashboard_api").error(f"Failed to get performance: {e}")
+        raise HTTPException(500, f"Failed to get performance: {str(e)}")
+
+
+@app.get("/api/dashboard/trades/{config_id}")
+async def get_recent_trades(config_id: str, limit: int = 10):
+    """
+    Get recent trades for a strategy configuration.
+    
+    Returns list of recent trades with entry/exit details and P&L.
+    """
+    try:
+        tracker = get_performance_tracker()
+        trades = await tracker.get_recent_trades(config_id, limit)
+        
+        logger.bind(module="dashboard_api").info(
+            f"Retrieved {len(trades)} recent trades for config {config_id}"
+        )
+        
+        return trades
+        
+    except Exception as e:
+        logger.bind(module="dashboard_api").error(f"Failed to get trades: {e}")
+        raise HTTPException(500, f"Failed to get trades: {str(e)}")
 
 
 @app.websocket("/ws/dashboard/{user_id}")

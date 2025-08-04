@@ -16,6 +16,8 @@ from datetime import datetime, timezone
 from decision.llm_providers.factory import get_llm_provider
 from core.common.logger import logger
 from .market_data_service import MarketDataService
+from .instance_manager import HummingbotInstanceManager
+from .paper_trading_manager import PaperTradingManager
 
 from hummingbot_api_client import Client
 from hummingbot_api_client.api.trading import place_trade_trading_orders_post
@@ -74,6 +76,12 @@ class HummingbotExecutionAdapter:
         
         # Initialize market data service
         self.market_data = MarketDataService(api_url, username, password, connector)
+        
+        # Initialize instance manager for config-based instance mapping
+        self.instance_manager = HummingbotInstanceManager()
+        
+        # Initialize paper trading manager
+        self.paper_manager = PaperTradingManager(api_url)
         
         # Initialize Hummingbot client
         import base64
@@ -364,8 +372,13 @@ OUTPUT (JSON only, no additional text):"""
         """Execute trade via Hummingbot Position Executor with paper trading enabled."""
         
         try:
-            # Create unique instance name for this trade
-            instance_name = f"ggshot-{trading_pair.lower().replace('-', '')}-{intent.direction}-{str(uuid.uuid4())[:8]}"
+            # Get or create config-based instance mapping
+            mapping = await self.instance_manager.ensure_mapping(user_id, config_id)
+            instance_name = mapping['instance_name']
+            account_name = mapping['hummingbot_account']
+            
+            # Ensure paper trading account is initialized
+            await self.paper_manager.initialize_paper_account(account_name, config_id)
             
             # Create Position Executor controller configuration as YAML string
             controller_yaml = f"""controller_name: position_executor
@@ -419,6 +432,7 @@ paper_trade_account_balance:
                 
                 return {
                     "bot_instance": instance_name,
+                    "account_name": account_name,
                     "status": "position_executor_deployed", 
                     "trading_pair": trading_pair,
                     "quantity": float(quantity),

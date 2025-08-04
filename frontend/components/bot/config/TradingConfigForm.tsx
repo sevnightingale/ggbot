@@ -28,8 +28,11 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
   const [justSaved, setJustSaved] = useState(false)
   
   const [formData, setFormData] = useState<TradingConfig>({
+    exchange: config?.exchange || 'bitmex',
+    exchange_id: config?.exchange_id || '',
+    authentication: config?.authentication || '',
     risk_rules: {
-      max_leverage: config?.risk_rules?.max_leverage || 10,
+      max_leverage: config?.risk_rules?.max_leverage || 3,
       max_position_size_pct: config?.risk_rules?.max_position_size_pct || 0.05,
       max_risk_per_trade_pct: config?.risk_rules?.max_risk_per_trade_pct || 0.02,
       min_equity_protection: config?.risk_rules?.min_equity_protection || 0.80,
@@ -37,7 +40,6 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
     }
   })
 
-  const [selectedExchange, setSelectedExchange] = useState('bitmex')
   const [selectedOrderTypes, setSelectedOrderTypes] = useState(['market', 'limit', 'stop'])
 
   const handleSave = async () => {
@@ -77,8 +79,8 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                 type="radio"
                 name="exchange"
                 value={exchange.value}
-                checked={selectedExchange === exchange.value}
-                onChange={(e) => setSelectedExchange(e.target.value)}
+                checked={formData.exchange === exchange.value}
+                onChange={(e) => setFormData(prev => ({ ...prev, exchange: e.target.value }))}
                 className="mt-1 text-agents-trading focus:ring-agents-trading"
               />
               <div className="flex-1">

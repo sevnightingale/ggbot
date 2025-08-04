@@ -247,38 +247,40 @@ The Decision Module includes specialized support for external signal validation,
 4. **Confidence Scoring**: Assigns confidence score (0.0-1.0) based on market context alignment
 5. **Publisher Integration**: High-confidence signals (>0.80 default) are published to filtered channels
 
-#### **Signal Validation Prompt**
+#### **Signal Validation Prompt** ⭐ UPDATED
 ```
-You are validating a ggShot trading signal. Your job is to assess signal quality 
-by comparing it against current market context.
+You are validating a ggShot trading signal using the Enhanced 4-Pillar Framework.
 
-SIGNAL TO VALIDATE:
-Direction: {direction}
-Entry Zone: {entry_low}-{entry_high}
-Target 1: {target_1}
-Stop Loss: {stop_loss}
+ORIGINAL GGSHOT SIGNAL:
+{original_signal_message}
 
-MARKET CONTEXT:
+CURRENT MARKET CONDITIONS:
 {technical_indicators_and_analysis}
 
-Assign confidence (0.0-1.0) based on how well market conditions support this signal.
+Apply the 4-Pillar validation framework and provide confidence scoring.
 
 FORMAT YOUR RESPONSE EXACTLY AS:
-ACTION: {direction.lower()}
-CONFIDENCE: [0.000-1.000]
-STOP_LOSS: {stop_loss}
-TAKE_PROFIT: {target_1}
+ACTION: [extract direction from signal - if signal contains "Long" use "long", if contains "Short" use "short"]
+CONFIDENCE: [use the exact result from your Final Calculation above, 3 decimal places]
+STOP_LOSS: [extract from signal]
+TAKE_PROFIT: [extract Target 1 from signal]
 
 REASONING:
-{your analysis}
+{your detailed 4-pillar analysis}
 ```
 
-#### **Integration Flow**
+#### **Integration Flow** ⭐ UPDATED
 ```
 ggShot Signal → Listener (decision_mode='signal_validation') 
-    → Extraction → Decision (validation prompt) 
-    → Publisher (if confidence > threshold)
+    → Extraction → Decision (action="long"/"short") → Trading Module → Paper Trade Execution
+    → Also: Publisher (if confidence ≥ 0.50) → Telegram Channel
 ```
+
+#### **Key Changes (August 2025)**
+- **Dynamic Actions**: Changed from hardcoded `ACTION: validate` to dynamic direction extraction
+- **Paper Trading**: ggShot signals now trigger actual paper trades in isolated $10k account
+- **Dual Output**: High-confidence signals published to Telegram AND execute paper trades
+- **Performance Tracking**: All ggShot trades tracked with real P&L data
 
 #### **Future Integration**
 - ggShot signals can be used as regular indicators in `dynamic_strategy` mode
@@ -443,3 +445,38 @@ Consider:
 6. Iterate on prompt engineering based on results
 
 This module is designed to be the intelligent core of the ggbot system, interpreting human strategies and applying them consistently in changing market conditions.
+
+---
+
+## 🎯 **Current Live Status (August 2025)**
+
+### **ggShot Paper Trading**: ✅ **ACTIVE**
+- **Config ID**: `e249bb49-0455-4596-9657-09bf9e14ca14`
+- **Status**: Processing live Telegram signals from GGShot_Bot channel
+- **Action Generation**: Dynamic `long`/`short` actions (no longer hardcoded `validate`)
+- **Paper Trading**: Automatically triggers trades in isolated $10k Hummingbot account
+- **Performance**: Real P&L tracking via PerformanceTracker service
+
+### **Decision Webhook Chain**: ✅ **OPERATIONAL**
+```bash
+# Test ggShot decision processing (safe - won't trigger live trades)
+curl -X POST http://localhost:8000/decision/webhooks/trigger-decision \
+  -H "Content-Type: application/json" \
+  -d '{
+    "user_id": "00000000-0000-0000-0000-000000000001",
+    "config_id": "e249bb49-0455-4596-9657-09bf9e14ca14", 
+    "symbol": "BTC/USDT",
+    "timeframes": ["1h"],
+    "custom_mode": "ggshot"
+  }'
+```
+
+### **Integration Flow (Live)**
+1. **Signal Reception**: ggShot signals arrive via Telegram → stored in market_data
+2. **Extraction**: Technical indicators gathered via 4-Pillar framework  
+3. **Decision**: LLM processes with ggShot-specific prompt → generates `long`/`short` action
+4. **Trading**: Webhook automatically triggers paper trade execution
+5. **Tracking**: PerformanceTracker logs P&L and trade statistics
+6. **Publishing**: High-confidence signals (≥0.50) also sent to Telegram filter channel
+
+The Decision Module is live and processing real ggShot signals for paper trading!

@@ -25,6 +25,9 @@ import uvicorn
 # Add project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+# Add hummingbot client to path for API client imports
+sys.path.insert(0, str(Path(__file__).parent.parent / "hummingbot" / "client"))
+
 from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
 from trading.services import HummingbotExecutionAdapter, TradeIntent
