@@ -43,8 +43,8 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
   
   const [formData, setFormData] = useState<DecisionConfig>({
     llm_provider: config?.llm_provider || 'deepseek',
-    system_prompt: config?.system_prompt || '',
     strategy: config?.strategy || '',
+    risk_guidelines: config?.risk_guidelines || '',
     additional_context: config?.additional_context || ''
   })
 
@@ -56,6 +56,10 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
       // Validation
       if (!formData.strategy.trim()) {
         setError('Trading strategy is required')
+        return
+      }
+      if (!formData.risk_guidelines.trim()) {
+        setError('Risk guidelines are required')
         return
       }
 
@@ -73,6 +77,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
     setFormData(prev => ({
       ...prev,
       strategy: template.strategy,
+      risk_guidelines: template.risk,
       additional_context: template.context
     }))
   }
@@ -85,27 +90,7 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
           Describe your trading strategy in natural language. The AI will interpret and execute this strategy autonomously.
         </p>
 
-        {/* Strategy Input - Moved to top */}
-        <div className="mb-6">
-          <label className="block text-sm font-medium mb-2">Your Trading Strategy</label>
-          <textarea
-            value={formData.strategy}
-            onChange={(e) => setFormData(prev => ({ ...prev, strategy: e.target.value }))}
-            placeholder="Describe how you want the AI to trade. For example: 'Trade momentum breakouts using RSI position relative to 50. If RSI is above 50, enter SHORT. If RSI is below 50, enter LONG. Use 15m timeframe for entries. Hold positions for at least 5 minutes, then exit on 2-point RSI move in opposite direction.'"
-            rows={8}
-            className="w-full p-4 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
-          />
-          <div className="flex justify-between items-center mt-2">
-            <p className="text-xs text-bone-400">
-              Be specific about entry/exit conditions, timeframes, and decision logic.
-            </p>
-            <p className="text-xs text-bone-400">
-              {formData.strategy.length} characters
-            </p>
-          </div>
-        </div>
-
-        {/* Strategy Templates - Moved below */}
+        {/* Strategy Templates */}
         <div className="mb-6">
           <h4 className="text-sm font-medium mb-3">Quick Start Templates</h4>
           <div className="grid gap-3">
@@ -128,23 +113,24 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
           </div>
         </div>
 
-        {/* Output Format - New section */}
-        <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
-          <h4 className="text-sm font-medium mb-3">Required Output Format</h4>
-          <div className="p-3 bg-charcoal-800/50 border border-bone-200/40 font-mono text-xs text-bone-300">
-            <div className="text-bone-400 opacity-60">
-              ACTION: [long/short/no_action]<br/>
-              CONFIDENCE: [0.000-1.000, 3 decimal places]<br/>
-              STOP_LOSS: [price level]<br/>
-              TAKE_PROFIT: [price level]<br/>
-              <br/>
-              REASONING:<br/>
-              [your detailed analysis]
-            </div>
+        {/* Strategy Input */}
+        <div>
+          <label className="block text-sm font-medium mb-2">Your Trading Strategy</label>
+          <textarea
+            value={formData.strategy}
+            onChange={(e) => setFormData(prev => ({ ...prev, strategy: e.target.value }))}
+            placeholder="Describe how you want the AI to trade. For example: 'Trade momentum breakouts using RSI position relative to 50. If RSI is above 50, enter SHORT. If RSI is below 50, enter LONG. Use 15m timeframe for entries. Hold positions for at least 5 minutes, then exit on 2-point RSI move in opposite direction.'"
+            rows={8}
+            className="w-full p-4 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
+          />
+          <div className="flex justify-between items-center mt-2">
+            <p className="text-xs text-bone-400">
+              Be specific about entry/exit conditions, timeframes, and decision logic.
+            </p>
+            <p className="text-xs text-bone-400">
+              {formData.strategy.length} characters
+            </p>
           </div>
-          <p className="text-xs text-bone-400 mt-2">
-            All decisions must follow this exact format for proper system integration.
-          </p>
         </div>
 
         {/* Strategy Tips */}
@@ -153,8 +139,8 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
           <ul className="text-sm text-blue-200 space-y-1">
             <li>• Specify clear entry and exit conditions</li>
             <li>• Mention preferred timeframes and indicators</li>
-            <li>• Describe risk tolerance and position management</li>
-            <li>• Include market conditions you prefer (trending vs ranging)</li>
+            <li>• Describe your risk tolerance and position holding style</li>
+            <li>• Include any market conditions you prefer (trending vs ranging)</li>
           </ul>
         </div>
       </div>
@@ -208,22 +194,126 @@ export function DecisionConfigForm({ activeTab, config }: DecisionConfigFormProp
         )}
       </div>
 
-      {/* Model Performance Notes */}
-      <div className="p-4 bg-bone-200/10 border border-bone-200/60">
-        <h4 className="text-sm font-medium mb-2">Model Performance</h4>
-        <p className="text-sm text-bone-300">
-          All models are configured to output structured decisions with confidence scoring and reasoning. 
-          The system automatically includes market context from technical indicators and price data.
-        </p>
+      {/* Advanced Settings */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Decision Making Settings</h4>
+        <div className="space-y-4">
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                className="border-bone-200/80 text-agents-decision focus:ring-agents-decision"
+              />
+              <span className="text-sm">Enable decision confidence scoring</span>
+            </label>
+            <p className="text-xs text-bone-400 ml-6">
+              AI will provide confidence scores (0-100%) for each trading decision
+            </p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                defaultChecked
+                className="border-bone-200/80 text-agents-decision focus:ring-agents-decision"
+              />
+              <span className="text-sm">Include market context in decisions</span>
+            </label>
+            <p className="text-xs text-bone-400 ml-6">
+              AI will consider broader market conditions when making trading decisions
+            </p>
+          </div>
+        </div>
       </div>
     </div>
   )
 
+  const renderContextTab = () => (
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-medium mb-3">Risk Guidelines</h3>
+        <p className="text-sm text-bone-400 mb-4">
+          Set hard limits and risk management rules that the AI must always follow.
+        </p>
+
+        <textarea
+          value={formData.risk_guidelines}
+          onChange={(e) => setFormData(prev => ({ ...prev, risk_guidelines: e.target.value }))}
+          placeholder="Max position size 5% of capital. Max leverage 10x. Stop trading after 3 losses in a day or 5% daily drawdown. Never risk more than 2% per trade."
+          rows={4}
+          className="w-full p-4 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
+        />
+      </div>
+
+      <div>
+        <h3 className="text-lg font-medium mb-3">Additional Context</h3>
+        <p className="text-sm text-bone-400 mb-4">
+          Share additional information about your trading style and preferences to help the AI trade more like you.
+        </p>
+
+        <textarea
+          value={formData.additional_context}
+          onChange={(e) => setFormData(prev => ({ ...prev, additional_context: e.target.value }))}
+          placeholder="I prefer catching big moves over frequent small trades. The account typically holds 1-3 positions at a time. I'm comfortable with moderate volatility and prefer trending markets over ranging conditions."
+          rows={4}
+          className="w-full p-4 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400 resize-none focus:border-agents-decision focus:outline-none"
+        />
+      </div>
+
+      {/* Trading Style Questions */}
+      <div>
+        <h4 className="text-sm font-medium mb-3">Trading Style Preferences</h4>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium mb-2">Position Holding Time</label>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
+              {['Scalp (minutes)', 'Short-term (hours)', 'Swing (days)', 'Position (weeks)'].map((style) => (
+                <button
+                  key={style}
+                  className="p-2 text-sm bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/80 transition-colors"
+                  onClick={() => {
+                    const contextAddition = `\nPreferred holding time: ${style}.`
+                    if (!formData.additional_context.includes(style)) {
+                      setFormData(prev => ({ ...prev, additional_context: prev.additional_context + contextAddition }))
+                    }
+                  }}
+                >
+                  {style}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium mb-2">Market Conditions</label>
+            <div className="grid grid-cols-2 gap-2">
+              {['Trending markets', 'Ranging markets', 'High volatility', 'Low volatility'].map((condition) => (
+                <button
+                  key={condition}
+                  className="p-2 text-sm bg-charcoal-700 hover:bg-charcoal-600 border border-bone-200/80 transition-colors"
+                  onClick={() => {
+                    const contextAddition = `\nPrefers: ${condition}.`
+                    if (!formData.additional_context.includes(condition)) {
+                      setFormData(prev => ({ ...prev, additional_context: prev.additional_context + contextAddition }))
+                    }
+                  }}
+                >
+                  {condition}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 0: return renderStrategyTab()
       case 1: return renderLLMSettingsTab()
+      case 2: return renderContextTab()
       default: return null
     }
   }

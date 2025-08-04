@@ -13,8 +13,7 @@ interface TradingConfigFormProps {
 const exchanges = [
   { value: 'bitmex', label: 'BitMEX', description: 'Crypto derivatives, high leverage available' },
   { value: 'binance', label: 'Binance', description: 'Spot and futures, largest volume' },
-  { value: 'coinbase', label: 'Coinbase Pro', description: 'US regulated, spot trading' },
-  { value: 'uniswap_scroll', label: 'Uniswap on Scroll', description: 'Your bot\'s transactions are private thanks to ZK proofs & Scroll Cloak' }
+  { value: 'coinbase', label: 'Coinbase Pro', description: 'US regulated, spot trading' }
 ]
 
 const orderTypes = [
@@ -29,17 +28,16 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
   const [justSaved, setJustSaved] = useState(false)
   
   const [formData, setFormData] = useState<TradingConfig>({
-    exchange: config?.exchange || 'bitmex',
-    exchange_id: config?.exchange_id || '',
-    authentication: config?.authentication || '',
     risk_rules: {
-      max_leverage: config?.risk_rules?.max_leverage || 3,
+      max_leverage: config?.risk_rules?.max_leverage || 10,
       max_position_size_pct: config?.risk_rules?.max_position_size_pct || 0.05,
       max_risk_per_trade_pct: config?.risk_rules?.max_risk_per_trade_pct || 0.02,
-      min_equity_protection: config?.risk_rules?.min_equity_protection || 0.80
+      min_equity_protection: config?.risk_rules?.min_equity_protection || 0.80,
+      max_contracts_per_trade: config?.risk_rules?.max_contracts_per_trade || 1000000
     }
   })
 
+  const [selectedExchange, setSelectedExchange] = useState('bitmex')
   const [selectedOrderTypes, setSelectedOrderTypes] = useState(['market', 'limit', 'stop'])
 
   const handleSave = async () => {
@@ -79,8 +77,8 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
                 type="radio"
                 name="exchange"
                 value={exchange.value}
-                checked={formData.exchange === exchange.value}
-                onChange={(e) => setFormData(prev => ({ ...prev, exchange: e.target.value }))}
+                checked={selectedExchange === exchange.value}
+                onChange={(e) => setSelectedExchange(e.target.value)}
                 className="mt-1 text-agents-trading focus:ring-agents-trading"
               />
               <div className="flex-1">
@@ -289,6 +287,24 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
               <h4 className="font-medium text-red-300">Emergency Limits</h4>
             </div>
 
+            <div>
+              <label className="block text-sm font-medium mb-2">
+                Max Contracts Per Trade
+              </label>
+              <input
+                type="number"
+                value={formData.risk_rules.max_contracts_per_trade}
+                onChange={(e) => setFormData(prev => ({
+                  ...prev,
+                  risk_rules: { ...prev.risk_rules, max_contracts_per_trade: parseInt(e.target.value) || 0 }
+                }))}
+                className="w-full p-3 bg-charcoal-700 border border-bone-200/80 text-bone-200"
+                placeholder="1000000"
+              />
+              <p className="text-xs text-red-300 mt-1">
+                Hard limit to prevent runaway position sizes
+              </p>
+            </div>
           </div>
         </div>
       </div>
