@@ -367,9 +367,21 @@ export const useBotStore = create<BotState>((set, get) => ({
   updateAgentConfig: async (agent, config) => {
     set({ isLoading: true, error: null })
     try {
-      await api.updateConfig(agent, config)
+      // Check if API is available, otherwise just update local state
+      const isConnected = await api.testConnection()
       
-      // Update local state
+      if (isConnected) {
+        try {
+          await api.updateConfig(agent, config)
+          console.log(`Successfully saved ${agent} config to API`)
+        } catch (apiError) {
+          console.warn(`API save failed for ${agent}, using local state only:`, apiError)
+        }
+      } else {
+        console.log(`API not available, saving ${agent} config locally only`)
+      }
+      
+      // Always update local state for demo mode
       if (agent === 'extraction') {
         set({ 
           extractionConfig: config,
