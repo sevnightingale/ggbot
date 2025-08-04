@@ -49,7 +49,7 @@ class ConfigPermissions(BaseModel):
 class ConfigResponse(BaseModel):
     """Configuration response with details."""
     config_id: str
-    config_name: str
+    config_name: Optional[str] = None
     config_type: str
     user_id: str
     created_at: datetime
@@ -306,7 +306,7 @@ async def get_single_config(config_id: str):
             is_flagship = config_type in ["ggshot", "ggshot_production"]
             
             return {
-                "config_id": config_id,
+                "config_id": str(config_id),
                 "config_name": config_name,
                 "config_type": config_type,
                 "user_id": str(user_id),
@@ -403,10 +403,10 @@ async def get_user_configs(user_id: str):
                 is_flagship = config_type in ["ggshot", "ggshot_production"]
                 
                 configs.append(ConfigResponse(
-                    config_id=config_id,
+                    config_id=str(config_id),
                     config_name=config_name,
                     config_type=config_type,
-                    user_id=user_id,
+                    user_id=str(user_id),
                     created_at=created_at,
                     updated_at=updated_at,
                     editable=not is_flagship,
