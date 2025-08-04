@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { PasswordGate } from './PasswordGate'
 import { EmailSignup } from './EmailSignup'
-import { api } from '@/lib/api/client'
+// import { api } from '@/lib/api/client' // Not needed in stable version
 
 interface DemoAuthProps {
   children: React.ReactNode
@@ -42,8 +42,8 @@ export function DemoAuth({ children }: DemoAuthProps) {
       email,
       isLoading: false
     })
-    // Update the API client with the new user ID
-    api.setUserId(userId)
+    // API client in old version doesn't need setUserId
+    console.log('User logged in:', userId)
   }
 
   if (userState.isLoading) {

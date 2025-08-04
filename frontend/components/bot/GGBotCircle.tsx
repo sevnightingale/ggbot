@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Play, Square, TestTube, Edit3, Check, X, Trash2, Crown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Play, Square, TestTube, Edit3, Check, X, Trash2 } from 'lucide-react'
 import { useBotStore } from '@/store/bot'
 import { SchedulerStatus } from '@/types'
 
@@ -16,7 +16,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
     agentStatuses,
     availableBots,
     currentBotId,
-    currentConfig,
+    currentBotName,
     createBot,
     selectBot,
     updateBotName,
@@ -25,14 +25,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   } = useBotStore()
   const [currentBotIndex, setCurrentBotIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
-  const [editName, setEditName] = useState('')
-  
-  // ggShot flagship detection
-  const GGSHOT_CONFIG_ID = "e249bb49-0455-4596-9657-09bf9e14ca14"
-  const DEMO_CONFIG_ID = "demo-bot-00000000-1111-2222-3333-444444444444"
-  const currentBotName = currentConfig?.config_name || 'Loading...'
-  const isFlagship = currentBotId === GGSHOT_CONFIG_ID
-  const isDemoBot = currentBotId === DEMO_CONFIG_ID
+  const [editName, setEditName] = useState(currentBotName)
   
   const isRunning = status?.is_running || false
   
@@ -75,9 +68,9 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
 
   const handleRightNav = async () => {
     if (isLastBot) {
-      // Create new bot from RSI template
+      // Create new bot
       const newBotName = `GGBOT-${String(availableBots.length + 1).padStart(2, '0')}`
-      await createBot('rsi', newBotName)
+      await createBot(newBotName)
     } else {
       const newIndex = currentBotIndex + 1
       const targetBot = availableBots[newIndex]
@@ -173,7 +166,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
                 
                 {/* Bot Name Inside Circle */}
                 <div className="flex items-center space-x-1 z-10">
-                  {isEditingName && !isFlagship ? (
+                  {isEditingName ? (
                     <div className="flex items-center space-x-1">
                       <input
                         type="text"
@@ -197,22 +190,13 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
                     </div>
                   ) : (
                     <div className="flex items-center space-x-1">
-                      {isFlagship && (
-                        <Crown size={12} className="text-yellow-400" />
-                      )}
-                      <span className={`font-display font-bold text-sm ${
-                        isFlagship ? 'text-yellow-400' : isDemoBot ? 'text-blue-400' : 'text-charcoal-900'
-                      }`}>
-                        {currentBotName}
-                      </span>
-                      {!isFlagship && (
-                        <button
-                          onClick={handleNameEdit}
-                          className="text-charcoal-700 hover:text-charcoal-900"
-                        >
-                          <Edit3 size={12} />
-                        </button>
-                      )}
+                      <span className="text-charcoal-900 font-display font-bold text-sm">{currentBotName}</span>
+                      <button
+                        onClick={handleNameEdit}
+                        className="text-charcoal-700 hover:text-charcoal-900"
+                      >
+                        <Edit3 size={12} />
+                      </button>
                     </div>
                   )}
                 </div>
@@ -244,27 +228,6 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
                 }`}
               />
             ))}
-          </div>
-          
-          {/* Bot Status Badge */}
-          <div className="flex justify-center mt-3">
-            {isFlagship && (
-              <div className="flex items-center space-x-1 bg-yellow-400/20 border border-yellow-400/60 px-3 py-1 rounded-full">
-                <Crown size={12} className="text-yellow-400" />
-                <span className="text-yellow-400 text-xs font-semibold">FLAGSHIP</span>
-              </div>
-            )}
-            {isDemoBot && (
-              <div className="flex items-center space-x-1 bg-blue-400/20 border border-blue-400/60 px-3 py-1 rounded-full">
-                <TestTube size={12} className="text-blue-400" />
-                <span className="text-blue-400 text-xs font-semibold">DEMO</span>
-              </div>
-            )}
-            {!isFlagship && !isDemoBot && currentConfig && (
-              <div className="flex items-center space-x-1 bg-bone-200/20 border border-bone-200/60 px-3 py-1 rounded-full">
-                <span className="text-bone-200 text-xs font-semibold uppercase">{currentConfig.config_type}</span>
-              </div>
-            )}
           </div>
         </div>
         
