@@ -12,7 +12,7 @@ const DEFAULT_USER_ID = process.env.NEXT_PUBLIC_USER_ID || '00000000-0000-0000-0
 class ApiClient {
   private baseUrl: string
   private userId: string
-  private readonly timeout: number = 8000 // 8 second timeout
+  private readonly timeout: number = 5000 // 5 second timeout for faster fallback
 
   constructor() {
     this.baseUrl = API_URL
