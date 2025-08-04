@@ -89,15 +89,18 @@ class ApiClient {
   }
 
   // Configuration APIs
-  async getConfig(module: 'extraction' | 'decision' | 'trading'): Promise<{ config: ExtractionConfig | DecisionConfig | TradingConfig }> {
-    return this.request(`/agent/api/config/${this.userId}/${module}`)
+  async getConfig(module: 'extraction' | 'decision' | 'trading', configId?: string): Promise<{ config: ExtractionConfig | DecisionConfig | TradingConfig }> {
+    const configParam = configId ? `?config_id=${configId}` : ''
+    return this.request(`/agent/api/config/${this.userId}/${module}${configParam}`)
   }
 
   async updateConfig(
     module: 'extraction' | 'decision' | 'trading', 
-    config: ExtractionConfig | DecisionConfig | TradingConfig
+    config: ExtractionConfig | DecisionConfig | TradingConfig,
+    configId?: string
   ): Promise<ApiResponse<{ config: ExtractionConfig | DecisionConfig | TradingConfig }>> {
-    return this.request(`/agent/api/config/${this.userId}/${module}`, {
+    const configParam = configId ? `?config_id=${configId}` : ''
+    return this.request(`/agent/api/config/${this.userId}/${module}${configParam}`, {
       method: 'PUT',
       body: JSON.stringify({ config }),
     })
@@ -121,12 +124,14 @@ class ApiClient {
   }
 
   // Dashboard APIs
-  async getTrades(): Promise<{ trades: Trade[] }> {
-    return this.request(`/dashboard/api/dashboard/${this.userId}/trades`)
+  async getTrades(configId?: string): Promise<{ trades: Trade[] }> {
+    const configParam = configId ? `?config_id=${configId}` : ''
+    return this.request(`/dashboard/api/dashboard/${this.userId}/trades${configParam}`)
   }
 
-  async getPerformance(period: string = '7d'): Promise<PerformanceData> {
-    return this.request(`/dashboard/api/dashboard/${this.userId}/performance?period=${period}`)
+  async getPerformance(period: string = '7d', configId?: string): Promise<PerformanceData> {
+    const configParam = configId ? `&config_id=${configId}` : ''
+    return this.request(`/dashboard/api/dashboard/${this.userId}/performance?period=${period}${configParam}`)
   }
 
   // Test execution

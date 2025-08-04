@@ -28,22 +28,34 @@ The ggbots platform is designed to support multiple users, each able to create a
 - `0013_enhanced_trade_lifecycle.sql`: Adds config_id integration, TP/SL tracking, strategy metadata, and backward compatibility
 - `0014_create_ggshot_filter_table.sql`: Creates ggshot_filter table for logging all ggShot signal filter decisions
 - `2025-06-30_add_config_id_to_market_data.sql`: Adds config_id column to market_data table for configuration-driven extraction system
+- **2025-08-03_config_instances.sql**: ⭐ Creates config_instances table for mapping configurations to Hummingbot instances (Phase 1 paper trading)
 
 ## Database Schema
 
 ### users
-Stores user information for multi-user support.
+Stores user information for multi-user support with demo access capabilities.
 
-| Column     | Type            | Description                            |
-|------------|-----------------|----------------------------------------|
-| user_id    | UUID            | Primary Key                            |
-| username   | VARCHAR         | User's username                        |
-| email      | VARCHAR         | User's email address                   |
-| created_at | TIMESTAMP       | Account creation timestamp             |
-| last_login | TIMESTAMP       | Last login timestamp                   |
+| Column      | Type            | Description                            |
+|-------------|-----------------|----------------------------------------|
+| user_id     | UUID            | Primary Key                            |
+| username    | VARCHAR         | User's username (nullable for email-only signups) |
+| email       | VARCHAR         | User's email address (nullable, unique) |
+| created_at  | TIMESTAMP       | Account creation timestamp             |
+| last_login  | TIMESTAMP       | Last login timestamp                   |
+| demo_access | BOOLEAN         | Demo access flag (default: true)      |
 
 **Indexes:**
 - Primary Key on `user_id`
+- Unique constraint on `email` (users_email_unique)
+- Index on `email` for fast lookups (idx_users_email)
+
+**Constraints:**
+- `check_username_or_email`: Ensures either username OR email is provided (supports email-only demo signups)
+
+**Demo Integration (2025-08-03):**
+- Added support for email-only user registration for hackathon demo
+- Users can sign up with just email address (no password required)
+- Default user `00000000-0000-0000-0000-000000000001` updated with demo access
 
 ### sessions
 Stores session information for TradingView access and other authenticated services.
@@ -77,8 +89,70 @@ Stores user-specific configurations for each module of the platform.
 **Indexes:**
 - Primary Key on `config_id`
 - Unique constraint on `(user_id, config_type)`
+
+### config_instances ⭐ NEW
+Maps configurations to Hummingbot instances for paper trading isolation. Each configuration gets its own dedicated paper trading account.
+
+| Column            | Type            | Description                            |
+|-------------------|-----------------|----------------------------------------|
+| config_id         | UUID            | Primary Key, Foreign Key to configurations |
+| instance_name     | VARCHAR         | Unique Hummingbot instance identifier  |
+| hummingbot_account| VARCHAR         | Paper trading account name             |
+| created_at        | TIMESTAMP       | Instance creation timestamp            |
+| status            | VARCHAR         | Instance status (active, inactive)    |
+| paper_balance_usd | DECIMAL         | Initial paper trading balance          |
+
+**Indexes:**
+- Primary Key on `config_id`
+- Unique constraint on `instance_name`
+
+**Example Entries:**
+```sql
+-- ggShot flagship configuration
+config_id: e249bb49-0455-4596-9657-09bf9e14ca14
+instance_name: ggbot-00000000-e249bb49
+hummingbot_account: ggshot_paper_account
+status: active
+paper_balance_usd: 10000.00
+
+-- User-created RSI strategy
+config_id: a1b2c3d4-e5f6-7890-abcd-ef1234567890  
+instance_name: ggbot-00000000-a1b2c3d4
+hummingbot_account: paper_rsi_momentum_a1b2c3d4
+status: active
+paper_balance_usd: 10000.00
+```
+
+**Usage:**
+- **Instance Mapping**: Each config_id maps to exactly one Hummingbot instance
+- **Account Isolation**: Paper trading accounts are isolated per configuration
+- **Naming Convention**: `ggbot-{user_id[:8]}-{config_id[:8]}`
+- **Account Naming**: `paper_{strategy_type}_{config_id[:8]}` or custom names
 - Index on `(user_id, config_type)` for efficient lookups
 - Foreign Key constraint on `user_id` referencing users table
+
+### config_instances
+**NEW TABLE (2025-08-03)**: Maps configurations to Hummingbot instances for paper trading isolation.
+
+| Column            | Type            | Description                            |
+|-------------------|-----------------|----------------------------------------|
+| config_id         | UUID            | Foreign Key to configurations table    |
+| instance_name     | VARCHAR         | Hummingbot instance name (ggbot-user123-conf456) |
+| hummingbot_account| VARCHAR         | Hummingbot account name for paper trading |
+| created_at        | TIMESTAMP       | Instance creation timestamp            |
+| status            | VARCHAR         | Instance status ('active', 'disabled') |
+| paper_balance_usd | DECIMAL(10,2)   | Paper trading balance (default $10,000) |
+
+**Purpose:**
+- Maps each config_id to a persistent Hummingbot instance
+- Enables isolated paper trading accounts per configuration
+- Prevents random instance creation per trade
+- Supports multi-user paper trading with account isolation
+
+**Indexes:**
+- Unique constraint on `config_id` (one instance per config)
+- Unique constraint on `instance_name` (prevent name conflicts)
+- Foreign Key constraint on `config_id` referencing configurations table
 
 ### trades
 **ENHANCED SCHEMA (Migration 0012 + 0013)**: Position-based trade tracking with decision module compatibility.
@@ -525,4 +599,55 @@ FROM ggshot_filter
 WHERE created_at >= CURRENT_DATE - INTERVAL '7 days'
 GROUP BY DATE(created_at) 
 ORDER BY date DESC;
+
+-- Check config_instances for ggShot paper trading
+SELECT 
+  ci.config_id,
+  ci.instance_name,
+  ci.hummingbot_account,
+  ci.status,
+  ci.paper_balance_usd,
+  c.config_name,
+  c.config_type
+FROM config_instances ci
+JOIN configurations c ON ci.config_id = c.config_id
+WHERE c.config_type = 'ggshot';
 ```
+
+---
+
+## 🎯 **Current Live Usage (August 2025)**
+
+### **ggShot Paper Trading**
+The config_instances table is actively used for live ggShot paper trading:
+
+```sql
+-- Live ggShot configuration mapping
+SELECT * FROM config_instances 
+WHERE config_id = 'e249bb49-0455-4596-9657-09bf9e14ca14';
+
+/*
+Expected result:
+config_id: e249bb49-0455-4596-9657-09bf9e14ca14
+instance_name: ggbot-00000000-e249bb49  
+hummingbot_account: ggshot_paper_account
+status: active
+paper_balance_usd: 10000.00
+*/
+```
+
+### **Performance Tracking Integration**
+The PerformanceTracker service queries both ggBot and Hummingbot databases:
+- **Strategy runs**: Decision tracking in ggBot database
+- **Trade execution**: Actual trades in Hummingbot database  
+- **Account mapping**: config_instances links the two systems
+- **P&L calculation**: Real-time performance from actual paper trades
+
+### **Multi-Strategy Architecture** 
+Ready for template-based strategy creation:
+- Each new configuration gets automatic config_instances entry
+- Isolated $10k paper accounts per strategy
+- Unique instance naming prevents conflicts
+- Dashboard APIs provide unified performance view
+
+The database schema supports live paper trading with real performance tracking!

@@ -33,6 +33,12 @@ from trading.api import app as trading_app
 from core.api.dashboard_api import app as dashboard_app
 from core.api.agent_control_api import app as agent_control_app
 
+# Import config API router
+from core.api.config_api import router as config_router
+
+# Import users API router
+from core.api.users_api import router as users_router
+
 # Create the main app
 app = FastAPI(
     title="GGBot API",
@@ -55,6 +61,12 @@ app.mount("/decision", decision_app)
 app.mount("/trading", trading_app)
 app.mount("/dashboard", dashboard_app)
 app.mount("/agent", agent_control_app)
+
+# Include the config router directly
+app.include_router(config_router)
+
+# Include the users router directly
+app.include_router(users_router)
 
 @app.get("/")
 async def root():

@@ -261,38 +261,44 @@ export const useBotStore = create<BotState>((set, get) => ({
         if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
           console.log('Loading demo bot configurations')
           const mockExtraction: ExtractionConfig = {
-            symbols: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'AVAX/USDT'],
-            timeframes: ['15m', '1h', '4h'],
+            symbols: ['BTC/USDT'],
+            timeframes: [], // No longer used
             sources: {
+              ggshot: {
+                enabled: true // ggShot flagship has ggShot signals enabled
+              },
               crypto_indicators_mcp: {
                 enabled: true,
-                indicators: ['RSI', 'MACD', 'BollingerBands', 'ATR', 'EMA', 'VWAP'],
-                use_llm_selection: true,
-                llm_interpretation: true,
-                llm_model: 'deepseek-chat'
+                indicators: ['RSI_15m', 'RSI_1h', 'MACD_15m', 'MACD_1h', 'BollingerBands_15m', 'BollingerBands_1h', 'ATR_15m', 'ATR_1h', 'EMA_15m', 'EMA_1h', 'VWAP_15m', 'VWAP_1h'],
+                use_llm_selection: false,
+                llm_interpretation: false,
+                llm_model: ''
               },
               tradingview: {
                 enabled: false,
                 strategy: ''
               },
               yfinance: {
-                enabled: true
+                enabled: false
               }
             }
           }
           const mockDecision: DecisionConfig = {
             llm_provider: 'deepseek',
-            strategy: 'Multi-timeframe momentum strategy focusing on crypto majors with strong technical confirmation and volume validation',
-            risk_guidelines: 'Maximum 2% risk per trade, strict stop losses, position sizing based on volatility',
-            additional_context: 'Focus on established cryptocurrencies with high liquidity and clear trend patterns'
+            system_prompt: '',
+            strategy: 'ggShot signal validation and execution using 4-Pillar framework. Process high-confidence signals from ggShot Telegram channel with technical confirmation.',
+            additional_context: 'Focus on ggShot signal quality and market alignment for optimal execution timing.'
           }
           const mockTrading: TradingConfig = {
+            exchange: 'bitmex',
+            exchange_id: 'paper_trading',
+            authentication: 'paper_account',
             risk_rules: {
               max_leverage: 3,
-              max_position_size_pct: 5,
-              max_risk_per_trade_pct: 2,
-              min_equity_protection: 2000,
-              max_contracts_per_trade: 50
+              max_position_size_pct: 0.05,
+              max_risk_per_trade_pct: 0.02,
+              min_equity_protection: 0.80,
+              max_contracts_per_trade: 1000000
             }
           }
           
@@ -328,10 +334,11 @@ export const useBotStore = create<BotState>((set, get) => ({
 
       // Try to load real configurations if API is available
       console.log('API available, attempting to load real configurations...')
+      const currentBotId = get().currentBotId
       const [extractionResult, decisionResult, tradingResult] = await Promise.allSettled([
-        api.getConfig('extraction'),
-        api.getConfig('decision'),
-        api.getConfig('trading')
+        api.getConfig('extraction', currentBotId || undefined),
+        api.getConfig('decision', currentBotId || undefined),
+        api.getConfig('trading', currentBotId || undefined)
       ])
 
       const extractionConfig = extractionResult.status === 'fulfilled' ? extractionResult.value.config as ExtractionConfig : null
@@ -369,11 +376,12 @@ export const useBotStore = create<BotState>((set, get) => ({
     try {
       // Check if API is available, otherwise just update local state
       const isConnected = await api.testConnection()
+      const currentBotId = get().currentBotId
       
       if (isConnected) {
         try {
-          await api.updateConfig(agent, config)
-          console.log(`Successfully saved ${agent} config to API`)
+          await api.updateConfig(agent, config, currentBotId || undefined)
+          console.log(`Successfully saved ${agent} config to API for bot ${currentBotId}`)
         } catch (apiError) {
           console.warn(`API save failed for ${agent}, using local state only:`, apiError)
         }
@@ -416,7 +424,8 @@ export const useBotStore = create<BotState>((set, get) => ({
       
       if (isConnected) {
         try {
-          const result = await api.getTrades()
+          const currentBotId = get().currentBotId
+          const result = await api.getTrades(currentBotId || undefined)
           console.log('Trades loaded from API:', result.trades.length)
           set({ trades: result.trades })
           return
@@ -512,7 +521,8 @@ export const useBotStore = create<BotState>((set, get) => ({
       
       if (isConnected) {
         try {
-          const result = await api.getPerformance(period)
+          const currentBotId = get().currentBotId
+          const result = await api.getPerformance(period, currentBotId || undefined)
           console.log('Performance data loaded from API')
           set({ performance: result })
           return

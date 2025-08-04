@@ -845,7 +845,7 @@ Use exact numerical boundaries provided for each pillar. Apply adjustments syste
 
 After completing your reasoning and calculation above, provide the structured output in plain text format with NO FORMATTING:
 
-ACTION: validate
+ACTION: [extract direction from signal - if signal contains "Long" use "long", if contains "Short" use "short"]
 CONFIDENCE: [use the exact result from your Final Calculation above, 3 decimal places]
 STOP_LOSS: [extract from signal]  
 TAKE_PROFIT: [extract Target 1 from signal]
