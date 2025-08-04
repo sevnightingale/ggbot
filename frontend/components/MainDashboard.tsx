@@ -12,7 +12,6 @@ import { AgentConfigModal } from '@/components/bot/AgentConfigModal'
 export function MainDashboard() {
   const {
     loadBots,
-    loadCurrentConfig,
     loadTrades,
     loadPerformance,
     checkSchedulerStatus,

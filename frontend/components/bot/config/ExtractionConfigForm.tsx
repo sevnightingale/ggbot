@@ -111,7 +111,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
     } else {
       newSelected.add(indicatorName)
       // Add default timeframes (15m and 1h)
-      newTimeframes[indicatorName] = ['15m', '1h']
+      newTimeframes = { ...newTimeframes, [indicatorName]: ['15m', '1h'] }
     }
     
     setSelectedIndicators(newSelected)
@@ -181,35 +181,7 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
     }))
   }
 
-  const toggleIndicator = (indicator: string) => {
-    setFormData(prev => ({
-      ...prev,
-      sources: {
-        ...prev.sources,
-        crypto_indicators_mcp: {
-          ...prev.sources.crypto_indicators_mcp!,
-          indicators: prev.sources.crypto_indicators_mcp!.indicators.includes(indicator)
-            ? prev.sources.crypto_indicators_mcp!.indicators.filter(i => i !== indicator)
-            : [...prev.sources.crypto_indicators_mcp!.indicators, indicator]
-        }
-      }
-    }))
-  }
 
-  const toggleSource = (source: string) => {
-    if (source === 'ggshot') {
-      setFormData(prev => ({
-        ...prev,
-        sources: {
-          ...prev.sources,
-          ggshot: {
-            ...prev.sources.ggshot!,
-            enabled: !prev.sources.ggshot!.enabled
-          }
-        }
-      }))
-    }
-  }
 
   const renderSymbolsTab = () => (
     <div className="space-y-4">
@@ -266,32 +238,6 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
         </p>
       </div>
 
-      {/* ggShot Signals */}
-      <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h4 className="font-medium">ggShot Signals</h4>
-            <p className="text-sm text-bone-400">High-confidence trading signals from ggShot Telegram channel</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.sources.ggshot?.enabled}
-              onChange={() => toggleSource('ggshot')}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:h-5 after:w-5 after:transition-all peer-checked:bg-agents-extraction"></div>
-          </label>
-        </div>
-
-        {formData.sources.ggshot?.enabled && (
-          <div className="p-3 bg-blue-900/20 border border-blue-500/60">
-            <p className="text-sm text-blue-200">
-              ✅ ggShot signals will be processed for trading decisions. These are manually curated, high-confidence signals.
-            </p>
-          </div>
-        )}
-      </div>
 
       {/* Technical Indicators */}
       <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">

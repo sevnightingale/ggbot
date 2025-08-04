@@ -1,7 +1,4 @@
 import { 
-  ExtractionConfig, 
-  DecisionConfig, 
-  TradingConfig,
   UnifiedConfig,
   Trade,
   PerformanceData,
@@ -32,6 +29,11 @@ class ApiClient {
   setUserId(userId: string) {
     this.userId = userId
     console.log('ApiClient userId updated to:', userId)
+  }
+
+  // Getter for userId
+  get currentUserId(): string {
+    return this.userId
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
@@ -110,7 +112,7 @@ class ApiClient {
     return this.request(`/api/configs/user/${userIdToUse}`)
   }
 
-  async updateUnifiedConfig(configId: string, configData: any): Promise<ApiResponse<{ status: string, message: string }>> {
+  async updateUnifiedConfig(configId: string, configData: Record<string, unknown>): Promise<ApiResponse<{ status: string, message: string }>> {
     return this.request(`/api/configs/${configId}`, {
       method: 'PUT',
       body: JSON.stringify(configData),

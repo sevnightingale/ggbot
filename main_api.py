@@ -131,10 +131,10 @@ async def health_check():
 
 @app.on_event("startup")
 async def startup_event():
-    """Initialize scheduler on startup."""
+    """Initialize scheduler and trading execution adapter on startup."""
     from core.common.logger import logger
     
-    logger.info("🚀 Starting GGBot API Server with integrated scheduler")
+    logger.info("🚀 Starting GGBot API Server with integrated scheduler and trading")
     
     # Initialize the scheduler (but don't start autonomous mode)
     success = await initialize_scheduler()
@@ -142,6 +142,19 @@ async def startup_event():
         logger.info("✅ Scheduler initialized successfully (autonomous mode off)")
     else:
         logger.error("❌ Failed to initialize scheduler")
+    
+    # Initialize the trading execution adapter since mounted apps don't trigger lifespan events
+    try:
+        from trading.services.hummingbot_execution_adapter import HummingbotExecutionAdapter
+        import trading.api as trading_module
+        
+        logger.info("🔧 Initializing HummingbotExecutionAdapter...")
+        trading_module.execution_adapter = HummingbotExecutionAdapter()
+        logger.info("✅ HummingbotExecutionAdapter initialized successfully")
+        
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize HummingbotExecutionAdapter: {e}")
+        # Don't fail startup if trading adapter fails, just log the error
 
 
 @app.on_event("shutdown") 
