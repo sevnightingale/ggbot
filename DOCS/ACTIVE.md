@@ -1,7 +1,23 @@
 # 🚀 ACTIVE - GGBots System Status
 
-**Last Updated**: 2025-08-03  
+**Last Updated**: 2025-08-04  
 **System Health**: 🟢 Operational
+
+---
+
+## 🌐 API Access Points
+
+### Production API Endpoints
+| Service | Internal Port | Public URL | SSL | Purpose |
+|---------|--------------|------------|-----|---------|
+| **ggbots-api** | `localhost:8000` | `https://ggbots-api.nightingale.business` | ✅ | Main backend API |
+| **Frontend** | N/A | `https://ggbot-app.vercel.app` | ✅ | Next.js application |
+
+### Frontend Configuration
+- **Production**: Uses `NEXT_PUBLIC_API_URL=https://ggbots-api.nightingale.business`
+- **Development**: Uses `NEXT_PUBLIC_API_URL=http://localhost:8000`
+- **Nginx Proxy**: SSL termination handled by nginx with Let's Encrypt certificates
+- **CORS**: Enabled for frontend access from Vercel deployment
 
 ---
 
@@ -39,9 +55,17 @@
 - ✅ $10k isolated paper accounts per configuration
 - ✅ All integration tests passing (3/3)
 
+### 🔐 Demo Authentication System - DEPLOYED (2025-08-04)
+- ✅ Password protection active ("vibecodecamp")
+- ✅ Email-based UUID generation working
+- ✅ Backend API endpoints functional (`/api/users/demo-signup`)
+- ✅ Frontend deployed on Vercel with proper API configuration
+- ⏳ Config API endpoints needed for full demo functionality
+
 ### Active Tasks
-1. **Deploy ggShot paper trading** (infrastructure ready)
-2. **Continue ggShot filter test** (ongoing 2-week evaluation)
+1. **Build Config API endpoints** (next priority for demo completion)
+2. **Deploy ggShot paper trading** (infrastructure ready)
+3. **Continue ggShot filter test** (ongoing 2-week evaluation)
 
 ---
 

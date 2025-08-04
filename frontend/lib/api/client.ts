@@ -9,7 +9,7 @@ import {
 } from '@/types'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-const USER_ID = process.env.NEXT_PUBLIC_USER_ID || '00000000-0000-0000-0000-000000000001'
+const DEFAULT_USER_ID = process.env.NEXT_PUBLIC_USER_ID || '00000000-0000-0000-0000-000000000001'
 
 class ApiClient {
   private baseUrl: string
@@ -18,8 +18,19 @@ class ApiClient {
 
   constructor() {
     this.baseUrl = API_URL
-    this.userId = USER_ID
-    console.log('ApiClient initialized with baseUrl:', this.baseUrl)
+    // Check for demo user ID in localStorage first, fallback to default
+    if (typeof window !== 'undefined') {
+      this.userId = localStorage.getItem('demo_user_id') || DEFAULT_USER_ID
+    } else {
+      this.userId = DEFAULT_USER_ID
+    }
+    console.log('ApiClient initialized with baseUrl:', this.baseUrl, 'userId:', this.userId)
+  }
+
+  // Method to update user ID after demo signup
+  setUserId(userId: string) {
+    this.userId = userId
+    console.log('ApiClient userId updated to:', userId)
   }
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
