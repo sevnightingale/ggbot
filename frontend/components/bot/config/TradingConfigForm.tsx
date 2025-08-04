@@ -13,7 +13,8 @@ interface TradingConfigFormProps {
 const exchanges = [
   { value: 'bitmex', label: 'BitMEX', description: 'Crypto derivatives, high leverage available' },
   { value: 'binance', label: 'Binance', description: 'Spot and futures, largest volume' },
-  { value: 'coinbase', label: 'Coinbase Pro', description: 'US regulated, spot trading' }
+  { value: 'coinbase', label: 'Coinbase Pro', description: 'US regulated, spot trading' },
+  { value: 'uniswap_scroll', label: 'Uniswap on Scroll', description: 'Your bot\'s transactions are private thanks to ZK proofs & Scroll Cloak' }
 ]
 
 const orderTypes = [
@@ -35,8 +36,7 @@ export function TradingConfigForm({ activeTab, config }: TradingConfigFormProps)
       max_leverage: config?.risk_rules?.max_leverage || 3,
       max_position_size_pct: config?.risk_rules?.max_position_size_pct || 0.05,
       max_risk_per_trade_pct: config?.risk_rules?.max_risk_per_trade_pct || 0.02,
-      min_equity_protection: config?.risk_rules?.min_equity_protection || 0.80,
-      max_contracts_per_trade: config?.risk_rules?.max_contracts_per_trade || 1000000
+      min_equity_protection: config?.risk_rules?.min_equity_protection || 0.80
     }
   })
 

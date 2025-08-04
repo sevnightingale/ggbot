@@ -2,6 +2,7 @@ import {
   ExtractionConfig, 
   DecisionConfig, 
   TradingConfig,
+  UnifiedConfig,
   Trade,
   PerformanceData,
   SchedulerStatus,
@@ -100,20 +101,39 @@ class ApiClient {
   }
 
   // Configuration APIs
-  async getConfig(module: 'extraction' | 'decision' | 'trading', configId?: string): Promise<{ config: ExtractionConfig | DecisionConfig | TradingConfig }> {
-    const configParam = configId ? `?config_id=${configId}` : ''
-    return this.request(`/agent/api/config/${this.userId}/${module}${configParam}`)
+  async getUnifiedConfig(configId: string): Promise<UnifiedConfig> {
+    return this.request(`/api/configs/${configId}`)
   }
 
-  async updateConfig(
-    module: 'extraction' | 'decision' | 'trading', 
-    config: ExtractionConfig | DecisionConfig | TradingConfig,
-    configId?: string
-  ): Promise<ApiResponse<{ config: ExtractionConfig | DecisionConfig | TradingConfig }>> {
-    const configParam = configId ? `?config_id=${configId}` : ''
-    return this.request(`/agent/api/config/${this.userId}/${module}${configParam}`, {
+  async getUserConfigs(userId?: string): Promise<UnifiedConfig[]> {
+    const userIdToUse = userId || this.userId
+    return this.request(`/api/configs/user/${userIdToUse}`)
+  }
+
+  async updateUnifiedConfig(configId: string, configData: any): Promise<ApiResponse<{ status: string, message: string }>> {
+    return this.request(`/api/configs/${configId}`, {
       method: 'PUT',
-      body: JSON.stringify({ config }),
+      body: JSON.stringify(configData),
+    })
+  }
+
+  async createConfigFromTemplate(template: string, symbol?: string, configName?: string, userId?: string): Promise<UnifiedConfig> {
+    const userIdToUse = userId || this.userId
+    return this.request(`/api/configs/create-from-template`, {
+      method: 'POST',
+      body: JSON.stringify({
+        template,
+        symbol: symbol || 'BTC/USDT',
+        config_name: configName,
+        user_id: userIdToUse,
+        risk_level: 'medium'
+      }),
+    })
+  }
+
+  async deleteConfig(configId: string): Promise<ApiResponse<{ status: string, message: string }>> {
+    return this.request(`/api/configs/${configId}`, {
+      method: 'DELETE',
     })
   }
 
@@ -136,13 +156,17 @@ class ApiClient {
 
   // Dashboard APIs
   async getTrades(configId?: string): Promise<{ trades: Trade[] }> {
-    const configParam = configId ? `?config_id=${configId}` : ''
-    return this.request(`/dashboard/api/dashboard/${this.userId}/trades${configParam}`)
+    if (configId) {
+      return this.request(`/dashboard/api/dashboard/trades/${configId}`)
+    }
+    return this.request(`/dashboard/api/dashboard/${this.userId}/trades`)
   }
 
   async getPerformance(period: string = '7d', configId?: string): Promise<PerformanceData> {
-    const configParam = configId ? `&config_id=${configId}` : ''
-    return this.request(`/dashboard/api/dashboard/${this.userId}/performance?period=${period}${configParam}`)
+    if (configId) {
+      return this.request(`/dashboard/api/dashboard/performance/${configId}?period=${period}`)
+    }
+    return this.request(`/dashboard/api/dashboard/${this.userId}/performance?period=${period}`)
   }
 
   // Test execution

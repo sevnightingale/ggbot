@@ -7,17 +7,18 @@ import {
   ExtractionConfig,
   DecisionConfig,
   TradingConfig,
+  UnifiedConfig,
   Bot
 } from '@/types'
 import { api } from '@/lib/api/client'
 
 interface BotState {
   // Bot management
-  availableBots: Bot[]
+  availableBots: UnifiedConfig[]
   currentBotId: string | null
-  currentBotName: string
+  currentConfig: UnifiedConfig | null
   
-  // Agent configurations (for current bot)
+  // Agent configurations (parsed from current config)
   extractionConfig: ExtractionConfig | null
   decisionConfig: DecisionConfig | null
   tradingConfig: TradingConfig | null
@@ -44,11 +45,11 @@ interface BotState {
   
   // Actions
   loadBots: () => Promise<void>
-  createBot: (name: string) => Promise<void>
+  createBot: (template: string, name?: string) => Promise<void>
   selectBot: (botId: string) => Promise<void>
   updateBotName: (botId: string, name: string) => Promise<void>
   deleteBot: (botId: string) => Promise<void>
-  loadConfigurations: () => Promise<void>
+  loadCurrentConfig: () => Promise<void>
   updateAgentConfig: (agent: 'extraction' | 'decision' | 'trading', config: any) => Promise<void>
   loadTrades: () => Promise<void>
   loadPerformance: (period?: string) => Promise<void>
@@ -68,10 +69,14 @@ const calculateAgentStatus = (config: any): AgentStatus => {
   return hasRequiredFields ? 'configured' : 'partial'
 }
 
+// Demo config ID for rich mock data
+const DEMO_CONFIG_ID = "demo-bot-00000000-1111-2222-3333-444444444444"
+const GGSHOT_CONFIG_ID = "e249bb49-0455-4596-9657-09bf9e14ca14"
+
 export const useBotStore = create<BotState>((set, get) => ({
   availableBots: [],
   currentBotId: null,
-  currentBotName: 'GGBOT-01',
+  currentConfig: null,
   extractionConfig: null,
   decisionConfig: null,
   tradingConfig: null,
@@ -91,91 +96,125 @@ export const useBotStore = create<BotState>((set, get) => ({
   loadBots: async () => {
     console.log('Loading available bots...')
     try {
-      // For now, create a default bot if none exist
-      const state = get()
-      if (state.availableBots.length === 0) {
-        const defaultBot: Bot = {
-          config_id: 'default-bot-id',
-          config_name: 'GGBOT-01',
-          created_at: new Date().toISOString()
+      set({ isLoading: true, error: null })
+      
+      // Load all user configs from API
+      const configs = await api.getUserConfigs()
+      
+      // Add demo bot if not present
+      const hasDemoBot = configs.some(c => c.config_id === DEMO_CONFIG_ID)
+      if (!hasDemoBot) {
+        const demoConfig: UnifiedConfig = {
+          config_id: DEMO_CONFIG_ID,
+          config_name: "Demo Bot - Showcase",
+          config_type: "demo",
+          user_id: api.userId,
+          config_data: {
+            extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
+            decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
+            trading: { exchange: 'demo', exchange_id: '', authentication: '', risk_rules: { max_leverage: 3, max_position_size_pct: 0.05, max_risk_per_trade_pct: 0.02, min_equity_protection: 0.8 } }
+          },
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          editable: true,
+          is_flagship: false,
+          paper_balance: 10000
         }
-        set({ 
-          availableBots: [defaultBot],
-          currentBotId: defaultBot.config_id,
-          currentBotName: defaultBot.config_name
-        })
+        configs.unshift(demoConfig)
+      }
+      
+      // Default to ggShot flagship if available, otherwise first config
+      const defaultConfigId = configs.find(c => c.config_id === GGSHOT_CONFIG_ID)?.config_id || configs[0]?.config_id
+      
+      set({ 
+        availableBots: configs,
+        currentBotId: defaultConfigId || null,
+        isLoading: false
+      })
+      
+      // Load the default config
+      if (defaultConfigId) {
+        await get().selectBot(defaultConfigId)
       }
     } catch (error) {
       console.error('Error loading bots:', error)
-      set({ error: error instanceof Error ? error.message : 'Failed to load bots' })
+      set({ error: error instanceof Error ? error.message : 'Failed to load bots', isLoading: false })
     }
   },
 
-  createBot: async (name: string) => {
-    console.log('Creating new bot:', name)
+  createBot: async (template: string, name?: string) => {
+    console.log('Creating new bot:', name, 'from template:', template)
     try {
-      // Generate a new bot ID (in real implementation, this would come from backend)
-      const newBot: Bot = {
-        config_id: `bot-${Date.now()}`,
-        config_name: name,
-        created_at: new Date().toISOString()
-      }
+      set({ isLoading: true, error: null })
+      
+      // Create config from template via API
+      const newConfig = await api.createConfigFromTemplate(template, 'BTC/USDT', name)
       
       const state = get()
+      const updatedBots = [...state.availableBots, newConfig]
+      
       set({
-        availableBots: [...state.availableBots, newBot],
-        currentBotId: newBot.config_id,
-        currentBotName: newBot.config_name,
-        // Reset configurations for new bot
-        extractionConfig: null,
-        decisionConfig: null,
-        tradingConfig: null,
-        agentStatuses: {
-          extraction: 'unconfigured',
-          decision: 'unconfigured',
-          trading: 'unconfigured',
-        },
-        trades: [],
-        performance: null,
-        schedulerStatus: { is_running: false }
+        availableBots: updatedBots,
+        currentBotId: newConfig.config_id,
+        currentConfig: newConfig,
+        isLoading: false
       })
+      
+      // Load the new config and switch to it
+      await get().selectBot(newConfig.config_id)
     } catch (error) {
       console.error('Error creating bot:', error)
-      set({ error: error instanceof Error ? error.message : 'Failed to create bot' })
+      set({ error: error instanceof Error ? error.message : 'Failed to create bot', isLoading: false })
     }
   },
 
   selectBot: async (botId: string) => {
     console.log('Selecting bot:', botId)
     try {
+      set({ isLoading: true, error: null })
+      
       const state = get()
-      const selectedBot = state.availableBots.find(bot => bot.config_id === botId)
-      if (!selectedBot) {
-        throw new Error('Bot not found')
+      
+      // Check if it's the demo bot
+      if (botId === DEMO_CONFIG_ID) {
+        const demoBot = state.availableBots.find(bot => bot.config_id === DEMO_CONFIG_ID)
+        if (demoBot) {
+          set({
+            currentBotId: botId,
+            currentConfig: demoBot,
+            extractionConfig: demoBot.config_data.extraction,
+            decisionConfig: demoBot.config_data.decision,
+            tradingConfig: demoBot.config_data.trading,
+            agentStatuses: {
+              extraction: calculateAgentStatus(demoBot.config_data.extraction),
+              decision: calculateAgentStatus(demoBot.config_data.decision),
+              trading: calculateAgentStatus(demoBot.config_data.trading),
+            },
+            isLoading: false
+          })
+          return
+        }
       }
+      
+      // Load real config from API
+      const config = await api.getUnifiedConfig(botId)
       
       set({
         currentBotId: botId,
-        currentBotName: selectedBot.config_name,
-        // Reset data for new bot
-        extractionConfig: null,
-        decisionConfig: null,
-        tradingConfig: null,
+        currentConfig: config,
+        extractionConfig: config.config_data.extraction,
+        decisionConfig: config.config_data.decision,
+        tradingConfig: config.config_data.trading,
         agentStatuses: {
-          extraction: 'unconfigured',
-          decision: 'unconfigured',
-          trading: 'unconfigured',
+          extraction: calculateAgentStatus(config.config_data.extraction),
+          decision: calculateAgentStatus(config.config_data.decision),
+          trading: calculateAgentStatus(config.config_data.trading),
         },
-        trades: [],
-        performance: null,
-        schedulerStatus: { is_running: false }
+        isLoading: false
       })
-      
-      // Load configurations for the selected bot
-      await get().loadConfigurations()
     } catch (error) {
       console.error('Error selecting bot:', error)
-      set({ error: error instanceof Error ? error.message : 'Failed to select bot' })
+      set({ error: error instanceof Error ? error.message : 'Failed to select bot', isLoading: false })
     }
   },
 
@@ -242,7 +281,7 @@ export const useBotStore = create<BotState>((set, get) => ({
     }
   },
 
-  loadConfigurations: async () => {
+  loadCurrentConfig: async () => {
     set({ isLoading: true, error: null })
     console.log('Starting loadConfigurations...')
     
@@ -374,34 +413,71 @@ export const useBotStore = create<BotState>((set, get) => ({
   updateAgentConfig: async (agent, config) => {
     set({ isLoading: true, error: null })
     try {
-      // Check if API is available, otherwise just update local state
-      const isConnected = await api.testConnection()
       const currentBotId = get().currentBotId
+      const currentConfig = get().currentConfig
       
-      if (isConnected) {
-        try {
-          await api.updateConfig(agent, config, currentBotId || undefined)
-          console.log(`Successfully saved ${agent} config to API for bot ${currentBotId}`)
-        } catch (apiError) {
-          console.warn(`API save failed for ${agent}, using local state only:`, apiError)
-        }
-      } else {
-        console.log(`API not available, saving ${agent} config locally only`)
+      if (!currentBotId || !currentConfig) {
+        throw new Error('No bot selected')
       }
       
-      // Always update local state for demo mode
+      // Check if it's the demo bot - only update local state
+      if (currentBotId === DEMO_CONFIG_ID) {
+        console.log(`Updating demo bot ${agent} config locally only`)
+        
+        // Update local state only for demo bot
+        if (agent === 'extraction') {
+          set({ 
+            extractionConfig: config,
+            agentStatuses: { ...get().agentStatuses, extraction: calculateAgentStatus(config) }
+          })
+        } else if (agent === 'decision') {
+          set({ 
+            decisionConfig: config,
+            agentStatuses: { ...get().agentStatuses, decision: calculateAgentStatus(config) }
+          })
+        } else if (agent === 'trading') {
+          set({ 
+            tradingConfig: config,
+            agentStatuses: { ...get().agentStatuses, trading: calculateAgentStatus(config) }
+          })
+        }
+        
+        set({ isLoading: false, isConfigModalOpen: false })
+        return
+      }
+      
+      // For real bots, merge with existing config and save to API
+      const updatedConfigData = {
+        ...currentConfig.config_data,
+        [agent]: config
+      }
+      
+      // Save to API using unified config endpoint
+      await api.updateUnifiedConfig(currentBotId, { config_data: updatedConfigData })
+      console.log(`Successfully saved ${agent} config to API for bot ${currentBotId}`)
+      
+      // Update local state
+      const updatedConfig = {
+        ...currentConfig,
+        config_data: updatedConfigData,
+        updated_at: new Date().toISOString()
+      }
+      
       if (agent === 'extraction') {
         set({ 
+          currentConfig: updatedConfig,
           extractionConfig: config,
           agentStatuses: { ...get().agentStatuses, extraction: calculateAgentStatus(config) }
         })
       } else if (agent === 'decision') {
         set({ 
+          currentConfig: updatedConfig,
           decisionConfig: config,
           agentStatuses: { ...get().agentStatuses, decision: calculateAgentStatus(config) }
         })
       } else if (agent === 'trading') {
         set({ 
+          currentConfig: updatedConfig,
           tradingConfig: config,
           agentStatuses: { ...get().agentStatuses, trading: calculateAgentStatus(config) }
         })
@@ -409,6 +485,7 @@ export const useBotStore = create<BotState>((set, get) => ({
       
       set({ isLoading: false, isConfigModalOpen: false })
     } catch (error) {
+      console.error(`Error updating ${agent} config:`, error)
       set({ 
         error: error instanceof Error ? error.message : 'Failed to update configuration',
         isLoading: false 
@@ -419,27 +496,18 @@ export const useBotStore = create<BotState>((set, get) => ({
   loadTrades: async () => {
     console.log('Loading trades...')
     try {
-      // Try to load from API first, fall back to mock data
-      const isConnected = await api.testConnection()
-      
-      if (isConnected) {
-        try {
-          const currentBotId = get().currentBotId
-          const result = await api.getTrades(currentBotId || undefined)
-          console.log('Trades loaded from API:', result.trades.length)
-          set({ trades: result.trades })
-          return
-        } catch (apiError) {
-          console.warn('API trades request failed, using mock data:', apiError)
-        }
-      }
-
-      // Use mock trades data based on current bot
       const currentBotId = get().currentBotId
-      const currentBotName = get().currentBotName
       
-      // If this is the default/demo bot (GGBOT-01), show rich trading history
-      if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
+      if (!currentBotId) {
+        set({ trades: [] })
+        return
+      }
+      
+      // Check if it's the demo bot - use mock data
+      if (currentBotId === DEMO_CONFIG_ID) {
+        console.log('Loading demo bot trading history')
+        
+        // Use rich mock data for demo bot
         const mockTrades: Trade[] = [
           // Active profitable trades
           {
@@ -516,31 +584,20 @@ export const useBotStore = create<BotState>((set, get) => ({
   loadPerformance: async (period = '7d') => {
     console.log('Loading performance data for period:', period)
     try {
-      // Try to load from API first, fall back to mock data
-      const isConnected = await api.testConnection()
-      
-      if (isConnected) {
-        try {
-          const currentBotId = get().currentBotId
-          const result = await api.getPerformance(period, currentBotId || undefined)
-          console.log('Performance data loaded from API')
-          set({ performance: result })
-          return
-        } catch (apiError) {
-          console.warn('API performance request failed, using mock data:', apiError)
-        }
-      }
-
-      // Mock performance data based on current bot
       const currentBotId = get().currentBotId
-      const currentBotName = get().currentBotName
       
-      // If this is the default/demo bot (GGBOT-01), show profitable 30-day history
-      if (currentBotId === 'default-bot-id' || currentBotName === 'GGBOT-01') {
+      if (!currentBotId) {
+        set({ performance: null })
+        return
+      }
+      
+      // Check if it's the demo bot - use mock data
+      if (currentBotId === DEMO_CONFIG_ID) {
+        console.log('Loading demo bot performance data')
+        
         // Generate 30-day performance data showing steady growth
         const generateDailyPnL = () => {
           const data = []
-          let cumulativePnL = 0
           const today = new Date()
           
           for (let i = 29; i >= 0; i--) {
@@ -549,7 +606,6 @@ export const useBotStore = create<BotState>((set, get) => ({
             
             // Generate realistic daily P&L with some volatility but overall upward trend
             const dayPnL = Math.random() * 200 - 50 + (29 - i) * 5 // Slight upward bias over time
-            cumulativePnL += dayPnL
             
             data.push({
               date: date.toISOString().split('T')[0],
@@ -569,8 +625,17 @@ export const useBotStore = create<BotState>((set, get) => ({
         }
         console.log('Using demo bot mock performance data')
         set({ performance: mockPerformance })
-      } else {
-        // New bots have no performance history
+        return
+      }
+      
+      // For real bots, load from API
+      try {
+        const result = await api.getPerformance(period, currentBotId)
+        console.log('Performance data loaded from API for config:', currentBotId)
+        set({ performance: result })
+      } catch (apiError) {
+        console.warn('API performance request failed:', apiError)
+        // Empty performance for real bots with no data
         const emptyPerformance: PerformanceData = {
           period,
           total_pnl: 0,
@@ -579,7 +644,6 @@ export const useBotStore = create<BotState>((set, get) => ({
           total_trades: 0,
           daily_pnl: []
         }
-        console.log('Using empty performance for new bot')
         set({ performance: emptyPerformance })
       }
     } catch (error) {
