@@ -24,7 +24,8 @@ export function EmailSignup({ onUserCreated }: EmailSignupProps) {
 
     try {
       // Call backend API to create/get user
-      const response = await fetch('/api/users/demo-signup', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const response = await fetch(`${apiUrl}/api/users/demo-signup`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
