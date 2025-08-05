@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { PageWrapper } from '@/components/ui/PageWrapper'
 import { useBotStore } from '@/store/bot'
 import { AgentCard } from '@/components/bot/AgentCard'
@@ -23,64 +23,64 @@ export function MainDashboard() {
   } = useBotStore()
 
   // Use a ref to track if initial load has been completed
-  const [hasInitialized, setHasInitialized] = useState(false)
-
-  // Memoize the load functions to prevent unnecessary re-renders
-  const loadInitialData = useCallback(async () => {
-    console.log('MainDashboard: Loading initial data...')
-    const startTime = Date.now()
-    
-    try {
-      // Load bots first, then configurations and other data
-      console.log('MainDashboard: Loading bots...')
-      await loadBots()
-      console.log('MainDashboard: Bots loaded')
-      
-      // Load other data in parallel
-      console.log('MainDashboard: Loading trades, performance, and scheduler status...')
-      await Promise.allSettled([
-        loadTrades(),
-        loadPerformance('7d'),
-        checkSchedulerStatus()
-      ])
-      
-      const endTime = Date.now()
-      console.log(`MainDashboard: All data loaded in ${endTime - startTime}ms`)
-    } catch (error) {
-      console.error('MainDashboard: Failed to load initial data:', error)
-    } finally {
-      setHasInitialized(true)
-    }
-  }, [loadBots, loadTrades, loadPerformance, checkSchedulerStatus])
-
-  const refreshData = useCallback(() => {
-    console.log('MainDashboard: Periodic refresh triggered')
-    loadTrades()
-    checkSchedulerStatus()
-  }, [loadTrades, checkSchedulerStatus])
+  const hasInitialized = useRef(false)
+  const [isInitializing, setIsInitializing] = useState(true)
 
   useEffect(() => {
     // Only run once on component mount
-    if (hasInitialized) return
+    if (hasInitialized.current) return
 
     console.log('MainDashboard: Starting initial data load...')
-    loadInitialData()
-  }, [hasInitialized, loadInitialData])
+    hasInitialized.current = true
+    
+    const loadInitialData = async () => {
+      console.log('MainDashboard: Loading initial data...')
+      const startTime = Date.now()
+      
+      try {
+        // Load bots first, then configurations and other data
+        console.log('MainDashboard: Loading bots...')
+        await loadBots()
+        console.log('MainDashboard: Bots loaded')
+        
+        // Load other data in parallel
+        console.log('MainDashboard: Loading trades, performance, and scheduler status...')
+        await Promise.allSettled([
+          loadTrades(),
+          loadPerformance('7d'),
+          checkSchedulerStatus()
+        ])
+        
+        const endTime = Date.now()
+        console.log(`MainDashboard: All data loaded in ${endTime - startTime}ms`)
+      } catch (error) {
+        console.error('MainDashboard: Failed to load initial data:', error)
+      } finally {
+        setIsInitializing(false)
+      }
+    }
 
-  // Separate effect for periodic refresh
+    loadInitialData()
+  }, []) // Empty dependency array - runs only once
+
+  // Separate effect for periodic refresh - only after initialization
   useEffect(() => {
-    if (!hasInitialized) return
+    if (isInitializing) return
 
     console.log('MainDashboard: Setting up periodic refresh (30s)')
-    const interval = setInterval(refreshData, 30000)
+    const interval = setInterval(() => {
+      console.log('MainDashboard: Periodic refresh triggered')
+      loadTrades()
+      checkSchedulerStatus()
+    }, 30000)
 
     return () => {
       console.log('MainDashboard: Cleaning up periodic refresh')
       clearInterval(interval)
     }
-  }, [hasInitialized, refreshData])
+  }, [isInitializing]) // Only depends on initialization state
 
-  if (isLoading) {
+  if (isLoading || isInitializing) {
     return (
       <PageWrapper>
         <div className="flex items-center justify-center min-h-[60vh]">
