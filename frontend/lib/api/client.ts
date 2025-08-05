@@ -14,7 +14,7 @@ class ApiClient {
   private baseUrl: string
   private userId: string
   private readonly timeout: number = 8000 // 8 second timeout
-  private requestCache = new Map<string, Promise<any>>()
+  private requestCache = new Map<string, Promise<unknown>>()
 
   constructor() {
     this.baseUrl = API_URL
@@ -45,7 +45,7 @@ class ApiClient {
     // Check if request is already in progress
     if (this.requestCache.has(cacheKey)) {
       console.log('Reusing existing request for:', path)
-      return this.requestCache.get(cacheKey)
+      return this.requestCache.get(cacheKey) as Promise<T>
     }
     
     console.log('Making API request to:', url)
