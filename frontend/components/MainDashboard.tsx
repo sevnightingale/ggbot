@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { PageWrapper } from '@/components/ui/PageWrapper'
 import { useBotStore } from '@/store/bot'
 import { AgentCard } from '@/components/bot/AgentCard'
@@ -19,10 +19,17 @@ export function MainDashboard() {
     error,
     isConfigModalOpen,
     agentStatuses,
-    schedulerStatus
+    schedulerStatus,
+    currentBotId
   } = useBotStore()
 
+  // Use a ref to track if initial load has been completed
+  const [hasInitialized, setHasInitialized] = useState(false)
+
   useEffect(() => {
+    // Only run once on component mount
+    if (hasInitialized) return
+
     console.log('MainDashboard: Starting initial data load...')
     
     const loadInitialData = async () => {
@@ -34,7 +41,6 @@ export function MainDashboard() {
         console.log('MainDashboard: Loading bots...')
         await loadBots()
         console.log('MainDashboard: Bots loaded')
-        
         
         // Load other data in parallel
         console.log('MainDashboard: Loading trades, performance, and scheduler status...')
@@ -48,12 +54,18 @@ export function MainDashboard() {
         console.log(`MainDashboard: All data loaded in ${endTime - startTime}ms`)
       } catch (error) {
         console.error('MainDashboard: Failed to load initial data:', error)
+      } finally {
+        setHasInitialized(true)
       }
     }
 
     loadInitialData()
+  }, [hasInitialized])
 
-    // Set up periodic refresh
+  // Separate effect for periodic refresh
+  useEffect(() => {
+    if (!hasInitialized) return
+
     console.log('MainDashboard: Setting up periodic refresh (30s)')
     const interval = setInterval(() => {
       console.log('MainDashboard: Periodic refresh triggered')
@@ -65,7 +77,7 @@ export function MainDashboard() {
       console.log('MainDashboard: Cleaning up periodic refresh')
       clearInterval(interval)
     }
-  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [hasInitialized])
 
   if (isLoading) {
     return (

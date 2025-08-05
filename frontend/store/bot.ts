@@ -94,6 +94,14 @@ export const useBotStore = create<BotState>((set, get) => ({
 
   loadBots: async () => {
     console.log('Loading available bots...')
+    const state = get()
+    
+    // Prevent multiple simultaneous loads
+    if (state.isLoading && state.availableBots.length === 0) {
+      console.log('Already loading bots, skipping...')
+      return
+    }
+    
     try {
       set({ isLoading: true, error: null })
       
@@ -218,9 +226,15 @@ export const useBotStore = create<BotState>((set, get) => ({
   selectBot: async (botId: string) => {
     console.log('Selecting bot:', botId)
     try {
-      set({ isLoading: true, error: null })
-      
       const state = get()
+      
+      // Prevent unnecessary re-selection of the same bot
+      if (state.currentBotId === botId && state.currentConfig) {
+        console.log('Bot already selected:', botId)
+        return
+      }
+      
+      set({ isLoading: true, error: null })
       
       // Check if it's the demo bot
       if (botId === DEMO_CONFIG_ID) {
