@@ -27,7 +27,7 @@ const agentInfo = {
 }
 
 const tabs = {
-  extraction: ['Symbols', 'Timeframes', 'Data Sources'],
+  extraction: ['Symbols', 'Technical Indicators'],
   decision: ['Strategy', 'LLM Settings', 'Context'],
   trading: ['Exchange', 'Risk Management', 'Execution Rules']
 }

@@ -1,8 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
+import { Search } from 'lucide-react'
 import { useBotStore } from '@/store/bot'
 import { ExtractionConfig } from '@/types'
+import { IndicatorCard } from './IndicatorCard'
+import { INDICATORS, CATEGORY_LABELS, IndicatorCategory } from './constants'
+import { cn } from '@/lib/utils/cn'
 
 interface ExtractionConfigFormProps {
   activeTab: number
@@ -14,148 +18,94 @@ const commonSymbols = [
   'MATIC/USDT', 'AVAX/USDT', 'DOT/USDT', 'LINK/USDT', 'UNI/USDT'
 ]
 
-// Technical indicators without timeframes
-const baseIndicators = [
-  { name: 'RSI', label: 'RSI (Relative Strength Index)', description: 'Momentum oscillator (0-100)' },
-  { name: 'MACD', label: 'MACD', description: 'Moving Average Convergence Divergence' },
-  { name: 'BollingerBands', label: 'Bollinger Bands', description: 'Volatility bands around moving average' },
-  { name: 'ATR', label: 'ATR (Average True Range)', description: 'Volatility measurement' },
-  { name: 'EMA', label: 'EMA (Exponential Moving Average)', description: 'Trend-following indicator' },
-  { name: 'VWAP', label: 'VWAP (Volume Weighted Average Price)', description: 'Volume-based price average' },
-  { name: 'Stochastic', label: 'Stochastic Oscillator', description: 'Momentum indicator (0-100)' },
-  { name: 'Williams%R', label: 'Williams %R', description: 'Momentum indicator (-100 to 0)' },
-  { name: 'OBV', label: 'OBV (On-Balance Volume)', description: 'Volume-based momentum' },
-  { name: 'CCI', label: 'CCI (Commodity Channel Index)', description: 'Momentum oscillator' }
-]
-
-const availableTimeframes = [
-  { value: '15m', label: '15 Minutes' },
-  { value: '1h', label: '1 Hour' },
-  { value: '4h', label: '4 Hours' },
-  { value: '1d', label: '1 Day' }
-]
-
-// Premium indicator
-const premiumIndicators = [
-  { name: 'ggshot', label: 'ggShot Signals', description: 'Premium AI-powered trading signals', premium: true }
-]
-
-
 export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigFormProps) {
   const { updateAgentConfig, setError } = useBotStore()
   const [isSaving, setIsSaving] = useState(false)
   const [justSaved, setJustSaved] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [selectedCategory, setSelectedCategory] = useState<IndicatorCategory | 'all'>('all')
   
-  // Parse existing indicators to get selected indicators and timeframes
-  const parseExistingIndicators = (indicators: string[]) => {
-    const selectedIndicators = new Set<string>()
-    const indicatorTimeframes: Record<string, string[]> = {}
+  // Parse existing config to new format
+  const parseExistingConfig = (config: ExtractionConfig | null) => {
+    if (!config) {
+      return {
+        symbols: [],
+        indicators: INDICATORS.map(ind => ({
+          name: ind.name,
+          enabled: false,
+          timeframes: []
+        }))
+      }
+    }
+
+    const existingIndicators = config.sources?.crypto_indicators_mcp?.indicators || []
+    const indicatorMap = new Map<string, string[]>()
     
-    indicators.forEach(indicator => {
+    // Parse old format (RSI_15m) to new format
+    existingIndicators.forEach(indicator => {
       const parts = indicator.split('_')
       if (parts.length >= 2) {
         const timeframe = parts[parts.length - 1]
-        const indicatorName = parts.slice(0, -1).join('_')
-        selectedIndicators.add(indicatorName)
-        if (!indicatorTimeframes[indicatorName]) {
-          indicatorTimeframes[indicatorName] = []
+        const indicatorName = parts.slice(0, -1).join('_').toLowerCase()
+        
+        if (!indicatorMap.has(indicatorName)) {
+          indicatorMap.set(indicatorName, [])
         }
-        if (!indicatorTimeframes[indicatorName].includes(timeframe)) {
-          indicatorTimeframes[indicatorName].push(timeframe)
-        }
+        indicatorMap.get(indicatorName)!.push(timeframe)
       }
     })
-    
-    return { selectedIndicators, indicatorTimeframes }
-  }
-  
-  const existingIndicators = config?.sources?.crypto_indicators_mcp?.indicators || []
-  const { selectedIndicators: initialSelected, indicatorTimeframes: initialTimeframes } = parseExistingIndicators(existingIndicators)
-  
-  const [formData, setFormData] = useState<ExtractionConfig>({
-    symbols: config?.symbols || [],
-    sources: {
-      crypto_indicators_mcp: {
-        enabled: config?.sources?.crypto_indicators_mcp?.enabled ?? true,
-        indicators: existingIndicators
-      }
-    }
-  })
-  
-  const [selectedIndicators, setSelectedIndicators] = useState<Set<string>>(initialSelected)
-  const [indicatorTimeframes, setIndicatorTimeframes] = useState<Record<string, string[]>>(initialTimeframes)
-  const [ggShotEnabled, setGgShotEnabled] = useState(false)
 
-  // Helper function to rebuild indicator list with timeframes
-  const rebuildIndicatorList = (currentSelected: Set<string>, currentTimeframes: Record<string, string[]>) => {
-    const indicators: string[] = []
-    
-    currentSelected.forEach(indicator => {
-      const timeframes = currentTimeframes[indicator] || []
-      timeframes.forEach(timeframe => {
-        indicators.push(`${indicator}_${timeframe}`)
-      })
+    return {
+      symbols: config.symbols || [],
+      indicators: INDICATORS.map(ind => ({
+        name: ind.name,
+        enabled: indicatorMap.has(ind.name),
+        timeframes: indicatorMap.get(ind.name) || []
+      }))
+    }
+  }
+
+  const [formData, setFormData] = useState(() => parseExistingConfig(config))
+
+  // Filter indicators based on search and category
+  const filteredIndicators = useMemo(() => {
+    return INDICATORS.filter(indicator => {
+      const matchesSearch = searchQuery === '' || 
+        indicator.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        indicator.description.toLowerCase().includes(searchQuery.toLowerCase())
+      
+      const matchesCategory = selectedCategory === 'all' || indicator.category === selectedCategory
+      
+      return matchesSearch && matchesCategory
     })
-    
-    return indicators
-  }
+  }, [searchQuery, selectedCategory])
 
-  const toggleIndicator = (indicatorName: string) => {
-    const newSelected = new Set(selectedIndicators)
-    
-    let newTimeframes: Record<string, string[]>
-    if (newSelected.has(indicatorName)) {
-      newSelected.delete(indicatorName)
-      // Remove timeframes for this indicator
-      newTimeframes = { ...indicatorTimeframes }
-      delete newTimeframes[indicatorName]
-    } else {
-      newSelected.add(indicatorName)
-      // Add default timeframes (15m and 1h)
-      newTimeframes = { ...indicatorTimeframes, [indicatorName]: ['15m', '1h'] }
-    }
-    
-    setSelectedIndicators(newSelected)
-    setIndicatorTimeframes(newTimeframes)
-    
-    // Update form data
-    const newIndicators = rebuildIndicatorList(newSelected, newTimeframes)
+  const handleToggleIndicator = (indicatorName: string, enabled: boolean) => {
     setFormData(prev => ({
       ...prev,
-      sources: {
-        ...prev.sources,
-        crypto_indicators_mcp: {
-          ...prev.sources.crypto_indicators_mcp,
-          indicators: newIndicators
-        }
-      }
+      indicators: prev.indicators.map(ind => 
+        ind.name === indicatorName
+          ? { 
+              ...ind, 
+              enabled,
+              // Set default timeframes when enabling
+              timeframes: enabled && ind.timeframes.length === 0 
+                ? INDICATORS.find(i => i.name === indicatorName)?.defaultTimeframes || []
+                : ind.timeframes
+            }
+          : ind
+      )
     }))
   }
 
-  const toggleTimeframe = (indicatorName: string, timeframe: string) => {
-    const currentTimeframes = indicatorTimeframes[indicatorName] || []
-    const newTimeframeList = currentTimeframes.includes(timeframe)
-      ? currentTimeframes.filter(tf => tf !== timeframe)
-      : [...currentTimeframes, timeframe]
-    
-    const newTimeframes = {
-      ...indicatorTimeframes,
-      [indicatorName]: newTimeframeList
-    }
-    
-    setIndicatorTimeframes(newTimeframes)
-    
-    // Update form data
-    const newIndicators = rebuildIndicatorList(selectedIndicators, newTimeframes)
+  const handleTimeframeChange = (indicatorName: string, timeframes: string[]) => {
     setFormData(prev => ({
       ...prev,
-      sources: {
-        ...prev.sources,
-        crypto_indicators_mcp: {
-          ...prev.sources.crypto_indicators_mcp,
-          indicators: newIndicators
-        }
-      }
+      indicators: prev.indicators.map(ind => 
+        ind.name === indicatorName
+          ? { ...ind, timeframes }
+          : ind
+      )
     }))
   }
 
@@ -163,9 +113,45 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
     try {
       setIsSaving(true)
       setError(null)
-      await updateAgentConfig('extraction', formData)
+      
+      // Validate
+      if (formData.symbols.length === 0) {
+        throw new Error('Please select at least one symbol')
+      }
+      
+      const enabledIndicators = formData.indicators.filter(ind => ind.enabled)
+      if (enabledIndicators.length === 0) {
+        throw new Error('Please select at least one indicator')
+      }
+      
+      const hasTimeframes = enabledIndicators.every(ind => ind.timeframes.length > 0)
+      if (!hasTimeframes) {
+        throw new Error('Please select timeframes for all enabled indicators')
+      }
+      
+      // Convert back to old format for compatibility
+      const indicators: string[] = []
+      formData.indicators.forEach(ind => {
+        if (ind.enabled) {
+          ind.timeframes.forEach(tf => {
+            indicators.push(`${ind.name}_${tf}`)
+          })
+        }
+      })
+      
+      const configToSave: ExtractionConfig = {
+        symbols: formData.symbols,
+        sources: {
+          crypto_indicators_mcp: {
+            enabled: true,
+            indicators
+          }
+        }
+      }
+      
+      await updateAgentConfig('extraction', configToSave)
       setJustSaved(true)
-      setTimeout(() => setJustSaved(false), 2000) // Clear feedback after 2 seconds
+      setTimeout(() => setJustSaved(false), 2000)
     } catch (error) {
       setError(error instanceof Error ? error.message : 'Failed to save configuration')
     } finally {
@@ -182,226 +168,166 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
     }))
   }
 
-
-  const toggleSource = (source: string) => {
-    if (source === 'ggshot') {
-      setFormData(prev => ({
-        ...prev,
-        sources: {
-          ...prev.sources,
-          ggshot: {
-            ...prev.sources.ggshot!,
-            enabled: !prev.sources.ggshot!.enabled
-          }
-        }
-      }))
-    }
-  }
-
   const renderSymbolsTab = () => (
-    <div className="space-y-4">
+    <div className="space-y-6">
       <div>
-        <h3 className="text-lg font-medium mb-3">Trading Symbols</h3>
+        <h3 className="text-lg font-medium mb-3">Trading Pairs</h3>
         <p className="text-sm text-bone-400 mb-4">
-          Select the cryptocurrency pairs you want to analyze. Common pairs are shown below.
+          Select the cryptocurrency pairs to analyze. You can choose from common pairs or add custom ones.
         </p>
         
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
           {commonSymbols.map(symbol => (
             <button
               key={symbol}
               onClick={() => toggleSymbol(symbol)}
-              className={`p-3 text-sm border transition-colors ${
+              className={cn(
+                "p-3 text-sm font-medium rounded-lg border transition-all duration-200",
                 formData.symbols.includes(symbol)
-                  ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
-                  : 'bg-charcoal-700 border-bone-200/80 text-bone-300 hover:border-bone-200/90'
-              }`}
+                  ? "bg-agents-extraction/20 border-agents-extraction text-bone-200 shadow-sm"
+                  : "bg-charcoal-700/50 border-bone-200/40 text-bone-300 hover:border-bone-200/60"
+              )}
             >
               {symbol}
             </button>
           ))}
         </div>
         
-        <div className="mt-4">
-          <label className="block text-sm font-medium mb-2">Custom Symbol</label>
-          <input
-            type="text"
-            placeholder="e.g., DOGE/USDT"
-            className="w-full p-3 bg-charcoal-700 border border-bone-200/80 text-bone-200 placeholder-bone-400"
-            onKeyDown={(e) => {
-              if (e.key === 'Enter') {
-                const value = e.currentTarget.value.trim()
+        <div className="mt-6">
+          <label className="block text-sm font-medium mb-2">Add Custom Symbol</label>
+          <div className="flex gap-2">
+            <input
+              type="text"
+              placeholder="e.g., DOGE/USDT"
+              className="flex-1 p-3 bg-charcoal-700 border border-bone-200/40 rounded-lg text-bone-200 placeholder-bone-500 focus:border-agents-extraction focus:outline-none"
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  const value = e.currentTarget.value.trim().toUpperCase()
+                  if (value && !formData.symbols.includes(value)) {
+                    toggleSymbol(value)
+                    e.currentTarget.value = ''
+                  }
+                }
+              }}
+            />
+            <button
+              onClick={(e) => {
+                const input = e.currentTarget.previousElementSibling as HTMLInputElement
+                const value = input.value.trim().toUpperCase()
                 if (value && !formData.symbols.includes(value)) {
                   toggleSymbol(value)
-                  e.currentTarget.value = ''
+                  input.value = ''
                 }
-              }
-            }}
-          />
-        </div>
-      </div>
-    </div>
-  )
-
-
-  const renderDataSourcesTab = () => (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-medium mb-3">Data Sources</h3>
-        <p className="text-sm text-bone-400 mb-4">
-          Configure data sources for market analysis. ggShot provides high-confidence signals, while Technical Indicators offer detailed market analysis.
-        </p>
-      </div>
-
-      {/* ggShot Signals */}
-      <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h4 className="font-medium">ggShot Signals</h4>
-            <p className="text-sm text-bone-400">High-confidence trading signals from ggShot Telegram channel</p>
+              }}
+              className="px-4 py-3 bg-agents-extraction hover:bg-agents-extraction/80 text-charcoal-900 font-medium rounded-lg transition-colors"
+            >
+              Add
+            </button>
           </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.sources.ggshot?.enabled}
-              onChange={() => toggleSource('ggshot')}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:h-5 after:w-5 after:transition-all peer-checked:bg-agents-extraction"></div>
-          </label>
         </div>
-
-        {formData.sources.ggshot?.enabled && (
-          <div className="p-3 bg-blue-900/20 border border-blue-500/60">
-            <p className="text-sm text-blue-200">
-              ✅ ggShot signals will be processed for trading decisions. These are manually curated, high-confidence signals.
+        
+        {formData.symbols.length > 0 && (
+          <div className="mt-4 p-3 bg-bone-200/10 border border-bone-200/40 rounded-lg">
+            <p className="text-sm text-bone-300">
+              <strong>{formData.symbols.length}</strong> symbols selected
             </p>
           </div>
         )}
       </div>
+    </div>
+  )
 
-      {/* Technical Indicators */}
-      <div className="p-4 bg-charcoal-700/50 border border-bone-200/60">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h4 className="font-medium">Technical Indicators</h4>
-            <p className="text-sm text-bone-400">20 pre-processed indicators with timeframe integration (15m & 1h)</p>
-          </div>
-          <label className="relative inline-flex items-center cursor-pointer">
-            <input
-              type="checkbox"
-              checked={formData.sources.crypto_indicators_mcp?.enabled}
-              onChange={(e) => setFormData(prev => ({
-                ...prev,
-                sources: {
-                  ...prev.sources,
-                  crypto_indicators_mcp: {
-                    ...prev.sources.crypto_indicators_mcp!,
-                    enabled: e.target.checked
-                  }
-                }
-              }))}
-              className="sr-only peer"
-            />
-            <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:h-5 after:w-5 after:transition-all peer-checked:bg-agents-extraction"></div>
-          </label>
-        </div>
+  const renderIndicatorsTab = () => {
+    const enabledCount = formData.indicators.filter(ind => ind.enabled).length
+    const totalCombinations = formData.indicators.reduce((acc, ind) => 
+      acc + (ind.enabled ? ind.timeframes.length : 0), 0
+    )
 
-        {formData.sources.crypto_indicators_mcp?.enabled && (
-          <div className="space-y-6">
-            {/* Premium ggShot Indicator */}
-            <div>
-              <h4 className="text-sm font-medium text-bone-300 mb-3 flex items-center gap-2">
-                Premium Signals
-                <span className="text-xs bg-yellow-400/20 text-yellow-400 px-2 py-1 rounded">PREMIUM</span>
-              </h4>
-              {premiumIndicators.map(indicator => (
-                <div key={indicator.name} className="p-4 bg-gradient-to-r from-yellow-400/10 to-orange-400/10 border border-yellow-400/40 rounded">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="text-yellow-400">⭐</div>
-                      <div>
-                        <h5 className="font-medium text-yellow-400">{indicator.label}</h5>
-                        <p className="text-sm text-bone-300">{indicator.description}</p>
-                      </div>
-                    </div>
-                    <label className="relative inline-flex items-center cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={ggShotEnabled}
-                        onChange={(e) => setGgShotEnabled(e.target.checked)}
-                        className="sr-only peer"
-                      />
-                      <div className="w-11 h-6 bg-charcoal-600 peer-focus:outline-none peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:h-5 after:w-5 after:transition-all peer-checked:bg-yellow-500"></div>
-                    </label>
-                  </div>
-                </div>
+    return (
+      <div className="space-y-6">
+        {/* Header & Search */}
+        <div>
+          <h3 className="text-lg font-medium mb-3">Technical Indicators</h3>
+          <p className="text-sm text-bone-400 mb-4">
+            Select indicators and their timeframes. Premium indicators provide AI-enhanced signals.
+          </p>
+          
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-bone-500" size={18} />
+              <input
+                type="text"
+                placeholder="Search indicators..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-charcoal-700 border border-bone-200/40 rounded-lg text-bone-200 placeholder-bone-500 focus:border-agents-extraction focus:outline-none"
+              />
+            </div>
+            
+            <div className="flex gap-2 flex-wrap">
+              <button
+                onClick={() => setSelectedCategory('all')}
+                className={cn(
+                  "px-3 py-2 text-sm rounded-lg border transition-colors",
+                  selectedCategory === 'all'
+                    ? "bg-agents-extraction/20 border-agents-extraction text-bone-200"
+                    : "bg-charcoal-700 border-bone-200/40 text-bone-400 hover:border-bone-200/60"
+                )}
+              >
+                All
+              </button>
+              {Object.entries(CATEGORY_LABELS).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => setSelectedCategory(key as IndicatorCategory)}
+                  className={cn(
+                    "px-3 py-2 text-sm rounded-lg border transition-colors",
+                    selectedCategory === key
+                      ? "bg-agents-extraction/20 border-agents-extraction text-bone-200"
+                      : "bg-charcoal-700 border-bone-200/40 text-bone-400 hover:border-bone-200/60"
+                  )}
+                >
+                  {label}
+                </button>
               ))}
             </div>
+          </div>
+        </div>
 
-            {/* Technical Indicators */}
-            <div>
-              <h4 className="text-sm font-medium text-bone-300 mb-3">Technical Indicators</h4>
-              <div className="space-y-4">
-                {baseIndicators.map(indicator => (
-                  <div key={indicator.name} className="p-4 bg-charcoal-600/50 border border-bone-200/40 rounded">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="checkbox"
-                          checked={selectedIndicators.has(indicator.name)}
-                          onChange={() => toggleIndicator(indicator.name)}
-                          className="w-5 h-5 text-agents-extraction bg-charcoal-700 border-bone-200/60 rounded focus:ring-agents-extraction"
-                        />
-                        <div>
-                          <h5 className="font-medium text-bone-200">{indicator.label}</h5>
-                          <p className="text-sm text-bone-400">{indicator.description}</p>
-                        </div>
-                      </div>
-                    </div>
-                    
-                    {selectedIndicators.has(indicator.name) && (
-                      <div className="ml-8 pl-4 border-l border-bone-200/30">
-                        <p className="text-sm text-bone-300 mb-2">Select timeframes:</p>
-                        <div className="flex flex-wrap gap-2">
-                          {availableTimeframes.map(timeframe => (
-                            <button
-                              key={timeframe.value}
-                              onClick={() => toggleTimeframe(indicator.name, timeframe.value)}
-                              className={`px-3 py-1 text-sm border rounded transition-colors ${
-                                (indicatorTimeframes[indicator.name] || []).includes(timeframe.value)
-                                  ? 'bg-agents-extraction/20 border-agents-extraction text-bone-200'
-                                  : 'bg-charcoal-700 border-bone-200/60 text-bone-300 hover:border-bone-200/80'
-                              }`}
-                            >
-                              {timeframe.label}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-              
-              {/* Selection summary */}
-              <div className="mt-4 p-3 bg-bone-200/10 border border-bone-200/60 rounded">
-                <p className="text-sm text-bone-300">
-                  <strong>{selectedIndicators.size}</strong> indicators selected with{' '}
-                  <strong>{formData.sources.crypto_indicators_mcp!.indicators.length}</strong> total timeframe combinations
-                </p>
-              </div>
-            </div>
+        {/* Indicators Grid */}
+        <div className="grid gap-4 md:grid-cols-2">
+          {filteredIndicators.map(indicator => {
+            const config = formData.indicators.find(ind => ind.name === indicator.name)!
+            return (
+              <IndicatorCard
+                key={indicator.name}
+                indicator={indicator}
+                selected={config.enabled}
+                selectedTimeframes={config.timeframes}
+                onToggle={(enabled) => handleToggleIndicator(indicator.name, enabled)}
+                onTimeframeChange={(timeframes) => handleTimeframeChange(indicator.name, timeframes)}
+              />
+            )
+          })}
+        </div>
+
+        {/* Summary */}
+        {enabledCount > 0 && (
+          <div className="p-4 bg-bone-200/10 border border-bone-200/40 rounded-lg">
+            <p className="text-sm text-bone-300">
+              <strong>{enabledCount}</strong> indicators selected with{' '}
+              <strong>{totalCombinations}</strong> total timeframe combinations
+            </p>
           </div>
         )}
       </div>
-    </div>
-  )
+    )
+  }
 
   const renderTabContent = () => {
     switch (activeTab) {
       case 0: return renderSymbolsTab()
-      case 1: return renderDataSourcesTab()
+      case 1: return renderIndicatorsTab()
       default: return null
     }
   }
@@ -411,19 +337,20 @@ export function ExtractionConfigForm({ activeTab, config }: ExtractionConfigForm
       {renderTabContent()}
       
       {/* Save Button */}
-      <div className="flex justify-end pt-4 border-t border-bone-200/60">
+      <div className="flex justify-end pt-4 border-t border-bone-200/40">
         <button
           onClick={handleSave}
           disabled={isSaving}
-          className={`px-6 py-3 font-medium transition-colors ${
+          className={cn(
+            "px-6 py-3 font-medium rounded-lg transition-all duration-200",
             justSaved
-              ? 'bg-green-500 text-white'
+              ? "bg-green-500 text-white"
               : isSaving
-                ? 'bg-agents-extraction/50 text-charcoal-900/70 cursor-not-allowed'
-                : 'bg-agents-extraction hover:bg-agents-extraction/80 text-charcoal-900'
-          }`}
+                ? "bg-agents-extraction/50 text-charcoal-900/70 cursor-not-allowed"
+                : "bg-agents-extraction hover:bg-agents-extraction/80 text-charcoal-900"
+          )}
         >
-          {justSaved ? '✓ Saved!' : isSaving ? 'Saving...' : 'Save Configuration'}
+          {justSaved ? '✓ Saved Successfully!' : isSaving ? 'Saving...' : 'Save Configuration'}
         </button>
       </div>
     </div>
