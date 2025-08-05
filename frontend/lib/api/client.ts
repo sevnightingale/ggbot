@@ -14,6 +14,7 @@ class ApiClient {
   private baseUrl: string
   private userId: string
   private readonly timeout: number = 8000 // 8 second timeout
+  private requestCache = new Map<string, Promise<any>>()
 
   constructor() {
     this.baseUrl = API_URL
@@ -39,43 +40,63 @@ class ApiClient {
 
   private async request<T>(path: string, options?: RequestInit): Promise<T> {
     const url = `${this.baseUrl}${path}`
+    const cacheKey = `${path}-${JSON.stringify(options)}`
+    
+    // Check if request is already in progress
+    if (this.requestCache.has(cacheKey)) {
+      console.log('Reusing existing request for:', path)
+      return this.requestCache.get(cacheKey)
+    }
+    
     console.log('Making API request to:', url)
     
     // Create AbortController for timeout
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), this.timeout)
     
-    try {
-      const response = await fetch(url, {
-        ...options,
-        signal: controller.signal,
-        headers: {
-          'Content-Type': 'application/json',
-          ...options?.headers,
-        },
-      })
+    const requestPromise = (async () => {
+      try {
+        const response = await fetch(url, {
+          ...options,
+          signal: controller.signal,
+          headers: {
+            'Content-Type': 'application/json',
+            ...options?.headers,
+          },
+        })
 
-      clearTimeout(timeoutId)
+        clearTimeout(timeoutId)
 
-      if (!response.ok) {
-        console.error(`API Error: ${response.status} ${response.statusText}`)
-        throw new Error(`API Error: ${response.status} ${response.statusText}`)
+        if (!response.ok) {
+          console.error(`API Error: ${response.status} ${response.statusText}`)
+          throw new Error(`API Error: ${response.status} ${response.statusText}`)
+        }
+
+        const data = await response.json()
+        console.log('API request successful:', path)
+        return data
+      } catch (error) {
+        clearTimeout(timeoutId)
+        
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.error('API request timed out:', path)
+          throw new Error(`Request timeout: ${path}`)
+        }
+        
+        console.error('API request failed:', path, error)
+        throw error
       }
-
-      const data = await response.json()
-      console.log('API request successful:', path)
-      return data
-    } catch (error) {
-      clearTimeout(timeoutId)
-      
-      if (error instanceof Error && error.name === 'AbortError') {
-        console.error('API request timed out:', path)
-        throw new Error(`Request timeout: ${path}`)
-      }
-      
-      console.error('API request failed:', path, error)
-      throw error
-    }
+    })()
+    
+    // Cache the request
+    this.requestCache.set(cacheKey, requestPromise)
+    
+    // Remove from cache when complete (success or failure)
+    requestPromise.finally(() => {
+      this.requestCache.delete(cacheKey)
+    })
+    
+    return requestPromise
   }
 
   // Test API connection
