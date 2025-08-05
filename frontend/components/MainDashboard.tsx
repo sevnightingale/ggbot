@@ -61,7 +61,7 @@ export function MainDashboard() {
     }
 
     loadInitialData()
-  }, []) // Empty dependency array - runs only once
+  }, []) // Empty array is INTENTIONAL - we use hasInitialized.current to prevent re-runs
 
   // Separate effect for periodic refresh - only after initialization
   useEffect(() => {
@@ -70,15 +70,17 @@ export function MainDashboard() {
     console.log('MainDashboard: Setting up periodic refresh (30s)')
     const interval = setInterval(() => {
       console.log('MainDashboard: Periodic refresh triggered')
-      loadTrades()
-      checkSchedulerStatus()
+      // Get fresh references from store on each interval tick
+      const store = useBotStore.getState()
+      store.loadTrades()
+      store.checkSchedulerStatus()
     }, 30000)
 
     return () => {
       console.log('MainDashboard: Cleaning up periodic refresh')
       clearInterval(interval)
     }
-  }, [isInitializing]) // Only depends on initialization state
+  }, [isInitializing]) // Only re-setup interval when initialization changes
 
   if (isLoading || isInitializing) {
     return (

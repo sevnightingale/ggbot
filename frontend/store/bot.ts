@@ -110,11 +110,13 @@ export const useBotStore = create<BotState>((set, get) => ({
       // Select first config if available, otherwise leave empty
       const defaultConfigId = configs.length > 0 ? configs[0].config_id : null
       
-      set({ 
+      // Single atomic state update to prevent multiple re-renders
+      set((state) => ({
+        ...state,
         availableBots: configs,
         currentBotId: defaultConfigId,
         isLoading: false
-      })
+      }))
       
     } catch (error) {
       console.error('Error loading bots:', error)
@@ -138,15 +140,16 @@ export const useBotStore = create<BotState>((set, get) => ({
       const state = get()
       const updatedBots = [...state.availableBots, newConfig]
       
-      set({
+      // Single atomic update - set both bot list and current bot
+      set((state) => ({
+        ...state,
         availableBots: updatedBots,
         currentBotId: newConfig.config_id,
         currentConfig: newConfig,
         isLoading: false
-      })
+      }))
       
-      // Load the new config and switch to it
-      await get().selectBot(newConfig.config_id)
+      // Don't call selectBot here - it causes cascading updates
     } catch (error) {
       console.error('Error creating bot:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to create bot', isLoading: false })
@@ -279,16 +282,13 @@ export const useBotStore = create<BotState>((set, get) => ({
         }
       }
       
-      set({
+      // Single atomic update - don't call selectBot to avoid cascades
+      set((state) => ({
+        ...state,
         availableBots: updatedBots,
         currentBotId: newCurrentBotId,
         currentConfig: null // Clear current config
-      })
-      
-      // Load the new bot if we switched
-      if (state.currentBotId === botId && newCurrentBotId) {
-        await get().selectBot(newCurrentBotId)
-      }
+      }))
     } catch (error) {
       console.error('Error deleting bot:', error)
       set({ error: error instanceof Error ? error.message : 'Failed to delete bot' })
