@@ -97,8 +97,24 @@ export const useBotStore = create<BotState>((set, get) => ({
     try {
       set({ isLoading: true, error: null })
       
-      // Load all user configs from API
-      const configs = await api.getUserConfigs()
+      // Test API connection first
+      const isConnected = await api.testConnection()
+      console.log('API connection test result:', isConnected)
+      
+      let configs: UnifiedConfig[] = []
+      
+      if (isConnected) {
+        try {
+          // Load all user configs from API
+          configs = await api.getUserConfigs()
+          console.log('Loaded configs from API:', configs.length)
+        } catch (apiError) {
+          console.warn('Failed to load configs from API, using demo fallback:', apiError)
+          configs = []
+        }
+      } else {
+        console.warn('API not available, using demo fallback')
+      }
       
       // Default to ggShot flagship if available, otherwise first config, otherwise create demo
       let defaultConfigId = configs.find(c => c.config_id === GGSHOT_CONFIG_ID)?.config_id
@@ -107,25 +123,27 @@ export const useBotStore = create<BotState>((set, get) => ({
         defaultConfigId = configs[0].config_id
       }
       
-      // Only add demo bot if no real configs exist
+      // Always add demo bot as fallback
+      const demoConfig: UnifiedConfig = {
+        config_id: DEMO_CONFIG_ID,
+        config_name: "Demo Bot - Showcase",
+        config_type: "demo",
+        user_id: api.currentUserId,
+        config_data: {
+          extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
+          decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
+          trading: { exchange: 'demo', exchange_id: '', authentication: '', risk_rules: { max_leverage: 3, max_position_size_pct: 0.05, max_risk_per_trade_pct: 0.02, min_equity_protection: 0.8 } }
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        editable: true,
+        is_flagship: false,
+        paper_balance: 10000
+      }
+      configs.push(demoConfig)
+      
+      // Default to demo if no real configs available
       if (!defaultConfigId) {
-        const demoConfig: UnifiedConfig = {
-          config_id: DEMO_CONFIG_ID,
-          config_name: "Demo Bot - Showcase",
-          config_type: "demo",
-          user_id: api.currentUserId,
-          config_data: {
-            extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
-            decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
-            trading: { exchange: 'demo', exchange_id: '', authentication: '', risk_rules: { max_leverage: 3, max_position_size_pct: 0.05, max_risk_per_trade_pct: 0.02, min_equity_protection: 0.8 } }
-          },
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          editable: true,
-          is_flagship: false,
-          paper_balance: 10000
-        }
-        configs.push(demoConfig)
         defaultConfigId = DEMO_CONFIG_ID
       }
       
@@ -141,7 +159,33 @@ export const useBotStore = create<BotState>((set, get) => ({
       }
     } catch (error) {
       console.error('Error loading bots:', error)
-      set({ error: error instanceof Error ? error.message : 'Failed to load bots', isLoading: false })
+      // Still show demo bot even if everything fails
+      const demoConfig: UnifiedConfig = {
+        config_id: DEMO_CONFIG_ID,
+        config_name: "Demo Bot - Showcase",
+        config_type: "demo",
+        user_id: api.currentUserId,
+        config_data: {
+          extraction: { symbols: ['BTC/USDT'], sources: { crypto_indicators_mcp: { enabled: true, indicators: [] } } },
+          decision: { llm_provider: 'deepseek', system_prompt: '', strategy: '', additional_context: '' },
+          trading: { exchange: 'demo', exchange_id: '', authentication: '', risk_rules: { max_leverage: 3, max_position_size_pct: 0.05, max_risk_per_trade_pct: 0.02, min_equity_protection: 0.8 } }
+        },
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+        editable: true,
+        is_flagship: false,
+        paper_balance: 10000
+      }
+      
+      set({ 
+        availableBots: [demoConfig],
+        currentBotId: DEMO_CONFIG_ID,
+        error: `API connection failed, showing demo mode. Error: ${error instanceof Error ? error.message : 'Unknown error'}`,
+        isLoading: false
+      })
+      
+      // Load demo config
+      await get().selectBot(DEMO_CONFIG_ID)
     }
   },
 
