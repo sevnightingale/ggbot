@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { ChevronLeft, ChevronRight, Plus, Play, Square, TestTube, Edit3, Check, X, Trash2, Crown } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Plus, Play, Square, TestTube, Edit3, Check, X, Trash2 } from 'lucide-react'
 import { useBotStore } from '@/store/bot'
 import { SchedulerStatus } from '@/types'
 
@@ -20,8 +20,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
     createBot,
     selectBot,
     updateBotName,
-    deleteBot,
-    loadBots
+    deleteBot
   } = useBotStore()
   const [currentBotIndex, setCurrentBotIndex] = useState(0)
   const [isEditingName, setIsEditingName] = useState(false)
