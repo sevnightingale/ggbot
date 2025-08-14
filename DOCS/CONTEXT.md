@@ -101,7 +101,7 @@
   │       └── demo_bot.py            # Demo bot logic
   └── api/
       ├── bot_control_api.py         # Start/stop bots (toggle status)
-      └── dashboard_api.py           # Extended WebSocket for bot status
+      └── (WebSocket integration TBD) # Real-time status broadcasting
 
   Core Service Components:
 

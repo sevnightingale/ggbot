@@ -72,7 +72,7 @@
 - ✅ Universal architecture ready for demo bots
 
 ### Active Tasks
-1. **Frontend WebSocket integration** (connect monitoring service to dashboard)
+1. **Frontend WebSocket integration** (connect monitoring service to frontend)
 2. **Bot control API endpoints** (start/stop demo bots)
 3. **Demo bot configuration system** (12 pre-built configs)
 4. **Continue ggShot filter test** (ongoing 2-week evaluation)
@@ -84,7 +84,7 @@
 ### Application Ports
 | Port | Service | Protocol | Access | Purpose |
 |------|---------|----------|--------|---------|
-| **8000** | ggbots-api | HTTP | Public | Main API server (extraction, decision, trading, dashboard) |
+| **8000** | ggbots-api | HTTP | Public | Main API server (extraction, decision, trading, agent control) |
 | **8080** | Node.js | HTTP | Local | Active Node.js process (PID 214156) |
 | **15888** | hummingbot-api | HTTP | Internal | Trading execution & monitoring |
 
@@ -117,7 +117,7 @@
 ## 🔄 Background Tasks
 
 - **Bot Status Monitoring**: Every 10s (active bot pipeline tracking)
-- **WebSocket Updates**: Every 30s (dashboard clients)  
+- **WebSocket Updates**: Every 30s (when implemented)  
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
 - **Autonomous Trading**: DISABLED

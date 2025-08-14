@@ -254,10 +254,9 @@ class ActiveBotMonitor:
         """
         if self.websocket_manager:
             try:
-                # Broadcast to all connected users
-                # TODO: Filter by user_id when user management is implemented
-                message = json.dumps(status_data)
-                await self.websocket_manager.broadcast(message)
+                # Broadcast to all connected users via dashboard WebSocket manager
+                for user_id in self.websocket_manager.active_connections:
+                    await self.websocket_manager.broadcast_to_user(user_id, status_data)
                 
             except Exception as e:
                 logger.bind(module="active_bot_monitor").error(

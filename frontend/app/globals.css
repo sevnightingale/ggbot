@@ -88,6 +88,7 @@ body {
 }
 
 /* Status-specific quadrant borders */
+.ggbot-circle.ggbot-extraction::before,
 .ggbot-circle.ggbot-extracting::before {
   background: 
     /* Top-left quadrant - blue */
@@ -96,10 +97,12 @@ body {
     radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
 }
 
+.ggbot-circle.ggbot-extraction,
 .ggbot-circle.ggbot-extracting {
   animation: rotatingShadowBlue 4s linear infinite;
 }
 
+.ggbot-circle.ggbot-decision::before,
 .ggbot-circle.ggbot-deciding::before {
   background: 
     /* Top-left quadrant - green */
@@ -108,6 +111,7 @@ body {
     radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
 }
 
+.ggbot-circle.ggbot-decision,
 .ggbot-circle.ggbot-deciding {
   animation: rotatingShadowGreen 3.5s linear infinite;
 }
@@ -125,11 +129,15 @@ body {
 }
 
 /* Message text colors by status - both inline and external */
+.ggbot-container.ggbot-extraction .ggbot-message-text,
+.ggbot-container.ggbot-extraction .ggbot-message-text-inline,
 .ggbot-container.ggbot-extracting .ggbot-message-text,
 .ggbot-container.ggbot-extracting .ggbot-message-text-inline {
   color: #38a1c7; /* Extraction blue */
 }
 
+.ggbot-container.ggbot-decision .ggbot-message-text,
+.ggbot-container.ggbot-decision .ggbot-message-text-inline,
 .ggbot-container.ggbot-deciding .ggbot-message-text,
 .ggbot-container.ggbot-deciding .ggbot-message-text-inline {
   color: #2cbe77; /* Decision green */
@@ -141,12 +149,14 @@ body {
 }
 
 /* Hover states for status colors */
+.ggbot-circle.ggbot-extraction:hover:not(.ggbot-disabled),
 .ggbot-circle.ggbot-extracting:hover:not(.ggbot-disabled) {
   box-shadow: 
     10px 10px 20px rgba(0, 0, 0, 0.95),
     -10px -10px 20px rgba(56, 161, 199, 0.2);
 }
 
+.ggbot-circle.ggbot-decision:hover:not(.ggbot-disabled),
 .ggbot-circle.ggbot-deciding:hover:not(.ggbot-disabled) {
   box-shadow: 
     10px 10px 20px rgba(0, 0, 0, 0.95),
@@ -468,4 +478,57 @@ a {
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
   }
+}
+
+/* Status for all messaging contexts - consistent color system */
+.ggbot-status-text-inactive, .ggbot-message-text.ggbot-status-inactive, .ggbot-message-text-inline.ggbot-status-inactive { color: var(--bone-300); }
+.ggbot-status-text-idle, .ggbot-message-text.ggbot-status-idle, .ggbot-message-text-inline.ggbot-status-idle { color: var(--agent-extraction); }
+.ggbot-status-text-extracting, .ggbot-message-text.ggbot-status-extracting, .ggbot-message-text-inline.ggbot-status-extracting { color: var(--agent-extraction); }
+.ggbot-status-text-deciding, .ggbot-message-text.ggbot-status-deciding, .ggbot-message-text-inline.ggbot-status-deciding { color: var(--agent-decision); }
+.ggbot-status-text-trading, .ggbot-message-text.ggbot-status-trading, .ggbot-message-text-inline.ggbot-status-trading { color: var(--agent-trading); }
+
+/* Control Modal Styles */
+
+/* Custom slider styling for brutalist aesthetic */
+.slider {
+  -webkit-appearance: none;
+  appearance: none;
+  background: var(--charcoal-800);
+  outline: none;
+  border: 2px solid var(--charcoal-600);
+  height: 8px;
+}
+
+.slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: var(--agent-extraction);
+  border: 2px solid var(--charcoal-900);
+  cursor: pointer;
+  /* No border radius for brutalist style */
+  border-radius: 0;
+}
+
+.slider::-moz-range-thumb {
+  width: 24px;
+  height: 24px;
+  background: var(--agent-extraction);
+  border: 2px solid var(--charcoal-900);
+  cursor: pointer;
+  /* No border radius for brutalist style */
+  border-radius: 0;
+}
+
+.slider:focus {
+  border-color: var(--agent-extraction);
+}
+
+.slider::-webkit-slider-thumb:hover {
+  background: #4ab3d9;
+}
+
+.slider::-moz-range-thumb:hover {
+  background: #4ab3d9;
 }

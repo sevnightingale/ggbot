@@ -22,8 +22,7 @@ core/
 ├── README.md                          # This file
 ├── api/                              # REST API endpoints and services
 │   ├── config_api.py                 # NEW: Strategy configuration management
-│   ├── dashboard_api.py              # Enhanced: Performance and monitoring APIs
-│   └── agent_control_api.py          # Service control and health checks
+│   └── agent_control_api.py          # Bot control and service management
 ├── common/                           # Shared utilities and services
 │   ├── config.py                     # Environment and configuration management
 │   ├── db.py                         # Database connection and utilities
@@ -61,20 +60,20 @@ core/
 - Risk parameter adjustment by risk level (low/medium/high)
 - Template-specific indicator selection
 
-### **2. Enhanced Dashboard API** ⭐ ENHANCED
+### **2. Bot Control API** ⭐ NEW
 ```python
-# /core/api/dashboard_api.py  
-@app.get("/api/dashboard/strategies/{user_id}")      # List all strategies with P&L
-@app.get("/api/dashboard/performance/{config_id}")   # Detailed performance metrics  
-@app.get("/api/dashboard/trades/{config_id}")        # Recent trade history
-@app.websocket("/ws/dashboard/{user_id}")            # Real-time updates
+# /core/api/agent_control_api.py  
+@app.get("/api/bots")                               # List all bot configurations
+@app.post("/api/bots/{config_id}/start")            # Start/activate a bot
+@app.post("/api/bots/{config_id}/stop")             # Stop/deactivate a bot
+@app.get("/api/bots/{config_id}/status")            # Get detailed bot status
 ```
 
-**Performance Integration:**
-- **Dual-Database Queries**: ggBot (strategy_runs) + Hummingbot (trade_fills)
-- **Real-Time P&L**: Live calculation from actual paper trades
-- **Multi-Strategy View**: Portfolio-level performance analytics
-- **WebSocket Updates**: Live position and P&L streaming
+**Bot Management Features:**
+- **Config-Based Control**: Start/stop bots by configuration ID
+- **Real-Time Status**: Live bot activity and pipeline monitoring
+- **Universal Support**: Works with all bot types (ggshot, demo, etc.)
+- **Production Ready**: Integrated with existing PM2 services
 
 ### **3. Permissions System** ⭐ NEW
 **Flagship Protection:**

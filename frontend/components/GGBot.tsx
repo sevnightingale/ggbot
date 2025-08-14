@@ -5,7 +5,7 @@ interface GGBotProps {
   message?: string
   onClick?: () => void
   disabled?: boolean
-  status?: 'inactive' | 'idle' | 'extracting' | 'deciding' | 'trading'
+  status?: 'idle' | 'extraction' | 'decision' | 'trading'
   showSpinner?: boolean
   className?: string
 }
@@ -15,7 +15,7 @@ const GGBot: React.FC<GGBotProps> = ({
   message = '',
   onClick,
   disabled = false,
-  status = 'inactive',
+  status = 'idle',
   showSpinner = false,
   className = ''
 }) => {
@@ -23,14 +23,14 @@ const GGBot: React.FC<GGBotProps> = ({
   const [spinnerIndex, setSpinnerIndex] = React.useState(0)
 
   React.useEffect(() => {
-    if (showSpinner && status !== 'inactive') {
+    if (showSpinner) {
       const interval = setInterval(() => {
         setSpinnerIndex((prev) => (prev + 1) % spinnerChars.length)
       }, 80)
       return () => clearInterval(interval)
     }
     return undefined
-  }, [showSpinner, status, spinnerChars.length])
+  }, [showSpinner, spinnerChars.length])
 
   return (
     <div className={`ggbot-container ggbot-${status} ${className}`}>
@@ -44,7 +44,7 @@ const GGBot: React.FC<GGBotProps> = ({
           <div className="ggbot-name">{name}</div>
           {message && (
             <div className="ggbot-message-inline">
-              {showSpinner && status !== 'inactive' && (
+              {showSpinner && status !== 'idle' && (
                 <span className="ggbot-spinner-inline">{spinnerChars[spinnerIndex]}</span>
               )}
               <span className="ggbot-message-text-inline">{message}</span>
