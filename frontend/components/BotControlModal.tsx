@@ -131,6 +131,36 @@ export default function BotControlModal({
           {/* Status Bar - Compact */}
           <div className="flex items-center justify-between px-8 py-4 border-b border-charcoal-600 bg-charcoal-800/30 flex-shrink-0">
               <div className="flex items-center gap-4">
+                {/* Bot Name with Edit */}
+                <div className="flex items-center gap-2">
+                  {isEditingName ? (
+                    <input
+                      type="text"
+                      value={formData.name}
+                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                      onBlur={() => setIsEditingName(false)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') setIsEditingName(false)
+                      }}
+                      className="bg-charcoal-900 border border-charcoal-600 text-bone px-2 py-1 text-body focus:border-agent-extraction transition-colors"
+                      autoFocus
+                    />
+                  ) : (
+                    <>
+                      <span className="text-body font-medium text-bone">{formData.name}</span>
+                      <button
+                        onClick={() => setIsEditingName(true)}
+                        className="text-gray-400 hover:text-bone transition-colors"
+                        title="Edit name"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/>
+                        </svg>
+                      </button>
+                    </>
+                  )}
+                </div>
+                <span className="text-gray-500">•</span>
                 <div className={`flex items-center gap-3 ${getStatusColor(bot.status.phase)}`}>
                   <div className="w-4 h-4 bg-current"></div>
                   <span className="text-body font-medium">{getStatusLabel(bot.status.phase)}</span>
