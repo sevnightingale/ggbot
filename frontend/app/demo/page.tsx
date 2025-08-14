@@ -83,8 +83,8 @@ export default function DemoPage() {
         </div>
 
         {/* Dots navigation with + */}
-        <div className="flex items-center justify-center gap-3 relative">
-          {/* Centered dots */}
+        <div className="relative flex justify-center">
+          {/* Centered dots - positioned to align with ggbot center */}
           <div className="flex items-center gap-3">
             {demoBots.map((_, index) => (
               <button
@@ -99,9 +99,9 @@ export default function DemoPage() {
             ))}
           </div>
           
-          {/* Plus button positioned to the right */}
+          {/* Plus button positioned absolutely to the right */}
           <button
-            className="w-6 h-6 rounded-full border-2 border-bone-300 flex items-center justify-center text-bone-300 hover:text-bone-200 hover:border-bone-200 transition-all duration-200 ml-4"
+            className="absolute left-full ml-4 w-6 h-6 rounded-full border-2 border-bone-300 flex items-center justify-center text-bone-300 hover:text-bone-200 hover:border-bone-200 transition-all duration-200"
             onClick={() => handleBotClick('Create New')}
           >
             <span className="text-sm font-bold">+</span>
