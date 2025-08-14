@@ -26,10 +26,14 @@ export default function DemoPage() {
     }
   ]
 
-  const currentBot = demoBots[currentBotIndex]
+  // Add virtual "create bot" state
+  const isCreatingBot = currentBotIndex >= demoBots.length
+  const currentBot = isCreatingBot 
+    ? { name: "Create New", status: "inactive" as const, message: "Click to configure your ggbot", showSpinner: false }
+    : demoBots[currentBotIndex]
 
   const handleBotClick = (botName: string) => {
-    if (botName === 'Create New') {
+    if (botName === 'Create New' || isCreatingBot) {
       console.log('Opening configuration modal...')
       return
     }
@@ -37,17 +41,17 @@ export default function DemoPage() {
   }
 
   const nextBot = () => {
-    setCurrentBotIndex((prev) => (prev + 1) % demoBots.length)
+    setCurrentBotIndex((prev) => prev + 1)
   }
 
   const prevBot = () => {
-    setCurrentBotIndex((prev) => (prev - 1 + demoBots.length) % demoBots.length)
+    setCurrentBotIndex((prev) => Math.max(0, prev - 1))
   }
 
   return (
     <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
       <div className="flex flex-col items-center">
-        {/* ggbot with flanking arrows */}
+        {/* ggbot with flanking arrows/plus */}
         <div className="flex items-center gap-16 mb-6">
           <button 
             className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
@@ -70,21 +74,15 @@ export default function DemoPage() {
           />
           
           <button 
-            className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
-              currentBotIndex === demoBots.length - 1 
-                ? 'text-bone-500 cursor-not-allowed opacity-50' 
-                : 'text-bone-300 hover:text-bone-200 hover:scale-110'
-            }`}
-            onClick={nextBot}
-            disabled={currentBotIndex === demoBots.length - 1}
+            className="text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center text-bone-300 hover:text-bone-200 hover:scale-110"
+            onClick={isCreatingBot ? () => handleBotClick('Create New') : nextBot}
           >
-            ▶
+            {isCreatingBot ? '○' : (currentBotIndex === demoBots.length - 1 ? '+' : '▶')}
           </button>
         </div>
 
-        {/* Dots navigation with + */}
-        <div className="relative flex justify-center">
-          {/* Centered dots - positioned to align with ggbot center */}
+        {/* Dots navigation */}
+        <div className="flex justify-center">
           <div className="flex items-center gap-3">
             {demoBots.map((_, index) => (
               <button
@@ -97,15 +95,13 @@ export default function DemoPage() {
                 onClick={() => setCurrentBotIndex(index)}
               />
             ))}
+            {isCreatingBot && (
+              <button
+                className="w-3 h-3 rounded-full bg-bone-200 transition-all duration-200"
+                onClick={() => setCurrentBotIndex(demoBots.length)}
+              />
+            )}
           </div>
-          
-          {/* Plus button positioned absolutely to the right */}
-          <button
-            className="absolute left-full ml-4 w-6 h-6 rounded-full border-2 border-bone-300 flex items-center justify-center text-bone-300 hover:text-bone-200 hover:border-bone-200 transition-all duration-200"
-            onClick={() => handleBotClick('Create New')}
-          >
-            <span className="text-sm font-bold">+</span>
-          </button>
         </div>
       </div>
     </div>

@@ -56,11 +56,14 @@ class GGShotBotHandler(BaseBotHandler):
         # Get timing for different pipeline activities
         signal_time = self.get_time_since_last_activity(
             'market_data',
+            time_column='updated_at',
             where_clause="source = 'telegram' AND config_id IS NULL"
         )
         
         decision_time = self.get_time_since_last_activity(
-            'ggshot_filter'
+            'ggshot_filter',
+            time_column='created_at',
+            include_user_filter=False  # ggshot_filter doesn't have user_id
         )
         
         # ggShot-specific phase detection logic
@@ -117,6 +120,7 @@ class GGShotBotHandler(BaseBotHandler):
         """Detect extraction sub-phase based on timing."""
         signal_time = self.get_time_since_last_activity(
             'market_data',
+            time_column='updated_at',
             where_clause="source = 'telegram' AND config_id IS NULL"
         )
         
@@ -136,9 +140,14 @@ class GGShotBotHandler(BaseBotHandler):
     
     async def _detect_decision_sub_phase(self) -> str:
         """Detect decision sub-phase based on timing and logs."""
-        decision_time = self.get_time_since_last_activity('ggshot_filter')
+        decision_time = self.get_time_since_last_activity(
+            'ggshot_filter',
+            time_column='created_at',
+            include_user_filter=False
+        )
         signal_time = self.get_time_since_last_activity(
             'market_data', 
+            time_column='updated_at',
             where_clause="source = 'telegram' AND config_id IS NULL"
         )
         
@@ -207,6 +216,7 @@ class GGShotBotHandler(BaseBotHandler):
         # Get time since last signal for idle messages
         signal_time = self.get_time_since_last_activity(
             'market_data',
+            time_column='updated_at',
             where_clause="source = 'telegram' AND config_id IS NULL"  
         )
         if signal_time:
