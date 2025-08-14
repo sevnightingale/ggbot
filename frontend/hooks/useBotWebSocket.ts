@@ -21,12 +21,12 @@ export function useBotWebSocket(userId: string, wsUrl?: string) {
   useEffect(() => {
     let isMounted = true
     
-    const initializeConnection = async () => {
+    const initializeConnection = async (): Promise<(() => void) | undefined> => {
       try {
         // First, load bots from the API
         await loadBots(userId)
         
-        if (!isMounted) return // Component unmounted during load
+        if (!isMounted) return undefined // Component unmounted during load
         
         // Determine WebSocket URL
         let finalWsUrl = wsUrl
@@ -44,7 +44,7 @@ export function useBotWebSocket(userId: string, wsUrl?: string) {
         // Connect to WebSocket
         await connectWebSocket(userId, finalWsUrl)
         
-        if (!isMounted) return
+        if (!isMounted) return undefined
         
         // Subscribe to all user's bots after connection
         const subscribeTimer = setTimeout(() => {
@@ -59,6 +59,7 @@ export function useBotWebSocket(userId: string, wsUrl?: string) {
         return () => clearTimeout(subscribeTimer)
       } catch (error) {
         console.error('Failed to initialize bot WebSocket connection:', error)
+        return undefined
       }
     }
     

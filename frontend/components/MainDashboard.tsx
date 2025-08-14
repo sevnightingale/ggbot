@@ -61,7 +61,8 @@ export function MainDashboard() {
     }
 
     loadInitialData()
-  }, []) // Empty array is INTENTIONAL - we use hasInitialized.current to prevent re-runs
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+  // Empty array is INTENTIONAL - we use hasInitialized.current to prevent re-runs
 
   // Separate effect for periodic refresh - only after initialization
   useEffect(() => {

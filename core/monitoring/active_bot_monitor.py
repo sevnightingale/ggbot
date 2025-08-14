@@ -170,9 +170,10 @@ class ActiveBotMonitor:
             bot_config: Bot configuration dictionary
         """
         try:
-            config_id = bot_config['config_id']
-            bot_type = bot_config['config_type']
-            bot_name = bot_config['config_name'] or f"Bot {config_id[:8]}"
+            config_id = str(bot_config['config_id'])
+            bot_type = str(bot_config['config_type'])
+            user_id = str(bot_config['user_id'])
+            bot_name = bot_config.get('config_name') or f"Bot {config_id[:8]}"
             
             # Create or get bot handler
             if config_id not in self.bot_handlers:
@@ -202,23 +203,35 @@ class ActiveBotMonitor:
             # Create bot_id for WebSocket
             bot_id = self.generate_bot_id(config_id, bot_type)
             
-            # Broadcast status update
+            # Create status update message
+            status_update = {
+                "type": "bot_status_update",
+                "bot_id": bot_id,
+                "bot_type": bot_type,
+                "config_id": config_id,
+                "bot_name": bot_name,
+                "user_id": user_id,
+                "status": {
+                    "phase": current_phase,
+                    "sub_phase": sub_phase,
+                    "color": self.get_phase_color(current_phase),
+                    "message": status_message,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "showSpinner": current_phase in ["extraction", "decision", "trading"],
+                    "context": context_data
+                }
+            }
+            
+            # Broadcast to the bot's user
             if self.websocket_manager:
-                await self.broadcast_bot_status(bot_id, {
-                    "type": "bot_status_update",
-                    "bot_id": bot_id,
-                    "bot_type": bot_type,
-                    "config_id": config_id,
-                    "bot_name": bot_name,
-                    "status": {
-                        "phase": current_phase,
-                        "sub_phase": sub_phase,
-                        "color": self.get_phase_color(current_phase),
-                        "message": status_message,
-                        "timestamp": datetime.utcnow().isoformat() + "Z",
-                        "context": context_data
-                    }
-                })
+                # Send to the specific user who owns this bot
+                if hasattr(self.websocket_manager, 'active_connections'):
+                    if user_id in self.websocket_manager.active_connections:
+                        await self.websocket_manager.broadcast_to_user(user_id, status_update)
+                    
+                    # Also broadcast to all connected users for demo purposes
+                    for connected_user_id in self.websocket_manager.active_connections:
+                        await self.websocket_manager.broadcast_to_user(connected_user_id, status_update)
             
             logger.bind(module="active_bot_monitor").debug(
                 f"Bot {bot_id}: {current_phase} - {status_message}"
