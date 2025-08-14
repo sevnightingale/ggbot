@@ -100,35 +100,30 @@ export default function BotControlModal({
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="modal-background bg-charcoal-900 border-2 border-charcoal-700 w-full max-w-4xl h-[90vh] flex flex-col relative">
-        {/* Header */}
-        <div className="flex items-center justify-between p-8 border-b border-charcoal-700">
-          <h1 className="text-header text-bone">
-            {bot.name} Control Panel
-          </h1>
+        {/* Tabs with Close Button */}
+        <div className="flex items-center justify-between border-b border-charcoal-700 px-8">
+          <div className="flex">
+            {visibleTabs.map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                className={`flex items-center gap-2 px-4 py-4 border-b-2 transition-colors ${
+                  activeTab === tab.id
+                    ? 'border-agent-extraction text-agent-extraction'
+                    : 'border-transparent text-gray-400 hover:text-bone'
+                }`}
+              >
+                <span className="text-lg">{tab.icon}</span>
+                <span className="text-subheader">{tab.title}</span>
+              </button>
+            ))}
+          </div>
           <button
             onClick={onClose}
-            className="text-2xl text-gray-400 hover:text-bone transition-colors"
+            className="text-2xl text-gray-400 hover:text-bone transition-colors p-2"
           >
             ×
           </button>
-        </div>
-
-        {/* Tabs */}
-        <div className="flex border-b border-charcoal-700 px-8">
-          {visibleTabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center gap-2 px-4 py-4 border-b-2 transition-colors ${
-                activeTab === tab.id
-                  ? 'border-agent-extraction text-agent-extraction'
-                  : 'border-transparent text-gray-400 hover:text-bone'
-              }`}
-            >
-              <span className="text-lg">{tab.icon}</span>
-              <span className="text-subheader">{tab.title}</span>
-            </button>
-          ))}
         </div>
 
         {/* Content */}
@@ -192,21 +187,7 @@ export default function BotControlModal({
           <div className="flex-1 overflow-y-auto px-8 py-6 scroll-area">
             {activeTab === 'general' && (
               <div className="space-y-6">
-                  {/* Bot Name Section */}
-                <div className="form-section p-4 border border-charcoal-600 bg-charcoal-800/20">
-                    <label className="block text-subheader text-bone mb-4">
-                      Bot Name
-                    </label>
-                    <input
-                      type="text"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full bg-charcoal-900 border-2 border-charcoal-700 text-bone p-4 focus:border-agent-extraction transition-colors text-body"
-                      placeholder="Enter bot name"
-                    />
-                  </div>
-
-                  {/* Trading Strategy Section */}
+                {/* Trading Strategy Section */}
                 <div className="form-section p-4 border border-charcoal-600 bg-charcoal-800/20">
                   <label className="block text-subheader text-bone mb-4">
                       Trading Strategy
@@ -306,7 +287,7 @@ export default function BotControlModal({
         </div>
 
         {/* Fixed Action Buttons */}
-        <div className="border-t border-charcoal-700 p-6 bg-charcoal-900 flex justify-end gap-3 flex-shrink-0">
+        <div className="border-t border-charcoal-700 px-8 py-3 bg-charcoal-900 flex justify-end gap-3 flex-shrink-0">
           <button
             onClick={onClose}
             className="px-6 py-3 border-2 border-charcoal-600 text-bone hover:bg-charcoal-700/50 transition-colors text-body"
