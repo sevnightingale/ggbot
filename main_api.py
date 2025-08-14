@@ -39,6 +39,9 @@ from core.api.config_api import router as config_router
 # Import users API router
 from core.api.users_api import router as users_router
 
+# Import test API router
+from core.api.test_api import router as test_router
+
 # Create the main app
 app = FastAPI(
     title="GGBot API",
@@ -67,6 +70,9 @@ app.include_router(config_router)
 
 # Include the users router directly
 app.include_router(users_router)
+
+# Include the test router directly
+app.include_router(test_router)
 
 @app.get("/")
 async def root():
