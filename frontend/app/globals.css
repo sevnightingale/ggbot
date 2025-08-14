@@ -25,43 +25,82 @@ body {
 
 /* GGBot Component Styles */
 
-/* Status-based color variations using agent colors from VIBE.md */
-.ggbot-idle .ggbot-circle,
-.ggbot-extracting {
+/* Status-based color variations - light shadow, border, and text */
+.ggbot-circle.ggbot-extracting {
   box-shadow: 
     8px 8px 16px rgba(0, 0, 0, 0.9),
-    -8px -8px 16px rgba(56, 161, 199, 0.08); /* Extraction blue highlight */
+    -8px -8px 16px rgba(56, 161, 199, 0.15); /* Blue light shadow - more visible */
+  
+  background-image: 
+    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
+    conic-gradient(from 225deg, 
+      rgba(56, 161, 199, 0.6) 0deg,     /* Blue border top-left */
+      rgba(56, 161, 199, 0.3) 90deg,    /* Blue fade */
+      transparent 180deg,               /* Transparent */
+      rgba(0, 0, 0, 0.3) 270deg,        /* Dark bottom-right */
+      rgba(56, 161, 199, 0.3) 360deg);  /* Back to blue */
 }
 
-.ggbot-deciding {
+.ggbot-circle.ggbot-deciding {
   box-shadow: 
     8px 8px 16px rgba(0, 0, 0, 0.9),
-    -8px -8px 16px rgba(44, 190, 119, 0.08); /* Decision green highlight */
+    -8px -8px 16px rgba(44, 190, 119, 0.15); /* Green light shadow */
+  
+  background-image: 
+    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
+    conic-gradient(from 225deg, 
+      rgba(44, 190, 119, 0.6) 0deg,     /* Green border top-left */
+      rgba(44, 190, 119, 0.3) 90deg,    /* Green fade */
+      transparent 180deg,
+      rgba(0, 0, 0, 0.3) 270deg,
+      rgba(44, 190, 119, 0.3) 360deg);
 }
 
-.ggbot-trading {
+.ggbot-circle.ggbot-trading {
   box-shadow: 
     8px 8px 16px rgba(0, 0, 0, 0.9),
-    -8px -8px 16px rgba(190, 106, 71, 0.08); /* Trading orange highlight */
+    -8px -8px 16px rgba(190, 106, 71, 0.15); /* Orange light shadow */
+  
+  background-image: 
+    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
+    conic-gradient(from 225deg, 
+      rgba(190, 106, 71, 0.6) 0deg,     /* Orange border top-left */
+      rgba(190, 106, 71, 0.3) 90deg,    /* Orange fade */
+      transparent 180deg,
+      rgba(0, 0, 0, 0.3) 270deg,
+      rgba(190, 106, 71, 0.3) 360deg);
+}
+
+/* Message text colors by status */
+.ggbot-extracting .ggbot-message-text {
+  color: #38a1c7; /* Extraction blue */
+}
+
+.ggbot-deciding .ggbot-message-text {
+  color: #2cbe77; /* Decision green */
+}
+
+.ggbot-trading .ggbot-message-text {
+  color: #be6a47; /* Trading orange */
 }
 
 /* Hover states for status colors */
-.ggbot-extracting:hover:not(.ggbot-disabled) {
+.ggbot-circle.ggbot-extracting:hover:not(.ggbot-disabled) {
   box-shadow: 
     10px 10px 20px rgba(0, 0, 0, 0.95),
-    -10px -10px 20px rgba(56, 161, 199, 0.12);
+    -10px -10px 20px rgba(56, 161, 199, 0.2);
 }
 
-.ggbot-deciding:hover:not(.ggbot-disabled) {
+.ggbot-circle.ggbot-deciding:hover:not(.ggbot-disabled) {
   box-shadow: 
     10px 10px 20px rgba(0, 0, 0, 0.95),
-    -10px -10px 20px rgba(44, 190, 119, 0.12);
+    -10px -10px 20px rgba(44, 190, 119, 0.2);
 }
 
-.ggbot-trading:hover:not(.ggbot-disabled) {
+.ggbot-circle.ggbot-trading:hover:not(.ggbot-disabled) {
   box-shadow: 
     10px 10px 20px rgba(0, 0, 0, 0.95),
-    -10px -10px 20px rgba(190, 106, 71, 0.12);
+    -10px -10px 20px rgba(190, 106, 71, 0.2);
 }
 
 /* Spinner styles */
@@ -97,18 +136,16 @@ body {
     8px 8px 16px rgba(0, 0, 0, 0.9),     /* Dark shadow - sharper */
     -8px -8px 16px rgba(255, 255, 255, 0.08); /* Light shadow - brighter */
   
-  /* Directional border using gradient */
+  /* Default directional border (white for inactive/idle) */
   border: 2px solid transparent;
   background-image: 
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
-    conic-gradient(from 315deg, 
-      rgba(255, 255, 255, 0.4) 0deg,    /* Bright white top-left */
-      rgba(255, 255, 255, 0.2) 45deg,   /* Fade to medium */
-      rgba(255, 255, 255, 0.05) 90deg,  /* Fade to subtle */
-      transparent 135deg,               /* Transparent */
-      transparent 225deg,               /* Stay transparent */
-      rgba(0, 0, 0, 0.3) 270deg,       /* Dark bottom-right */
-      rgba(0, 0, 0, 0.15) 315deg);     /* Fade back to start */
+    conic-gradient(from 225deg, 
+      rgba(255, 255, 255, 0.5) 0deg,    /* White border top-left */
+      rgba(255, 255, 255, 0.3) 90deg,   /* White fade */
+      transparent 180deg,               /* Transparent */
+      rgba(0, 0, 0, 0.3) 270deg,        /* Dark bottom-right */
+      rgba(255, 255, 255, 0.3) 360deg); /* Back to white */
   background-origin: border-box;
   background-clip: content-box, border-box;
 }
