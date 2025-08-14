@@ -23,6 +23,169 @@ body {
   /* Pure void background */
 }
 
+/* Circular ggbot Component */
+.ggbot-circle {
+  width: 200px;
+  height: 200px;
+  border-radius: 50%;
+  border: 2px solid var(--bone-200);
+  background: var(--charcoal-900);
+  /* Paper texture */
+  background-image: 
+    radial-gradient(circle at 20% 50%, transparent 20%, rgba(227, 229, 230, 0.03) 21%, rgba(227, 229, 230, 0.03) 34%, transparent 35%, transparent),
+    linear-gradient(0deg, transparent 24%, rgba(227, 229, 230, 0.05) 25%, rgba(227, 229, 230, 0.05) 26%, transparent 27%, transparent 74%, rgba(227, 229, 230, 0.03) 75%, rgba(227, 229, 230, 0.03) 76%, transparent 77%, transparent);
+  
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.ggbot-circle.clickable {
+  cursor: pointer;
+  /* Dark drop shadow for clickable affordance */
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.ggbot-circle.clickable:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.5);
+}
+
+.ggbot-circle.view-only {
+  opacity: 0.8;
+  cursor: default;
+}
+
+/* Status-based glow effects */
+.ggbot-circle.inactive {
+  border-color: var(--bone-200);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.ggbot-circle.idle {
+  border-color: var(--agent-extraction);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 20px rgba(56, 161, 199, 0.4);
+}
+
+.ggbot-circle.extracting {
+  border-color: var(--agent-extraction);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(56, 161, 199, 0.6);
+  animation: extractingPulse 2s ease-in-out infinite;
+}
+
+.ggbot-circle.deciding {
+  border-color: var(--agent-decision);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(44, 190, 119, 0.6);
+  animation: decidingPulse 2s ease-in-out infinite;
+}
+
+.ggbot-circle.trading {
+  border-color: var(--agent-trading);
+  box-shadow: 
+    0 4px 12px rgba(0, 0, 0, 0.4),
+    0 0 30px rgba(190, 106, 71, 0.6);
+  animation: tradingPulse 2s ease-in-out infinite;
+}
+
+/* Content styling */
+.ggbot-content {
+  text-align: center;
+  color: var(--bone-200);
+  padding: 20px;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.bot-name {
+  font-family: 'Kanit', sans-serif;
+  font-weight: 700;
+  font-size: 18px;
+  margin: 0;
+  color: var(--bone-200);
+}
+
+.status-message {
+  font-family: 'Inter', sans-serif;
+  font-size: 12px;
+  margin: 0;
+  line-height: 1.4;
+  text-align: center;
+  word-wrap: break-word;
+  overflow-wrap: break-word;
+  max-width: 160px;
+}
+
+/* Status-based text colors */
+.ggbot-circle.idle .status-message,
+.ggbot-circle.extracting .status-message {
+  color: var(--agent-extraction);
+}
+
+.ggbot-circle.deciding .status-message {
+  color: var(--agent-decision);
+}
+
+.ggbot-circle.trading .status-message {
+  color: var(--agent-trading);
+}
+
+.ggbot-circle.inactive .status-message {
+  color: var(--bone-300);
+}
+
+/* Pulse animations */
+@keyframes extractingPulse {
+  0%, 100% {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 20px rgba(56, 161, 199, 0.4);
+  }
+  50% {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 40px rgba(56, 161, 199, 0.8);
+  }
+}
+
+@keyframes decidingPulse {
+  0%, 100% {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 20px rgba(44, 190, 119, 0.4);
+  }
+  50% {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 40px rgba(44, 190, 119, 0.8);
+  }
+}
+
+@keyframes tradingPulse {
+  0%, 100% {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 20px rgba(190, 106, 71, 0.4);
+  }
+  50% {
+    box-shadow: 
+      0 4px 12px rgba(0, 0, 0, 0.4),
+      0 0 40px rgba(190, 106, 71, 0.8);
+  }
+}
+
 :root {
   /* Base colors */
   --charcoal-900: #161618;
