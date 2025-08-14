@@ -87,44 +87,41 @@ body {
   100% { box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.9), -8px -8px 16px rgba(190, 106, 71, 0.15); }
 }
 
-/* Status-based color variations - with static borders and rotating shadows */
+/* Status-specific quadrant borders */
+.ggbot-circle.ggbot-extracting::before {
+  background: 
+    /* Top-left quadrant - blue */
+    radial-gradient(circle at 25% 25%, rgba(56, 161, 199, 0.6) 0%, transparent 50%),
+    /* Bottom-right quadrant - dark */
+    radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
+}
+
 .ggbot-circle.ggbot-extracting {
   animation: rotatingShadowBlue 4s linear infinite;
-  
-  background-image: 
-    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
-    conic-gradient(from 225deg, 
-      rgba(56, 161, 199, 0.6) 0deg,     /* Blue border top-left */
-      rgba(56, 161, 199, 0.3) 90deg,    /* Blue fade */
-      transparent 180deg,               /* Transparent */
-      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      transparent 360deg);              /* Clean loop back */
+}
+
+.ggbot-circle.ggbot-deciding::before {
+  background: 
+    /* Top-left quadrant - green */
+    radial-gradient(circle at 25% 25%, rgba(44, 190, 119, 0.6) 0%, transparent 50%),
+    /* Bottom-right quadrant - dark */
+    radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
 }
 
 .ggbot-circle.ggbot-deciding {
   animation: rotatingShadowGreen 3.5s linear infinite;
-  
-  background-image: 
-    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
-    conic-gradient(from 225deg, 
-      rgba(44, 190, 119, 0.6) 0deg,     /* Green border top-left */
-      rgba(44, 190, 119, 0.3) 90deg,    /* Green fade */
-      transparent 180deg,               /* Transparent */
-      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      transparent 360deg);              /* Clean loop back */
+}
+
+.ggbot-circle.ggbot-trading::before {
+  background: 
+    /* Top-left quadrant - orange */
+    radial-gradient(circle at 25% 25%, rgba(190, 106, 71, 0.6) 0%, transparent 50%),
+    /* Bottom-right quadrant - dark */
+    radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
 }
 
 .ggbot-circle.ggbot-trading {
   animation: rotatingShadowOrange 3s linear infinite;
-  
-  background-image: 
-    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
-    conic-gradient(from 225deg, 
-      rgba(190, 106, 71, 0.6) 0deg,     /* Orange border top-left */
-      rgba(190, 106, 71, 0.3) 90deg,    /* Orange fade */
-      transparent 180deg,               /* Transparent */
-      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      transparent 360deg);              /* Clean loop back */
 }
 
 /* Message text colors by status */
@@ -187,23 +184,36 @@ body {
   align-items: center;
   justify-content: center;
   overflow: visible;
-  /* Neumorphic dual shadows - tighter and more contrast */
+  /* Neumorphic dual shadows */
   box-shadow: 
-    8px 8px 16px rgba(0, 0, 0, 0.9),     /* Dark shadow - sharper */
-    -8px -8px 16px rgba(255, 255, 255, 0.08); /* Light shadow - brighter */
-  
-  /* Default directional border (white for inactive/idle) */
-  border: 2px solid transparent;
-  background-image: 
-    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
-    conic-gradient(from 225deg, 
-      rgba(255, 255, 255, 0.5) 0deg,    /* White border top-left */
-      rgba(255, 255, 255, 0.3) 90deg,   /* White fade */
-      transparent 180deg,               /* Transparent */
-      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      transparent 360deg);              /* Clean loop back */
-  background-origin: border-box;
-  background-clip: content-box, border-box;
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(255, 255, 255, 0.08);
+}
+
+/* 4-quadrant border system using pseudo-elements */
+.ggbot-circle::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  border-radius: 50%;
+  background: 
+    /* Top-left quadrant - light */
+    radial-gradient(circle at 25% 25%, rgba(255, 255, 255, 0.5) 0%, transparent 50%),
+    /* Bottom-right quadrant - dark */
+    radial-gradient(circle at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
+  mask: 
+    radial-gradient(circle at center, transparent 88px, black 90px);
+  -webkit-mask: 
+    radial-gradient(circle at center, transparent 88px, black 90px);
+  z-index: 0;
+}
+
+.ggbot-circle > * {
+  position: relative;
+  z-index: 1;
 }
 
 .ggbot-circle:hover:not(.ggbot-disabled) {
