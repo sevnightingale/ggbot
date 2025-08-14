@@ -53,18 +53,9 @@ class GGShotBotHandler(BaseBotHandler):
         Returns:
             str: Current pipeline phase
         """
-        # Get timing for different pipeline activities
-        signal_time = self.get_time_since_last_activity(
-            'market_data',
-            time_column='updated_at',
-            where_clause="source = 'telegram' AND config_id IS NULL"
-        )
-        
-        decision_time = self.get_time_since_last_activity(
-            'ggshot_filter',
-            time_column='created_at',
-            include_user_filter=False  # ggshot_filter doesn't have user_id
-        )
+        # Get timing for different pipeline activities using ggShot-specific user_id
+        signal_time = await self._get_ggshot_signal_time()
+        decision_time = await self._get_ggshot_decision_time()
         
         # ggShot-specific phase detection logic
         
@@ -118,11 +109,7 @@ class GGShotBotHandler(BaseBotHandler):
     
     async def _detect_extraction_sub_phase(self) -> str:
         """Detect extraction sub-phase based on timing."""
-        signal_time = self.get_time_since_last_activity(
-            'market_data',
-            time_column='updated_at',
-            where_clause="source = 'telegram' AND config_id IS NULL"
-        )
+        signal_time = await self._get_ggshot_signal_time()
         
         if not signal_time:
             return "signal_received"
@@ -140,16 +127,8 @@ class GGShotBotHandler(BaseBotHandler):
     
     async def _detect_decision_sub_phase(self) -> str:
         """Detect decision sub-phase based on timing and logs."""
-        decision_time = self.get_time_since_last_activity(
-            'ggshot_filter',
-            time_column='created_at',
-            include_user_filter=False
-        )
-        signal_time = self.get_time_since_last_activity(
-            'market_data', 
-            time_column='updated_at',
-            where_clause="source = 'telegram' AND config_id IS NULL"
-        )
+        decision_time = await self._get_ggshot_decision_time()
+        signal_time = await self._get_ggshot_signal_time()
         
         # If we have decision but it's older than signal, we're processing new signal
         if decision_time and signal_time and signal_time < decision_time:
@@ -214,11 +193,7 @@ class GGShotBotHandler(BaseBotHandler):
             })
         
         # Get time since last signal for idle messages
-        signal_time = self.get_time_since_last_activity(
-            'market_data',
-            time_column='updated_at',
-            where_clause="source = 'telegram' AND config_id IS NULL"  
-        )
+        signal_time = await self._get_ggshot_signal_time()
         if signal_time:
             context['timeSinceLastSignal'] = self.format_time_ago(signal_time)
         
@@ -317,6 +292,7 @@ class GGShotBotHandler(BaseBotHandler):
             conn = active_bot_monitor._get_db_connection()
             try:
                 with conn.cursor() as cur:
+                    # ggShot signals have specific user_id and config_id IS NULL
                     cur.execute("""
                         SELECT symbol, timeframe, indicators, updated_at
                         FROM market_data
@@ -325,7 +301,7 @@ class GGShotBotHandler(BaseBotHandler):
                           AND config_id IS NULL
                         ORDER BY updated_at DESC
                         LIMIT 1
-                    """, (self.user_id,))
+                    """, ('00000000-0000-0000-0000-000000000001',))
                     
                     result = cur.fetchone()
                     if result:
@@ -365,4 +341,83 @@ class GGShotBotHandler(BaseBotHandler):
                 
         except Exception as e:
             self.logger.error(f"Failed to get latest decision: {str(e)}")
+            return None
+    
+    async def _get_ggshot_signal_time(self) -> Optional[timedelta]:
+        """Get time since last ggShot signal."""
+        try:
+            from core.monitoring.active_bot_monitor import active_bot_monitor
+            from datetime import datetime
+            
+            conn = active_bot_monitor._get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT updated_at
+                        FROM market_data
+                        WHERE user_id = %s 
+                          AND source = 'telegram' 
+                          AND config_id IS NULL
+                        ORDER BY updated_at DESC
+                        LIMIT 1
+                    """, ('00000000-0000-0000-0000-000000000001',))
+                    
+                    result = cur.fetchone()
+                    if result and result[0]:
+                        last_activity = result[0]
+                        if isinstance(last_activity, str):
+                            last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                        
+                        # Ensure timezone awareness
+                        if last_activity.tzinfo is None:
+                            last_activity = last_activity.replace(tzinfo=datetime.now().astimezone().tzinfo)
+                        
+                        now = datetime.now(last_activity.tzinfo)
+                        return now - last_activity
+                    
+                    return None
+                    
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get ggShot signal time: {str(e)}")
+            return None
+    
+    async def _get_ggshot_decision_time(self) -> Optional[timedelta]:
+        """Get time since last ggShot decision."""
+        try:
+            from core.monitoring.active_bot_monitor import active_bot_monitor
+            from datetime import datetime
+            
+            conn = active_bot_monitor._get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT created_at
+                        FROM ggshot_filter
+                        ORDER BY created_at DESC
+                        LIMIT 1
+                    """)
+                    
+                    result = cur.fetchone()
+                    if result and result[0]:
+                        last_activity = result[0]
+                        if isinstance(last_activity, str):
+                            last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
+                        
+                        # Ensure timezone awareness
+                        if last_activity.tzinfo is None:
+                            last_activity = last_activity.replace(tzinfo=datetime.now().astimezone().tzinfo)
+                        
+                        now = datetime.now(last_activity.tzinfo)
+                        return now - last_activity
+                    
+                    return None
+                    
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            self.logger.error(f"Failed to get ggShot decision time: {str(e)}")
             return None

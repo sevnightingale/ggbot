@@ -4,9 +4,10 @@ import React, { useEffect } from 'react'
 import GGBot from '@/components/GGBot'
 import BotControlModal from '@/components/BotControlModal'
 import { useBotStore, Bot } from '@/store/botStore'
+import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 
-// Demo user ID constant
-const DEMO_USER_ID = "demo-user-123"
+// Production user ID from backend
+const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001"
 
 export default function DemoPage() {
   const [currentBotIndex, setCurrentBotIndex] = React.useState(0)
@@ -20,78 +21,17 @@ export default function DemoPage() {
     updateBot,
     startBot,
     deleteBot,
-    createBot
+    createBot,
+    stopBot
   } = useBotStore()
+  
+  // WebSocket connection for real-time updates
+  const { isConnected, isLoadingBots } = useBotWebSocket(DEMO_USER_ID)
   
   const demoBots = getBotsByUser(DEMO_USER_ID)
 
-  // Initialize demo bots on component mount
-  useEffect(() => {
-    // Only initialize if no bots exist for this user
-    if (demoBots.length === 0) {
-      const initialBots: Bot[] = [
-        {
-          config_id: "e249bb49-0455-4596-9657-09bf9e14ca14", // Real ggShot config_id from CONTEXT.md
-          instance_name: "ggshot-pro-1",
-          name: "ggShot-Pro",
-          config_type: "ggshot",
-          strategy: "ai",
-          crypto: "BTC",
-          riskLevel: "medium",
-          userId: DEMO_USER_ID,
-          isActive: true,
-          createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000), // 2 hours ago
-          status: {
-            phase: "idle",
-            color: "blue",
-            message: "Monitoring 140+ crypto pairs...",
-            timestamp: new Date().toISOString()
-          }
-        },
-        {
-          config_id: "demo-config-001", // Demo config from CONTEXT.md
-          instance_name: "mytrader-1", 
-          name: "MyTrader",
-          config_type: "demo",
-          strategy: "meanrev",
-          crypto: "BTC",
-          riskLevel: "medium",
-          userId: DEMO_USER_ID,
-          isActive: true,
-          createdAt: new Date(Date.now() - 30 * 60 * 1000), // 30 minutes ago
-          status: {
-            phase: "extraction",
-            color: "blue",
-            message: "Fetching BTC market data...",
-            timestamp: new Date().toISOString(),
-            showSpinner: true
-          }
-        },
-        {
-          config_id: "demo-config-002",
-          instance_name: "testbot-1",
-          name: "TestBot", 
-          config_type: "demo",
-          strategy: "momentum",
-          crypto: "ETH",
-          riskLevel: "high",
-          userId: DEMO_USER_ID,
-          isActive: true,
-          createdAt: new Date(Date.now() - 10 * 60 * 1000), // 10 minutes ago
-          status: {
-            phase: "decision",
-            color: "green",
-            message: "AI analyzing RSI signals...",
-            timestamp: new Date().toISOString(),
-            showSpinner: true
-          }
-        }
-      ]
-
-      // Add all initial bots to store
-      initialBots.forEach(bot => addBot(bot))
-    }
-  }, [demoBots.length, addBot])
+  // Note: Bots are now loaded automatically via useBotWebSocket hook
+  // Real backend data will be fetched on component mount
 
   // Add virtual "create bot" state
   const isCreatingBot = currentBotIndex >= demoBots.length
@@ -171,11 +111,16 @@ export default function DemoPage() {
 
   const handleStartBot = async (config_id: string) => {
     try {
-      await startBot(config_id)
+      const bot = demoBots.find(b => b.config_id === config_id)
+      if (bot?.isActive) {
+        await stopBot(config_id)
+      } else {
+        await startBot(config_id)
+      }
       setIsModalOpen(false)
       setSelectedBot(null)
     } catch (error) {
-      console.error('Failed to start bot:', error)
+      console.error('Failed to toggle bot:', error)
     }
   }
 
@@ -203,8 +148,27 @@ export default function DemoPage() {
     setCurrentBotIndex((prev) => Math.max(0, prev - 1))
   }
 
+  // Show loading state while fetching bots
+  if (isLoadingBots) {
+    return (
+      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-bone-300">Loading bots...</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
+      {/* Connection Status */}
+      <div className="absolute top-4 right-4 flex items-center gap-2">
+        <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
+        <span className="text-footnote text-gray-400">
+          {isConnected ? 'Connected' : 'Disconnected'}
+        </span>
+      </div>
       <div className="flex flex-col items-center">
         {/* ggbot with flanking arrows/plus */}
         <div className="flex items-center gap-16 mb-6">
@@ -259,6 +223,13 @@ export default function DemoPage() {
           </div>
         </div>
       </div>
+
+      {/* Bot Count Info */}
+      {demoBots.length > 0 && (
+        <div className="absolute bottom-4 left-4 text-footnote text-gray-400">
+          Showing {demoBots.length} bot{demoBots.length !== 1 ? 's' : ''}
+        </div>
+      )}
 
       {/* Control Modal */}
       {selectedBot && (
