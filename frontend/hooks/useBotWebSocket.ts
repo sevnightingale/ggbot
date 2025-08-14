@@ -6,38 +6,76 @@ import { useBotStore } from '@/store/botStore'
  * This will integrate with your backend WebSocket service
  */
 export function useBotWebSocket(userId: string, wsUrl?: string) {
-  const { connectWebSocket, disconnectWebSocket, isWebSocketConnected, subscribeToBot, getBotsByUser } = useBotStore()
+  const { 
+    loadBots, 
+    connectWebSocket, 
+    disconnectWebSocket, 
+    isWebSocketConnected, 
+    subscribeToBot, 
+    getBotsByUser,
+    isLoading
+  } = useBotStore()
   
   const userBots = getBotsByUser(userId)
   
   useEffect(() => {
-    if (!wsUrl) {
-      // Use default WebSocket URL based on environment
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:'
-      const host = window.location.host
-      wsUrl = `${protocol}//${host}/ws/bot-status/${userId}`
+    let isMounted = true
+    
+    const initializeConnection = async () => {
+      try {
+        // First, load bots from the API
+        await loadBots(userId)
+        
+        if (!isMounted) return // Component unmounted during load
+        
+        // Determine WebSocket URL
+        let finalWsUrl = wsUrl
+        if (!finalWsUrl) {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL
+          if (apiUrl?.includes('localhost')) {
+            finalWsUrl = `ws://localhost:8000/ws/bot-status/${userId}`
+          } else {
+            // For production, use wss protocol
+            const host = apiUrl?.replace(/^https?:\/\//, '') || window.location.host
+            finalWsUrl = `wss://${host}/ws/bot-status/${userId}`
+          }
+        }
+
+        // Connect to WebSocket
+        await connectWebSocket(userId, finalWsUrl)
+        
+        if (!isMounted) return
+        
+        // Subscribe to all user's bots after connection
+        const subscribeTimer = setTimeout(() => {
+          if (isMounted) {
+            const currentBots = getBotsByUser(userId)
+            currentBots.forEach(bot => {
+              subscribeToBot(bot.config_id)
+            })
+          }
+        }, 1000) // Wait 1 second for connection to establish
+        
+        return () => clearTimeout(subscribeTimer)
+      } catch (error) {
+        console.error('Failed to initialize bot WebSocket connection:', error)
+      }
     }
-
-    // Connect to WebSocket
-    connectWebSocket(userId, wsUrl)
-
-    // Subscribe to all user's bots
-    const subscribeTimer = setTimeout(() => {
-      userBots.forEach(bot => {
-        subscribeToBot(bot.config_id)
-      })
-    }, 1000) // Wait 1 second for connection to establish
+    
+    const cleanupPromise = initializeConnection()
 
     // Cleanup on unmount
     return () => {
-      clearTimeout(subscribeTimer)
+      isMounted = false
+      cleanupPromise.then(cleanup => cleanup?.())
       disconnectWebSocket(userId)
     }
-  }, [userId, wsUrl, connectWebSocket, disconnectWebSocket, subscribeToBot, userBots])
+  }, [userId, wsUrl]) // Removed dependencies that cause reconnection loops
 
   return {
     isConnected: isWebSocketConnected(userId),
-    userBots
+    userBots,
+    isLoadingBots: isLoading
   }
 }
 

@@ -76,7 +76,8 @@ interface BotStore {
   subscribeToBot: (config_id: string) => void
   isWebSocketConnected: (userId: string) => boolean
   
-  // API Actions (for future backend integration)
+  // API Actions
+  loadBots: (userId: string) => Promise<void>
   createBot: (botData: Omit<Bot, 'config_id' | 'createdAt' | 'status'>) => Promise<Bot>
   startBot: (config_id: string) => Promise<void>
   stopBot: (config_id: string) => Promise<void> 
@@ -311,7 +312,62 @@ export const useBotStore = create<BotStore>()(
         return get().connections.get(userId)?.isConnected || false
       },
 
-      // API Actions (placeholder for future backend integration)
+      // API Actions
+      loadBots: async (userId: string) => {
+        set({ isLoading: true, error: null })
+        
+        try {
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+          const response = await fetch(`${apiUrl}/agent/api/bots`)
+          
+          if (!response.ok) {
+            throw new Error(`Failed to load bots: ${response.status}`)
+          }
+          
+          const botsData = await response.json()
+          
+          // Transform backend data to frontend Bot interface
+          const transformedBots: Bot[] = botsData.map((botData: any) => ({
+            config_id: botData.config_id,
+            instance_name: botData.instance_name || `Bot-${botData.config_id.slice(0, 8)}`,
+            config_type: botData.config_type || 'ggshot',
+            name: botData.config_name || botData.instance_name || `Bot-${botData.config_id.slice(0, 8)}`,
+            strategy: 'meanrev', // Default for now
+            crypto: 'BTC', // Default for now  
+            riskLevel: 'medium', // Default for now
+            status: {
+              phase: 'idle',
+              color: 'gray',
+              message: 'Loading bot status...',
+              timestamp: new Date().toISOString()
+            },
+            isActive: botData.status === 'active',
+            createdAt: new Date(),
+            userId: userId
+          }))
+          
+          // Clear existing bots for this user and add new ones
+          const newBots = new Map(get().bots)
+          // Remove existing user bots
+          for (const [configId, bot] of newBots) {
+            if (bot.userId === userId) {
+              newBots.delete(configId)
+            }
+          }
+          // Add new bots
+          transformedBots.forEach(bot => {
+            newBots.set(bot.config_id, bot)
+          })
+          
+          set({ bots: newBots, isLoading: false })
+          
+        } catch (error) {
+          const errorMessage = error instanceof Error ? error.message : 'Failed to load bots'
+          set({ error: errorMessage, isLoading: false })
+          throw error
+        }
+      },
+
       createBot: async (botData) => {
         set({ isLoading: true, error: null })
         
@@ -344,7 +400,15 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          // TODO: Replace with actual API call to update config_instances.status = 'active'
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+          const response = await fetch(`${apiUrl}/agent/api/bots/${config_id}/start`, {
+            method: 'POST'
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Failed to start bot: ${response.status}`)
+          }
+          
           get().setBotActive(config_id, true)
           set({ isLoading: false })
           
@@ -359,7 +423,15 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          // TODO: Replace with actual API call to update config_instances.status = 'inactive'
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+          const response = await fetch(`${apiUrl}/agent/api/bots/${config_id}/stop`, {
+            method: 'POST'
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Failed to stop bot: ${response.status}`)
+          }
+          
           get().setBotActive(config_id, false)
           set({ isLoading: false })
           
@@ -374,7 +446,15 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          // TODO: Replace with actual API call to delete from config_instances
+          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+          const response = await fetch(`${apiUrl}/agent/api/bots/${config_id}`, {
+            method: 'DELETE'
+          })
+          
+          if (!response.ok) {
+            throw new Error(`Failed to delete bot: ${response.status}`)
+          }
+          
           get().removeBot(config_id)
           set({ isLoading: false })
           
