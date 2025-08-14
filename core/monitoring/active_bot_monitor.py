@@ -254,9 +254,19 @@ class ActiveBotMonitor:
         """
         if self.websocket_manager:
             try:
-                # Broadcast to all connected users via dashboard WebSocket manager
-                for user_id in self.websocket_manager.active_connections:
-                    await self.websocket_manager.broadcast_to_user(user_id, status_data)
+                # Extract the user_id from the bot config to send to the right user
+                user_id = status_data.get("status", {}).get("context", {}).get("user_id")
+                
+                if not user_id and "config_id" in status_data:
+                    # If user_id not in context, get it from the config
+                    config_id = status_data["config_id"]
+                    # Find the user_id from our bot handlers or active configs
+                    # For now, broadcast to all connected users
+                    for connected_user_id in self.websocket_manager.active_connections:
+                        await self.websocket_manager.broadcast_to_user(connected_user_id, status_data)
+                else:
+                    # Send to specific user
+                    await self.websocket_manager.broadcast_to_user(str(user_id), status_data)
                 
             except Exception as e:
                 logger.bind(module="active_bot_monitor").error(
