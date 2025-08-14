@@ -26,10 +26,9 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|---------|---------|
-| ggbots-api | 🟢 Online | 0% | 201MB | Main API server (FastAPI) |
-| ccxt-mcp-server | 🟢 Online | 0% | 12MB | Crypto price/data provider |
-| ggshot-filter | 🟢 Online | 0% | 64MB | Signal filtering service |
-| bot-monitor | 🟢 Online | 0% | 45MB | Universal bot status monitoring |
+| ggbots-api | 🟢 Online | 28% | 324MB | Main API server (FastAPI + integrated bot monitoring) |
+| ccxt-mcp-server | 🟢 Online | 0% | 5MB | Crypto price/data provider |
+| ggshot-filter | 🟢 Online | 0% | 25MB | Signal filtering service |
 
 ### Infrastructure Services
 | Service | Status | Port | Purpose |
@@ -64,16 +63,17 @@
 - ⏳ Config API endpoints needed for full demo functionality
 
 ### ✅ Recently Completed
-**Universal Bot Monitoring Service - DEPLOYED** (2025-08-14)
-- ✅ Active bot monitoring system operational
-- ✅ ggShot-Pro live status tracking working
-- ✅ Real-time pipeline phase detection (idle/extraction/decision/trading)
-- ✅ Dynamic status messages with real context data
-- ✅ Universal architecture ready for demo bots
+**Bot Monitoring Integration - COMPLETED** (2025-08-14)
+- ✅ Integrated bot monitoring into main ggbots-api service
+- ✅ WebSocket endpoint `/ws/bot-status/{user_id}` operational
+- ✅ Real-time bot status broadcasting every 10 seconds
+- ✅ Frontend-ready data structure and heartbeat system
+- ✅ Removed separate bot-monitor PM2 service (consolidated architecture)
+- ✅ 24MB memory savings from service consolidation
 
 ### Active Tasks
-1. **Frontend WebSocket integration** (connect monitoring service to frontend)
-2. **Bot control API endpoints** (start/stop demo bots)
+1. **Frontend WebSocket integration** (connect to `/ws/bot-status/{user_id}`)
+2. **Bot control API endpoints** ✅ COMPLETED (start/stop bots via `/agent/api/bots`)
 3. **Demo bot configuration system** (12 pre-built configs)
 4. **Continue ggShot filter test** (ongoing 2-week evaluation)
 
@@ -116,8 +116,8 @@
 
 ## 🔄 Background Tasks
 
-- **Bot Status Monitoring**: Every 10s (active bot pipeline tracking)
-- **WebSocket Updates**: Every 30s (when implemented)  
+- **Bot Status Monitoring**: Every 10s (integrated into main API)
+- **WebSocket Bot Status**: Every 10s (real-time broadcasting to connected clients)  
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
 - **Autonomous Trading**: DISABLED
@@ -135,7 +135,6 @@ pm2 monit
 # Logs  
 pm2 logs ggbots-api
 pm2 logs ggshot-filter
-pm2 logs bot-monitor
 
 # Resources
 htop
@@ -144,4 +143,4 @@ df -h
 
 ---
 
-*Last major update: Universal Bot Monitoring Service deployed - real-time ggBot status tracking operational*
+*Last major update: Bot monitoring integrated into main API - WebSocket endpoint `/ws/bot-status/{user_id}` operational with real-time status broadcasting*

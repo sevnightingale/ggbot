@@ -489,6 +489,86 @@ a {
 
 /* Control Modal Styles */
 
+/* VIBE.md Typography Classes */
+.text-header { @apply text-3xl md:text-4xl lg:text-5xl font-display; }
+.text-subheader { @apply text-lg md:text-xl lg:text-2xl font-display; }
+.text-body { @apply text-sm md:text-base lg:text-base font-sans; }
+.text-footnote { @apply text-xs font-sans; }
+
+/* Scroll area with fade indicators */
+.scroll-area {
+  position: relative;
+}
+
+.scroll-area::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to bottom, var(--charcoal-900), transparent);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.scroll-area::after {
+  content: '';
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 20px;
+  background: linear-gradient(to top, var(--charcoal-900), transparent);
+  pointer-events: none;
+  z-index: 10;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.scroll-area:hover::before,
+.scroll-area:hover::after {
+  opacity: 1;
+}
+
+/* Form section styling */
+.form-section {
+  transition: all 0.2s ease;
+}
+
+.form-section:hover {
+  border-color: var(--charcoal-500);
+  background: var(--charcoal-800)/40;
+}
+
+/* Modal background with subtle paper texture */
+.modal-background {
+  position: relative;
+}
+
+.modal-background::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: 
+    /* Subtle paper grain */
+    radial-gradient(circle at 20% 80%, transparent 1px, rgba(227, 229, 230, 0.015) 1px) 0 0 / 4px 4px,
+    /* Fiber texture */
+    linear-gradient(45deg, transparent 2px, rgba(227, 229, 230, 0.008) 2px, rgba(227, 229, 230, 0.008) 4px, transparent 4px) 0 0 / 6px 6px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.modal-background > * {
+  position: relative;
+  z-index: 2;
+}
+
 /* Custom slider styling for brutalist aesthetic */
 .slider {
   -webkit-appearance: none;
