@@ -99,7 +99,7 @@ export default function BotControlModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="modal-background bg-charcoal-900 border-2 border-charcoal-700 w-full max-w-4xl max-h-[80vh] flex flex-col relative">
+      <div className="modal-background bg-charcoal-900 border-2 border-charcoal-700 w-full max-w-4xl h-[90vh] flex flex-col relative">
         {/* Header */}
         <div className="flex items-center justify-between p-8 border-b border-charcoal-700">
           <h1 className="text-header text-bone">
@@ -132,11 +132,9 @@ export default function BotControlModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden">
-          {/* Main Content Area */}
-          <div className="p-8">
-            {/* Status Bar */}
-            <div className="flex items-center justify-between mb-8 p-4 border border-charcoal-600 bg-charcoal-800/30">
+        <div className="flex-1 overflow-hidden flex flex-col">
+          {/* Status Bar - Compact */}
+          <div className="flex items-center justify-between px-8 py-4 border-b border-charcoal-600 bg-charcoal-800/30 flex-shrink-0">
               <div className="flex items-center gap-4">
                 <div className={`flex items-center gap-3 ${getStatusColor(bot.status.phase)}`}>
                   <div className="w-4 h-4 bg-current"></div>
@@ -190,12 +188,12 @@ export default function BotControlModal({
               </div>
             </div>
 
-            {/* Scrollable Form Content */}
-            <div className="max-h-80 overflow-y-auto pr-3 scroll-area">
-              {activeTab === 'general' && (
-                <div className="space-y-10">
+          {/* Scrollable Form Content */}
+          <div className="flex-1 overflow-y-auto px-8 py-6 scroll-area">
+            {activeTab === 'general' && (
+              <div className="space-y-6 pb-24">
                   {/* Bot Name Section */}
-                  <div className="form-section p-6 border border-charcoal-600 bg-charcoal-800/20">
+                <div className="form-section p-4 border border-charcoal-600 bg-charcoal-800/20">
                     <label className="block text-subheader text-bone mb-4">
                       Bot Name
                     </label>
@@ -209,18 +207,18 @@ export default function BotControlModal({
                   </div>
 
                   {/* Trading Strategy Section */}
-                  <div className="form-section p-6 border border-charcoal-600 bg-charcoal-800/20">
-                    <label className="block text-subheader text-bone mb-6">
+                <div className="form-section p-4 border border-charcoal-600 bg-charcoal-800/20">
+                  <label className="block text-subheader text-bone mb-4">
                       Trading Strategy
                     </label>
-                    <div className="space-y-5">
+                  <div className="space-y-3">
                       {[
                         { id: 'momentum', label: 'I like momentum breakouts' },
                         { id: 'meanrev', label: 'I prefer mean reversion strategies' },
                         { id: 'trend', label: 'I follow trend continuations' },
                         { id: 'ai', label: 'Let the AI decide' }
                       ].map((strategy) => (
-                        <label key={strategy.id} className="flex items-center gap-4 cursor-pointer p-2 hover:bg-charcoal-700/30 transition-colors">
+                        <label key={strategy.id} className="flex items-center gap-3 cursor-pointer p-2 hover:bg-charcoal-700/30 transition-colors">
                           <input
                             type="radio"
                             name="strategy"
@@ -236,8 +234,8 @@ export default function BotControlModal({
                   </div>
 
                   {/* Market Configuration Section */}
-                  <div className="form-section p-6 border border-charcoal-600 bg-charcoal-800/20">
-                    <div className="space-y-6">
+                <div className="form-section p-4 border border-charcoal-600 bg-charcoal-800/20">
+                  <div className="space-y-4">
                       {/* Target Crypto */}
                       <div>
                         <label className="block text-subheader text-bone mb-4">
@@ -259,7 +257,7 @@ export default function BotControlModal({
                         <label className="block text-subheader text-bone mb-4">
                           Risk Tolerance
                         </label>
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                           <div className="flex items-center justify-between">
                             <span className="text-footnote text-gray-400">Low</span>
                             <span className="text-footnote text-gray-400">High</span>
@@ -285,31 +283,30 @@ export default function BotControlModal({
                     </div>
                   </div>
                 </div>
-              )}
+            )}
 
-              {activeTab === 'extraction' && (
-                <div className="text-gray-400 text-center py-8">
-                  Extraction module configuration coming soon...
-                </div>
-              )}
+            {activeTab === 'extraction' && (
+              <div className="text-gray-400 text-center py-8 pb-24">
+                Extraction module configuration coming soon...
+              </div>
+            )}
 
-              {activeTab === 'decision' && (
-                <div className="text-gray-400 text-center py-8">
-                  Decision module configuration coming soon...
-                </div>
-              )}
+            {activeTab === 'decision' && (
+              <div className="text-gray-400 text-center py-8 pb-24">
+                Decision module configuration coming soon...
+              </div>
+            )}
 
-              {activeTab === 'trading' && (
-                <div className="text-gray-400 text-center py-8">
-                  Trading module configuration coming soon...
-                </div>
-              )}
-            </div>
+            {activeTab === 'trading' && (
+              <div className="text-gray-400 text-center py-8 pb-24">
+                Trading module configuration coming soon...
+              </div>
+            )}
           </div>
         </div>
 
         {/* Floating Action Buttons */}
-        <div className="absolute bottom-8 right-8 flex gap-3">
+        <div className="absolute bottom-6 right-6 flex gap-3">
           <button
             onClick={onClose}
             className="px-6 py-3 border-2 border-charcoal-600 text-bone hover:bg-charcoal-700/50 transition-colors text-body bg-charcoal-900/90 backdrop-blur-sm"

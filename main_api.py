@@ -195,8 +195,9 @@ async def bot_monitoring_task():
     
     # Initialize bot monitor
     bot_monitor = ActiveBotMonitor()
+    bot_monitor.set_websocket_manager(manager)
     
-    # Register bot handlers (copy from working service)
+    # Register bot handlers
     bot_monitor.register_bot_handler('decision', GGShotBotHandler)
     bot_monitor.register_bot_handler('ggshot', GGShotBotHandler)
     logger.info("🤖 Registered bot handlers: decision, ggshot")
@@ -208,54 +209,19 @@ async def bot_monitoring_task():
                 # Get active bot configs
                 active_configs = await bot_monitor.get_active_bot_configs()
                 
-                # Process each active bot
+                # Process each active bot using the proper monitor method
                 for bot_config in active_configs:
-                    config_id = bot_config['config_id']
-                    config_type = bot_config['config_type']
-                    user_id = bot_config['user_id']
-                    
-                    # Skip if no handler for this bot type
-                    if config_id not in bot_monitor.bot_handlers:
-                        # Try to create handler
-                        handler = bot_monitor.create_bot_handler(bot_config)
-                        if handler:
-                            bot_monitor.bot_handlers[config_id] = handler
-                        else:
-                            continue
-                    
-                    handler = bot_monitor.bot_handlers[config_id]
-                    
                     try:
-                        # Detect current pipeline phase
-                        current_phase = await handler.detect_pipeline_phase()
-                        sub_phase = await handler.detect_sub_phase(current_phase)
-                        context_data = await handler.extract_context_data()
-                        status_message = await handler.generate_status_message(
-                            phase=current_phase,
-                            sub_phase=sub_phase,
-                            context=context_data
-                        )
+                        # Ensure UUID fields are converted to strings
+                        config_id = str(bot_config['config_id'])
+                        config_type = str(bot_config['config_type'])
+                        user_id = str(bot_config['user_id'])
                         
-                        # Create status update for frontend
-                        phase_colors = {"idle": "gray", "extraction": "blue", "decision": "green", "trading": "orange"}
-                        
-                        bot_status = {
-                            "type": "bot_status_update",
-                            "config_id": config_id,
-                            "bot_type": config_type,
-                            "phase": current_phase,
-                            "color": phase_colors.get(current_phase, "gray"),
-                            "message": status_message,
-                            "timestamp": datetime.utcnow().isoformat() + "Z",
-                            "showSpinner": current_phase in ["extraction", "decision", "trading"],
-                            "context": context_data
-                        }
-                        
-                        # Broadcast to user's WebSocket
-                        await manager.broadcast_to_user(user_id, bot_status)
+                        # Use the monitor's single bot method
+                        await bot_monitor.monitor_single_bot(bot_config)
                         
                     except Exception as e:
-                        logger.error(f"Error monitoring bot {config_id}: {e}")
+                        logger.error(f"Error processing bot config {bot_config.get('config_id', 'unknown')}: {e}")
             
             # Wait before next monitoring cycle
             await asyncio.sleep(10)
