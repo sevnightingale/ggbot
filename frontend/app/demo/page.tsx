@@ -174,7 +174,7 @@ export default function DemoPage() {
         <div className="flex w-full max-w-7xl mx-auto gap-8 items-center">
           
           {/* Left Panel - Performance */}
-          <div className="hidden lg:block w-80 h-96">
+          <div className="hidden lg:block w-80 h-[600px]">
             <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 h-full p-6 shadow-2xl paper-texture-subtle">
               <div className="flex items-center gap-2 mb-6">
                 <div className="w-2 h-2 bg-agent-extraction rounded-full"></div>
@@ -182,7 +182,7 @@ export default function DemoPage() {
               </div>
               
               {/* Chart Placeholder */}
-              <div className="bg-charcoal-800 border border-charcoal-600 h-48 mb-4 p-4 flex items-center justify-center">
+              <div className="bg-charcoal-800 border border-charcoal-600 h-80 mb-6 p-4 flex items-center justify-center">
                 <div className="text-gray-500 text-footnote">📊 Chart Coming Soon</div>
               </div>
               
@@ -261,7 +261,7 @@ export default function DemoPage() {
           </div>
 
           {/* Right Panel - Open Trades */}
-          <div className="hidden lg:block w-80 h-96">
+          <div className="hidden lg:block w-80 h-[600px]">
             <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 h-full p-6 shadow-2xl paper-texture-subtle">
               <div className="flex items-center gap-2 mb-6">
                 <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
