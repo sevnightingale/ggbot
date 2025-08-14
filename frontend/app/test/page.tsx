@@ -156,10 +156,13 @@ export default function TestPage() {
           
           <div className="mb-8 text-center">
             <p className="text-bone-200/80 mb-4">
-              Testing connections to backend services
+              Testing connections from Vercel → Backend API → Databases
             </p>
             <p className="text-sm text-bone-200/60">
               API Base URL: {process.env.NEXT_PUBLIC_API_URL || 'https://ggbots-api.nightingale.business'}
+            </p>
+            <p className="text-xs text-bone-200/40 mt-2">
+              Note: Frontend connects to HTTPS API, which then tests local database connections
             </p>
           </div>
 
