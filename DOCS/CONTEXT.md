@@ -1,15 +1,27 @@
-● ggShot Live Status Monitoring Service - Deep Architecture
+● Universal ggBot Live Status Monitoring Service - Updated Architecture
+
+  **UPDATED**: After database review, we discovered existing config_instances 
+  table with status field. This is the FINAL implementation plan using 
+  existing infrastructure.
 
   Based on the ggShot config_id (e249bb49-0455-4596-9657-09bf9e14ca14)
-  and pipeline analysis, here's how the status monitoring service would
-  work:
+  and existing config_instances table, here's how the universal monitoring 
+  service works:
 
-  🔍 ggShot-Specific Activity Tracking
+  🔍 Universal Bot Tracking with Existing Infrastructure
 
-  Config-ID Pipeline Tracking:
+  Database Integration:
 
-  # The monitoring service tracks this specific flow:
-  GGSHOT_CONFIG_ID = "e249bb49-0455-4596-9657-09bf9e14ca14"
+  # Uses existing config_instances table:
+  SELECT ci.config_id, ci.instance_name, ci.status,
+         c.config_name, c.config_type, c.config_data
+  FROM config_instances ci
+  JOIN configurations c ON ci.config_id = c.config_id  
+  WHERE ci.status = 'active'
+
+  # Monitor ONLY active bots (no background processes)
+  # ggShot-Pro: e249bb49-0455-4596-9657-09bf9e14ca14 (always active)
+  # Demo bots: Activated when user clicks START button
 
   # Main Status Categories (4 phases visible to frontend):
   1. IDLE: No recent activity (>5 minutes since last action)
@@ -76,15 +88,33 @@
   - Extract symbol/timeframe from signal data
   - Calculate actual time elapsed for realistic progress
 
-  🎛️ Status Monitoring Service Architecture
+  🎛️ Universal Bot Monitoring Service Architecture
+
+  File Structure:
+  core/
+  ├── monitoring/
+  │   ├── active_bot_monitor.py      # Main service - monitors active configs only  
+  │   ├── bot_status_detector.py     # Detects pipeline phases per config
+  │   ├── log_parser.py              # Extracts real data from logs/database
+  │   └── bot_types/
+  │       ├── ggshot_bot.py          # ggShot-specific logic
+  │       └── demo_bot.py            # Demo bot logic
+  └── api/
+      ├── bot_control_api.py         # Start/stop bots (toggle status)
+      └── dashboard_api.py           # Extended WebSocket for bot status
 
   Core Service Components:
 
-  1. Pipeline State Detector
-  - Purpose: Determine ggShot's current pipeline phase
-  - Data Sources: market_data, ggshot_filter tables with ggShot config
-  filtering
-  - Logic: Time-based phase detection using realistic pipeline timings
+  1. Active Bot Monitor (NEW)
+  - Purpose: Monitor only config_instances with status='active'
+  - Data Sources: config_instances JOIN configurations for active bots only
+  - Logic: Poll every 10 seconds, detect phases per active config
+  - Output: Real-time status for each active bot instance
+
+  2. Pipeline State Detector (Universal)
+  - Purpose: Determine any bot's current pipeline phase
+  - Data Sources: market_data, ggshot_filter, strategy_runs (config-driven)
+  - Logic: Time-based phase detection using config-specific pipeline timings
   - Output: Current phase + contextual data (symbol, timeframe, progress)
 
   2. Status Message Generator

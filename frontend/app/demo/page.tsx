@@ -83,20 +83,25 @@ export default function DemoPage() {
         </div>
 
         {/* Dots navigation with + */}
-        <div className="flex items-center gap-3">
-          {demoBots.map((_, index) => (
-            <button
-              key={index}
-              className={`w-3 h-3 rounded-full transition-all duration-200 ${
-                index === currentBotIndex
-                  ? 'bg-bone-200'
-                  : 'bg-bone-500 hover:bg-bone-300'
-              }`}
-              onClick={() => setCurrentBotIndex(index)}
-            />
-          ))}
+        <div className="flex items-center justify-center gap-3 relative">
+          {/* Centered dots */}
+          <div className="flex items-center gap-3">
+            {demoBots.map((_, index) => (
+              <button
+                key={index}
+                className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                  index === currentBotIndex
+                    ? 'bg-bone-200'
+                    : 'bg-bone-500 hover:bg-bone-300'
+                }`}
+                onClick={() => setCurrentBotIndex(index)}
+              />
+            ))}
+          </div>
+          
+          {/* Plus button positioned to the right */}
           <button
-            className="w-6 h-6 rounded-full border-2 border-bone-300 flex items-center justify-center text-bone-300 hover:text-bone-200 hover:border-bone-200 transition-all duration-200 ml-2"
+            className="w-6 h-6 rounded-full border-2 border-bone-300 flex items-center justify-center text-bone-300 hover:text-bone-200 hover:border-bone-200 transition-all duration-200 ml-4"
             onClick={() => handleBotClick('Create New')}
           >
             <span className="text-sm font-bold">+</span>

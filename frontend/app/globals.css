@@ -124,16 +124,19 @@ body {
   animation: rotatingShadowOrange 3s linear infinite;
 }
 
-/* Message text colors by status */
-.ggbot-container.ggbot-extracting .ggbot-message-text {
+/* Message text colors by status - both inline and external */
+.ggbot-container.ggbot-extracting .ggbot-message-text,
+.ggbot-container.ggbot-extracting .ggbot-message-text-inline {
   color: #38a1c7; /* Extraction blue */
 }
 
-.ggbot-container.ggbot-deciding .ggbot-message-text {
+.ggbot-container.ggbot-deciding .ggbot-message-text,
+.ggbot-container.ggbot-deciding .ggbot-message-text-inline {
   color: #2cbe77; /* Decision green */
 }
 
-.ggbot-container.ggbot-trading .ggbot-message-text {
+.ggbot-container.ggbot-trading .ggbot-message-text,
+.ggbot-container.ggbot-trading .ggbot-message-text-inline {
   color: #be6a47; /* Trading orange */
 }
 
