@@ -163,38 +163,54 @@
   - Metrics: Last signal time, success rate, signals today, average
   confidence
 
-  Service Polling Logic:
+  Universal Monitoring Logic:
 
-  # Monitoring loop (every 10-15 seconds for responsiveness):
-  async def monitor_ggshot_pipeline():
-      # 1. Query recent ggShot activity + logs
-      signal_activity = get_latest_signal_activity(GGSHOT_CONFIG_ID)
-      decision_activity = get_latest_decision_activity()
-      recent_logs = get_recent_logs(['extraction', 'decision.engine'])
+  # Main monitoring loop (every 10 seconds):
+  async def monitor_active_bots():
+      # 1. Get all active bots from config_instances
+      active_bots = await get_active_bot_configs()
       
-      # 2. Determine current phase AND sub-phase
-      current_phase = detect_main_phase(signal_activity, decision_activity)
-      sub_phase = detect_sub_phase(current_phase, time_elapsed, logs)
-      
-      # 3. Extract real data for dynamic messages
-      context_data = extract_context_from_logs(recent_logs)
-      # Examples: indicator names, confidence scores, symbols, pillars
-      
-      # 4. Generate message with real data
-      status_message = generate_dynamic_message(
-          phase=current_phase,
-          sub_phase=sub_phase, 
-          context=context_data,
-          signal_data=signal_activity
-      )
-      
-      # 5. Broadcast with proper color coding
-      await broadcast_status_update("ggshot-pro", {
-          "phase": current_phase,  # idle/extraction/decision/trading
-          "message": status_message,
-          "color": get_phase_color(current_phase),
-          "data": context_data  # Real values for frontend
-      })
+      # 2. Monitor each active bot individually
+      for bot_config in active_bots:
+          config_id = bot_config['config_id']
+          bot_type = bot_config['config_type']
+          
+          # 3. Get bot-specific data sources and detection logic
+          bot_handler = create_bot_handler(bot_type, bot_config)
+          
+          # 4. Detect current pipeline phase
+          current_phase = await bot_handler.detect_pipeline_phase()
+          sub_phase = await bot_handler.detect_sub_phase(current_phase)
+          
+          # 5. Extract real data for dynamic messages
+          context_data = await bot_handler.extract_context_data()
+          
+          # 6. Generate bot-specific status message
+          status_message = await bot_handler.generate_status_message(
+              phase=current_phase,
+              sub_phase=sub_phase,
+              context=context_data
+          )
+          
+          # 7. Broadcast to WebSocket subscribers
+          bot_id = f"{bot_type}-{config_id[:8]}"  # e.g., "ggshot-e249bb49"
+          await broadcast_status_update(bot_id, {
+              "phase": current_phase,
+              "message": status_message,
+              "color": get_phase_color(current_phase),
+              "data": context_data,
+              "bot_type": bot_type
+          })
+
+  # Get active bots from existing database
+  async def get_active_bot_configs():
+      return await db.execute("""
+          SELECT ci.config_id, ci.instance_name, ci.status,
+                 c.config_name, c.config_type, c.config_data
+          FROM config_instances ci
+          JOIN configurations c ON ci.config_id = c.config_id  
+          WHERE ci.status = 'active'
+      """)
 
   🔄 Message Rotation Strategy
 
@@ -262,33 +278,54 @@
       match = re.search(r"Pillar (\d): (.+)", log_message)
       return (int(match.group(1)), match.group(2)) if match else None
 
+  🏗️ Implementation Plan - READY TO BUILD
+
+  Phase 1: Active Bot Monitor (START HERE)
+  - ✅ Database infrastructure exists (config_instances table)
+  - ✅ ggShot-Pro already active and ready to monitor
+  - 🔨 Build core/monitoring/active_bot_monitor.py
+  - 🔨 Create bot_types/ggshot_bot.py for ggShot-specific logic
+  - 🔨 Implement basic phase detection using existing pipeline
+
+  Phase 2: Bot Control API 
+  - 🔨 Build core/api/bot_control_api.py
+  - 🔨 Add start/stop endpoints (UPDATE config_instances.status)
+  - 🔨 Frontend integration for demo bot start/stop buttons
+
+  Phase 3: WebSocket Integration
+  - 🔨 Extend existing dashboard_api.py with bot-specific channels
+  - 🔨 Multi-bot broadcasting system
+  - 🔨 Frontend WebSocket client updates
+
   🔌 Critical Frontend ↔ Backend Interactions
 
-  1. WebSocket Connection Protocol
+  1. WebSocket Connection Protocol (UPDATED)
 
   Backend WebSocket Endpoint:
   # Extend existing dashboard_api.py
   @app.websocket("/ws/bot-status/{user_id}")
   async def bot_status_websocket(websocket: WebSocket, user_id: str):
       await manager.connect(websocket, user_id)
-      # Send initial ggShot status
-      # Handle bot-specific subscriptions
+      # Send initial status for all user's active bots
+      # Handle multi-bot subscriptions
 
   Frontend WebSocket Client Requirements:
   // WebSocket connection management
   interface BotStatusConnection {
     connect(userId: string): void;
-    subscribe(botId: string): void; // "ggshot-pro", "demo-bot-1", etc.
-    onStatusUpdate(callback: (status: BotStatus) => void): void;
+    subscribe(botId: string): void; // "ggshot-e249bb49", "demo-a1b2c3d4"
+    onStatusUpdate(callback: (botId: string, status: BotStatus) => void): void;
     disconnect(): void;
   }
 
   2. Status Message Protocol
 
-  Backend Message Format:
+  Backend Message Format (UPDATED):
   {
     "type": "bot_status_update",
-    "bot_id": "ggshot-pro",
+    "bot_id": "ggshot-e249bb49",  # Now includes config_id suffix
+    "bot_type": "ggshot",         # Bot type for frontend handling
+    "config_id": "e249bb49-0455-4596-9657-09bf9e14ca14",
     "status": {
       "phase": "extraction",
       "color": "blue",
@@ -297,7 +334,8 @@
       "context": {
         "symbol": "BTC/USDT",
         "timeframe": "1h",
-        "progress": "pillar_2_analysis"
+        "progress": "pillar_2_analysis",
+        "indicatorCount": 14
       }
     }
   }
