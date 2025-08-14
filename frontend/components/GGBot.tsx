@@ -33,7 +33,7 @@ const GGBot: React.FC<GGBotProps> = ({
   }, [showSpinner, status, spinnerChars.length])
 
   return (
-    <div className={`ggbot-container ${className}`}>
+    <div className={`ggbot-container ggbot-${status} ${className}`}>
       <button
         className={`ggbot-circle ggbot-${status} ${disabled ? 'ggbot-disabled' : ''}`}
         onClick={onClick}
