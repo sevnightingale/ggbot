@@ -67,9 +67,10 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 - **Unified tool interface** for consistent agent-to-service communication
 
 **📊 [Monitoring & Observability](core/monitoring/)**
+- **Universal Bot Status Monitoring** - Real-time pipeline tracking for all active ggbots
 - **Real-time position tracking** across all user strategies
 - **Performance analytics** with P&L calculation and risk metrics
-- **System health monitoring** (enhanced alerting and distributed monitoring planned)
+- **Live status broadcasting** via WebSocket for dashboard integration
 
 **⚙️ [Configuration Management](core/config/)**
 - **JSON blob configuration system** with template-based setup

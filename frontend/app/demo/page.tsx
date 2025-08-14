@@ -54,7 +54,7 @@ export default function DemoPage() {
         {/* ggbot with flanking arrows/plus */}
         <div className="flex items-center gap-16 mb-6">
           <button 
-            className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
+            className={`text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
               currentBotIndex === 0 
                 ? 'text-bone-500 cursor-not-allowed opacity-50' 
                 : 'text-bone-300 hover:text-bone-200 hover:scale-110'
@@ -62,7 +62,7 @@ export default function DemoPage() {
             onClick={prevBot}
             disabled={currentBotIndex === 0}
           >
-            ◀
+            ‹
           </button>
           
           <GGBot
@@ -74,10 +74,10 @@ export default function DemoPage() {
           />
           
           <button 
-            className="text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center text-bone-300 hover:text-bone-200 hover:scale-110"
+            className="text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center text-bone-300 hover:text-bone-200 hover:scale-110"
             onClick={isCreatingBot ? () => handleBotClick('Create New') : nextBot}
           >
-            {isCreatingBot ? '○' : (currentBotIndex === demoBots.length - 1 ? '+' : '▶')}
+            {isCreatingBot ? '○' : (currentBotIndex === demoBots.length - 1 ? '+' : '›')}
           </button>
         </div>
 
