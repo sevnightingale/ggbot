@@ -78,7 +78,7 @@ async def test_hummingbot_postgres():
             user=DB_USER,  # Same user as main DB
             password=DB_PASS,  # Same password as main DB
             host=DB_HOST,  # Same host (localhost in production)
-            port="5434"  # Different port for hummingbot (from ACTIVE.md)
+            port="5433"  # Actual port for hummingbot container
         )
         
         with conn.cursor() as cur:
@@ -105,7 +105,7 @@ async def test_hummingbot_postgres():
             "table_count": table_count,
             "connection_info": {
                 "host": DB_HOST,
-                "port": "5434",
+                "port": "5433",
                 "database": "hummingbot_db"
             }
         }

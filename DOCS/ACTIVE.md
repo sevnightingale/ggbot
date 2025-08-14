@@ -34,7 +34,7 @@
 | Service | Status | Port | Purpose |
 |---------|--------|------|---------|
 | PostgreSQL (ggbot) | 🟢 Online | 5432 | Main application database |
-| PostgreSQL (hummingbot) | 🟢 Online | 5434 | Trading data storage |
+| PostgreSQL (hummingbot) | 🟢 Online | 5433 | Trading data storage |
 | hummingbot-api | 🟢 Online | 15888 | Trading API server |
 | hummingbot-broker (EMQX) | 🟢 Online | 1883,8081,8083,8084,8883,18083,61613 | Message broker |
 
@@ -82,7 +82,7 @@
 | Port | Service | Access | Purpose |
 |------|---------|--------|---------|
 | **5432** | PostgreSQL (ggbot) | Localhost only | Main application data (not in VSCode ports) |
-| **5434** | PostgreSQL (hummingbot) | All interfaces | Trading data & configurations (visible in VSCode) |
+| **5433** | PostgreSQL (hummingbot) | All interfaces | Trading data & configurations (visible in VSCode) |
 
 ### EMQX Message Broker Ports (Hummingbot)
 | Port | Protocol | Access | Purpose |
