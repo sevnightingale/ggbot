@@ -39,3 +39,5 @@
 
 ## IMPORTANT
 - You need to be methodical. Slow. Think hard. Ask questions. Don't make assumptions. We're working with very new tools with changing documentation. ANY TIME you think it might be helpful to look at the latest documenation, just say so! We'll find it for you and provide it.
+
+NEVER, NEVER, NEVER, I REPEAT NEVER HARDCODE SECRETS OR CREDENTIALS. ALWAYS USE .env variables. UNDER NO CIRCUMSTANCES SHOULD YOU EVER HARDCODE SECRETS OF ANY SORT EVER. IF YOU PUT CREDENTIALS INTO ANY FILE, EVER, YOU WILL IMMEDIATELY BE TERMINATED.
