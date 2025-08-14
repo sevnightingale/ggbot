@@ -348,6 +348,229 @@ async def get_scheduler_status():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+# Bot Control Endpoints for config_instances management
+
+@app.get("/api/bots")
+async def get_all_bots():
+    """Get all bot configurations with status."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT 
+                        ci.config_id,
+                        ci.instance_name,
+                        ci.status as instance_status,
+                        c.config_name,
+                        c.config_type,
+                        c.user_id,
+                        ci.hummingbot_account,
+                        ci.paper_balance_usd,
+                        ci.created_at,
+                        c.updated_at
+                    FROM config_instances ci
+                    JOIN configurations c ON ci.config_id = c.config_id
+                    ORDER BY c.config_type, ci.instance_name
+                """)
+                
+                bots = []
+                for row in cur.fetchall():
+                    (config_id, instance_name, instance_status, config_name, config_type,
+                     user_id, hummingbot_account, paper_balance_usd, created_at, updated_at) = row
+                     
+                    bots.append({
+                        "config_id": config_id,
+                        "instance_name": instance_name,
+                        "status": instance_status,
+                        "config_name": config_name,
+                        "config_type": config_type,
+                        "user_id": user_id,
+                        "hummingbot_account": hummingbot_account,
+                        "paper_balance_usd": float(paper_balance_usd) if paper_balance_usd else 0,
+                        "created_at": created_at.isoformat() + "Z" if created_at else None,
+                        "updated_at": updated_at.isoformat() + "Z" if updated_at else None
+                    })
+                
+                return {
+                    "bots": bots,
+                    "total_count": len(bots),
+                    "active_count": len([b for b in bots if b["status"] == "active"]),
+                    "inactive_count": len([b for b in bots if b["status"] == "inactive"])
+                }
+                
+    except Exception as e:
+        logger.error(f"Failed to get bots: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/bots/{config_id}/start")
+async def start_bot(config_id: str):
+    """Start (activate) a specific bot configuration."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Check if bot exists
+                cur.execute("""
+                    SELECT ci.config_id, ci.instance_name, ci.status, c.config_name, c.config_type
+                    FROM config_instances ci
+                    JOIN configurations c ON ci.config_id = c.config_id
+                    WHERE ci.config_id = %s
+                """, (config_id,))
+                
+                bot = cur.fetchone()
+                if not bot:
+                    raise HTTPException(status_code=404, detail="Bot not found")
+                
+                config_id_db, instance_name, current_status, config_name, config_type = bot
+                
+                if current_status == "active":
+                    return {
+                        "status": "already_active",
+                        "config_id": config_id,
+                        "message": f"Bot {instance_name or config_name} is already active"
+                    }
+                
+                # Update status to active
+                cur.execute("""
+                    UPDATE config_instances 
+                    SET status = 'active'
+                    WHERE config_id = %s
+                """, (config_id,))
+                conn.commit()
+                
+                logger.info(f"🚀 Started bot {config_id}: {instance_name or config_name}")
+                
+                return {
+                    "status": "started",
+                    "config_id": config_id,
+                    "bot_name": instance_name or config_name,
+                    "bot_type": config_type,
+                    "message": f"Bot {instance_name or config_name} started successfully"
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start bot {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/bots/{config_id}/stop")
+async def stop_bot(config_id: str):
+    """Stop (deactivate) a specific bot configuration."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Check if bot exists
+                cur.execute("""
+                    SELECT ci.config_id, ci.instance_name, ci.status, c.config_name, c.config_type
+                    FROM config_instances ci
+                    JOIN configurations c ON ci.config_id = c.config_id
+                    WHERE ci.config_id = %s
+                """, (config_id,))
+                
+                bot = cur.fetchone()
+                if not bot:
+                    raise HTTPException(status_code=404, detail="Bot not found")
+                
+                config_id_db, instance_name, current_status, config_name, config_type = bot
+                
+                if current_status == "inactive":
+                    return {
+                        "status": "already_inactive",
+                        "config_id": config_id,
+                        "message": f"Bot {instance_name or config_name} is already inactive"
+                    }
+                
+                # Update status to inactive
+                cur.execute("""
+                    UPDATE config_instances 
+                    SET status = 'inactive'
+                    WHERE config_id = %s
+                """, (config_id,))
+                conn.commit()
+                
+                logger.info(f"🛑 Stopped bot {config_id}: {instance_name or config_name}")
+                
+                return {
+                    "status": "stopped",
+                    "config_id": config_id,
+                    "bot_name": instance_name or config_name,
+                    "bot_type": config_type,
+                    "message": f"Bot {instance_name or config_name} stopped successfully"
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to stop bot {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/bots/{config_id}/status")
+async def get_bot_status(config_id: str):
+    """Get detailed status for a specific bot."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Get bot info
+                cur.execute("""
+                    SELECT 
+                        ci.config_id,
+                        ci.instance_name,
+                        ci.status,
+                        c.config_name,
+                        c.config_type,
+                        c.user_id,
+                        c.updated_at
+                    FROM config_instances ci
+                    JOIN configurations c ON ci.config_id = c.config_id
+                    WHERE ci.config_id = %s
+                """, (config_id,))
+                
+                bot = cur.fetchone()
+                if not bot:
+                    raise HTTPException(status_code=404, detail="Bot not found")
+                
+                (config_id_db, instance_name, status, config_name, config_type,
+                 user_id, updated_at) = bot
+                 
+                # Get recent activity based on bot type
+                last_activity = None
+                activity_type = None
+                
+                if config_type in ['decision', 'ggshot']:
+                    # Check for recent market data or ggshot signals
+                    cur.execute("""
+                        SELECT updated_at, 'market_data' as type
+                        FROM market_data 
+                        WHERE config_id = %s 
+                        ORDER BY updated_at DESC 
+                        LIMIT 1
+                    """, (config_id,))
+                    
+                    result = cur.fetchone()
+                    if result:
+                        last_activity, activity_type = result
+                
+                return {
+                    "config_id": config_id,
+                    "bot_name": instance_name or config_name,
+                    "bot_type": config_type,
+                    "status": status,
+                    "user_id": user_id,
+                    "last_updated": updated_at.isoformat() + "Z" if updated_at else None,
+                    "last_activity": last_activity.isoformat() + "Z" if last_activity else None,
+                    "activity_type": activity_type
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get bot status for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
