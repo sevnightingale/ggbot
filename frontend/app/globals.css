@@ -35,9 +35,12 @@ body {
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
     conic-gradient(from 225deg, 
       rgba(56, 161, 199, 0.6) 0deg,     /* Blue border top-left */
-      rgba(56, 161, 199, 0.3) 90deg,    /* Blue fade */
-      transparent 180deg,               /* Transparent */
-      rgba(0, 0, 0, 0.3) 270deg,        /* Dark bottom-right */
+      rgba(56, 161, 199, 0.4) 60deg,    /* Blue fade */
+      rgba(56, 161, 199, 0.1) 120deg,   /* More gradual fade */
+      transparent 150deg,               /* Transparent */
+      transparent 210deg,               /* Stay transparent longer */
+      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
+      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
       rgba(56, 161, 199, 0.3) 360deg);  /* Back to blue */
 }
 
@@ -50,10 +53,13 @@ body {
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
     conic-gradient(from 225deg, 
       rgba(44, 190, 119, 0.6) 0deg,     /* Green border top-left */
-      rgba(44, 190, 119, 0.3) 90deg,    /* Green fade */
-      transparent 180deg,
-      rgba(0, 0, 0, 0.3) 270deg,
-      rgba(44, 190, 119, 0.3) 360deg);
+      rgba(44, 190, 119, 0.4) 60deg,    /* Green fade */
+      rgba(44, 190, 119, 0.1) 120deg,   /* More gradual fade */
+      transparent 150deg,               /* Transparent */
+      transparent 210deg,               /* Stay transparent longer */
+      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
+      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
+      rgba(44, 190, 119, 0.3) 360deg);  /* Back to green */
 }
 
 .ggbot-circle.ggbot-trading {
@@ -65,22 +71,25 @@ body {
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
     conic-gradient(from 225deg, 
       rgba(190, 106, 71, 0.6) 0deg,     /* Orange border top-left */
-      rgba(190, 106, 71, 0.3) 90deg,    /* Orange fade */
-      transparent 180deg,
-      rgba(0, 0, 0, 0.3) 270deg,
-      rgba(190, 106, 71, 0.3) 360deg);
+      rgba(190, 106, 71, 0.4) 60deg,    /* Orange fade */
+      rgba(190, 106, 71, 0.1) 120deg,   /* More gradual fade */
+      transparent 150deg,               /* Transparent */
+      transparent 210deg,               /* Stay transparent longer */
+      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
+      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
+      rgba(190, 106, 71, 0.3) 360deg);  /* Back to orange */
 }
 
 /* Message text colors by status */
-.ggbot-extracting .ggbot-message-text {
+.ggbot-container.ggbot-extracting .ggbot-message-text {
   color: #38a1c7; /* Extraction blue */
 }
 
-.ggbot-deciding .ggbot-message-text {
+.ggbot-container.ggbot-deciding .ggbot-message-text {
   color: #2cbe77; /* Decision green */
 }
 
-.ggbot-trading .ggbot-message-text {
+.ggbot-container.ggbot-trading .ggbot-message-text {
   color: #be6a47; /* Trading orange */
 }
 
@@ -142,10 +151,13 @@ body {
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
     conic-gradient(from 225deg, 
       rgba(255, 255, 255, 0.5) 0deg,    /* White border top-left */
-      rgba(255, 255, 255, 0.3) 90deg,   /* White fade */
-      transparent 180deg,               /* Transparent */
-      rgba(0, 0, 0, 0.3) 270deg,        /* Dark bottom-right */
-      rgba(255, 255, 255, 0.3) 360deg); /* Back to white */
+      rgba(255, 255, 255, 0.3) 60deg,   /* White fade */
+      rgba(255, 255, 255, 0.1) 120deg,  /* More gradual fade */
+      transparent 150deg,               /* Transparent */
+      transparent 210deg,               /* Stay transparent longer */
+      rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
+      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
+      rgba(255, 255, 255, 0.2) 360deg); /* Back to white */
   background-origin: border-box;
   background-clip: content-box, border-box;
 }
