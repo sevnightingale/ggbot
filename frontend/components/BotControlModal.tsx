@@ -39,6 +39,7 @@ export default function BotControlModal({
   mode = 'demo'
 }: BotControlModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('general')
+  const [isEditingName, setIsEditingName] = useState(false)
   const [formData, setFormData] = useState({
     name: bot.name,
     strategy: bot.strategy || 'meanrev',
