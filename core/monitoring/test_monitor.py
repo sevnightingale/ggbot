@@ -26,8 +26,8 @@ async def test_monitoring():
     # Create monitor instance
     monitor = ActiveBotMonitor()
     
-    # Register ggShot bot handler
-    register_bot_handler('ggshot', GGShotBotHandler)
+    # Register ggShot bot handler directly on the instance
+    monitor.register_bot_handler('ggshot', GGShotBotHandler)
     
     print("✅ Registered ggShot bot handler")
     
@@ -44,20 +44,39 @@ async def test_monitoring():
     
     print("\n🔄 Running single monitoring cycle...")
     
-    # Test single monitoring cycle
-    monitoring_tasks = []
-    for bot_config in active_configs:
-        task = monitor.monitor_single_bot(bot_config)
-        monitoring_tasks.append(task)
-    
-    if monitoring_tasks:
-        results = await asyncio.gather(*monitoring_tasks, return_exceptions=True)
-        
-        for i, result in enumerate(results):
-            if isinstance(result, Exception):
-                print(f"❌ Error monitoring bot {i}: {result}")
-            else:
-                print(f"✅ Successfully monitored bot {i}")
+    # Test single monitoring cycle with detailed output
+    for i, bot_config in enumerate(active_configs):
+        try:
+            config_id = bot_config['config_id']
+            bot_type = bot_config['config_type']
+            bot_name = bot_config.get('config_name', f"Bot {config_id[:8]}")
+            
+            print(f"\n🔍 Testing Bot {i+1}: {bot_type} - {bot_name}")
+            print(f"   Config ID: {config_id}")
+            
+            # Test if handler exists
+            handler = monitor.create_bot_handler(bot_config)
+            if not handler:
+                print(f"   ⚠️  No handler available for {bot_type}")
+                continue
+            
+            # Test phase detection
+            current_phase = await handler.detect_pipeline_phase()
+            sub_phase = await handler.detect_sub_phase(current_phase)
+            context_data = await handler.extract_context_data()
+            status_message = await handler.generate_status_message(current_phase, sub_phase, context_data)
+            
+            # Display results
+            color = monitor.get_phase_color(current_phase)
+            print(f"   📊 Phase: {current_phase} ({sub_phase}) [{color}]")
+            print(f"   💬 Message: \"{status_message}\"")
+            if context_data:
+                print(f"   🔧 Context: {context_data}")
+            
+            print(f"   ✅ Bot monitoring successful")
+            
+        except Exception as e:
+            print(f"   ❌ Error: {str(e)}")
     
     print("\n✅ Test completed successfully!")
     print("\n💡 To run continuous monitoring, use: monitor.start_monitoring()")

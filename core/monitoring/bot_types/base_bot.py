@@ -100,7 +100,7 @@ class BaseBotHandler(ABC):
     # Utility methods available to all bot handlers
     
     def get_time_since_last_activity(self, table: str, time_column: str = 'created_at',
-                                   where_clause: str = None) -> Optional[timedelta]:
+                                   where_clause: str = None, include_user_filter: bool = True) -> Optional[timedelta]:
         """
         Calculate time since last activity in specified table.
         
@@ -108,6 +108,7 @@ class BaseBotHandler(ABC):
             table: Database table name
             time_column: Timestamp column name
             where_clause: Optional WHERE clause (without WHERE keyword)
+            include_user_filter: Whether to filter by user_id
             
         Returns:
             Optional[timedelta]: Time since last activity or None if no activity
@@ -118,13 +119,20 @@ class BaseBotHandler(ABC):
             conn = active_bot_monitor._get_db_connection()
             try:
                 with conn.cursor() as cur:
-                    base_query = f"""
-                        SELECT {time_column}
-                        FROM {table}
-                        WHERE user_id = %s
-                    """
-                    
-                    params = [self.user_id]
+                    if include_user_filter:
+                        base_query = f"""
+                            SELECT {time_column}
+                            FROM {table}
+                            WHERE user_id = %s
+                        """
+                        params = [self.user_id]
+                    else:
+                        base_query = f"""
+                            SELECT {time_column}
+                            FROM {table}
+                            WHERE 1=1
+                        """
+                        params = []
                     
                     if where_clause:
                         base_query += f" AND {where_clause}"
