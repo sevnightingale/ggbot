@@ -29,6 +29,7 @@
 | ggbots-api | 🟢 Online | 0% | 201MB | Main API server (FastAPI) |
 | ccxt-mcp-server | 🟢 Online | 0% | 12MB | Crypto price/data provider |
 | ggshot-filter | 🟢 Online | 0% | 64MB | Signal filtering service |
+| bot-monitor | 🟢 Online | 0% | 45MB | Universal bot status monitoring |
 
 ### Infrastructure Services
 | Service | Status | Port | Purpose |
@@ -62,10 +63,19 @@
 - ✅ Frontend deployed on Vercel with proper API configuration
 - ⏳ Config API endpoints needed for full demo functionality
 
+### ✅ Recently Completed
+**Universal Bot Monitoring Service - DEPLOYED** (2025-08-14)
+- ✅ Active bot monitoring system operational
+- ✅ ggShot-Pro live status tracking working
+- ✅ Real-time pipeline phase detection (idle/extraction/decision/trading)
+- ✅ Dynamic status messages with real context data
+- ✅ Universal architecture ready for demo bots
+
 ### Active Tasks
-1. **Build Config API endpoints** (next priority for demo completion)
-2. **Deploy ggShot paper trading** (infrastructure ready)
-3. **Continue ggShot filter test** (ongoing 2-week evaluation)
+1. **Frontend WebSocket integration** (connect monitoring service to dashboard)
+2. **Bot control API endpoints** (start/stop demo bots)
+3. **Demo bot configuration system** (12 pre-built configs)
+4. **Continue ggShot filter test** (ongoing 2-week evaluation)
 
 ---
 
@@ -106,7 +116,8 @@
 
 ## 🔄 Background Tasks
 
-- **WebSocket Updates**: Every 30s (dashboard clients)
+- **Bot Status Monitoring**: Every 10s (active bot pipeline tracking)
+- **WebSocket Updates**: Every 30s (dashboard clients)  
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
 - **Autonomous Trading**: DISABLED
@@ -124,6 +135,7 @@ pm2 monit
 # Logs  
 pm2 logs ggbots-api
 pm2 logs ggshot-filter
+pm2 logs bot-monitor
 
 # Resources
 htop
@@ -132,4 +144,4 @@ df -h
 
 ---
 
-*Last major update: HUM_INTEGRATION Phase 1 complete - universal paper trading ready*
+*Last major update: Universal Bot Monitoring Service deployed - real-time ggBot status tracking operational*
