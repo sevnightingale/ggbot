@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect } from 'react'
+import React from 'react'
 import GGBot from '@/components/GGBot'
 import BotControlModal from '@/components/BotControlModal'
 import { useBotStore, Bot } from '@/store/botStore'
@@ -17,7 +17,6 @@ export default function DemoPage() {
   // Zustand store hooks
   const { 
     getBotsByUser, 
-    addBot, 
     updateBot,
     startBot,
     deleteBot,
@@ -161,65 +160,149 @@ export default function DemoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
+    <div className="min-h-screen bg-charcoal-900 relative">
       {/* Connection Status */}
-      <div className="absolute top-4 right-4 flex items-center gap-2">
+      <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
         <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
         <span className="text-footnote text-gray-400">
           {isConnected ? 'Connected' : 'Disconnected'}
         </span>
       </div>
-      <div className="flex flex-col items-center">
-        {/* ggbot with flanking arrows/plus */}
-        <div className="flex items-center gap-16 mb-6">
-          <button 
-            className={`text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
-              currentBotIndex === 0 
-                ? 'text-bone-500 cursor-not-allowed opacity-50' 
-                : 'text-bone-300 hover:text-bone-200 hover:scale-110'
-            }`}
-            onClick={prevBot}
-            disabled={currentBotIndex === 0}
-          >
-            ‹
-          </button>
-          
-          <GGBot
-            name={currentBot.name}
-            status={currentBot.status.phase}
-            message={currentBot.status.message}
-            showSpinner={currentBot.status.showSpinner}
-            onClick={() => handleBotClick(currentBot)}
-          />
-          
-          <button 
-            className="text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center text-bone-300 hover:text-bone-200 hover:scale-110"
-            onClick={isCreatingBot ? () => handleBotClick(currentBot) : nextBot}
-          >
-            {isCreatingBot ? '○' : (currentBotIndex === demoBots.length - 1 ? '+' : '›')}
-          </button>
-        </div>
 
-        {/* Dots navigation */}
-        <div className="flex justify-center">
-          <div className="flex items-center gap-3">
-            {demoBots.map((_, index) => (
-              <button
-                key={index}
-                className={`w-3 h-3 rounded-full transition-all duration-200 ${
-                  index === currentBotIndex
-                    ? 'bg-bone-200'
-                    : 'bg-bone-500 hover:bg-bone-300'
+      {/* 3-Column Desktop Layout */}
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <div className="flex w-full max-w-7xl mx-auto gap-8 items-center">
+          
+          {/* Left Panel - Performance */}
+          <div className="hidden lg:block w-80 h-96">
+            <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 h-full p-6 shadow-2xl paper-texture-subtle">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-2 h-2 bg-agent-extraction rounded-full"></div>
+                <h3 className="text-subheader text-bone">Performance</h3>
+              </div>
+              
+              {/* Chart Placeholder */}
+              <div className="bg-charcoal-800 border border-charcoal-600 h-48 mb-4 p-4 flex items-center justify-center">
+                <div className="text-gray-500 text-footnote">📊 Chart Coming Soon</div>
+              </div>
+              
+              {/* Key Metrics */}
+              <div className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-footnote text-gray-400">Accuracy</span>
+                  <span className="text-body text-agent-extraction font-medium">95.2%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-footnote text-gray-400">Stop Loss Rate</span>
+                  <span className="text-body text-green-400 font-medium">4.8%</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-footnote text-gray-400">Signals</span>
+                  <span className="text-body text-bone font-medium">227</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Center Column - ggbot Component */}
+          <div className="flex-1 flex flex-col items-center max-w-md">
+            {/* ggbot with flanking arrows/plus */}
+            <div className="flex items-center gap-16 mb-6">
+              <button 
+                className={`text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
+                  currentBotIndex === 0 
+                    ? 'text-bone-500 cursor-not-allowed opacity-50' 
+                    : 'text-bone-300 hover:text-bone-200 hover:scale-110'
                 }`}
-                onClick={() => setCurrentBotIndex(index)}
+                onClick={prevBot}
+                disabled={currentBotIndex === 0}
+              >
+                ‹
+              </button>
+              
+              <GGBot
+                name={currentBot.name}
+                status={currentBot.status.phase}
+                message={currentBot.status.message}
+                showSpinner={currentBot.status.showSpinner}
+                onClick={() => handleBotClick(currentBot)}
               />
-            ))}
-            {isCreatingBot && (
-              <button
-                className="w-3 h-3 rounded-full bg-bone-200 transition-all duration-200"
-                onClick={() => setCurrentBotIndex(demoBots.length)}
-              />
-            )}
+              
+              <button 
+                className="text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center text-bone-300 hover:text-bone-200 hover:scale-110"
+                onClick={isCreatingBot ? () => handleBotClick(currentBot) : nextBot}
+              >
+                {isCreatingBot ? '○' : (currentBotIndex === demoBots.length - 1 ? '+' : '›')}
+              </button>
+            </div>
+
+            {/* Dots navigation */}
+            <div className="flex justify-center">
+              <div className="flex items-center gap-3">
+                {demoBots.map((_, index) => (
+                  <button
+                    key={index}
+                    className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                      index === currentBotIndex
+                        ? 'bg-bone-200'
+                        : 'bg-bone-500 hover:bg-bone-300'
+                    }`}
+                    onClick={() => setCurrentBotIndex(index)}
+                  />
+                ))}
+                {isCreatingBot && (
+                  <button
+                    className="w-3 h-3 rounded-full bg-bone-200 transition-all duration-200"
+                    onClick={() => setCurrentBotIndex(demoBots.length)}
+                  />
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Right Panel - Open Trades */}
+          <div className="hidden lg:block w-80 h-96">
+            <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 h-full p-6 shadow-2xl paper-texture-subtle">
+              <div className="flex items-center gap-2 mb-6">
+                <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
+                <h3 className="text-subheader text-bone">Open Trades</h3>
+              </div>
+              
+              {/* Trades List */}
+              <div className="space-y-4">
+                <div className="bg-charcoal-800 border border-charcoal-600 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                    <span className="text-body text-bone font-medium">APE/USDT</span>
+                    <span className="text-footnote text-gray-400">SHORT</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">52% confidence</span>
+                    <span className="text-body text-red-400 font-medium">-$45.32</span>
+                  </div>
+                </div>
+                
+                <div className="bg-charcoal-800 border border-charcoal-600 p-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
+                    <span className="text-body text-bone font-medium">BTC/USDT</span>
+                    <span className="text-footnote text-gray-400">LONG</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">67% confidence</span>
+                    <span className="text-body text-green-400 font-medium">+$12.08</span>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Total P&L */}
+              <div className="mt-6 pt-4 border-t border-charcoal-600">
+                <div className="flex justify-between items-center">
+                  <span className="text-footnote text-gray-400">Total P&L</span>
+                  <span className="text-body text-red-400 font-medium">-$33.24</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
       </div>

@@ -30,12 +30,15 @@ class BaseBotHandler(ABC):
         Args:
             bot_config: Bot configuration from config_instances JOIN configurations
         """
-        self.config_id = bot_config['config_id']
-        self.config_type = bot_config['config_type']
+        # Ensure UUID fields are converted to strings
+        self.config_id = str(bot_config['config_id'])
+        self.config_type = str(bot_config['config_type'])
+        self.user_id = str(bot_config.get('user_id')) if bot_config.get('user_id') else None
+        self.instance_name = bot_config.get('instance_name')
+        
+        # Now we can safely use string operations
         self.config_name = bot_config.get('config_name', f"Bot {self.config_id[:8]}")
         self.config_data = bot_config.get('config_data', {})
-        self.user_id = bot_config.get('user_id')
-        self.instance_name = bot_config.get('instance_name')
         
         self.logger = logger.bind(
             module=f"bot.{self.config_type}",

@@ -205,23 +205,34 @@ async def bot_monitoring_task():
     # Main monitoring loop
     while True:
         try:
-            if manager.active_connections:
-                # Get active bot configs
-                active_configs = await bot_monitor.get_active_bot_configs()
+            # Get active bot configs
+            active_configs = await bot_monitor.get_active_bot_configs()
+            
+            if active_configs:
+                logger.debug(f"Monitoring {len(active_configs)} active bots")
                 
                 # Process each active bot using the proper monitor method
                 for bot_config in active_configs:
                     try:
-                        # Ensure UUID fields are converted to strings
-                        config_id = str(bot_config['config_id'])
-                        config_type = str(bot_config['config_type'])
-                        user_id = str(bot_config['user_id'])
-                        
                         # Use the monitor's single bot method
                         await bot_monitor.monitor_single_bot(bot_config)
                         
                     except Exception as e:
                         logger.error(f"Error processing bot config {bot_config.get('config_id', 'unknown')}: {e}")
+            else:
+                logger.debug("No active bots to monitor")
+            
+            # Send heartbeat to all connected clients
+            if manager.active_connections:
+                heartbeat_msg = {
+                    "type": "heartbeat",
+                    "timestamp": datetime.utcnow().isoformat() + "Z"
+                }
+                for user_id in list(manager.active_connections.keys()):
+                    try:
+                        await manager.broadcast_to_user(user_id, heartbeat_msg)
+                    except:
+                        pass  # Connection might be closed
             
             # Wait before next monitoring cycle
             await asyncio.sleep(10)
