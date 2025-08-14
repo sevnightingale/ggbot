@@ -8,7 +8,7 @@ interface TestResult {
   status: 'pending' | 'success' | 'error'
   message: string
   responseTime?: number
-  data?: any
+  data?: Record<string, unknown>
 }
 
 export default function TestPage() {
@@ -177,7 +177,7 @@ export default function TestPage() {
           </div>
 
           <div className="space-y-6">
-            {results.map((result, index) => (
+            {results.map((result) => (
               <div
                 key={result.service}
                 className="border-2 border-bone-200/20 p-6 bg-bone-200/5"
