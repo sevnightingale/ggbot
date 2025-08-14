@@ -45,56 +45,61 @@ export default function DemoPage() {
   }
 
   return (
-    <div className="min-h-screen bg-charcoal-900 p-8">
-      <div className="max-w-7xl mx-auto">
-        <h1 className="text-4xl font-bold text-center mb-12 text-bone-200">
-          ggbot Live Demo
-        </h1>
-
-
-        {/* Integrated Control Hub */}
-        <div className="flex flex-col items-center max-w-md mx-auto">
-          {/* ggbot with flanking arrows */}
-          <div className="flex items-center gap-12 mb-8">
-            <button 
-              className={`text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
-                currentBotIndex === 0 
-                  ? 'text-bone-500 cursor-not-allowed opacity-50' 
-                  : 'text-bone-300 hover:text-bone-200 hover:scale-110'
-              }`}
-              onClick={prevBot}
-              disabled={currentBotIndex === 0}
-            >
-              ◀
-            </button>
-            
-            <GGBot
-              name={currentBot.name}
-              status={currentBot.status}
-              message={currentBot.message}
-              showSpinner={currentBot.showSpinner}
-              onClick={() => handleBotClick(currentBot.name)}
-            />
-            
-            <button 
-              className={`text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
-                currentBotIndex === demoBots.length - 1 
-                  ? 'text-bone-500 cursor-not-allowed opacity-50' 
-                  : 'text-bone-300 hover:text-bone-200 hover:scale-110'
-              }`}
-              onClick={nextBot}
-              disabled={currentBotIndex === demoBots.length - 1}
-            >
-              ▶
-            </button>
-          </div>
-
-          {/* Create button */}
+    <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
+      <div className="flex flex-col items-center">
+        {/* ggbot with flanking arrows */}
+        <div className="flex items-center gap-16 mb-6">
           <button 
-            className="w-full max-w-sm px-8 py-3 bg-charcoal-800 border border-bone-200/20 text-bone-200 hover:bg-charcoal-700 hover:border-bone-200/30 transition-all duration-200"
+            className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
+              currentBotIndex === 0 
+                ? 'text-bone-500 cursor-not-allowed opacity-50' 
+                : 'text-bone-300 hover:text-bone-200 hover:scale-110'
+            }`}
+            onClick={prevBot}
+            disabled={currentBotIndex === 0}
+          >
+            ◀
+          </button>
+          
+          <GGBot
+            name={currentBot.name}
+            status={currentBot.status}
+            message={currentBot.message}
+            showSpinner={currentBot.showSpinner}
+            onClick={() => handleBotClick(currentBot.name)}
+          />
+          
+          <button 
+            className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
+              currentBotIndex === demoBots.length - 1 
+                ? 'text-bone-500 cursor-not-allowed opacity-50' 
+                : 'text-bone-300 hover:text-bone-200 hover:scale-110'
+            }`}
+            onClick={nextBot}
+            disabled={currentBotIndex === demoBots.length - 1}
+          >
+            ▶
+          </button>
+        </div>
+
+        {/* Dots navigation with + */}
+        <div className="flex items-center gap-3">
+          {demoBots.map((_, index) => (
+            <button
+              key={index}
+              className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                index === currentBotIndex
+                  ? 'bg-bone-200'
+                  : 'bg-bone-500 hover:bg-bone-300'
+              }`}
+              onClick={() => setCurrentBotIndex(index)}
+            />
+          ))}
+          <button
+            className="w-6 h-6 rounded-full border-2 border-bone-300 flex items-center justify-center text-bone-300 hover:text-bone-200 hover:border-bone-200 transition-all duration-200 ml-2"
             onClick={() => handleBotClick('Create New')}
           >
-            + Create Your ggbot
+            <span className="text-sm font-bold">+</span>
           </button>
         </div>
       </div>
