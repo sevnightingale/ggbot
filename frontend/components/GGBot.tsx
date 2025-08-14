@@ -42,16 +42,16 @@ const GGBot: React.FC<GGBotProps> = ({
       >
         <div className="ggbot-inner">
           <div className="ggbot-name">{name}</div>
+          {message && (
+            <div className="ggbot-message-inline">
+              {showSpinner && status !== 'inactive' && (
+                <span className="ggbot-spinner-inline">{spinnerChars[spinnerIndex]}</span>
+              )}
+              <span className="ggbot-message-text-inline">{message}</span>
+            </div>
+          )}
         </div>
       </button>
-      {message && (
-        <div className="ggbot-message">
-          {showSpinner && status !== 'inactive' && (
-            <span className="ggbot-spinner">{spinnerChars[spinnerIndex]}</span>
-          )}
-          <span className="ggbot-message-text">{message}</span>
-        </div>
-      )}
     </div>
   )
 }
