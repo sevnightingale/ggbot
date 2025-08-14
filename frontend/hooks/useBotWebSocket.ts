@@ -23,7 +23,10 @@ export function useBotWebSocket(userId: string, wsUrl?: string) {
     
     const initializeConnection = async (): Promise<(() => void) | undefined> => {
       try {
+        console.log('🔗 Initializing bot WebSocket connection for user:', userId)
+        
         // First, load bots from the API
+        console.log('📡 Loading bots from API...')
         await loadBots(userId)
         
         if (!isMounted) return undefined // Component unmounted during load
@@ -42,6 +45,7 @@ export function useBotWebSocket(userId: string, wsUrl?: string) {
         }
 
         // Connect to WebSocket
+        console.log('🔌 Connecting to WebSocket:', finalWsUrl)
         await connectWebSocket(userId, finalWsUrl)
         
         if (!isMounted) return undefined
@@ -58,7 +62,12 @@ export function useBotWebSocket(userId: string, wsUrl?: string) {
         
         return () => clearTimeout(subscribeTimer)
       } catch (error) {
-        console.error('Failed to initialize bot WebSocket connection:', error)
+        console.error('❌ Failed to initialize bot WebSocket connection:', error)
+        console.error('Error details:', {
+          userId,
+          apiUrl: process.env.NEXT_PUBLIC_API_URL,
+          error: error instanceof Error ? error.message : error
+        })
         return undefined
       }
     }
