@@ -25,6 +25,43 @@ body {
 
 /* GGBot Component Styles */
 
+/* Inactive state - dimmed */
+.ggbot-circle.ggbot-inactive {
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.7),      /* Darker, less prominent */
+    -8px -8px 16px rgba(255, 255, 255, 0.03); /* Very subtle light */
+  opacity: 0.7;
+}
+
+.ggbot-container.ggbot-inactive .ggbot-message-text {
+  color: var(--bone-300); /* Muted text */
+}
+
+/* Idle state - brighter with subtle pulse */
+.ggbot-circle.ggbot-idle {
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(255, 255, 255, 0.12); /* Brighter white */
+  animation: idlePulse 3s ease-in-out infinite;
+}
+
+@keyframes idlePulse {
+  0%, 100% {
+    box-shadow: 
+      8px 8px 16px rgba(0, 0, 0, 0.9),
+      -8px -8px 16px rgba(255, 255, 255, 0.12);
+  }
+  50% {
+    box-shadow: 
+      8px 8px 16px rgba(0, 0, 0, 0.9),
+      -8px -8px 16px rgba(255, 255, 255, 0.18);
+  }
+}
+
+.ggbot-container.ggbot-idle .ggbot-message-text {
+  color: var(--bone-200); /* Normal bright text */
+}
+
 /* Status-based color variations - light shadow, border, and text */
 .ggbot-circle.ggbot-extracting {
   box-shadow: 
@@ -149,15 +186,16 @@ body {
   border: 2px solid transparent;
   background-image: 
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
-    conic-gradient(from 225deg, 
+    conic-gradient(from 215deg, 
       rgba(255, 255, 255, 0.5) 0deg,    /* White border top-left */
-      rgba(255, 255, 255, 0.3) 60deg,   /* White fade */
-      rgba(255, 255, 255, 0.1) 120deg,  /* More gradual fade */
-      transparent 150deg,               /* Transparent */
-      transparent 210deg,               /* Stay transparent longer */
+      rgba(255, 255, 255, 0.4) 45deg,   /* White fade */
+      rgba(255, 255, 255, 0.2) 90deg,   /* Continue fade */
+      rgba(255, 255, 255, 0.05) 135deg, /* Almost transparent */
+      transparent 180deg,               /* Fully transparent */
+      rgba(0, 0, 0, 0.1) 225deg,        /* Start dark fade */
       rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
-      rgba(255, 255, 255, 0.2) 360deg); /* Back to white */
+      rgba(0, 0, 0, 0.1) 315deg,        /* Fade back */
+      rgba(255, 255, 255, 0.1) 360deg); /* Smooth back to white */
   background-origin: border-box;
   background-clip: content-box, border-box;
 }
