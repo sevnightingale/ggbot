@@ -464,4 +464,143 @@
   ggShot pipeline while giving you the specific frontend interface
   requirements to build against.
 
-╭─────────────────────────────────────────────────────────────────────────────────────────╮
+
+
+
+
+
+
+
+
+
+  ● Technical Debt Analysis
+
+  1. UUID Subscript Error in Bot Monitoring Loop
+
+  Issue: Getting 'UUID' object is not subscriptable error in the monitoring task.
+
+  Root Cause: Database query is returning a different format than expected. Likely:
+  # Expected: dict access
+  bot_config['config_id']
+
+  # Reality: UUID object being treated as dict
+  uuid_object['config_id']  # ❌ Fails
+
+  Considerations:
+  - Data Flow: get_active_bot_configs() → bot monitoring loop → WebSocket broadcasting
+  - Impact: Bot monitoring fails silently, no WebSocket messages sent
+  - Fix Complexity: Medium - need to trace database cursor factory settings
+  - Priority: HIGH - breaks core functionality
+
+  2. Log Parsing for Real Context Data
+
+  Current State: Status messages are generic placeholders.
+
+  Missing Context Extraction:
+  # What we want to extract from logs:
+  "Analyzing Pillar 2: Volume Confirmation" → pillar_number=2, pillar_name="Volume"
+  "RSI: 68.4 on 1h timeframe" → rsi_value=68.4, timeframe="1h"
+  "Confidence score: 0.784" → confidence=78.4%
+  "Processing 14 technical indicators" → indicator_count=14
+
+  Considerations:
+  - Log Format Stability: Logs change when code changes - fragile parsing
+  - Performance: Regex parsing on every monitoring cycle (every 10s)
+  - Error Handling: What if log format changes? Graceful degradation?
+  - Alternative: Could use database fields instead of log parsing
+  - Priority: MEDIUM - improves realism but not essential for MVP
+
+  3. Message Rotation/Cycling System
+
+  Current State: Static messages per phase.
+
+  Desired Behavior:
+  # IDLE phase - rotate every 30 seconds
+  idle_messages = [
+      "Monitoring 140+ crypto pairs...",
+      "Waiting for high-confidence setup...",
+      f"Last signal: {time_since_last} ago"
+  ]
+
+  # EXTRACTION phase - progress through sub-phases
+  extraction_progress = [
+      (0-10s): "Signal received: {symbol}",
+      (10-30s): "Fetching price data...",
+      (30-45s): "Calculating {indicator}...",
+      (45-60s): "Processing {count} indicators..."
+  ]
+
+  Considerations:
+  - State Management: Need to track time-in-phase per bot
+  - Memory Usage: Store rotation state for each active bot
+  - Synchronization: Multiple WebSocket clients seeing same progression
+  - Realism vs Simplicity: More rotation = more realistic, but more complex
+  - Priority: LOW - polish feature, not core functionality
+
+  4. Database vs Log-Based Context
+
+  Trade-off Analysis:
+
+  Database Approach (Recommended):
+  # Extract from existing tables
+  market_data.indicators → indicator_count, names
+  ggshot_filter.confidence_score → confidence percentage
+  market_data.symbol → current symbol being analyzed
+  ✅ Pros: Reliable, structured data, no parsing fragility
+  ❌ Cons: Limited to data we already store
+
+  Log Parsing Approach:
+  # Parse from application logs
+  recent_logs = get_logs(module='decision', last_5_minutes=True)
+  confidence = extract_confidence_from_logs(recent_logs)
+  ✅ Pros: Rich contextual information, detailed sub-phases
+  ❌ Cons: Fragile, performance overhead, format dependencies
+
+  5. Performance Considerations
+
+  Current Monitoring Load:
+  - Runs every 10 seconds
+  - Queries database for active bots
+  - Creates/manages bot handlers
+  - Broadcasts to all WebSocket connections
+
+  Scaling Concerns:
+  - Memory: Bot handlers stored per config_id (grows with active bots)
+  - Database: Multiple queries per monitoring cycle
+  - WebSocket: Broadcast amplification (1 status → N connected users)
+  - CPU: Regex parsing if log extraction implemented
+
+  Optimization Strategies:
+  - Cache active bot configs (don't query every cycle)
+  - Batch database queries
+  - Rate limit WebSocket broadcasts per user
+  - Use database triggers instead of polling
+
+  6. Error Handling & Resilience
+
+  Current Gaps:
+  - Bot handler creation failures (unsupported bot types)
+  - Database connectivity issues
+  - WebSocket client disconnections
+  - Log parsing failures
+
+  Resilience Strategies:
+  # Graceful degradation
+  try:
+      context_data = await extract_rich_context()
+  except Exception:
+      context_data = {"symbol": "BTC/USDT"}  # Fallback
+
+  # Circuit breaker for expensive operations
+  if consecutive_failures > 3:
+      disable_log_parsing_for_5_minutes()
+
+  Recommended Priorities:
+
+  1. HIGH: Fix UUID subscript error - blocks core functionality
+  2. MEDIUM: Database-based context extraction - improves UX significantly
+  3. LOW: Message rotation system - polish for later
+  4. LOW: Log parsing - nice-to-have, but fragile
+
+  The UUID fix is essential for basic functionality. Database context gives good
+  realism with low risk. Log parsing and rotation are polish features that can wait.

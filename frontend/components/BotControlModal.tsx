@@ -99,7 +99,7 @@ export default function BotControlModal({
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="modal-background bg-charcoal-900 border-2 border-charcoal-700 w-full max-w-4xl max-h-[80vh] flex flex-col">
+      <div className="modal-background bg-charcoal-900 border-2 border-charcoal-700 w-full max-w-4xl max-h-[80vh] flex flex-col relative">
         {/* Header */}
         <div className="flex items-center justify-between p-8 border-b border-charcoal-700">
           <h1 className="text-header text-bone">
@@ -121,7 +121,7 @@ export default function BotControlModal({
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2 px-4 py-4 border-b-2 transition-colors ${
                 activeTab === tab.id
-                  ? 'border-blue-400 text-blue-400'
+                  ? 'border-agent-extraction text-agent-extraction'
                   : 'border-transparent text-gray-400 hover:text-bone'
               }`}
             >
@@ -132,9 +132,9 @@ export default function BotControlModal({
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-hidden flex">
+        <div className="flex-1 overflow-hidden">
           {/* Main Content Area */}
-          <div className="flex-1 p-8">
+          <div className="p-8">
             {/* Status Bar */}
             <div className="flex items-center justify-between mb-8 p-4 border border-charcoal-600 bg-charcoal-800/30">
               <div className="flex items-center gap-4">
@@ -146,6 +146,47 @@ export default function BotControlModal({
                 <span className="text-footnote text-gray-400">
                   {bot.isActive ? 'Active' : 'Inactive'} • Created: {bot.createdAt ? bot.createdAt.toLocaleDateString() : 'Just now'}
                 </span>
+              </div>
+              
+              {/* Action Icons */}
+              <div className="flex items-center gap-3">
+                {/* Start/Stop Toggle */}
+                {getAvailableActions(bot.isActive, bot.status.phase).includes('start') && (
+                  <button
+                    onClick={() => onStart(bot.config_id)}
+                    className="p-2 text-green-400 hover:text-green-300 hover:bg-green-400/10 transition-colors rounded group"
+                    title="Start Bot"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M8 5v14l11-7z"/>
+                    </svg>
+                  </button>
+                )}
+                
+                {getAvailableActions(bot.isActive, bot.status.phase).includes('stop') && (
+                  <button
+                    onClick={() => onStart(bot.config_id)} // TODO: use stopBot when implemented
+                    className="p-2 text-orange-400 hover:text-orange-300 hover:bg-orange-400/10 transition-colors rounded group"
+                    title="Stop Bot"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M6 4h4v16H6V4zm8 0h4v16h-4V4z"/>
+                    </svg>
+                  </button>
+                )}
+
+                {/* Delete Button */}
+                {getAvailableActions(bot.isActive, bot.status.phase).includes('delete') && (
+                  <button
+                    onClick={() => onDelete(bot.config_id)}
+                    className="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 transition-colors rounded group"
+                    title="Delete Bot"
+                  >
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M3 6v18h18v-18h-18zm5 14c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm5 0c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm5 0c0 .552-.448 1-1 1s-1-.448-1-1v-10c0-.552.448-1 1-1s1 .448 1 1v10zm4-18v2h-20v-2h5.711c.9 0 1.631-1.099 1.631-2h5.315c0 .901.73 2 1.631 2h5.712z"/>
+                    </svg>
+                  </button>
+                )}
               </div>
             </div>
 
@@ -162,7 +203,7 @@ export default function BotControlModal({
                       type="text"
                       value={formData.name}
                       onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      className="w-full bg-charcoal-900 border-2 border-charcoal-700 text-bone p-4 focus:border-blue-400 transition-colors text-body"
+                      className="w-full bg-charcoal-900 border-2 border-charcoal-700 text-bone p-4 focus:border-agent-extraction transition-colors text-body"
                       placeholder="Enter bot name"
                     />
                   </div>
@@ -186,7 +227,7 @@ export default function BotControlModal({
                             value={strategy.id}
                             checked={formData.strategy === strategy.id}
                             onChange={(e) => setFormData({ ...formData, strategy: e.target.value })}
-                            className="scale-125 accent-blue-400"
+                            className="scale-125 accent-agent-extraction"
                           />
                           <span className="text-body text-bone">{strategy.label}</span>
                         </label>
@@ -205,7 +246,7 @@ export default function BotControlModal({
                         <select
                           value={formData.crypto}
                           onChange={(e) => setFormData({ ...formData, crypto: e.target.value })}
-                          className="w-full bg-charcoal-900 border-2 border-charcoal-700 text-bone p-4 focus:border-blue-400 transition-colors text-body"
+                          className="w-full bg-charcoal-900 border-2 border-charcoal-700 text-bone p-4 focus:border-agent-extraction transition-colors text-body"
                         >
                           <option value="BTC">BTC - Bitcoin</option>
                           <option value="ETH">ETH - Ethereum</option>
@@ -235,7 +276,7 @@ export default function BotControlModal({
                             }}
                             className="w-full h-3 bg-charcoal-700 appearance-none cursor-pointer slider"
                           />
-                          <div className="text-center text-blue-400 text-body font-medium">
+                          <div className="text-center text-agent-extraction text-body font-medium">
                             {formData.riskLevel === 'low' ? '1% per trade' : 
                              formData.riskLevel === 'medium' ? '2% per trade' : '3% per trade'}
                           </div>
@@ -265,67 +306,22 @@ export default function BotControlModal({
               )}
             </div>
           </div>
-
-          {/* Quick Actions Sidebar */}
-          <div className="w-56 border-l border-charcoal-700 p-8 bg-charcoal-800/10">
-            <h3 className="text-subheader text-bone mb-6">Quick Actions</h3>
-            <div className="space-y-4">
-              {getAvailableActions(bot.isActive, bot.status.phase).includes('start') && (
-                <button
-                  onClick={() => onStart(bot.config_id)}
-                  className="w-full bg-green-600 hover:bg-green-700 text-bone text-body font-medium py-4 px-6 transition-colors border-2 border-green-600 hover:border-green-700"
-                >
-                  START BOT
-                </button>
-              )}
-              
-              {getAvailableActions(bot.isActive, bot.status.phase).includes('stop') && (
-                <button
-                  onClick={() => onStart(bot.config_id)} // For now, use same handler - will need stopBot later
-                  className="w-full bg-transparent hover:bg-orange-600/20 text-orange-400 hover:text-orange-300 text-body font-medium py-4 px-6 transition-colors border-2 border-orange-500 hover:border-orange-400"
-                >
-                  STOP BOT
-                </button>
-              )}
-
-              {getAvailableActions(bot.isActive, bot.status.phase).includes('delete') && (
-                <button
-                  onClick={() => onDelete(bot.config_id)}
-                  className="w-full bg-transparent hover:bg-red-600/10 text-red-400 hover:text-red-300 text-footnote py-3 px-4 transition-colors border border-red-600 hover:border-red-500"
-                >
-                  DELETE BOT
-                </button>
-              )}
-            </div>
-          </div>
         </div>
 
-        {/* Footer */}
-        <div className="border-t border-charcoal-700 p-8 flex items-center justify-between bg-charcoal-800/20">
-          <div className="text-footnote text-gray-400 flex items-center gap-2">
-            <span>💡</span>
-            <span>
-              {mode === 'demo' 
-                ? 'Demo mode: Changes apply to next analysis cycle'
-                : 'Changes can be made while bot is running'
-              }
-            </span>
-          </div>
-          
-          <div className="flex gap-4">
-            <button
-              onClick={onClose}
-              className="px-8 py-4 border-2 border-charcoal-600 text-bone hover:bg-charcoal-700/50 transition-colors text-body"
-            >
-              Cancel
-            </button>
-            <button
-              onClick={handleSave}
-              className="px-8 py-4 bg-blue-600 hover:bg-blue-700 text-bone text-body font-medium transition-colors border-2 border-blue-600 hover:border-blue-700"
-            >
-              Save Changes
-            </button>
-          </div>
+        {/* Floating Action Buttons */}
+        <div className="absolute bottom-8 right-8 flex gap-3">
+          <button
+            onClick={onClose}
+            className="px-6 py-3 border-2 border-charcoal-600 text-bone hover:bg-charcoal-700/50 transition-colors text-body bg-charcoal-900/90 backdrop-blur-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleSave}
+            className="px-6 py-3 bg-agent-extraction hover:bg-agent-extraction/90 text-bone text-body font-medium transition-colors border-2 border-agent-extraction hover:border-agent-extraction/90"
+          >
+            Save Changes
+          </button>
         </div>
       </div>
     </div>

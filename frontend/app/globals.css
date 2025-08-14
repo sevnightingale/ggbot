@@ -605,6 +605,23 @@ a {
   border-color: var(--agent-extraction);
 }
 
+/* Accent color utilities for form controls */
+.accent-agent-extraction {
+  accent-color: var(--agent-extraction);
+}
+
+.text-agent-extraction {
+  color: var(--agent-extraction);
+}
+
+.border-agent-extraction {
+  border-color: var(--agent-extraction);
+}
+
+.bg-agent-extraction {
+  background-color: var(--agent-extraction);
+}
+
 .slider::-webkit-slider-thumb:hover {
   background: #4ab3d9;
 }
