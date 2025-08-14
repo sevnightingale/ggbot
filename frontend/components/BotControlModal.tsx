@@ -191,7 +191,7 @@ export default function BotControlModal({
           {/* Scrollable Form Content */}
           <div className="flex-1 overflow-y-auto px-8 py-6 scroll-area">
             {activeTab === 'general' && (
-              <div className="space-y-6 pb-24">
+              <div className="space-y-6">
                   {/* Bot Name Section */}
                 <div className="form-section p-4 border border-charcoal-600 bg-charcoal-800/20">
                     <label className="block text-subheader text-bone mb-4">
@@ -286,30 +286,30 @@ export default function BotControlModal({
             )}
 
             {activeTab === 'extraction' && (
-              <div className="text-gray-400 text-center py-8 pb-24">
+              <div className="text-gray-400 text-center py-8">
                 Extraction module configuration coming soon...
               </div>
             )}
 
             {activeTab === 'decision' && (
-              <div className="text-gray-400 text-center py-8 pb-24">
+              <div className="text-gray-400 text-center py-8">
                 Decision module configuration coming soon...
               </div>
             )}
 
             {activeTab === 'trading' && (
-              <div className="text-gray-400 text-center py-8 pb-24">
+              <div className="text-gray-400 text-center py-8">
                 Trading module configuration coming soon...
               </div>
             )}
           </div>
         </div>
 
-        {/* Floating Action Buttons */}
-        <div className="absolute bottom-6 right-6 flex gap-3">
+        {/* Fixed Action Buttons */}
+        <div className="border-t border-charcoal-700 p-6 bg-charcoal-900 flex justify-end gap-3 flex-shrink-0">
           <button
             onClick={onClose}
-            className="px-6 py-3 border-2 border-charcoal-600 text-bone hover:bg-charcoal-700/50 transition-colors text-body bg-charcoal-900/90 backdrop-blur-sm"
+            className="px-6 py-3 border-2 border-charcoal-600 text-bone hover:bg-charcoal-700/50 transition-colors text-body"
           >
             Cancel
           </button>
