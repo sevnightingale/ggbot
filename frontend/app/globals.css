@@ -62,59 +62,69 @@ body {
   color: var(--bone-200); /* Normal bright text */
 }
 
-/* Status-based color variations - light shadow, border, and text */
+/* Rotating shadow animation for active states */
+@keyframes rotatingShadowBlue {
+  0%   { box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.9), -8px -8px 16px rgba(56, 161, 199, 0.15); }
+  25%  { box-shadow: -8px 8px 16px rgba(0, 0, 0, 0.9), 8px -8px 16px rgba(56, 161, 199, 0.15); }
+  50%  { box-shadow: -8px -8px 16px rgba(0, 0, 0, 0.9), 8px 8px 16px rgba(56, 161, 199, 0.15); }
+  75%  { box-shadow: 8px -8px 16px rgba(0, 0, 0, 0.9), -8px 8px 16px rgba(56, 161, 199, 0.15); }
+  100% { box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.9), -8px -8px 16px rgba(56, 161, 199, 0.15); }
+}
+
+@keyframes rotatingShadowGreen {
+  0%   { box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.9), -8px -8px 16px rgba(44, 190, 119, 0.15); }
+  25%  { box-shadow: -8px 8px 16px rgba(0, 0, 0, 0.9), 8px -8px 16px rgba(44, 190, 119, 0.15); }
+  50%  { box-shadow: -8px -8px 16px rgba(0, 0, 0, 0.9), 8px 8px 16px rgba(44, 190, 119, 0.15); }
+  75%  { box-shadow: 8px -8px 16px rgba(0, 0, 0, 0.9), -8px 8px 16px rgba(44, 190, 119, 0.15); }
+  100% { box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.9), -8px -8px 16px rgba(44, 190, 119, 0.15); }
+}
+
+@keyframes rotatingShadowOrange {
+  0%   { box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.9), -8px -8px 16px rgba(190, 106, 71, 0.15); }
+  25%  { box-shadow: -8px 8px 16px rgba(0, 0, 0, 0.9), 8px -8px 16px rgba(190, 106, 71, 0.15); }
+  50%  { box-shadow: -8px -8px 16px rgba(0, 0, 0, 0.9), 8px 8px 16px rgba(190, 106, 71, 0.15); }
+  75%  { box-shadow: 8px -8px 16px rgba(0, 0, 0, 0.9), -8px 8px 16px rgba(190, 106, 71, 0.15); }
+  100% { box-shadow: 8px 8px 16px rgba(0, 0, 0, 0.9), -8px -8px 16px rgba(190, 106, 71, 0.15); }
+}
+
+/* Status-based color variations - with static borders and rotating shadows */
 .ggbot-circle.ggbot-extracting {
-  box-shadow: 
-    8px 8px 16px rgba(0, 0, 0, 0.9),
-    -8px -8px 16px rgba(56, 161, 199, 0.15); /* Blue light shadow - more visible */
+  animation: rotatingShadowBlue 4s linear infinite;
   
   background-image: 
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
     conic-gradient(from 225deg, 
       rgba(56, 161, 199, 0.6) 0deg,     /* Blue border top-left */
-      rgba(56, 161, 199, 0.4) 60deg,    /* Blue fade */
-      rgba(56, 161, 199, 0.1) 120deg,   /* More gradual fade */
-      transparent 150deg,               /* Transparent */
-      transparent 210deg,               /* Stay transparent longer */
+      rgba(56, 161, 199, 0.3) 90deg,    /* Blue fade */
+      transparent 180deg,               /* Transparent */
       rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
-      rgba(56, 161, 199, 0.3) 360deg);  /* Back to blue */
+      transparent 360deg);              /* Clean loop back */
 }
 
 .ggbot-circle.ggbot-deciding {
-  box-shadow: 
-    8px 8px 16px rgba(0, 0, 0, 0.9),
-    -8px -8px 16px rgba(44, 190, 119, 0.15); /* Green light shadow */
+  animation: rotatingShadowGreen 3.5s linear infinite;
   
   background-image: 
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
     conic-gradient(from 225deg, 
       rgba(44, 190, 119, 0.6) 0deg,     /* Green border top-left */
-      rgba(44, 190, 119, 0.4) 60deg,    /* Green fade */
-      rgba(44, 190, 119, 0.1) 120deg,   /* More gradual fade */
-      transparent 150deg,               /* Transparent */
-      transparent 210deg,               /* Stay transparent longer */
+      rgba(44, 190, 119, 0.3) 90deg,    /* Green fade */
+      transparent 180deg,               /* Transparent */
       rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
-      rgba(44, 190, 119, 0.3) 360deg);  /* Back to green */
+      transparent 360deg);              /* Clean loop back */
 }
 
 .ggbot-circle.ggbot-trading {
-  box-shadow: 
-    8px 8px 16px rgba(0, 0, 0, 0.9),
-    -8px -8px 16px rgba(190, 106, 71, 0.15); /* Orange light shadow */
+  animation: rotatingShadowOrange 3s linear infinite;
   
   background-image: 
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
     conic-gradient(from 225deg, 
       rgba(190, 106, 71, 0.6) 0deg,     /* Orange border top-left */
-      rgba(190, 106, 71, 0.4) 60deg,    /* Orange fade */
-      rgba(190, 106, 71, 0.1) 120deg,   /* More gradual fade */
-      transparent 150deg,               /* Transparent */
-      transparent 210deg,               /* Stay transparent longer */
+      rgba(190, 106, 71, 0.3) 90deg,    /* Orange fade */
+      transparent 180deg,               /* Transparent */
       rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      rgba(0, 0, 0, 0.1) 315deg,        /* Fade dark */
-      rgba(190, 106, 71, 0.3) 360deg);  /* Back to orange */
+      transparent 360deg);              /* Clean loop back */
 }
 
 /* Message text colors by status */
@@ -186,16 +196,12 @@ body {
   border: 2px solid transparent;
   background-image: 
     radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
-    conic-gradient(from 215deg, 
+    conic-gradient(from 225deg, 
       rgba(255, 255, 255, 0.5) 0deg,    /* White border top-left */
-      rgba(255, 255, 255, 0.4) 45deg,   /* White fade */
-      rgba(255, 255, 255, 0.2) 90deg,   /* Continue fade */
-      rgba(255, 255, 255, 0.05) 135deg, /* Almost transparent */
-      transparent 180deg,               /* Fully transparent */
-      rgba(0, 0, 0, 0.1) 225deg,        /* Start dark fade */
+      rgba(255, 255, 255, 0.3) 90deg,   /* White fade */
+      transparent 180deg,               /* Transparent */
       rgba(0, 0, 0, 0.2) 270deg,        /* Dark bottom-right */
-      rgba(0, 0, 0, 0.1) 315deg,        /* Fade back */
-      rgba(255, 255, 255, 0.1) 360deg); /* Smooth back to white */
+      transparent 360deg);              /* Clean loop back */
   background-origin: border-box;
   background-clip: content-box, border-box;
 }
