@@ -22,13 +22,56 @@ export default function DemoPage() {
           <div className="flex gap-12 justify-center">
             <GGBot
               name="ggShot-Pro"
+              status="idle"
               message="Monitoring 140+ crypto pairs..."
               onClick={() => handleBotClick('ggShot-Pro')}
             />
             <GGBot
               name="MyTrader"
+              status="extracting"
               message="Analyzing market conditions for high-confidence setups"
+              showSpinner={true}
               onClick={() => handleBotClick('MyTrader')}
+            />
+          </div>
+        </div>
+
+        {/* Status variations */}
+        <div className="mb-16">
+          <h2 className="text-2xl font-semibold mb-8 text-bone-300">Status Colors</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8 justify-items-center">
+            <GGBot
+              name="Inactive"
+              status="inactive"
+              message="Bot stopped"
+              onClick={() => handleBotClick('Inactive')}
+            />
+            <GGBot
+              name="Idle"
+              status="idle"
+              message="Waiting for signals"
+              onClick={() => handleBotClick('Idle')}
+            />
+            <GGBot
+              name="Extracting"
+              status="extracting"
+              message="Fetching market data..."
+              showSpinner={true}
+              onClick={() => handleBotClick('Extracting')}
+            />
+            <GGBot
+              name="Deciding"
+              status="deciding"
+              message="AI analyzing patterns..."
+              showSpinner={true}
+              onClick={() => handleBotClick('Deciding')}
+            />
+            <GGBot
+              name="Trading"
+              status="trading"
+              message="Executing trade..."
+              showSpinner={true}
+              onClick={() => handleBotClick('Trading')}
             />
           </div>
         </div>

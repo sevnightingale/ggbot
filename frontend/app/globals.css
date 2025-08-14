@@ -24,6 +24,54 @@ body {
 }
 
 /* GGBot Component Styles */
+
+/* Status-based color variations using agent colors from VIBE.md */
+.ggbot-idle .ggbot-circle,
+.ggbot-extracting {
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(56, 161, 199, 0.08); /* Extraction blue highlight */
+}
+
+.ggbot-deciding {
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(44, 190, 119, 0.08); /* Decision green highlight */
+}
+
+.ggbot-trading {
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(190, 106, 71, 0.08); /* Trading orange highlight */
+}
+
+/* Hover states for status colors */
+.ggbot-extracting:hover:not(.ggbot-disabled) {
+  box-shadow: 
+    10px 10px 20px rgba(0, 0, 0, 0.95),
+    -10px -10px 20px rgba(56, 161, 199, 0.12);
+}
+
+.ggbot-deciding:hover:not(.ggbot-disabled) {
+  box-shadow: 
+    10px 10px 20px rgba(0, 0, 0, 0.95),
+    -10px -10px 20px rgba(44, 190, 119, 0.12);
+}
+
+.ggbot-trading:hover:not(.ggbot-disabled) {
+  box-shadow: 
+    10px 10px 20px rgba(0, 0, 0, 0.95),
+    -10px -10px 20px rgba(190, 106, 71, 0.12);
+}
+
+/* Spinner styles */
+.ggbot-spinner {
+  display: inline-block;
+  margin-right: 0.5rem;
+  font-family: monospace;
+  font-size: 1rem;
+  color: var(--bone-200);
+}
 .ggbot-container {
   display: flex;
   flex-direction: column;
@@ -38,7 +86,6 @@ body {
   height: 180px;
   border-radius: 90px;
   background: var(--charcoal-900);
-  border: 1px solid rgba(255, 255, 255, 0.15);
   cursor: pointer;
   transition: all 0.3s cubic-bezier(0.4, 0.0, 0.2, 1);
   display: flex;
@@ -49,6 +96,21 @@ body {
   box-shadow: 
     8px 8px 16px rgba(0, 0, 0, 0.9),     /* Dark shadow - sharper */
     -8px -8px 16px rgba(255, 255, 255, 0.08); /* Light shadow - brighter */
+  
+  /* Directional border using gradient */
+  border: 2px solid transparent;
+  background-image: 
+    radial-gradient(circle at center, var(--charcoal-900) 60%, var(--charcoal-900) 100%),
+    conic-gradient(from 315deg, 
+      rgba(255, 255, 255, 0.4) 0deg,    /* Bright white top-left */
+      rgba(255, 255, 255, 0.2) 45deg,   /* Fade to medium */
+      rgba(255, 255, 255, 0.05) 90deg,  /* Fade to subtle */
+      transparent 135deg,               /* Transparent */
+      transparent 225deg,               /* Stay transparent */
+      rgba(0, 0, 0, 0.3) 270deg,       /* Dark bottom-right */
+      rgba(0, 0, 0, 0.15) 315deg);     /* Fade back to start */
+  background-origin: border-box;
+  background-clip: content-box, border-box;
 }
 
 .ggbot-circle:hover:not(.ggbot-disabled) {
