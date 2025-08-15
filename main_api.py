@@ -116,59 +116,66 @@ app.include_router(users_router)
 # Include the test router directly
 app.include_router(test_router)
 
-# Demo trading positions for ggShot-Pro bot (real entries from ggshot_filter table - last 3 days approved signals)
-demo_positions = [
-    {
-        'id': 'pos_001',
-        'symbol': 'NKN/USDT',
-        'direction': 'SHORT',
-        'entry_price': 0.02825,
-        'entry_time': '2025-08-14T19:01:11.984Z',
-        'position_size': 800,  # USD
-        'leverage': 10,
-        'confidence': 57
-    },
-    {
-        'id': 'pos_002', 
-        'symbol': 'APE/USDT',
-        'direction': 'SHORT',
-        'entry_price': 0.61850,
-        'entry_time': '2025-08-14T18:31:16.640Z',
-        'position_size': 1200,  # USD
-        'leverage': 10,
-        'confidence': 52
-    },
-    {
-        'id': 'pos_003',
-        'symbol': 'ZRX/USDT', 
-        'direction': 'SHORT',
-        'entry_price': 0.25110,
-        'entry_time': '2025-08-14T17:01:48.849Z',
-        'position_size': 600,  # USD
-        'leverage': 10,
-        'confidence': 56
-    },
-    {
-        'id': 'pos_004',
-        'symbol': 'KNC/USDT',
-        'direction': 'SHORT',
-        'entry_price': 0.41710,
-        'entry_time': '2025-08-14T16:32:10.883Z',
-        'position_size': 900,  # USD
-        'leverage': 10,
-        'confidence': 52
-    },
-    {
-        'id': 'pos_005',
-        'symbol': 'ETHFI/USDT',
-        'direction': 'SHORT',
-        'entry_price': 1.22420,
-        'entry_time': '2025-08-14T16:31:13.286Z',
-        'position_size': 1000,  # USD
-        'leverage': 10,
-        'confidence': 78
-    }
-]
+async def get_latest_approved_signals(limit: int = 5) -> List[Dict]:
+    """
+    Dynamically fetch the latest approved signals from ggshot_filter table.
+    Returns them in the format expected by the live position API.
+    """
+    from core.common.db import get_db_connection
+    
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT symbol, signal_direction, entry_price, created_at, confidence_score
+                    FROM ggshot_filter 
+                    WHERE filter_status = 'APPROVED' 
+                    ORDER BY created_at DESC 
+                    LIMIT %s
+                """, (limit,))
+                
+                results = cur.fetchall()
+                
+                # Generate demo position sizes for variety
+                position_sizes = [800, 1200, 600, 900, 1000]
+                
+                positions = []
+                for i, row in enumerate(results):
+                    symbol, direction, entry_price, created_at, confidence = row
+                    
+                    positions.append({
+                        'id': f'pos_{i+1:03d}',
+                        'symbol': symbol,
+                        'direction': direction,
+                        'entry_price': float(entry_price),
+                        'entry_time': created_at.isoformat() + 'Z',
+                        'position_size': position_sizes[i % len(position_sizes)],  # USD
+                        'leverage': 10,
+                        'confidence': int(float(confidence) * 100)  # Convert 0.57 to 57
+                    })
+                
+                return positions
+                
+    except Exception as e:
+        from core.common.logger import logger
+        logger.error(f"Failed to fetch latest signals: {e}")
+        
+        # Fallback to a minimal static set if database fails
+        return [
+            {
+                'id': 'pos_001',
+                'symbol': 'BTC/USDT',
+                'direction': 'LONG',
+                'entry_price': 43000.0,
+                'entry_time': datetime.now(timezone.utc).isoformat(),
+                'position_size': 1000,
+                'leverage': 10,
+                'confidence': 75
+            }
+        ]
+
+# Demo trading positions for ggShot-Pro bot (now dynamically loaded from ggshot_filter table)
+# This will be replaced by get_latest_approved_signals() at runtime
 
 def calculate_position_pnl(entry_price: float, current_price: float, position_size: float, direction: str, leverage: float) -> Dict[str, float]:
     """Calculate realistic P&L with leverage for a position."""
@@ -223,6 +230,9 @@ async def get_live_position_data():
     from core.common.logger import logger
     
     try:
+        # Get latest approved signals dynamically from database
+        demo_positions = await get_latest_approved_signals(5)
+        
         # Initialize price service (uses existing CCXT infrastructure)
         price_service = PriceService()
         
