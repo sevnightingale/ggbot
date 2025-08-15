@@ -292,13 +292,13 @@ export default function DemoPage() {
 
       {/* 3-Column Layout with Sharp Dividers */}
       <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="w-full max-w-[1500px] mx-auto grid grid-cols-[1fr_320px_1fr] gap-6 relative">
+        <div className="w-full max-w-[1680px] mx-auto grid grid-cols-[1fr_400px_1fr] gap-8 relative">
           
           {/* Left Vertical Divider - at left edge of center column */}
-          <div className="absolute left-[calc(50%-160px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
+          <div className="absolute left-[calc(50%-200px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
           
           {/* Right Vertical Divider - at right edge of center column */}
-          <div className="absolute right-[calc(50%-160px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
+          <div className="absolute right-[calc(50%-200px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
           
           {/* Left Column - Historical Performance */}
           <div className="hidden lg:block">
@@ -446,7 +446,7 @@ export default function DemoPage() {
                 </div>
                 <div className="gradient-divider mb-4"></div>
                 <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
-                  <table className="w-full text-footnote min-w-[500px]">
+                  <table className="w-full text-footnote">
                     <thead className="text-gray-400 border-b border-gray-700">
                       <tr>
                         <th className="text-left py-1 pr-2">PnL</th>
@@ -485,7 +485,7 @@ export default function DemoPage() {
                 <h3 className="text-subheader text-bone-200 mb-4">Closed Trades</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
-                  <table className="w-full text-footnote min-w-[500px]">
+                  <table className="w-full text-footnote">
                     <thead className="text-gray-400 border-b border-gray-700">
                       <tr>
                         <th className="text-left py-1 pr-2">PnL</th>
