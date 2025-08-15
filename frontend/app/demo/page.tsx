@@ -294,12 +294,6 @@ export default function DemoPage() {
       <div className="min-h-screen flex items-center justify-center p-8">
         <div className="w-full max-w-[1680px] mx-auto grid grid-cols-[1fr_400px_1fr] gap-8 relative">
           
-          {/* Left Vertical Divider - at left edge of center column */}
-          <div className="absolute left-[calc(50%-200px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
-          
-          {/* Right Vertical Divider - at right edge of center column */}
-          <div className="absolute right-[calc(50%-200px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
-          
           {/* Left Column - Historical Performance */}
           <div className="hidden lg:block">
             <div className="flex flex-col min-h-[500px] gap-6">
