@@ -196,6 +196,9 @@ class GGShotBotHandler(BaseBotHandler):
         signal_time = await self._get_ggshot_signal_time()
         if signal_time:
             context['timeSinceLastSignal'] = self.format_time_ago(signal_time)
+        else:
+            # If no signal time found, provide a default message
+            context['timeSinceLastSignal'] = 'No recent signals'
         
         return context
     
@@ -231,11 +234,19 @@ class GGShotBotHandler(BaseBotHandler):
     
     def _generate_idle_message(self, sub_phase: Optional[str], time_since: str) -> str:
         """Generate idle phase messages with rotation."""
-        messages = [
-            "Monitoring 140+ crypto pairs...",
-            "Waiting for high-confidence setup...",
-            f"Last signal: {time_since}"
-        ]
+        # Only include last signal message if we have actual signal time
+        if time_since == 'No recent signals':
+            messages = [
+                "Monitoring 140+ crypto pairs...",
+                "Waiting for high-confidence setup...",
+                "Scanning for trading opportunities..."
+            ]
+        else:
+            messages = [
+                "Monitoring 140+ crypto pairs...",
+                "Waiting for high-confidence setup...",
+                f"Last signal: {time_since}"
+            ]
         
         if sub_phase == "waiting":
             return messages[0]
@@ -368,12 +379,18 @@ class GGShotBotHandler(BaseBotHandler):
                         if isinstance(last_activity, str):
                             last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
                         
-                        # Ensure timezone awareness
+                        # Ensure timezone awareness - use UTC for consistency
+                        from datetime import timezone
                         if last_activity.tzinfo is None:
-                            last_activity = last_activity.replace(tzinfo=datetime.now().astimezone().tzinfo)
+                            last_activity = last_activity.replace(tzinfo=timezone.utc)
                         
-                        now = datetime.now(last_activity.tzinfo)
-                        return now - last_activity
+                        now = datetime.now(timezone.utc)
+                        time_diff = now - last_activity
+                        
+                        # Log for debugging
+                        self.logger.info(f"ggShot last signal: {last_activity}, Now: {now}, Diff: {time_diff}")
+                        
+                        return time_diff
                     
                     return None
                     
