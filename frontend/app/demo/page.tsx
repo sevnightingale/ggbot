@@ -184,8 +184,8 @@ export default function DemoPage() {
             {/* Transparent container that fills space */}
             <div className="flex flex-col min-h-[500px]">
               
-              {/* Performance Chart Card - Has background */}
-              <div className="relative mb-6 flex-1 corner-brackets">
+              {/* Performance Chart Card - Has background with all 4 corners */}
+              <div className="relative mb-6 flex-1 corner-top-left corner-top-right corner-bottom-left corner-bottom-right">
                 
                 {/* Chart Placeholder with Grid - Full card fill */}
                 <div className="h-64 flex items-center justify-center relative chart-grid bg-charcoal-700">
@@ -194,7 +194,7 @@ export default function DemoPage() {
               </div>
               
               {/* Key Metrics Card - Floating Elements */}
-              <div className="relative p-6 corner-brackets min-h-[120px]">
+              <div className="relative p-6 corner-top-left min-h-[120px]">
                 <div className="space-y-2">
                   <div className="flex justify-between items-center py-2">
                     <span className="text-footnote text-gray-400">Accuracy</span>
@@ -277,7 +277,7 @@ export default function DemoPage() {
             <div className="flex flex-col min-h-[500px]">
               
               {/* Active Trades Card - Floating Elements */}
-              <div className="relative p-6 mb-6 flex-1 corner-brackets min-h-[200px]">
+              <div className="relative p-6 mb-6 flex-1 corner-top-right min-h-[200px]">
                 
                 {/* Trades List - Floating Elements */}
                 <div className="space-y-4">
@@ -310,7 +310,7 @@ export default function DemoPage() {
               </div>
               
               {/* Portfolio Summary Card - Floating Elements */}
-              <div className="relative p-6 corner-brackets min-h-[80px]">
+              <div className="relative p-6 corner-top-right min-h-[80px]">
                 <div className="flex justify-between items-center">
                   <span className="text-footnote text-gray-400">Total P&L</span>
                   <span className="text-body text-red-400 font-medium">-$33.24</span>
