@@ -182,33 +182,29 @@ export default function DemoPage() {
           {/* Left Column - Performance */}
           <div className="hidden lg:block pr-8">
             {/* Transparent container that fills space */}
-            <div className="h-[600px] flex flex-col">
+            <div className="flex flex-col min-h-[500px]">
               
               {/* Performance Chart Card */}
-              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle mb-6 flex-1">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="w-2 h-2 bg-agent-extraction rounded-full"></div>
-                  <h3 className="text-subheader text-bone">Performance</h3>
-                </div>
+              <div className="relative bg-charcoal-700 p-6 mb-6 flex-1 corner-brackets">
                 
                 {/* Chart Placeholder */}
-                <div className="bg-charcoal-800 border border-charcoal-600 h-64 p-4 flex items-center justify-center">
-                  <div className="text-gray-500 text-footnote">📊 Chart Coming Soon</div>
+                <div className="bg-charcoal-600 h-64 p-4 flex items-center justify-center border border-charcoal-500">
+                  <div className="text-bone-400 text-footnote">📊 Chart Coming Soon</div>
                 </div>
               </div>
               
-              {/* Key Metrics Card */}
-              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle">
-                <div className="space-y-3">
-                  <div className="flex justify-between items-center">
+              {/* Key Metrics Card - Floating Elements */}
+              <div className="relative p-6 corner-brackets min-h-[120px]">
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-charcoal-600">
                     <span className="text-footnote text-gray-400">Accuracy</span>
                     <span className="text-body text-agent-extraction font-medium">95.2%</span>
                   </div>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center py-2 border-b border-charcoal-600">
                     <span className="text-footnote text-gray-400">Stop Loss Rate</span>
                     <span className="text-body text-green-400 font-medium">4.8%</span>
                   </div>
-                  <div className="flex justify-between items-center">
+                  <div className="flex justify-between items-center py-2">
                     <span className="text-footnote text-gray-400">Signals</span>
                     <span className="text-body text-bone font-medium">227</span>
                   </div>
@@ -276,18 +272,14 @@ export default function DemoPage() {
           {/* Right Column - Open Trades */}
           <div className="hidden lg:block pl-8">
             {/* Transparent container that fills space */}
-            <div className="h-[600px] flex flex-col">
+            <div className="flex flex-col min-h-[500px]">
               
-              {/* Active Trades Card */}
-              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle mb-6 flex-1">
-                <div className="flex items-center gap-2 mb-6">
-                  <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
-                  <h3 className="text-subheader text-bone">Open Trades</h3>
-                </div>
+              {/* Active Trades Card - Floating Elements */}
+              <div className="relative p-6 mb-6 flex-1 corner-brackets min-h-[200px]">
                 
-                {/* Trades List */}
-                <div className="space-y-4">
-                  <div className="bg-charcoal-800 border border-charcoal-600 p-4">
+                {/* Trades List - Floating Elements */}
+                <div className="space-y-6">
+                  <div className="py-3 border-b border-charcoal-600">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 bg-green-400 rounded-full"></div>
                       <span className="text-body text-bone font-medium">APE/USDT</span>
@@ -299,7 +291,7 @@ export default function DemoPage() {
                     </div>
                   </div>
                   
-                  <div className="bg-charcoal-800 border border-charcoal-600 p-4">
+                  <div className="py-3 border-b border-charcoal-600">
                     <div className="flex items-center gap-2 mb-2">
                       <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
                       <span className="text-body text-bone font-medium">BTC/USDT</span>
@@ -313,8 +305,8 @@ export default function DemoPage() {
                 </div>
               </div>
               
-              {/* Portfolio Summary Card */}
-              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle">
+              {/* Portfolio Summary Card - Floating Elements */}
+              <div className="relative p-6 corner-brackets min-h-[80px]">
                 <div className="flex justify-between items-center">
                   <span className="text-footnote text-gray-400">Total P&L</span>
                   <span className="text-body text-red-400 font-medium">-$33.24</span>

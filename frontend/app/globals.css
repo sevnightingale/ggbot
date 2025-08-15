@@ -18,6 +18,34 @@
   animation: flowPulse 2s ease-in-out infinite;
 }
 
+/* Corner Bracket Styling with Tapered Gradients */
+.corner-brackets::before,
+.corner-brackets::after {
+  content: '';
+  position: absolute;
+  width: 24px;
+  height: 24px;
+  opacity: 0.6;
+}
+
+/* Top-left corner bracket */
+.corner-brackets::before {
+  top: 0;
+  left: 0;
+  background: 
+    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) top/100% 2px no-repeat,
+    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) left/2px 100% no-repeat;
+}
+
+/* Bottom-right corner bracket */
+.corner-brackets::after {
+  bottom: 0;
+  right: 0;
+  background: 
+    linear-gradient(to left, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) bottom/100% 2px no-repeat,
+    linear-gradient(to top, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) right/2px 100% no-repeat;
+}
+
 /* Keep main body as pure charcoal void - no texture */
 body {
   /* Pure void background */
