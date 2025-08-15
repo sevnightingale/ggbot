@@ -357,8 +357,9 @@ body {
 }
 
 .ggbot-name {
+  font-family: 'Kanit', system-ui, sans-serif;
   font-size: 1.25rem;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--bone-200);
   letter-spacing: -0.02em;
   line-height: 1.2;
