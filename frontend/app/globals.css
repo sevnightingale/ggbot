@@ -18,39 +18,23 @@
   animation: flowPulse 2s ease-in-out infinite;
 }
 
-/* Extended Corner Brackets - Cover halfway across edges with gradient fade */
+/* Extended Corner Brackets - Only top-left with 70% fade */
 .corner-brackets {
   position: relative;
 }
 
-.corner-brackets::before,
-.corner-brackets::after {
+.corner-brackets::before {
   content: '';
   position: absolute;
-  opacity: 0.6;
-  pointer-events: none;
-}
-
-/* Top-left extended corner bracket */
-.corner-brackets::before {
   top: 0;
   left: 0;
-  width: 50%;
-  height: 50%;
+  width: 70%;
+  height: 70%;
+  opacity: 0.6;
+  pointer-events: none;
   background: 
-    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) top/100% 2px no-repeat,
-    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) left/2px 100% no-repeat;
-}
-
-/* Bottom-right extended corner bracket */
-.corner-brackets::after {
-  bottom: 0;
-  right: 0;
-  width: 50%;
-  height: 50%;
-  background: 
-    linear-gradient(to left, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) bottom/100% 2px no-repeat,
-    linear-gradient(to top, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) right/2px 100% no-repeat;
+    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) top/100% 2px no-repeat,
+    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) left/2px 100% no-repeat;
 }
 
 /* Chart Grid Background - Much more subtle */
