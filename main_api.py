@@ -205,22 +205,27 @@ async def bot_monitoring_task():
     # Main monitoring loop
     while True:
         try:
-            # Get active bot configs
-            active_configs = await bot_monitor.get_active_bot_configs()
+            # Get all bot configs (both active and inactive) for comprehensive monitoring
+            all_configs = await bot_monitor.get_all_bot_configs()
             
-            if active_configs:
-                logger.debug(f"Monitoring {len(active_configs)} active bots")
+            if all_configs:
+                active_count = sum(1 for config in all_configs if config.get('status') == 'active')
+                logger.debug(f"Monitoring {len(all_configs)} total bots ({active_count} active)")
                 
-                # Process each active bot using the proper monitor method
-                for bot_config in active_configs:
+                # Process each bot config
+                for bot_config in all_configs:
                     try:
-                        # Use the monitor's single bot method
-                        await bot_monitor.monitor_single_bot(bot_config)
+                        if bot_config.get('status') == 'active':
+                            # Use the monitor's single bot method for active bots
+                            await bot_monitor.monitor_single_bot(bot_config)
+                        else:
+                            # Send inactive status for inactive bots
+                            await bot_monitor.send_inactive_status(bot_config)
                         
                     except Exception as e:
                         logger.error(f"Error processing bot config {bot_config.get('config_id', 'unknown')}: {e}")
             else:
-                logger.debug("No active bots to monitor")
+                logger.debug("No bots found in database")
             
             # Send heartbeat to all connected clients
             if manager.active_connections:

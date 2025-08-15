@@ -68,6 +68,68 @@ class ActiveBotMonitor:
         """Inject WebSocket manager for broadcasting."""
         self.websocket_manager = manager
     
+    async def get_all_bot_configs(self) -> List[Dict[str, Any]]:
+        """
+        Get ALL bot configurations (both active and inactive) from config_instances table.
+        
+        Returns:
+            List[Dict]: All bot configurations with all needed data
+        """
+        try:
+            conn = self._get_db_connection()
+            try:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT 
+                            ci.config_id,
+                            ci.instance_name,
+                            ci.status,
+                            ci.hummingbot_account,
+                            ci.paper_balance_usd,
+                            c.config_name,
+                            c.config_type,
+                            c.config_data,
+                            c.user_id
+                        FROM config_instances ci
+                        JOIN configurations c ON ci.config_id = c.config_id
+                        ORDER BY c.config_type, ci.config_id
+                    """)
+                    
+                    results = cur.fetchall()
+                    
+                    # Convert RealDictRow to regular dict for easier handling
+                    all_configs = []
+                    for row in results:
+                        config = dict(row)
+                        # Parse config_data JSON
+                        if config['config_data']:
+                            try:
+                                config['config_data'] = json.loads(config['config_data']) \
+                                    if isinstance(config['config_data'], str) \
+                                    else config['config_data']
+                            except json.JSONDecodeError:
+                                logger.warning(
+                                    f"Failed to parse config_data for {config['config_id']}"
+                                )
+                                config['config_data'] = {}
+                        
+                        all_configs.append(config)
+                    
+                    logger.bind(module="active_bot_monitor").debug(
+                        f"Found {len(all_configs)} total bot configurations"
+                    )
+                    
+                    return all_configs
+                    
+            finally:
+                conn.close()
+                
+        except Exception as e:
+            logger.bind(module="active_bot_monitor").error(
+                f"Failed to get all bot configs: {str(e)}"
+            )
+            return []
+
     async def get_active_bot_configs(self) -> List[Dict[str, Any]]:
         """
         Get all active bot configurations from config_instances table.
@@ -250,13 +312,65 @@ class ActiveBotMonitor:
             str: Color name for frontend styling
         """
         color_map = {
-            "idle": "gray",
+            "inactive": "gray",
+            "idle": "blue",
             "extraction": "blue", 
             "decision": "green",
             "trading": "orange"
         }
         return color_map.get(phase, "gray")
     
+    async def send_inactive_status(self, bot_config: Dict[str, Any]):
+        """
+        Send inactive status for a stopped/disabled bot.
+        
+        Args:
+            bot_config: Bot configuration dictionary
+        """
+        try:
+            config_id = str(bot_config['config_id'])
+            bot_type = str(bot_config['config_type'])
+            user_id = str(bot_config['user_id'])
+            bot_name = bot_config.get('config_name') or f"Bot {config_id[:8]}"
+            
+            # Create bot_id for WebSocket
+            bot_id = self.generate_bot_id(config_id, bot_type)
+            
+            # Create inactive status update message
+            status_update = {
+                "type": "bot_status_update",
+                "bot_id": bot_id,
+                "bot_type": bot_type,
+                "config_id": config_id,
+                "bot_name": bot_name,
+                "user_id": user_id,
+                "status": {
+                    "phase": "inactive",
+                    "sub_phase": None,
+                    "color": "gray",
+                    "message": "Bot stopped",
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "showSpinner": False,
+                    "context": {}
+                }
+            }
+            
+            # Broadcast to users
+            if self.websocket_manager:
+                if hasattr(self.websocket_manager, 'active_connections'):
+                    # Send to all connected users for demo purposes
+                    for connected_user_id in self.websocket_manager.active_connections:
+                        await self.websocket_manager.broadcast_to_user(connected_user_id, status_update)
+            
+            logger.bind(module="active_bot_monitor").debug(
+                f"Bot {bot_id}: inactive - Bot stopped"
+            )
+            
+        except Exception as e:
+            logger.bind(module="active_bot_monitor").error(
+                f"Error sending inactive status for bot {config_id}: {str(e)}"
+            )
+
     async def broadcast_bot_status(self, bot_id: str, status_data: Dict[str, Any]):
         """
         Broadcast bot status to WebSocket subscribers.
