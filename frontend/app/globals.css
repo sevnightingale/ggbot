@@ -18,31 +18,39 @@
   animation: flowPulse 2s ease-in-out infinite;
 }
 
-/* Corner Bracket Styling - Simple L-shaped brackets */
+/* Extended Corner Brackets - Cover halfway across edges with gradient fade */
+.corner-brackets {
+  position: relative;
+}
+
 .corner-brackets::before,
 .corner-brackets::after {
   content: '';
   position: absolute;
-  width: 20px;
-  height: 20px;
   opacity: 0.6;
   pointer-events: none;
 }
 
-/* Top-left corner bracket */
+/* Top-left extended corner bracket */
 .corner-brackets::before {
   top: 0;
   left: 0;
-  border-top: 2px solid #e3e5e6;
-  border-left: 2px solid #e3e5e6;
+  width: 50%;
+  height: 50%;
+  background: 
+    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) top/100% 2px no-repeat,
+    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) left/2px 100% no-repeat;
 }
 
-/* Bottom-right corner bracket */
+/* Bottom-right extended corner bracket */
 .corner-brackets::after {
   bottom: 0;
   right: 0;
-  border-bottom: 2px solid #e3e5e6;
-  border-right: 2px solid #e3e5e6;
+  width: 50%;
+  height: 50%;
+  background: 
+    linear-gradient(to left, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) bottom/100% 2px no-repeat,
+    linear-gradient(to top, #e3e5e6 0%, #e3e5e6 10%, transparent 100%) right/2px 100% no-repeat;
 }
 
 /* Chart Grid Background - Much more subtle */
@@ -53,10 +61,7 @@
   background-size: 40px 40px;
 }
 
-/* Full Gradient Borders for Cards - Simplified */
-.gradient-borders {
-  border: 1px solid rgba(227, 229, 230, 0.3);
-}
+/* Remove basic borders - we're going back to extended corner brackets only */
 
 /* Gradient Horizontal Dividers */
 .gradient-divider {
