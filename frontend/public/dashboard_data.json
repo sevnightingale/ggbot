@@ -1,0 +1,801 @@
+{
+  "profitLossData": [
+    {
+      "date": "07-28",
+      "profit": -31.6,
+      "timestamp": "2025-07-28 00:31:09"
+    },
+    {
+      "date": "07-28",
+      "profit": -78.38,
+      "timestamp": "2025-07-28 03:00:15"
+    },
+    {
+      "date": "07-28",
+      "profit": -127.69,
+      "timestamp": "2025-07-28 03:00:26"
+    },
+    {
+      "date": "07-28",
+      "profit": -195.14,
+      "timestamp": "2025-07-28 05:00:14"
+    },
+    {
+      "date": "07-28",
+      "profit": -193.84,
+      "timestamp": "2025-07-28 05:00:24"
+    },
+    {
+      "date": "07-28",
+      "profit": -232.72,
+      "timestamp": "2025-07-28 06:00:21"
+    },
+    {
+      "date": "07-28",
+      "profit": -190.7,
+      "timestamp": "2025-07-28 14:00:16"
+    },
+    {
+      "date": "07-28",
+      "profit": -100.76,
+      "timestamp": "2025-07-28 15:00:15"
+    },
+    {
+      "date": "07-28",
+      "profit": -55.87,
+      "timestamp": "2025-07-28 16:01:12"
+    },
+    {
+      "date": "07-28",
+      "profit": -17.98,
+      "timestamp": "2025-07-28 21:00:19"
+    },
+    {
+      "date": "07-28",
+      "profit": 42.01,
+      "timestamp": "2025-07-28 23:00:47"
+    },
+    {
+      "date": "07-29",
+      "profit": 90.51,
+      "timestamp": "2025-07-29 01:00:24"
+    },
+    {
+      "date": "07-29",
+      "profit": 117.52,
+      "timestamp": "2025-07-29 02:00:32"
+    },
+    {
+      "date": "07-29",
+      "profit": 176.27,
+      "timestamp": "2025-07-29 02:30:23"
+    },
+    {
+      "date": "07-29",
+      "profit": 215.29,
+      "timestamp": "2025-07-29 14:30:18"
+    },
+    {
+      "date": "07-29",
+      "profit": 276.18,
+      "timestamp": "2025-07-29 14:56:14"
+    },
+    {
+      "date": "07-29",
+      "profit": 343.68,
+      "timestamp": "2025-07-29 15:00:18"
+    },
+    {
+      "date": "07-29",
+      "profit": 400.73,
+      "timestamp": "2025-07-29 15:00:50"
+    },
+    {
+      "date": "07-29",
+      "profit": 448.81,
+      "timestamp": "2025-07-29 16:32:11"
+    },
+    {
+      "date": "07-29",
+      "profit": 506.07,
+      "timestamp": "2025-07-29 20:00:37"
+    },
+    {
+      "date": "07-29",
+      "profit": 559.48,
+      "timestamp": "2025-07-29 20:39:14"
+    },
+    {
+      "date": "07-30",
+      "profit": 616.48,
+      "timestamp": "2025-07-30 09:49:11"
+    },
+    {
+      "date": "07-30",
+      "profit": 684.65,
+      "timestamp": "2025-07-30 11:30:15"
+    },
+    {
+      "date": "07-30",
+      "profit": 707.23,
+      "timestamp": "2025-07-30 12:00:22"
+    },
+    {
+      "date": "07-30",
+      "profit": 778.2,
+      "timestamp": "2025-07-30 19:00:32"
+    },
+    {
+      "date": "07-30",
+      "profit": 778.2,
+      "timestamp": "2025-07-30 19:00:58"
+    },
+    {
+      "date": "07-30",
+      "profit": 778.2,
+      "timestamp": "2025-07-30 19:01:09"
+    },
+    {
+      "date": "07-31",
+      "profit": 792.35,
+      "timestamp": "2025-07-31 14:24:11"
+    },
+    {
+      "date": "08-01",
+      "profit": 776.37,
+      "timestamp": "2025-08-01 10:00:16"
+    },
+    {
+      "date": "08-04",
+      "profit": 725.9,
+      "timestamp": "2025-08-04 01:00:18"
+    },
+    {
+      "date": "08-04",
+      "profit": 837.61,
+      "timestamp": "2025-08-04 01:00:26"
+    },
+    {
+      "date": "08-04",
+      "profit": 874.3,
+      "timestamp": "2025-08-04 09:00:22"
+    },
+    {
+      "date": "08-04",
+      "profit": 912.7,
+      "timestamp": "2025-08-04 12:00:19"
+    },
+    {
+      "date": "08-04",
+      "profit": 951.92,
+      "timestamp": "2025-08-04 14:00:23"
+    },
+    {
+      "date": "08-04",
+      "profit": 954.58,
+      "timestamp": "2025-08-04 16:30:19"
+    },
+    {
+      "date": "08-04",
+      "profit": 1008.57,
+      "timestamp": "2025-08-04 16:48:13"
+    },
+    {
+      "date": "08-04",
+      "profit": 980.15,
+      "timestamp": "2025-08-04 17:30:27"
+    },
+    {
+      "date": "08-04",
+      "profit": 1026.17,
+      "timestamp": "2025-08-04 18:00:20"
+    },
+    {
+      "date": "08-04",
+      "profit": 992.31,
+      "timestamp": "2025-08-04 19:00:20"
+    },
+    {
+      "date": "08-04",
+      "profit": 992.31,
+      "timestamp": "2025-08-04 21:00:17"
+    },
+    {
+      "date": "08-04",
+      "profit": 959.17,
+      "timestamp": "2025-08-04 22:00:23"
+    },
+    {
+      "date": "08-05",
+      "profit": 925.56,
+      "timestamp": "2025-08-05 10:00:32"
+    },
+    {
+      "date": "08-05",
+      "profit": 884.78,
+      "timestamp": "2025-08-05 10:49:16"
+    },
+    {
+      "date": "08-05",
+      "profit": 949.93,
+      "timestamp": "2025-08-05 12:00:23"
+    },
+    {
+      "date": "08-05",
+      "profit": 1046.56,
+      "timestamp": "2025-08-05 12:00:39"
+    },
+    {
+      "date": "08-05",
+      "profit": 1133.74,
+      "timestamp": "2025-08-05 12:00:50"
+    },
+    {
+      "date": "08-06",
+      "profit": 1133.74,
+      "timestamp": "2025-08-06 17:00:20"
+    },
+    {
+      "date": "08-06",
+      "profit": 1190.71,
+      "timestamp": "2025-08-06 18:00:17"
+    },
+    {
+      "date": "08-06",
+      "profit": 1262.93,
+      "timestamp": "2025-08-06 18:05:17"
+    },
+    {
+      "date": "08-07",
+      "profit": 1314.21,
+      "timestamp": "2025-08-07 08:32:13"
+    },
+    {
+      "date": "08-07",
+      "profit": 1377.26,
+      "timestamp": "2025-08-07 08:47:19"
+    },
+    {
+      "date": "08-07",
+      "profit": 1422.29,
+      "timestamp": "2025-08-07 10:00:18"
+    },
+    {
+      "date": "08-07",
+      "profit": 1482.29,
+      "timestamp": "2025-08-07 10:30:13"
+    },
+    {
+      "date": "08-07",
+      "profit": 1536.29,
+      "timestamp": "2025-08-07 10:30:31"
+    },
+    {
+      "date": "08-07",
+      "profit": 1536.29,
+      "timestamp": "2025-08-07 10:30:51"
+    },
+    {
+      "date": "08-07",
+      "profit": 1600.16,
+      "timestamp": "2025-08-07 10:31:06"
+    },
+    {
+      "date": "08-07",
+      "profit": 1632.54,
+      "timestamp": "2025-08-07 10:31:30"
+    },
+    {
+      "date": "08-07",
+      "profit": 1709.71,
+      "timestamp": "2025-08-07 10:31:32"
+    },
+    {
+      "date": "08-07",
+      "profit": 1757.62,
+      "timestamp": "2025-08-07 10:31:44"
+    },
+    {
+      "date": "08-07",
+      "profit": 1813.36,
+      "timestamp": "2025-08-07 10:40:12"
+    },
+    {
+      "date": "08-07",
+      "profit": 1865.9,
+      "timestamp": "2025-08-07 10:40:24"
+    },
+    {
+      "date": "08-07",
+      "profit": 1909.24,
+      "timestamp": "2025-08-07 11:00:19"
+    },
+    {
+      "date": "08-07",
+      "profit": 1941.65,
+      "timestamp": "2025-08-07 11:00:55"
+    },
+    {
+      "date": "08-07",
+      "profit": 1941.65,
+      "timestamp": "2025-08-07 11:01:06"
+    },
+    {
+      "date": "08-07",
+      "profit": 2014.04,
+      "timestamp": "2025-08-07 11:01:33"
+    },
+    {
+      "date": "08-07",
+      "profit": 2068.81,
+      "timestamp": "2025-08-07 11:12:18"
+    },
+    {
+      "date": "08-07",
+      "profit": 2128.6,
+      "timestamp": "2025-08-07 11:22:15"
+    },
+    {
+      "date": "08-07",
+      "profit": 2212.52,
+      "timestamp": "2025-08-07 11:30:38"
+    },
+    {
+      "date": "08-07",
+      "profit": 2269.89,
+      "timestamp": "2025-08-07 12:00:26"
+    },
+    {
+      "date": "08-07",
+      "profit": 2321.95,
+      "timestamp": "2025-08-07 12:30:17"
+    },
+    {
+      "date": "08-07",
+      "profit": 2379.92,
+      "timestamp": "2025-08-07 14:00:33"
+    },
+    {
+      "date": "08-07",
+      "profit": 2443.13,
+      "timestamp": "2025-08-07 14:00:49"
+    },
+    {
+      "date": "08-07",
+      "profit": 2493.74,
+      "timestamp": "2025-08-07 14:00:59"
+    },
+    {
+      "date": "08-07",
+      "profit": 2541.43,
+      "timestamp": "2025-08-07 14:15:18"
+    },
+    {
+      "date": "08-07",
+      "profit": 2592.45,
+      "timestamp": "2025-08-07 21:20:11"
+    },
+    {
+      "date": "08-07",
+      "profit": 2658.6,
+      "timestamp": "2025-08-07 21:30:19"
+    },
+    {
+      "date": "08-07",
+      "profit": 2712.61,
+      "timestamp": "2025-08-07 22:30:15"
+    },
+    {
+      "date": "08-07",
+      "profit": 2761.23,
+      "timestamp": "2025-08-07 23:00:24"
+    },
+    {
+      "date": "08-07",
+      "profit": 2828.85,
+      "timestamp": "2025-08-07 23:00:34"
+    },
+    {
+      "date": "08-07",
+      "profit": 2890.0,
+      "timestamp": "2025-08-07 23:00:45"
+    },
+    {
+      "date": "08-07",
+      "profit": 2941.75,
+      "timestamp": "2025-08-07 23:50:11"
+    },
+    {
+      "date": "08-08",
+      "profit": 2902.46,
+      "timestamp": "2025-08-08 00:30:17"
+    },
+    {
+      "date": "08-08",
+      "profit": 2969.84,
+      "timestamp": "2025-08-08 01:00:23"
+    },
+    {
+      "date": "08-08",
+      "profit": 2971.88,
+      "timestamp": "2025-08-08 09:30:19"
+    },
+    {
+      "date": "08-08",
+      "profit": 3012.37,
+      "timestamp": "2025-08-08 14:00:46"
+    },
+    {
+      "date": "08-08",
+      "profit": 3066.83,
+      "timestamp": "2025-08-08 14:01:01"
+    },
+    {
+      "date": "08-08",
+      "profit": 3119.47,
+      "timestamp": "2025-08-08 19:00:21"
+    },
+    {
+      "date": "08-08",
+      "profit": 3170.8,
+      "timestamp": "2025-08-08 20:00:21"
+    },
+    {
+      "date": "08-09",
+      "profit": 3207.54,
+      "timestamp": "2025-08-09 06:00:30"
+    },
+    {
+      "date": "08-09",
+      "profit": 3182.01,
+      "timestamp": "2025-08-09 07:00:21"
+    },
+    {
+      "date": "08-09",
+      "profit": 3103.36,
+      "timestamp": "2025-08-09 09:00:15"
+    },
+    {
+      "date": "08-09",
+      "profit": 3076.43,
+      "timestamp": "2025-08-09 11:00:19"
+    },
+    {
+      "date": "08-10",
+      "profit": 3129.9,
+      "timestamp": "2025-08-10 04:00:30"
+    },
+    {
+      "date": "08-11",
+      "profit": 3093.86,
+      "timestamp": "2025-08-11 11:30:17"
+    },
+    {
+      "date": "08-11",
+      "profit": 3093.86,
+      "timestamp": "2025-08-11 11:30:29"
+    },
+    {
+      "date": "08-11",
+      "profit": 3089.88,
+      "timestamp": "2025-08-11 12:00:36"
+    },
+    {
+      "date": "08-11",
+      "profit": 3095.96,
+      "timestamp": "2025-08-11 12:00:49"
+    },
+    {
+      "date": "08-11",
+      "profit": 3039.6,
+      "timestamp": "2025-08-11 22:00:23"
+    },
+    {
+      "date": "08-11",
+      "profit": 2994.1,
+      "timestamp": "2025-08-11 22:00:48"
+    },
+    {
+      "date": "08-11",
+      "profit": 2935.37,
+      "timestamp": "2025-08-11 22:01:25"
+    },
+    {
+      "date": "08-11",
+      "profit": 2897.18,
+      "timestamp": "2025-08-11 22:13:13"
+    },
+    {
+      "date": "08-11",
+      "profit": 2850.79,
+      "timestamp": "2025-08-11 22:30:15"
+    },
+    {
+      "date": "08-12",
+      "profit": 2833.58,
+      "timestamp": "2025-08-12 00:00:27"
+    },
+    {
+      "date": "08-12",
+      "profit": 2798.76,
+      "timestamp": "2025-08-12 05:30:27"
+    },
+    {
+      "date": "08-12",
+      "profit": 2759.0,
+      "timestamp": "2025-08-12 11:00:54"
+    },
+    {
+      "date": "08-12",
+      "profit": 2787.36,
+      "timestamp": "2025-08-12 17:03:11"
+    },
+    {
+      "date": "08-12",
+      "profit": 2836.29,
+      "timestamp": "2025-08-12 20:30:14"
+    },
+    {
+      "date": "08-12",
+      "profit": 2866.44,
+      "timestamp": "2025-08-12 20:30:25"
+    },
+    {
+      "date": "08-12",
+      "profit": 2891.51,
+      "timestamp": "2025-08-12 21:00:23"
+    },
+    {
+      "date": "08-13",
+      "profit": 2918.27,
+      "timestamp": "2025-08-13 03:44:15"
+    },
+    {
+      "date": "08-13",
+      "profit": 2962.15,
+      "timestamp": "2025-08-13 03:51:10"
+    },
+    {
+      "date": "08-13",
+      "profit": 3006.18,
+      "timestamp": "2025-08-13 08:00:27"
+    },
+    {
+      "date": "08-13",
+      "profit": 3023.08,
+      "timestamp": "2025-08-13 08:30:17"
+    },
+    {
+      "date": "08-13",
+      "profit": 3023.97,
+      "timestamp": "2025-08-13 09:00:19"
+    },
+    {
+      "date": "08-13",
+      "profit": 3047.88,
+      "timestamp": "2025-08-13 10:00:21"
+    },
+    {
+      "date": "08-13",
+      "profit": 3060.39,
+      "timestamp": "2025-08-13 10:30:26"
+    },
+    {
+      "date": "08-13",
+      "profit": 3055.68,
+      "timestamp": "2025-08-13 10:30:37"
+    }
+  ],
+  "tradeStats": {
+    "totalTrades": 117,
+    "winCount": 83,
+    "lossCount": 27,
+    "neutralCount": 7,
+    "winRate": 70.9,
+    "lossRate": 23.1,
+    "neutralRate": 6.0,
+    "avgProfitPerTrade": 49.13,
+    "avgLossPerTrade": -37.87,
+    "totalProfit": 3055.68,
+    "avgTradeDuration": "4h 15m"
+  },
+  "closedTrades": [
+    {
+      "symbol": "NEO/USDT",
+      "direction": "LONG",
+      "pnl": -4.71,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.67,
+      "status": "Buy",
+      "date": "2025-08-13 10:30:37"
+    },
+    {
+      "symbol": "ROSE/USDT",
+      "direction": "LONG",
+      "pnl": 12.51,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.76,
+      "status": "Sell(1/4)",
+      "date": "2025-08-13 10:30:26"
+    },
+    {
+      "symbol": "COTI/USDT",
+      "direction": "LONG",
+      "pnl": 23.91,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.76,
+      "status": "Sell(2/4)",
+      "date": "2025-08-13 10:00:21"
+    },
+    {
+      "symbol": "CAKE/USDT",
+      "direction": "LONG",
+      "pnl": 0.89,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.87,
+      "status": "Buy",
+      "date": "2025-08-13 09:00:19"
+    },
+    {
+      "symbol": "CHR/USDT",
+      "direction": "LONG",
+      "pnl": 16.9,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.8,
+      "status": "Sell(3/4)",
+      "date": "2025-08-13 08:30:17"
+    },
+    {
+      "symbol": "STRK/USDT",
+      "direction": "LONG",
+      "pnl": 44.03,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.53,
+      "status": "Sell(3/4)",
+      "date": "2025-08-13 08:00:27"
+    },
+    {
+      "symbol": "TIA/USDT",
+      "direction": "LONG",
+      "pnl": 43.88,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.5,
+      "status": "Sell(1/4)",
+      "date": "2025-08-13 03:51:10"
+    },
+    {
+      "symbol": "PYTH/USDT",
+      "direction": "LONG",
+      "pnl": 26.76,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.87,
+      "status": "Sell(1/4)",
+      "date": "2025-08-13 03:44:15"
+    },
+    {
+      "symbol": "ZIL/USDT",
+      "direction": "LONG",
+      "pnl": 25.07,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.64,
+      "status": "Sell(2/4)",
+      "date": "2025-08-12 21:00:23"
+    },
+    {
+      "symbol": "APT/USDT",
+      "direction": "LONG",
+      "pnl": 30.15,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.69,
+      "status": "Sell(1/4)",
+      "date": "2025-08-12 20:30:25"
+    },
+    {
+      "symbol": "INJ/USDT",
+      "direction": "LONG",
+      "pnl": 48.93,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.73,
+      "status": "Sell(3/4)",
+      "date": "2025-08-12 20:30:14"
+    },
+    {
+      "symbol": "RUNE/USDT",
+      "direction": "LONG",
+      "pnl": 28.36,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.69,
+      "status": "Sell(1/4)",
+      "date": "2025-08-12 17:03:11"
+    },
+    {
+      "symbol": "STORJ/USDT",
+      "direction": "SHORT",
+      "pnl": -39.76,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.58,
+      "status": "Stopped Out",
+      "date": "2025-08-12 11:00:54"
+    },
+    {
+      "symbol": "QTUM/USDT",
+      "direction": "SHORT",
+      "pnl": -34.82,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.61,
+      "status": "Partial Targets Achieved",
+      "date": "2025-08-12 05:30:27"
+    },
+    {
+      "symbol": "LQTY/USDT",
+      "direction": "SHORT",
+      "pnl": -17.21,
+      "positionSize": 1000,
+      "entryPrice": 0.0,
+      "confidence": 0.58,
+      "status": "Buy",
+      "date": "2025-08-12 00:00:27"
+    }
+  ],
+  "openTrades": [
+    {
+      "symbol": "NOT/USDT",
+      "direction": "SHORT",
+      "pnl": -22.5,
+      "positionSize": 750,
+      "entryPrice": 0.0,
+      "confidence": 0.45
+    },
+    {
+      "symbol": "STORJ/USDT",
+      "direction": "LONG",
+      "pnl": -17.0,
+      "positionSize": 750,
+      "entryPrice": 0.0,
+      "confidence": 0.36
+    },
+    {
+      "symbol": "BAKE/USDT",
+      "direction": "LONG",
+      "pnl": -6.0,
+      "positionSize": 750,
+      "entryPrice": 0.0,
+      "confidence": 0.38
+    },
+    {
+      "symbol": "OGN/USDT",
+      "direction": "LONG",
+      "pnl": 2.0,
+      "positionSize": 750,
+      "entryPrice": 0.0,
+      "confidence": 0.34
+    },
+    {
+      "symbol": "RLC/USDT",
+      "direction": "LONG",
+      "pnl": 13.0,
+      "positionSize": 750,
+      "entryPrice": 0.0,
+      "confidence": 0.36
+    }
+  ],
+  "metadata": {
+    "totalApprovedSignals": 117,
+    "dataRange": "2025-07-28 to 2025-08-13",
+    "processedAt": "2025-08-15T07:49:36.852122"
+  }
+}
