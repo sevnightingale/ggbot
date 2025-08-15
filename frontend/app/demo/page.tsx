@@ -185,10 +185,10 @@ export default function DemoPage() {
             <div className="flex flex-col min-h-[500px]">
               
               {/* Performance Chart Card */}
-              <div className="relative bg-charcoal-700 p-6 mb-6 flex-1 corner-brackets gradient-borders">
+              <div className="relative mb-6 flex-1 corner-brackets gradient-borders">
                 
-                {/* Chart Placeholder with Grid */}
-                <div className="h-64 p-4 flex items-center justify-center relative chart-grid">
+                {/* Chart Placeholder with Grid - Full card fill */}
+                <div className="h-64 flex items-center justify-center relative chart-grid bg-charcoal-700">
                   <div className="text-bone-400 text-footnote relative z-10">📊 Chart Coming Soon</div>
                 </div>
               </div>

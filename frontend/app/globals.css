@@ -18,60 +18,44 @@
   animation: flowPulse 2s ease-in-out infinite;
 }
 
-/* Corner Bracket Styling with Tapered Gradients */
+/* Corner Bracket Styling - Simple L-shaped brackets */
 .corner-brackets::before,
 .corner-brackets::after {
   content: '';
   position: absolute;
-  width: 24px;
-  height: 24px;
+  width: 20px;
+  height: 20px;
   opacity: 0.6;
+  pointer-events: none;
 }
 
 /* Top-left corner bracket */
 .corner-brackets::before {
   top: 0;
   left: 0;
-  background: 
-    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) top/100% 2px no-repeat,
-    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) left/2px 100% no-repeat;
+  border-top: 2px solid #e3e5e6;
+  border-left: 2px solid #e3e5e6;
 }
 
 /* Bottom-right corner bracket */
 .corner-brackets::after {
   bottom: 0;
   right: 0;
-  background: 
-    linear-gradient(to left, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) bottom/100% 2px no-repeat,
-    linear-gradient(to top, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) right/2px 100% no-repeat;
+  border-bottom: 2px solid #e3e5e6;
+  border-right: 2px solid #e3e5e6;
 }
 
-/* Chart Grid Background */
+/* Chart Grid Background - Much more subtle */
 .chart-grid {
   background-image: 
-    linear-gradient(rgba(227, 229, 230, 0.1) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(227, 229, 230, 0.1) 1px, transparent 1px);
-  background-size: 20px 20px;
+    linear-gradient(rgba(227, 229, 230, 0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(227, 229, 230, 0.03) 1px, transparent 1px);
+  background-size: 40px 40px;
 }
 
-/* Full Gradient Borders for Cards */
+/* Full Gradient Borders for Cards - Simplified */
 .gradient-borders {
-  position: relative;
-}
-
-.gradient-borders::before {
-  content: '';
-  position: absolute;
-  inset: 0;
-  padding: 1px;
-  background: 
-    linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) top/100% 1px no-repeat,
-    linear-gradient(to bottom, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) right/1px 100% no-repeat,
-    linear-gradient(to left, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) bottom/100% 1px no-repeat,
-    linear-gradient(to top, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) left/1px 100% no-repeat;
-  opacity: 0.4;
-  pointer-events: none;
-  z-index: 1;
+  border: 1px solid rgba(227, 229, 230, 0.3);
 }
 
 /* Gradient Horizontal Dividers */
