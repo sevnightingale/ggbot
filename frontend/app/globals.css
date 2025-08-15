@@ -46,6 +46,42 @@
     linear-gradient(to top, #e3e5e6 0%, #e3e5e6 50%, transparent 100%) right/2px 100% no-repeat;
 }
 
+/* Chart Grid Background */
+.chart-grid {
+  background-image: 
+    linear-gradient(rgba(227, 229, 230, 0.1) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(227, 229, 230, 0.1) 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Full Gradient Borders for Cards */
+.gradient-borders {
+  position: relative;
+}
+
+.gradient-borders::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  background: 
+    linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) top/100% 1px no-repeat,
+    linear-gradient(to bottom, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) right/1px 100% no-repeat,
+    linear-gradient(to left, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) bottom/100% 1px no-repeat,
+    linear-gradient(to top, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%) left/1px 100% no-repeat;
+  opacity: 0.4;
+  pointer-events: none;
+  z-index: 1;
+}
+
+/* Gradient Horizontal Dividers */
+.gradient-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%);
+  opacity: 0.4;
+  margin: 12px 0;
+}
+
 /* Keep main body as pure charcoal void - no texture */
 body {
   /* Pure void background */
