@@ -25,7 +25,7 @@ export default function DemoPage() {
   } = useBotStore()
   
   // WebSocket connection for real-time updates
-  const { isConnected, isLoadingBots } = useBotWebSocket(DEMO_USER_ID)
+  const { isLoadingBots } = useBotWebSocket(DEMO_USER_ID)
   
   const demoBots = getBotsByUser(DEMO_USER_ID)
 
@@ -161,53 +161,66 @@ export default function DemoPage() {
 
   return (
     <div className="min-h-screen bg-charcoal-900 relative">
-      {/* Connection Status */}
-      <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
+      {/* Connection Status - Hidden for now to avoid layout interference */}
+      {/* <div className="absolute top-4 right-4 flex items-center gap-2 z-50">
         <div className={`w-3 h-3 rounded-full ${isConnected ? 'bg-green-400' : 'bg-red-400'}`}></div>
         <span className="text-footnote text-gray-400">
           {isConnected ? 'Connected' : 'Disconnected'}
         </span>
-      </div>
+      </div> */}
 
-      {/* 3-Column Desktop Layout */}
+      {/* 3-Column Layout with Sharp Dividers */}
       <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="flex w-full max-w-7xl mx-auto gap-8 items-center">
+        <div className="w-full max-w-7xl mx-auto grid grid-cols-3 relative">
           
-          {/* Left Panel - Performance */}
-          <div className="hidden lg:block w-80 h-[600px]">
-            <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 h-full p-6 shadow-2xl paper-texture-subtle">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-2 h-2 bg-agent-extraction rounded-full"></div>
-                <h3 className="text-subheader text-bone">Performance</h3>
+          {/* Left Vertical Divider */}
+          <div className="absolute left-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60 transform -translate-x-0.5"></div>
+          
+          {/* Right Vertical Divider */}
+          <div className="absolute right-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60 transform translate-x-0.5"></div>
+          
+          {/* Left Column - Performance */}
+          <div className="hidden lg:block pr-8">
+            {/* Transparent container that fills space */}
+            <div className="h-[600px] flex flex-col">
+              
+              {/* Performance Chart Card */}
+              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle mb-6 flex-1">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-2 h-2 bg-agent-extraction rounded-full"></div>
+                  <h3 className="text-subheader text-bone">Performance</h3>
+                </div>
+                
+                {/* Chart Placeholder */}
+                <div className="bg-charcoal-800 border border-charcoal-600 h-64 p-4 flex items-center justify-center">
+                  <div className="text-gray-500 text-footnote">📊 Chart Coming Soon</div>
+                </div>
               </div>
               
-              {/* Chart Placeholder */}
-              <div className="bg-charcoal-800 border border-charcoal-600 h-80 mb-6 p-4 flex items-center justify-center">
-                <div className="text-gray-500 text-footnote">📊 Chart Coming Soon</div>
-              </div>
-              
-              {/* Key Metrics */}
-              <div className="space-y-3">
-                <div className="flex justify-between items-center">
-                  <span className="text-footnote text-gray-400">Accuracy</span>
-                  <span className="text-body text-agent-extraction font-medium">95.2%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-footnote text-gray-400">Stop Loss Rate</span>
-                  <span className="text-body text-green-400 font-medium">4.8%</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-footnote text-gray-400">Signals</span>
-                  <span className="text-body text-bone font-medium">227</span>
+              {/* Key Metrics Card */}
+              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle">
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">Accuracy</span>
+                    <span className="text-body text-agent-extraction font-medium">95.2%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">Stop Loss Rate</span>
+                    <span className="text-body text-green-400 font-medium">4.8%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">Signals</span>
+                    <span className="text-body text-bone font-medium">227</span>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Center Column - ggbot Component */}
-          <div className="flex-1 flex flex-col items-center max-w-md">
+          {/* Center Column - ggbot Component (Fixed Width) */}
+          <div className="flex flex-col items-center justify-center px-8">
             {/* ggbot with flanking arrows/plus */}
-            <div className="flex items-center gap-16 mb-6">
+            <div className="flex items-center gap-8 mb-6">
               <button 
                 className={`text-3xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
                   currentBotIndex === 0 
@@ -260,43 +273,48 @@ export default function DemoPage() {
             </div>
           </div>
 
-          {/* Right Panel - Open Trades */}
-          <div className="hidden lg:block w-80 h-[600px]">
-            <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 h-full p-6 shadow-2xl paper-texture-subtle">
-              <div className="flex items-center gap-2 mb-6">
-                <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
-                <h3 className="text-subheader text-bone">Open Trades</h3>
-              </div>
+          {/* Right Column - Open Trades */}
+          <div className="hidden lg:block pl-8">
+            {/* Transparent container that fills space */}
+            <div className="h-[600px] flex flex-col">
               
-              {/* Trades List */}
-              <div className="space-y-4">
-                <div className="bg-charcoal-800 border border-charcoal-600 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                    <span className="text-body text-bone font-medium">APE/USDT</span>
-                    <span className="text-footnote text-gray-400">SHORT</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-footnote text-gray-400">52% confidence</span>
-                    <span className="text-body text-red-400 font-medium">-$45.32</span>
-                  </div>
+              {/* Active Trades Card */}
+              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle mb-6 flex-1">
+                <div className="flex items-center gap-2 mb-6">
+                  <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
+                  <h3 className="text-subheader text-bone">Open Trades</h3>
                 </div>
                 
-                <div className="bg-charcoal-800 border border-charcoal-600 p-4">
-                  <div className="flex items-center gap-2 mb-2">
-                    <div className="w-2 h-2 bg-yellow-400 rounded-full"></div>
-                    <span className="text-body text-bone font-medium">BTC/USDT</span>
-                    <span className="text-footnote text-gray-400">LONG</span>
+                {/* Trades List */}
+                <div className="space-y-4">
+                  <div className="bg-charcoal-800 border border-charcoal-600 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                      <span className="text-body text-bone font-medium">APE/USDT</span>
+                      <span className="text-footnote text-gray-400">SHORT</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-footnote text-gray-400">52% confidence</span>
+                      <span className="text-body text-red-400 font-medium">-$45.32</span>
+                    </div>
                   </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-footnote text-gray-400">67% confidence</span>
-                    <span className="text-body text-green-400 font-medium">+$12.08</span>
+                  
+                  <div className="bg-charcoal-800 border border-charcoal-600 p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
+                      <span className="text-body text-bone font-medium">BTC/USDT</span>
+                      <span className="text-footnote text-gray-400">LONG</span>
+                    </div>
+                    <div className="flex justify-between items-center">
+                      <span className="text-footnote text-gray-400">67% confidence</span>
+                      <span className="text-body text-green-400 font-medium">+$12.08</span>
+                    </div>
                   </div>
                 </div>
               </div>
               
-              {/* Total P&L */}
-              <div className="mt-6 pt-4 border-t border-charcoal-600">
+              {/* Portfolio Summary Card */}
+              <div className="bg-charcoal-900/90 backdrop-blur-sm border border-charcoal-700/80 p-6 shadow-2xl paper-texture-subtle">
                 <div className="flex justify-between items-center">
                   <span className="text-footnote text-gray-400">Total P&L</span>
                   <span className="text-body text-red-400 font-medium">-$33.24</span>
