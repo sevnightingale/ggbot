@@ -10,56 +10,68 @@ import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 // Production user ID from backend
 const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001"
 
-// Sample profit/loss data (from last 2 weeks of signals_cleaned_fix.csv)
-const profitLossData = [
-  { date: '08-12', profit: 0 },
-  { date: '08-12', profit: 25.07 },
-  { date: '08-12', profit: 87.10 },
-  { date: '08-13', profit: 130.95 },
-  { date: '08-13', profit: 147.74 },
-  { date: '08-13', profit: 164.50 },
-  { date: '08-13', profit: 188.39 },
-  { date: '08-13', profit: 232.23 },
-  { date: '08-13', profit: 276.07 },
-  { date: '08-13', profit: 295.95 },
-  { date: '08-13', profit: 296.84 },
-  { date: '08-13', profit: 284.07 },
-  { date: '08-13', profit: 279.36 }
-]
-
-// Trade statistics (calculated from signals_cleaned_fix.csv)
-const tradeStats = {
-  totalTrades: 20,
-  winCount: 15,
-  lossCount: 3,
-  neutralCount: 2,
-  winRate: 75.0,
-  lossRate: 15.0,
-  neutralRate: 10.0,
-  avgProfitPerTrade: 18.97,
-  avgLossPerTrade: -3.69,
-  avgTradeDuration: '5h 24m'
+// Real ggShot trading data (117 approved signals from 2-week test period)
+const realTradingData = {
+  profitLossData: [
+    { date: '07-28', profit: -31.6 },
+    { date: '07-28', profit: -78.38 },
+    { date: '07-29', profit: -32.49 },
+    { date: '07-29', profit: 41.02 },
+    { date: '07-30', profit: 86.91 },
+    { date: '07-30', profit: 192.44 },
+    { date: '07-31', profit: 264.27 },
+    { date: '08-01', profit: 334.40 },
+    { date: '08-02', profit: 562.91 },
+    { date: '08-03', profit: 735.44 },
+    { date: '08-04', profit: 1187.95 },
+    { date: '08-05', profit: 1436.84 },
+    { date: '08-06', profit: 1789.33 },
+    { date: '08-07', profit: 2156.44 },
+    { date: '08-08', profit: 2389.21 },
+    { date: '08-09', profit: 2534.88 },
+    { date: '08-10', profit: 2798.76 },
+    { date: '08-11', profit: 2934.23 },
+    { date: '08-12', profit: 3055.68 },
+    { date: '08-13', profit: 3055.68 }
+  ],
+  tradeStats: {
+    totalTrades: 117,
+    winCount: 83,
+    lossCount: 27,
+    neutralCount: 7,
+    winRate: 70.9,
+    lossRate: 23.1,
+    neutralRate: 6.0,
+    avgProfitPerTrade: 49.13,
+    avgLossPerTrade: -37.87,
+    totalProfit: 3055.68,
+    avgTradeDuration: '4h 15m'
+  },
+  closedTrades: [
+    { symbol: 'NEO/USDT', direction: 'LONG', pnl: -4.71, positionSize: 1000, entryPrice: 6.525 },
+    { symbol: 'ROSE/USDT', direction: 'LONG', pnl: 12.51, positionSize: 1000, entryPrice: 0.0299 },
+    { symbol: 'COTI/USDT', direction: 'LONG', pnl: 23.91, positionSize: 1000, entryPrice: 0.0574 },
+    { symbol: 'CAKE/USDT', direction: 'LONG', pnl: 0.89, positionSize: 1000, entryPrice: 2.870 },
+    { symbol: 'CHR/USDT', direction: 'LONG', pnl: 16.90, positionSize: 1000, entryPrice: 0.0983 },
+    { symbol: 'STRK/USDT', direction: 'LONG', pnl: 44.03, positionSize: 1000, entryPrice: 0.137 },
+    { symbol: 'TIA/USDT', direction: 'LONG', pnl: 43.88, positionSize: 1000, entryPrice: 1.851 },
+    { symbol: 'PYTH/USDT', direction: 'LONG', pnl: 26.76, positionSize: 1000, entryPrice: 0.128 },
+    { symbol: 'ZIL/USDT', direction: 'LONG', pnl: 25.07, positionSize: 1000, entryPrice: 0.0119 },
+    { symbol: 'SKL/USDT', direction: 'LONG', pnl: 62.03, positionSize: 1000, entryPrice: 0.0220 },
+    { symbol: 'APT/USDT', direction: 'LONG', pnl: 30.15, positionSize: 1000, entryPrice: 4.778 },
+    { symbol: 'INJ/USDT', direction: 'LONG', pnl: 48.93, positionSize: 1000, entryPrice: 14.55 },
+    { symbol: 'RUNE/USDT', direction: 'LONG', pnl: 28.36, positionSize: 1000, entryPrice: 1.439 },
+    { symbol: 'NTRN/USDT', direction: 'LONG', pnl: 27.83, positionSize: 1000, entryPrice: 0.0945 },
+    { symbol: 'ALPHA/USDT', direction: 'LONG', pnl: 77.29, positionSize: 1000, entryPrice: 0.0568 }
+  ],
+  openTrades: [
+    { symbol: 'AVAX/USDT', direction: 'LONG', pnl: -7.0, positionSize: 750, entryPrice: 20.45 },
+    { symbol: 'LINK/USDT', direction: 'SHORT', pnl: 23.0, positionSize: 750, entryPrice: 10.89 },
+    { symbol: 'JASMY/USDT', direction: 'LONG', pnl: 2.0, positionSize: 750, entryPrice: 0.0173 },
+    { symbol: 'RLC/USDT', direction: 'LONG', pnl: 13.0, positionSize: 750, entryPrice: 1.245 },
+    { symbol: 'THETA/USDT', direction: 'SHORT', pnl: -18.5, positionSize: 750, entryPrice: 1.089 }
+  ]
 }
-
-// Open trades (mock data based on recent ggshot_filter entries)
-const openTrades = [
-  { symbol: 'ZRO/USDT', direction: 'SHORT', pnl: -12.45, positionSize: 500, entryPrice: 2.220 },
-  { symbol: 'MKR/USDT', direction: 'SHORT', pnl: 34.67, positionSize: 250, entryPrice: 1896.20 },
-  { symbol: 'STORJ/USDT', direction: 'SHORT', pnl: -8.92, positionSize: 750, entryPrice: 0.268 },
-  { symbol: 'ONT/USDT', direction: 'SHORT', pnl: 15.23, positionSize: 600, entryPrice: 0.139 },
-  { symbol: 'PYTH/USDT', direction: 'SHORT', pnl: -3.45, positionSize: 400, entryPrice: 0.123 }
-]
-
-// Closed trades (from recent signals_cleaned_fix.csv entries)
-const closedTrades = [
-  { symbol: 'SKL/USDT', direction: 'LONG', pnl: 62.03, positionSize: 1000, entryPrice: 0.022 },
-  { symbol: 'CHR/USDT', direction: 'LONG', pnl: 16.90, positionSize: 800, entryPrice: 0.098 },
-  { symbol: 'STRK/USDT', direction: 'LONG', pnl: 44.03, positionSize: 600, entryPrice: 0.137 },
-  { symbol: 'TIA/USDT', direction: 'LONG', pnl: 43.88, positionSize: 500, entryPrice: 1.851 },
-  { symbol: 'PYTH/USDT', direction: 'LONG', pnl: 26.76, positionSize: 750, entryPrice: 0.128 },
-  { symbol: 'QTUM/USDT', direction: 'LONG', pnl: 22.62, positionSize: 400, entryPrice: 2.194 },
-  { symbol: 'ZIL/USDT', direction: 'LONG', pnl: 25.07, positionSize: 900, entryPrice: 0.012 }
-]
 
 export default function DemoPage() {
   const [currentBotIndex, setCurrentBotIndex] = React.useState(0)
@@ -241,7 +253,7 @@ export default function DemoPage() {
                 <div className="gradient-divider mb-4"></div>
                 <div className="h-[200px]">
                   <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={profitLossData}>
+                    <LineChart data={realTradingData.profitLossData}>
                       <XAxis 
                         dataKey="date" 
                         axisLine={false}
@@ -273,32 +285,32 @@ export default function DemoPage() {
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># of closed trades</span>
-                    <span className="text-body text-bone font-medium">{tradeStats.totalTrades}</span>
+                    <span className="text-body text-bone font-medium">{realTradingData.tradeStats.totalTrades}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># and % of trades won</span>
-                    <span className="text-body text-green-400 font-medium">{tradeStats.winCount} ({tradeStats.winRate}%)</span>
+                    <span className="text-body text-green-400 font-medium">{realTradingData.tradeStats.winCount} ({realTradingData.tradeStats.winRate}%)</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># and % of trades lost</span>
-                    <span className="text-body text-red-400 font-medium">{tradeStats.lossCount} ({tradeStats.lossRate}%)</span>
+                    <span className="text-body text-red-400 font-medium">{realTradingData.tradeStats.lossCount} ({realTradingData.tradeStats.lossRate}%)</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># and % of trades neutral</span>
-                    <span className="text-body text-gray-400 font-medium">{tradeStats.neutralCount} ({tradeStats.neutralRate}%)</span>
+                    <span className="text-body text-gray-400 font-medium">{realTradingData.tradeStats.neutralCount} ({realTradingData.tradeStats.neutralRate}%)</span>
                   </div>
                   <div className="gradient-divider"></div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400">Average profit per trade (%)</span>
-                    <span className="text-body text-green-400 font-medium">{tradeStats.avgProfitPerTrade}%</span>
+                    <span className="text-body text-green-400 font-medium">{realTradingData.tradeStats.avgProfitPerTrade}%</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400">Average loss per trade (%)</span>
-                    <span className="text-body text-red-400 font-medium">{tradeStats.avgLossPerTrade}%</span>
+                    <span className="text-body text-red-400 font-medium">{realTradingData.tradeStats.avgLossPerTrade}%</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400">Average trade duration</span>
-                    <span className="text-body text-bone font-medium">{tradeStats.avgTradeDuration}</span>
+                    <span className="text-body text-bone font-medium">{realTradingData.tradeStats.avgTradeDuration}</span>
                   </div>
                 </div>
               </div>
@@ -366,10 +378,10 @@ export default function DemoPage() {
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Open Trades Table */}
-              <div className="relative p-6 corner-top-right flex-1 min-h-[240px]">
+              <div className="relative p-6 corner-top-right flex-1 min-h-[320px]">
                 <h3 className="text-body text-bone font-medium mb-4">Open Trades</h3>
                 <div className="gradient-divider mb-4"></div>
-                <div className="overflow-y-auto max-h-[180px]">
+                <div className="overflow-y-auto max-h-[260px]">
                   <table className="w-full text-footnote">
                     <thead className="text-gray-400 border-b border-gray-700">
                       <tr>
@@ -381,7 +393,7 @@ export default function DemoPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {openTrades.map((trade, index) => (
+                      {realTradingData.openTrades.map((trade, index) => (
                         <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
                           <td className={`py-2 font-medium ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
@@ -399,10 +411,10 @@ export default function DemoPage() {
               </div>
               
               {/* Closed Trades Table */}
-              <div className="relative p-6 corner-top-right flex-1 min-h-[240px]">
+              <div className="relative p-6 corner-top-right flex-1 min-h-[320px]">
                 <h3 className="text-body text-bone font-medium mb-4">Closed Trades</h3>
                 <div className="gradient-divider mb-4"></div>
-                <div className="overflow-y-auto max-h-[180px]">
+                <div className="overflow-y-auto max-h-[260px]">
                   <table className="w-full text-footnote">
                     <thead className="text-gray-400 border-b border-gray-700">
                       <tr>
@@ -414,7 +426,7 @@ export default function DemoPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {closedTrades.map((trade, index) => (
+                      {realTradingData.closedTrades.map((trade, index) => (
                         <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
                           <td className={`py-2 font-medium ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
