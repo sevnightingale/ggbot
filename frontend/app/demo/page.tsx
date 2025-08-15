@@ -13,26 +13,23 @@ const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001"
 // Real ggShot trading data (117 approved signals from 2-week test period)
 const realTradingData = {
   profitLossData: [
-    { date: '07-28', profit: -31.6 },
-    { date: '07-28', profit: -78.38 },
-    { date: '07-29', profit: -32.49 },
-    { date: '07-29', profit: 41.02 },
-    { date: '07-30', profit: 86.91 },
-    { date: '07-30', profit: 192.44 },
-    { date: '07-31', profit: 264.27 },
-    { date: '08-01', profit: 334.40 },
-    { date: '08-02', profit: 562.91 },
-    { date: '08-03', profit: 735.44 },
-    { date: '08-04', profit: 1187.95 },
-    { date: '08-05', profit: 1436.84 },
-    { date: '08-06', profit: 1789.33 },
-    { date: '08-07', profit: 2156.44 },
-    { date: '08-08', profit: 2389.21 },
-    { date: '08-09', profit: 2534.88 },
-    { date: '08-10', profit: 2798.76 },
-    { date: '08-11', profit: 2934.23 },
-    { date: '08-12', profit: 3055.68 },
-    { date: '08-13', profit: 3055.68 }
+    { date: '28', profit: -78.38 },
+    { date: '29', profit: 41.02 },
+    { date: '30', profit: 192.44 },
+    { date: '31', profit: 264.27 },
+    { date: '01', profit: 334.40 },
+    { date: '02', profit: 562.91 },
+    { date: '03', profit: 735.44 },
+    { date: '04', profit: 1187.95 },
+    { date: '05', profit: 1436.84 },
+    { date: '06', profit: 1789.33 },
+    { date: '07', profit: 2156.44 },
+    { date: '08', profit: 2389.21 },
+    { date: '09', profit: 2534.88 },
+    { date: '10', profit: 2798.76 },
+    { date: '11', profit: 2934.23 },
+    { date: '12', profit: 3055.68 },
+    { date: '13', profit: 3055.68 }
   ],
   tradeStats: {
     totalTrades: 117,
@@ -87,13 +84,7 @@ export default function DemoPage() {
     timeInTrade: string;
     leverage?: number;
     confidence?: number;
-  }>>(realTradingData.openTrades.map(trade => ({
-    ...trade,
-    currentPrice: trade.entryPrice,
-    timeInTrade: 'N/A',
-    leverage: 10,
-    confidence: 75
-  })))
+  }>>([])
   const [lastUpdated, setLastUpdated] = React.useState<string>('')
   
   // Zustand store hooks
@@ -301,21 +292,21 @@ export default function DemoPage() {
 
       {/* 3-Column Layout with Sharp Dividers */}
       <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="w-full max-w-7xl mx-auto grid grid-cols-3 relative">
+        <div className="w-full max-w-[1600px] mx-auto grid grid-cols-[1fr_280px_1fr] relative">
           
           {/* Left Vertical Divider */}
-          <div className="absolute left-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60 transform -translate-x-0.5"></div>
+          <div className="absolute left-[calc(33.333%-140px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
           
           {/* Right Vertical Divider */}
-          <div className="absolute right-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60 transform translate-x-0.5"></div>
+          <div className="absolute right-[calc(33.333%-140px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
           
           {/* Left Column - Historical Performance */}
-          <div className="hidden lg:block pr-4">
+          <div className="hidden lg:block pr-3">
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Profit/Loss Chart Card */}
               <div className="relative p-6 corner-top-left flex-1 min-h-[280px]">
-                <h3 className="text-subheader text-bone mb-4">Profit/Loss</h3>
+                <h3 className="text-subheader text-bone-200 mb-4">Profit/Loss</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="h-[200px]">
                   <ResponsiveContainer width="100%" height="100%">
@@ -346,37 +337,37 @@ export default function DemoPage() {
               
               {/* Trade Statistics Card */}
               <div className="relative p-6 corner-top-left min-h-[200px]">
-                <h3 className="text-subheader text-bone mb-4">Trade Statistics</h3>
+                <h3 className="text-subheader text-bone-200 mb-4">Trade Statistics</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># of closed trades</span>
-                    <span className="text-body text-bone">{realTradingData.tradeStats.totalTrades}</span>
+                    <span className="text-footnote text-bone-200">{realTradingData.tradeStats.totalTrades}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># and % of trades won</span>
-                    <span className="text-body text-green-400">{realTradingData.tradeStats.winCount} ({realTradingData.tradeStats.winRate}%)</span>
+                    <span className="text-footnote text-green-400">{realTradingData.tradeStats.winCount} ({realTradingData.tradeStats.winRate}%)</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># and % of trades lost</span>
-                    <span className="text-body text-red-400">{realTradingData.tradeStats.lossCount} ({realTradingData.tradeStats.lossRate}%)</span>
+                    <span className="text-footnote text-red-400">{realTradingData.tradeStats.lossCount} ({realTradingData.tradeStats.lossRate}%)</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400"># and % of trades neutral</span>
-                    <span className="text-body text-gray-400">{realTradingData.tradeStats.neutralCount} ({realTradingData.tradeStats.neutralRate}%)</span>
+                    <span className="text-footnote text-gray-400">{realTradingData.tradeStats.neutralCount} ({realTradingData.tradeStats.neutralRate}%)</span>
                   </div>
                   <div className="gradient-divider"></div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400">Average profit per trade (%)</span>
-                    <span className="text-body text-green-400">{realTradingData.tradeStats.avgProfitPerTrade}%</span>
+                    <span className="text-footnote text-green-400">{realTradingData.tradeStats.avgProfitPerTrade}%</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400">Average loss per trade (%)</span>
-                    <span className="text-body text-red-400">{realTradingData.tradeStats.avgLossPerTrade}%</span>
+                    <span className="text-footnote text-red-400">{realTradingData.tradeStats.avgLossPerTrade}%</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-footnote text-gray-400">Average trade duration</span>
-                    <span className="text-body text-bone">{realTradingData.tradeStats.avgTradeDuration}</span>
+                    <span className="text-footnote text-bone-200">{realTradingData.tradeStats.avgTradeDuration}</span>
                   </div>
                 </div>
               </div>
@@ -384,7 +375,7 @@ export default function DemoPage() {
           </div>
 
           {/* Center Column - ggbot Component (Fixed Width) */}
-          <div className="flex flex-col items-center justify-center px-4">
+          <div className="flex flex-col items-center justify-center px-2">
             {/* ggbot with flanking arrows/plus */}
             <div className="flex items-center gap-8 mb-6">
               <button 
@@ -440,13 +431,13 @@ export default function DemoPage() {
           </div>
 
           {/* Right Column - Activity */}
-          <div className="hidden lg:block pl-4">
+          <div className="hidden lg:block pl-3">
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Open Trades Table */}
               <div className="relative p-6 corner-top-right flex-1 min-h-[320px]">
                 <div className="flex justify-between items-center mb-4">
-                  <h3 className="text-subheader text-bone">Open Trades</h3>
+                  <h3 className="text-subheader text-bone-200">Open Trades</h3>
                   {lastUpdated && (
                     <span className="text-footnote text-gray-500">
                       Updated: {lastUpdated}
@@ -454,35 +445,35 @@ export default function DemoPage() {
                   )}
                 </div>
                 <div className="gradient-divider mb-4"></div>
-                <div className="overflow-y-auto max-h-[260px]">
-                  <table className="w-full text-footnote">
+                <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
+                  <table className="w-full text-footnote min-w-[500px]">
                     <thead className="text-gray-400 border-b border-gray-700">
                       <tr>
-                        <th className="text-left py-2 px-1">PnL ($)</th>
-                        <th className="text-left py-2 px-1">Symbol</th>
-                        <th className="text-left py-2 px-1">Size ($)</th>
-                        <th className="text-left py-2 px-1">Direction</th>
-                        <th className="text-left py-2 px-1">Entry</th>
-                        <th className="text-left py-2 px-1">Current</th>
-                        <th className="text-left py-2 px-1">Time</th>
+                        <th className="text-left py-1 pr-2">PnL</th>
+                        <th className="text-left py-1 px-1">Symbol</th>
+                        <th className="text-left py-1 px-1">Size</th>
+                        <th className="text-left py-1 px-1">Dir</th>
+                        <th className="text-left py-1 px-1">Entry</th>
+                        <th className="text-left py-1 px-1">Price</th>
+                        <th className="text-left py-1 pl-1">Time</th>
                       </tr>
                     </thead>
                     <tbody>
                       {livePositions.map((trade, index) => (
                         <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
-                          <td className={`py-2 px-1 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
+                          <td className={`py-1 pr-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(0)}
                           </td>
-                          <td className="py-2 px-1 text-bone">{trade.symbol}</td>
-                          <td className="py-2 px-1 text-gray-400">{trade.positionSize}</td>
-                          <td className={`py-2 px-1 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
-                            {trade.direction}
+                          <td className="py-1 px-1 text-bone-200">{trade.symbol.replace('/USDT', '')}</td>
+                          <td className="py-1 px-1 text-gray-400">{trade.positionSize}</td>
+                          <td className={`py-1 px-1 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.direction.slice(0, 1)}
                           </td>
-                          <td className="py-2 px-1 text-gray-400">{trade.entryPrice.toFixed(2)}</td>
-                          <td className="py-2 px-1 text-gray-400">
-                            {trade.currentPrice.toFixed(2)}
+                          <td className="py-1 px-1 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
+                          <td className="py-1 px-1 text-gray-400">
+                            {trade.currentPrice.toFixed(3)}
                           </td>
-                          <td className="py-2 px-1 text-gray-400">{trade.timeInTrade}</td>
+                          <td className="py-1 pl-1 text-gray-400">{trade.timeInTrade}</td>
                         </tr>
                       ))}</tbody>
                   </table>
@@ -491,31 +482,31 @@ export default function DemoPage() {
               
               {/* Closed Trades Table */}
               <div className="relative p-6 corner-top-right flex-1 min-h-[320px]">
-                <h3 className="text-subheader text-bone mb-4">Closed Trades</h3>
+                <h3 className="text-subheader text-bone-200 mb-4">Closed Trades</h3>
                 <div className="gradient-divider mb-4"></div>
-                <div className="overflow-y-auto max-h-[260px]">
-                  <table className="w-full text-footnote">
+                <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
+                  <table className="w-full text-footnote min-w-[500px]">
                     <thead className="text-gray-400 border-b border-gray-700">
                       <tr>
-                        <th className="text-left py-2">PnL ($)</th>
-                        <th className="text-left py-2">Symbol</th>
-                        <th className="text-left py-2">Size ($)</th>
-                        <th className="text-left py-2">Direction</th>
-                        <th className="text-left py-2">Entry</th>
+                        <th className="text-left py-1 pr-2">PnL</th>
+                        <th className="text-left py-1 px-1">Symbol</th>
+                        <th className="text-left py-1 px-1">Size</th>
+                        <th className="text-left py-1 px-1">Dir</th>
+                        <th className="text-left py-1 pl-1">Entry</th>
                       </tr>
                     </thead>
                     <tbody>
                       {realTradingData.closedTrades.map((trade, index) => (
                         <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
-                          <td className={`py-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
+                          <td className={`py-1 pr-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(0)}
                           </td>
-                          <td className="py-2 text-bone">{trade.symbol}</td>
-                          <td className="py-2 text-gray-400">{trade.positionSize}</td>
-                          <td className={`py-2 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
-                            {trade.direction}
+                          <td className="py-1 px-1 text-bone-200">{trade.symbol.replace('/USDT', '')}</td>
+                          <td className="py-1 px-1 text-gray-400">{trade.positionSize}</td>
+                          <td className={`py-1 px-1 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.direction.slice(0, 1)}
                           </td>
-                          <td className="py-2 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
+                          <td className="py-1 pl-1 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
                         </tr>
                       ))}</tbody>
                   </table>
