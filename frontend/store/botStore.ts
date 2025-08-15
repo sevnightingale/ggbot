@@ -326,8 +326,14 @@ export const useBotStore = create<BotStore>()(
           
           const botsData = await response.json()
           
+          console.log('📊 API Response from /agent/api/bots:', botsData)
+          console.log('📊 Type:', typeof botsData, 'Is Array:', Array.isArray(botsData))
+          
+          // Ensure botsData is an array
+          const botsArray = Array.isArray(botsData) ? botsData : []
+          
           // Transform backend data to frontend Bot interface
-          const transformedBots: Bot[] = botsData.map((botData: any) => ({
+          const transformedBots: Bot[] = botsArray.map((botData: any) => ({
             config_id: botData.config_id,
             instance_name: botData.instance_name || `Bot-${botData.config_id.slice(0, 8)}`,
             config_type: botData.config_type || 'ggshot',
