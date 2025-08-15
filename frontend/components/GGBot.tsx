@@ -5,7 +5,7 @@ interface GGBotProps {
   message?: string
   onClick?: () => void
   disabled?: boolean
-  status?: 'idle' | 'extraction' | 'decision' | 'trading'
+  status?: 'inactive' | 'idle' | 'extraction' | 'decision' | 'trading'
   showSpinner?: boolean
   className?: string
 }
@@ -15,7 +15,7 @@ const GGBot: React.FC<GGBotProps> = ({
   message = '',
   onClick,
   disabled = false,
-  status = 'idle',
+  status = 'inactive',
   showSpinner = false,
   className = ''
 }) => {
@@ -44,7 +44,7 @@ const GGBot: React.FC<GGBotProps> = ({
           <div className="ggbot-name">{name}</div>
           {message && (
             <div className="ggbot-message-inline">
-              {showSpinner && status !== 'idle' && (
+              {showSpinner && status !== 'idle' && status !== 'inactive' && (
                 <span className="ggbot-spinner-inline">{spinnerChars[spinnerIndex]}</span>
               )}
               <span className="ggbot-message-text-inline">{message}</span>

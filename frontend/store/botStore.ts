@@ -3,7 +3,7 @@ import { devtools, subscribeWithSelector } from 'zustand/middleware'
 
 // Bot interfaces aligned with backend config_instances table
 export interface BotStatus {
-  phase: 'idle' | 'extraction' | 'decision' | 'trading'
+  phase: 'inactive' | 'idle' | 'extraction' | 'decision' | 'trading'
   color: 'gray' | 'blue' | 'green' | 'orange'
   message: string
   timestamp: string
@@ -155,8 +155,8 @@ export const useBotStore = create<BotStore>()(
             ...bot, 
             isActive,
             status: isActive 
-              ? { ...bot.status, phase: 'idle', message: 'Bot started, waiting for signals...' }
-              : { ...bot.status, phase: 'idle', message: 'Bot stopped' }
+              ? { ...bot.status, phase: 'idle', color: 'blue', message: 'Bot started, waiting for signals...' }
+              : { ...bot.status, phase: 'inactive', color: 'gray', message: 'Bot stopped' }
           })
         }
         return { bots: newBots }
@@ -329,11 +329,27 @@ export const useBotStore = create<BotStore>()(
           console.log('📊 API Response from /agent/api/bots:', botsData)
           console.log('📊 Type:', typeof botsData, 'Is Array:', Array.isArray(botsData))
           
-          // Ensure botsData is an array
-          const botsArray = Array.isArray(botsData) ? botsData : []
+          // Handle different API response formats
+          let botsArray = []
+          if (Array.isArray(botsData)) {
+            botsArray = botsData
+          } else if (botsData && typeof botsData === 'object') {
+            // If it's an object with a data property (common API pattern)
+            if (Array.isArray(botsData.data)) {
+              botsArray = botsData.data
+            } else if (Array.isArray(botsData.bots)) {
+              botsArray = botsData.bots
+            } else if (Array.isArray(botsData.items)) {
+              botsArray = botsData.items
+            } else {
+              console.warn('⚠️ API returned object but no array found in data/bots/items properties')
+            }
+          }
           
-          // Transform backend data to frontend Bot interface
-          const transformedBots: Bot[] = botsArray.map((botData: any) => ({
+          console.log('📊 Final botsArray:', botsArray)
+          
+          // Transform backend data to frontend Bot interface (only if we have data)
+          const transformedBots: Bot[] = botsArray.length > 0 ? botsArray.map((botData: any) => ({
             config_id: botData.config_id,
             instance_name: botData.instance_name || `Bot-${botData.config_id.slice(0, 8)}`,
             config_type: botData.config_type || 'ggshot',
@@ -342,15 +358,15 @@ export const useBotStore = create<BotStore>()(
             crypto: 'BTC', // Default for now  
             riskLevel: 'medium', // Default for now
             status: {
-              phase: 'idle',
-              color: 'gray',
-              message: 'Loading bot status...',
+              phase: botData.status === 'active' ? 'idle' : 'inactive',
+              color: botData.status === 'active' ? 'blue' : 'gray',
+              message: botData.status === 'active' ? 'Loading bot status...' : 'Bot stopped',
               timestamp: new Date().toISOString()
             },
             isActive: botData.status === 'active',
             createdAt: new Date(),
             userId: userId
-          }))
+          })) : []
           
           // Clear existing bots for this user and add new ones
           const newBots = new Map(get().bots)
