@@ -836,4 +836,21 @@
   - Performance data integration
 
   The core infrastructure is production-ready, but the demo-specific features (guaranteed trades,
-  pre-configs) need implementation for the full user journey described in the document.
+  pre-configs) need implementation for the full user journey described in the document. The columns do not need titles.
+
+
+
+  Here's what I want displayed on our dashboard. The columns themselves do not need titles.
+
+  Left column (historical performance):
+  1) a simple line chart, with the title "Profit/Loss". For our demo, this will use ggShot historical performance from the last 2 weeks, using the profit_gained column in a csv we have. In the future we will update this properly. The X axis should be $ and the Y axis should be Time.
+  2) a card with the title "Trade Statistics" including these metrics: #of closed trades, # and % of trades won, # and % of trades lost, # and % of trades neutral, average profit per trade (%), average loss per trade (%), average trade duration. These should be obtainable via ggshot/analysis/signals_cleaned_fix.csv
+
+
+  Right column (Activity):
+  1) Open trades element presented as a compact table, with one of our spacer/dividers between the title and the table, and the table only having a subtle background change between rows, like every other row has a lighter background, very minimal design. The headers should be 1. PnL ($) 2. Symbol. 3. Position Size ($) 4. Direction (long/short) 5. Entry Price.
+  These should be mocked, using the most recent signals from our ggshot-filter service, from the last few days.
+  2) Closed trades element, exact same design as the open trades element. We can pull this from that csv too.
+  Both of these elements should have a fixed height and be scrollable.
+
+  Now, think deeply about how to add all of this. the ggShot bot can be hardcoded and mocked data, (but using the real data we have, so it's sort of mixed mock and real data) you should review all the data (use postgres mcp to see our ggshot filter table, reviw the csv mentioned, skim ggshot/anlaysis for more context if needed) and create a comprehensive plan where the first phase is designing the elements I ahve described, exactly I ahve described, and the second phase is adding in the ggshot data to populate all these elements for our demo. 

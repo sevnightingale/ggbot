@@ -5,9 +5,61 @@ import GGBot from '@/components/GGBot'
 import BotControlModal from '@/components/BotControlModal'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
+import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 
 // Production user ID from backend
 const DEMO_USER_ID = "00000000-0000-0000-0000-000000000001"
+
+// Sample profit/loss data (from last 2 weeks of signals_cleaned_fix.csv)
+const profitLossData = [
+  { date: '08-12', profit: 0 },
+  { date: '08-12', profit: 25.07 },
+  { date: '08-12', profit: 87.10 },
+  { date: '08-13', profit: 130.95 },
+  { date: '08-13', profit: 147.74 },
+  { date: '08-13', profit: 164.50 },
+  { date: '08-13', profit: 188.39 },
+  { date: '08-13', profit: 232.23 },
+  { date: '08-13', profit: 276.07 },
+  { date: '08-13', profit: 295.95 },
+  { date: '08-13', profit: 296.84 },
+  { date: '08-13', profit: 284.07 },
+  { date: '08-13', profit: 279.36 }
+]
+
+// Trade statistics (calculated from signals_cleaned_fix.csv)
+const tradeStats = {
+  totalTrades: 20,
+  winCount: 15,
+  lossCount: 3,
+  neutralCount: 2,
+  winRate: 75.0,
+  lossRate: 15.0,
+  neutralRate: 10.0,
+  avgProfitPerTrade: 18.97,
+  avgLossPerTrade: -3.69,
+  avgTradeDuration: '5h 24m'
+}
+
+// Open trades (mock data based on recent ggshot_filter entries)
+const openTrades = [
+  { symbol: 'ZRO/USDT', direction: 'SHORT', pnl: -12.45, positionSize: 500, entryPrice: 2.220 },
+  { symbol: 'MKR/USDT', direction: 'SHORT', pnl: 34.67, positionSize: 250, entryPrice: 1896.20 },
+  { symbol: 'STORJ/USDT', direction: 'SHORT', pnl: -8.92, positionSize: 750, entryPrice: 0.268 },
+  { symbol: 'ONT/USDT', direction: 'SHORT', pnl: 15.23, positionSize: 600, entryPrice: 0.139 },
+  { symbol: 'PYTH/USDT', direction: 'SHORT', pnl: -3.45, positionSize: 400, entryPrice: 0.123 }
+]
+
+// Closed trades (from recent signals_cleaned_fix.csv entries)
+const closedTrades = [
+  { symbol: 'SKL/USDT', direction: 'LONG', pnl: 62.03, positionSize: 1000, entryPrice: 0.022 },
+  { symbol: 'CHR/USDT', direction: 'LONG', pnl: 16.90, positionSize: 800, entryPrice: 0.098 },
+  { symbol: 'STRK/USDT', direction: 'LONG', pnl: 44.03, positionSize: 600, entryPrice: 0.137 },
+  { symbol: 'TIA/USDT', direction: 'LONG', pnl: 43.88, positionSize: 500, entryPrice: 1.851 },
+  { symbol: 'PYTH/USDT', direction: 'LONG', pnl: 26.76, positionSize: 750, entryPrice: 0.128 },
+  { symbol: 'QTUM/USDT', direction: 'LONG', pnl: 22.62, positionSize: 400, entryPrice: 2.194 },
+  { symbol: 'ZIL/USDT', direction: 'LONG', pnl: 25.07, positionSize: 900, entryPrice: 0.012 }
+]
 
 export default function DemoPage() {
   const [currentBotIndex, setCurrentBotIndex] = React.useState(0)
@@ -179,36 +231,74 @@ export default function DemoPage() {
           {/* Right Vertical Divider */}
           <div className="absolute right-1/3 top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60 transform translate-x-0.5"></div>
           
-          {/* Left Column - Performance */}
+          {/* Left Column - Historical Performance */}
           <div className="hidden lg:block pr-8">
-            {/* Transparent container that fills space */}
-            <div className="flex flex-col min-h-[500px]">
+            <div className="flex flex-col min-h-[500px] gap-6">
               
-              {/* Performance Chart Card - Has background with all 4 corners */}
-              <div className="relative mb-6 flex-1 corner-top-left corner-top-right corner-bottom-left corner-bottom-right">
-                
-                {/* Chart Placeholder with Grid - Full card fill */}
-                <div className="h-64 flex items-center justify-center relative chart-grid bg-charcoal-700">
-                  <div className="text-bone-400 text-footnote relative z-10">📊 Chart Coming Soon</div>
+              {/* Profit/Loss Chart Card */}
+              <div className="relative p-6 corner-top-left flex-1 min-h-[280px]">
+                <h3 className="text-body text-bone font-medium mb-4">Profit/Loss</h3>
+                <div className="gradient-divider mb-4"></div>
+                <div className="h-[200px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={profitLossData}>
+                      <XAxis 
+                        dataKey="date" 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: '#9ca3af' }}
+                      />
+                      <YAxis 
+                        axisLine={false}
+                        tickLine={false}
+                        tick={{ fontSize: 12, fill: '#9ca3af' }}
+                        tickFormatter={(value) => `$${value}`}
+                      />
+                      <Line 
+                        type="monotone" 
+                        dataKey="profit" 
+                        stroke="#10b981" 
+                        strokeWidth={2}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
                 </div>
               </div>
               
-              {/* Key Metrics Card - Floating Elements */}
-              <div className="relative p-6 corner-top-left min-h-[120px]">
-                <div className="space-y-2">
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-footnote text-gray-400">Accuracy</span>
-                    <span className="text-body text-agent-extraction font-medium">95.2%</span>
+              {/* Trade Statistics Card */}
+              <div className="relative p-6 corner-top-left min-h-[200px]">
+                <h3 className="text-body text-bone font-medium mb-4">Trade Statistics</h3>
+                <div className="gradient-divider mb-4"></div>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400"># of closed trades</span>
+                    <span className="text-body text-bone font-medium">{tradeStats.totalTrades}</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400"># and % of trades won</span>
+                    <span className="text-body text-green-400 font-medium">{tradeStats.winCount} ({tradeStats.winRate}%)</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400"># and % of trades lost</span>
+                    <span className="text-body text-red-400 font-medium">{tradeStats.lossCount} ({tradeStats.lossRate}%)</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400"># and % of trades neutral</span>
+                    <span className="text-body text-gray-400 font-medium">{tradeStats.neutralCount} ({tradeStats.neutralRate}%)</span>
                   </div>
                   <div className="gradient-divider"></div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-footnote text-gray-400">Stop Loss Rate</span>
-                    <span className="text-body text-green-400 font-medium">4.8%</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">Average profit per trade (%)</span>
+                    <span className="text-body text-green-400 font-medium">{tradeStats.avgProfitPerTrade}%</span>
                   </div>
-                  <div className="gradient-divider"></div>
-                  <div className="flex justify-between items-center py-2">
-                    <span className="text-footnote text-gray-400">Signals</span>
-                    <span className="text-body text-bone font-medium">227</span>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">Average loss per trade (%)</span>
+                    <span className="text-body text-red-400 font-medium">{tradeStats.avgLossPerTrade}%</span>
+                  </div>
+                  <div className="flex justify-between items-center">
+                    <span className="text-footnote text-gray-400">Average trade duration</span>
+                    <span className="text-body text-bone font-medium">{tradeStats.avgTradeDuration}</span>
                   </div>
                 </div>
               </div>
@@ -271,49 +361,73 @@ export default function DemoPage() {
             </div>
           </div>
 
-          {/* Right Column - Open Trades */}
+          {/* Right Column - Activity */}
           <div className="hidden lg:block pl-8">
-            {/* Transparent container that fills space */}
-            <div className="flex flex-col min-h-[500px]">
+            <div className="flex flex-col min-h-[500px] gap-6">
               
-              {/* Active Trades Card - Floating Elements */}
-              <div className="relative p-6 mb-6 flex-1 corner-top-right min-h-[200px]">
-                
-                {/* Trades List - Floating Elements */}
-                <div className="space-y-4">
-                  <div className="py-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-green-400 rounded-full"></div>
-                      <span className="text-body text-bone font-medium">APE/USDT</span>
-                      <span className="text-footnote text-gray-400">SHORT</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-footnote text-gray-400">52% confidence</span>
-                      <span className="text-body text-red-400 font-medium">-$45.32</span>
-                    </div>
-                  </div>
-                  
-                  <div className="gradient-divider"></div>
-                  
-                  <div className="py-3">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="w-2 h-2 bg-agent-trading rounded-full"></div>
-                      <span className="text-body text-bone font-medium">BTC/USDT</span>
-                      <span className="text-footnote text-gray-400">LONG</span>
-                    </div>
-                    <div className="flex justify-between items-center">
-                      <span className="text-footnote text-gray-400">67% confidence</span>
-                      <span className="text-body text-green-400 font-medium">+$12.08</span>
-                    </div>
-                  </div>
+              {/* Open Trades Table */}
+              <div className="relative p-6 corner-top-right flex-1 min-h-[240px]">
+                <h3 className="text-body text-bone font-medium mb-4">Open Trades</h3>
+                <div className="gradient-divider mb-4"></div>
+                <div className="overflow-y-auto max-h-[180px]">
+                  <table className="w-full text-footnote">
+                    <thead className="text-gray-400 border-b border-gray-700">
+                      <tr>
+                        <th className="text-left py-2">PnL ($)</th>
+                        <th className="text-left py-2">Symbol</th>
+                        <th className="text-left py-2">Size ($)</th>
+                        <th className="text-left py-2">Direction</th>
+                        <th className="text-left py-2">Entry</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {openTrades.map((trade, index) => (
+                        <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
+                          <td className={`py-2 font-medium ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
+                          </td>
+                          <td className="py-2 text-bone">{trade.symbol}</td>
+                          <td className="py-2 text-gray-400">{trade.positionSize}</td>
+                          <td className={`py-2 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.direction}
+                          </td>
+                          <td className="py-2 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
+                        </tr>
+                      ))}</tbody>
+                  </table>
                 </div>
               </div>
               
-              {/* Portfolio Summary Card - Floating Elements */}
-              <div className="relative p-6 corner-top-right min-h-[80px]">
-                <div className="flex justify-between items-center">
-                  <span className="text-footnote text-gray-400">Total P&L</span>
-                  <span className="text-body text-red-400 font-medium">-$33.24</span>
+              {/* Closed Trades Table */}
+              <div className="relative p-6 corner-top-right flex-1 min-h-[240px]">
+                <h3 className="text-body text-bone font-medium mb-4">Closed Trades</h3>
+                <div className="gradient-divider mb-4"></div>
+                <div className="overflow-y-auto max-h-[180px]">
+                  <table className="w-full text-footnote">
+                    <thead className="text-gray-400 border-b border-gray-700">
+                      <tr>
+                        <th className="text-left py-2">PnL ($)</th>
+                        <th className="text-left py-2">Symbol</th>
+                        <th className="text-left py-2">Size ($)</th>
+                        <th className="text-left py-2">Direction</th>
+                        <th className="text-left py-2">Entry</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {closedTrades.map((trade, index) => (
+                        <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
+                          <td className={`py-2 font-medium ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
+                          </td>
+                          <td className="py-2 text-bone">{trade.symbol}</td>
+                          <td className="py-2 text-gray-400">{trade.positionSize}</td>
+                          <td className={`py-2 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
+                            {trade.direction}
+                          </td>
+                          <td className="py-2 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
+                        </tr>
+                      ))}</tbody>
+                  </table>
                 </div>
               </div>
             </div>
