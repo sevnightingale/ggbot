@@ -116,37 +116,57 @@ app.include_router(users_router)
 # Include the test router directly
 app.include_router(test_router)
 
-# Demo trading positions for ggShot-Pro bot (simulated but with real entry prices)
+# Demo trading positions for ggShot-Pro bot (real entries from ggshot_filter table - last 3 days approved signals)
 demo_positions = [
     {
         'id': 'pos_001',
-        'symbol': 'BTC/USDT',
-        'direction': 'LONG',
-        'entry_price': 67234.50,
-        'entry_time': datetime.now(timezone.utc).replace(hour=14, minute=23).isoformat(),
-        'position_size': 1000,  # USD
+        'symbol': 'NKN/USDT',
+        'direction': 'SHORT',
+        'entry_price': 0.02825,
+        'entry_time': '2025-08-14T19:01:11.984Z',
+        'position_size': 800,  # USD
         'leverage': 10,
-        'confidence': 84
+        'confidence': 57
     },
     {
         'id': 'pos_002', 
-        'symbol': 'ETH/USDT',
+        'symbol': 'APE/USDT',
         'direction': 'SHORT',
-        'entry_price': 2467.89,
-        'entry_time': datetime.now(timezone.utc).replace(hour=13, minute=45).isoformat(),
-        'position_size': 750,  # USD
+        'entry_price': 0.61850,
+        'entry_time': '2025-08-14T18:31:16.640Z',
+        'position_size': 1200,  # USD
         'leverage': 10,
-        'confidence': 76
+        'confidence': 52
     },
     {
         'id': 'pos_003',
-        'symbol': 'SOL/USDT', 
-        'direction': 'LONG',
-        'entry_price': 142.33,
-        'entry_time': datetime.now(timezone.utc).replace(hour=15, minute=12).isoformat(),
-        'position_size': 500,  # USD
+        'symbol': 'ZRX/USDT', 
+        'direction': 'SHORT',
+        'entry_price': 0.25110,
+        'entry_time': '2025-08-14T17:01:48.849Z',
+        'position_size': 600,  # USD
         'leverage': 10,
-        'confidence': 68
+        'confidence': 56
+    },
+    {
+        'id': 'pos_004',
+        'symbol': 'KNC/USDT',
+        'direction': 'SHORT',
+        'entry_price': 0.41710,
+        'entry_time': '2025-08-14T16:32:10.883Z',
+        'position_size': 900,  # USD
+        'leverage': 10,
+        'confidence': 52
+    },
+    {
+        'id': 'pos_005',
+        'symbol': 'ETHFI/USDT',
+        'direction': 'SHORT',
+        'entry_price': 1.22420,
+        'entry_time': '2025-08-14T16:31:13.286Z',
+        'position_size': 1000,  # USD
+        'leverage': 10,
+        'confidence': 78
     }
 ]
 
