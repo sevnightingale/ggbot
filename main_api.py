@@ -15,8 +15,9 @@ import uvicorn
 import httpx
 import aiohttp
 import json
-from typing import Dict, List
-from datetime import datetime
+from typing import Dict, List, Optional
+from datetime import datetime, timezone
+import random
 
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -114,6 +115,167 @@ app.include_router(users_router)
 
 # Include the test router directly
 app.include_router(test_router)
+
+# Demo trading positions for ggShot-Pro bot (simulated but with real entry prices)
+demo_positions = [
+    {
+        'id': 'pos_001',
+        'symbol': 'BTC/USDT',
+        'direction': 'LONG',
+        'entry_price': 67234.50,
+        'entry_time': datetime.now(timezone.utc).replace(hour=14, minute=23).isoformat(),
+        'position_size': 1000,  # USD
+        'leverage': 10,
+        'confidence': 84
+    },
+    {
+        'id': 'pos_002', 
+        'symbol': 'ETH/USDT',
+        'direction': 'SHORT',
+        'entry_price': 2467.89,
+        'entry_time': datetime.now(timezone.utc).replace(hour=13, minute=45).isoformat(),
+        'position_size': 750,  # USD
+        'leverage': 10,
+        'confidence': 76
+    },
+    {
+        'id': 'pos_003',
+        'symbol': 'SOL/USDT', 
+        'direction': 'LONG',
+        'entry_price': 142.33,
+        'entry_time': datetime.now(timezone.utc).replace(hour=15, minute=12).isoformat(),
+        'position_size': 500,  # USD
+        'leverage': 10,
+        'confidence': 68
+    }
+]
+
+def calculate_position_pnl(entry_price: float, current_price: float, position_size: float, direction: str, leverage: float) -> Dict[str, float]:
+    """Calculate realistic P&L with leverage for a position."""
+    try:
+        # Calculate price change percentage
+        price_change_percent = (current_price - entry_price) / entry_price
+        
+        # Reverse for short positions
+        if direction.upper() == 'SHORT':
+            price_change_percent *= -1
+        
+        # Apply leverage
+        leveraged_return = price_change_percent * leverage
+        
+        # Calculate dollar P&L
+        pnl_usd = position_size * leveraged_return
+        
+        # Calculate percentage P&L (relative to position size)
+        pnl_percent = leveraged_return * 100
+        
+        return {
+            'pnl_usd': round(pnl_usd, 2),
+            'pnl_percent': round(pnl_percent, 2),
+            'price_change_percent': round(price_change_percent * 100, 2)
+        }
+    except Exception as e:
+        return {'pnl_usd': 0.0, 'pnl_percent': 0.0, 'price_change_percent': 0.0}
+
+def get_time_in_trade(entry_time_str: str) -> str:
+    """Calculate time since entry."""
+    try:
+        entry_time = datetime.fromisoformat(entry_time_str.replace('Z', '+00:00'))
+        if entry_time.tzinfo is None:
+            entry_time = entry_time.replace(tzinfo=timezone.utc)
+        
+        time_diff = datetime.now(timezone.utc) - entry_time
+        
+        hours = int(time_diff.total_seconds() // 3600)
+        minutes = int((time_diff.total_seconds() % 3600) // 60)
+        
+        if hours > 0:
+            return f"{hours}h {minutes}m"
+        else:
+            return f"{minutes}m"
+    except:
+        return "N/A"
+
+@app.get("/api/live-position-data")
+async def get_live_position_data():
+    """Get live position data with real-time prices and P&L calculations."""
+    from decision.services.price_service import PriceService
+    from core.common.logger import logger
+    
+    try:
+        # Initialize price service (uses existing CCXT infrastructure)
+        price_service = PriceService()
+        
+        live_positions = []
+        
+        for position in demo_positions:
+            try:
+                # Get current market price using existing price service
+                current_price = await price_service.get_current_price(position['symbol'])
+                
+                if current_price:
+                    # Calculate real P&L
+                    pnl_data = calculate_position_pnl(
+                        entry_price=position['entry_price'],
+                        current_price=float(current_price),
+                        position_size=position['position_size'],
+                        direction=position['direction'],
+                        leverage=position['leverage']
+                    )
+                    
+                    # Calculate time in trade
+                    time_in_trade = get_time_in_trade(position['entry_time'])
+                    
+                    live_positions.append({
+                        **position,
+                        'current_price': float(current_price),
+                        'pnl': pnl_data['pnl_usd'],
+                        'pnl_percent': pnl_data['pnl_percent'],
+                        'price_change_percent': pnl_data['price_change_percent'],
+                        'time_in_trade': time_in_trade,
+                        'last_updated': datetime.now(timezone.utc).isoformat()
+                    })
+                else:
+                    # Fallback if price service fails
+                    live_positions.append({
+                        **position,
+                        'current_price': position['entry_price'],  # Use entry price as fallback
+                        'pnl': 0.0,
+                        'pnl_percent': 0.0,
+                        'price_change_percent': 0.0,
+                        'time_in_trade': get_time_in_trade(position['entry_time']),
+                        'last_updated': datetime.now(timezone.utc).isoformat(),
+                        'price_error': 'Unable to fetch current price'
+                    })
+            except Exception as e:
+                logger.error(f"Error processing position {position['id']}: {e}")
+                # Include position with error state
+                live_positions.append({
+                    **position,
+                    'current_price': position['entry_price'],
+                    'pnl': 0.0,
+                    'pnl_percent': 0.0,
+                    'price_change_percent': 0.0,
+                    'time_in_trade': get_time_in_trade(position['entry_time']),
+                    'last_updated': datetime.now(timezone.utc).isoformat(),
+                    'error': str(e)
+                })
+        
+        return {
+            'status': 'success',
+            'positions': live_positions,
+            'total_positions': len(live_positions),
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in live position data endpoint: {e}")
+        return {
+            'status': 'error',
+            'error': str(e),
+            'positions': [],
+            'timestamp': datetime.now(timezone.utc).isoformat()
+        }
 
 @app.get("/")
 async def root():
