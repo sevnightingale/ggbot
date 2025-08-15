@@ -363,7 +363,58 @@ body {
   color: var(--bone-200);
   letter-spacing: -0.02em;
   line-height: 1.2;
+  margin-bottom: 0.25rem;
+}
+
+.ggbot-status-label {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
   margin-bottom: 0.5rem;
+}
+
+.ggbot-status-indicator {
+  font-size: 0.75rem;
+  line-height: 1;
+}
+
+.ggbot-status-active {
+  color: #2cbe77;
+  animation: pulse-glow 2s ease-in-out infinite;
+}
+
+.ggbot-status-inactive {
+  color: var(--bone-300);
+}
+
+.ggbot-status-extraction {
+  color: #38a1c7;
+}
+
+.ggbot-status-decision {
+  color: #2cbe77;
+}
+
+.ggbot-status-trading {
+  color: #be6a47;
+}
+
+.ggbot-status-text {
+  font-size: 0.625rem;
+  font-weight: 500;
+  color: var(--bone-300);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+@keyframes pulse-glow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.6;
+  }
 }
 
 .ggbot-message-inline {

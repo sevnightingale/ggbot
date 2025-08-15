@@ -47,6 +47,9 @@ export default function BotControlModal({
     riskLevel: bot.riskLevel || 'medium'
   })
 
+  // Check if this is the real ggshot config (protected from editing)
+  const isLockedConfig = bot.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' || bot.name === 'ggbot-01'
+  
   const visibleTabs = mode === 'demo' 
     ? TABS.filter(tab => tab.alwaysVisible)
     : TABS
@@ -132,9 +135,19 @@ export default function BotControlModal({
           {/* Status Bar - Compact */}
           <div className="flex items-center justify-between px-8 py-4 border-b border-charcoal-600 bg-charcoal-800/30 flex-shrink-0">
               <div className="flex items-center gap-4">
-                {/* Bot Name with Edit */}
+                {/* Bot Name with Edit or Lock */}
                 <div className="flex items-center gap-2">
-                  {isEditingName ? (
+                  {isLockedConfig ? (
+                    <>
+                      <span className="text-body font-medium text-bone">{formData.name}</span>
+                      <div className="flex items-center gap-1 text-orange-400" title="Live ggbot - View Only">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor">
+                          <path d="M18,8h-1V6c0-2.76-2.24-5-5-5S7,3.24,7,6v2H6c-1.1,0-2,0.9-2,2v10c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V10C20,8.9,19.1,8,18,8z M12,17c-1.1,0-2-0.9-2-2s0.9-2,2-2s2,0.9,2,2S13.1,17,12,17z M15.1,8H8.9V6c0-1.71,1.39-3.1,3.1-3.1s3.1,1.39,3.1,3.1V8z"/>
+                        </svg>
+                        <span className="text-footnote">LIVE</span>
+                      </div>
+                    </>
+                  ) : isEditingName ? (
                     <input
                       type="text"
                       value={formData.name}
@@ -215,7 +228,29 @@ export default function BotControlModal({
             </div>
 
           {/* Scrollable Form Content */}
-          <div className="flex-1 overflow-y-auto px-8 py-6 scroll-area">
+          <div className="flex-1 overflow-y-auto px-8 py-6 scroll-area relative">
+            {isLockedConfig && (
+              <div className="absolute inset-0 bg-charcoal-900/90 backdrop-blur-sm z-10 flex items-center justify-center">
+                <div className="text-center p-8 max-w-md">
+                  <div className="mb-4">
+                    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-orange-400 mx-auto">
+                      <path d="M18,8h-1V6c0-2.76-2.24-5-5-5S7,3.24,7,6v2H6c-1.1,0-2,0.9-2,2v10c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V10C20,8.9,19.1,8,18,8z M12,17c-1.1,0-2-0.9-2-2s0.9-2,2-2s2,0.9,2,2S13.1,17,12,17z M15.1,8H8.9V6c0-1.71,1.39-3.1,3.1-3.1s3.1,1.39,3.1,3.1V8z"/>
+                    </svg>
+                  </div>
+                  <h3 className="text-subheader text-bone mb-4">Live ggbot Configuration</h3>
+                  <p className="text-body text-gray-400 mb-6">
+                    This is a live ggbot with real trading activity. Configuration is protected to ensure uninterrupted operation.
+                  </p>
+                  <button
+                    onClick={onClose}
+                    className="px-6 py-3 bg-agent-extraction hover:bg-agent-extraction/90 text-bone text-body font-medium transition-colors border-2 border-agent-extraction hover:border-agent-extraction/90"
+                  >
+                    Create Your Own ggbot
+                  </button>
+                </div>
+              </div>
+            )}
+            
             {activeTab === 'general' && (
               <div className="space-y-6">
                 {/* Trading Strategy Section */}
@@ -323,14 +358,16 @@ export default function BotControlModal({
             onClick={onClose}
             className="px-6 py-3 border-2 border-charcoal-600 text-bone hover:bg-charcoal-700/50 transition-colors text-body"
           >
-            Cancel
+            {isLockedConfig ? 'Close' : 'Cancel'}
           </button>
-          <button
-            onClick={handleSave}
-            className="px-6 py-3 bg-agent-extraction hover:bg-agent-extraction/90 text-bone text-body font-medium transition-colors border-2 border-agent-extraction hover:border-agent-extraction/90"
-          >
-            Save Changes
-          </button>
+          {!isLockedConfig && (
+            <button
+              onClick={handleSave}
+              className="px-6 py-3 bg-agent-extraction hover:bg-agent-extraction/90 text-bone text-body font-medium transition-colors border-2 border-agent-extraction hover:border-agent-extraction/90"
+            >
+              Save Changes
+            </button>
+          )}
         </div>
       </div>
     </div>
