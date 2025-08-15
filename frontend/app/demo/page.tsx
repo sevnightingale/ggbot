@@ -292,20 +292,20 @@ export default function DemoPage() {
 
       {/* 3-Column Layout with Sharp Dividers */}
       <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="w-full max-w-[1600px] mx-auto grid grid-cols-[1fr_280px_1fr] relative">
+        <div className="w-full max-w-[1500px] mx-auto grid grid-cols-[1fr_320px_1fr] gap-6 relative">
           
-          {/* Left Vertical Divider */}
-          <div className="absolute left-[calc(33.333%-140px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
+          {/* Left Vertical Divider - at left edge of center column */}
+          <div className="absolute left-[calc(50%-160px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
           
-          {/* Right Vertical Divider */}
-          <div className="absolute right-[calc(33.333%-140px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
+          {/* Right Vertical Divider - at right edge of center column */}
+          <div className="absolute right-[calc(50%-160px)] top-0 bottom-0 w-px bg-gradient-to-b from-transparent via-bone-300 to-transparent opacity-60"></div>
           
           {/* Left Column - Historical Performance */}
-          <div className="hidden lg:block pr-3">
+          <div className="hidden lg:block">
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Profit/Loss Chart Card */}
-              <div className="relative p-6 corner-top-left flex-1 min-h-[280px]">
+              <div className="relative p-4 corner-top-left flex-1 min-h-[280px]">
                 <h3 className="text-subheader text-bone-200 mb-4">Profit/Loss</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="h-[200px]">
@@ -336,7 +336,7 @@ export default function DemoPage() {
               </div>
               
               {/* Trade Statistics Card */}
-              <div className="relative p-6 corner-top-left min-h-[200px]">
+              <div className="relative p-4 corner-top-left min-h-[200px]">
                 <h3 className="text-subheader text-bone-200 mb-4">Trade Statistics</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="space-y-3">
@@ -375,7 +375,7 @@ export default function DemoPage() {
           </div>
 
           {/* Center Column - ggbot Component (Fixed Width) */}
-          <div className="flex flex-col items-center justify-center px-2">
+          <div className="flex flex-col items-center justify-center">
             {/* ggbot with flanking arrows/plus */}
             <div className="flex items-center gap-8 mb-6">
               <button 
@@ -431,11 +431,11 @@ export default function DemoPage() {
           </div>
 
           {/* Right Column - Activity */}
-          <div className="hidden lg:block pl-3">
+          <div className="hidden lg:block">
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Open Trades Table */}
-              <div className="relative p-6 corner-top-right flex-1 min-h-[320px]">
+              <div className="relative p-4 corner-top-right flex-1 min-h-[320px]">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-subheader text-bone-200">Open Trades</h3>
                   {lastUpdated && (
@@ -481,7 +481,7 @@ export default function DemoPage() {
               </div>
               
               {/* Closed Trades Table */}
-              <div className="relative p-6 corner-top-right flex-1 min-h-[320px]">
+              <div className="relative p-4 corner-top-right flex-1 min-h-[320px]">
                 <h3 className="text-subheader text-bone-200 mb-4">Closed Trades</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
