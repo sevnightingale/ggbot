@@ -77,6 +77,24 @@ export default function DemoPage() {
   const [currentBotIndex, setCurrentBotIndex] = React.useState(0)
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [selectedBot, setSelectedBot] = React.useState<Bot | null>(null)
+  const [livePositions, setLivePositions] = React.useState<Array<{
+    symbol: string;
+    direction: string;
+    pnl: number;
+    positionSize: number;
+    entryPrice: number;
+    currentPrice: number;
+    timeInTrade: string;
+    leverage?: number;
+    confidence?: number;
+  }>>(realTradingData.openTrades.map(trade => ({
+    ...trade,
+    currentPrice: trade.entryPrice,
+    timeInTrade: 'N/A',
+    leverage: 10,
+    confidence: 75
+  })))
+  const [lastUpdated, setLastUpdated] = React.useState<string>('')
   
   // Zustand store hooks
   const { 
@@ -90,6 +108,54 @@ export default function DemoPage() {
   
   // WebSocket connection for real-time updates
   const { isLoadingBots } = useBotWebSocket(DEMO_USER_ID)
+
+  // Live position data fetching
+  React.useEffect(() => {
+    const fetchLivePositions = async () => {
+      try {
+        const response = await fetch('/api/live-position-data')
+        const data = await response.json()
+        
+        if (data.status === 'success' && data.positions) {
+          // Transform API data to match frontend structure
+          const transformedPositions = data.positions.map((pos: {
+            symbol: string;
+            direction: string;
+            pnl: number;
+            position_size: number;
+            entry_price: number;
+            current_price?: number;
+            time_in_trade?: string;
+            leverage: number;
+            confidence: number;
+          }) => ({
+            symbol: pos.symbol,
+            direction: pos.direction,
+            pnl: pos.pnl,
+            positionSize: pos.position_size,
+            entryPrice: pos.entry_price,
+            currentPrice: pos.current_price || pos.entry_price,
+            timeInTrade: pos.time_in_trade || 'N/A',
+            leverage: pos.leverage,
+            confidence: pos.confidence
+          }))
+          
+          setLivePositions(transformedPositions)
+          setLastUpdated(new Date().toLocaleTimeString())
+        }
+      } catch (error) {
+        console.error('Failed to fetch live positions:', error)
+      }
+    }
+
+    // Initial fetch
+    fetchLivePositions()
+
+    // Set up polling every 5 seconds for live updates
+    const interval = setInterval(fetchLivePositions, 5000)
+
+    return () => clearInterval(interval)
+  }, [])
   
   const demoBots = getBotsByUser(DEMO_USER_ID)
 
@@ -379,7 +445,14 @@ export default function DemoPage() {
               
               {/* Open Trades Table */}
               <div className="relative p-6 corner-top-right flex-1 min-h-[320px]">
-                <h3 className="text-body text-bone font-medium mb-4">Open Trades</h3>
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-body text-bone font-medium">Open Trades</h3>
+                  {lastUpdated && (
+                    <span className="text-footnote text-gray-500">
+                      Updated: {lastUpdated}
+                    </span>
+                  )}
+                </div>
                 <div className="gradient-divider mb-4"></div>
                 <div className="overflow-y-auto max-h-[260px]">
                   <table className="w-full text-footnote">
@@ -390,10 +463,12 @@ export default function DemoPage() {
                         <th className="text-left py-2">Size ($)</th>
                         <th className="text-left py-2">Direction</th>
                         <th className="text-left py-2">Entry</th>
+                        <th className="text-left py-2">Current</th>
+                        <th className="text-left py-2">Time</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {realTradingData.openTrades.map((trade, index) => (
+                      {livePositions.map((trade, index) => (
                         <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
                           <td className={`py-2 font-medium ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                             {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(2)}
@@ -403,7 +478,11 @@ export default function DemoPage() {
                           <td className={`py-2 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
                             {trade.direction}
                           </td>
-                          <td className="py-2 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
+                          <td className="py-2 text-gray-400">{trade.entryPrice.toFixed(2)}</td>
+                          <td className="py-2 text-gray-400">
+                            {trade.currentPrice.toFixed(2)}
+                          </td>
+                          <td className="py-2 text-gray-400">{trade.timeInTrade}</td>
                         </tr>
                       ))}</tbody>
                   </table>
