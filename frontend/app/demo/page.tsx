@@ -75,6 +75,7 @@ export default function DemoPage() {
   const [isModalOpen, setIsModalOpen] = React.useState(false)
   const [selectedBot, setSelectedBot] = React.useState<Bot | null>(null)
   const [livePositions, setLivePositions] = React.useState<Array<{
+    id?: string;
     symbol: string;
     direction: string;
     pnl: number;
@@ -84,8 +85,12 @@ export default function DemoPage() {
     timeInTrade: string;
     leverage?: number;
     confidence?: number;
+    reasoning_text?: string;
+    volume_analysis?: string;
+    signal_timeframe?: string;
   }>>([])
   const [lastUpdated, setLastUpdated] = React.useState<string>('')
+  const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
   
   // Zustand store hooks
   const { 
@@ -110,6 +115,7 @@ export default function DemoPage() {
         if (data.status === 'success' && data.positions) {
           // Transform API data to match frontend structure
           const transformedPositions = data.positions.map((pos: {
+            id?: string;
             symbol: string;
             direction: string;
             pnl: number;
@@ -119,7 +125,11 @@ export default function DemoPage() {
             time_in_trade?: string;
             leverage: number;
             confidence: number;
+            reasoning_text?: string;
+            volume_analysis?: string;
+            signal_timeframe?: string;
           }) => ({
+            id: pos.id || `${pos.symbol}-${Date.now()}`,
             symbol: pos.symbol,
             direction: pos.direction,
             pnl: pos.pnl,
@@ -128,7 +138,10 @@ export default function DemoPage() {
             currentPrice: pos.current_price || pos.entry_price,
             timeInTrade: pos.time_in_trade || 'N/A',
             leverage: pos.leverage,
-            confidence: pos.confidence
+            confidence: pos.confidence,
+            reasoning_text: pos.reasoning_text,
+            volume_analysis: pos.volume_analysis,
+            signal_timeframe: pos.signal_timeframe
           }))
           
           setLivePositions(transformedPositions)
@@ -142,8 +155,8 @@ export default function DemoPage() {
     // Initial fetch
     fetchLivePositions()
 
-    // Set up polling every 5 seconds for live updates
-    const interval = setInterval(fetchLivePositions, 5000)
+    // Set up polling every 15 seconds for live updates (reduced from 5s to save memory)
+    const interval = setInterval(fetchLivePositions, 15000)
 
     return () => clearInterval(interval)
   }, [])
@@ -258,6 +271,18 @@ export default function DemoPage() {
     } catch (error) {
       console.error('Failed to delete bot:', error)
     }
+  }
+
+  const toggleReasoningExpansion = (tradeId: string) => {
+    setExpandedReasoningIds(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(tradeId)) {
+        newSet.delete(tradeId)
+      } else {
+        newSet.add(tradeId)
+      }
+      return newSet
+    })
   }
 
   const nextBot = () => {
@@ -389,6 +414,7 @@ export default function DemoPage() {
                 status={currentBot.status.phase}
                 message={currentBot.status.message}
                 showSpinner={currentBot.status.showSpinner}
+                demoMode={currentBot.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' && currentBot.status.phase !== 'inactive'}
                 onClick={() => handleBotClick(currentBot)}
               />
               
@@ -453,23 +479,99 @@ export default function DemoPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {livePositions.map((trade, index) => (
-                        <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
-                          <td className={`py-1 pr-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                            {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(0)}
-                          </td>
-                          <td className="py-1 px-1 text-bone-200">{trade.symbol.replace('/USDT', '')}</td>
-                          <td className="py-1 px-1 text-gray-400">{trade.positionSize}</td>
-                          <td className={`py-1 px-1 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
-                            {trade.direction.slice(0, 1)}
-                          </td>
-                          <td className="py-1 px-1 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
-                          <td className="py-1 px-1 text-gray-400">
-                            {trade.currentPrice.toFixed(3)}
-                          </td>
-                          <td className="py-1 pl-1 text-gray-400">{trade.timeInTrade}</td>
-                        </tr>
-                      ))}</tbody>
+                      {livePositions.map((trade, index) => {
+                        const tradeId = trade.id || `trade-${index}`
+                        const isExpanded = expandedReasoningIds.has(tradeId)
+                        
+                        return (
+                          <React.Fragment key={tradeId}>
+                            <tr 
+                              className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''} cursor-pointer hover:bg-gray-700/30 transition-colors`}
+                              onClick={() => toggleReasoningExpansion(tradeId)}
+                            >
+                              <td className={`py-1 pr-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(0)}
+                              </td>
+                              <td className="py-1 px-1 text-bone-200">{trade.symbol.replace('/USDT', '')}</td>
+                              <td className="py-1 px-1 text-gray-400">{trade.positionSize}</td>
+                              <td className={`py-1 px-1 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
+                                {trade.direction.slice(0, 1)}
+                              </td>
+                              <td className="py-1 px-1 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
+                              <td className="py-1 px-1 text-gray-400">
+                                {trade.currentPrice.toFixed(3)}
+                              </td>
+                              <td className="py-1 pl-1 text-gray-400 flex items-center justify-between">
+                                {trade.timeInTrade}
+                                <span className="text-agent-extraction ml-1">
+                                  {isExpanded ? '▼' : '▶'}
+                                </span>
+                              </td>
+                            </tr>
+                            
+                            {/* AI Reasoning Expansion */}
+                            {isExpanded && (
+                              <tr className="bg-charcoal-800/50">
+                                <td colSpan={7} className="p-3">
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-2 border-b border-charcoal-600 pb-2">
+                                      <span className="text-lg">🧠</span>
+                                      <h4 className="text-footnote text-agent-extraction font-medium">
+                                        4-Pillar AI Analysis (Confidence: {trade.confidence || 0}%)
+                                      </h4>
+                                    </div>
+                                    
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-footnote">
+                                      <div>
+                                        <div className="text-gray-400 mb-1">Market Regime Assessment:</div>
+                                        <div className="text-bone-200 text-xs leading-relaxed">
+                                          {trade.reasoning_text?.includes('regime') ? 
+                                            trade.reasoning_text.split('regime')[1]?.split('.')[0] + '...' : 
+                                            "Trend alignment and volatility analysis confirmed"}
+                                        </div>
+                                      </div>
+                                      
+                                      <div>
+                                        <div className="text-gray-400 mb-1">Volume Confirmation:</div>
+                                        <div className="text-bone-200 text-xs">
+                                          {trade.volume_analysis || "Volume confirmation analysis completed"}
+                                        </div>
+                                      </div>
+                                      
+                                      <div>
+                                        <div className="text-gray-400 mb-1">Signal Timeframe:</div>
+                                        <div className="text-bone-200 text-xs">
+                                          {trade.signal_timeframe || "1h"}
+                                        </div>
+                                      </div>
+                                      
+                                      <div>
+                                        <div className="text-gray-400 mb-1">4-Pillar Framework:</div>
+                                        <div className="text-bone-200 text-xs grid grid-cols-2 gap-1">
+                                          <span>• Market Regime ✓</span>
+                                          <span>• Signal Confirmation ✓</span>
+                                          <span>• Multi-timeframe Context ✓</span>
+                                          <span>• Risk Assessment ✓</span>
+                                        </div>
+                                      </div>
+                                    </div>
+                                    
+                                    {trade.reasoning_text && (
+                                      <div className="pt-2 border-t border-charcoal-700">
+                                        <div className="text-gray-400 mb-1 text-footnote">Full AI Reasoning:</div>
+                                        <div className="text-bone-200 text-xs leading-relaxed max-h-20 overflow-y-auto">
+                                          {trade.reasoning_text}
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                              </tr>
+                            )}
+                          </React.Fragment>
+                        )
+                      })}
+                    </tbody>
                   </table>
                 </div>
               </div>

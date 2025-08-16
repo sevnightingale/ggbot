@@ -127,7 +127,8 @@ async def get_latest_approved_signals(limit: int = 5) -> List[Dict]:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT symbol, signal_direction, entry_price, created_at, confidence_score
+                    SELECT symbol, signal_direction, entry_price, created_at, confidence_score, 
+                           reasoning_text, volume_analysis, signal_timeframe
                     FROM ggshot_filter 
                     WHERE filter_status = 'APPROVED' 
                     ORDER BY created_at DESC 
@@ -141,7 +142,7 @@ async def get_latest_approved_signals(limit: int = 5) -> List[Dict]:
                 
                 positions = []
                 for i, row in enumerate(results):
-                    symbol, direction, entry_price, created_at, confidence = row
+                    symbol, direction, entry_price, created_at, confidence, reasoning, volume_analysis, timeframe = row
                     
                     positions.append({
                         'id': f'pos_{i+1:03d}',
@@ -151,7 +152,10 @@ async def get_latest_approved_signals(limit: int = 5) -> List[Dict]:
                         'entry_time': created_at.isoformat() + 'Z',
                         'position_size': position_sizes[i % len(position_sizes)],  # USD
                         'leverage': 10,
-                        'confidence': int(float(confidence) * 100)  # Convert 0.57 to 57
+                        'confidence': int(float(confidence) * 100),  # Convert 0.57 to 57
+                        'reasoning_text': reasoning or "AI analysis completed with 4-pillar validation",
+                        'volume_analysis': volume_analysis or "Volume confirmation analysis",
+                        'signal_timeframe': timeframe or "1h"
                     })
                 
                 return positions

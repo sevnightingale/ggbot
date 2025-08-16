@@ -403,9 +403,149 @@ async def get_all_bots():
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class BotStartRequest(BaseModel):
+    demo_mode: bool = False
+
+
+async def get_latest_ggshot_signal() -> Optional[Dict[str, Any]]:
+    """Get the latest approved signal from ggshot_filter table."""
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT symbol, signal_direction, entry_price, stop_loss_price, 
+                           take_profit_price, confidence_score, reasoning_text,
+                           volume_analysis, signal_timeframe, created_at
+                    FROM ggshot_filter 
+                    WHERE filter_status = 'APPROVED' 
+                    ORDER BY created_at DESC 
+                    LIMIT 1
+                """)
+                
+                row = cur.fetchone()
+                if row:
+                    return {
+                        'symbol': row[0],
+                        'signal_direction': row[1],
+                        'entry_price': float(row[2]) if row[2] else 0,
+                        'stop_loss_price': float(row[3]) if row[3] else 0,
+                        'take_profit_price': float(row[4]) if row[4] else 0,
+                        'confidence_score': float(row[5]) if row[5] else 0,
+                        'reasoning_text': row[6],
+                        'volume_analysis': row[7],
+                        'signal_timeframe': row[8],
+                        'created_at': row[9].isoformat() if row[9] else None
+                    }
+                return None
+    except Exception as e:
+        logger.error(f"Failed to get latest ggshot signal: {e}")
+        return None
+
+
+async def run_demo_sequence(config_id: str, signal_data: Dict[str, Any]):
+    """Run the demo sequence with real ggshot data."""
+    try:
+        # Import WebSocket manager from main_api
+        from main_api import manager
+        
+        # Helper to broadcast status
+        async def broadcast_status(phase: str, message: str, show_spinner: bool = False):
+            status_update = {
+                "type": "bot_status_update",
+                "bot_id": f"decision-{config_id[:8]}",
+                "bot_type": "decision",
+                "config_id": config_id,
+                "bot_name": "ggbot-01",
+                "user_id": "00000000-0000-0000-0000-000000000001",
+                "status": {
+                    "phase": phase,
+                    "color": {"idle": "blue", "extraction": "blue", "decision": "green", "trading": "orange"}.get(phase, "gray"),
+                    "message": message,
+                    "timestamp": datetime.utcnow().isoformat() + "Z",
+                    "showSpinner": show_spinner,
+                    "demo_mode": True
+                }
+            }
+            # Broadcast to all connected users
+            for user_id in list(manager.active_connections.keys()):
+                await manager.broadcast_to_user(user_id, status_update)
+        
+        # Phase 1: Idle -> Extraction (10-15s)
+        await broadcast_status("idle", "Starting analysis...", True)
+        await asyncio.sleep(2)
+        
+        await broadcast_status("extraction", f"Analyzing {signal_data['symbol']} on {signal_data['signal_timeframe']}...", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("extraction", "Processing 14+ technical indicators...", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("extraction", "4-pillar market regime analysis...", True)
+        await asyncio.sleep(3)
+        
+        volume_preview = signal_data.get('volume_analysis', 'Volume data processing')[:50]
+        await broadcast_status("extraction", f"Volume analysis: {volume_preview}...", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("extraction", "Market data extraction complete ✓", False)
+        await asyncio.sleep(2)
+        
+        # Phase 2: Decision (15-20s)
+        await broadcast_status("decision", "Running 4-pillar validation framework...", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("decision", "Market regime assessment: trend alignment check...", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("decision", "Signal confirmation: momentum analysis...", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("decision", "Multi-timeframe RSI analysis...", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("decision", "Risk assessment: volatility and overextension...", True)
+        await asyncio.sleep(3)
+        
+        confidence = round(signal_data.get('confidence_score', 0) * 100)
+        await broadcast_status("decision", f"Signal confidence: {confidence}%", False)
+        await asyncio.sleep(2)
+        
+        direction = signal_data.get('signal_direction', 'LONG')
+        symbol = signal_data.get('symbol', 'BTC/USDT')
+        await broadcast_status("decision", f"Decision: {direction} {symbol} (confidence: {confidence}%)", False)
+        await asyncio.sleep(3)
+        
+        # Phase 3: Trading (10s)
+        await broadcast_status("trading", "Preparing trade execution...", True)
+        await asyncio.sleep(2)
+        
+        entry = signal_data.get('entry_price', 0)
+        await broadcast_status("trading", f"Entry: ${entry:.4f} • Size: 2%", True)
+        await asyncio.sleep(3)
+        
+        sl = signal_data.get('stop_loss_price', 0)
+        tp = signal_data.get('take_profit_price', 0)
+        await broadcast_status("trading", f"Stop loss: ${sl:.4f} • Take profit: ${tp:.4f}", True)
+        await asyncio.sleep(3)
+        
+        await broadcast_status("trading", "Submitting to paper trading account...", True)
+        await asyncio.sleep(2)
+        
+        await broadcast_status("trading", "✓ Demo trade executed successfully", False)
+        await asyncio.sleep(2)
+        
+        # Return to idle
+        await broadcast_status("idle", "Demo complete - monitoring position", False)
+        
+        logger.info(f"✅ Demo sequence completed for {config_id}")
+        
+    except Exception as e:
+        logger.error(f"Error in demo sequence: {e}")
+
+
 @app.post("/api/bots/{config_id}/start")
-async def start_bot(config_id: str):
-    """Start (activate) a specific bot configuration."""
+async def start_bot(config_id: str, request: BotStartRequest = BotStartRequest()):
+    """Start (activate) a specific bot configuration with optional demo mode."""
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -423,6 +563,34 @@ async def start_bot(config_id: str):
                 
                 config_id_db, instance_name, current_status, config_name, config_type = bot
                 
+                # Handle demo mode for ggbot-01
+                if request.demo_mode and config_id == 'e249bb49-0455-4596-9657-09bf9e14ca14':
+                    logger.info(f"🎭 Starting demo mode for ggbot-01")
+                    
+                    # Get latest approved signal from ggshot_filter
+                    signal_data = await get_latest_ggshot_signal()
+                    
+                    if signal_data:
+                        # Start demo mode background task
+                        asyncio.create_task(run_demo_sequence(config_id, signal_data))
+                        
+                        return {
+                            "status": "demo_started",
+                            "config_id": config_id,
+                            "bot_name": instance_name or config_name,
+                            "bot_type": config_type,
+                            "demo_mode": True,
+                            "signal_preview": {
+                                "symbol": signal_data.get('symbol'),
+                                "direction": signal_data.get('signal_direction'),
+                                "confidence": round(signal_data.get('confidence_score', 0) * 100)
+                            },
+                            "message": f"Demo mode started for {instance_name or config_name}"
+                        }
+                    else:
+                        raise HTTPException(status_code=503, detail="No approved signals available for demo")
+                
+                # Normal bot start logic
                 if current_status == "active":
                     return {
                         "status": "already_active",

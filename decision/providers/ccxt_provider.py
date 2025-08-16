@@ -283,7 +283,7 @@ class CCXTPriceProvider(PriceProvider):
         """Initialize CCXT price provider."""
         super().__init__(**kwargs)
         self._log = logger.bind(provider="ccxt")
-        self._exchange_clients = {}  # Cache for exchange clients
+        self._exchange_clients = {}  # Cache for exchange clients - NOW WE ACTUALLY USE IT!
     
     async def get_current_price(self, symbol: str) -> Optional[Decimal]:
         """
@@ -332,17 +332,14 @@ class CCXTPriceProvider(PriceProvider):
                 self._log.debug(f"Symbol {symbol} not supported on {exchange_name}")
                 return None
             
-            # Load markets if not already loaded
-            if not hasattr(exchange, 'markets') or not exchange.markets:
-                await exchange.load_markets()
-            
-            # Check if symbol exists
-            if exchange_symbol not in exchange.markets:
-                self._log.debug(f"Symbol {exchange_symbol} not found in {exchange_name} markets")
+            # Skip loading all markets - just try to fetch the ticker directly
+            # This saves hundreds of MB of memory per exchange
+            # Most exchanges support fetching tickers without loading all markets
+            try:
+                ticker = await exchange.fetch_ticker(exchange_symbol)
+            except Exception as ticker_error:
+                self._log.debug(f"Symbol {exchange_symbol} not available on {exchange_name}: {ticker_error}")
                 return None
-            
-            # Fetch ticker
-            ticker = await exchange.fetch_ticker(exchange_symbol)
             
             # Get last price
             price = ticker.get('last')
@@ -357,13 +354,9 @@ class CCXTPriceProvider(PriceProvider):
             self._log.error(f"Error fetching from {exchange_name}: {e}")
             return None
         finally:
-            # Always close the exchange connection
-            if exchange_name in self._exchange_clients:
-                try:
-                    await self._exchange_clients[exchange_name].close()
-                    del self._exchange_clients[exchange_name]
-                except:
-                    pass
+            # Don't close the connection - keep it cached for reuse
+            # This avoids recreating exchanges every 5 seconds
+            pass
     
     async def _get_exchange_client(self, exchange_name: str):
         """
@@ -376,7 +369,11 @@ class CCXTPriceProvider(PriceProvider):
             Exchange client or None if not available
         """
         try:
-            # Create new client (don't cache to avoid connection issues)
+            # Reuse cached client if available
+            if exchange_name in self._exchange_clients:
+                return self._exchange_clients[exchange_name]
+            
+            # Create new client and cache it
             if hasattr(ccxt, exchange_name):
                 exchange_class = getattr(ccxt, exchange_name)
                 exchange = exchange_class({
@@ -384,6 +381,7 @@ class CCXTPriceProvider(PriceProvider):
                     'timeout': 10000,  # 10 second timeout
                 })
                 self._exchange_clients[exchange_name] = exchange
+                self._log.info(f"Created and cached {exchange_name} client")
                 return exchange
             else:
                 self._log.warning(f"Exchange {exchange_name} not available in CCXT")

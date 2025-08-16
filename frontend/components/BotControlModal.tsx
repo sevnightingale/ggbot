@@ -230,23 +230,153 @@ export default function BotControlModal({
           {/* Scrollable Form Content */}
           <div className="flex-1 overflow-y-auto px-8 py-6 scroll-area relative">
             {isLockedConfig && (
-              <div className="absolute inset-0 bg-charcoal-900/90 backdrop-blur-sm z-10 flex items-center justify-center">
-                <div className="text-center p-8 max-w-md">
-                  <div className="mb-4">
-                    <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-orange-400 mx-auto">
-                      <path d="M18,8h-1V6c0-2.76-2.24-5-5-5S7,3.24,7,6v2H6c-1.1,0-2,0.9-2,2v10c0,1.1,0.9,2,2,2h12c1.1,0,2-0.9,2-2V10C20,8.9,19.1,8,18,8z M12,17c-1.1,0-2-0.9-2-2s0.9-2,2-2s2,0.9,2,2S13.1,17,12,17z M15.1,8H8.9V6c0-1.71,1.39-3.1,3.1-3.1s3.1,1.39,3.1,3.1V8z"/>
-                    </svg>
+              <div className="absolute inset-0 bg-charcoal-900/95 backdrop-blur-sm z-10 overflow-y-auto">
+                <div className="p-8 max-w-4xl mx-auto">
+                  {/* Enhanced Configuration Display */}
+                  <div className="space-y-8">
+                    <div className="text-center mb-8">
+                      <div className="mb-4">
+                        <svg width="48" height="48" viewBox="0 0 24 24" fill="currentColor" className="text-agent-extraction mx-auto">
+                          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+                        </svg>
+                      </div>
+                      <h3 className="text-header text-bone mb-2">ggbot-01 Intelligence Architecture</h3>
+                      <p className="text-body text-gray-400">
+                        Sophisticated 3-agent AI trading system with real 4-Pillar Validation Framework
+                      </p>
+                    </div>
+
+                    {/* Extraction Agent Section */}
+                    <div className="p-6 border border-charcoal-600 bg-charcoal-800/30">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-2xl">📊</span>
+                        <h4 className="text-subheader text-agent-extraction">Extraction Agent - 4-Pillar Framework</h4>
+                      </div>
+                      <div className="space-y-3 text-footnote text-gray-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-bone">• Pillar 0 - Market Regime:</span>
+                            <div className="ml-4 text-gray-400">
+                              Aroon_1d, BollingerBandsWidth_1d, TRIX_1d
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-bone">• Pillar 1 - Signal Confirmation:</span>
+                            <div className="ml-4 text-gray-400">
+                              Vortex_1h, VWAP_1h, MFI_1h + Volume Analysis
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-bone">• Pillar 2 - Multi-Timeframe Context:</span>
+                            <div className="ml-4 text-gray-400">
+                              RSI_15m/30m/1h/4h, DonchianChannel_200_1h
+                            </div>
+                          </div>
+                          <div>
+                            <span className="text-bone">• Pillar 3 - Risk Assessment:</span>
+                            <div className="ml-4 text-gray-400">
+                              BollingerBands_1h, ATR_1h
+                            </div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-charcoal-700">
+                          <span className="text-bone">Data Sources:</span> TradingView Charts, ggShot Indicator, crypto_indicators_mcp
+                          <br />
+                          <span className="text-bone">Coverage:</span> 140+ cryptocurrency pairs, real-time scanning
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Decision Agent Section */}
+                    <div className="p-6 border border-charcoal-600 bg-charcoal-800/30">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-2xl">🧠</span>
+                        <h4 className="text-subheader text-agent-decision">Decision Agent - AI Validation</h4>
+                      </div>
+                      <div className="space-y-3 text-footnote text-gray-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-bone">Strategy:</span>
+                            <div className="text-gray-400">Enhanced 4-Pillar Validation Framework</div>
+                          </div>
+                          <div>
+                            <span className="text-bone">LLM Provider:</span>
+                            <div className="text-gray-400">DeepSeek R1 reasoning pipeline</div>
+                          </div>
+                          <div>
+                            <span className="text-bone">Confidence Threshold:</span>
+                            <div className="text-gray-400">≥50% for signal approval</div>
+                          </div>
+                          <div>
+                            <span className="text-bone">System Prompt:</span>
+                            <div className="text-gray-400">Quantitative trading analyst with Four-Pillar Framework</div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-charcoal-700">
+                          <span className="text-bone">Analysis Flow:</span> Market regime → Signal confirmation → Multi-timeframe context → Risk assessment
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Trading Agent Section */}
+                    <div className="p-6 border border-charcoal-600 bg-charcoal-800/30">
+                      <div className="flex items-center gap-3 mb-4">
+                        <span className="text-2xl">💰</span>
+                        <h4 className="text-subheader text-agent-trading">Trading Agent - Risk Management</h4>
+                      </div>
+                      <div className="space-y-3 text-footnote text-gray-300">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <span className="text-bone">Execution:</span>
+                            <div className="text-gray-400">Paper trading (Hummingbot integration)</div>
+                          </div>
+                          <div>
+                            <span className="text-bone">Account Balance:</span>
+                            <div className="text-gray-400">$10,000 paper account</div>
+                          </div>
+                          <div>
+                            <span className="text-bone">Risk Management:</span>
+                            <div className="text-gray-400">Confidence-based position sizing</div>
+                          </div>
+                          <div>
+                            <span className="text-bone">Account Risk:</span>
+                            <div className="text-gray-400">1-3% per trade based on signal strength</div>
+                          </div>
+                        </div>
+                        <div className="pt-2 border-t border-charcoal-700">
+                          <span className="text-bone">Stop Loss:</span> Dynamic based on volatility analysis
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Action Button */}
+                    <div className="text-center pt-6">
+                      <button
+                        onClick={async () => {
+                          try {
+                            const response = await fetch(`/api/bots/${bot.config_id}/start`, {
+                              method: 'POST',
+                              headers: {
+                                'Content-Type': 'application/json',
+                              },
+                              body: JSON.stringify({ demo_mode: true })
+                            })
+                            const result = await response.json()
+                            console.log('Demo mode started:', result)
+                            onClose()
+                          } catch (error) {
+                            console.error('Failed to start demo mode:', error)
+                          }
+                        }}
+                        className="px-8 py-4 bg-agent-extraction hover:bg-agent-extraction/90 text-bone text-body font-medium transition-colors border-2 border-agent-extraction hover:border-agent-extraction/90 text-center"
+                      >
+                        🚀 Start ggbot-01 Intelligence Demo
+                      </button>
+                      <p className="text-footnote text-gray-500 mt-3">
+                        45-second demo showcasing real ggShot AI complexity
+                      </p>
+                    </div>
                   </div>
-                  <h3 className="text-subheader text-bone mb-4">Live ggbot Configuration</h3>
-                  <p className="text-body text-gray-400 mb-6">
-                    This is a live ggbot with real trading activity. Configuration is protected to ensure uninterrupted operation.
-                  </p>
-                  <button
-                    onClick={onClose}
-                    className="px-6 py-3 bg-agent-extraction hover:bg-agent-extraction/90 text-bone text-body font-medium transition-colors border-2 border-agent-extraction hover:border-agent-extraction/90"
-                  >
-                    Create Your Own ggbot
-                  </button>
                 </div>
               </div>
             )}
