@@ -8,6 +8,7 @@ interface GGBotProps {
   status?: 'inactive' | 'idle' | 'extraction' | 'decision' | 'trading'
   showSpinner?: boolean
   className?: string
+  demoMode?: boolean
 }
 
 const GGBot: React.FC<GGBotProps> = ({ 
@@ -17,7 +18,8 @@ const GGBot: React.FC<GGBotProps> = ({
   disabled = false,
   status = 'inactive',
   showSpinner = false,
-  className = ''
+  className = '',
+  demoMode = false
 }) => {
   const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
   const [spinnerIndex, setSpinnerIndex] = React.useState(0)
@@ -33,7 +35,7 @@ const GGBot: React.FC<GGBotProps> = ({
   }, [showSpinner, spinnerChars.length])
 
   return (
-    <div className={`ggbot-container ggbot-${status} ${className}`}>
+    <div className={`ggbot-container ggbot-${status} ${demoMode ? 'demo-mode' : ''} ${className}`}>
       <button
         className={`ggbot-circle ggbot-${status} ${disabled ? 'ggbot-disabled' : ''}`}
         onClick={onClick}
@@ -60,6 +62,15 @@ const GGBot: React.FC<GGBotProps> = ({
           )}
         </div>
       </button>
+      
+      {/* Demo Mode Indicator */}
+      {demoMode && status !== 'inactive' && (
+        <div className="demo-mode-badge">
+          <span className="text-xs text-agent-extraction bg-agent-extraction/20 px-2 py-1 rounded border border-agent-extraction/30">
+            DEMO
+          </span>
+        </div>
+      )}
     </div>
   )
 }
