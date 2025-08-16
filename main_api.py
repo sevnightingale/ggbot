@@ -75,6 +75,9 @@ app.mount("/trading", trading_app)
 # Dashboard mount removed - legacy
 app.mount("/agent", agent_control_app)
 
+# Set WebSocket manager for agent control API demo mode
+from core.api.agent_control_api import set_websocket_manager
+
 # Include the config router directly
 app.include_router(config_router)
 
@@ -109,6 +112,9 @@ class WebSocketManager:
 
 # Global WebSocket manager
 manager = WebSocketManager()
+
+# Set the WebSocket manager for agent control API demo mode
+set_websocket_manager(manager)
 
 # Include the users router directly
 app.include_router(users_router)

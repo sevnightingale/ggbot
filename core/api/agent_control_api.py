@@ -24,6 +24,15 @@ app = FastAPI(title="Agent Control API", version="1.0.0")
 # Global process tracking
 active_processes: Dict[str, Dict[str, subprocess.Popen]] = {}
 
+# Global WebSocket manager (will be set by main_api.py)
+websocket_manager = None
+
+
+def set_websocket_manager(manager):
+    """Set the WebSocket manager for demo mode broadcasting."""
+    global websocket_manager
+    websocket_manager = manager
+
 
 class StartRequest(BaseModel):
     modules: List[str] = ["all"]  # ["extraction", "decision", "trading", "monitoring"]
@@ -445,8 +454,8 @@ async def get_latest_ggshot_signal() -> Optional[Dict[str, Any]]:
 async def run_demo_sequence(config_id: str, signal_data: Dict[str, Any]):
     """Run the demo sequence with real ggshot data."""
     try:
-        # Import WebSocket manager from main_api
-        from main_api import manager
+        # Use global WebSocket manager
+        global websocket_manager
         
         # Helper to broadcast status
         async def broadcast_status(phase: str, message: str, show_spinner: bool = False):
@@ -467,8 +476,9 @@ async def run_demo_sequence(config_id: str, signal_data: Dict[str, Any]):
                 }
             }
             # Broadcast to all connected users
-            for user_id in list(manager.active_connections.keys()):
-                await manager.broadcast_to_user(user_id, status_update)
+            if websocket_manager:
+                for user_id in list(websocket_manager.active_connections.keys()):
+                    await websocket_manager.broadcast_to_user(user_id, status_update)
         
         # Phase 1: Idle -> Extraction (10-15s)
         await broadcast_status("idle", "Starting analysis...", True)
