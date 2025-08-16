@@ -105,61 +105,61 @@ export default function DemoPage() {
   // WebSocket connection for real-time updates
   const { isLoadingBots } = useBotWebSocket(DEMO_USER_ID)
 
-  // Live position data fetching
-  React.useEffect(() => {
-    const fetchLivePositions = async () => {
-      try {
-        const response = await fetch('/api/live-position-data')
-        const data = await response.json()
-        
-        if (data.status === 'success' && data.positions) {
-          // Transform API data to match frontend structure
-          const transformedPositions = data.positions.map((pos: {
-            id?: string;
-            symbol: string;
-            direction: string;
-            pnl: number;
-            position_size: number;
-            entry_price: number;
-            current_price?: number;
-            time_in_trade?: string;
-            leverage: number;
-            confidence: number;
-            reasoning_text?: string;
-            volume_analysis?: string;
-            signal_timeframe?: string;
-          }) => ({
-            id: pos.id || `${pos.symbol}-${Date.now()}`,
-            symbol: pos.symbol,
-            direction: pos.direction,
-            pnl: pos.pnl,
-            positionSize: pos.position_size,
-            entryPrice: pos.entry_price,
-            currentPrice: pos.current_price || pos.entry_price,
-            timeInTrade: pos.time_in_trade || 'N/A',
-            leverage: pos.leverage,
-            confidence: pos.confidence,
-            reasoning_text: pos.reasoning_text,
-            volume_analysis: pos.volume_analysis,
-            signal_timeframe: pos.signal_timeframe
-          }))
-          
-          setLivePositions(transformedPositions)
-          setLastUpdated(new Date().toLocaleTimeString())
-        }
-      } catch (error) {
-        console.error('Failed to fetch live positions:', error)
-      }
-    }
+  // Live position data fetching - disabled for demo to start with empty trades
+  // React.useEffect(() => {
+  //   const fetchLivePositions = async () => {
+  //     try {
+  //       const response = await fetch('/api/live-position-data')
+  //       const data = await response.json()
+  //       
+  //       if (data.status === 'success' && data.positions) {
+  //         // Transform API data to match frontend structure
+  //         const transformedPositions = data.positions.map((pos: {
+  //           id?: string;
+  //           symbol: string;
+  //           direction: string;
+  //           pnl: number;
+  //           position_size: number;
+  //           entry_price: number;
+  //           current_price?: number;
+  //           time_in_trade?: string;
+  //           leverage: number;
+  //           confidence: number;
+  //           reasoning_text?: string;
+  //           volume_analysis?: string;
+  //           signal_timeframe?: string;
+  //         }) => ({
+  //           id: pos.id || `${pos.symbol}-${Date.now()}`,
+  //           symbol: pos.symbol,
+  //           direction: pos.direction,
+  //           pnl: pos.pnl,
+  //           positionSize: pos.position_size,
+  //           entryPrice: pos.entry_price,
+  //           currentPrice: pos.current_price || pos.entry_price,
+  //           timeInTrade: pos.time_in_trade || 'N/A',
+  //           leverage: pos.leverage,
+  //           confidence: pos.confidence,
+  //           reasoning_text: pos.reasoning_text,
+  //           volume_analysis: pos.volume_analysis,
+  //           signal_timeframe: pos.signal_timeframe
+  //         }))
+  //         
+  //         setLivePositions(transformedPositions)
+  //         setLastUpdated(new Date().toLocaleTimeString())
+  //       }
+  //     } catch (error) {
+  //       console.error('Failed to fetch live positions:', error)
+  //     }
+  //   }
 
-    // Initial fetch
-    fetchLivePositions()
+  //   // Initial fetch
+  //   fetchLivePositions()
 
-    // Set up polling every 15 seconds for live updates (reduced from 5s to save memory)
-    const interval = setInterval(fetchLivePositions, 15000)
+  //   // Set up polling every 15 seconds for live updates (reduced from 5s to save memory)
+  //   const interval = setInterval(fetchLivePositions, 15000)
 
-    return () => clearInterval(interval)
-  }, [])
+  //   return () => clearInterval(interval)
+  // }, [])
   
   const demoBots = getBotsByUser(DEMO_USER_ID)
 

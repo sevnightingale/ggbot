@@ -63,14 +63,6 @@ const GGBot: React.FC<GGBotProps> = ({
         </div>
       </button>
       
-      {/* Demo Mode Indicator */}
-      {demoMode && status !== 'inactive' && (
-        <div className="demo-mode-badge">
-          <span className="text-xs text-agent-extraction bg-agent-extraction/20 px-2 py-1 rounded border border-agent-extraction/30">
-            DEMO
-          </span>
-        </div>
-      )}
     </div>
   )
 }
