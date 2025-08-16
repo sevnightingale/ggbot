@@ -547,6 +547,19 @@ async def run_demo_sequence(config_id: str, signal_data: Dict[str, Any]):
         # Return to idle
         await broadcast_status("idle", "Demo complete - monitoring position", False)
         
+        # Also broadcast a special message for position creation
+        await asyncio.sleep(1)
+        position_create_message = {
+            "type": "demo_position_create",
+            "config_id": config_id,
+            "signal_data": signal_data,
+            "timestamp": datetime.utcnow().isoformat() + "Z"
+        }
+        
+        if websocket_manager:
+            for user_id in list(websocket_manager.active_connections.keys()):
+                await websocket_manager.broadcast_to_user(user_id, position_create_message)
+        
         logger.info(f"✅ Demo sequence completed for {config_id}")
         
     except Exception as e:

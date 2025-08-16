@@ -144,8 +144,39 @@ export default function DemoPage() {
     const handleBotStatusUpdate = (event: MessageEvent) => {
       const data = JSON.parse(event.data)
       
-      // Check if this is a demo completion for ggbot-01
-      if (data.type === 'bot_status_update' && 
+      // Check for demo position creation message
+      if (data.type === 'demo_position_create' && 
+          data.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' &&
+          data.signal_data) {
+        
+        // Create position directly from signal data
+        const signalData = data.signal_data
+        const newPosition = {
+          id: `demo-${Date.now()}`,
+          symbol: signalData.symbol,
+          direction: signalData.signal_direction,
+          pnl: 0, // Start with 0 P&L
+          positionSize: 1000, // Fixed demo size
+          entryPrice: signalData.entry_price,
+          currentPrice: signalData.entry_price, // Start with entry price
+          timeInTrade: '0m',
+          leverage: 10,
+          confidence: Math.round(signalData.confidence_score * 100),
+          reasoning_text: signalData.reasoning_text,
+          volume_analysis: signalData.volume_analysis,
+          signal_timeframe: signalData.signal_timeframe
+        }
+        
+        setLivePositions([newPosition])
+        
+        // Start updating P&L with live prices
+        startLivePnLUpdates(newPosition)
+        
+        console.log('🎯 Demo position created:', newPosition)
+      }
+      
+      // Also check for the old demo completion format (backup)
+      else if (data.type === 'bot_status_update' && 
           data.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' &&
           data.status?.demo_mode && 
           data.status?.phase === 'idle' &&
