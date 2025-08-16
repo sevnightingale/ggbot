@@ -354,7 +354,7 @@ export default function BotControlModal({
                       <button
                         onClick={async () => {
                           try {
-                            const response = await fetch(`/api/bots/${bot.config_id}/start`, {
+                            const response = await fetch(`/agent/api/bots/${bot.config_id}/start`, {
                               method: 'POST',
                               headers: {
                                 'Content-Type': 'application/json',
