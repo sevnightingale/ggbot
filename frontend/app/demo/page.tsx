@@ -89,7 +89,6 @@ export default function DemoPage() {
     volume_analysis?: string;
     signal_timeframe?: string;
   }>>([])
-  const [lastUpdated, setLastUpdated] = React.useState<string>('')
   const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
   
   // Zustand store hooks
@@ -104,6 +103,96 @@ export default function DemoPage() {
   
   // WebSocket connection for real-time updates
   const { isLoadingBots } = useBotWebSocket(DEMO_USER_ID)
+
+  // Demo completion handler - adds position when demo finishes
+  React.useEffect(() => {
+    // Function to start live P&L updates for a position
+    const startLivePnLUpdates = (position: typeof livePositions[0]) => {
+      const updatePnL = async () => {
+        try {
+          const response = await fetch('/api/live-position-data')
+          const data = await response.json()
+          
+          if (data.status === 'success' && data.positions && data.positions.length > 0) {
+            const latestData = data.positions[0]
+            
+            setLivePositions(prevPositions => 
+              prevPositions.map(pos => 
+                pos.id === position.id 
+                  ? {
+                      ...pos,
+                      currentPrice: latestData.current_price || pos.entryPrice,
+                      pnl: latestData.pnl || 0,
+                      timeInTrade: latestData.time_in_trade || pos.timeInTrade
+                    }
+                  : pos
+              )
+            )
+          }
+        } catch (error) {
+          console.error('Failed to update P&L:', error)
+        }
+      }
+
+      // Update P&L every 15 seconds
+      const interval = setInterval(updatePnL, 15000)
+      
+      // Store interval for cleanup (in a real app, you'd want better cleanup management)
+      ;(window as unknown as { pnlUpdateInterval?: NodeJS.Timeout }).pnlUpdateInterval = interval
+    }
+
+    const handleBotStatusUpdate = (event: MessageEvent) => {
+      const data = JSON.parse(event.data)
+      
+      // Check if this is a demo completion for ggbot-01
+      if (data.type === 'bot_status_update' && 
+          data.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' &&
+          data.status?.demo_mode && 
+          data.status?.phase === 'idle' &&
+          data.status?.message?.includes('Demo complete')) {
+        
+        // Fetch the latest signal data and add it as a live position
+        fetch('/api/live-position-data')
+          .then(response => response.json())
+          .then(apiData => {
+            if (apiData.status === 'success' && apiData.positions && apiData.positions.length > 0) {
+              // Take the first (latest) position and add it to live positions
+              const latestSignal = apiData.positions[0]
+              const newPosition = {
+                id: `demo-${Date.now()}`,
+                symbol: latestSignal.symbol,
+                direction: latestSignal.direction,
+                pnl: 0, // Start with 0 P&L
+                positionSize: latestSignal.position_size,
+                entryPrice: latestSignal.entry_price,
+                currentPrice: latestSignal.entry_price, // Start with entry price
+                timeInTrade: '0m',
+                leverage: latestSignal.leverage,
+                confidence: latestSignal.confidence,
+                reasoning_text: latestSignal.reasoning_text,
+                volume_analysis: latestSignal.volume_analysis,
+                signal_timeframe: latestSignal.signal_timeframe
+              }
+              
+              setLivePositions([newPosition])
+              
+              // Start updating P&L with live prices
+              startLivePnLUpdates(newPosition)
+            }
+          })
+          .catch(error => console.error('Failed to fetch signal data:', error))
+      }
+    }
+
+    // Only add listener if WebSocket is connected
+    const ws = (window as unknown as { ggbotWebSocket?: WebSocket }).ggbotWebSocket
+    if (ws) {
+      ws.addEventListener('message', handleBotStatusUpdate)
+      return () => ws.removeEventListener('message', handleBotStatusUpdate)
+    }
+    
+    return undefined
+  }, [])
 
   // Live position data fetching - disabled for demo to start with empty trades
   // React.useEffect(() => {
@@ -458,11 +547,9 @@ export default function DemoPage() {
               <div className="relative p-3 corner-top-right flex-1 min-h-[320px]">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-subheader text-bone-200">Open Trades</h3>
-                  {lastUpdated && (
-                    <span className="text-footnote text-gray-500">
-                      Updated: {lastUpdated}
-                    </span>
-                  )}
+                  <span className="text-footnote text-gray-500">
+                    {livePositions.length > 0 ? `${livePositions.length} position${livePositions.length !== 1 ? 's' : ''}` : 'No positions'}
+                  </span>
                 </div>
                 <div className="gradient-divider mb-4"></div>
                 <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
@@ -479,7 +566,18 @@ export default function DemoPage() {
                       </tr>
                     </thead>
                     <tbody>
-                      {livePositions.map((trade, index) => {
+                      {livePositions.length === 0 ? (
+                        <tr>
+                          <td colSpan={7} className="text-center py-8 text-gray-500">
+                            <div className="flex flex-col items-center gap-2">
+                              <span className="text-2xl">📊</span>
+                              <span>No active positions</span>
+                              <span className="text-xs">Start ggbot-01 demo to see AI trading in action</span>
+                            </div>
+                          </td>
+                        </tr>
+                      ) : (
+                        livePositions.map((trade, index) => {
                         const tradeId = trade.id || `trade-${index}`
                         const isExpanded = expandedReasoningIds.has(tradeId)
                         
@@ -570,7 +668,7 @@ export default function DemoPage() {
                             )}
                           </React.Fragment>
                         )
-                      })}
+                      }))}
                     </tbody>
                   </table>
                 </div>
