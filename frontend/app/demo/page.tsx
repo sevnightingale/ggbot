@@ -148,7 +148,8 @@ export default function DemoPage() {
       console.log('📨 WebSocket message received:', event.data)
       
       try {
-        const data = JSON.parse(event.data)
+        // Handle both string and object formats
+        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
         console.log('📊 Parsed message:', data)
         
         // Check for demo position creation message
