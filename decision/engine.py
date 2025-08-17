@@ -732,7 +732,8 @@ Available Data:
 Assessment Boundaries:
 - Strong trend alignment (both Aroon timeframes favor signal direction): +0.03 to +0.08
 - Moderate trend alignment (mixed signals, some consolidation): +0.00 to +0.03
-- Counter-trend setup (short-term trend opposes signal): -0.12 to -0.20
+- Counter-trend setup (short-term trend opposes signal): -0.20 to -0.08
+  With volume confirmation >2.5x: reduce penalty below -0.12
 - Ranging/consolidating markets (both timeframes ranging): -0.06 to -0.12
 
 Micro-adjustments within ranges:
@@ -755,8 +756,8 @@ Assessment Boundaries:
 - Exceptional volume (>1.5x avg) with momentum alignment: +0.05 to +0.12
 - Strong volume (1.0-1.5x avg) with momentum alignment: +0.00 to +0.04
 - Moderate volume with mixed momentum: +0.00 to +0.02
-- Weak volume (<0.75x avg): -0.08 to -0.15
-- MFI strongly opposing direction (>20 points): -0.06 to -0.12
+- Weak volume (<0.75x avg): -0.06 to -0.12
+- MFI strongly opposing direction (>20 points): -0.07 to -0.14
 
 Micro-adjustments within ranges:
 - Price vs VWAP favorable side by >1%: bias toward upper end of positive ranges
@@ -783,6 +784,7 @@ Assessment Boundaries:
 Micro-adjustments within ranges:
 - Donchian breakout aligning with signal direction: bias toward upper end of positive ranges
 - Price at Donchian extreme opposing signal direction: bias toward lower end of negative ranges
+- Donchian position >80% with direction alignment: +0.02 to +0.04 additional boost
 
 PILLAR 3 - IMMEDIATE CONDITIONS
 Core Question: "Are there immediate execution risks?"

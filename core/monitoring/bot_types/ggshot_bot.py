@@ -374,8 +374,8 @@ class GGShotBotHandler(BaseBotHandler):
                     """, ('00000000-0000-0000-0000-000000000001',))
                     
                     result = cur.fetchone()
-                    if result and result[0]:
-                        last_activity = result[0]
+                    if result and result.get('updated_at'):
+                        last_activity = result['updated_at']
                         if isinstance(last_activity, str):
                             last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
                         
@@ -398,14 +398,15 @@ class GGShotBotHandler(BaseBotHandler):
                 conn.close()
                 
         except Exception as e:
-            self.logger.error(f"Failed to get ggShot signal time: {str(e)}")
+            self.logger.error(f"Failed to get ggShot signal time: {type(e).__name__}: {str(e)}")
+            self.logger.error(f"Exception details: {repr(e)}")
             return None
     
     async def _get_ggshot_decision_time(self) -> Optional[timedelta]:
         """Get time since last ggShot decision."""
         try:
             from core.monitoring.active_bot_monitor import active_bot_monitor
-            from datetime import datetime
+            from datetime import datetime, timezone
             
             conn = active_bot_monitor._get_db_connection()
             try:
@@ -418,17 +419,22 @@ class GGShotBotHandler(BaseBotHandler):
                     """)
                     
                     result = cur.fetchone()
-                    if result and result[0]:
-                        last_activity = result[0]
+                    if result and result.get('created_at'):
+                        last_activity = result['created_at']
                         if isinstance(last_activity, str):
                             last_activity = datetime.fromisoformat(last_activity.replace('Z', '+00:00'))
                         
                         # Ensure timezone awareness
                         if last_activity.tzinfo is None:
-                            last_activity = last_activity.replace(tzinfo=datetime.now().astimezone().tzinfo)
+                            last_activity = last_activity.replace(tzinfo=timezone.utc)
                         
-                        now = datetime.now(last_activity.tzinfo)
-                        return now - last_activity
+                        now = datetime.now(timezone.utc)
+                        time_diff = now - last_activity
+                        
+                        # Log for debugging
+                        self.logger.info(f"ggShot last decision: {last_activity}, Now: {now}, Diff: {time_diff}")
+                        
+                        return time_diff
                     
                     return None
                     
@@ -436,5 +442,6 @@ class GGShotBotHandler(BaseBotHandler):
                 conn.close()
                 
         except Exception as e:
-            self.logger.error(f"Failed to get ggShot decision time: {str(e)}")
+            self.logger.error(f"Failed to get ggShot decision time: {type(e).__name__}: {str(e)}")
+            self.logger.error(f"Exception details: {repr(e)}")
             return None

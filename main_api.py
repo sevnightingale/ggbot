@@ -241,7 +241,7 @@ async def get_live_position_data():
     
     try:
         # Get latest approved signals dynamically from database
-        demo_positions = await get_latest_approved_signals(5)
+        demo_positions = await get_latest_approved_signals(1)
         
         # Initialize price service (uses existing CCXT infrastructure)
         price_service = PriceService()
