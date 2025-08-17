@@ -2,7 +2,7 @@
 
 import React from 'react'
 import GGBot from '@/components/GGBot'
-import BotControlModal from '@/components/BotControlModal'
+import GGBotConfig from '@/components/GGBotConfig'
 import FloatingActionButtons from '@/components/FloatingActionButtons'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
@@ -73,7 +73,7 @@ const realTradingData = {
 
 export default function DemoPage() {
   const [currentBotIndex, setCurrentBotIndex] = React.useState(0)
-  const [isModalOpen, setIsModalOpen] = React.useState(false)
+  const [isConfigOpen, setIsConfigOpen] = React.useState(false)
   const [selectedBot, setSelectedBot] = React.useState<Bot | null>(null)
   const [livePositions, setLivePositions] = React.useState<Array<{
     id?: string;
@@ -91,14 +91,13 @@ export default function DemoPage() {
     signal_timeframe?: string;
   }>>([])
   const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
+  const [demoStarted, setDemoStarted] = React.useState(false)
   
   // Zustand store hooks
   const { 
     getBotsByUser, 
-    updateBot,
     startBot,
     deleteBot,
-    createBot,
     stopBot
   } = useBotStore()
   
@@ -281,72 +280,16 @@ export default function DemoPage() {
     : demoBots[currentBotIndex]
 
   const handleBotClick = (bot: Bot) => {
-    if (bot.name === 'Create New' || isCreatingBot) {
-      // Handle creating new bot
-      setSelectedBot(bot)
-      setIsModalOpen(true)
-      return
-    }
-    
-    // Handle clicking existing bot - open configuration
     setSelectedBot(bot)
-    setIsModalOpen(true)
+    setIsConfigOpen(true)
   }
 
-  const handleModalSave = async (updatedBot: Bot) => {
-    try {
-      if (updatedBot.config_id === 'create-new') {
-        // Create new bot using Zustand action
-        await createBot({
-          instance_name: `${updatedBot.name.toLowerCase().replace(/\s+/g, '-')}-${Date.now()}`,
-          name: updatedBot.name,
-          config_type: 'demo',
-          strategy: updatedBot.strategy,
-          crypto: updatedBot.crypto,
-          riskLevel: updatedBot.riskLevel,
-          userId: DEMO_USER_ID,
-          isActive: false
-        })
-        
-        // Navigate to new bot
-        setCurrentBotIndex(demoBots.length)
-      } else {
-        // Update existing bot using Zustand action
-        updateBot(updatedBot.config_id, {
-          name: updatedBot.name,
-          strategy: updatedBot.strategy,
-          crypto: updatedBot.crypto,
-          riskLevel: updatedBot.riskLevel
-        })
-      }
-      
-      setIsModalOpen(false)
-      setSelectedBot(null)
-    } catch (error) {
-      console.error('Failed to save bot:', error)
-      // Error handling - could show toast notification
-    }
-  }
-
-  const handleModalClose = () => {
-    setIsModalOpen(false)
+  const handleConfigClose = () => {
+    setIsConfigOpen(false)
     setSelectedBot(null)
   }
 
-  const handleStartBot = async (config_id: string) => {
-    try {
-      const bot = demoBots.find(b => b.config_id === config_id)
-      if (bot?.isActive) {
-        await stopBot(config_id)
-      } else {
-        await startBot(config_id)
-      }
-      setIsModalOpen(false)
-      setSelectedBot(null)
-    } catch (error) {
-      console.error('Failed to toggle bot:', error)
-    }
-  }
+
 
   const handleDeleteBot = async (config_id: string) => {
     try {
@@ -356,9 +299,6 @@ export default function DemoPage() {
       if (currentBotIndex >= demoBots.length - 1) {
         setCurrentBotIndex(Math.max(0, demoBots.length - 2))
       }
-      
-      setIsModalOpen(false)
-      setSelectedBot(null)
     } catch (error) {
       console.error('Failed to delete bot:', error)
     }
@@ -370,7 +310,7 @@ export default function DemoPage() {
       const bot = demoBots.find(b => b.config_id === config_id)
       if (!bot) return
 
-      if (config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14') {
+      if (config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' && !demoStarted) {
         // Special handling for ggbot-01 demo
         console.log('🎭 Starting ggbot-01 demo via floating button')
         
@@ -384,6 +324,9 @@ export default function DemoPage() {
         
         const result = await response.json()
         console.log('Demo mode started:', result)
+        
+        // Mark demo as started
+        setDemoStarted(true)
         
         // Update bot status to active
         await startBot(config_id)
@@ -401,28 +344,8 @@ export default function DemoPage() {
   }
 
   const handleFloatingAdd = () => {
-    // Navigate to create bot state
-    setCurrentBotIndex(demoBots.length)
-    const createBot = { 
-      config_id: "create-new",
-      instance_name: "new-bot",
-      name: "Create New", 
-      config_type: "demo" as const,
-      strategy: "meanrev",
-      crypto: "BTC",
-      riskLevel: "medium",
-      userId: DEMO_USER_ID,
-      isActive: false,
-      createdAt: new Date(),
-      status: {
-        phase: "idle" as const,
-        color: "gray" as const,
-        message: "Click to configure your ggbot",
-        timestamp: new Date().toISOString()
-      }
-    }
-    setSelectedBot(createBot)
-    setIsModalOpen(true)
+    // TODO: Handle add new bot with GGBotConfig component
+    console.log('Add new bot clicked')
   }
 
   const toggleReasoningExpansion = (tradeId: string) => {
@@ -608,6 +531,7 @@ export default function DemoPage() {
                 onStart={handleFloatingStart}
                 onDelete={handleDeleteBot}
                 onAdd={handleFloatingAdd}
+                demoStarted={demoStarted}
               />
             </div>
           </div>
@@ -791,18 +715,12 @@ export default function DemoPage() {
         </div>
       )}
 
-      {/* Control Modal */}
-      {selectedBot && (
-        <BotControlModal
-          bot={selectedBot}
-          isOpen={isModalOpen}
-          onClose={handleModalClose}
-          onSave={handleModalSave}
-          onStart={handleStartBot}
-          onDelete={handleDeleteBot}
-          mode="demo"
-        />
-      )}
+      {/* Bottom Sheet Config */}
+      <GGBotConfig 
+        bot={selectedBot}
+        isOpen={isConfigOpen}
+        onClose={handleConfigClose}
+      />
     </div>
   )
 }

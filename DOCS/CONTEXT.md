@@ -526,7 +526,3 @@ This simplified approach leverages our existing sophisticated ggShot system to c
 
 This approach transforms the demo from "look how easy it is" to "look how intelligent it is" - perfect for impressing technical judges who value sophistication over simplicity, using the real complexity we've already built.
 
-Ok, there are number of issues.
-1) remove the 'demo' label beneath the ggbot component please. 
-2) remove the existing active positions in the open trades. This should be empty and then we start the bot. 
-3) 

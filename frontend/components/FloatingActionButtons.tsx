@@ -9,6 +9,7 @@ interface FloatingActionButtonsProps {
   onStart?: (config_id: string) => void
   onDelete?: (config_id: string) => void
   onAdd?: () => void
+  demoStarted?: boolean
 }
 
 const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({ 
@@ -16,10 +17,13 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
   className = '',
   onStart,
   onDelete,
-  onAdd
+  onAdd,
+  demoStarted = false
 }) => {
   // Determine button states based on current bot
-  const isActive = currentBot.isActive
+  // For ggbot-01, use demoStarted state instead of isActive before demo
+  const isGgbot01 = currentBot.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14'
+  const isActive = isGgbot01 ? demoStarted : currentBot.isActive
   const canDelete = !isActive // Can only delete inactive bots
   const canToggle = true // Can always toggle start/stop
 
