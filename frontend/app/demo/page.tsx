@@ -3,6 +3,7 @@
 import React from 'react'
 import GGBot from '@/components/GGBot'
 import BotControlModal from '@/components/BotControlModal'
+import FloatingActionButtons from '@/components/FloatingActionButtons'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
@@ -485,6 +486,11 @@ export default function DemoPage() {
 
           {/* Center Column - ggbot Component (Fixed Width) */}
           <div className="flex flex-col items-center justify-center">
+            {/* Floating Action Buttons - positioned above ggbot */}
+            <div className="mb-4">
+              <FloatingActionButtons currentBot={currentBot} />
+            </div>
+            
             {/* ggbot with flanking arrows/plus */}
             <div className="flex items-center gap-10 mb-6 px-4">
               <button 
