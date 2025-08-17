@@ -71,7 +71,7 @@ interface BotStore {
   setBotActive: (config_id: string, isActive: boolean) => void
   
   // WebSocket Management Actions
-  connectWebSocket: (userId: string, wsUrl: string) => Promise<void>
+  connectWebSocket: (userId: string, wsUrl: string, onDemoMessage?: (data: Record<string, unknown>) => void) => Promise<void>
   disconnectWebSocket: (userId: string) => void
   subscribeToBot: (config_id: string) => void
   isWebSocketConnected: (userId: string) => boolean
@@ -163,7 +163,7 @@ export const useBotStore = create<BotStore>()(
       }),
 
       // WebSocket Management Actions
-      connectWebSocket: async (userId: string, wsUrl: string) => {
+      connectWebSocket: async (userId: string, wsUrl: string, onDemoMessage?: (data: Record<string, unknown>) => void) => {
         const state = get()
         const existing = state.connections.get(userId)
         
@@ -202,6 +202,11 @@ export const useBotStore = create<BotStore>()(
           ws.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data)
+              
+              // Forward demo messages to callback if provided
+              if (onDemoMessage && (data.type === 'demo_position_create' || data.status === 'demo_started')) {
+                onDemoMessage(data)
+              }
               
               if (data.type === 'bot_status_update') {
                 // Extract config_id from bot_id (format: "ggshot-e249bb49")  
