@@ -50,15 +50,12 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
         
         if (!isMounted) return undefined
         
-        // Subscribe to all user's bots after connection (except ggbot-01)
+        // Subscribe to all user's bots after connection
         const subscribeTimer = setTimeout(() => {
           if (isMounted) {
             const currentBots = getBotsByUser(userId)
             currentBots.forEach(bot => {
-              // Skip WebSocket monitoring for ggbot-01 to prevent demo interference
-              if (bot.config_id !== 'e249bb49-0455-4596-9657-09bf9e14ca14') {
-                subscribeToBot(bot.config_id)
-              }
+              subscribeToBot(bot.config_id)
             })
           }
         }, 1000) // Wait 1 second for connection to establish
