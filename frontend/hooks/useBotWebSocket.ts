@@ -5,7 +5,7 @@ import { useBotStore } from '@/store/botStore'
  * Custom hook to manage WebSocket connection for bot status updates
  * This will integrate with your backend WebSocket service
  */
-export function useBotWebSocket(userId: string, wsUrl?: string) {
+export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: (data: Record<string, unknown>) => void) {
   const { 
     loadBots, 
     connectWebSocket, 
@@ -44,9 +44,9 @@ export function useBotWebSocket(userId: string, wsUrl?: string) {
           }
         }
 
-        // Connect to WebSocket
+        // Connect to WebSocket with demo message callback
         console.log('🔌 Connecting to WebSocket:', finalWsUrl)
-        await connectWebSocket(userId, finalWsUrl)
+        await connectWebSocket(userId, finalWsUrl, onDemoMessage)
         
         if (!isMounted) return undefined
         

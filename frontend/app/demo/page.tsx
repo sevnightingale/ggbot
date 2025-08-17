@@ -101,26 +101,61 @@ export default function DemoPage() {
     stopBot
   } = useBotStore()
   
-  // WebSocket connection for real-time updates
-  const { isLoadingBots } = useBotWebSocket(DEMO_USER_ID)
-
-  // Demo completion handler - adds position when demo finishes
-  React.useEffect(() => {
-    console.log('🔍 Setting up demo WebSocket listener')
+  // Function to handle demo messages from WebSocket
+  const handleDemoMessage = React.useCallback((data: { 
+    type?: string; 
+    config_id?: string; 
+    signal_data?: {
+      symbol: string;
+      signal_direction: string;
+      entry_price: number;
+      confidence_score: number;
+      reasoning_text?: string;
+      volume_analysis?: string;
+      signal_timeframe?: string;
+    };
+  }) => {
+    console.log('🎯 Demo message received:', data)
     
-    // Function to start live P&L updates for a position
-    const startLivePnLUpdates = (position: typeof livePositions[0]) => {
+    // Check for demo position creation message
+    if (data.type === 'demo_position_create' && 
+        data.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' &&
+        data.signal_data) {
+      
+      console.log('🎯 Demo position creation detected!')
+      
+      // Create position directly from signal data
+      const signalData = data.signal_data
+      const newPosition = {
+        id: `demo-${Date.now()}`,
+        symbol: signalData.symbol,
+        direction: signalData.signal_direction,
+        pnl: 0, // Start with 0 P&L
+        positionSize: 1000, // Fixed demo size
+        entryPrice: signalData.entry_price,
+        currentPrice: signalData.entry_price, // Start with entry price
+        timeInTrade: '0m',
+        leverage: 10,
+        confidence: Math.round(signalData.confidence_score * 100),
+        reasoning_text: signalData.reasoning_text,
+        volume_analysis: signalData.volume_analysis,
+        signal_timeframe: signalData.signal_timeframe
+      }
+      
+      setLivePositions([newPosition])
+      
+      // Start updating P&L with live prices
       const updatePnL = async () => {
         try {
           const response = await fetch('/api/live-position-data')
-          const data = await response.json()
+          const apiData = await response.json()
           
-          if (data.status === 'success' && data.positions && data.positions.length > 0) {
-            const latestData = data.positions[0]
+          if (apiData.status === 'success' && apiData.positions && apiData.positions.length > 0) {
+            const latestData = apiData.positions[0]
             
             setLivePositions(prevPositions => 
               prevPositions.map(pos => 
-                pos.id === position.id 
+                pos.id === newPosition.id 
                   ? {
                       ...pos,
                       currentPrice: latestData.current_price || pos.entryPrice,
@@ -139,119 +174,24 @@ export default function DemoPage() {
       // Update P&L every 15 seconds
       const interval = setInterval(updatePnL, 15000)
       
-      // Store interval for cleanup (in a real app, you'd want better cleanup management)
+      // Store interval for cleanup
       ;(window as unknown as { pnlUpdateInterval?: NodeJS.Timeout }).pnlUpdateInterval = interval
-    }
-
-    // Listen to all WebSocket messages on the window
-    const handleWebSocketMessage = (event: MessageEvent) => {
-      console.log('📨 WebSocket message received:', event.data)
       
-      try {
-        // Handle both string and object formats
-        const data = typeof event.data === 'string' ? JSON.parse(event.data) : event.data
-        console.log('📊 Parsed message:', data)
-        
-        // Check for demo position creation message
-        if (data.type === 'demo_position_create' && 
-            data.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' &&
-            data.signal_data) {
-          
-          console.log('🎯 Demo position creation detected!')
-          
-          // Create position directly from signal data
-          const signalData = data.signal_data
-          const newPosition = {
-            id: `demo-${Date.now()}`,
-            symbol: signalData.symbol,
-            direction: signalData.signal_direction,
-            pnl: 0, // Start with 0 P&L
-            positionSize: 1000, // Fixed demo size
-            entryPrice: signalData.entry_price,
-            currentPrice: signalData.entry_price, // Start with entry price
-            timeInTrade: '0m',
-            leverage: 10,
-            confidence: Math.round(signalData.confidence_score * 100),
-            reasoning_text: signalData.reasoning_text,
-            volume_analysis: signalData.volume_analysis,
-            signal_timeframe: signalData.signal_timeframe
-          }
-          
-          setLivePositions([newPosition])
-          
-          // Start updating P&L with live prices
-          startLivePnLUpdates(newPosition)
-          
-          console.log('🎯 Demo position created:', newPosition)
-        }
-        
-        // Also check for the old demo completion format (backup)
-        else if (data.type === 'bot_status_update' && 
-            data.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' &&
-            data.status?.demo_mode && 
-            data.status?.phase === 'idle' &&
-            data.status?.message?.includes('Demo complete')) {
-          
-          console.log('🎯 Demo completion detected (backup method)')
-          
-          // Fetch the latest signal data and add it as a live position
-          fetch('/api/live-position-data')
-            .then(response => response.json())
-            .then(apiData => {
-              if (apiData.status === 'success' && apiData.positions && apiData.positions.length > 0) {
-                // Take the first (latest) position and add it to live positions
-                const latestSignal = apiData.positions[0]
-                const newPosition = {
-                  id: `demo-${Date.now()}`,
-                  symbol: latestSignal.symbol,
-                  direction: latestSignal.direction,
-                  pnl: 0, // Start with 0 P&L
-                  positionSize: latestSignal.position_size,
-                  entryPrice: latestSignal.entry_price,
-                  currentPrice: latestSignal.entry_price, // Start with entry price
-                  timeInTrade: '0m',
-                  leverage: latestSignal.leverage,
-                  confidence: latestSignal.confidence,
-                  reasoning_text: latestSignal.reasoning_text,
-                  volume_analysis: latestSignal.volume_analysis,
-                  signal_timeframe: latestSignal.signal_timeframe
-                }
-                
-                setLivePositions([newPosition])
-                
-                // Start updating P&L with live prices
-                startLivePnLUpdates(newPosition)
-                
-                console.log('🎯 Demo position created (backup):', newPosition)
-              }
-            })
-            .catch(error => console.error('Failed to fetch signal data:', error))
-        }
-      } catch (error) {
-        console.error('Error parsing WebSocket message:', error)
-      }
+      console.log('🎯 Demo position created:', newPosition)
     }
+  }, [])
+  
+  // WebSocket connection for real-time updates with demo message handler
+  const { isLoadingBots } = useBotWebSocket(DEMO_USER_ID, undefined, handleDemoMessage)
 
-    // Add global event listener for WebSocket messages
-    window.addEventListener('message', handleWebSocketMessage)
+  // Cleanup P&L update interval on unmount
+  React.useEffect(() => {
     
-    // Also try to find existing WebSocket and add listener
-    const checkForWebSocket = () => {
-      const ws = (window as unknown as { ggbotWebSocket?: WebSocket }).ggbotWebSocket
-      if (ws) {
-        console.log('🔌 Found existing WebSocket, adding listener')
-        ws.addEventListener('message', handleWebSocketMessage)
-        return () => ws.removeEventListener('message', handleWebSocketMessage)
-      }
-      return undefined
-    }
-    
-    const wsCleanup = checkForWebSocket()
-    
-    // Cleanup
     return () => {
-      window.removeEventListener('message', handleWebSocketMessage)
-      if (wsCleanup) wsCleanup()
+      const interval = (window as unknown as { pnlUpdateInterval?: NodeJS.Timeout }).pnlUpdateInterval
+      if (interval) {
+        clearInterval(interval)
+      }
     }
   }, [])
 
