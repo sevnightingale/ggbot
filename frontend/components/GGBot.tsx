@@ -43,7 +43,6 @@ const GGBot: React.FC<GGBotProps> = ({
         aria-label={`${name} bot`}
       >
         <div className="ggbot-inner">
-          <div className="ggbot-name">{name}</div>
           <div className="ggbot-status-label">
             <span className={`ggbot-status-indicator ${status === 'idle' ? 'ggbot-status-active' : `ggbot-status-${status}`}`}>
               {status === 'idle' ? '●' : status === 'inactive' ? '○' : '●'}
@@ -52,6 +51,7 @@ const GGBot: React.FC<GGBotProps> = ({
               {status === 'idle' ? 'active' : status}
             </span>
           </div>
+          <div className="ggbot-name">{name}</div>
           {message && (
             <div className="ggbot-message-inline">
               {showSpinner && status !== 'idle' && status !== 'inactive' && (

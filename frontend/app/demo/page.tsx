@@ -364,6 +364,67 @@ export default function DemoPage() {
     }
   }
 
+  // Handle floating action button clicks
+  const handleFloatingStart = async (config_id: string) => {
+    try {
+      const bot = demoBots.find(b => b.config_id === config_id)
+      if (!bot) return
+
+      if (config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14') {
+        // Special handling for ggbot-01 demo
+        console.log('🎭 Starting ggbot-01 demo via floating button')
+        
+        const response = await fetch(`/agent/api/bots/${config_id}/start`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ demo_mode: true })
+        })
+        
+        const result = await response.json()
+        console.log('Demo mode started:', result)
+        
+        // Update bot status to active
+        await startBot(config_id)
+      } else {
+        // Regular start/stop for other bots
+        if (bot.isActive) {
+          await stopBot(config_id)
+        } else {
+          await startBot(config_id)
+        }
+      }
+    } catch (error) {
+      console.error('Failed to handle floating start action:', error)
+    }
+  }
+
+  const handleFloatingAdd = () => {
+    // Navigate to create bot state
+    setCurrentBotIndex(demoBots.length)
+    const createBot = { 
+      config_id: "create-new",
+      instance_name: "new-bot",
+      name: "Create New", 
+      config_type: "demo" as const,
+      strategy: "meanrev",
+      crypto: "BTC",
+      riskLevel: "medium",
+      userId: DEMO_USER_ID,
+      isActive: false,
+      createdAt: new Date(),
+      status: {
+        phase: "idle" as const,
+        color: "gray" as const,
+        message: "Click to configure your ggbot",
+        timestamp: new Date().toISOString()
+      }
+    }
+    setSelectedBot(createBot)
+    setIsModalOpen(true)
+  }
+
   const toggleReasoningExpansion = (tradeId: string) => {
     setExpandedReasoningIds(prev => {
       const newSet = new Set(prev)
@@ -486,11 +547,6 @@ export default function DemoPage() {
 
           {/* Center Column - ggbot Component (Fixed Width) */}
           <div className="flex flex-col items-center justify-center">
-            {/* Floating Action Buttons - positioned above ggbot */}
-            <div className="mb-4">
-              <FloatingActionButtons currentBot={currentBot} />
-            </div>
-            
             {/* ggbot with flanking arrows/plus */}
             <div className="flex items-center gap-10 mb-6 px-4">
               <button 
@@ -523,7 +579,7 @@ export default function DemoPage() {
             </div>
 
             {/* Dots navigation */}
-            <div className="flex justify-center">
+            <div className="flex justify-center mb-4">
               <div className="flex items-center gap-3">
                 {demoBots.map((_, index) => (
                   <button
@@ -543,6 +599,16 @@ export default function DemoPage() {
                   />
                 )}
               </div>
+            </div>
+
+            {/* Floating Action Buttons - positioned below dots */}
+            <div>
+              <FloatingActionButtons 
+                currentBot={currentBot}
+                onStart={handleFloatingStart}
+                onDelete={handleDeleteBot}
+                onAdd={handleFloatingAdd}
+              />
             </div>
           </div>
 
