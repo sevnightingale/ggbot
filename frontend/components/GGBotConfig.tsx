@@ -14,12 +14,22 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [botName, setBotName] = React.useState(bot?.name || '')
   const [hasChanges, setHasChanges] = React.useState(false)
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['extraction']))
+  const [isVisible, setIsVisible] = React.useState(false)
 
   React.useEffect(() => {
     if (bot) {
       setBotName(bot.name)
     }
   }, [bot])
+
+  React.useEffect(() => {
+    if (isOpen) {
+      // Small delay to ensure the component is mounted before animation
+      setTimeout(() => setIsVisible(true), 50)
+    } else {
+      setIsVisible(false)
+    }
+  }, [isOpen])
 
   const toggleSection = (sectionId: string) => {
     setExpandedSections(prev => {
@@ -49,33 +59,32 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
     setHasChanges(false)
   }
 
-  if (!isOpen || !bot) return null
+  if (!bot) return null
 
   return (
-    <>
+    <div className={`fixed inset-0 z-50 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
       {/* Backdrop overlay */}
       <div 
-        className={`fixed inset-0 bg-black transition-opacity duration-[5000ms] z-40 ${
-          isOpen ? 'bg-opacity-50' : 'bg-opacity-0 pointer-events-none'
+        className={`fixed inset-0 bg-black transition-opacity duration-[2000ms] ${
+          isVisible ? 'opacity-50' : 'opacity-0'
         }`}
         onClick={onClose}
       />
 
       {/* Bottom sheet */}
       <div 
-        className={`fixed bottom-0 left-0 right-0 z-50 transition-transform duration-[5000ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${
-          isOpen ? 'translate-y-0' : 'translate-y-full'
+        className={`fixed bottom-0 left-0 right-0 transition-transform duration-[2000ms] ease-out ${
+          isVisible ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={{ height: '85vh' }}
       >
         <div className="h-full bg-charcoal-900 relative">
           {/* Top sharp gradient border - matching dashboard style */}
           <div 
-            className="absolute top-0 left-0 right-0"
+            className="absolute top-0 left-0 right-0 z-30"
             style={{
-              height: '2px',
-              background: 'linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%)',
-              opacity: 0.8
+              height: '3px',
+              background: 'linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%)'
             }}
           />
 
