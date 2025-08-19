@@ -65,7 +65,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
     <div className={`fixed inset-0 z-50 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
       {/* Backdrop overlay */}
       <div 
-        className={`fixed inset-0 bg-black transition-opacity duration-[2000ms] ${
+        className={`fixed inset-0 bg-black transition-opacity duration-500 ${
           isVisible ? 'opacity-50' : 'opacity-0'
         }`}
         onClick={onClose}
@@ -73,7 +73,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
 
       {/* Bottom sheet */}
       <div 
-        className={`fixed bottom-0 left-0 right-0 transition-transform duration-[2000ms] ease-out ${
+        className={`fixed bottom-0 left-0 right-0 transition-transform duration-500 ease-out ${
           isVisible ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={{ height: '85vh' }}
@@ -83,8 +83,9 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
           <div 
             className="absolute top-0 left-0 right-0 z-30"
             style={{
-              height: '3px',
-              background: 'linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%)'
+              height: '1px',
+              background: 'linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%)',
+              opacity: 0.6
             }}
           />
 
