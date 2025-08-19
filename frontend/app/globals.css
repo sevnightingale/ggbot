@@ -797,7 +797,7 @@ a {
   background: #4ab3d9;
 }
 
-/* GGBot Accordion Styling - Match neumorphic design */
+/* GGBot Accordion Styling - Neumorphic shadows + corner brackets */
 .ggbot-accordion-btn {
   /* Neumorphic dual shadows - matching ggbot circle */
   box-shadow: 
@@ -805,26 +805,19 @@ a {
     -8px -8px 16px rgba(255, 255, 255, 0.08);
 }
 
-/* 4-quadrant border system for accordion buttons */
+/* Corner bracket styling for accordion buttons - matching dashboard cards */
 .ggbot-accordion-btn::before {
   content: '';
   position: absolute;
-  top: -2px;
-  left: -2px;
-  width: calc(100% + 4px);
-  height: calc(100% + 4px);
-  background: 
-    /* Top-left quadrant - light */
-    radial-gradient(ellipse at 25% 25%, rgba(255, 255, 255, 0.5) 0%, transparent 50%),
-    /* Bottom-right quadrant - dark */
-    radial-gradient(ellipse at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
-  z-index: 0;
+  top: 0;
+  left: 0;
+  width: 70%;
+  height: 70%;
+  opacity: 0.6;
   pointer-events: none;
-}
-
-.ggbot-accordion-btn > * {
-  position: relative;
-  z-index: 1;
+  background: 
+    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) top/100% 2px no-repeat,
+    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) left/2px 100% no-repeat;
 }
 
 .ggbot-accordion-btn:hover {
@@ -843,7 +836,7 @@ a {
     -4px -4px 8px rgba(255, 255, 255, 0.06);
 }
 
-/* Expanded accordion styling - same shadows but larger container */
+/* Expanded accordion styling - same shadows and corner brackets */
 .ggbot-accordion-expanded {
   box-shadow: 
     8px 8px 16px rgba(0, 0, 0, 0.9),
@@ -853,22 +846,15 @@ a {
 .ggbot-accordion-expanded::before {
   content: '';
   position: absolute;
-  top: -2px;
-  left: -2px;
-  width: calc(100% + 4px);
-  height: calc(100% + 4px);
-  background: 
-    /* Top-left quadrant - light */
-    radial-gradient(ellipse at 25% 25%, rgba(255, 255, 255, 0.5) 0%, transparent 50%),
-    /* Bottom-right quadrant - dark */
-    radial-gradient(ellipse at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
-  z-index: 0;
+  top: 0;
+  left: 0;
+  width: 70%;
+  height: 70%;
+  opacity: 0.6;
   pointer-events: none;
-}
-
-.ggbot-accordion-expanded > * {
-  position: relative;
-  z-index: 1;
+  background: 
+    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) top/100% 2px no-repeat,
+    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) left/2px 100% no-repeat;
 }
 
 /* Floating Action Buttons - Match ggbot circle design */
