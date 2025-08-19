@@ -404,7 +404,7 @@ class ActiveBotMonitor:
         """
         Main monitoring loop - monitors all active bots continuously.
         
-        Runs every 10 seconds and checks pipeline status for each active bot.
+        Runs every 60 seconds and checks pipeline status for each active bot.
         """
         logger.bind(module="active_bot_monitor").info(
             "🚀 Starting universal bot monitoring loop"
@@ -438,7 +438,7 @@ class ActiveBotMonitor:
                 await self.cleanup_inactive_handlers(active_configs)
                 
                 # Wait before next poll
-                await asyncio.sleep(10)  # Monitor every 10 seconds
+                await asyncio.sleep(60)  # Monitor every 60 seconds
                 
             except Exception as e:
                 logger.bind(module="active_bot_monitor").error(
