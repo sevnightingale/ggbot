@@ -122,7 +122,7 @@ class BotMonitoringService:
                 consecutive_errors = 0
                 
                 # Wait before next poll
-                await asyncio.sleep(10)  # Monitor every 10 seconds
+                await asyncio.sleep(60)  # Monitor every 60 seconds
                 
             except Exception as e:
                 consecutive_errors += 1

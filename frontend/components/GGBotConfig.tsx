@@ -9,6 +9,40 @@ interface GGBotConfigProps {
   onClose: () => void
 }
 
+// Technical Indicators data (20 preprocessed indicators)
+const technicalIndicators = {
+  'Momentum Indicators': [
+    { id: 'RSI', name: 'RSI', description: 'Relative Strength Index - Momentum oscillator (0-100)' },
+    { id: 'Stochastic', name: 'Stochastic', description: 'Stochastic Oscillator - %K %D momentum indicator' },
+    { id: 'Williams%R', name: 'Williams %R', description: 'Williams %R - Momentum oscillator (-100 to 0)' },
+    { id: 'CCI', name: 'CCI', description: 'Commodity Channel Index - Momentum indicator' },
+    { id: 'ROC', name: 'ROC', description: 'Rate of Change - Price momentum indicator' },
+    { id: 'MFI', name: 'MFI', description: 'Money Flow Index - Volume-weighted RSI' }
+  ],
+  'Trend Indicators': [
+    { id: 'MACD', name: 'MACD', description: 'Moving Average Convergence Divergence - Trend following' },
+    { id: 'ADX', name: 'ADX', description: 'Average Directional Index - Trend strength indicator' },
+    { id: 'Aroon', name: 'Aroon', description: 'Aroon Oscillator - Trending vs ranging market detector' },
+    { id: 'Vortex', name: 'Vortex', description: 'Vortex Indicator - Trend momentum alignment' },
+    { id: 'EMA', name: 'EMA', description: 'Exponential Moving Average - Trend following' },
+    { id: 'TRIX', name: 'TRIX', description: 'Triple Exponential Average - Trend indicator' }
+  ],
+  'Volatility Indicators': [
+    { id: 'BollingerBands', name: 'Bollinger Bands', description: 'Statistical volatility bands around price' },
+    { id: 'BollingerBandsWidth', name: 'Bollinger Bands Width', description: 'Volatility/range detection indicator' },
+    { id: 'ATR', name: 'ATR', description: 'Average True Range - Market volatility/choppiness' },
+    { id: 'KeltnerChannel', name: 'Keltner Channel', description: 'Volatility-based channel indicator' }
+  ],
+  'Volume Indicators': [
+    { id: 'VWAP', name: 'VWAP', description: 'Volume Weighted Average Price - Volume-price sentiment' },
+    { id: 'OBV', name: 'OBV', description: 'On Balance Volume - Volume momentum indicator' }
+  ],
+  'Support/Resistance': [
+    { id: 'DonchianChannel', name: 'Donchian Channel', description: 'Major liquidity zones and breakouts' },
+    { id: 'ParabolicSAR', name: 'Parabolic SAR', description: 'Stop and Reverse - Trend reversal points' }
+  ]
+}
+
 const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [isEditingName, setIsEditingName] = React.useState(false)
   const [botName, setBotName] = React.useState(bot?.name || '')
@@ -16,6 +50,44 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['extraction']))
   const [isVisible, setIsVisible] = React.useState(false)
   const [isMounted, setIsMounted] = React.useState(false)
+  
+  // Extraction Agent states
+  const [selectedDataSource, setSelectedDataSource] = React.useState('Technical Indicators')
+  const [selectedIndicators, setSelectedIndicators] = React.useState<Set<string>>(new Set(['RSI', 'MACD', 'BollingerBands']))
+  const [searchTerm, setSearchTerm] = React.useState('')
+
+  // Helper functions for indicator management
+  const toggleIndicator = (indicatorId: string) => {
+    setSelectedIndicators(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(indicatorId)) {
+        newSet.delete(indicatorId)
+      } else {
+        if (newSet.size < 12) { // Max 12 indicators
+          newSet.add(indicatorId)
+        }
+      }
+      setHasChanges(true)
+      return newSet
+    })
+  }
+
+  const filteredIndicators = React.useMemo(() => {
+    const filtered: Record<string, typeof technicalIndicators['Momentum Indicators']> = {}
+    
+    Object.entries(technicalIndicators).forEach(([category, indicators]) => {
+      const categoryFiltered = indicators.filter(indicator => 
+        indicator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        indicator.description.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      
+      if (categoryFiltered.length > 0) {
+        filtered[category] = categoryFiltered
+      }
+    })
+    
+    return filtered
+  }, [searchTerm])
 
   React.useEffect(() => {
     if (bot) {
@@ -218,11 +290,143 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                         ▶
                       </span>
                     </div>
-                    <div className="p-6">
-                      <p className="text-footnote text-gray-400 mb-4">Market data extraction and indicator configuration</p>
-                      {/* Minimal content structure - to be expanded later */}
-                      <div className="space-y-4">
-                        <div className="text-footnote text-gray-500">Indicator configuration will go here...</div>
+                    <div className="p-6 space-y-6">
+                      {/* Data Source Selection */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-footnote text-bone-200 font-medium">DATA SOURCE</h4>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => setSelectedDataSource('Technical Indicators')}
+                            className={`px-3 py-1 text-xs rounded transition-colors ${
+                              selectedDataSource === 'Technical Indicators'
+                                ? 'bg-agent-extraction text-charcoal-900'
+                                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                            }`}
+                          >
+                            Technical Indicators
+                          </button>
+                          <button
+                            disabled
+                            className="px-3 py-1 text-xs rounded bg-charcoal-800 text-gray-600 cursor-not-allowed"
+                          >
+                            Sentiment
+                          </button>
+                          <button
+                            disabled
+                            className="px-3 py-1 text-xs rounded bg-charcoal-800 text-gray-600 cursor-not-allowed"
+                          >
+                            News
+                          </button>
+                          <button
+                            disabled
+                            className="px-3 py-1 text-xs rounded bg-charcoal-800 text-gray-600 cursor-not-allowed"
+                          >
+                            On-chain
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Search and Filter */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-footnote text-bone-200 font-medium">INDICATOR SELECTION</h4>
+                          <span className="text-footnote text-gray-400">{selectedIndicators.size}/12 selected</span>
+                        </div>
+                        <div className="flex gap-4 mb-4">
+                          <div className="flex-1 relative">
+                            <input
+                              type="text"
+                              placeholder="Search indicators..."
+                              value={searchTerm}
+                              onChange={(e) => setSearchTerm(e.target.value)}
+                              className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-extraction transition-colors"
+                            />
+                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-gray-400">
+                                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+                              </svg>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Selected Indicators */}
+                        {selectedIndicators.size > 0 && (
+                          <div className="mb-6">
+                            <h5 className="text-xs text-gray-400 mb-2">Selected:</h5>
+                            <div className="flex flex-wrap gap-2">
+                              {Array.from(selectedIndicators).map(indicatorId => (
+                                <span
+                                  key={indicatorId}
+                                  className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
+                                >
+                                  {indicatorId}
+                                  <button
+                                    onClick={() => toggleIndicator(indicatorId)}
+                                    className="hover:bg-black/20 rounded"
+                                  >
+                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                    </svg>
+                                  </button>
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Indicator Categories */}
+                        <div className="space-y-6">
+                          {Object.entries(filteredIndicators).map(([category, indicators]) => (
+                            <div key={category}>
+                              <h5 className="text-xs text-bone-200 font-medium mb-3 bg-charcoal-800 px-3 py-2 border-l-2 border-agent-extraction">
+                                {category.toUpperCase()}
+                              </h5>
+                              <div className="space-y-2">
+                                {indicators.map(indicator => {
+                                  const isSelected = selectedIndicators.has(indicator.id)
+                                  const isDisabled = !isSelected && selectedIndicators.size >= 12
+                                  
+                                  return (
+                                    <button
+                                      key={indicator.id}
+                                      onClick={() => !isDisabled && toggleIndicator(indicator.id)}
+                                      disabled={isDisabled}
+                                      className={`w-full text-left p-3 border transition-colors ${
+                                        isSelected
+                                          ? 'bg-agent-extraction/10 border-agent-extraction text-bone-200'
+                                          : isDisabled
+                                          ? 'bg-charcoal-800/50 border-charcoal-700 text-gray-600 cursor-not-allowed'
+                                          : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agent-extraction hover:bg-agent-extraction/5'
+                                      }`}
+                                    >
+                                      <div className="flex items-center justify-between">
+                                        <div className="flex items-center gap-3">
+                                          <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                                            isSelected
+                                              ? 'bg-agent-extraction border-agent-extraction'
+                                              : 'border-gray-600'
+                                          }`}>
+                                            {isSelected && (
+                                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
+                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                              </svg>
+                                            )}
+                                          </div>
+                                          <div>
+                                            <div className="text-footnote font-medium">{indicator.name}</div>
+                                            <div className="text-xs text-gray-400 mt-1">{indicator.description}</div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    </button>
+                                  )
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
                       </div>
                     </div>
                   </div>
