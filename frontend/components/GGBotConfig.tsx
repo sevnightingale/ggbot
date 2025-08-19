@@ -55,7 +55,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
     <>
       {/* Backdrop overlay */}
       <div 
-        className={`fixed inset-0 bg-black transition-opacity duration-1000 z-40 ${
+        className={`fixed inset-0 bg-black transition-opacity duration-[5000ms] z-40 ${
           isOpen ? 'bg-opacity-50' : 'bg-opacity-0 pointer-events-none'
         }`}
         onClick={onClose}
@@ -63,7 +63,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
 
       {/* Bottom sheet */}
       <div 
-        className={`fixed bottom-0 left-0 right-0 z-50 transition-transform duration-1000 ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${
+        className={`fixed bottom-0 left-0 right-0 z-50 transition-transform duration-[5000ms] ease-[cubic-bezier(0.25,0.46,0.45,0.94)] ${
           isOpen ? 'translate-y-0' : 'translate-y-full'
         }`}
         style={{ height: '85vh' }}
@@ -71,10 +71,11 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
         <div className="h-full bg-charcoal-900 relative">
           {/* Top sharp gradient border - matching dashboard style */}
           <div 
-            className="absolute top-0 left-0 right-0 h-px"
+            className="absolute top-0 left-0 right-0"
             style={{
+              height: '2px',
               background: 'linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%)',
-              opacity: 0.6
+              opacity: 0.8
             }}
           />
 
@@ -188,7 +189,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                     className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
                   >
                     <h3 className="text-subheader text-bone-200 font-medium">Extraction Agent</h3>
-                    <span className="text-agent-extraction text-xl transition-transform duration-200">
+                    <span className="text-xl transition-transform duration-200" style={{ color: '#38a1c7' }}>
                       ▶
                     </span>
                   </button>
@@ -199,7 +200,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                       className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
                     >
                       <h3 className="text-subheader text-bone-200 font-medium">Extraction Agent</h3>
-                      <span className="text-agent-extraction text-xl transition-transform duration-200 rotate-90">
+                      <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: '#38a1c7' }}>
                         ▶
                       </span>
                     </div>
@@ -222,7 +223,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                     className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
                   >
                     <h3 className="text-subheader text-bone-200 font-medium">Decision Agent</h3>
-                    <span className="text-agent-decision text-xl transition-transform duration-200">
+                    <span className="text-xl transition-transform duration-200" style={{ color: '#2cbe77' }}>
                       ▶
                     </span>
                   </button>
@@ -233,7 +234,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                       className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
                     >
                       <h3 className="text-subheader text-bone-200 font-medium">Decision Agent</h3>
-                      <span className="text-agent-decision text-xl transition-transform duration-200 rotate-90">
+                      <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: '#2cbe77' }}>
                         ▶
                       </span>
                     </div>
@@ -256,7 +257,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                     className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
                   >
                     <h3 className="text-subheader text-bone-200 font-medium">Trading Agent</h3>
-                    <span className="text-agent-trading text-xl transition-transform duration-200">
+                    <span className="text-xl transition-transform duration-200" style={{ color: '#be6a47' }}>
                       ▶
                     </span>
                   </button>
@@ -267,7 +268,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                       className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
                     >
                       <h3 className="text-subheader text-bone-200 font-medium">Trading Agent</h3>
-                      <span className="text-agent-trading text-xl transition-transform duration-200 rotate-90">
+                      <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: '#be6a47' }}>
                         ▶
                       </span>
                     </div>
