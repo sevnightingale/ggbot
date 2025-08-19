@@ -296,7 +296,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
           </div>
         </div>
       </div>
-    </>
+    </div>
   )
 }
 
