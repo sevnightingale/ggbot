@@ -9,6 +9,23 @@ interface GGBotConfigProps {
   onClose: () => void
 }
 
+// Trading pairs data
+const tradingPairs = {
+  popular: ['BTC/USDT', 'ETH/USDT', 'SOL/USDT', 'BNB/USDT', 'XRP/USDT'],
+  all: [
+    'AAVE/USDT', 'ADA/USDT', 'ALGO/USDT', 'APT/USDT', 'ARB/USDT', 'ATOM/USDT', 'AVAX/USDT',
+    'AXS/USDT', 'BAL/USDT', 'BCH/USDT', 'BNB/USDT', 'BTC/USDT', 'CAKE/USDT', 'CHZ/USDT',
+    'COMP/USDT', 'CRV/USDT', 'DOT/USDT', 'DYDX/USDT', 'EGLD/USDT', 'ENJ/USDT', 'EOS/USDT',
+    'ETC/USDT', 'ETH/USDT', 'FIL/USDT', 'FLOW/USDT', 'FTM/USDT', 'GALA/USDT', 'GMT/USDT',
+    'GRT/USDT', 'HBAR/USDT', 'ICP/USDT', 'IMX/USDT', 'INJ/USDT', 'JUP/USDT', 'KSM/USDT',
+    'LINK/USDT', 'LRC/USDT', 'LTC/USDT', 'MANA/USDT', 'MATIC/USDT', 'MINA/USDT', 'MKR/USDT',
+    'NEAR/USDT', 'NEO/USDT', 'OP/USDT', 'PYTH/USDT', 'QNT/USDT', 'RNDR/USDT', 'ROSE/USDT',
+    'RUNE/USDT', 'SAND/USDT', 'SEI/USDT', 'SHIB/USDT', 'SNX/USDT', 'SOL/USDT', 'STX/USDT',
+    'SUI/USDT', 'SUSHI/USDT', 'TIA/USDT', 'TRX/USDT', 'UNI/USDT', 'VET/USDT', 'WLD/USDT',
+    'WOO/USDT', 'XLM/USDT', 'XRP/USDT', 'XTZ/USDT', 'ZIL/USDT', 'ZRX/USDT'
+  ].sort()
+}
+
 // Technical Indicators data (20 preprocessed indicators)
 const technicalIndicators = {
   'Momentum Indicators': [
@@ -52,6 +69,9 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [isMounted, setIsMounted] = React.useState(false)
   
   // Extraction Agent states
+  const [selectedPair, setSelectedPair] = React.useState('BTC/USDT')
+  const [pairSearchTerm, setPairSearchTerm] = React.useState('')
+  const [showPairDropdown, setShowPairDropdown] = React.useState(false)
   const [selectedDataSource, setSelectedDataSource] = React.useState('Technical Indicators')
   const [selectedIndicators, setSelectedIndicators] = React.useState<Set<string>>(new Set(['RSI', 'MACD', 'BollingerBands']))
   const [searchTerm, setSearchTerm] = React.useState('')
@@ -71,6 +91,21 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
       return newSet
     })
   }
+
+  // Filter trading pairs based on search
+  const filteredPairs = React.useMemo(() => {
+    if (!pairSearchTerm) return tradingPairs
+    
+    const searchLower = pairSearchTerm.toLowerCase()
+    return {
+      popular: tradingPairs.popular.filter(pair => 
+        pair.toLowerCase().includes(searchLower)
+      ),
+      all: tradingPairs.all.filter(pair => 
+        pair.toLowerCase().includes(searchLower)
+      )
+    }
+  }, [pairSearchTerm])
 
   const filteredIndicators = React.useMemo(() => {
     const filtered: Record<string, typeof technicalIndicators['Momentum Indicators']> = {}
@@ -94,6 +129,19 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
       setBotName(bot.name)
     }
   }, [bot])
+
+  // Close dropdown when clicking outside
+  React.useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (showPairDropdown && !(e.target as HTMLElement).closest('.pair-dropdown-container')) {
+        setShowPairDropdown(false)
+        setPairSearchTerm('')
+      }
+    }
+    
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [showPairDropdown])
 
   React.useEffect(() => {
     if (isOpen) {
@@ -291,6 +339,94 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                       </span>
                     </div>
                     <div className="p-6 space-y-6">
+                      {/* Trading Pair Selection */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-footnote text-bone-200 font-medium">TRADING PAIR</h4>
+                        </div>
+                        <div className="relative pair-dropdown-container">
+                          <div 
+                            className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs cursor-pointer hover:border-agent-extraction transition-colors flex items-center justify-between"
+                            onClick={() => setShowPairDropdown(!showPairDropdown)}
+                          >
+                            <span>{selectedPair}</span>
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className={`text-gray-400 transition-transform ${showPairDropdown ? 'rotate-180' : ''}`}>
+                              <path d="M7 10l5 5 5-5z"/>
+                            </svg>
+                          </div>
+                          
+                          {showPairDropdown && (
+                            <div className="absolute top-full mt-1 w-full bg-charcoal-800 border border-charcoal-600 z-10">
+                              {/* Search input */}
+                              <div className="p-2 border-b border-charcoal-600">
+                                <input
+                                  type="text"
+                                  placeholder="Search pairs..."
+                                  value={pairSearchTerm}
+                                  onChange={(e) => setPairSearchTerm(e.target.value)}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-2 py-1 text-xs focus:border-agent-extraction transition-colors"
+                                  autoFocus
+                                />
+                              </div>
+                              
+                              {/* Scrollable list */}
+                              <div className="max-h-64 overflow-y-auto">
+                                {filteredPairs.popular.length > 0 && (
+                                  <div>
+                                    <div className="px-2 py-1 text-xs text-gray-500 bg-charcoal-900">Popular Pairs</div>
+                                    {filteredPairs.popular.map(pair => (
+                                      <button
+                                        key={pair}
+                                        onClick={() => {
+                                          setSelectedPair(pair)
+                                          setShowPairDropdown(false)
+                                          setPairSearchTerm('')
+                                          setHasChanges(true)
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-agent-extraction/10 transition-colors ${
+                                          selectedPair === pair ? 'bg-agent-extraction/20 text-bone-200' : 'text-bone-200'
+                                        }`}
+                                      >
+                                        {pair}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {filteredPairs.all.length > 0 && (
+                                  <div>
+                                    <div className="px-2 py-1 text-xs text-gray-500 bg-charcoal-900">All Pairs</div>
+                                    {filteredPairs.all.map(pair => (
+                                      <button
+                                        key={pair}
+                                        onClick={() => {
+                                          setSelectedPair(pair)
+                                          setShowPairDropdown(false)
+                                          setPairSearchTerm('')
+                                          setHasChanges(true)
+                                        }}
+                                        className={`w-full text-left px-3 py-2 text-xs hover:bg-agent-extraction/10 transition-colors ${
+                                          selectedPair === pair ? 'bg-agent-extraction/20 text-bone-200' : 'text-bone-200'
+                                        }`}
+                                      >
+                                        {pair}
+                                      </button>
+                                    ))}
+                                  </div>
+                                )}
+                                
+                                {filteredPairs.popular.length === 0 && filteredPairs.all.length === 0 && (
+                                  <div className="px-3 py-4 text-xs text-gray-500 text-center">
+                                    No pairs found
+                                  </div>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Data Source Selection */}
                       <div>
                         <div className="flex items-center justify-between mb-4">
