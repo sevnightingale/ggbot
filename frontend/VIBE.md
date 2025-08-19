@@ -1,184 +1,296 @@
-# ggbots Brand Aesthetic & Strategy Guide
+# GGBot Frontend Design System & Visual Standards
 
-This document is your alignment protocol. It's the canonical reference for maintaining aesthetic, voice, and vision across every ggbots interface. This isn't branding fluff; it's a precision-cut blueprint for building a platform where traders architect autonomous AI agents in an environment that feels more command center than marketing funnel.
+## Core Design Philosophy
 
-## 1. Brand Essence
+**Brutalist Command Center Aesthetic** - A sophisticated, industrial interface that conveys precision, control, and advanced technical capabilities. Think mission control meets high-end trading terminal.
 
-**Vision:** Every trader commands a fully autonomous, hyper-adaptive AI agent that trades like them. Flawlessly. Relentlessly.
+## Color Palette
 
-**Mission:** Deliver a platform for building, training, and deploying precision AI trading agents that execute your edge with no sleep, no second-guessing, and zero deviation.
+### Primary Colors
+- **Charcoal-900** (`#161618`) - Primary background, deepest dark
+- **Charcoal-800** (`#1f1f23`) - Secondary backgrounds, cards
+- **Charcoal-700** (`#2a2a30`) - Borders, dividers
+- **Charcoal-600** (`#36363d`) - Interactive element borders
 
-**Core Values:**
-- **Adaptability:** Agents evolve. Market conditions don't break them. They sharpen them.
-- **Empowerment:** Interface meets control. Strategy becomes software.
-- **Precision:** No clutter, no drift. Every action is deliberate.
-- **Innovation:** Tradecraft meets neural networks.
+### Text Colors
+- **Bone-200** (`#e3e5e6`) - Primary text, headers
+- **Bone-100** (`#f0f2f3`) - Emphasized text, hover states
+- **Bone-300** (`#d6d8da`) - Secondary text
+- **Gray-400/500** (`#9ca3af`, `#6b7280`) - Muted text, placeholders
+- **Gray-600** (`#4b5563`) - Disabled text
 
-## 2. Brand Personality
+### Agent Colors (Status & Accents)
+- **Agent-Extraction** (`#38a1c7`) - Blue, data extraction
+- **Agent-Decision** (`#2cbe77`) - Green, AI decision making  
+- **Agent-Trading** (`#be6a47`) - Orange, trade execution
 
-- **Rational & Tactical:** Speaks in clear commands, not pitch decks.
-- **Assertive & Measured:** Bold, but not loud. Cool under pressure.
-- **Empowering, Not Coddling:** Gives you control, not training wheels.
-- **Futuristic, Not Flashy:** Aesthetic cues from brutalist interfaces, terminal UIs, and stripped-down cybernetics.
+### Status Colors
+- **Green-400** (`#10b981`) - Profit, success, active
+- **Red-400** (`#ef4444`) - Loss, error, inactive
+- **Orange-400** (`#f97316`) - Warning, pending
+- **Yellow-400** (`#eab308`) - Caution, neutral
 
-## 3. Visual Identity
+## Typography Scale
 
-Our aesthetic draws from a **cyber-samurai design ethos**. It's an intersection of brutalist modernism, restrained futurism, and tactical clarity. Think stark monochrome palettes, ruthless minimalism, and interfaces that feel forged rather than designed. Every surface should communicate function and restraint, like a 17th-century warrior operating a precision interface in a post-apocalyptic tech cathedral.
+### Font Sizes (Tailwind Classes)
+- **Headers**: `text-subheader` - Section titles, bot names
+- **Body**: `text-footnote` - Primary text, descriptions
+- **Small**: `text-xs` - Meta info, labels, secondary text
+- **Tiny**: `text-[10px]` - Timestamps, fine details
 
-No gradients. No gloss. No corporate clip-art.
+### Font Weights
+- **Medium** (`font-medium`) - Headers, emphasized text
+- **Normal** (`font-normal`) - Body text, descriptions
 
-### Color Palette
+## Layout System
 
-- **Primary:** `#161618` (Charcoal Black) - Total control panel energy
-- **Text/Line:** `#e3e5e6` (Bone White) - High contrast, zero distractions
-- **Accents** (used sparingly):
-  - **Extraction Agent Blue:** `#38a1c7`
-  - **Decision Agent Green:** `#2cbe77`
-  - **Trading Agent Orange:** `#be6a47`
-
-Use color like a weapon. Sparingly and with intention. Most of the UI should remain stark, grayscale, and focused.
-
-### Typography
-
-**Font Families:**
-- **Headlines:** Kanit Bold - Modern, punchy, grounded
-- **Body:** Inter - Clean, readable, stripped of excess
-
-**Font Size System (4-Tier Responsive):**
-
-| Element | Mobile | Medium | Large | Font Family | Usage |
-|---------|--------|--------|-------|-------------|-------|
-| **Header** | `text-3xl` (30px) | `text-4xl` (36px) | `text-5xl` (48px) | Kanit Bold (`font-display`) | Main page titles, primary headlines |
-| **Subheader** | `text-lg` (18px) | `text-xl` (20px) | `text-2xl` (24px) | Kanit Bold (`font-display`) | Section headings, card titles |
-| **Body** | `text-sm` (14px) | `text-base` (16px) | `text-base` (16px) | Inter (`font-sans`) | All primary content, descriptions |
-| **Footnote** | `text-xs` (12px) | `text-xs` (12px) | `text-xs` (12px) | Inter (`font-sans`) | Labels, metadata, fine print |
-
-**Special Cases:**
-- **Hero Header**: `text-4xl md:text-6xl lg:text-7xl` (36/60/72px) - Exception for maximum impact on landing page hero
-
-**Implementation:**
+### Grid Structure
 ```css
-/* Header - Main titles */
-.text-header { @apply text-3xl md:text-4xl lg:text-5xl font-display; }
+/* 3-Column Dashboard Layout */
+grid-cols-[1fr_400px_1fr]  /* Left data | Center bot | Right data */
 
-/* Subheader - Section titles */  
-.text-subheader { @apply text-lg md:text-xl lg:text-2xl font-display; }
-
-/* Body - Primary content */
-.text-body { @apply text-sm md:text-base lg:text-base font-sans; }
-
-/* Footnote - Secondary content */
-.text-footnote { @apply text-xs font-sans; }
-
-/* Special: Hero headline only */
-.text-hero { @apply text-4xl md:text-6xl lg:text-7xl font-display; }
+/* Responsive Breakpoints */
+hidden lg:block  /* Hide on mobile, show on large screens */
+max-w-[1680px]   /* Maximum container width */
 ```
 
-**Font Family Rules:**
-- **Kanit Bold** (`font-display`): All headers and subheaders
-- **Inter** (`font-sans`): All body text and footnotes
-- Always specify font family explicitly
-- Headers create bold visual hierarchy
-- Body text prioritizes readability
+### Spacing Standards
+- **Component Padding**: `p-3` (12px), `p-6` (24px), `p-8` (32px)
+- **Section Gaps**: `gap-6` (24px), `gap-8` (32px)
+- **Element Margins**: `mb-4` (16px), `mb-6` (24px), `mb-8` (32px)
 
-**Sizing Rules:**
-- Always use responsive sizing with breakpoints
-- Never mix font sizes arbitrarily  
-- Header for page/section titles only
-- Subheader for component/card titles
-- Body for all readable content
-- Footnote for labels and metadata only
-- Hero header is the only exception to standard header sizing
+## Component Design Patterns
 
-### Layout Principles
+### 1. Neumorphic Interactive Elements
 
-- Rigid grid systems
-- Ruthless negative space
-- UI elements framed like they're engineered, not decorated
-- Interface panels that resemble machine logic more than app kitsch
-- Subtle paper-texture backgrounds (via overlay image, mix-blend-mode, 5% opacity)
+**GGBot Circle** - Central bot selector with depth and dimensionality:
+```css
+.ggbot-circle {
+  /* Dual-shadow neumorphic effect */
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),      /* Dark shadow (bottom-right) */
+    -8px -8px 16px rgba(255, 255, 255, 0.08); /* Light shadow (top-left) */
+  
+  /* 4-quadrant gradient borders */
+  background: radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.15), transparent 50%);
+}
+```
 
-### Design Language
+**Floating Action Buttons** - Circular controls with hover states:
+```css
+.floating-action-btn {
+  /* Matching neumorphic shadows */
+  box-shadow: 
+    4px 4px 8px rgba(0, 0, 0, 0.9),
+    -4px -4px 8px rgba(255, 255, 255, 0.08);
+  
+  /* Agent-specific hover colors */
+  &:hover { background-color: rgba(56, 161, 199, 0.1); } /* extraction blue */
+}
+```
 
-- Monochrome interface layers with thin white borders
-- Subtle background grids as a nod to data flow
-- Glowing edge effects for interactivity, minimal and tasteful
-- Data viz that looks like schematics, not marketing charts
+### 2. Sharp Geometric Containers
 
-### Imagery
+**Dashboard Cards** - Angular containers with corner brackets:
+```css
+.corner-top-left {
+  position: relative;
+  background: #1f1f23; /* charcoal-800 */
+}
 
-Interfaces that feel forged, not decorated. Schematic over aesthetic.
+.corner-top-left::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0;
+  width: 70%; height: 70%;
+  background: 
+    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) top/100% 2px no-repeat,
+    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) left/2px 100% no-repeat;
+}
+```
 
-- Candlestick charts, agent configuration flows, and modular systems. Everything should suggest structure and intent.
-- Abstract neural networks rendered in grayscale wireframe. Convey complexity without literalness.
-- Paper-like textures, scanned-in grain overlays, or digital patinas that evoke a blend of tech and tactility.
+**Sharp Dividers** - Gradient separators:
+```css
+.gradient-divider {
+  height: 1px;
+  background: linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%);
+  opacity: 0.6;
+}
+```
 
-Imagery should carry a sense of stoic focus, like a tactical manual or an ops dashboard. Not a startup hero banner.
+### 3. Accordion/Collapsible Sections
 
-Avoid generic stock photos. If it doesn't look like it belongs on a command terminal built in a dark room by a disciplined coder-warrior, cut it.
+**Agent Configuration Panels** - Expandable sections with neumorphic styling:
+```css
+.ggbot-accordion-btn {
+  /* Interactive neumorphic styling */
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(255, 255, 255, 0.08);
+  
+  /* Corner bracket system for visual hierarchy */
+  &::before { /* Top-left corner bracket */ }
+  &::after  { /* Bottom-right corner bracket */ }
+}
 
-## 4. Core Messaging
+.ggbot-accordion-expanded {
+  /* Flat styling for expanded content */
+  background: #161618; /* charcoal-900 */
+  border: 1px solid #36363d; /* charcoal-600 */
+}
+```
 
-**Tagline:** "Your Edge, Amplified."
+### 4. Form Controls & Inputs
 
-**Key Propositions:**
-- "Train AI to think and trade like you."
-- "Three agents, one system: Extract. Decide. Execute."
-- "Built for volatility. Designed for control."
-- "Adaptive intelligence that never hesitates."
-- "Beyond bots. This is trade automation evolved."
+**Search/Input Fields**:
+```css
+input[type="text"] {
+  background: #1f1f23;      /* charcoal-800 */
+  border: 1px solid #36363d; /* charcoal-600 */
+  color: #e3e5e6;           /* bone-200 */
+  
+  &:focus {
+    border-color: #38a1c7;   /* agent-extraction */
+    transition: border-color 0.2s;
+  }
+}
+```
 
-**Voice Style:**
-- Tactical, direct, efficient
-- Assume the reader knows what a candle chart is
-- Lean into trading language without over-explaining
-- Use verbs like "adapt," "deploy," "optimize," "dominate"
+**Checkbox/Selection Controls**:
+```css
+.selection-checkbox {
+  width: 16px; height: 16px;
+  border: 2px solid #6b7280;  /* gray-600 */
+  border-radius: 2px;
+  
+  &.selected {
+    background: #38a1c7;      /* agent-extraction */
+    border-color: #38a1c7;
+  }
+}
+```
 
-## 5. Target Audience
+### 5. Data Display Components
 
-### Trader Types & How We Appeal
+**Trade Tables**:
+```css
+.trade-table {
+  /* Alternating row backgrounds */
+  tr:nth-child(even) {
+    background: rgba(128, 128, 128, 0.3);
+  }
+  
+  /* Color-coded data */
+  .profit { color: #10b981; }  /* green-400 */
+  .loss   { color: #ef4444; }  /* red-400 */
+  .neutral { color: #e3e5e6; } /* bone-200 */
+}
+```
 
-**Sharp & Analytical Traders (Data-driven pros):**
-- **Value:** Expertise, precision, data-driven insights
-- **Appeal:** Adaptive AI, precision execution, content showcasing results like "How ggbots crushed today's volatility"
+**Status Indicators**:
+```css
+.status-indicator {
+  /* Colored dots with glow effect */
+  &.active   { color: #10b981; text-shadow: 0 0 4px rgba(16, 185, 129, 0.5); }
+  &.warning  { color: #f97316; text-shadow: 0 0 4px rgba(249, 115, 22, 0.5); }
+  &.error    { color: #ef4444; text-shadow: 0 0 4px rgba(239, 68, 68, 0.5); }
+  &.inactive { color: #6b7280; }
+}
+```
 
-**Degen & Playful Traders (Meme-loving risk-takers):**
-- **Value:** Humor, edge, community
-- **Appeal:** Bold personality, trader banter, strategy sharing features
+## Animation Standards
 
-**Practical & Promotional Traders (Educators & influencers):**
-- **Value:** Actionable insights, tangible results
-- **Appeal:** No-code customization, compelling user stories, clear tutorials on agent setup
+### Micro-Interactions
+```css
+/* Standard transition timing */
+transition: all 0.2s ease;
 
-### What They Value
-- Flexibility, innovation, and control
-- Tools that evolve with the market
+/* Hover states */
+&:hover {
+  transform: translateY(-1px);
+  transition-duration: 0.15s;
+}
 
-### Their Challenges
-- Rigid bots that crash during changing market conditions
-- Complex tools requiring coding skills
-- Lack of trust in automation
-- Expensive and complex quant trading platforms
+/* Loading spinners */
+.spinner {
+  animation: spin 1s linear infinite;
+}
+```
 
-### What They Need
-- AI mirroring their personal strategies
-- Easy customization, no barriers
-- Reliable, transparent execution
+### Modal/Sheet Transitions
+```css
+/* Bottom sheet slide animation */
+.sheet-enter {
+  transform: translateY(100%);
+  transition: transform 500ms ease-out;
+}
 
-## 6. Guardrails
+.sheet-enter-active {
+  transform: translateY(0);
+}
+```
 
-- **No Marketing Fluff:** If it sounds like ad copy, delete it.
-- **No Visual Noise:** Every element must earn its place.
-- **No Imitation:** Don't copy Web3 trends. We're forging a new visual and functional language.
-- **Minimal, Not Bland:** Brutalism with intention. Even empty space speaks.
-- **No Brightness for Brightness' Sake:** Accent only where function dictates. Glows, gradients, or animation must serve utility, not spectacle.
+## Visual Hierarchy Rules
 
-## 7. The ggbots Edge
+### 1. Element Classification
 
-A three-agent system engineered for total automation:
+**Interactive Elements** (clickable):
+- Use neumorphic styling with dual shadows
+- Apply hover effects and transitions
+- Examples: GGBot circle, floating buttons, accordions
 
-- **Extraction Agent:** Observes. Absorbs market data, news, sentiment.
-- **Decision Agent:** Thinks. Filters through chaos to spot your edge.
-- **Trading Agent:** Acts. Executes with precision, never wavers.
+**Display Elements** (informational):
+- Use corner bracket styling
+- Minimal shadows, focus on content
+- Examples: Dashboard cards, data tables
 
-Built to work together. Trained by you. Always on. Always adapting.
+### 2. Color Usage Priority
+
+1. **Agent colors** for primary actions and status
+2. **Status colors** for data states (profit/loss, active/inactive)
+3. **Bone colors** for text hierarchy
+4. **Gray colors** for secondary information
+
+### 3. Spacing Consistency
+
+- **Large gaps** (32px) between major sections
+- **Medium gaps** (24px) between related components  
+- **Small gaps** (16px) within component groups
+- **Micro gaps** (8px, 12px) for fine adjustments
+
+## Component Relationships
+
+### Layout Nesting Patterns
+```
+Dashboard Container (charcoal-900)
+├── Section Cards (charcoal-800 + corner brackets)
+│   ├── Headers (bone-200, text-subheader)
+│   ├── Dividers (gradient-divider)
+│   └── Content (text-footnote, bone-200)
+└── Interactive Overlays (neumorphic styling)
+    ├── GGBot Circle (central focal point)
+    ├── Floating Buttons (contextual actions)
+    └── Modal Sheets (configuration panels)
+```
+
+### State Communication
+- **Visual feedback** through color changes
+- **Depth changes** via shadow intensity
+- **Border highlights** for focus states
+- **Subtle animations** for state transitions
+
+## Responsive Design
+
+### Breakpoint Strategy
+- **Mobile-first** approach with progressive enhancement
+- **Hide complex elements** on small screens (`hidden lg:block`)
+- **Maintain core functionality** across all device sizes
+- **Preserve visual hierarchy** at different scales
+
+### Content Prioritization
+1. **Central bot display** always visible
+2. **Critical controls** accessible on mobile
+3. **Data tables** become scrollable
+4. **Secondary information** hidden on small screens
+
+This design system creates a cohesive, professional interface that conveys the sophisticated nature of AI-powered trading while maintaining excellent usability and visual appeal.

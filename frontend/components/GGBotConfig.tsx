@@ -376,8 +376,8 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                           </div>
                         )}
 
-                        {/* Indicator Categories */}
-                        <div className="space-y-6">
+                        {/* Indicator Categories - Scrollable */}
+                        <div className="space-y-6 max-h-96 overflow-y-auto">
                           {Object.entries(filteredIndicators).map(([category, indicators]) => (
                             <div key={category}>
                               <h5 className="text-xs text-bone-200 font-medium mb-3 bg-charcoal-800 px-3 py-2 border-l-2 border-agent-extraction">
