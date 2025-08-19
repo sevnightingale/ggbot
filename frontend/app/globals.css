@@ -797,6 +797,80 @@ a {
   background: #4ab3d9;
 }
 
+/* GGBot Accordion Styling - Match neumorphic design */
+.ggbot-accordion-btn {
+  /* Neumorphic dual shadows - matching ggbot circle */
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(255, 255, 255, 0.08);
+}
+
+/* 4-quadrant border system for accordion buttons */
+.ggbot-accordion-btn::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  background: 
+    /* Top-left quadrant - light */
+    radial-gradient(ellipse at 25% 25%, rgba(255, 255, 255, 0.5) 0%, transparent 50%),
+    /* Bottom-right quadrant - dark */
+    radial-gradient(ellipse at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ggbot-accordion-btn > * {
+  position: relative;
+  z-index: 1;
+}
+
+.ggbot-accordion-btn:hover {
+  transform: translateY(-1px);
+  background: #1c1c1e; /* 10% lighter than charcoal-900 */
+  box-shadow: 
+    10px 10px 20px rgba(0, 0, 0, 0.95),
+    -10px -10px 20px rgba(255, 255, 255, 0.15),
+    0 0 20px rgba(227, 229, 230, 0.08); /* Subtle glow */
+}
+
+.ggbot-accordion-btn:active {
+  transform: translateY(0.5px);
+  box-shadow: 
+    4px 4px 8px rgba(0, 0, 0, 0.85),
+    -4px -4px 8px rgba(255, 255, 255, 0.06);
+}
+
+/* Expanded accordion styling - same shadows but larger container */
+.ggbot-accordion-expanded {
+  box-shadow: 
+    8px 8px 16px rgba(0, 0, 0, 0.9),
+    -8px -8px 16px rgba(255, 255, 255, 0.08);
+}
+
+.ggbot-accordion-expanded::before {
+  content: '';
+  position: absolute;
+  top: -2px;
+  left: -2px;
+  width: calc(100% + 4px);
+  height: calc(100% + 4px);
+  background: 
+    /* Top-left quadrant - light */
+    radial-gradient(ellipse at 25% 25%, rgba(255, 255, 255, 0.5) 0%, transparent 50%),
+    /* Bottom-right quadrant - dark */
+    radial-gradient(ellipse at 75% 75%, rgba(0, 0, 0, 0.3) 0%, transparent 50%);
+  z-index: 0;
+  pointer-events: none;
+}
+
+.ggbot-accordion-expanded > * {
+  position: relative;
+  z-index: 1;
+}
+
 /* Floating Action Buttons - Match ggbot circle design */
 .floating-action-buttons {
   position: relative;

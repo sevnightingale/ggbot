@@ -82,7 +82,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
           <div className="sticky top-0 z-20 bg-charcoal-900" style={{
             boxShadow: '0 8px 16px -8px rgba(22, 22, 24, 1)'
           }}>
-            <div className="w-full max-w-none px-4 md:max-w-4xl md:mx-auto md:px-8 py-4">
+            <div className="w-full max-w-none px-4 md:max-w-4xl md:mx-auto md:px-8 py-6">
               <div className="flex items-center justify-between">
                 {/* Left side - Bot name */}
                 <div className="flex items-center gap-2">
@@ -100,7 +100,13 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                     />
                   ) : (
                     <>
-                      <h2 className="text-subheader text-bone-200 font-medium">{botName}</h2>
+                      <h2 
+                        className="text-subheader text-bone-200 font-medium cursor-pointer hover:text-bone-100 transition-colors"
+                        onClick={() => setIsEditingName(true)}
+                        title="Click to edit name"
+                      >
+                        {botName}
+                      </h2>
                       <button
                         onClick={() => setIsEditingName(true)}
                         className="text-gray-400 hover:text-bone-200 transition-colors"
@@ -175,81 +181,102 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
             <div className="w-full max-w-none px-4 md:max-w-4xl md:mx-auto md:px-8 pb-8">
               
               {/* Extraction Agent Section */}
-              <div className="mb-6">
-                <button
-                  onClick={() => toggleSection('extraction')}
-                  className="w-full flex items-center justify-between p-4 bg-charcoal-800/30 border border-charcoal-600 hover:border-agent-extraction/50 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">📊</span>
-                    <h3 className="text-subheader text-agent-extraction font-medium">EXTRACTION AGENT</h3>
-                  </div>
-                  <span className={`text-agent-extraction transition-transform duration-200 ${
-                    expandedSections.has('extraction') ? 'rotate-90' : ''
-                  }`}>
-                    ▶
-                  </span>
-                </button>
-                {expandedSections.has('extraction') && (
-                  <div className="border-l border-r border-b border-charcoal-600 p-6 bg-charcoal-800/10">
-                    <p className="text-footnote text-gray-400 mb-4">Market data extraction and indicator configuration</p>
-                    {/* Minimal content structure - to be expanded later */}
-                    <div className="space-y-4">
-                      <div className="text-footnote text-gray-500">Indicator configuration will go here...</div>
+              <div className="mb-8">
+                {!expandedSections.has('extraction') ? (
+                  <button
+                    onClick={() => toggleSection('extraction')}
+                    className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
+                  >
+                    <h3 className="text-subheader text-bone-200 font-medium">EXTRACTION AGENT</h3>
+                    <span className="text-agent-extraction text-xl transition-transform duration-200">
+                      ▶
+                    </span>
+                  </button>
+                ) : (
+                  <div className="bg-charcoal-900 relative ggbot-accordion-expanded">
+                    <div 
+                      onClick={() => toggleSection('extraction')}
+                      className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
+                    >
+                      <h3 className="text-subheader text-bone-200 font-medium">EXTRACTION AGENT</h3>
+                      <span className="text-agent-extraction text-xl transition-transform duration-200 rotate-90">
+                        ▶
+                      </span>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-footnote text-gray-400 mb-4">Market data extraction and indicator configuration</p>
+                      {/* Minimal content structure - to be expanded later */}
+                      <div className="space-y-4">
+                        <div className="text-footnote text-gray-500">Indicator configuration will go here...</div>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Decision Agent Section */}
-              <div className="mb-6">
-                <button
-                  onClick={() => toggleSection('decision')}
-                  className="w-full flex items-center justify-between p-4 bg-charcoal-800/30 border border-charcoal-600 hover:border-agent-decision/50 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">🧠</span>
-                    <h3 className="text-subheader text-agent-decision font-medium">DECISION AGENT</h3>
-                  </div>
-                  <span className={`text-agent-decision transition-transform duration-200 ${
-                    expandedSections.has('decision') ? 'rotate-90' : ''
-                  }`}>
-                    ▶
-                  </span>
-                </button>
-                {expandedSections.has('decision') && (
-                  <div className="border-l border-r border-b border-charcoal-600 p-6 bg-charcoal-800/10">
-                    <p className="text-footnote text-gray-400 mb-4">AI decision making and strategy configuration</p>
-                    {/* Minimal content structure - to be expanded later */}
-                    <div className="space-y-4">
-                      <div className="text-footnote text-gray-500">Strategy configuration will go here...</div>
+              <div className="mb-8">
+                {!expandedSections.has('decision') ? (
+                  <button
+                    onClick={() => toggleSection('decision')}
+                    className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
+                  >
+                    <h3 className="text-subheader text-bone-200 font-medium">DECISION AGENT</h3>
+                    <span className="text-agent-decision text-xl transition-transform duration-200">
+                      ▶
+                    </span>
+                  </button>
+                ) : (
+                  <div className="bg-charcoal-900 relative ggbot-accordion-expanded">
+                    <div 
+                      onClick={() => toggleSection('decision')}
+                      className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
+                    >
+                      <h3 className="text-subheader text-bone-200 font-medium">DECISION AGENT</h3>
+                      <span className="text-agent-decision text-xl transition-transform duration-200 rotate-90">
+                        ▶
+                      </span>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-footnote text-gray-400 mb-4">AI decision making and strategy configuration</p>
+                      {/* Minimal content structure - to be expanded later */}
+                      <div className="space-y-4">
+                        <div className="text-footnote text-gray-500">Strategy configuration will go here...</div>
+                      </div>
                     </div>
                   </div>
                 )}
               </div>
 
               {/* Trading Agent Section */}
-              <div className="mb-6">
-                <button
-                  onClick={() => toggleSection('trading')}
-                  className="w-full flex items-center justify-between p-4 bg-charcoal-800/30 border border-charcoal-600 hover:border-agent-trading/50 transition-colors group"
-                >
-                  <div className="flex items-center gap-3">
-                    <span className="text-2xl">💰</span>
-                    <h3 className="text-subheader text-agent-trading font-medium">TRADING AGENT</h3>
-                  </div>
-                  <span className={`text-agent-trading transition-transform duration-200 ${
-                    expandedSections.has('trading') ? 'rotate-90' : ''
-                  }`}>
-                    ▶
-                  </span>
-                </button>
-                {expandedSections.has('trading') && (
-                  <div className="border-l border-r border-b border-charcoal-600 p-6 bg-charcoal-800/10">
-                    <p className="text-footnote text-gray-400 mb-4">Exchange connections and risk management</p>
-                    {/* Minimal content structure - to be expanded later */}
-                    <div className="space-y-4">
-                      <div className="text-footnote text-gray-500">Trading configuration will go here...</div>
+              <div className="mb-8">
+                {!expandedSections.has('trading') ? (
+                  <button
+                    onClick={() => toggleSection('trading')}
+                    className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
+                  >
+                    <h3 className="text-subheader text-bone-200 font-medium">TRADING AGENT</h3>
+                    <span className="text-agent-trading text-xl transition-transform duration-200">
+                      ▶
+                    </span>
+                  </button>
+                ) : (
+                  <div className="bg-charcoal-900 relative ggbot-accordion-expanded">
+                    <div 
+                      onClick={() => toggleSection('trading')}
+                      className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
+                    >
+                      <h3 className="text-subheader text-bone-200 font-medium">TRADING AGENT</h3>
+                      <span className="text-agent-trading text-xl transition-transform duration-200 rotate-90">
+                        ▶
+                      </span>
+                    </div>
+                    <div className="p-6">
+                      <p className="text-footnote text-gray-400 mb-4">Exchange connections and risk management</p>
+                      {/* Minimal content structure - to be expanded later */}
+                      <div className="space-y-4">
+                        <div className="text-footnote text-gray-500">Trading configuration will go here...</div>
+                      </div>
                     </div>
                   </div>
                 )}
