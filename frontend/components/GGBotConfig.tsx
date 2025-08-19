@@ -15,6 +15,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [hasChanges, setHasChanges] = React.useState(false)
   const [expandedSections, setExpandedSections] = React.useState<Set<string>>(new Set(['extraction']))
   const [isVisible, setIsVisible] = React.useState(false)
+  const [isMounted, setIsMounted] = React.useState(false)
 
   React.useEffect(() => {
     if (bot) {
@@ -24,10 +25,13 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
 
   React.useEffect(() => {
     if (isOpen) {
+      setIsMounted(true)
       // Small delay to ensure the component is mounted before animation
       setTimeout(() => setIsVisible(true), 50)
     } else {
       setIsVisible(false)
+      // Keep component mounted during close animation
+      setTimeout(() => setIsMounted(false), 500)
     }
   }, [isOpen])
 
@@ -59,7 +63,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
     setHasChanges(false)
   }
 
-  if (!bot) return null
+  if (!bot || !isMounted) return null
 
   return (
     <div className={`fixed inset-0 z-50 ${isOpen ? 'pointer-events-auto' : 'pointer-events-none'}`}>
@@ -78,7 +82,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
         }`}
         style={{ height: '85vh' }}
       >
-        <div className="h-full bg-charcoal-900 relative">
+        <div className="h-full bg-charcoal-900 relative flex flex-col">
           {/* Top sharp gradient border - matching dashboard style */}
           <div 
             className="absolute top-0 left-0 right-0 z-30"
@@ -90,7 +94,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
           />
 
           {/* Sticky Top Bar */}
-          <div className="sticky top-0 z-20 bg-charcoal-900" style={{
+          <div className="flex-shrink-0 z-20 bg-charcoal-900" style={{
             boxShadow: '0 8px 16px -8px rgba(22, 22, 24, 1)'
           }}>
             <div className="w-full max-w-none px-4 md:max-w-4xl md:mx-auto md:px-8 py-8">
@@ -187,9 +191,9 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
             </div>
           </div>
 
-          {/* Content area */}
-          <div className="h-full overflow-y-auto">
-            <div className="w-full max-w-none px-4 md:max-w-4xl md:mx-auto md:px-8 pb-8">
+          {/* Content area - scrollable */}
+          <div className="flex-1 overflow-y-auto">
+            <div className="w-full max-w-none px-4 md:max-w-4xl md:mx-auto md:px-8 py-8">
               
               {/* Extraction Agent Section */}
               <div className="mb-8">
