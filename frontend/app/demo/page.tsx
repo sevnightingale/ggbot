@@ -286,7 +286,7 @@ export default function DemoPage() {
 
   const handleConfigClose = () => {
     setIsConfigOpen(false)
-    setSelectedBot(null)
+    // Keep selectedBot to allow close animation
   }
 
 
