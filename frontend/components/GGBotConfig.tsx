@@ -26,6 +26,17 @@ const tradingPairs = {
   ].sort()
 }
 
+// Analysis frequency options
+const frequencyOptions = [
+  { value: '5m', label: '5 minutes' },
+  { value: '15m', label: '15 minutes' },
+  { value: '30m', label: '30 minutes' },
+  { value: '1h', label: '1 hour' },
+  { value: '4h', label: '4 hours' },
+  { value: '1d', label: '1 day' },
+  { value: '1w', label: '1 week' }
+]
+
 // Technical Indicators data (20 preprocessed indicators)
 const technicalIndicators = {
   'Momentum Indicators': [
@@ -75,6 +86,13 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [selectedDataSource, setSelectedDataSource] = React.useState('Technical Indicators')
   const [selectedIndicators, setSelectedIndicators] = React.useState<Set<string>>(new Set(['RSI', 'MACD', 'BollingerBands']))
   const [searchTerm, setSearchTerm] = React.useState('')
+
+  // Decision Agent states
+  const [analysisFrequency, setAnalysisFrequency] = React.useState('1h')
+  const [tradingStrategy, setTradingStrategy] = React.useState('Enter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods or when multiple indicators conflict.')
+  const [marketAnalysis, setMarketAnalysis] = React.useState('Look for confluence between momentum and trend indicators. Pay special attention to volume confirmation and support/resistance levels.')
+  const [customPrompt, setCustomPrompt] = React.useState('')
+  const [useCustomPrompt, setUseCustomPrompt] = React.useState(false)
 
   // Helper functions for indicator management
   const toggleIndicator = (indicatorId: string) => {
@@ -592,11 +610,125 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                         ▶
                       </span>
                     </div>
-                    <div className="p-6">
-                      <p className="text-footnote text-gray-400 mb-4">AI decision making and strategy configuration</p>
-                      {/* Minimal content structure - to be expanded later */}
-                      <div className="space-y-4">
-                        <div className="text-footnote text-gray-500">Strategy configuration will go here...</div>
+                    <div className="p-6 space-y-6">
+                      {/* Analysis Frequency */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-footnote text-bone-200 font-medium">ANALYSIS FREQUENCY</h4>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          {frequencyOptions.map(freq => (
+                            <button
+                              key={freq.value}
+                              onClick={() => {
+                                setAnalysisFrequency(freq.value)
+                                setHasChanges(true)
+                              }}
+                              className={`px-3 py-1 text-xs rounded transition-colors ${
+                                analysisFrequency === freq.value
+                                  ? 'bg-agent-decision text-charcoal-900'
+                                  : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                              }`}
+                            >
+                              {freq.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Context Display */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-footnote text-bone-200 font-medium">MARKET CONTEXT</h4>
+                        </div>
+                        <div className="bg-charcoal-800 border border-charcoal-600 p-3 text-xs text-gray-300">
+                          <div>Analyzing: <span className="text-bone-200">{selectedPair}</span></div>
+                          <div className="mt-1">Using indicators: <span className="text-bone-200">{Array.from(selectedIndicators).join(', ')}</span></div>
+                          <div className="mt-1">Review frequency: <span className="text-bone-200">Every {frequencyOptions.find(f => f.value === analysisFrequency)?.label.toLowerCase()}</span></div>
+                        </div>
+                      </div>
+
+                      {/* Strategy Configuration */}
+                      {!useCustomPrompt ? (
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-footnote text-bone-200 font-medium">TRADING STRATEGY</h4>
+                            <button
+                              onClick={() => setUseCustomPrompt(true)}
+                              className="text-xs text-gray-400 hover:text-agent-decision transition-colors"
+                            >
+                              Custom Prompt ↗
+                            </button>
+                          </div>
+
+                          <div className="space-y-4">
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-2">Your trading strategy:</label>
+                              <textarea
+                                value={tradingStrategy}
+                                onChange={(e) => {
+                                  setTradingStrategy(e.target.value)
+                                  setHasChanges(true)
+                                }}
+                                placeholder="Enter when conditions are met and avoid when..."
+                                rows={3}
+                                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-decision transition-colors resize-none"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-xs text-gray-400 mb-2">Market analysis approach:</label>
+                              <textarea
+                                value={marketAnalysis}
+                                onChange={(e) => {
+                                  setMarketAnalysis(e.target.value)
+                                  setHasChanges(true)
+                                }}
+                                placeholder="Look for patterns and pay attention to..."
+                                rows={3}
+                                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-decision transition-colors resize-none"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-footnote text-bone-200 font-medium">CUSTOM PROMPT</h4>
+                            <button
+                              onClick={() => setUseCustomPrompt(false)}
+                              className="text-xs text-gray-400 hover:text-agent-decision transition-colors"
+                            >
+                              ← Guided Mode
+                            </button>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs text-gray-400 mb-2">Full decision prompt (advanced):</label>
+                            <textarea
+                              value={customPrompt}
+                              onChange={(e) => {
+                                setCustomPrompt(e.target.value)
+                                setHasChanges(true)
+                              }}
+                              placeholder="You are analyzing {SYMBOL} using {INDICATORS}. Your complete trading strategy and decision framework..."
+                              rows={6}
+                              className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-decision transition-colors resize-none"
+                            />
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Output Format Info */}
+                      <div>
+                        <div className="bg-charcoal-800 border border-charcoal-700 p-3 text-xs">
+                          <div className="text-gray-400 mb-2">Expected output format:</div>
+                          <div className="text-bone-200 font-mono">
+                            ACTION: ENTER|WAIT|EXIT<br />
+                            CONFIDENCE: 0.000-1.000<br />
+                            REASONING: [Detailed analysis...]
+                          </div>
+                        </div>
                       </div>
                     </div>
                   </div>
