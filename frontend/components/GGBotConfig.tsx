@@ -37,6 +37,17 @@ const frequencyOptions = [
   { value: '1w', label: '1 week' }
 ]
 
+// Signal providers data
+const signalProviders = [
+  { id: 'ggshot', name: 'GG-Shot', description: 'Breakout and momentum signals from ggShot indicator' }
+]
+
+// Decision modes
+const decisionModes = [
+  { value: 'autonomous', label: 'Autonomous Trading', description: 'Generate and execute trades independently' },
+  { value: 'validation', label: 'Signal Validation', description: 'Validate external signals before execution' }
+]
+
 // Technical Indicators data (20 preprocessed indicators)
 const technicalIndicators = {
   'Momentum Indicators': [
@@ -88,11 +99,18 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [searchTerm, setSearchTerm] = React.useState('')
 
   // Decision Agent states
+  const [decisionMode, setDecisionMode] = React.useState('autonomous')
   const [analysisFrequency, setAnalysisFrequency] = React.useState('1h')
   const [tradingStrategy, setTradingStrategy] = React.useState('Enter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods or when multiple indicators conflict.')
   const [marketAnalysis, setMarketAnalysis] = React.useState('Look for confluence between momentum and trend indicators. Pay special attention to volume confirmation and support/resistance levels.')
+  const [validationCriteria, setValidationCriteria] = React.useState('Accept signals that align with overall trend and have strong volume confirmation. Avoid signals during major news events or extreme market conditions.')
+  const [riskAssessment, setRiskAssessment] = React.useState('Evaluate market volatility and position sizing based on signal confidence. Consider correlation with other active positions.')
   const [customPrompt, setCustomPrompt] = React.useState('')
   const [useCustomPrompt, setUseCustomPrompt] = React.useState(false)
+  const [showPromptPreview, setShowPromptPreview] = React.useState(false)
+  
+  // Additional data sources
+  const [selectedSignals, setSelectedSignals] = React.useState<Set<string>>(new Set())
 
   // Helper functions for indicator management
   const toggleIndicator = (indicatorId: string) => {
@@ -445,6 +463,30 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                         </div>
                       </div>
 
+                      {/* Selected Data Points Summary */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-footnote text-bone-200 font-medium">SELECTED DATA POINTS</h4>
+                        </div>
+                        <div className="bg-charcoal-800 border border-charcoal-600 p-3 text-xs">
+                          {selectedIndicators.size > 0 && (
+                            <div className="mb-2">
+                              <span className="text-gray-400">Indicators: </span>
+                              <span className="text-bone-200">{Array.from(selectedIndicators).join(', ')}</span>
+                            </div>
+                          )}
+                          {selectedSignals.size > 0 && (
+                            <div className="mb-2">
+                              <span className="text-gray-400">Signals: </span>
+                              <span className="text-bone-200">{Array.from(selectedSignals).join(', ')}</span>
+                            </div>
+                          )}
+                          {selectedIndicators.size === 0 && selectedSignals.size === 0 && (
+                            <div className="text-gray-500">No data sources selected</div>
+                          )}
+                        </div>
+                      </div>
+
                       {/* Data Source Selection */}
                       <div>
                         <div className="flex items-center justify-between mb-4">
@@ -455,11 +497,21 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                             onClick={() => setSelectedDataSource('Technical Indicators')}
                             className={`px-3 py-1 text-xs rounded transition-colors ${
                               selectedDataSource === 'Technical Indicators'
-                                ? 'bg-agent-extraction text-charcoal-900'
+                                ? 'bg-agents-extraction text-charcoal-900'
                                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                             }`}
                           >
                             Technical Indicators
+                          </button>
+                          <button
+                            onClick={() => setSelectedDataSource('Signals')}
+                            className={`px-3 py-1 text-xs rounded transition-colors ${
+                              selectedDataSource === 'Signals'
+                                ? 'bg-agents-extraction text-charcoal-900'
+                                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                            }`}
+                          >
+                            Signals
                           </button>
                           <button
                             disabled
@@ -530,8 +582,9 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                           </div>
                         )}
 
-                        {/* Indicator Categories - Scrollable */}
-                        <div className="space-y-6 max-h-96 overflow-y-auto">
+                        {/* Technical Indicators Content */}
+                        {selectedDataSource === 'Technical Indicators' && (
+                          <div className="space-y-6 max-h-96 overflow-y-auto">
                           {Object.entries(filteredIndicators).map(([category, indicators]) => (
                             <div key={category}>
                               <h5 className="text-xs text-bone-200 font-medium mb-3 bg-charcoal-800 px-3 py-2 border-l-2 border-agent-extraction">
@@ -580,7 +633,60 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                               </div>
                             </div>
                           ))}
-                        </div>
+                          </div>
+                        )}
+
+                        {/* Signals Content */}
+                        {selectedDataSource === 'Signals' && (
+                          <div className="space-y-4">
+                            {signalProviders.map(provider => {
+                              const isSelected = selectedSignals.has(provider.id)
+                              
+                              return (
+                                <button
+                                  key={provider.id}
+                                  onClick={() => {
+                                    setSelectedSignals(prev => {
+                                      const newSet = new Set(prev)
+                                      if (newSet.has(provider.id)) {
+                                        newSet.delete(provider.id)
+                                      } else {
+                                        newSet.add(provider.id)
+                                      }
+                                      setHasChanges(true)
+                                      return newSet
+                                    })
+                                  }}
+                                  className={`w-full text-left p-4 border transition-colors ${
+                                    isSelected
+                                      ? 'bg-agents-extraction/10 border-agents-extraction text-bone-200'
+                                      : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agents-extraction hover:bg-agents-extraction/5'
+                                  }`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                      <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                                        isSelected
+                                          ? 'bg-agents-extraction border-agents-extraction'
+                                          : 'border-gray-600'
+                                      }`}>
+                                        {isSelected && (
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
+                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                                          </svg>
+                                        )}
+                                      </div>
+                                      <div>
+                                        <div className="text-footnote font-medium">{provider.name}</div>
+                                        <div className="text-xs text-gray-400 mt-1">{provider.description}</div>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </button>
+                              )
+                            })}
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -611,6 +717,34 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                       </span>
                     </div>
                     <div className="p-6 space-y-6">
+                      {/* Decision Mode Selection */}
+                      <div>
+                        <div className="flex items-center justify-between mb-4">
+                          <h4 className="text-footnote text-bone-200 font-medium">DECISION MODE</h4>
+                        </div>
+                        <div className="flex gap-2 flex-wrap">
+                          {decisionModes.map(mode => (
+                            <button
+                              key={mode.value}
+                              onClick={() => {
+                                setDecisionMode(mode.value)
+                                setHasChanges(true)
+                              }}
+                              className={`px-3 py-1 text-xs rounded transition-colors ${
+                                decisionMode === mode.value
+                                  ? 'bg-agents-decision text-charcoal-900 font-medium'
+                                  : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                              }`}
+                            >
+                              {mode.label}
+                            </button>
+                          ))}
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400">
+                          {decisionModes.find(m => m.value === decisionMode)?.description}
+                        </div>
+                      </div>
+
                       {/* Analysis Frequency */}
                       <div>
                         <div className="flex items-center justify-between mb-4">
@@ -626,7 +760,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                               }}
                               className={`px-3 py-1 text-xs rounded transition-colors ${
                                 analysisFrequency === freq.value
-                                  ? 'bg-agent-decision text-charcoal-900'
+                                  ? 'bg-agents-decision text-charcoal-900 font-medium'
                                   : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                               }`}
                             >
@@ -652,44 +786,78 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                       {!useCustomPrompt ? (
                         <div>
                           <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-footnote text-bone-200 font-medium">TRADING STRATEGY</h4>
+                            <h4 className="text-footnote text-bone-200 font-medium">
+                              {decisionMode === 'autonomous' ? 'TRADING STRATEGY' : 'VALIDATION CRITERIA'}
+                            </h4>
                             <button
                               onClick={() => setUseCustomPrompt(true)}
-                              className="text-xs text-gray-400 hover:text-agent-decision transition-colors"
+                              className="text-xs text-gray-400 hover:text-agents-decision transition-colors"
                             >
                               Custom Prompt ↗
                             </button>
                           </div>
 
-                          <div className="space-y-4">
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-2">Your trading strategy:</label>
-                              <textarea
-                                value={tradingStrategy}
-                                onChange={(e) => {
-                                  setTradingStrategy(e.target.value)
-                                  setHasChanges(true)
-                                }}
-                                placeholder="Enter when conditions are met and avoid when..."
-                                rows={3}
-                                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-decision transition-colors resize-none"
-                              />
-                            </div>
+                          {decisionMode === 'autonomous' ? (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-2">Your trading strategy:</label>
+                                <textarea
+                                  value={tradingStrategy}
+                                  onChange={(e) => {
+                                    setTradingStrategy(e.target.value)
+                                    setHasChanges(true)
+                                  }}
+                                  placeholder="Enter when conditions are met and avoid when..."
+                                  rows={3}
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                />
+                              </div>
 
-                            <div>
-                              <label className="block text-xs text-gray-400 mb-2">Market analysis approach:</label>
-                              <textarea
-                                value={marketAnalysis}
-                                onChange={(e) => {
-                                  setMarketAnalysis(e.target.value)
-                                  setHasChanges(true)
-                                }}
-                                placeholder="Look for patterns and pay attention to..."
-                                rows={3}
-                                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-decision transition-colors resize-none"
-                              />
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-2">Market analysis approach:</label>
+                                <textarea
+                                  value={marketAnalysis}
+                                  onChange={(e) => {
+                                    setMarketAnalysis(e.target.value)
+                                    setHasChanges(true)
+                                  }}
+                                  placeholder="Look for patterns and pay attention to..."
+                                  rows={3}
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                />
+                              </div>
                             </div>
-                          </div>
+                          ) : (
+                            <div className="space-y-4">
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-2">Signal acceptance criteria:</label>
+                                <textarea
+                                  value={validationCriteria}
+                                  onChange={(e) => {
+                                    setValidationCriteria(e.target.value)
+                                    setHasChanges(true)
+                                  }}
+                                  placeholder="What makes a signal worth taking?"
+                                  rows={3}
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-xs text-gray-400 mb-2">Risk assessment approach:</label>
+                                <textarea
+                                  value={riskAssessment}
+                                  onChange={(e) => {
+                                    setRiskAssessment(e.target.value)
+                                    setHasChanges(true)
+                                  }}
+                                  placeholder="How to evaluate signal risks?"
+                                  rows={3}
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                />
+                              </div>
+                            </div>
+                          )}
                         </div>
                       ) : (
                         <div>
@@ -697,7 +865,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                             <h4 className="text-footnote text-bone-200 font-medium">CUSTOM PROMPT</h4>
                             <button
                               onClick={() => setUseCustomPrompt(false)}
-                              className="text-xs text-gray-400 hover:text-agent-decision transition-colors"
+                              className="text-xs text-gray-400 hover:text-agents-decision transition-colors"
                             >
                               ← Guided Mode
                             </button>
@@ -713,20 +881,83 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                               }}
                               placeholder="You are analyzing {SYMBOL} using {INDICATORS}. Your complete trading strategy and decision framework..."
                               rows={6}
-                              className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-decision transition-colors resize-none"
+                              className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
                             />
                           </div>
                         </div>
                       )}
 
+                      {/* Prompt Preview */}
+                      <div>
+                        <button
+                          onClick={() => setShowPromptPreview(!showPromptPreview)}
+                          className="flex items-center justify-between w-full p-3 bg-charcoal-800 border border-charcoal-700 text-xs text-gray-400 hover:text-bone-200 transition-colors"
+                        >
+                          <span>View Full Prompt</span>
+                          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className={`transition-transform ${showPromptPreview ? 'rotate-180' : ''}`}>
+                            <path d="M7 10l5 5 5-5z"/>
+                          </svg>
+                        </button>
+                        
+                        {showPromptPreview && (
+                          <div className="mt-2 bg-charcoal-900 border border-charcoal-700 p-3 text-xs max-h-64 overflow-y-auto">
+                            <div className="space-y-3">
+                              <div>
+                                <div className="text-gray-500 mb-1">System Prompt (read-only):</div>
+                                <div className="text-gray-400 italic">
+                                  You are an expert cryptocurrency {decisionMode === 'autonomous' ? 'trader' : 'signal validator'} analyzing market data...
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <div className="text-gray-500 mb-1">Market Context (auto-generated):</div>
+                                <div className="text-gray-400">
+                                  Analyzing {selectedPair} using: {Array.from(selectedIndicators).concat(Array.from(selectedSignals)).join(', ') || 'No data sources selected'}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <div className="text-gray-500 mb-1">User Strategy (editable):</div>
+                                <div className="text-bone-200">
+                                  {useCustomPrompt ? customPrompt || '[Custom prompt...]' : 
+                                   decisionMode === 'autonomous' ? tradingStrategy : validationCriteria}
+                                </div>
+                              </div>
+                              
+                              <div>
+                                <div className="text-gray-500 mb-1">Output Format (read-only):</div>
+                                <div className="text-gray-400 font-mono">
+                                  {decisionMode === 'autonomous' ? 
+                                    'ACTION: ENTER|WAIT|EXIT' : 
+                                    'ACTION: APPROVE|REJECT'
+                                  }<br />
+                                  CONFIDENCE: 0.000-1.000<br />
+                                  REASONING: [Detailed analysis...]
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
                       {/* Output Format Info */}
                       <div>
                         <div className="bg-charcoal-800 border border-charcoal-700 p-3 text-xs">
-                          <div className="text-gray-400 mb-2">Expected output format:</div>
-                          <div className="text-bone-200 font-mono">
-                            ACTION: ENTER|WAIT|EXIT<br />
-                            CONFIDENCE: 0.000-1.000<br />
-                            REASONING: [Detailed analysis...]
+                          <div className="text-gray-500 mb-2">Expected output format:</div>
+                          <div className="text-gray-400 font-mono">
+                            {decisionMode === 'autonomous' ? (
+                              <>
+                                ACTION: ENTER|WAIT|EXIT<br />
+                                CONFIDENCE: 0.000-1.000<br />
+                                REASONING: [Detailed analysis...]
+                              </>
+                            ) : (
+                              <>
+                                ACTION: APPROVE|REJECT<br />
+                                CONFIDENCE: 0.000-1.000<br />
+                                REASONING: [Detailed analysis...]
+                              </>
+                            )}
                           </div>
                         </div>
                       </div>
