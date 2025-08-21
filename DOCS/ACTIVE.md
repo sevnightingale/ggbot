@@ -90,10 +90,9 @@
 
 ### Active Tasks
 1. **Demo Buildout** - Polish design & UX (core functionality complete)
-   - Remove demo label from UI
-   - Clear existing positions when starting demo
    - Add restart demo button
    - Mobile responsiveness testing
+   - agent configurations
    
 2. **Hummingbot Integration** - Architecture decision needed
    - **Status**: Removed failing `hummingbot-worker` container (2025-08-17)
