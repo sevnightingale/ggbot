@@ -1,15 +1,14 @@
 """
 Universal Active Bot Monitoring Service
 
-Monitors only config_instances with status='active' and broadcasts 
-real-time status updates via WebSocket. Uses existing database 
-infrastructure with no schema changes required.
+Monitors configurations and broadcasts real-time status updates via WebSocket. 
+Uses existing database infrastructure with no schema changes required.
 
 Key Features:
-- Only monitors active bots (no background processes for inactive)
-- ggShot-Pro (e249bb49-...) is always active and monitored
-- Demo bots are monitored only when user activates them
+- Monitors all configured bots
 - Universal architecture supports any bot type via bot handlers
+- Real-time WebSocket broadcasting for frontend updates
+- Supports pipeline phase detection and status messaging
 """
 
 import asyncio
@@ -26,9 +25,9 @@ from core.common.logger import logger
 
 class ActiveBotMonitor:
     """
-    Universal monitoring service for all active ggbots.
+    Universal monitoring service for all ggbots.
     
-    Polls config_instances table for active bots and monitors their
+    Polls configurations table for bots and monitors their
     pipeline activity using bot-type specific handlers.
     """
     
@@ -70,7 +69,7 @@ class ActiveBotMonitor:
     
     async def get_all_bot_configs(self) -> List[Dict[str, Any]]:
         """
-        Get ALL bot configurations (both active and inactive) from config_instances table.
+        Get ALL bot configurations from configurations table.
         
         Returns:
             List[Dict]: All bot configurations with all needed data
@@ -81,18 +80,14 @@ class ActiveBotMonitor:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT 
-                            ci.config_id,
-                            ci.instance_name,
-                            ci.status,
-                            ci.hummingbot_account,
-                            ci.paper_balance_usd,
+                            c.config_id,
                             c.config_name,
                             c.config_type,
                             c.config_data,
-                            c.user_id
-                        FROM config_instances ci
-                        JOIN configurations c ON ci.config_id = c.config_id
-                        ORDER BY c.config_type, ci.config_id
+                            c.user_id,
+                            'active' as status
+                        FROM configurations c
+                        ORDER BY c.config_type, c.config_id
                     """)
                     
                     results = cur.fetchall()
@@ -132,7 +127,7 @@ class ActiveBotMonitor:
 
     async def get_active_bot_configs(self) -> List[Dict[str, Any]]:
         """
-        Get all active bot configurations from config_instances table.
+        Get all active bot configurations from configurations table.
         
         Returns:
             List[Dict]: Active bot configurations with all needed data
@@ -143,19 +138,14 @@ class ActiveBotMonitor:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT 
-                            ci.config_id,
-                            ci.instance_name,
-                            ci.status,
-                            ci.hummingbot_account,
-                            ci.paper_balance_usd,
+                            c.config_id,
                             c.config_name,
                             c.config_type,
                             c.config_data,
-                            c.user_id
-                        FROM config_instances ci
-                        JOIN configurations c ON ci.config_id = c.config_id
-                        WHERE ci.status = 'active'
-                        ORDER BY c.config_type, ci.config_id
+                            c.user_id,
+                            'active' as status
+                        FROM configurations c
+                        ORDER BY c.config_type, c.config_id
                     """)
                     
                     results = cur.fetchall()

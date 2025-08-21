@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
 """
-Manual test of the trading module using the EGLD/USDT decision from the logs.
-This will test the complete trading pipeline and check Hummingbot database results.
+DISABLED - Manual test of the trading module using the EGLD/USDT decision from the logs.
+This test is disabled because the Hummingbot integration has been removed for rebuild.
+
+TODO: Update this test for the new Hummingbot API-only integration approach.
 """
+
+# DISABLED - Exit early to prevent test execution
+import sys
+print("⚠️ Test disabled - Hummingbot integration removed for rebuild")
+sys.exit(0)
 
 import asyncio
 import httpx

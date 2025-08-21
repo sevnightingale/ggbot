@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - GGBots System Status
 
-**Last Updated**: 2025-08-17  
+**Last Updated**: 2025-08-21  
 **System Health**: 🟢 Operational
 
 ---
@@ -28,7 +28,7 @@
 **Signal Processing (Backend-to-Backend)**
 - `POST /api/run-extraction` - ggshot-filter calls this to process new signals
 - `POST /api/run-decision` - Decision validation after extraction
-- `POST /api/execute-trade` - Trade execution (currently disabled)
+- ~~`POST /api/execute-trade` - Trade execution~~ **REMOVED** (Hummingbot integration removed)
 
 **Demo Mode**
 - `POST /agent/api/bots/e249bb49-0455-4596-9657-09bf9e14ca14/start` - Start ggbot-01 demo
@@ -55,9 +55,6 @@
 | Service | Status | Port | Purpose |
 |---------|--------|------|---------|
 | PostgreSQL (ggbot) | 🟢 Online | 5432 | Main application database |
-| PostgreSQL (hummingbot) | 🟢 Online | 5433 | Trading data storage |
-| hummingbot-api | 🟡 Partial | 15888 | Trading API server (no execution worker) |
-| hummingbot-broker (EMQX) | 🟢 Online | 1883,8081,8083,8084,8883,18083,61613 | Message broker |
 
 ---
 
@@ -94,14 +91,12 @@
    - Mobile responsiveness testing
    - agent configurations
    
-2. **Hummingbot Integration** - Architecture decision needed
-   - **Status**: Removed failing `hummingbot-worker` container (2025-08-17)
-   - **Current**: API layer working (port 15888), but no trade execution capability
-   - **Next Steps**: Assess rebuild from source vs fixing Docker execution
-   - **Options**: 
-     - Build hummingbot from source for better debugging/customization
-     - Fix Docker worker container for proven deployment approach
-   - **Dependencies**: Trading endpoints not functional without execution layer
+2. **Fresh Hummingbot Integration** - Clean slate approach
+   - **Status**: **COMPLETE REMOVAL** - All legacy integration deleted (2025-08-21)
+   - **Current**: Clean system with no Hummingbot components
+   - **Next Steps**: Implement new API-only integration per DOCS/HUMMINGBOT.md
+   - **Approach**: Official Hummingbot API Docker deployment
+   - **Phase 1**: Core API Setup targeting single ggShot signal execution
 
 ---
 
@@ -110,25 +105,19 @@
 ### Application Ports
 | Port | Service | Protocol | Access | Purpose |
 |------|---------|----------|--------|---------|
-| **8000** | ggbot-api | HTTP | Public | Main API server (extraction, decision, trading, agent control) |
-| **15888** | hummingbot-api | HTTP | Internal | Trading execution & monitoring |
+| **8000** | ggbot-api | HTTP | Public | Main API server (extraction, decision, agent control) |
 
 ### Database Ports
 | Port | Service | Access | Purpose |
 |------|---------|--------|---------|
-| **5432** | PostgreSQL (ggbot) | Localhost only | Main application data (not in VSCode ports) |
-| **5433** | PostgreSQL (hummingbot) | All interfaces | Trading data & configurations (visible in VSCode) |
+| **5432** | PostgreSQL (ggbot) | Localhost only | Main application data |
 
-### EMQX Message Broker Ports (Hummingbot)
-| Port | Protocol | Access | Purpose |
-|------|----------|--------|---------|
-| **1883** | MQTT | Public | Standard MQTT messaging |
-| **8081** | HTTP | Public | EMQX Dashboard |
-| **8083** | WebSocket | Public | MQTT over WebSocket |
-| **8084** | SSL/WebSocket | Public | Secure MQTT over WebSocket |
-| **8883** | MQTTS | Public | MQTT over SSL/TLS |
-| **18083** | HTTP | Public | EMQX Management API |
-| **61613** | STOMP | Public | STOMP protocol messaging |
+### Freed Ports (Available for New Hummingbot Integration)
+| Port | Previous Use | Status |
+|------|-------------|--------|
+| **15888** | hummingbot-api | 🟢 **AVAILABLE** |
+| **5433** | PostgreSQL (hummingbot) | 🟢 **AVAILABLE** |
+| **1883, 8081, 8083, 8084, 8883, 18083, 61613** | EMQX Message Broker | 🟢 **AVAILABLE** |
 
 ### System Ports
 | Port | Service | Access | Purpose |
@@ -147,7 +136,7 @@
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
 - **Demo Mode**: On-demand (45-second sequences with real ggshot_filter data)
-- **Autonomous Trading**: DISABLED (pending paper trading fixes)
+- **Autonomous Trading**: DISABLED (legacy Hummingbot integration removed)
 - **Scheduled Extractions**: DISABLED
 
 ---
@@ -170,4 +159,4 @@ df -h
 
 ---
 
-*Last major update: Demo mode implementation complete - 45-second intelligence showcase with real ggShot data and 4-Pillar Validation Framework display*
+*Last major update: Complete Hummingbot integration removal - Clean slate achieved, all legacy components deleted, ports freed for new API-only integration (2025-08-21)*
