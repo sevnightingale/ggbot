@@ -266,7 +266,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') setIsEditingName(false)
                       }}
-                      className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-subheader focus:border-agent-extraction transition-colors"
+                      className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-subheader focus:border-agent-extraction focus:outline-none transition-colors"
                       autoFocus
                     />
                   ) : (
@@ -401,7 +401,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                                   value={pairSearchTerm}
                                   onChange={(e) => setPairSearchTerm(e.target.value)}
                                   onClick={(e) => e.stopPropagation()}
-                                  className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-2 py-1 text-xs focus:border-agent-extraction transition-colors"
+                                  className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-2 py-1 text-xs focus:border-agent-extraction focus:outline-none transition-colors"
                                   autoFocus
                                 />
                               </div>
@@ -468,21 +468,62 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                         <div className="flex items-center justify-between mb-4">
                           <h4 className="text-footnote text-bone-200 font-medium">SELECTED DATA POINTS</h4>
                         </div>
-                        <div className="bg-charcoal-800 border border-charcoal-600 p-3 text-xs">
+                        <div className="bg-charcoal-800 border border-charcoal-600 p-3">
                           {selectedIndicators.size > 0 && (
-                            <div className="mb-2">
-                              <span className="text-gray-400">Indicators: </span>
-                              <span className="text-bone-200">{Array.from(selectedIndicators).join(', ')}</span>
+                            <div className="mb-3">
+                              <h5 className="text-xs text-gray-400 mb-2">Indicators:</h5>
+                              <div className="flex flex-wrap gap-2">
+                                {Array.from(selectedIndicators).map(indicatorId => (
+                                  <span
+                                    key={indicatorId}
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
+                                  >
+                                    {indicatorId}
+                                    <button
+                                      onClick={() => toggleIndicator(indicatorId)}
+                                      className="hover:bg-black/20 rounded"
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                      </svg>
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
                           {selectedSignals.size > 0 && (
-                            <div className="mb-2">
-                              <span className="text-gray-400">Signals: </span>
-                              <span className="text-bone-200">{Array.from(selectedSignals).join(', ')}</span>
+                            <div className="mb-3">
+                              <h5 className="text-xs text-gray-400 mb-2">Signals:</h5>
+                              <div className="flex flex-wrap gap-2">
+                                {Array.from(selectedSignals).map(signalId => (
+                                  <span
+                                    key={signalId}
+                                    className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
+                                  >
+                                    {signalId}
+                                    <button
+                                      onClick={() => {
+                                        setSelectedSignals(prev => {
+                                          const newSet = new Set(prev)
+                                          newSet.delete(signalId)
+                                          setHasChanges(true)
+                                          return newSet
+                                        })
+                                      }}
+                                      className="hover:bg-black/20 rounded"
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                        <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                      </svg>
+                                    </button>
+                                  </span>
+                                ))}
+                              </div>
                             </div>
                           )}
                           {selectedIndicators.size === 0 && selectedSignals.size === 0 && (
-                            <div className="text-gray-500">No data sources selected</div>
+                            <div className="text-gray-500 text-xs">No data sources selected</div>
                           )}
                         </div>
                       </div>
@@ -547,7 +588,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                               placeholder="Search indicators..."
                               value={searchTerm}
                               onChange={(e) => setSearchTerm(e.target.value)}
-                              className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-extraction transition-colors"
+                              className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-extraction focus:outline-none transition-colors"
                             />
                             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
                               <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-gray-400">
@@ -556,31 +597,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                             </div>
                           </div>
                         </div>
-
-                        {/* Selected Indicators */}
-                        {selectedIndicators.size > 0 && (
-                          <div className="mb-6">
-                            <h5 className="text-xs text-gray-400 mb-2">Selected:</h5>
-                            <div className="flex flex-wrap gap-2">
-                              {Array.from(selectedIndicators).map(indicatorId => (
-                                <span
-                                  key={indicatorId}
-                                  className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
-                                >
-                                  {indicatorId}
-                                  <button
-                                    onClick={() => toggleIndicator(indicatorId)}
-                                    className="hover:bg-black/20 rounded"
-                                  >
-                                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                    </svg>
-                                  </button>
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
 
                         {/* Technical Indicators Content */}
                         {selectedDataSource === 'Technical Indicators' && (
@@ -809,7 +825,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                                   }}
                                   placeholder="Enter when conditions are met and avoid when..."
                                   rows={3}
-                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision focus:outline-none transition-colors resize-none"
                                 />
                               </div>
 
@@ -823,7 +839,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                                   }}
                                   placeholder="Look for patterns and pay attention to..."
                                   rows={3}
-                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision focus:outline-none transition-colors resize-none"
                                 />
                               </div>
                             </div>
@@ -839,7 +855,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                                   }}
                                   placeholder="What makes a signal worth taking?"
                                   rows={3}
-                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision focus:outline-none transition-colors resize-none"
                                 />
                               </div>
 
@@ -853,7 +869,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                                   }}
                                   placeholder="How to evaluate signal risks?"
                                   rows={3}
-                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision transition-colors resize-none"
+                                  className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision focus:outline-none transition-colors resize-none"
                                 />
                               </div>
                             </div>
