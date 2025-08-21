@@ -22,8 +22,6 @@ import random
 # Add project root to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-# Add hummingbot client to path for API client imports
-sys.path.insert(0, str(Path(__file__).parent / "hummingbot" / "client"))
 
 # Set up logging before importing other modules
 from core.common.logging_config import setup_logging
@@ -39,7 +37,7 @@ from core.monitoring.bot_types.ggshot_bot import GGShotBotHandler
 # Import all the API apps
 from extraction.api import app as extraction_app
 from decision.api import app as decision_app
-from trading.api import app as trading_app
+# Trading API removed - being rebuilt with new Hummingbot integration
 # Dashboard API removed - legacy and unused
 from core.api.agent_control_api import app as agent_control_app
 
@@ -71,7 +69,7 @@ app.add_middleware(
 # Mount all the sub-applications
 app.mount("/extraction", extraction_app)
 app.mount("/decision", decision_app)
-app.mount("/trading", trading_app)
+# Trading API mount removed - being rebuilt with new Hummingbot integration
 # Dashboard mount removed - legacy
 app.mount("/agent", agent_control_app)
 
@@ -466,18 +464,7 @@ async def startup_event():
     else:
         logger.error("❌ Failed to initialize scheduler")
     
-    # Initialize the trading execution adapter since mounted apps don't trigger lifespan events
-    try:
-        from trading.services.hummingbot_execution_adapter import HummingbotExecutionAdapter
-        import trading.api as trading_module
-        
-        logger.info("🔧 Initializing HummingbotExecutionAdapter...")
-        trading_module.execution_adapter = HummingbotExecutionAdapter()
-        logger.info("✅ HummingbotExecutionAdapter initialized successfully")
-        
-    except Exception as e:
-        logger.error(f"❌ Failed to initialize HummingbotExecutionAdapter: {e}")
-        # Don't fail startup if trading adapter fails, just log the error
+    # Trading execution adapter initialization disabled - being rebuilt with new Hummingbot API integration
 
 
 @app.on_event("shutdown") 

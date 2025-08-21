@@ -107,7 +107,7 @@ async def create_strategy_from_template(request: StrategyTemplate):
     
     This endpoint:
     1. Creates a new configuration with template settings
-    2. Initializes paper trading account via config_instances
+    2. Creates configuration ready for new Hummingbot API integration
     3. Returns configuration details for frontend
     """
     try:
@@ -168,14 +168,7 @@ async def create_strategy_from_template(request: StrategyTemplate):
             timestamps = cur.fetchone()
             created_at, updated_at = timestamps
             
-            # Create config_instances entry for paper trading
-            instance_name = f"ggbot-{request.user_id[:8]}-{config_id[:8]}"
-            account_name = f"paper_{template['type']}_{config_id[:8]}"
-            
-            cur.execute("""
-                INSERT INTO config_instances (config_id, instance_name, hummingbot_account, status, paper_balance_usd, created_at)
-                VALUES (%s, %s, %s, 'active', 10000.00, NOW())
-            """, (config_id, instance_name, account_name))
+            # Note: Instance mapping will be handled by new Hummingbot API integration
             
             conn.commit()
             
@@ -191,9 +184,7 @@ async def create_strategy_from_template(request: StrategyTemplate):
                 created_at=created_at,
                 updated_at=updated_at,
                 editable=True,  # Template configs are editable
-                is_flagship=False,
-                instance_name=instance_name,
-                paper_balance=10000.0
+                is_flagship=False
             )
             
     except Exception as e:
@@ -287,12 +278,8 @@ async def get_single_config(config_id: str):
                     c.user_id,
                     c.config_data,
                     c.created_at,
-                    c.updated_at,
-                    ci.instance_name,
-                    ci.hummingbot_account,
-                    ci.paper_balance_usd
+                    c.updated_at
                 FROM configurations c
-                LEFT JOIN config_instances ci ON c.config_id = ci.config_id
                 WHERE c.config_id = %s
             """, (config_id,))
             
@@ -300,7 +287,7 @@ async def get_single_config(config_id: str):
             if not row:
                 raise HTTPException(404, "Configuration not found")
             
-            config_id, config_name, config_type, user_id, config_data, created_at, updated_at, instance_name, hummingbot_account, paper_balance = row
+            config_id, config_name, config_type, user_id, config_data, created_at, updated_at = row
             
             # Determine if config is editable
             is_flagship = config_type in ["ggshot", "ggshot_production"]
@@ -314,10 +301,7 @@ async def get_single_config(config_id: str):
                 "created_at": created_at,
                 "updated_at": updated_at,
                 "editable": not is_flagship,
-                "is_flagship": is_flagship,
-                "instance_name": instance_name,
-                "hummingbot_account": hummingbot_account,
-                "paper_balance": float(paper_balance) if paper_balance else 10000.0
+                "is_flagship": is_flagship
             }
             
     except HTTPException:
@@ -386,11 +370,8 @@ async def get_user_configs(user_id: str):
                     c.config_type,
                     c.user_id,
                     c.created_at,
-                    c.updated_at,
-                    ci.instance_name,
-                    ci.paper_balance_usd
+                    c.updated_at
                 FROM configurations c
-                LEFT JOIN config_instances ci ON c.config_id = ci.config_id
                 WHERE c.user_id = %s
                 ORDER BY c.created_at DESC
             """, (user_id,))
@@ -398,7 +379,7 @@ async def get_user_configs(user_id: str):
             rows = cur.fetchall()
             
             for row in rows:
-                config_id, config_name, config_type, user_id, created_at, updated_at, instance_name, balance = row
+                config_id, config_name, config_type, user_id, created_at, updated_at = row
                 
                 is_flagship = config_type in ["ggshot", "ggshot_production"]
                 
@@ -448,8 +429,7 @@ async def delete_config(config_id: str):
             if config_type in ["ggshot", "ggshot_production"]:
                 raise HTTPException(403, "Flagship ggBot cannot be deleted")
             
-            # Delete config_instances entry first
-            cur.execute("DELETE FROM config_instances WHERE config_id = %s", (config_id,))
+            # Note: Instance cleanup will be handled by new Hummingbot API integration
             
             # Delete configuration
             cur.execute("DELETE FROM configurations WHERE config_id = %s", (config_id,))

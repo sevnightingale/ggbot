@@ -28,7 +28,7 @@ class BaseBotHandler(ABC):
         Initialize base bot handler.
         
         Args:
-            bot_config: Bot configuration from config_instances JOIN configurations
+            bot_config: Bot configuration from configurations table
         """
         # Ensure UUID fields are converted to strings
         self.config_id = str(bot_config['config_id'])

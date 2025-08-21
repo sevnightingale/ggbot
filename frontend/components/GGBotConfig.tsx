@@ -82,6 +82,174 @@ const technicalIndicators = {
   ]
 }
 
+// Technical Indicators Section Component
+interface TechnicalIndicatorsSectionProps {
+  selectedIndicators: Set<string>
+  onToggleIndicator: (indicatorId: string) => void
+}
+
+const TechnicalIndicatorsSection: React.FC<TechnicalIndicatorsSectionProps> = ({
+  selectedIndicators,
+  onToggleIndicator
+}) => {
+  const [searchTerm, setSearchTerm] = React.useState('')
+
+  const filteredIndicators = React.useMemo(() => {
+    const filtered: Record<string, typeof technicalIndicators['Momentum Indicators']> = {}
+    
+    Object.entries(technicalIndicators).forEach(([category, indicators]) => {
+      const categoryFiltered = indicators.filter(indicator => 
+        indicator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        indicator.description.toLowerCase().includes(searchTerm.toLowerCase())
+      )
+      
+      if (categoryFiltered.length > 0) {
+        filtered[category] = categoryFiltered
+      }
+    })
+    
+    return filtered
+  }, [searchTerm])
+
+  return (
+    <div>
+      {/* Header and Search */}
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-footnote text-bone-200 font-medium">INDICATOR SELECTION</h4>
+        <span className="text-footnote text-gray-400">{selectedIndicators.size}/12 selected</span>
+      </div>
+      
+      <div className="flex gap-4 mb-4">
+        <div className="flex-1 relative">
+          <input
+            type="text"
+            placeholder="Search indicators..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-extraction focus:outline-none transition-colors"
+          />
+          <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-gray-400">
+              <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      {/* Indicators Content */}
+      <div className="space-y-6 max-h-96 overflow-y-auto">
+        {Object.entries(filteredIndicators).map(([category, indicators]) => (
+          <div key={category}>
+            <h5 className="text-xs text-bone-200 font-medium mb-3 bg-charcoal-800 px-3 py-2 border-l-2 border-agent-extraction">
+              {category.toUpperCase()}
+            </h5>
+            <div className="space-y-2">
+              {indicators.map(indicator => {
+                const isSelected = selectedIndicators.has(indicator.id)
+                const isDisabled = !isSelected && selectedIndicators.size >= 12
+                
+                return (
+                  <button
+                    key={indicator.id}
+                    onClick={() => !isDisabled && onToggleIndicator(indicator.id)}
+                    disabled={isDisabled}
+                    className={`w-full text-left p-3 border transition-colors ${
+                      isSelected
+                        ? 'bg-agent-extraction/10 border-agent-extraction text-bone-200'
+                        : isDisabled
+                        ? 'bg-charcoal-800/50 border-charcoal-700 text-gray-600 cursor-not-allowed'
+                        : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agent-extraction hover:bg-agent-extraction/5'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                          isSelected
+                            ? 'bg-agent-extraction border-agent-extraction'
+                            : 'border-gray-600'
+                        }`}>
+                          {isSelected && (
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
+                              <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                            </svg>
+                          )}
+                        </div>
+                        <div>
+                          <div className="text-footnote font-medium">{indicator.name}</div>
+                          <div className="text-xs text-gray-400 mt-1">{indicator.description}</div>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+// Signal Providers Section Component
+interface SignalProvidersSectionProps {
+  selectedSignals: Set<string>
+  onToggleSignal: (signalId: string) => void
+}
+
+const SignalProvidersSection: React.FC<SignalProvidersSectionProps> = ({
+  selectedSignals,
+  onToggleSignal
+}) => {
+  return (
+    <div>
+      {/* Header */}
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-footnote text-bone-200 font-medium">SIGNAL PROVIDER SELECTION</h4>
+      </div>
+
+      {/* Providers Content */}
+      <div className="space-y-4">
+        {signalProviders.map(provider => {
+          const isSelected = selectedSignals.has(provider.id)
+          
+          return (
+            <button
+              key={provider.id}
+              onClick={() => onToggleSignal(provider.id)}
+              className={`w-full text-left p-4 border transition-colors ${
+                isSelected
+                  ? 'bg-agents-extraction/10 border-agents-extraction text-bone-200'
+                  : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agents-extraction hover:bg-agents-extraction/5'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                    isSelected
+                      ? 'bg-agents-extraction border-agents-extraction'
+                      : 'border-gray-600'
+                  }`}>
+                    {isSelected && (
+                      <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
+                        <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                      </svg>
+                    )}
+                  </div>
+                  <div>
+                    <div className="text-footnote font-medium">{provider.name}</div>
+                    <div className="text-xs text-gray-400 mt-1">{provider.description}</div>
+                  </div>
+                </div>
+              </div>
+            </button>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [isEditingName, setIsEditingName] = React.useState(false)
   const [botName, setBotName] = React.useState(bot?.name || '')
@@ -96,7 +264,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [showPairDropdown, setShowPairDropdown] = React.useState(false)
   const [selectedDataSource, setSelectedDataSource] = React.useState('Technical Indicators')
   const [selectedIndicators, setSelectedIndicators] = React.useState<Set<string>>(new Set(['RSI', 'MACD', 'BollingerBands']))
-  const [searchTerm, setSearchTerm] = React.useState('')
 
   // Decision Agent states
   const [decisionMode, setDecisionMode] = React.useState('autonomous')
@@ -112,7 +279,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   // Additional data sources
   const [selectedSignals, setSelectedSignals] = React.useState<Set<string>>(new Set())
 
-  // Helper functions for indicator management
+  // Helper functions for selection management
   const toggleIndicator = (indicatorId: string) => {
     setSelectedIndicators(prev => {
       const newSet = new Set(prev)
@@ -122,6 +289,19 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
         if (newSet.size < 12) { // Max 12 indicators
           newSet.add(indicatorId)
         }
+      }
+      setHasChanges(true)
+      return newSet
+    })
+  }
+
+  const toggleSignal = (signalId: string) => {
+    setSelectedSignals(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(signalId)) {
+        newSet.delete(signalId)
+      } else {
+        newSet.add(signalId)
       }
       setHasChanges(true)
       return newSet
@@ -142,23 +322,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
       )
     }
   }, [pairSearchTerm])
-
-  const filteredIndicators = React.useMemo(() => {
-    const filtered: Record<string, typeof technicalIndicators['Momentum Indicators']> = {}
-    
-    Object.entries(technicalIndicators).forEach(([category, indicators]) => {
-      const categoryFiltered = indicators.filter(indicator => 
-        indicator.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        indicator.description.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-      
-      if (categoryFiltered.length > 0) {
-        filtered[category] = categoryFiltered
-      }
-    })
-    
-    return filtered
-  }, [searchTerm])
 
   React.useEffect(() => {
     if (bot) {
@@ -575,133 +738,19 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                         </div>
                       </div>
 
-                      {/* Search and Filter */}
+                      {/* Data Source Content */}
                       <div>
-                        <div className="flex items-center justify-between mb-4">
-                          <h4 className="text-footnote text-bone-200 font-medium">INDICATOR SELECTION</h4>
-                          <span className="text-footnote text-gray-400">{selectedIndicators.size}/12 selected</span>
-                        </div>
-                        <div className="flex gap-4 mb-4">
-                          <div className="flex-1 relative">
-                            <input
-                              type="text"
-                              placeholder="Search indicators..."
-                              value={searchTerm}
-                              onChange={(e) => setSearchTerm(e.target.value)}
-                              className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-extraction focus:outline-none transition-colors"
-                            />
-                            <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-gray-400">
-                                <path d="M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/>
-                              </svg>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Technical Indicators Content */}
                         {selectedDataSource === 'Technical Indicators' && (
-                          <div className="space-y-6 max-h-96 overflow-y-auto">
-                          {Object.entries(filteredIndicators).map(([category, indicators]) => (
-                            <div key={category}>
-                              <h5 className="text-xs text-bone-200 font-medium mb-3 bg-charcoal-800 px-3 py-2 border-l-2 border-agent-extraction">
-                                {category.toUpperCase()}
-                              </h5>
-                              <div className="space-y-2">
-                                {indicators.map(indicator => {
-                                  const isSelected = selectedIndicators.has(indicator.id)
-                                  const isDisabled = !isSelected && selectedIndicators.size >= 12
-                                  
-                                  return (
-                                    <button
-                                      key={indicator.id}
-                                      onClick={() => !isDisabled && toggleIndicator(indicator.id)}
-                                      disabled={isDisabled}
-                                      className={`w-full text-left p-3 border transition-colors ${
-                                        isSelected
-                                          ? 'bg-agent-extraction/10 border-agent-extraction text-bone-200'
-                                          : isDisabled
-                                          ? 'bg-charcoal-800/50 border-charcoal-700 text-gray-600 cursor-not-allowed'
-                                          : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agent-extraction hover:bg-agent-extraction/5'
-                                      }`}
-                                    >
-                                      <div className="flex items-center justify-between">
-                                        <div className="flex items-center gap-3">
-                                          <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
-                                            isSelected
-                                              ? 'bg-agent-extraction border-agent-extraction'
-                                              : 'border-gray-600'
-                                          }`}>
-                                            {isSelected && (
-                                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
-                                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                              </svg>
-                                            )}
-                                          </div>
-                                          <div>
-                                            <div className="text-footnote font-medium">{indicator.name}</div>
-                                            <div className="text-xs text-gray-400 mt-1">{indicator.description}</div>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </button>
-                                  )
-                                })}
-                              </div>
-                            </div>
-                          ))}
-                          </div>
+                          <TechnicalIndicatorsSection 
+                            selectedIndicators={selectedIndicators}
+                            onToggleIndicator={toggleIndicator}
+                          />
                         )}
-
-                        {/* Signals Content */}
                         {selectedDataSource === 'Signals' && (
-                          <div className="space-y-4">
-                            {signalProviders.map(provider => {
-                              const isSelected = selectedSignals.has(provider.id)
-                              
-                              return (
-                                <button
-                                  key={provider.id}
-                                  onClick={() => {
-                                    setSelectedSignals(prev => {
-                                      const newSet = new Set(prev)
-                                      if (newSet.has(provider.id)) {
-                                        newSet.delete(provider.id)
-                                      } else {
-                                        newSet.add(provider.id)
-                                      }
-                                      setHasChanges(true)
-                                      return newSet
-                                    })
-                                  }}
-                                  className={`w-full text-left p-4 border transition-colors ${
-                                    isSelected
-                                      ? 'bg-agents-extraction/10 border-agents-extraction text-bone-200'
-                                      : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agents-extraction hover:bg-agents-extraction/5'
-                                  }`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
-                                        isSelected
-                                          ? 'bg-agents-extraction border-agents-extraction'
-                                          : 'border-gray-600'
-                                      }`}>
-                                        {isSelected && (
-                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
-                                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                                          </svg>
-                                        )}
-                                      </div>
-                                      <div>
-                                        <div className="text-footnote font-medium">{provider.name}</div>
-                                        <div className="text-xs text-gray-400 mt-1">{provider.description}</div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                </button>
-                              )
-                            })}
-                          </div>
+                          <SignalProvidersSection 
+                            selectedSignals={selectedSignals}
+                            onToggleSignal={toggleSignal}
+                          />
                         )}
                       </div>
                     </div>

@@ -39,7 +39,7 @@ async def test_monitoring():
         print(f"   - {config['config_type']}: {config['config_name']} ({config['config_id'][:8]})")
     
     if not active_configs:
-        print("❌ No active bots found. Make sure ggShot-Pro is marked as active in config_instances.")
+        print("❌ No active bots found. Make sure configurations exist in the database.")
         return
     
     print("\n🔄 Running single monitoring cycle...")
