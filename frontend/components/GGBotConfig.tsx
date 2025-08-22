@@ -1107,7 +1107,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
         className={`fixed bottom-0 left-0 right-0 transition-transform duration-500 ease-out ${
           isVisible ? 'translate-y-0' : 'translate-y-full'
         }`}
-        style={{ height: '85vh' }}
+        style={{ height: '90vh' }}
       >
         <div className="h-full bg-charcoal-900 relative flex flex-col">
           {/* Top sharp gradient border - matching dashboard style */}
