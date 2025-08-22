@@ -250,6 +250,532 @@ const SignalProvidersSection: React.FC<SignalProvidersSectionProps> = ({
   )
 }
 
+// Risk Management Section Component
+interface RiskManagementSectionProps {
+  positionSizeType: string
+  onPositionSizeTypeChange: (type: string) => void
+  fixedAmount: number
+  onFixedAmountChange: (amount: number) => void
+  accountPercentage: number
+  onAccountPercentageChange: (percentage: number) => void
+  maxRiskPerTrade: number
+  onMaxRiskPerTradeChange: (risk: number) => void
+  maxTotalExposure: number
+  onMaxTotalExposureChange: (exposure: number) => void
+  maxPositions: number
+  onMaxPositionsChange: (positions: number) => void
+  dailyLossLimit: number
+  onDailyLossLimitChange: (limit: number) => void
+  stopTradingOnLimit: boolean
+  onStopTradingOnLimitChange: (enabled: boolean) => void
+  defaultStopLoss: number
+  onDefaultStopLossChange: (sl: number) => void
+  defaultTpRatio: string
+  onDefaultTpRatioChange: (ratio: string) => void
+  trailingStopsEnabled: boolean
+  onTrailingStopsEnabledChange: (enabled: boolean) => void
+  trailingDistance: number
+  onTrailingDistanceChange: (distance: number) => void
+}
+
+const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
+  positionSizeType,
+  onPositionSizeTypeChange,
+  fixedAmount,
+  onFixedAmountChange,
+  accountPercentage,
+  onAccountPercentageChange,
+  maxRiskPerTrade,
+  onMaxRiskPerTradeChange,
+  maxTotalExposure,
+  onMaxTotalExposureChange,
+  maxPositions,
+  onMaxPositionsChange,
+  dailyLossLimit,
+  onDailyLossLimitChange,
+  stopTradingOnLimit,
+  onStopTradingOnLimitChange,
+  defaultStopLoss,
+  onDefaultStopLossChange,
+  defaultTpRatio,
+  onDefaultTpRatioChange,
+  trailingStopsEnabled,
+  onTrailingStopsEnabledChange,
+  trailingDistance,
+  onTrailingDistanceChange
+}) => {
+  const tpRatioOptions = ['1:1', '2:1', '3:1', '4:1', '5:1']
+
+  return (
+    <div className="space-y-6">
+      {/* Position Sizing Strategy */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-footnote text-bone-200 font-medium">POSITION SIZING STRATEGY</h4>
+        </div>
+        <div className="flex gap-2 flex-wrap mb-4">
+          <button
+            onClick={() => onPositionSizeTypeChange('fixed')}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              positionSizeType === 'fixed'
+                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+            }`}
+          >
+            Fixed Amount
+          </button>
+          <button
+            onClick={() => onPositionSizeTypeChange('percentage')}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              positionSizeType === 'percentage'
+                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+            }`}
+          >
+            Account Percentage
+          </button>
+          <button
+            onClick={() => onPositionSizeTypeChange('risk-based')}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              positionSizeType === 'risk-based'
+                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+            }`}
+          >
+            Risk-Based
+          </button>
+        </div>
+        
+        <div className="flex items-center gap-2">
+          {positionSizeType === 'fixed' && (
+            <>
+              <span className="text-xs text-gray-400">Amount per trade:</span>
+              <div className="flex items-center">
+                <span className="text-bone-200 text-xs">$</span>
+                <input
+                  type="number"
+                  value={fixedAmount}
+                  onChange={(e) => onFixedAmountChange(Number(e.target.value))}
+                  min="1"
+                  step="1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-agent-trading focus:outline-none transition-colors ml-1"
+                />
+              </div>
+            </>
+          )}
+          {positionSizeType === 'percentage' && (
+            <>
+              <span className="text-xs text-gray-400">Percentage of account:</span>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={accountPercentage}
+                  onChange={(e) => onAccountPercentageChange(Number(e.target.value))}
+                  min="0.1"
+                  max="100"
+                  step="0.1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+                />
+                <span className="text-bone-200 text-xs ml-1">%</span>
+              </div>
+            </>
+          )}
+          {positionSizeType === 'risk-based' && (
+            <span className="text-xs text-gray-400">Size based on stop loss distance and max risk per trade</span>
+          )}
+        </div>
+      </div>
+
+      {/* Risk Limits */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-footnote text-bone-200 font-medium">RISK LIMITS</h4>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Max risk per trade:</span>
+            <div className="flex items-center">
+              <input
+                type="number"
+                value={maxRiskPerTrade}
+                onChange={(e) => onMaxRiskPerTradeChange(Number(e.target.value))}
+                min="0.1"
+                max="50"
+                step="0.1"
+                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+              />
+              <span className="text-bone-200 text-xs ml-1">% of balance</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Max total exposure:</span>
+            <div className="flex items-center">
+              <input
+                type="number"
+                value={maxTotalExposure}
+                onChange={(e) => onMaxTotalExposureChange(Number(e.target.value))}
+                min="1"
+                max="100"
+                step="1"
+                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+              />
+              <span className="text-bone-200 text-xs ml-1">% across positions</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Max active positions:</span>
+            <input
+              type="number"
+              value={maxPositions}
+              onChange={(e) => onMaxPositionsChange(Number(e.target.value))}
+              min="1"
+              max="20"
+              step="1"
+              className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+            />
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Daily loss limit:</span>
+            <div className="flex items-center gap-2">
+              <div className="flex items-center">
+                <span className="text-bone-200 text-xs">$</span>
+                <input
+                  type="number"
+                  value={dailyLossLimit}
+                  onChange={(e) => onDailyLossLimitChange(Number(e.target.value))}
+                  min="1"
+                  step="1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-agent-trading focus:outline-none transition-colors ml-1"
+                />
+              </div>
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={stopTradingOnLimit}
+                  onChange={(e) => onStopTradingOnLimitChange(e.target.checked)}
+                  className="w-3 h-3"
+                />
+                <span className="text-xs text-gray-400">Stop trading</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Stop Loss & Take Profit */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-footnote text-bone-200 font-medium">STOP LOSS & TAKE PROFIT</h4>
+        </div>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Default stop loss:</span>
+            <div className="flex items-center">
+              <input
+                type="number"
+                value={defaultStopLoss}
+                onChange={(e) => onDefaultStopLossChange(Number(e.target.value))}
+                min="0.1"
+                max="50"
+                step="0.1"
+                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+              />
+              <span className="text-bone-200 text-xs ml-1">% from entry</span>
+            </div>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <span className="text-xs text-gray-400">Default take profit:</span>
+            <select
+              value={defaultTpRatio}
+              onChange={(e) => onDefaultTpRatioChange(e.target.value)}
+              className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs focus:border-agent-trading focus:outline-none transition-colors"
+            >
+              {tpRatioOptions.map(ratio => (
+                <option key={ratio} value={ratio}>{ratio} risk/reward</option>
+              ))}
+            </select>
+          </div>
+          
+          <div className="flex items-center justify-between">
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={trailingStopsEnabled}
+                onChange={(e) => onTrailingStopsEnabledChange(e.target.checked)}
+                className="w-3 h-3"
+              />
+              <span className="text-xs text-gray-400">Enable trailing stops</span>
+            </label>
+            {trailingStopsEnabled && (
+              <div className="flex items-center">
+                <span className="text-xs text-gray-400 mr-2">Distance:</span>
+                <input
+                  type="number"
+                  value={trailingDistance}
+                  onChange={(e) => onTrailingDistanceChange(Number(e.target.value))}
+                  min="0.1"
+                  max="10"
+                  step="0.1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+                />
+                <span className="text-bone-200 text-xs ml-1">%</span>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// Exchange Connection Section Component
+interface ExchangeConnectionSectionProps {
+  exchangeType: string
+  onExchangeTypeChange: (type: string) => void
+  selectedExchange: string
+  onSelectedExchangeChange: (exchange: string) => void
+  apiKey: string
+  onApiKeyChange: (key: string) => void
+  secretKey: string
+  onSecretKeyChange: (key: string) => void
+  connectionStatus: 'disconnected' | 'connecting' | 'connected' | 'error'
+  onTestConnection: () => void
+  onClearCredentials: () => void
+  selectedNetwork: string
+  onSelectedNetworkChange: (network: string) => void
+  walletConnected: boolean
+  onConnectWallet: () => void
+  slippageTolerance: number
+  onSlippageToleranceChange: (slippage: number) => void
+}
+
+const ExchangeConnectionSection: React.FC<ExchangeConnectionSectionProps> = ({
+  exchangeType,
+  onExchangeTypeChange,
+  selectedExchange,
+  onSelectedExchangeChange,
+  apiKey,
+  onApiKeyChange,
+  secretKey,
+  onSecretKeyChange,
+  connectionStatus,
+  onTestConnection,
+  onClearCredentials,
+  selectedNetwork,
+  onSelectedNetworkChange,
+  walletConnected,
+  onConnectWallet,
+  slippageTolerance,
+  onSlippageToleranceChange
+}) => {
+  const cexOptions = ['binance', 'coinbase', 'kraken', 'bybit']
+  const networkOptions = ['ethereum', 'bsc', 'polygon', 'arbitrum']
+
+  const getStatusColor = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'text-green-400'
+      case 'connecting': return 'text-yellow-400'
+      case 'error': return 'text-red-400'
+      default: return 'text-gray-400'
+    }
+  }
+
+  const getStatusText = () => {
+    switch (connectionStatus) {
+      case 'connected': return 'Connected'
+      case 'connecting': return 'Connecting...'
+      case 'error': return 'Connection failed'
+      default: return exchangeType === 'cex' ? 'Not connected' : 'No wallet connected'
+    }
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Exchange Type Selection */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h4 className="text-footnote text-bone-200 font-medium">SELECT EXCHANGE TYPE</h4>
+        </div>
+        <div className="flex gap-2 flex-wrap mb-4">
+          <button
+            onClick={() => onExchangeTypeChange('cex')}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              exchangeType === 'cex'
+                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+            }`}
+          >
+            Centralized (CEX)
+          </button>
+          <button
+            onClick={() => onExchangeTypeChange('dex')}
+            className={`px-3 py-1 text-xs rounded transition-colors ${
+              exchangeType === 'dex'
+                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+            }`}
+          >
+            Decentralized (DEX)
+          </button>
+        </div>
+        
+        {/* Warning */}
+        <div className="bg-orange-900/20 border border-orange-700/50 p-3 mb-6">
+          <div className="flex items-center gap-2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-orange-400">
+              <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
+            </svg>
+            <span className="text-xs text-orange-400">Only one exchange can be connected per bot</span>
+          </div>
+        </div>
+      </div>
+
+      {/* CEX Configuration */}
+      {exchangeType === 'cex' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-footnote text-bone-200 font-medium">CENTRALIZED EXCHANGE</h4>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">Exchange:</span>
+              <select
+                value={selectedExchange}
+                onChange={(e) => onSelectedExchangeChange(e.target.value)}
+                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs focus:border-agent-trading focus:outline-none transition-colors capitalize"
+              >
+                {cexOptions.map(exchange => (
+                  <option key={exchange} value={exchange}>{exchange}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400">API Key:</span>
+              </div>
+              <input
+                type="password"
+                value={apiKey}
+                onChange={(e) => onApiKeyChange(e.target.value)}
+                placeholder="Enter API key..."
+                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-trading focus:outline-none transition-colors"
+              />
+            </div>
+            
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-xs text-gray-400">Secret Key:</span>
+              </div>
+              <input
+                type="password"
+                value={secretKey}
+                onChange={(e) => onSecretKeyChange(e.target.value)}
+                placeholder="Enter secret key..."
+                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-trading focus:outline-none transition-colors"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <button
+                onClick={onTestConnection}
+                disabled={!apiKey || !secretKey || connectionStatus === 'connecting'}
+                className={`px-3 py-1 text-xs rounded transition-colors ${
+                  !apiKey || !secretKey || connectionStatus === 'connecting'
+                    ? 'bg-charcoal-800 text-gray-600 cursor-not-allowed'
+                    : 'bg-agent-trading text-charcoal-900 hover:bg-agent-trading/80'
+                }`}
+              >
+                {connectionStatus === 'connecting' ? 'Testing...' : 'Test Connection'}
+              </button>
+              <button
+                onClick={onClearCredentials}
+                className="px-3 py-1 text-xs rounded transition-colors bg-charcoal-800 text-gray-400 hover:text-bone-200"
+              >
+                Clear Credentials
+              </button>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${
+                connectionStatus === 'connected' ? 'bg-green-400' :
+                connectionStatus === 'connecting' ? 'bg-yellow-400' :
+                connectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
+              }`} />
+              <span className={`text-xs ${getStatusColor()}`}>
+                Connection Status: {getStatusText()}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* DEX Configuration */}
+      {exchangeType === 'dex' && (
+        <div>
+          <div className="flex items-center justify-between mb-4">
+            <h4 className="text-footnote text-bone-200 font-medium">DECENTRALIZED EXCHANGE</h4>
+          </div>
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">Network:</span>
+              <select
+                value={selectedNetwork}
+                onChange={(e) => onSelectedNetworkChange(e.target.value)}
+                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs focus:border-agent-trading focus:outline-none transition-colors capitalize"
+              >
+                {networkOptions.map(network => (
+                  <option key={network} value={network}>{network}</option>
+                ))}
+              </select>
+            </div>
+            
+            <div>
+              <button
+                onClick={onConnectWallet}
+                className={`px-4 py-2 text-xs rounded transition-colors ${
+                  walletConnected
+                    ? 'bg-green-600 text-white'
+                    : 'bg-agent-trading text-charcoal-900 hover:bg-agent-trading/80'
+                }`}
+              >
+                {walletConnected ? '🔗 Wallet Connected' : '🔌 Connect Wallet'}
+              </button>
+            </div>
+            
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-gray-400">Slippage tolerance:</span>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={slippageTolerance}
+                  onChange={(e) => onSlippageToleranceChange(Number(e.target.value))}
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+                />
+                <span className="text-bone-200 text-xs ml-1">%</span>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-400' : 'bg-gray-400'}`} />
+              <span className={`text-xs ${walletConnected ? 'text-green-400' : 'text-gray-400'}`}>
+                {walletConnected ? 'Wallet connected' : 'No wallet connected'}
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   const [isEditingName, setIsEditingName] = React.useState(false)
   const [botName, setBotName] = React.useState(bot?.name || '')
@@ -279,6 +805,33 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
   // Additional data sources
   const [selectedSignals, setSelectedSignals] = React.useState<Set<string>>(new Set())
 
+  // Trading Agent states - with defaults
+  const [tradingAgentTab, setTradingAgentTab] = React.useState('risk-management')
+  
+  // Risk Management defaults
+  const [positionSizeType, setPositionSizeType] = React.useState('fixed')
+  const [fixedAmount, setFixedAmount] = React.useState(100)
+  const [accountPercentage, setAccountPercentage] = React.useState(5.0)
+  const [maxRiskPerTrade, setMaxRiskPerTrade] = React.useState(5.0)
+  const [maxTotalExposure, setMaxTotalExposure] = React.useState(20.0)
+  const [maxPositions, setMaxPositions] = React.useState(3)
+  const [dailyLossLimit, setDailyLossLimit] = React.useState(500)
+  const [stopTradingOnLimit, setStopTradingOnLimit] = React.useState(true)
+  const [defaultStopLoss, setDefaultStopLoss] = React.useState(2.0)
+  const [defaultTpRatio, setDefaultTpRatio] = React.useState('3:1')
+  const [trailingStopsEnabled, setTrailingStopsEnabled] = React.useState(true)
+  const [trailingDistance, setTrailingDistance] = React.useState(1.0)
+  
+  // Exchange Connection defaults
+  const [exchangeType, setExchangeType] = React.useState('cex')
+  const [selectedExchange, setSelectedExchange] = React.useState('binance')
+  const [apiKey, setApiKey] = React.useState('')
+  const [secretKey, setSecretKey] = React.useState('')
+  const [connectionStatus, setConnectionStatus] = React.useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
+  const [selectedNetwork, setSelectedNetwork] = React.useState('ethereum')
+  const [walletConnected, setWalletConnected] = React.useState(false)
+  const [slippageTolerance, setSlippageTolerance] = React.useState(0.5)
+
   // Helper functions for selection management
   const toggleIndicator = (indicatorId: string) => {
     setSelectedIndicators(prev => {
@@ -306,6 +859,34 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
       setHasChanges(true)
       return newSet
     })
+  }
+
+  // Trading Agent helper functions
+  const handleTestConnection = async () => {
+    setConnectionStatus('connecting')
+    // TODO: Implement actual API testing
+    setTimeout(() => {
+      setConnectionStatus(Math.random() > 0.5 ? 'connected' : 'error')
+    }, 2000)
+  }
+
+  const handleClearCredentials = () => {
+    setApiKey('')
+    setSecretKey('')
+    setConnectionStatus('disconnected')
+    setHasChanges(true)
+  }
+
+  const handleConnectWallet = async () => {
+    // TODO: Implement actual wallet connection
+    setWalletConnected(!walletConnected)
+    setHasChanges(true)
+  }
+
+  // Helper to update Trading Agent fields and trigger change detection
+  const updateTradingField = <T,>(setter: (value: T) => void) => (value: T) => {
+    setter(value)
+    setHasChanges(true)
   }
 
   // Filter trading pairs based on search
@@ -1054,11 +1635,90 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                         ▶
                       </span>
                     </div>
-                    <div className="p-6">
-                      <p className="text-footnote text-gray-400 mb-4">Exchange connections and risk management</p>
-                      {/* Minimal content structure - to be expanded later */}
-                      <div className="space-y-4">
-                        <div className="text-footnote text-gray-500">Trading configuration will go here...</div>
+                    <div className="p-6 space-y-6">
+                      {/* Tab Navigation */}
+                      <div>
+                        <div className="flex gap-2 flex-wrap">
+                          <button
+                            onClick={() => setTradingAgentTab('risk-management')}
+                            className={`px-3 py-1 text-xs rounded transition-colors ${
+                              tradingAgentTab === 'risk-management'
+                                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                            }`}
+                          >
+                            Risk Management
+                          </button>
+                          <button
+                            onClick={() => setTradingAgentTab('exchange-connection')}
+                            className={`px-3 py-1 text-xs rounded transition-colors ${
+                              tradingAgentTab === 'exchange-connection'
+                                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                                : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                            }`}
+                          >
+                            Exchange Connection
+                          </button>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-400">
+                          {tradingAgentTab === 'risk-management' 
+                            ? 'Configure position sizing, risk limits, and stop loss settings'
+                            : 'Connect to centralized or decentralized exchanges'
+                          }
+                        </div>
+                      </div>
+
+                      {/* Tab Content */}
+                      <div>
+                        {tradingAgentTab === 'risk-management' && (
+                          <RiskManagementSection
+                            positionSizeType={positionSizeType}
+                            onPositionSizeTypeChange={updateTradingField(setPositionSizeType)}
+                            fixedAmount={fixedAmount}
+                            onFixedAmountChange={updateTradingField(setFixedAmount)}
+                            accountPercentage={accountPercentage}
+                            onAccountPercentageChange={updateTradingField(setAccountPercentage)}
+                            maxRiskPerTrade={maxRiskPerTrade}
+                            onMaxRiskPerTradeChange={updateTradingField(setMaxRiskPerTrade)}
+                            maxTotalExposure={maxTotalExposure}
+                            onMaxTotalExposureChange={updateTradingField(setMaxTotalExposure)}
+                            maxPositions={maxPositions}
+                            onMaxPositionsChange={updateTradingField(setMaxPositions)}
+                            dailyLossLimit={dailyLossLimit}
+                            onDailyLossLimitChange={updateTradingField(setDailyLossLimit)}
+                            stopTradingOnLimit={stopTradingOnLimit}
+                            onStopTradingOnLimitChange={updateTradingField(setStopTradingOnLimit)}
+                            defaultStopLoss={defaultStopLoss}
+                            onDefaultStopLossChange={updateTradingField(setDefaultStopLoss)}
+                            defaultTpRatio={defaultTpRatio}
+                            onDefaultTpRatioChange={updateTradingField(setDefaultTpRatio)}
+                            trailingStopsEnabled={trailingStopsEnabled}
+                            onTrailingStopsEnabledChange={updateTradingField(setTrailingStopsEnabled)}
+                            trailingDistance={trailingDistance}
+                            onTrailingDistanceChange={updateTradingField(setTrailingDistance)}
+                          />
+                        )}
+                        {tradingAgentTab === 'exchange-connection' && (
+                          <ExchangeConnectionSection
+                            exchangeType={exchangeType}
+                            onExchangeTypeChange={updateTradingField(setExchangeType)}
+                            selectedExchange={selectedExchange}
+                            onSelectedExchangeChange={updateTradingField(setSelectedExchange)}
+                            apiKey={apiKey}
+                            onApiKeyChange={updateTradingField(setApiKey)}
+                            secretKey={secretKey}
+                            onSecretKeyChange={updateTradingField(setSecretKey)}
+                            connectionStatus={connectionStatus}
+                            onTestConnection={handleTestConnection}
+                            onClearCredentials={handleClearCredentials}
+                            selectedNetwork={selectedNetwork}
+                            onSelectedNetworkChange={updateTradingField(setSelectedNetwork)}
+                            walletConnected={walletConnected}
+                            onConnectWallet={handleConnectWallet}
+                            slippageTolerance={slippageTolerance}
+                            onSlippageToleranceChange={updateTradingField(setSlippageTolerance)}
+                          />
+                        )}
                       </div>
                     </div>
                   </div>

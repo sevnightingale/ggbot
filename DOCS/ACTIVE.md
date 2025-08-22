@@ -106,6 +106,7 @@
 | Port | Service | Protocol | Access | Purpose |
 |------|---------|----------|--------|---------|
 | **8000** | ggbot-api | HTTP | Public | Main API server (extraction, decision, agent control) |
+| **8080** | code-server | HTTP | Public | VSCode in browser (development environment) |
 
 ### Database Ports
 | Port | Service | Access | Purpose |
