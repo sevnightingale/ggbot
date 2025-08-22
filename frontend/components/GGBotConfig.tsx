@@ -309,7 +309,7 @@ const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
   return (
     <div className="space-y-6">
       {/* Position Sizing Strategy */}
-      <div>
+      <div className="bg-charcoal-800 border border-charcoal-600 p-4">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-footnote text-bone-200 font-medium">POSITION SIZING STRATEGY</h4>
         </div>
@@ -318,7 +318,7 @@ const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
             onClick={() => onPositionSizeTypeChange('fixed')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
               positionSizeType === 'fixed'
-                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                ? 'bg-[#be6a47] text-charcoal-900 font-medium'
                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
             }`}
           >
@@ -328,7 +328,7 @@ const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
             onClick={() => onPositionSizeTypeChange('percentage')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
               positionSizeType === 'percentage'
-                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                ? 'bg-[#be6a47] text-charcoal-900 font-medium'
                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
             }`}
           >
@@ -338,7 +338,7 @@ const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
             onClick={() => onPositionSizeTypeChange('risk-based')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
               positionSizeType === 'risk-based'
-                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                ? 'bg-[#be6a47] text-charcoal-900 font-medium'
                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
             }`}
           >
@@ -346,109 +346,161 @@ const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
           </button>
         </div>
         
-        <div className="flex items-center gap-2">
+        <div className="bg-charcoal-900 border border-charcoal-700 p-3 rounded">
           {positionSizeType === 'fixed' && (
-            <>
+            <div className="grid grid-cols-2 gap-4 items-center">
               <span className="text-xs text-gray-400">Amount per trade:</span>
               <div className="flex items-center">
-                <span className="text-bone-200 text-xs">$</span>
+                <span className="text-bone-200 text-xs mr-2">$</span>
                 <input
                   type="number"
                   value={fixedAmount}
                   onChange={(e) => onFixedAmountChange(Number(e.target.value))}
                   min="1"
                   step="1"
-                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-agent-trading focus:outline-none transition-colors ml-1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-[#be6a47] focus:outline-none transition-colors"
                 />
               </div>
-            </>
+            </div>
           )}
           {positionSizeType === 'percentage' && (
-            <>
-              <span className="text-xs text-gray-400">Percentage of account:</span>
-              <div className="flex items-center">
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 gap-4 items-center">
+                <span className="text-xs text-gray-400">Percentage of account:</span>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    value={accountPercentage}
+                    onChange={(e) => onAccountPercentageChange(Number(e.target.value))}
+                    min="0.1"
+                    max="100"
+                    step="0.1"
+                    className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                  />
+                  <span className="text-bone-200 text-xs ml-2">%</span>
+                </div>
+              </div>
+              <div>
                 <input
-                  type="number"
+                  type="range"
+                  min="0.1"
+                  max="25"
+                  step="0.1"
                   value={accountPercentage}
                   onChange={(e) => onAccountPercentageChange(Number(e.target.value))}
-                  min="0.1"
-                  max="100"
-                  step="0.1"
-                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+                  className="w-full h-2 bg-charcoal-700 rounded-lg appearance-none cursor-pointer slider-thumb"
+                  style={{
+                    background: `linear-gradient(to right, #be6a47 0%, #be6a47 ${(accountPercentage / 25) * 100}%, #374151 ${(accountPercentage / 25) * 100}%, #374151 100%)`
+                  }}
                 />
-                <span className="text-bone-200 text-xs ml-1">%</span>
               </div>
-            </>
+            </div>
           )}
           {positionSizeType === 'risk-based' && (
-            <span className="text-xs text-gray-400">Size based on stop loss distance and max risk per trade</span>
+            <div className="text-center">
+              <span className="text-xs text-gray-400">Position size calculated dynamically based on stop loss distance and maximum risk per trade</span>
+            </div>
           )}
         </div>
       </div>
 
       {/* Risk Limits */}
-      <div>
+      <div className="bg-charcoal-800 border border-charcoal-600 p-4">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-footnote text-bone-200 font-medium">RISK LIMITS</h4>
         </div>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Max risk per trade:</span>
-            <div className="flex items-center">
-              <input
-                type="number"
-                value={maxRiskPerTrade}
-                onChange={(e) => onMaxRiskPerTradeChange(Number(e.target.value))}
-                min="0.1"
-                max="50"
-                step="0.1"
-                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
-              />
-              <span className="text-bone-200 text-xs ml-1">% of balance</span>
+        <div className="space-y-4">
+          <div>
+            <div className="grid grid-cols-2 gap-4 items-center mb-2">
+              <span className="text-xs text-gray-400">Max risk per trade:</span>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={maxRiskPerTrade}
+                  onChange={(e) => onMaxRiskPerTradeChange(Number(e.target.value))}
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                />
+                <span className="text-bone-200 text-xs ml-2">% of balance</span>
+              </div>
             </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Max total exposure:</span>
-            <div className="flex items-center">
-              <input
-                type="number"
-                value={maxTotalExposure}
-                onChange={(e) => onMaxTotalExposureChange(Number(e.target.value))}
-                min="1"
-                max="100"
-                step="1"
-                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
-              />
-              <span className="text-bone-200 text-xs ml-1">% across positions</span>
-            </div>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Max active positions:</span>
             <input
-              type="number"
-              value={maxPositions}
-              onChange={(e) => onMaxPositionsChange(Number(e.target.value))}
-              min="1"
-              max="20"
-              step="1"
-              className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+              type="range"
+              min="0.1"
+              max="15"
+              step="0.1"
+              value={maxRiskPerTrade}
+              onChange={(e) => onMaxRiskPerTradeChange(Number(e.target.value))}
+              className="w-full h-2 bg-charcoal-700 rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #be6a47 0%, #be6a47 ${(maxRiskPerTrade / 15) * 100}%, #374151 ${(maxRiskPerTrade / 15) * 100}%, #374151 100%)`
+              }}
             />
           </div>
           
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Daily loss limit:</span>
-            <div className="flex items-center gap-2">
+          <div>
+            <div className="grid grid-cols-2 gap-4 items-center mb-2">
+              <span className="text-xs text-gray-400">Max total exposure:</span>
               <div className="flex items-center">
-                <span className="text-bone-200 text-xs">$</span>
+                <input
+                  type="number"
+                  value={maxTotalExposure}
+                  onChange={(e) => onMaxTotalExposureChange(Number(e.target.value))}
+                  min="1"
+                  max="100"
+                  step="1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                />
+                <span className="text-bone-200 text-xs ml-2">% across positions</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="5"
+              max="100"
+              step="5"
+              value={maxTotalExposure}
+              onChange={(e) => onMaxTotalExposureChange(Number(e.target.value))}
+              className="w-full h-2 bg-charcoal-700 rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #be6a47 0%, #be6a47 ${((maxTotalExposure - 5) / 95) * 100}%, #374151 ${((maxTotalExposure - 5) / 95) * 100}%, #374151 100%)`
+              }}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 items-center">
+            <span className="text-xs text-gray-400">Max active positions:</span>
+            <div className="flex gap-2">
+              {[1,2,3,4,5].map(num => (
+                <button
+                  key={num}
+                  onClick={() => onMaxPositionsChange(num)}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    maxPositions === num
+                      ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                      : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                  }`}
+                >
+                  {num}
+                </button>
+              ))}
+            </div>
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 items-center">
+            <span className="text-xs text-gray-400">Daily loss limit:</span>
+            <div className="flex items-center gap-3">
+              <div className="flex items-center">
+                <span className="text-bone-200 text-xs mr-1">$</span>
                 <input
                   type="number"
                   value={dailyLossLimit}
                   onChange={(e) => onDailyLossLimitChange(Number(e.target.value))}
                   min="1"
                   step="1"
-                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-agent-trading focus:outline-none transition-colors ml-1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-[#be6a47] focus:outline-none transition-colors"
                 />
               </div>
               <label className="flex items-center gap-2 cursor-pointer">
@@ -456,7 +508,7 @@ const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
                   type="checkbox"
                   checked={stopTradingOnLimit}
                   onChange={(e) => onStopTradingOnLimitChange(e.target.checked)}
-                  className="w-3 h-3"
+                  className="w-3 h-3 accent-[#be6a47]"
                 />
                 <span className="text-xs text-gray-400">Stop trading</span>
               </label>
@@ -466,63 +518,101 @@ const RiskManagementSection: React.FC<RiskManagementSectionProps> = ({
       </div>
 
       {/* Stop Loss & Take Profit */}
-      <div>
+      <div className="bg-charcoal-800 border border-charcoal-600 p-4">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-footnote text-bone-200 font-medium">STOP LOSS & TAKE PROFIT</h4>
         </div>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Default stop loss:</span>
-            <div className="flex items-center">
-              <input
-                type="number"
-                value={defaultStopLoss}
-                onChange={(e) => onDefaultStopLossChange(Number(e.target.value))}
-                min="0.1"
-                max="50"
-                step="0.1"
-                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
-              />
-              <span className="text-bone-200 text-xs ml-1">% from entry</span>
+        <div className="space-y-4">
+          <div>
+            <div className="grid grid-cols-2 gap-4 items-center mb-2">
+              <span className="text-xs text-gray-400">Default stop loss:</span>
+              <div className="flex items-center">
+                <input
+                  type="number"
+                  value={defaultStopLoss}
+                  onChange={(e) => onDefaultStopLossChange(Number(e.target.value))}
+                  min="0.1"
+                  max="50"
+                  step="0.1"
+                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                />
+                <span className="text-bone-200 text-xs ml-2">% from entry</span>
+              </div>
+            </div>
+            <input
+              type="range"
+              min="0.5"
+              max="10"
+              step="0.1"
+              value={defaultStopLoss}
+              onChange={(e) => onDefaultStopLossChange(Number(e.target.value))}
+              className="w-full h-2 bg-charcoal-700 rounded-lg appearance-none cursor-pointer"
+              style={{
+                background: `linear-gradient(to right, #be6a47 0%, #be6a47 ${((defaultStopLoss - 0.5) / 9.5) * 100}%, #374151 ${((defaultStopLoss - 0.5) / 9.5) * 100}%, #374151 100%)`
+              }}
+            />
+          </div>
+          
+          <div className="grid grid-cols-2 gap-4 items-center">
+            <span className="text-xs text-gray-400">Default take profit:</span>
+            <div className="flex gap-2">
+              {tpRatioOptions.map(ratio => (
+                <button
+                  key={ratio}
+                  onClick={() => onDefaultTpRatioChange(ratio)}
+                  className={`px-2 py-1 text-xs rounded transition-colors ${
+                    defaultTpRatio === ratio
+                      ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                      : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                  }`}
+                >
+                  {ratio}
+                </button>
+              ))}
             </div>
           </div>
           
-          <div className="flex items-center justify-between">
-            <span className="text-xs text-gray-400">Default take profit:</span>
-            <select
-              value={defaultTpRatio}
-              onChange={(e) => onDefaultTpRatioChange(e.target.value)}
-              className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs focus:border-agent-trading focus:outline-none transition-colors"
-            >
-              {tpRatioOptions.map(ratio => (
-                <option key={ratio} value={ratio}>{ratio} risk/reward</option>
-              ))}
-            </select>
-          </div>
-          
-          <div className="flex items-center justify-between">
-            <label className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={trailingStopsEnabled}
-                onChange={(e) => onTrailingStopsEnabledChange(e.target.checked)}
-                className="w-3 h-3"
-              />
-              <span className="text-xs text-gray-400">Enable trailing stops</span>
-            </label>
-            {trailingStopsEnabled && (
-              <div className="flex items-center">
-                <span className="text-xs text-gray-400 mr-2">Distance:</span>
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
-                  type="number"
+                  type="checkbox"
+                  checked={trailingStopsEnabled}
+                  onChange={(e) => onTrailingStopsEnabledChange(e.target.checked)}
+                  className="w-4 h-4 accent-[#be6a47]"
+                />
+                <span className="text-xs text-bone-200">Enable trailing stops</span>
+              </label>
+            </div>
+            {trailingStopsEnabled && (
+              <div>
+                <div className="grid grid-cols-2 gap-4 items-center mb-2">
+                  <span className="text-xs text-gray-400 ml-6">Trailing distance:</span>
+                  <div className="flex items-center">
+                    <input
+                      type="number"
+                      value={trailingDistance}
+                      onChange={(e) => onTrailingDistanceChange(Number(e.target.value))}
+                      min="0.1"
+                      max="10"
+                      step="0.1"
+                      className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                    />
+                    <span className="text-bone-200 text-xs ml-2">%</span>
+                  </div>
+                </div>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="5"
+                  step="0.1"
                   value={trailingDistance}
                   onChange={(e) => onTrailingDistanceChange(Number(e.target.value))}
-                  min="0.1"
-                  max="10"
-                  step="0.1"
-                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
+                  className="w-full h-2 bg-charcoal-700 rounded-lg appearance-none cursor-pointer ml-6"
+                  style={{
+                    background: `linear-gradient(to right, #be6a47 0%, #be6a47 ${((trailingDistance - 0.1) / 4.9) * 100}%, #374151 ${((trailingDistance - 0.1) / 4.9) * 100}%, #374151 100%)`
+                  }}
                 />
-                <span className="text-bone-200 text-xs ml-1">%</span>
               </div>
             )}
           </div>
@@ -596,7 +686,7 @@ const ExchangeConnectionSection: React.FC<ExchangeConnectionSectionProps> = ({
   return (
     <div className="space-y-6">
       {/* Exchange Type Selection */}
-      <div>
+      <div className="bg-charcoal-800 border border-charcoal-600 p-4">
         <div className="flex items-center justify-between mb-4">
           <h4 className="text-footnote text-bone-200 font-medium">SELECT EXCHANGE TYPE</h4>
         </div>
@@ -605,7 +695,7 @@ const ExchangeConnectionSection: React.FC<ExchangeConnectionSectionProps> = ({
             onClick={() => onExchangeTypeChange('cex')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
               exchangeType === 'cex'
-                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                ? 'bg-[#be6a47] text-charcoal-900 font-medium'
                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
             }`}
           >
@@ -615,7 +705,7 @@ const ExchangeConnectionSection: React.FC<ExchangeConnectionSectionProps> = ({
             onClick={() => onExchangeTypeChange('dex')}
             className={`px-3 py-1 text-xs rounded transition-colors ${
               exchangeType === 'dex'
-                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                ? 'bg-[#be6a47] text-charcoal-900 font-medium'
                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
             }`}
           >
@@ -624,7 +714,7 @@ const ExchangeConnectionSection: React.FC<ExchangeConnectionSectionProps> = ({
         </div>
         
         {/* Warning */}
-        <div className="bg-orange-900/20 border border-orange-700/50 p-3 mb-6">
+        <div className="bg-orange-900/20 border border-orange-700/50 p-3 rounded">
           <div className="flex items-center gap-2">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-orange-400">
               <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
@@ -636,79 +726,88 @@ const ExchangeConnectionSection: React.FC<ExchangeConnectionSectionProps> = ({
 
       {/* CEX Configuration */}
       {exchangeType === 'cex' && (
-        <div>
+        <div className="bg-charcoal-800 border border-charcoal-600 p-4">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="text-footnote text-bone-200 font-medium">CENTRALIZED EXCHANGE</h4>
+            <h4 className="text-footnote text-bone-200 font-medium">CENTRALIZED EXCHANGE SETUP</h4>
           </div>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
+            <div className="grid grid-cols-2 gap-4 items-center">
               <span className="text-xs text-gray-400">Exchange:</span>
-              <select
-                value={selectedExchange}
-                onChange={(e) => onSelectedExchangeChange(e.target.value)}
-                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs focus:border-agent-trading focus:outline-none transition-colors capitalize"
-              >
+              <div className="flex gap-2">
                 {cexOptions.map(exchange => (
-                  <option key={exchange} value={exchange}>{exchange}</option>
+                  <button
+                    key={exchange}
+                    onClick={() => onSelectedExchangeChange(exchange)}
+                    className={`px-2 py-1 text-xs rounded transition-colors capitalize ${
+                      selectedExchange === exchange
+                        ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                        : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                    }`}
+                  >
+                    {exchange}
+                  </button>
                 ))}
-              </select>
-            </div>
-            
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-400">API Key:</span>
               </div>
-              <input
-                type="password"
-                value={apiKey}
-                onChange={(e) => onApiKeyChange(e.target.value)}
-                placeholder="Enter API key..."
-                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-trading focus:outline-none transition-colors"
-              />
             </div>
             
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-xs text-gray-400">Secret Key:</span>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-xs text-gray-400 mb-2">API Key:</label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => onApiKeyChange(e.target.value)}
+                  placeholder="Enter API key..."
+                  className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-3 py-2 text-xs focus:border-[#be6a47] focus:outline-none transition-colors rounded"
+                />
               </div>
-              <input
-                type="password"
-                value={secretKey}
-                onChange={(e) => onSecretKeyChange(e.target.value)}
-                placeholder="Enter secret key..."
-                className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-trading focus:outline-none transition-colors"
-              />
+              
+              <div>
+                <label className="block text-xs text-gray-400 mb-2">Secret Key:</label>
+                <input
+                  type="password"
+                  value={secretKey}
+                  onChange={(e) => onSecretKeyChange(e.target.value)}
+                  placeholder="Enter secret key..."
+                  className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-3 py-2 text-xs focus:border-[#be6a47] focus:outline-none transition-colors rounded"
+                />
+              </div>
             </div>
             
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3 pt-2">
               <button
                 onClick={onTestConnection}
                 disabled={!apiKey || !secretKey || connectionStatus === 'connecting'}
-                className={`px-3 py-1 text-xs rounded transition-colors ${
+                className={`px-4 py-2 text-xs rounded transition-colors font-medium ${
                   !apiKey || !secretKey || connectionStatus === 'connecting'
-                    ? 'bg-charcoal-800 text-gray-600 cursor-not-allowed'
-                    : 'bg-agent-trading text-charcoal-900 hover:bg-agent-trading/80'
+                    ? 'bg-charcoal-700 text-gray-500 cursor-not-allowed'
+                    : 'bg-[#be6a47] text-charcoal-900 hover:bg-[#be6a47]/80'
                 }`}
               >
-                {connectionStatus === 'connecting' ? 'Testing...' : 'Test Connection'}
+                {connectionStatus === 'connecting' ? '⏳ Testing...' : '🔍 Test Connection'}
               </button>
               <button
                 onClick={onClearCredentials}
-                className="px-3 py-1 text-xs rounded transition-colors bg-charcoal-800 text-gray-400 hover:text-bone-200"
+                className="px-3 py-2 text-xs rounded transition-colors bg-charcoal-700 text-gray-400 hover:text-bone-200 hover:bg-charcoal-600"
               >
-                Clear Credentials
+                Clear
               </button>
             </div>
             
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${
-                connectionStatus === 'connected' ? 'bg-green-400' :
-                connectionStatus === 'connecting' ? 'bg-yellow-400' :
-                connectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
-              }`} />
-              <span className={`text-xs ${getStatusColor()}`}>
-                Connection Status: {getStatusText()}
-              </span>
+            <div className="bg-charcoal-900 border border-charcoal-700 p-3 rounded">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${
+                  connectionStatus === 'connected' ? 'bg-green-400' :
+                  connectionStatus === 'connecting' ? 'bg-yellow-400 animate-pulse' :
+                  connectionStatus === 'error' ? 'bg-red-400' : 'bg-gray-400'
+                }`} />
+                <span className={`text-xs font-medium ${getStatusColor()}`}>
+                  {getStatusText()}
+                </span>
+                {connectionStatus === 'connected' && (
+                  <span className="text-xs text-gray-400">• Ready for trading</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -716,58 +815,86 @@ const ExchangeConnectionSection: React.FC<ExchangeConnectionSectionProps> = ({
 
       {/* DEX Configuration */}
       {exchangeType === 'dex' && (
-        <div>
+        <div className="bg-charcoal-800 border border-charcoal-600 p-4">
           <div className="flex items-center justify-between mb-4">
-            <h4 className="text-footnote text-bone-200 font-medium">DECENTRALIZED EXCHANGE</h4>
+            <h4 className="text-footnote text-bone-200 font-medium">DECENTRALIZED EXCHANGE SETUP</h4>
           </div>
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">Network:</span>
-              <select
-                value={selectedNetwork}
-                onChange={(e) => onSelectedNetworkChange(e.target.value)}
-                className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs focus:border-agent-trading focus:outline-none transition-colors capitalize"
-              >
+            <div className="grid grid-cols-2 gap-4 items-center">
+              <span className="text-xs text-gray-400">Blockchain Network:</span>
+              <div className="flex gap-2">
                 {networkOptions.map(network => (
-                  <option key={network} value={network}>{network}</option>
+                  <button
+                    key={network}
+                    onClick={() => onSelectedNetworkChange(network)}
+                    className={`px-2 py-1 text-xs rounded transition-colors capitalize ${
+                      selectedNetwork === network
+                        ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                        : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                    }`}
+                  >
+                    {network}
+                  </button>
                 ))}
-              </select>
-            </div>
-            
-            <div>
-              <button
-                onClick={onConnectWallet}
-                className={`px-4 py-2 text-xs rounded transition-colors ${
-                  walletConnected
-                    ? 'bg-green-600 text-white'
-                    : 'bg-agent-trading text-charcoal-900 hover:bg-agent-trading/80'
-                }`}
-              >
-                {walletConnected ? '🔗 Wallet Connected' : '🔌 Connect Wallet'}
-              </button>
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <span className="text-xs text-gray-400">Slippage tolerance:</span>
-              <div className="flex items-center">
-                <input
-                  type="number"
-                  value={slippageTolerance}
-                  onChange={(e) => onSlippageToleranceChange(Number(e.target.value))}
-                  min="0.1"
-                  max="50"
-                  step="0.1"
-                  className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-agent-trading focus:outline-none transition-colors"
-                />
-                <span className="text-bone-200 text-xs ml-1">%</span>
               </div>
             </div>
             
-            <div className="flex items-center gap-2">
-              <div className={`w-2 h-2 rounded-full ${walletConnected ? 'bg-green-400' : 'bg-gray-400'}`} />
-              <span className={`text-xs ${walletConnected ? 'text-green-400' : 'text-gray-400'}`}>
-                {walletConnected ? 'Wallet connected' : 'No wallet connected'}
-              </span>
+            <div className="grid grid-cols-2 gap-4 items-center">
+              <span className="text-xs text-gray-400">Wallet Connection:</span>
+              <div>
+                <button
+                  onClick={onConnectWallet}
+                  className={`px-4 py-2 text-xs rounded transition-colors font-medium ${
+                    walletConnected
+                      ? 'bg-green-600 text-white'
+                      : 'bg-[#be6a47] text-charcoal-900 hover:bg-[#be6a47]/80'
+                  }`}
+                >
+                  {walletConnected ? '🔗 Wallet Connected' : '🔌 Connect Wallet'}
+                </button>
+              </div>
+            </div>
+            
+            <div>
+              <div className="grid grid-cols-2 gap-4 items-center mb-2">
+                <span className="text-xs text-gray-400">Slippage tolerance:</span>
+                <div className="flex items-center">
+                  <input
+                    type="number"
+                    value={slippageTolerance}
+                    onChange={(e) => onSlippageToleranceChange(Number(e.target.value))}
+                    min="0.1"
+                    max="50"
+                    step="0.1"
+                    className="bg-charcoal-900 border border-charcoal-700 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors rounded"
+                  />
+                  <span className="text-bone-200 text-xs ml-2">%</span>
+                </div>
+              </div>
+              <input
+                type="range"
+                min="0.1"
+                max="5"
+                step="0.1"
+                value={slippageTolerance}
+                onChange={(e) => onSlippageToleranceChange(Number(e.target.value))}
+                className="w-full h-2 bg-charcoal-700 rounded-lg appearance-none cursor-pointer"
+                style={{
+                  background: `linear-gradient(to right, #be6a47 0%, #be6a47 ${((slippageTolerance - 0.1) / 4.9) * 100}%, #374151 ${((slippageTolerance - 0.1) / 4.9) * 100}%, #374151 100%)`
+                }}
+              />
+            </div>
+            
+            <div className="bg-charcoal-900 border border-charcoal-700 p-3 rounded">
+              <div className="flex items-center gap-3">
+                <div className={`w-3 h-3 rounded-full ${walletConnected ? 'bg-green-400' : 'bg-gray-400'}`} />
+                <span className={`text-xs font-medium ${walletConnected ? 'text-green-400' : 'text-gray-400'}`}>
+                  {walletConnected ? 'Wallet Connected' : 'No Wallet Connected'}
+                </span>
+                {walletConnected && (
+                  <span className="text-xs text-gray-400">• Ready for DEX trading</span>
+                )}
+              </div>
             </div>
           </div>
         </div>
@@ -1437,7 +1564,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                             </h4>
                             <button
                               onClick={() => setUseCustomPrompt(true)}
-                              className="text-xs text-gray-400 hover:text-agents-decision transition-colors"
+                              className="text-xs text-gray-400 hover:text-agent-decision transition-colors"
                             >
                               Custom Prompt ↗
                             </button>
@@ -1511,7 +1638,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                             <h4 className="text-footnote text-bone-200 font-medium">CUSTOM PROMPT</h4>
                             <button
                               onClick={() => setUseCustomPrompt(false)}
-                              className="text-xs text-gray-400 hover:text-agents-decision transition-colors"
+                              className="text-xs text-gray-400 hover:text-agent-decision transition-colors"
                             >
                               ← Guided Mode
                             </button>
@@ -1643,7 +1770,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                             onClick={() => setTradingAgentTab('risk-management')}
                             className={`px-3 py-1 text-xs rounded transition-colors ${
                               tradingAgentTab === 'risk-management'
-                                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                                ? 'bg-[#be6a47] text-charcoal-900 font-medium'
                                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                             }`}
                           >
@@ -1653,7 +1780,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose }) => {
                             onClick={() => setTradingAgentTab('exchange-connection')}
                             className={`px-3 py-1 text-xs rounded transition-colors ${
                               tradingAgentTab === 'exchange-connection'
-                                ? 'bg-agent-trading text-charcoal-900 font-medium'
+                                ? 'bg-[#be6a47] text-charcoal-900 font-medium'
                                 : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                             }`}
                           >
