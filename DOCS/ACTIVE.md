@@ -47,7 +47,7 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|---------|---------|
-| ggbot-api | 🟢 Online | 0% | 329MB | Main API server (FastAPI + integrated bot monitoring) |
+| ggbots-api | 🟢 Online | 0% | 329MB | Main API server (FastAPI + integrated bot monitoring) |
 | ccxt-mcp-server | 🟢 Online | 0% | 5MB | Crypto price/data provider |
 | ggshot-filter | 🟢 Online | 0% | 25MB | Signal filtering service |
 
@@ -113,7 +113,7 @@
 ### Application Ports
 | Port | Service | Protocol | Access | Purpose |
 |------|---------|----------|--------|---------|
-| **8000** | ggbot-api | HTTP | Public | Main API server (extraction, decision, agent control) |
+| **8000** | ggbots-api | HTTP | Public | Main API server (extraction, decision, agent control) |
 | **8080** | code-server | HTTP | Public | VSCode in browser (development environment) |
 
 ### Database Ports
@@ -158,7 +158,7 @@ pm2 list
 pm2 monit
 
 # Logs  
-pm2 logs ggbot-api
+pm2 logs ggbots-api
 pm2 logs ggshot-filter
 
 # Resources
