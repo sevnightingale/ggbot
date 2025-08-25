@@ -732,8 +732,7 @@ Available Data:
 Assessment Boundaries:
 - Strong trend alignment (both Aroon timeframes favor signal direction): +0.03 to +0.08
 - Moderate trend alignment (mixed signals, some consolidation): +0.00 to +0.03
-- Counter-trend setup (short-term trend opposes signal): -0.20 to -0.08
-  With volume confirmation >2.5x: reduce penalty below -0.12
+- Counter-trend setup (short-term trend opposes signal): -0.12 to -0.20
 - Ranging/consolidating markets (both timeframes ranging): -0.06 to -0.12
 
 Micro-adjustments within ranges:
@@ -756,8 +755,8 @@ Assessment Boundaries:
 - Exceptional volume (>1.5x avg) with momentum alignment: +0.05 to +0.12
 - Strong volume (1.0-1.5x avg) with momentum alignment: +0.00 to +0.04
 - Moderate volume with mixed momentum: +0.00 to +0.02
-- Weak volume (<0.75x avg): -0.06 to -0.12
-- MFI strongly opposing direction (>20 points): -0.07 to -0.14
+- Weak volume (<0.75x avg): -0.08 to -0.15
+- MFI strongly opposing direction (>20 points): -0.06 to -0.12
 
 Micro-adjustments within ranges:
 - Price vs VWAP favorable side by >1%: bias toward upper end of positive ranges
@@ -784,7 +783,6 @@ Assessment Boundaries:
 Micro-adjustments within ranges:
 - Donchian breakout aligning with signal direction: bias toward upper end of positive ranges
 - Price at Donchian extreme opposing signal direction: bias toward lower end of negative ranges
-- Donchian position >80% with direction alignment: +0.02 to +0.04 additional boost
 
 PILLAR 3 - IMMEDIATE CONDITIONS
 Core Question: "Are there immediate execution risks?"
@@ -847,7 +845,7 @@ Use exact numerical boundaries provided for each pillar. Apply adjustments syste
 
 After completing your reasoning and calculation above, provide the structured output in plain text format with NO FORMATTING:
 
-ACTION: [extract direction from signal - if signal contains "Long" use "long", if contains "Short" use "short"]
+ACTION: validate
 CONFIDENCE: [use the exact result from your Final Calculation above, 3 decimal places]
 STOP_LOSS: [extract from signal]  
 TAKE_PROFIT: [extract Target 1 from signal]
@@ -1538,17 +1536,6 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             intent['ggshot_signal_validation'] = True
             intent['signal_data'] = decision['ggshot_signal_data']
             intent['original_signal'] = decision.get('original_signal', 'Signal data not available')
-            
-            # For ggShot signals, ensure we have a valid action for trading
-            # If no action was parsed but confidence >= 0.50, extract from signal direction
-            if not intent.get('action') or intent.get('action') == 'no_action':
-                signal_direction = decision['ggshot_signal_data'].get('parsed_data', {}).get('ggshot_signal', {}).get('direction', '').lower()
-                if signal_direction in ['long', 'short'] and decision['confidence'] >= 0.50:
-                    intent['action'] = signal_direction
-                    logger.bind(module="decision.engine", user_id=self.user_id).info(
-                        f"🎯 ggShot: Set action={signal_direction} from signal direction (confidence={decision['confidence']})"
-                    )
-            
             # Add full prompt for ggShot backtesting if available
             if decision.get('full_prompt'):
                 intent['full_prompt'] = decision['full_prompt']
@@ -1557,7 +1544,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             f"Created intent with confidence={decision['confidence']} for Trading Module risk calculation"
         )
         
-        return self._sanitize_for_json(intent)
+        return intent
     
     async def _fire_ggshot_parallel_testing(self, original_signal: str, market_data: Dict, symbol: str, user_id: str):
         """
