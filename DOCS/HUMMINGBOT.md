@@ -1,18 +1,18 @@
 # Hummingbot Integration Plan
 
 **Date**: 2025-08-21  
-**Status**: Fresh Start - Source Installation Approach  
+**Status**: Fresh Start - API + Script V2 Approach  
 **Priority**: High - ggShot paper trading ready for production
 
-## 🎯 **Approach: Official Source Installation**
+## 🎯 **Approach: Official API Integration + Custom Script V2**
 
-Following official Hummingbot source installation documentation exactly, with clean break from legacy integration. Source installation chosen to enable full customization and potential future connector development.
+Following official Hummingbot documentation exactly, with clean break from legacy integration. Combines source installation (for Script V2 development) with official HTTP API integration (for stable communication).
 
 ### **Architecture Overview**
 ```
-ggShot Signal → Trading Module → Hummingbot Client → Paper Trading
-     ↓              ↓              ↓              ↓
-Decision Agent  LLM Normalize   Account Mgmt   Real Execution
+ggShot Signal → ggbot API Client → Hummingbot API → Script V2 → Paper Trading
+     ↓              ↓                   ↓             ↓          ↓
+Decision Agent  HTTP Calls        Account Mgmt   ggShot Logic  Real Execution
 ```
 
 ## 🚀 **Implementation Phases**
@@ -21,49 +21,120 @@ Decision Agent  LLM Normalize   Account Mgmt   Real Execution
 **Goal**: ggShot signals execute as paper trades
 
 #### **Infrastructure Setup**
-**🧑‍💻 Sev Tasks** (Interactive/System-level):
-```bash
-# 1. System dependencies
-sudo apt update && sudo apt upgrade -y && sudo apt install -y build-essential
 
-# 2. Install Miniconda (interactive prompts)
+**🧑‍💻 Sev Tasks** (Interactive/System-level):
+
+**Step 1: System Dependencies** (from any directory) DONE
+```bash
+# Can be run from anywhere - installs system-wide packages
+sudo apt update && sudo apt upgrade -y && sudo apt install -y build-essential
+```
+
+**Step 2: Install Miniconda** (from home directory) DONE
+```bash
+# Navigate to home directory for clean installation
+cd ~
 wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh
 bash Miniconda3-latest-Linux-x86_64.sh
-# Follow prompts, accept defaults, restart terminal
-
-# 3. Initial Hummingbot setup (interactive configuration)
-cd hummingbot
-./start
-# Set security password, configure paper trading
+# Follow interactive prompts:
+# - Accept license terms
+# - Accept default installation location (/home/sev/miniconda3)
+# - Choose YES to initialize conda in .bashrc
+# - Restart terminal after installation completes
 ```
 
-**🤖 Claude Tasks** (Automated/Code):
+**Step 3: Clone Hummingbot** (separate from ggbot project) DONE
 ```bash
-# 1. Clone and install Hummingbot
+# IMPORTANT: Clone outside of /home/sev/ggbot to avoid conflicts
+cd ~  # Go to home directory (/home/sev)
 git clone https://github.com/hummingbot/hummingbot.git
-cd hummingbot
-./install
-conda activate hummingbot
-./compile
+cd hummingbot  # Now in /home/sev/hummingbot
 ```
+
+**Step 4: Hummingbot Installation** (inside hummingbot directory)
+```bash
+# Must be inside /home/sev/hummingbot for these commands
+pwd  # Should show /home/sev/hummingbot
+./install  # Interactive conda environment creation
+conda activate hummingbot  # Activate the environment
+./compile  # Compile Hummingbot (takes 2-3 minutes)
+```
+
+**Step 5: Initial Configuration** (interactive setup)
+```bash
+# Still inside /home/sev/hummingbot
+./start
+# Interactive prompts will ask for:
+# - Security password (remember this!)
+# - Paper trading setup
+# - Exchange connector configuration
+```
+
+**Step 6: Set Up Hummingbot API** (optional - can be Docker or source-based)
+```bash
+# Option A: Use existing Hummingbot source with API mode
+cd /home/sev/hummingbot
+# Configure for API mode if needed
+
+# Option B: Separate Hummingbot API installation (Docker)
+cd ~
+git clone https://github.com/hummingbot/hummingbot-api
+cd hummingbot-api
+./setup.sh
+./run.sh
+```
+
+**🤖 Claude Tasks** (Integration Development):
+```bash
+# Will work from /home/sev/ggbot directory
+# Building HTTP API client for ggbot → Hummingbot communication
+cd /home/sev/ggbot
+# Create trading/hummingbot_api_client.py and Script V2
+```
+
+#### **Directory Structure After Setup**
+```
+/home/sev/
+├── ggbot/                         # Your existing platform (PRIMARY WORK AREA)
+│   ├── main_api.py
+│   ├── decision/
+│   ├── extraction/
+│   └── (new) trading/hummingbot_api_client.py  # HTTP API integration
+├── hummingbot/                    # Hummingbot source installation
+│   ├── hummingbot/               # Source code
+│   ├── conf/                     # Configuration files
+│   ├── logs/                     # Hummingbot logs
+│   └── scripts/ggbot_strategy.py # ONE custom Script V2 file
+├── hummingbot-api/               # Optional: Separate API installation
+│   └── (Docker-based API server)
+└── miniconda3/                   # Conda installation
+```
+
+**Key Points:**
+- **90% of work happens in `/home/sev/ggbot`** (HTTP API client)
+- **Minimal `/home/sev/hummingbot` access** (just one Script V2 file)
+- **Clean separation** between ggbot platform and Hummingbot
 
 #### **Integration Strategy**
 
 **🤖 Claude Tasks** (Code Development):
-- **Trading Module**: Create Python interface to Hummingbot strategies
+- **HTTP API Client**: Create `hummingbot_api_client.py` in ggbot/trading/
+- **Script V2 Development**: Create `ggbot_strategy.py` in /home/sev/hummingbot/scripts/
 - **Market Data Service**: Symbol normalization ("solana" → "SOL-USDT")  
-- **Strategy Wrapper**: Convert ggShot signals to Hummingbot strategy execution
 - **Same Endpoints**: Keep `/webhooks/execute-trade` for seamless Decision Module integration
 
 **🧑‍💻 Sev Tasks** (Configuration):
 - **Exchange Setup**: Configure paper trading connectors in Hummingbot
-- **Strategy Configuration**: Set up basic trading strategies for testing
+- **API Setup**: Start Hummingbot API server (port 8000 or custom)
+- **Script Deployment**: Install ggbot_strategy.py and test with `start --script`
 - **Credentials**: Configure exchange API keys (sandbox/testnet initially)
 
 #### **Success Criteria**
 - [ ] Hummingbot running with paper trading enabled
-- [ ] Single ggShot signal executes paper trade via Python integration
-- [ ] Position tracking via Hummingbot's internal APIs
+- [ ] Hummingbot API server responding (http://localhost:8000/health)
+- [ ] Script V2 deployed and executable via `start --script ggbot_strategy.py`
+- [ ] Single ggShot signal executes paper trade via HTTP API integration
+- [ ] Position tracking via Hummingbot API endpoints
 - [ ] No changes needed to Decision Module
 
 ### **Phase 2: Multi-User & Symbol Support**
@@ -91,19 +162,19 @@ class MarketDataService:
 
 #### **User Account Management**
 **🤖 Claude Tasks** (Code Development):
-- **Account Mapping**: Each config_id maps to isolated Hummingbot strategy instance
-- **Configuration Management**: Separate strategy configs per user
-- **Data Isolation**: Query separation in strategy execution
+- **API Account Management**: Use Hummingbot API endpoints for user account isolation
+- **Configuration Management**: Separate API calls per user configuration
+- **Data Isolation**: Query separation via API account management
 
 **🧑‍💻 Sev Tasks** (Setup & Security):
-- **Credential Storage**: Configure secure API key storage per user+exchange
-- **Strategy Templates**: Set up base strategy configurations
-- **Monitoring Setup**: Configure separate logging/monitoring per config
+- **API Authentication**: Set up secure Hummingbot API authentication
+- **Account Creation**: Configure multiple accounts via API endpoints
+- **Monitoring Setup**: Configure separate API monitoring per config
 
 #### **Success Criteria**  
 - [ ] All 140+ ggShot symbols supported
-- [ ] Multiple users trading independently via separate strategy instances
-- [ ] Performance tracking per configuration
+- [ ] Multiple users trading independently via separate API accounts
+- [ ] Performance tracking per configuration via API endpoints
 
 ### **Phase 3: Production Features**
 **Goal**: Production-ready with advanced strategic management
@@ -134,31 +205,61 @@ class MarketDataService:
 - **Hummingbot Database**: Trade execution, position tracking, order management
 - **Sync Service**: Real-time bridging for frontend display
 
-### **Strategy Integration Pattern**
+### **API Integration Pattern**
 ```python
-# Direct Python integration with Hummingbot source
-from hummingbot.core.event.events import TradeType, OrderType
-from hummingbot.strategy.script_strategy_base import ScriptStrategyBase
+# ggbot/trading/hummingbot_api_client.py - HTTP API integration
+from hummingbot_api_client import HummingbotAPIClient
 
-class GGBotStrategy(ScriptStrategyBase):
-    """Custom strategy for ggShot signal execution"""
+class GGBotHummingbotClient:
+    """HTTP API client for ggBot → Hummingbot communication"""
     
-    def __init__(self, connectors: Dict[str, ConnectorBase]):
-        super().__init__(connectors)
-        self.ggbot_signal_queue = asyncio.Queue()
+    def __init__(self):
+        self.client = HummingbotAPIClient(
+            base_url="http://localhost:8000",
+            username="admin", 
+            password="admin"
+        )
     
-    async def execute_ggshot_signal(self, signal: dict):
-        """Execute ggShot trading signal"""
+    async def execute_ggshot_signal(self, config_id: str, signal: dict):
+        """Execute ggShot trading signal via HTTP API"""
         trading_pair = self.normalize_symbol(signal['symbol'])
         amount = self.calculate_position_size(signal['confidence'])
         
-        # Direct strategy execution
-        await self.buy(
+        # HTTP API call to Hummingbot
+        order = await self.client.trading.place_order(
+            account_name=f"paper_{config_id[:8]}",
             connector_name="binance_paper_trade",
             trading_pair=trading_pair,
+            trade_type="BUY" if signal['direction'] == 'long' else "SELL",
             amount=amount,
-            order_type=OrderType.MARKET
+            order_type="MARKET"
         )
+        
+        return order
+```
+
+### **Script V2 Pattern**
+```python
+# /home/sev/hummingbot/scripts/ggbot_strategy.py - Custom Script V2
+from hummingbot.strategy.strategy_v2_base import StrategyV2Base
+
+class GGBotStrategy(StrategyV2Base):
+    """Script V2 for ggShot signal execution"""
+    
+    def __init__(self):
+        super().__init__()
+        self.signal_queue = asyncio.Queue()
+    
+    async def on_tick(self):
+        """Process queued ggShot signals"""
+        if not self.signal_queue.empty():
+            signal = await self.signal_queue.get()
+            await self.execute_signal(signal)
+    
+    async def execute_signal(self, signal: dict):
+        """Execute ggShot trading signal within Hummingbot"""
+        # Signal comes from HTTP API, executes within Hummingbot
+        pass
 ```
 
 ### **Symbol Normalization Strategy**
@@ -186,108 +287,119 @@ def confidence_to_risk_percentage(confidence: float) -> float:
 
 ### **Core Components**
 
-#### **1. Trading Integration Bridge** 
+#### **1. HTTP API Integration Bridge** 
 ```python
-# /trading/hummingbot_bridge.py - New integration layer
+# /trading/hummingbot_api_client.py - HTTP API integration layer
 import asyncio
-from hummingbot.client.hummingbot_application import HummingbotApplication
+from hummingbot_api_client import HummingbotAPIClient
 
-class HummingbotBridge:
-    """Bridge between ggBot and Hummingbot strategies"""
+class HummingbotAPIBridge:
+    """Bridge between ggBot and Hummingbot via HTTP API"""
     
     def __init__(self):
-        self.app = HummingbotApplication.main_application()
-        self.active_strategies = {}
+        self.client = HummingbotAPIClient(
+            base_url="http://localhost:8000",
+            username="admin",
+            password="admin"
+        )
     
     async def execute_signal(self, user_config: str, signal: dict):
-        """Execute ggShot signal via Hummingbot strategy"""
-        strategy = self.get_user_strategy(user_config)
-        
+        """Execute ggShot signal via Hummingbot HTTP API"""
         # 1. Normalize symbol
         pair = await self.normalize_symbol(signal['symbol'])
         
         # 2. Calculate position size from confidence
         size = self.calculate_position_size(signal['confidence'])
         
-        # 3. Queue signal for strategy execution
-        await strategy.execute_ggshot_signal({
-            'trading_pair': pair,
-            'amount': size,
-            'side': signal['direction'],
-            'confidence': signal['confidence']
-        })
+        # 3. Execute via HTTP API
+        order = await self.client.trading.place_order(
+            account_name=f"paper_{user_config[:8]}",
+            connector_name="binance_paper_trade",
+            trading_pair=pair,
+            trade_type="BUY" if signal['direction'] == 'long' else "SELL",
+            amount=size,
+            order_type="MARKET"
+        )
         
-        return {"status": "success", "strategy": user_config}
+        return {"status": "success", "order_id": order.get('order_id')}
 
 # FastAPI endpoint (unchanged interface for Decision Module)
 @app.post("/webhooks/execute-trade")
 async def execute_trade(request: TradeRequest):
-    result = await hummingbot_bridge.execute_signal(
+    result = await hummingbot_api_bridge.execute_signal(
         user_config=request.config_id,
         signal=request.dict()
     )
     return result
 ```
 
-#### **2. Strategy Management**
+#### **2. API Account Management**
 ```python
-class StrategyManager:
-    """Maps ggBot configs to Hummingbot strategy instances"""
+class APIAccountManager:
+    """Maps ggBot configs to Hummingbot API accounts"""
     
-    def __init__(self, hummingbot_app):
-        self.app = hummingbot_app
-        self.user_strategies = {}
+    def __init__(self, api_client):
+        self.client = api_client
+        self.user_accounts = {}
     
-    async def create_user_strategy(self, config_id: str, user_config: dict):
-        """Create isolated strategy instance for user config"""
-        strategy_config = {
-            "strategy": "ggbot_strategy",
-            "exchange": "binance_paper_trade",
-            "trading_pairs": self.get_trading_pairs(user_config),
-            "order_amount": user_config.get("base_order_amount", 10.0),
-            "config_id": config_id
-        }
+    async def create_user_account(self, config_id: str, user_config: dict):
+        """Create isolated account for user config via API"""
+        account_name = f"paper_{config_id[:8]}"
         
-        # Initialize strategy with Hummingbot
-        strategy_instance = await self.app.create_strategy(strategy_config)
-        self.user_strategies[config_id] = strategy_instance
+        # Create account via HTTP API
+        account = await self.client.accounts.add_account(
+            account_name=account_name
+        )
         
-        return strategy_instance
+        # Add exchange credentials
+        await self.client.accounts.add_credential(
+            account_name=account_name,
+            connector_name="binance_paper_trade",
+            credentials={"api_key": "paper_key", "secret": "paper_secret"}
+        )
+        
+        self.user_accounts[config_id] = account_name
+        return account_name
     
-    def get_user_strategy(self, config_id: str):
-        """Get existing strategy instance for user"""
-        return self.user_strategies.get(config_id)
+    def get_user_account(self, config_id: str):
+        """Get existing account name for user"""
+        return self.user_accounts.get(config_id, f"paper_{config_id[:8]}")
 ```
 
 #### **3. Performance Tracking**
 ```python
-class PerformanceTracker:
-    """Track performance via direct Hummingbot strategy access"""
+class APIPerformanceTracker:
+    """Track performance via Hummingbot HTTP API"""
     
-    def __init__(self, strategy_manager):
-        self.strategy_manager = strategy_manager
+    def __init__(self, api_client, account_manager):
+        self.client = api_client
+        self.account_manager = account_manager
     
     async def get_config_performance(self, config_id: str) -> dict:
-        """Get performance metrics for user configuration"""
-        strategy = self.strategy_manager.get_user_strategy(config_id)
+        """Get performance metrics for user configuration via API"""
+        account_name = self.account_manager.get_user_account(config_id)
         
-        if not strategy:
-            return {"error": "Strategy not found"}
+        if not account_name:
+            return {"error": "Account not found"}
         
-        # Access strategy's trade history directly
-        trades = strategy.get_trade_history()
-        active_orders = strategy.get_active_orders()
+        # Get portfolio state via HTTP API
+        portfolio = await self.client.portfolio.get_state()
         
-        # Calculate metrics from strategy data
-        total_pnl = sum(trade.profit_loss for trade in trades)
-        winning_trades = [t for t in trades if t.profit_loss > 0]
+        # Get trade history via HTTP API  
+        # Note: API endpoints may vary - check official documentation
+        trades = await self.client.trading.get_trades(account_name=account_name)
+        orders = await self.client.trading.get_orders(account_name=account_name)
+        
+        # Calculate metrics from API data
+        total_pnl = sum(trade.get('profit_loss', 0) for trade in trades)
+        winning_trades = [t for t in trades if t.get('profit_loss', 0) > 0]
         
         return {
             "total_pnl": total_pnl,
             "trade_count": len(trades),
             "win_rate": len(winning_trades) / len(trades) if trades else 0,
-            "active_orders": len(active_orders),
-            "strategy_status": strategy.status
+            "active_orders": len([o for o in orders if o.get('status') == 'open']),
+            "account_name": account_name
         }
 ```
 
@@ -300,9 +412,9 @@ class PerformanceTracker:
 - **Audit Trail**: Keep strategy_runs for decision tracking
 
 ### **Replaced Components**  
-- **CCXT MCP**: Replaced with Hummingbot API
-- **Custom Trading Engine**: Replaced with Hummingbot execution
-- **Manual TP/SL**: Replaced with automatic position management
+- **CCXT MCP**: Replaced with Hummingbot HTTP API
+- **Custom Trading Engine**: Replaced with Hummingbot API execution
+- **Manual TP/SL**: Replaced with Hummingbot automatic position management
 
 ### **Enhanced Components**
 - **Monitoring**: Real-time position tracking vs 30-second polling
@@ -312,23 +424,23 @@ class PerformanceTracker:
 ## 🎯 **Success Metrics**
 
 ### **Core Functionality Targets**
-- [ ] ggShot signals → paper trades in <60 seconds
+- [ ] ggShot signals → paper trades in <60 seconds via HTTP API
 - [ ] Zero execution failures due to integration issues
 - [ ] Position sizing calculated correctly from confidence
-- [ ] Basic P&L tracking functional via Hummingbot strategies
+- [ ] Basic P&L tracking functional via Hummingbot API endpoints
 
 ### **Multi-User Platform Targets**
 - [ ] All 140+ ggShot symbols supported
-- [ ] 5+ users trading simultaneously via separate strategy instances
-- [ ] Performance tracking per configuration
+- [ ] 5+ users trading simultaneously via separate API accounts
+- [ ] Performance tracking per configuration via API queries
 - [ ] Resource usage <80% of available system capacity
 
 ### **Production Readiness Targets**  
-- [ ] Strategic trade management operational
+- [ ] Strategic trade management operational via Script V2
 - [ ] Live trading infrastructure ready (credentials, security)
-- [ ] <2 second signal execution latency
+- [ ] <2 second HTTP API call latency
 - [ ] >99% system uptime for extended periods
-- [ ] Comprehensive monitoring and alerting functional
+- [ ] Comprehensive monitoring and alerting functional via API
 
 ## 🔄 **Migration Strategy**
 
@@ -340,6 +452,7 @@ class PerformanceTracker:
 
 ### **Risk Mitigation**
 - **Version Pinning**: Use specific Hummingbot releases, avoid development branch for production
+- **API Stability**: Use official HTTP API endpoints only (no internal imports)
 - **Source Control**: Track all customizations in version control for reproducibility
 - **Rollback Plan**: Maintain clean system snapshots before major changes
 - **Gradual Rollout**: Start with paper trading only, progressive live trading deployment
@@ -354,10 +467,10 @@ class PerformanceTracker:
 4. Set up basic strategy configuration
 
 **🤖 Claude Tasks** (Integration Development):
-1. Build Hummingbot bridge layer for ggBot integration
-2. Create custom ggBot strategy class
+1. Build HTTP API client for ggBot integration (`trading/hummingbot_api_client.py`)
+2. Create custom Script V2 (`/home/sev/hummingbot/scripts/ggbot_strategy.py`)
 3. Implement symbol normalization service
-4. Test single ggShot signal execution
+4. Test single ggShot signal execution via API
 
 ### **Scale Phase**  
 **🧑‍💻 Sev Tasks** (Configuration & Testing):
@@ -367,10 +480,10 @@ class PerformanceTracker:
 4. Security and credential management setup
 
 **🤖 Claude Tasks** (Platform Development):
-1. Implement multi-user strategy management
-2. Build performance tracking integration
+1. Implement multi-user API account management
+2. Build performance tracking via API endpoints
 3. Create advanced position sizing algorithms
-4. Develop monitoring and alerting systems
+4. Develop monitoring and alerting systems via API
 
 ### **Production Phase**
 **🧑‍💻 Sev Tasks** (Production Setup):
@@ -387,4 +500,4 @@ class PerformanceTracker:
 
 ---
 
-**Result**: Clean, source-based Hummingbot integration that preserves ggBot's strengths while leveraging battle-tested execution infrastructure. Direct Python integration enables full customization and potential future connector development. Ready for ggShot production deployment with clear scaling path to multi-user platform.
+**Result**: Clean, API-based Hummingbot integration that preserves ggBot's strengths while leveraging battle-tested execution infrastructure. HTTP API integration ensures stability and upgradability, while Script V2 enables custom ggShot logic. Ready for ggShot production deployment with clear scaling path to multi-user platform.

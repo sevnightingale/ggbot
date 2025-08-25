@@ -13,9 +13,7 @@ module.exports = {
         PYTHONPATH: '/home/sev/ggbot',
         NODE_ENV: 'production'
       },
-      error_file: './logs/ggbots-api.error.log',
-      out_file: './logs/ggbots-api.out.log',
-      log_file: './logs/ggbots-api.combined.log',
+      log: false,
       time: true
     },
     {
@@ -30,31 +28,12 @@ module.exports = {
       env: {
         PYTHONPATH: '/home/sev/ggbot'
       },
-      error_file: './logs/ggshot-filter.error.log',
-      out_file: './logs/ggshot-filter.out.log',
-      log_file: './logs/ggshot-filter.combined.log',
-      time: true
-    },
-    {
-      name: 'bot-monitor',
-      script: 'core/monitoring/service_runner.py',
-      interpreter: '/home/sev/ggbot/.venv/bin/python',
-      cwd: '/home/sev/ggbot',
-      instances: 1,
-      autorestart: true,
-      watch: false,
-      max_memory_restart: '256M',
-      env: {
-        PYTHONPATH: '/home/sev/ggbot'
-      },
-      error_file: './logs/bot-monitor.error.log',
-      out_file: './logs/bot-monitor.out.log',
-      log_file: './logs/bot-monitor.combined.log',
+      log: false,
       time: true
     },
     {
       name: 'ccxt-mcp-server',
-      script: 'core/mcp/ccxt_server.py',
+      script: 'core/mcp/servers/ccxt_mcp_server.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
       instances: 1,
@@ -64,9 +43,7 @@ module.exports = {
       env: {
         PYTHONPATH: '/home/sev/ggbot'
       },
-      error_file: './logs/ccxt-mcp-server.error.log',
-      out_file: './logs/ccxt-mcp-server.out.log',
-      log_file: './logs/ccxt-mcp-server.combined.log',
+      log: false,
       time: true
     }
   ]

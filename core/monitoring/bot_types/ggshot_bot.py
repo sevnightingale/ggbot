@@ -387,8 +387,9 @@ class GGShotBotHandler(BaseBotHandler):
                         now = datetime.now(timezone.utc)
                         time_diff = now - last_activity
                         
-                        # Log for debugging
-                        self.logger.info(f"ggShot last signal: {last_activity}, Now: {now}, Diff: {time_diff}")
+                        # Log only if time_diff exceeds threshold (reduce noise)
+                        if time_diff.total_seconds() > 3600:  # Log only if >1 hour since last signal
+                            self.logger.debug(f"ggShot last signal: {last_activity}, Now: {now}, Diff: {time_diff}")
                         
                         return time_diff
                     
@@ -431,8 +432,9 @@ class GGShotBotHandler(BaseBotHandler):
                         now = datetime.now(timezone.utc)
                         time_diff = now - last_activity
                         
-                        # Log for debugging
-                        self.logger.info(f"ggShot last decision: {last_activity}, Now: {now}, Diff: {time_diff}")
+                        # Log only if time_diff exceeds threshold (reduce noise)  
+                        if time_diff.total_seconds() > 3600:  # Log only if >1 hour since last decision
+                            self.logger.debug(f"ggShot last decision: {last_activity}, Now: {now}, Diff: {time_diff}")
                         
                         return time_diff
                     

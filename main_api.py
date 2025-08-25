@@ -9,6 +9,7 @@ import sys
 import signal
 import asyncio
 from pathlib import Path
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
@@ -50,11 +51,43 @@ from core.api.users_api import router as users_router
 # Import test API router
 from core.api.test_api import router as test_router
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Handle startup and shutdown events."""
+    from core.common.logger import logger
+    
+    # Startup
+    logger.info("🚀 Starting GGBot API Server with integrated scheduler and trading")
+    
+    # Start bot monitoring background task
+    asyncio.create_task(bot_monitoring_task())
+    logger.info("🤖 Started bot monitoring with WebSocket broadcasting")
+    
+    # Initialize the scheduler (but don't start autonomous mode)
+    success = await initialize_scheduler()
+    if success:
+        logger.info("✅ Scheduler initialized successfully (autonomous mode off)")
+    else:
+        logger.error("❌ Failed to initialize scheduler")
+    
+    # Trading execution adapter initialization disabled - being rebuilt with new Hummingbot API integration
+    
+    yield  # App runs here
+    
+    # Shutdown
+    logger.info("🔄 Shutting down GGBot API Server...")
+    
+    # Shutdown the scheduler
+    await shutdown_scheduler()
+    
+    logger.info("✅ Scheduler shutdown complete")
+
 # Create the main app
 app = FastAPI(
     title="GGBot API",
     description="Combined API for GGBot cryptocurrency trading system",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # Add CORS middleware for frontend access
@@ -400,7 +433,10 @@ async def bot_monitoring_task():
     # Register bot handlers
     bot_monitor.register_bot_handler('decision', GGShotBotHandler)
     bot_monitor.register_bot_handler('ggshot', GGShotBotHandler)
-    logger.info("🤖 Registered bot handlers: decision, ggshot")
+    bot_monitor.register_bot_handler('ggshot_test', GGShotBotHandler)  # Test configs use same handler
+    bot_monitor.register_bot_handler('testing', GGShotBotHandler)     # Test configs use same handler  
+    bot_monitor.register_bot_handler('user', GGShotBotHandler)        # User configs use same handler
+    logger.info("🤖 Registered bot handlers: decision, ggshot, ggshot_test, testing, user")
     
     # Main monitoring loop
     while True:
@@ -446,38 +482,6 @@ async def bot_monitoring_task():
             logger.error(f"Error in bot monitoring task: {e}")
             await asyncio.sleep(30)  # Wait longer on errors
 
-@app.on_event("startup")
-async def startup_event():
-    """Initialize scheduler and trading execution adapter on startup."""
-    from core.common.logger import logger
-    
-    logger.info("🚀 Starting GGBot API Server with integrated scheduler and trading")
-    
-    # Start bot monitoring background task
-    asyncio.create_task(bot_monitoring_task())
-    logger.info("🤖 Started bot monitoring with WebSocket broadcasting")
-    
-    # Initialize the scheduler (but don't start autonomous mode)
-    success = await initialize_scheduler()
-    if success:
-        logger.info("✅ Scheduler initialized successfully (autonomous mode off)")
-    else:
-        logger.error("❌ Failed to initialize scheduler")
-    
-    # Trading execution adapter initialization disabled - being rebuilt with new Hummingbot API integration
-
-
-@app.on_event("shutdown") 
-async def shutdown_event():
-    """Gracefully shutdown scheduler on API shutdown."""
-    from core.common.logger import logger
-    
-    logger.info("🔄 Shutting down GGBot API Server...")
-    
-    # Shutdown the scheduler
-    await shutdown_scheduler()
-    
-    logger.info("✅ Scheduler shutdown complete")
 
 if __name__ == "__main__":
     # Get configuration from environment
