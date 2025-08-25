@@ -115,7 +115,7 @@ const TechnicalIndicatorsSection: React.FC<TechnicalIndicatorsSectionProps> = ({
     <div>
       {/* Header and Search */}
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-footnote text-bone-200 font-medium">INDICATOR SELECTION</h4>
+        <h4 className="text-xs text-gray-400 font-medium">INDICATOR SELECTION</h4>
         <span className="text-footnote text-gray-400">{selectedIndicators.size}/12 selected</span>
       </div>
       
@@ -205,7 +205,7 @@ const SignalProvidersSection: React.FC<SignalProvidersSectionProps> = ({
     <div>
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
-        <h4 className="text-footnote text-bone-200 font-medium">SIGNAL PROVIDER SELECTION</h4>
+        <h4 className="text-xs text-gray-400 font-medium">SIGNAL PROVIDER SELECTION</h4>
       </div>
 
       {/* Providers Content */}

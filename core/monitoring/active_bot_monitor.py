@@ -69,10 +69,11 @@ class ActiveBotMonitor:
     
     async def get_all_bot_configs(self) -> List[Dict[str, Any]]:
         """
-        Get ALL bot configurations from configurations table.
+        Get production bot configurations from configurations table.
+        Excludes test configs to reduce monitoring noise.
         
         Returns:
-            List[Dict]: All bot configurations with all needed data
+            List[Dict]: Production bot configurations with all needed data
         """
         try:
             conn = self._get_db_connection()
@@ -87,6 +88,8 @@ class ActiveBotMonitor:
                             c.user_id,
                             'active' as status
                         FROM configurations c
+                        WHERE c.config_type NOT LIKE '%_test' 
+                          AND c.config_type NOT IN ('testing')
                         ORDER BY c.config_type, c.config_id
                     """)
                     
