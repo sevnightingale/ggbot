@@ -31,9 +31,7 @@ log_file = setup_logging()
 # Import scheduler functions
 from core.scheduling.scheduler import initialize_scheduler, shutdown_scheduler
 
-# Import bot monitoring components
-from core.monitoring.active_bot_monitor import ActiveBotMonitor
-from core.monitoring.bot_types.ggshot_bot import GGShotBotHandler
+# Bot monitoring components removed - will rebuild simpler monitoring later
 
 # Import all the API apps
 from extraction.api import app as extraction_app
@@ -59,9 +57,8 @@ async def lifespan(app: FastAPI):
     # Startup
     logger.info("🚀 Starting GGBot API Server with integrated scheduler and trading")
     
-    # Start bot monitoring background task
-    asyncio.create_task(bot_monitoring_task())
-    logger.info("🤖 Started bot monitoring with WebSocket broadcasting")
+    # Bot monitoring removed - will rebuild simpler monitoring later
+    logger.info("🤖 API server starting without bot monitoring")
     
     # Initialize the scheduler (but don't start autonomous mode)
     success = await initialize_scheduler()
@@ -112,8 +109,7 @@ from core.api.agent_control_api import set_websocket_manager
 # Include the config router directly
 app.include_router(config_router)
 
-# Bot monitoring globals
-bot_monitor: ActiveBotMonitor = None
+# WebSocket connections for future use
 websocket_connections: Dict[str, WebSocket] = {}
 
 class WebSocketManager:
@@ -369,7 +365,7 @@ async def root():
 
 @app.websocket("/ws/bot-status/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    """WebSocket endpoint for real-time bot status updates."""
+    """WebSocket endpoint for future real-time updates (currently placeholder)."""
     await manager.connect(user_id, websocket)
     
     try:
@@ -420,67 +416,7 @@ async def health_check():
         "mode": "combined"
     }
 
-
-async def bot_monitoring_task():
-    """Background task for bot status monitoring and WebSocket broadcasting."""
-    global bot_monitor
-    from core.common.logger import logger
-    
-    # Initialize bot monitor
-    bot_monitor = ActiveBotMonitor()
-    bot_monitor.set_websocket_manager(manager)
-    
-    # Register bot handlers
-    bot_monitor.register_bot_handler('decision', GGShotBotHandler)
-    bot_monitor.register_bot_handler('ggshot', GGShotBotHandler)
-    bot_monitor.register_bot_handler('ggshot_test', GGShotBotHandler)  # Test configs use same handler
-    bot_monitor.register_bot_handler('testing', GGShotBotHandler)     # Test configs use same handler  
-    bot_monitor.register_bot_handler('user', GGShotBotHandler)        # User configs use same handler
-    logger.info("🤖 Registered bot handlers: decision, ggshot, ggshot_test, testing, user")
-    
-    # Main monitoring loop
-    while True:
-        try:
-            # Get all bot configs (both active and inactive) for comprehensive monitoring
-            all_configs = await bot_monitor.get_all_bot_configs()
-            
-            if all_configs:
-                active_count = sum(1 for config in all_configs if config.get('status') == 'active')
-                logger.debug(f"Monitoring {len(all_configs)} total bots ({active_count} active)")
-                
-                # Process each bot config
-                for bot_config in all_configs:
-                    try:
-                        if bot_config.get('status') == 'active':
-                            # Use the monitor's single bot method for active bots
-                            await bot_monitor.monitor_single_bot(bot_config)
-                        else:
-                            # Send inactive status for inactive bots
-                            await bot_monitor.send_inactive_status(bot_config)
-                        
-                    except Exception as e:
-                        logger.error(f"Error processing bot config {bot_config.get('config_id', 'unknown')}: {e}")
-            else:
-                logger.debug("No bots found in database")
-            
-            # Send heartbeat to all connected clients
-            if manager.active_connections:
-                heartbeat_msg = {
-                    "type": "heartbeat",
-                    "timestamp": datetime.utcnow().isoformat() + "Z"
-                }
-                for user_id in list(manager.active_connections.keys()):
-                    try:
-                        await manager.broadcast_to_user(user_id, heartbeat_msg)
-                    except:
-                        pass  # Connection might be closed
-            
-            # Wait before next monitoring cycle
-            await asyncio.sleep(10)
-            
-        except Exception as e:
-            logger.error(f"Error in bot monitoring task: {e}")
-            await asyncio.sleep(30)  # Wait longer on errors
+# Bot monitoring task removed - will rebuild simpler monitoring later
 
 
 if __name__ == "__main__":
