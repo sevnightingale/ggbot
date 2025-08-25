@@ -9,7 +9,7 @@
   2. Activate the virtual environment: source /home/sev/ggbot/.venv/bin/activate
   3. Run Python commands within the (.venv) prompt, e.g., 'python -m extraction.scheduled_extraction --update'
   The prompt should look like: (.venv) sev@ggbot-vm:~/ggbot$
-  This ensures the correct Python interpreter and dependencies (e.g., yfinance, pandas-ta) are used.
+  This ensures the correct Python interpreter and dependencies (e.g., pandas-ta) are used.
 
 ## Code Style
 - Imports: stdlib → third-party → local modules
@@ -27,11 +27,6 @@
 ## Database
 - Connect via common.db utilities
 - Always use context managers and close connections
-- Migrations in database/ directory
-
-## Browser Automation
-- Playwright for browser automation
-- Handle cookies properly (see extraction/run_extraction.py)
 
 ## Testing
 - When creating test scripts, add them to the ggbot/tests/ directory.
