@@ -15,11 +15,11 @@
 
 ### Active API Calls (Most Used)
 
-**Bot Control & Monitoring**
+**Bot Control** (Currently placeholder - will rebuild)
 - `GET /agent/api/bots` - List all bots for a user (frontend loads on mount)
 - `POST /agent/api/bots/{config_id}/start` - Start bot (with optional `demo_mode`)
 - `POST /agent/api/bots/{config_id}/stop` - Stop bot
-- `WS /ws/bot-status/{user_id}` - WebSocket for real-time status updates
+- `WS /ws/bot-status/{user_id}` - WebSocket placeholder (monitoring removed)
 
 **Trading Data**
 - `GET /api/live-position-data` - Fetch current positions with P&L (frontend polls every 15s)
@@ -47,7 +47,7 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|---------|---------|
-| ggbots-api | 🟢 Online | 0% | 329MB | Main API server (FastAPI + integrated bot monitoring) |
+| ggbots-api | 🟢 Online | 0% | 200MB | Main API server (FastAPI) |
 | ccxt-mcp-server | 🟢 Online | 0% | 5MB | Crypto price/data provider |
 | ggshot-filter | 🟢 Online | 0% | 25MB | Signal filtering service |
 
@@ -139,8 +139,7 @@
 
 ## 🔄 Background Tasks
 
-- **Bot Status Monitoring**: Every 10s (integrated into main API)
-- **WebSocket Bot Status**: Every 10s (real-time broadcasting to connected clients)  
+- **Bot Monitoring**: REMOVED (will rebuild simpler monitoring later)  
 - **ggShot Filter Service**: ACTIVE (processing signals 24/7, Test #3 preparing)
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)

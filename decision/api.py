@@ -17,7 +17,8 @@ from core.common.logging_config import logger
 from core.common.config import DEFAULT_USER_ID
 from core.common.db import get_db_connection
 from decision.decision_main import run_decision_process
-from core.monitoring.service import AccountMonitoringService
+# Account monitoring removed - will rebuild simpler monitoring later
+# from core.monitoring.service import AccountMonitoringService
 # Legacy import - TradeLifecycleManager moved to trading-legacy
 # from trading.lifecycle_manager import TradeLifecycleManager
 

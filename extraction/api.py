@@ -205,8 +205,9 @@ async def setup_pre_extraction_monitoring(user_id: str, config_id: str) -> Optio
             logger.bind(user_id=user_id).warning("Exchange credentials not found - proceeding without pre-extraction monitoring")
             return None
         
-        # Import monitoring service
-        from core.monitoring.service import AccountMonitoringService
+        # Account monitoring removed - will rebuild simpler monitoring later
+        # from core.monitoring.service import AccountMonitoringService
+        return None  # Temporarily disable account monitoring
         
         credentials = {
             'apiKey': api_key,

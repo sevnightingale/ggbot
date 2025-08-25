@@ -66,11 +66,11 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 - **CCXT MCP Server**: Universal exchange connectivity and market data
 - **Unified tool interface** for consistent agent-to-service communication
 
-**📊 [Monitoring & Observability](core/monitoring/)**
-- **Universal Bot Status Monitoring** - Real-time pipeline tracking for all active ggbots
-- **Real-time position tracking** across all user strategies
-- **Performance analytics** with P&L calculation and risk metrics
-- **Live status broadcasting** via bot monitoring service
+**📊 Monitoring & Observability** (Currently being rebuilt)
+- **Position tracking** via database queries
+- **Performance analytics** with P&L calculation and risk metrics  
+- **Health checks** via API endpoints
+- *Note: Complex bot monitoring system removed for simplification*
 
 **⚙️ [Configuration Management](core/config/)**
 - **JSON blob configuration system** with template-based setup
@@ -91,7 +91,7 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 - **Multi-bot management** with intuitive configuration interfaces
 - **Real-time performance tracking** showing trades, P&L, and analytics
 - **Brutalist design system** optimized for trading professionals
-- **WebSocket integration** for live updates and system status
+- **WebSocket placeholder** for future live updates (monitoring being rebuilt)
 
 ## Production Features
 
