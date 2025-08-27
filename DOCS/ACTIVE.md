@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - GGBots System Status
 
-**Last Updated**: 2025-08-22  
+**Last Updated**: 2025-08-27  
 **System Health**: 🟢 Operational
 
 ---
@@ -25,10 +25,17 @@
 - `GET /api/live-position-data` - Fetch current positions with P&L (frontend polls every 15s)
 - `GET /api/ggshot-filter-stats` - Historical ggShot performance data
 
+**Paper Trading Engine**
+- `POST /paper/execute` - Execute paper trade from Decision Module intent
+- `GET /paper/positions/{config_id}` - Get open positions with real-time P&L
+- `GET /paper/account/{config_id}` - Account summary with performance analytics
+- `POST /paper/close/{trade_id}` - Close position manually
+- `GET /paper/health` - Service health and diagnostics
+
 **Signal Processing (Backend-to-Backend)**
 - `POST /api/run-extraction` - ggshot-filter calls this to process new signals
 - `POST /api/run-decision` - Decision validation after extraction
-- ~~`POST /api/execute-trade` - Trade execution~~ **REMOVED** (Hummingbot integration removed)
+- `POST /decision/webhooks/trigger-decision` - Trigger decision → paper trading pipeline
 
 **Demo Mode**
 - `POST /agent/api/bots/e249bb49-0455-4596-9657-09bf9e14ca14/start` - Start ggbot-01 demo
@@ -55,6 +62,9 @@
 | Service | Status | Port | Purpose |
 |---------|--------|------|---------|
 | PostgreSQL (ggbot) | 🟢 Online | 5432 | Main application database |
+| PostgreSQL (hummingbot) | 🟢 Online | 5433 | Hummingbot API database (Docker) |
+| Hummingbot API | 🟢 Online | 8888 | Trade execution and market data (Docker) |
+| EMQX Message Broker | 🟢 Online | 1883+ | Real-time bot communication (Docker) |
 
 ---
 
@@ -99,12 +109,13 @@
    - Configuration persistence with save/load functionality
    - Real-time validation and error handling from API responses
    
-2. **Fresh Hummingbot Integration** - Clean slate approach
-   - **Status**: **COMPLETE REMOVAL** - All legacy integration deleted (2025-08-21)
-   - **Current**: Clean system with no Hummingbot components
-   - **Next Steps**: Implement new API-only integration per DOCS/HUMMINGBOT.md
-   - **Approach**: Official Hummingbot API Docker deployment
-   - **Phase 1**: Core API Setup targeting single ggShot signal execution
+2. **Paper Trading Engine** - ✅ **PRODUCTION READY** (2025-08-27)
+   - **Status**: **FULLY OPERATIONAL** - Complete paper trading system with Hummingbot integration
+   - **Architecture**: Real-time market data from Hummingbot API + custom execution engine
+   - **Features**: Isolated $10k accounts, 7-second monitoring, confidence-based sizing
+   - **Database**: New paper trading tables (paper_accounts, paper_trades, paper_orders)
+   - **Integration**: Decision Module → Paper Trading → Real-time P&L tracking
+   - **Next**: Frontend integration for position monitoring and portfolio analytics
 
 ---
 
@@ -120,13 +131,18 @@
 | Port | Service | Access | Purpose |
 |------|---------|--------|---------|
 | **5432** | PostgreSQL (ggbot) | Localhost only | Main application data |
+| **5433** | PostgreSQL (hummingbot) | Docker only | Hummingbot API database |
 
-### Freed Ports (Available for New Hummingbot Integration)
-| Port | Previous Use | Status |
-|------|-------------|--------|
-| **15888** | hummingbot-api | 🟢 **AVAILABLE** |
-| **5433** | PostgreSQL (hummingbot) | 🟢 **AVAILABLE** |
-| **1883, 8081, 8083, 8084, 8883, 18083, 61613** | EMQX Message Broker | 🟢 **AVAILABLE** |
+### Hummingbot Integration Ports (Active)
+| Port | Service | Status | Purpose |
+|------|---------|--------|------------|
+| **8888** | hummingbot-api | 🟢 **ACTIVE** | HTTP API server (Docker container) |
+| **1883** | EMQX Message Broker | 🟢 **ACTIVE** | MQTT communication |
+| **8081** | EMQX Management | 🟢 **ACTIVE** | HTTP management API |
+| **8083, 8084** | EMQX WebSocket | 🟢 **ACTIVE** | MQTT over WebSocket |
+| **8883** | EMQX SSL | 🟢 **ACTIVE** | MQTT over SSL |
+| **18083** | EMQX Dashboard | 🟢 **ACTIVE** | Web management interface |
+| **61613** | EMQX STOMP | 🟢 **ACTIVE** | Web-STOMP gateway |
 
 ### System Ports
 | Port | Service | Access | Purpose |
@@ -139,12 +155,12 @@
 
 ## 🔄 Background Tasks
 
-- **Bot Monitoring**: REMOVED (will rebuild simpler monitoring later)  
+- **Paper Trading Monitor**: ACTIVE (7-second position updates with auto TP/SL execution)
 - **ggShot Filter Service**: ACTIVE (processing signals 24/7, Test #3 preparing)
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
 - **Demo Mode**: On-demand (45-second sequences with real ggshot_filter data)
-- **Autonomous Trading**: DISABLED (legacy Hummingbot integration removed)
+- **Autonomous Trading**: PAPER MODE ACTIVE (live trading expansion planned)
 - **Scheduled Extractions**: DISABLED
 
 ---
@@ -167,4 +183,4 @@ df -h
 
 ---
 
-*Last major update: GGBotConfig design system completed - All three agent configuration sections fully implemented with professional UI/UX, ready for backend integration phase (2025-08-22)*
+*Last major update: Paper Trading Engine production deployment complete - Full Decision Module integration with real-time monitoring and automated risk management (2025-08-27)*

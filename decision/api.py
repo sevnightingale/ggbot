@@ -167,7 +167,8 @@ async def check_and_publish_ggshot_signal(intent: Dict[str, Any], reasoning: str
 
 async def trigger_trading_webhook(user_id: str, intent: Dict[str, Any], decision_id: str):
     """
-    Trigger Trading API after successful decision generation (Webhook pattern).
+    Trigger Paper Trading API after successful decision generation (Webhook pattern).
+    Updated to use new paper trading engine with Hummingbot API integration.
     """
     try:
         # Only trigger trading for actionable intents
@@ -175,22 +176,31 @@ async def trigger_trading_webhook(user_id: str, intent: Dict[str, Any], decision
         
         if action not in ["no_action", "hold", "wait"]:
             async with httpx.AsyncClient(timeout=120.0) as client:
-                # Call the trading webhook endpoint
-                trading_webhook_url = os.getenv("TRADING_WEBHOOK_URL", "http://localhost:8000/trading/webhooks/execute-trade")
+                # Call the paper trading execution endpoint
+                paper_trading_url = os.getenv("PAPER_TRADING_URL", "http://localhost:8000/paper/execute")
+                
+                logger.bind(user_id=user_id).info(f"🚀 Executing paper trade: {action} {intent.get('symbol')} (confidence: {intent.get('confidence', 0):.3f})")
+                
                 response = await client.post(
-                    trading_webhook_url,
+                    paper_trading_url,
                     json=intent
                 )
                 
                 if response.status_code == 200:
                     trade_result = response.json()
-                    logger.bind(user_id=user_id).info(
-                        f"Successfully triggered trade execution: {trade_result.get('trade_id', 'N/A')}"
-                    )
+                    if trade_result.get("status") == "executed":
+                        logger.bind(user_id=user_id).info(
+                            f"✅ Paper trade executed: {trade_result.get('trade_id')} - "
+                            f"${trade_result.get('size_usd', 0):.2f} @ ${trade_result.get('entry_price', 0):.2f}"
+                        )
+                    else:
+                        logger.bind(user_id=user_id).warning(
+                            f"Paper trade rejected: {trade_result.get('reason', 'Unknown reason')}"
+                        )
                     return trade_result
                 else:
-                    logger.bind(user_id=user_id).warning(
-                        f"Trading webhook failed: {response.status_code} - {response.text}"
+                    logger.bind(user_id=user_id).error(
+                        f"Paper trading endpoint failed: {response.status_code} - {response.text}"
                     )
         else:
             logger.bind(user_id=user_id).info(
@@ -224,8 +234,8 @@ async def generate_decision_task(
                     # Note: For mode determination, we check all configs for the user
                     # since mode should be determined by any open positions
                     cur.execute("""
-                        SELECT COUNT(*) FROM trades 
-                        WHERE user_id = %s AND trade_status = 'open'
+                        SELECT COUNT(*) FROM paper_trades 
+                        WHERE user_id = %s AND status = 'open'
                     """, (user_id,))
                     active_trades = cur.fetchone()[0]
                     actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
@@ -300,8 +310,8 @@ async def analyze_market(request: DecisionRequest):
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT COUNT(*) FROM trades 
-                        WHERE user_id = %s AND config_id = %s AND trade_status = 'open'
+                        SELECT COUNT(*) FROM paper_trades 
+                        WHERE user_id = %s AND config_id = %s AND status = 'open'
                     """, (request.user_id, config_id))
                     active_trades = cur.fetchone()[0]
                     actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
@@ -448,9 +458,9 @@ async def get_current_decision(user_id: str):
                     SELECT 
                         trade_id, symbol, entry_price, 
                         unrealized_pnl
-                    FROM trades
-                    WHERE user_id = %s AND trade_status = 'open'
-                    ORDER BY opened_at DESC
+                    FROM paper_trades
+                    WHERE user_id = %s AND status = 'open'
+                    ORDER BY created_at DESC
                     LIMIT 1
                 """, (user_id,))
                 
@@ -546,8 +556,8 @@ async def webhook_trigger_decision(request: WebhookRequest):
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT COUNT(*) FROM trades 
-                    WHERE user_id = %s AND config_id = %s AND trade_status = 'open'
+                    SELECT COUNT(*) FROM paper_trades 
+                    WHERE user_id = %s AND config_id = %s AND status = 'open'
                 """, (request.user_id, request.config_id))
                 active_trades = cur.fetchone()[0]
                 actual_mode = "MANAGE_TRADE" if active_trades > 0 else "NEW_TRADE"
