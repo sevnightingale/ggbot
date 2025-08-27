@@ -13,21 +13,36 @@ The ggbots platform is designed to support multiple users, each able to create a
 
 ## Migration Scripts
 
-- `0001_create_tables.sql`: Initial schema creation (sessions, trades, logs)
-- `0002_add_user_id.sql`: Adds multi-user support with users table and foreign key constraints
-- `0003_create_market_data.sql`: Creates the market_data table for storing price and indicator data
-- `0004_update_schema_for_platform.sql`: Updates schema to support platform architecture (configurations table, additional fields)
-- `0005_additional_improvements.sql`: Adds data_type column to market_data, config_name to configurations, and config_id to trades
-- `0006_update_configuration_constraint.sql`: Updates unique constraint on configurations table to support multiple named configurations
-- `0007_update_market_data_schema.sql`: Updates market_data schema for better data organization
-- `0008_update_market_data_constraint.sql`: Changes unique constraint to allow historical data storage
-- `0009_add_account_monitoring.sql`: Adds account_states table for exchange account monitoring
-- `0010_add_constraints_and_indexes.sql`: Adds position reconciliation and performance indexes
-- `0011_add_data_integrity_constraints.sql`: Adds comprehensive data integrity constraints and reconciliation logging
-- `0012_universal_trade_lifecycle.sql`: **MAJOR MIGRATION** - Transforms phantom-trade system to universal position-based trade lifecycle system
-- `0013_enhanced_trade_lifecycle.sql`: Adds config_id integration, TP/SL tracking, strategy metadata, and backward compatibility
-- `0014_create_ggshot_filter_table.sql`: Creates ggshot_filter table for logging all ggShot signal filter decisions
-- `2025-06-30_add_config_id_to_market_data.sql`: Adds config_id column to market_data table for configuration-driven extraction system
+**Location**: `database/migrations/` directory
+
+### Core Platform Migrations
+- `0001_create_tables.sql`: Initial schema creation (users, logs, core tables)
+- `0002_add_user_id.sql`: Multi-user support with foreign key constraints
+- `0003_create_market_data.sql`: Market data table for price and indicator storage
+- `0004_update_schema_for_platform.sql`: Platform architecture (configurations table)
+- `0005_additional_improvements.sql`: Schema enhancements and data_type columns
+- `0006_update_configuration_constraint.sql`: Configuration table constraint updates
+- `0007_update_market_data_schema.sql`: Market data organization improvements
+- `0008_update_market_data_constraint.sql`: Historical data storage support
+
+### Platform Features
+- `0009_add_account_monitoring.sql`: Account states table for exchange monitoring
+- `0010_add_constraints_and_indexes.sql`: Performance indexes and constraints
+- `0011_add_data_integrity_constraints.sql`: Data integrity and reconciliation
+- `0014_create_ggshot_filter_table.sql`: ggShot signal filter decision logging
+- `2025-08-03_demo_users.sql`: Demo user support for hackathon
+
+### Paper Trading System  
+- `0015_create_paper_trading_tables.sql`: **NEW (August 2025)** - Complete paper trading engine with Hummingbot API integration
+
+### Legacy Cleanup (August 2025)
+**REMOVED TABLES**: The following legacy trading tables have been removed as real trading now uses Hummingbot's own PostgreSQL database:
+- ~~`sessions`~~ - TradingView session management (no longer needed)
+- ~~`trades`~~ - Legacy trade tracking (replaced by `paper_trades` for paper trading, Hummingbot DB for real trades)  
+- ~~`trade_orders`~~ - Legacy order tracking (Hummingbot handles real order management)
+- ~~`instrument_metadata`~~ - Exchange contract specifications (Hummingbot provides this via API)
+
+**Rationale**: Clean separation between paper trading (our database) and real trading (Hummingbot database) prevents confusion and maintains data integrity.
 
 ## Database Schema
 
@@ -56,21 +71,9 @@ Stores user information for multi-user support with demo access capabilities.
 - Users can sign up with just email address (no password required)
 - Default user `00000000-0000-0000-0000-000000000001` updated with demo access
 
-### sessions
-Stores session information for TradingView access and other authenticated services.
-
-| Column     | Type            | Description                            |
-|------------|-----------------|----------------------------------------|
-| session_id | UUID            | Primary Key                            |
-| user_id    | UUID            | Foreign Key to users table             |
-| cookie_data| JSONB           | Session cookies and authentication data|
-| created_at | TIMESTAMP       | Session creation timestamp             |
-| expires_at | TIMESTAMP       | Session expiration timestamp           |
-
-**Indexes:**
-- Primary Key on `session_id`
-- Index on `expires_at` for session cleanup
-- Foreign Key constraint on `user_id` referencing users table
+### ~~sessions~~ (REMOVED)
+**LEGACY TABLE REMOVED (August 2025)**: TradingView session management no longer needed.
+- Browser automation now handles session management internally
 
 ### configurations
 Stores user-specific configurations for each module of the platform.
@@ -90,88 +93,15 @@ Stores user-specific configurations for each module of the platform.
 - Unique constraint on `(user_id, config_type)`
 
 
-### trades
-**ENHANCED SCHEMA (Migration 0012 + 0013)**: Position-based trade tracking with decision module compatibility.
+### ~~trades~~ (REMOVED)
+**LEGACY TABLE REMOVED (August 2025)**: Real trading now uses Hummingbot's own PostgreSQL database.
+- Paper trading uses `paper_trades` table instead
+- Live trading positions and orders are managed by Hummingbot API and stored in separate database
 
-| Column             | Type            | Description                            |
-|--------------------|-----------------|----------------------------------------|
-| trade_id           | UUID            | Primary Key                            |
-| user_id            | UUID            | Foreign Key to users table             |
-| account_id         | VARCHAR         | Account identifier (default: 'main')   |
-| exchange           | VARCHAR         | Exchange name (e.g., 'bitmex')         |
-| symbol             | VARCHAR         | Trading pair (e.g., 'BTC/USD')         |
-| side               | VARCHAR         | Position side: 'long'/'short' (NULL for net exchanges like BitMEX) |
-| trade_status       | VARCHAR         | Trade status: 'open' or 'closed'       |
-| size_contracts     | DECIMAL(20,8)   | Position size in contracts (single source of truth) |
-| entry_price        | DECIMAL(20,8)   | VWAP entry price (calculated from trade_orders) |
-| mark_price         | DECIMAL(20,8)   | Current market price (updated frequently) |
-| unrealized_pnl     | DECIMAL(20,8)   | Current unrealized P&L                 |
-| realized_pnl       | DECIMAL(20,8)   | Final P&L when closed                  |
-| total_fees         | DECIMAL(20,8)   | Sum of fees from trade_orders          |
-| opened_at          | TIMESTAMP       | Trade open timestamp                   |
-| closed_at          | TIMESTAMP       | Trade close timestamp                  |
-| last_updated       | TIMESTAMP       | Last position update timestamp         |
-| config_id          | UUID            | Foreign Key to configurations table (Migration 0013) |
-| leverage           | INTEGER         | Leverage used for this trade (Migration 0013) |
-| collateral_amount  | DECIMAL(20,8)   | Collateral amount in base currency (Migration 0013) |
-| stop_loss          | DECIMAL(20,8)   | Stop loss price level (Migration 0013) |
-| take_profit        | DECIMAL(20,8)   | Take profit price level (Migration 0013) |
-| confidence_score   | NUMERIC(3,2)    | Decision confidence score 0.0-1.0 (Migration 0013) |
-| reasoning_log      | TEXT            | Decision reasoning for audit trail (Migration 0013) |
-
-**Key Design Principles:**
-- **Position-driven lifecycle**: Exchange position changes drive trade state (open/update/close)
-- **Universal exchange support**: Configurable position keys (net vs hedge mode)
-- **Order precision**: Detailed order tracking in separate `trade_orders` table
-- **Single source of truth**: `size_contracts` is authoritative position size
-
-**Indexes:**
-- Primary Key on `trade_id`
-- Index on `(user_id, exchange, trade_status)` for active trades (partial index WHERE trade_status = 'open')
-- Index on `(user_id, exchange, symbol, side, trade_status)` for position key lookups
-- Unique constraint on `(user_id, account_id, exchange, symbol, side)` for position uniqueness
-- Foreign Key constraint on `user_id` referencing users table
-
-**Position Key Strategy:**
-- **Net exchanges (BitMEX)**: key = `(user_id, account_id, exchange, symbol)` (side = NULL)
-- **Hedge exchanges (Binance)**: key = `(user_id, account_id, exchange, symbol, side)`
-
-### trade_orders
-**ENHANCED TABLE (Migration 0012 + 0013)**: Order-level details with TP/SL tracking.
-
-| Column             | Type            | Description                            |
-|--------------------|-----------------|----------------------------------------|
-| id                 | SERIAL          | Primary Key                            |
-| trade_id           | UUID            | Foreign Key to trades table            |
-| exchange           | VARCHAR         | Exchange name for better joins         |
-| symbol             | VARCHAR         | Trading pair for better joins          |
-| exchange_order_id  | VARCHAR         | Exchange-assigned order ID             |
-| client_order_id    | VARCHAR         | Our trade_id when exchange supports it |
-| order_type         | VARCHAR         | Order type: 'market', 'limit', 'stop' |
-| side               | VARCHAR         | Order side: 'buy', 'sell'              |
-| price              | DECIMAL(20,8)   | Order price                            |
-| size               | DECIMAL(20,8)   | Order size                             |
-| filled_size        | DECIMAL(20,8)   | Actually filled size                   |
-| fee                | DECIMAL(20,8)   | Trading fee                            |
-| fee_currency       | VARCHAR         | Fee currency                           |
-| status             | VARCHAR         | Order status: 'open', 'filled', 'canceled' |
-| filled_at          | TIMESTAMP       | Fill timestamp                         |
-| created_at         | TIMESTAMP       | Order creation timestamp               |
-| is_risk_order      | BOOLEAN         | True if this is a TP/SL order (Migration 0013) |
-| risk_type          | VARCHAR(10)     | 'TP' or 'SL' for risk orders (Migration 0013) |
-
-**Purpose:**
-- Enables precise VWAP calculation from multiple fills
-- Tracks fees for accurate P&L computation
-- Supports partial fill scenarios and order tracking
-- Maintains order history for audit and analysis
-
-**Indexes:**
-- Primary Key on `id`
-- Index on `trade_id` for joining with trades
-- Index on `(exchange, exchange_order_id)` for order lookups
-- Unique constraint on `(exchange, exchange_order_id)` to prevent duplicates
-- Foreign Key constraint on `trade_id` referencing trades table
+### ~~trade_orders~~ (REMOVED)
+**LEGACY TABLE REMOVED (August 2025)**: Order management now handled by Hummingbot.
+- Paper trading uses `paper_orders` table for audit trail
+- Live orders are managed through Hummingbot API endpoints
 
 ### strategy_runs
 **NEW TABLE (Migration 0013)**: Tracks decision context and strategy metadata for trades.
@@ -204,33 +134,10 @@ Stores user-specific configurations for each module of the platform.
 - Index on `parent_strategy_run_id` for decision chains
 - Foreign Key constraints on `trade_id` and `config_id`
 
-### instrument_metadata
-**NEW TABLE (Migration 0012)**: Exchange-specific contract specifications.
-
-| Column                | Type            | Description                            |
-|-----------------------|-----------------|----------------------------------------|
-| id                    | SERIAL          | Primary Key                            |
-| exchange              | VARCHAR         | Exchange name                          |
-| symbol                | VARCHAR         | Trading pair symbol                    |
-| contract_value        | DECIMAL(20,8)   | Contract value (1.0 for BitMEX BTC/USD) |
-| contract_currency     | VARCHAR         | Contract currency ('USD', 'BTC', etc.) |
-| tick_size             | DECIMAL(20,8)   | Minimum price increment                |
-| lot_size              | DECIMAL(20,8)   | Minimum size increment                 |
-| supports_hedge_mode   | BOOLEAN         | Whether exchange supports hedge mode   |
-| default_position_mode | VARCHAR         | Default mode: 'net' or 'hedge'        |
-| active                | BOOLEAN         | Whether instrument is active           |
-| updated_at            | TIMESTAMP       | Last update timestamp                  |
-
-**Purpose:**
-- Normalizes contract specifications across exchanges
-- Enables universal position calculations
-- Supports exchange adapter configuration
-- Pre-populated with BitMEX BTC/USD metadata for testing
-
-**Indexes:**
-- Primary Key on `id`
-- Index on `(exchange, symbol)` for lookups
-- Unique constraint on `(exchange, symbol)` to prevent duplicates
+### ~~instrument_metadata~~ (REMOVED)
+**LEGACY TABLE REMOVED (August 2025)**: Exchange specifications now provided by Hummingbot API.
+- Trading rules available via `/connectors/{connector}/trading-rules` endpoint
+- Contract specifications handled by Hummingbot's internal metadata
 
 ### market_data
 Stores market data including indicators and price data for different pairs and timeframes.
@@ -538,8 +445,122 @@ ORDER BY date DESC;
 
 ```
 
+### Paper Trading Tables (Migration 0015)
+
+**NEW SYSTEM (August 2025)**: Complete paper trading engine with Hummingbot API integration for real-time market data.
+
+#### paper_accounts
+Isolated paper trading accounts with $10,000 starting balance per config_id.
+
+| Column | Type | Description |
+|---------|------|-------------|
+| account_id | UUID | Primary Key |
+| config_id | UUID | Foreign Key to configurations (UNIQUE) |
+| user_id | UUID | Foreign Key to users |
+| initial_balance | DECIMAL(20,8) | Starting balance ($10,000 default) |
+| current_balance | DECIMAL(20,8) | Available balance after trades |
+| total_pnl | DECIMAL(20,8) | Cumulative realized P&L |
+| open_positions | INTEGER | Count of active positions |
+| total_trades | INTEGER | Total trades executed |
+| win_trades | INTEGER | Number of profitable trades |
+| loss_trades | INTEGER | Number of losing trades |
+
+**Key Features:**
+- **One account per config_id**: Each strategy gets isolated $10k paper account
+- **Real-time balance tracking**: Updated with each trade and P&L calculation
+- **Performance statistics**: Win rate, total return, trade count
+- **CASCADE DELETE**: Account removed when config is deleted
+
+#### paper_trades  
+Paper trade positions with real-time P&L tracking using Hummingbot API prices.
+
+| Column | Type | Description |
+|---------|------|-------------|
+| trade_id | UUID | Primary Key |
+| account_id | UUID | Foreign Key to paper_accounts |
+| config_id | UUID | Foreign Key to configurations |
+| decision_id | UUID | Links to Decision Module decision |
+| symbol | VARCHAR(20) | Trading pair (BTC/USDT format) |
+| side | VARCHAR(10) | 'long' or 'short' |
+| entry_price | DECIMAL(20,8) | Entry price from Hummingbot API |
+| current_price | DECIMAL(20,8) | Latest price for P&L calculation |
+| size_usd | DECIMAL(20,8) | Position size in USD |
+| leverage | INTEGER | Leverage multiplier (1-100) |
+| unrealized_pnl | DECIMAL(20,8) | Current unrealized P&L |
+| realized_pnl | DECIMAL(20,8) | Final P&L when closed |
+| status | VARCHAR(20) | 'open' or 'closed' |
+| stop_loss | DECIMAL(20,8) | Stop loss price level |
+| take_profit | DECIMAL(20,8) | Take profit price level |
+| confidence_score | DECIMAL(3,2) | Decision confidence (0.0-1.0) |
+
+**Trade Lifecycle:**
+- **Entry**: Created from Decision Module trade intent
+- **Monitoring**: Prices updated every 30 seconds via background task
+- **Exit**: Closed by stop loss, take profit, or manual action
+- **Audit Trail**: Complete decision context preserved
+
+#### paper_orders
+Audit trail of all paper orders (market entry, stop loss, take profit).
+
+| Column | Type | Description |
+|---------|------|-------------|
+| order_id | UUID | Primary Key |
+| trade_id | UUID | Foreign Key to paper_trades |
+| order_type | VARCHAR(20) | 'market', 'stop_loss', 'take_profit' |
+| side | VARCHAR(10) | 'buy' or 'sell' |
+| filled_price | DECIMAL(20,8) | Actual fill price from Hummingbot |
+| size | DECIMAL(20,8) | Order size |
+| fees | DECIMAL(20,8) | Trading fees (0.06% taker fee) |
+
+**Order Types:**
+- **market**: Entry orders executed at mid-price
+- **stop_loss**: Triggered when price hits stop level
+- **take_profit**: Triggered when price hits profit target
+
+#### paper_trading_summary (View)
+Dashboard view combining account statistics with real-time position data.
+
+**Key Metrics:**
+- Current balance and total P&L
+- Win rate percentage and total return
+- Open position count and unrealized P&L
+- Trade statistics and performance analytics
+
+### Paper Trading Integration
+
+**Market Data Source**: Hummingbot API (localhost:8888)
+- **Exchange**: KuCoin connector for all 141 supported pairs
+- **Price Updates**: Real-time bid/ask/mid prices every 30 seconds
+- **Symbol Conversion**: Automatic conversion between internal (BTC/USDT) and Hummingbot (BTC-USDT) formats
+
+**Position Sizing**: Confidence-based sizing with risk management
+```sql
+position_size = confidence_score * max_position_size
+-- Example: confidence=0.65, max=10% of $10k = $650 position
+```
+
+**Fill Model**: Simple mid-price execution with realistic fees
+- **Entry**: Mid-price between bid/ask
+- **Fees**: 0.06% taker fee on all trades
+- **Slippage**: None initially (can be added later)
+
+**Performance Tracking**:
+```sql
+-- View account performance
+SELECT * FROM paper_trading_summary WHERE config_id = 'your-config-id';
+
+-- Active positions with current P&L  
+SELECT symbol, side, unrealized_pnl, confidence_score 
+FROM paper_trades WHERE config_id = ? AND status = 'open';
+
+-- Trade history analysis
+SELECT AVG(realized_pnl), COUNT(*) as total_trades,
+       COUNT(*) FILTER (WHERE realized_pnl > 0) as wins
+FROM paper_trades WHERE config_id = ? AND status = 'closed';
+```
+
 ---
 
 ## 🎯 **Current Live Usage (August 2025)**
 
-The database schema is ready for the new Hummingbot API-only integration approach. The previous config_instances table has been removed as part of the clean slate rebuild.
+The database schema supports both live trading (existing tables) and paper trading (new Migration 0015) with complete isolation between systems. Paper trading uses Hummingbot API for real-time market data while maintaining its own execution and portfolio management logic.

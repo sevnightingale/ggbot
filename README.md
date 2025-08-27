@@ -29,10 +29,12 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 - **Risk-aware decision making** with confidence scoring and position sizing
 
 **⚡ [Trading Agent](trading/)** - Precision Execution Engine
-- **Hummingbot integration** for professional-grade trade execution
-- **Real-time position management** with automatic TP/SL monitoring
-- **Risk enforcement** with user-defined guardrails and emergency controls
-- **Multi-exchange support** with advanced order types (expansion planned)
+- **Paper Trading Engine** - Professional-grade simulation with real Hummingbot market data
+- **Isolated accounts** - $10,000 starting balance per strategy configuration
+- **Real-time monitoring** - 7-second price updates with automatic TP/SL execution
+- **Confidence-based sizing** - Position size = confidence × max position (10% of balance)
+- **Risk enforcement** with portfolio limits, exposure tracking, and emergency controls
+- **Multi-exchange support** with advanced order types (live trading expansion planned)
 
 ## Platform Infrastructure
 
@@ -65,6 +67,12 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 - **Crypto Indicators MCP**: 20 professionally preprocessed technical indicators
 - **CCXT MCP Server**: Universal exchange connectivity and market data
 - **Unified tool interface** for consistent agent-to-service communication
+
+**🎯 [Symbol Standardization](core/symbols/)** - Universal Trading Pair Management
+- **141 trading pairs** with comprehensive format support across all systems
+- **Multi-format conversion**: ggShot (`BTCUSDT`) ↔ CCXT (`BTC/USDT`) ↔ Hummingbot (`BTC-USDT`)
+- **Validation and suggestions** for format errors and unsupported symbols
+- **Future-proof architecture** for platform-wide symbol consistency
 
 **📊 Monitoring & Observability** (Currently being rebuilt)
 - **Position tracking** via database queries
@@ -111,11 +119,13 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 
 ### Enterprise-Grade Execution
 
-**🏛️ [Hummingbot Integration](hummingbot/)** (Phase 1 Complete)
-- **$34B+ proven execution engine** with institutional-grade order management
-- **Paper trading capabilities** for strategy validation and testing
-- **Basic execution adapter** with LLM signal normalization
-- **Multi-exchange connectivity** and advanced order types (Phase 2-3 planned)
+**🏛️ [Paper Trading Engine](trading/)** (Production Ready)
+- **$34B+ proven Hummingbot API** for real-time market data (KuCoin connector)
+- **Professional simulation** - Real prices, realistic spreads, accurate fees (0.06% taker)
+- **Isolated accounts** - $10,000 starting balance per strategy configuration
+- **Automated risk management** - 7-second monitoring with auto TP/SL execution
+- **Complete audit trail** - Full trade lifecycle tracking and performance analytics
+- **Multi-exchange connectivity** and live trading (Phase 2-3 planned)
 
 **🛡️ [Risk Management](trading/)**
 - **Position sizing algorithms** based on AI confidence scoring
