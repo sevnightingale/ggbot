@@ -6,14 +6,24 @@ Includes template-based creation for demo purposes and permission management.
 """
 
 import uuid
+import json
+import psycopg2
+import psycopg2.extras
 from typing import Dict, List, Optional, Any
 from datetime import datetime
 from fastapi import APIRouter, HTTPException, Depends
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from core.common.logger import logger
 from core.common.db import get_db_connection
 from core.common.config import DEFAULT_USER_ID
+from core.config import (
+    BotConfig, 
+    ConfigRepository, 
+    config_repo,
+    PositionSizingMethod,
+    ExecutionMode
+)
 
 
 # API Router
@@ -31,11 +41,13 @@ class StrategyTemplate(BaseModel):
 
 
 class ConfigUpdate(BaseModel):
-    """Update request for configuration."""
+    """Update request for configuration using new schema."""
     config_name: Optional[str] = None
-    strategy: Optional[str] = None
-    risk_guidelines: Optional[str] = None
-    additional_context: Optional[str] = None
+    selected_pair: Optional[str] = None
+    extraction: Optional[Dict] = None
+    decision: Optional[Dict] = None
+    trading: Optional[Dict] = None
+    telegram_integration: Optional[Dict] = None
 
 
 class ConfigPermissions(BaseModel):
@@ -56,8 +68,7 @@ class ConfigResponse(BaseModel):
     updated_at: datetime
     editable: bool
     is_flagship: bool
-    instance_name: Optional[str] = None
-    paper_balance: float = 10000.0
+    config_data: Optional[Dict] = None
 
 
 # Strategy Templates
@@ -103,11 +114,11 @@ STRATEGY_TEMPLATES = {
 @router.post("/create-from-template", response_model=ConfigResponse)
 async def create_strategy_from_template(request: StrategyTemplate):
     """
-    Create a new strategy configuration from a template.
+    Create a new strategy configuration from a template using BotConfig model.
     
     This endpoint:
     1. Creates a new configuration with template settings
-    2. Creates configuration ready for new Hummingbot API integration
+    2. Uses ConfigRepository for structured access
     3. Returns configuration details for frontend
     """
     try:
@@ -126,49 +137,57 @@ async def create_strategy_from_template(request: StrategyTemplate):
         # Adjust risk parameters based on risk_level
         risk_multiplier = {"low": 0.5, "medium": 1.0, "high": 1.5}.get(request.risk_level, 1.0)
         
-        # Build configuration data
+        # Build configuration data using new schema
         config_data = {
-            "user_id": request.user_id,
-            "decision": {
-                "llm_provider": "deepseek",
-                "strategy": template["strategy"],
-                "risk_guidelines": template["risk_guidelines"],
-                "additional_context": template["additional_context"]
-            },
-            "trading": {
-                "exchange": "binance_paper",
-                "symbol": request.symbol,
-                "risk_rules": {
-                    "max_position_size_pct": 0.05 * risk_multiplier,
-                    "max_leverage": 3 * risk_multiplier,
-                    "stop_loss_pct": 0.02,
-                    "take_profit_pct": 0.05
+            "schema_version": "1.0",
+            "selected_pair": request.symbol,
+            "extraction": {
+                "data_sources": {
+                    "technical_indicators": ["RSI_15m", "RSI_1h", "MACD_1h", "BollingerBands_1h", "ATR_1h", "VWAP_1h"]
                 }
             },
-            "extraction": {
-                "sources": {
-                    "crypto_indicators_mcp": {
-                        "enabled": True,
-                        "indicators": ["RSI_15m", "RSI_1h", "MACD_1h", "BollingerBands_1h", "ATR_1h", "VWAP_1h"]
-                    }
+            "decision": {
+                "analysis_frequency": "1h",
+                "system_prompt": f"You are an expert cryptocurrency trader analyzing {request.symbol}. " + template["additional_context"],
+                "user_prompt": template["strategy"] + "\n\nRisk Guidelines: " + template["risk_guidelines"]
+            },
+            "trading": {
+                "execution_mode": "paper",
+                "leverage": int(3 * risk_multiplier),
+                "position_sizing": {
+                    "method": "account_percentage",
+                    "account_percent": 5.0 * risk_multiplier
+                },
+                "risk_management": {
+                    "max_positions": 5,
+                    "default_stop_loss_percent": 2.0,
+                    "default_take_profit_percent": 5.0
                 }
             }
         }
         
+        # Validate config with BotConfig model
+        try:
+            bot_config = BotConfig(**config_data)
+        except Exception as validation_error:
+            logger.error(f"Config validation failed: {validation_error}")
+            raise HTTPException(400, f"Invalid configuration: {str(validation_error)}")
+        
         with get_db_connection() as conn:
             cur = conn.cursor()
+            
+            # Determine config_type based on template
+            config_type = "autonomous_trading"  # All templates are autonomous trading mode
             
             # Insert configuration
             cur.execute("""
                 INSERT INTO configurations (config_id, user_id, config_name, config_type, config_data, created_at, updated_at)
                 VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
                 RETURNING created_at, updated_at
-            """, (config_id, request.user_id, config_name, template["type"], psycopg2.extras.Json(config_data)))
+            """, (config_id, request.user_id, config_name, config_type, psycopg2.extras.Json(config_data)))
             
             timestamps = cur.fetchone()
             created_at, updated_at = timestamps
-            
-            # Note: Instance mapping will be handled by new Hummingbot API integration
             
             conn.commit()
             
@@ -179,14 +198,17 @@ async def create_strategy_from_template(request: StrategyTemplate):
             return ConfigResponse(
                 config_id=config_id,
                 config_name=config_name,
-                config_type=template["type"],
+                config_type=config_type,
                 user_id=request.user_id,
                 created_at=created_at,
                 updated_at=updated_at,
                 editable=True,  # Template configs are editable
-                is_flagship=False
+                is_flagship=False,
+                config_data=config_data
             )
             
+    except HTTPException:
+        raise
     except Exception as e:
         logger.bind(module="config_api").error(f"Failed to create config from template: {e}")
         raise HTTPException(500, f"Failed to create configuration: {str(e)}")
@@ -195,7 +217,7 @@ async def create_strategy_from_template(request: StrategyTemplate):
 @router.put("/{config_id}")
 async def update_config(config_id: str, updates: ConfigUpdate):
     """
-    Update a configuration if it's editable.
+    Update a configuration if it's editable using ConfigRepository.
     
     Flagship configurations (like ggShot) cannot be edited.
     """
@@ -205,7 +227,7 @@ async def update_config(config_id: str, updates: ConfigUpdate):
             
             # Check if config exists and is editable
             cur.execute("""
-                SELECT config_type, config_data 
+                SELECT config_type, config_data, config_name
                 FROM configurations 
                 WHERE config_id = %s
             """, (config_id,))
@@ -214,13 +236,13 @@ async def update_config(config_id: str, updates: ConfigUpdate):
             if not config:
                 raise HTTPException(404, "Configuration not found")
             
-            config_type, config_data = config
+            config_type, config_data, current_name = config
             
             # Check if this is a flagship config (non-editable)
             if config_type in ["ggshot", "ggshot_production"]:
                 raise HTTPException(403, "Flagship ggBot cannot be edited")
             
-            # Apply updates to config_data
+            # Update config_name if provided
             if updates.config_name is not None:
                 cur.execute("""
                     UPDATE configurations 
@@ -228,23 +250,44 @@ async def update_config(config_id: str, updates: ConfigUpdate):
                     WHERE config_id = %s
                 """, (updates.config_name, config_id))
             
-            if any([updates.strategy, updates.risk_guidelines, updates.additional_context]):
-                # Update decision configuration
-                if "decision" not in config_data:
-                    config_data["decision"] = {}
+            # Update config_data if any sections provided
+            updated_config_data = dict(config_data)  # Copy existing data
+            config_updated = False
+            
+            if updates.selected_pair is not None:
+                updated_config_data["selected_pair"] = updates.selected_pair
+                config_updated = True
                 
-                if updates.strategy is not None:
-                    config_data["decision"]["strategy"] = updates.strategy
-                if updates.risk_guidelines is not None:
-                    config_data["decision"]["risk_guidelines"] = updates.risk_guidelines
-                if updates.additional_context is not None:
-                    config_data["decision"]["additional_context"] = updates.additional_context
+            if updates.extraction is not None:
+                updated_config_data["extraction"] = updates.extraction
+                config_updated = True
                 
+            if updates.decision is not None:
+                updated_config_data["decision"] = updates.decision
+                config_updated = True
+                
+            if updates.trading is not None:
+                updated_config_data["trading"] = updates.trading
+                config_updated = True
+                
+            if updates.telegram_integration is not None:
+                updated_config_data["telegram_integration"] = updates.telegram_integration
+                config_updated = True
+            
+            if config_updated:
+                # Validate updated config with BotConfig model
+                try:
+                    bot_config = BotConfig(**updated_config_data)
+                except Exception as validation_error:
+                    logger.error(f"Config validation failed during update: {validation_error}")
+                    raise HTTPException(400, f"Invalid configuration update: {str(validation_error)}")
+                
+                # Update the database
                 cur.execute("""
                     UPDATE configurations 
                     SET config_data = %s, updated_at = NOW()
                     WHERE config_id = %s
-                """, (psycopg2.extras.Json(config_data), config_id))
+                """, (psycopg2.extras.Json(updated_config_data), config_id))
             
             conn.commit()
             
@@ -262,47 +305,91 @@ async def update_config(config_id: str, updates: ConfigUpdate):
 @router.get("/{config_id}")
 async def get_single_config(config_id: str):
     """
-    Get a single configuration by config_id.
+    Get a single configuration by config_id using ConfigRepository.
     
     Returns the complete config_data JSONB for the specified configuration.
     """
     try:
-        with get_db_connection() as conn:
-            cur = conn.cursor()
+        # Try to get config using ConfigRepository first (validates with BotConfig)
+        try:
+            bot_config = config_repo.get_config(config_id)
+            # If successful, also get metadata from database
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT 
+                        c.config_id,
+                        c.config_name,
+                        c.config_type,
+                        c.user_id,
+                        c.config_data,
+                        c.created_at,
+                        c.updated_at
+                    FROM configurations c
+                    WHERE c.config_id = %s
+                """, (config_id,))
+                
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(404, "Configuration not found")
+                
+                config_id, config_name, config_type, user_id, config_data, created_at, updated_at = row
+                
+                # Determine if config is editable
+                is_flagship = config_type in ["ggshot", "ggshot_production"]
+                
+                return {
+                    "config_id": str(config_id),
+                    "config_name": config_name,
+                    "config_type": config_type,
+                    "user_id": str(user_id),
+                    "config_data": config_data,
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                    "editable": not is_flagship,
+                    "is_flagship": is_flagship
+                }
+                
+        except Exception as config_error:
+            # Fall back to raw database access if config validation fails
+            logger.warning(f"ConfigRepository failed for {config_id}, falling back to raw access: {config_error}")
             
-            cur.execute("""
-                SELECT 
-                    c.config_id,
-                    c.config_name,
-                    c.config_type,
-                    c.user_id,
-                    c.config_data,
-                    c.created_at,
-                    c.updated_at
-                FROM configurations c
-                WHERE c.config_id = %s
-            """, (config_id,))
-            
-            row = cur.fetchone()
-            if not row:
-                raise HTTPException(404, "Configuration not found")
-            
-            config_id, config_name, config_type, user_id, config_data, created_at, updated_at = row
-            
-            # Determine if config is editable
-            is_flagship = config_type in ["ggshot", "ggshot_production"]
-            
-            return {
-                "config_id": str(config_id),
-                "config_name": config_name,
-                "config_type": config_type,
-                "user_id": str(user_id),
-                "config_data": config_data,
-                "created_at": created_at,
-                "updated_at": updated_at,
-                "editable": not is_flagship,
-                "is_flagship": is_flagship
-            }
+            with get_db_connection() as conn:
+                cur = conn.cursor()
+                cur.execute("""
+                    SELECT 
+                        c.config_id,
+                        c.config_name,
+                        c.config_type,
+                        c.user_id,
+                        c.config_data,
+                        c.created_at,
+                        c.updated_at
+                    FROM configurations c
+                    WHERE c.config_id = %s
+                """, (config_id,))
+                
+                row = cur.fetchone()
+                if not row:
+                    raise HTTPException(404, "Configuration not found")
+                
+                config_id, config_name, config_type, user_id, config_data, created_at, updated_at = row
+                
+                # Determine if config is editable
+                is_flagship = config_type in ["ggshot", "ggshot_production"]
+                
+                return {
+                    "config_id": str(config_id),
+                    "config_name": config_name,
+                    "config_type": config_type,
+                    "user_id": str(user_id),
+                    "config_data": config_data,
+                    "created_at": created_at,
+                    "updated_at": updated_at,
+                    "editable": not is_flagship,
+                    "is_flagship": is_flagship,
+                    "validation_warning": "Configuration does not conform to current schema"
+                }
             
     except HTTPException:
         raise
@@ -391,9 +478,7 @@ async def get_user_configs(user_id: str):
                     created_at=created_at,
                     updated_at=updated_at,
                     editable=not is_flagship,
-                    is_flagship=is_flagship,
-                    instance_name=instance_name,
-                    paper_balance=float(balance) if balance else 10000.0
+                    is_flagship=is_flagship
                 ))
         
         return configs
@@ -447,6 +532,3 @@ async def delete_config(config_id: str):
         raise HTTPException(500, f"Failed to delete configuration: {str(e)}")
 
 
-# Import required for database operations
-import psycopg2
-import psycopg2.extras

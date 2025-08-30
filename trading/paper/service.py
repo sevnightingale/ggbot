@@ -16,6 +16,10 @@ from psycopg2.extras import RealDictCursor
 from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
 from core.common.logger import logger
 from core.symbols.standardizer import UniversalSymbolStandardizer
+from core.config import config_repo, BotConfig, PositionSizingMethod
+from core.domain.models.account import Account
+from core.domain.models.value_objects import Money, Symbol
+from core.domain.repositories.account_repository import account_repo
 from .market_data import MarketDataAdapter, MarketPrice
 
 
@@ -30,13 +34,10 @@ class PaperTradingService:
     def __init__(self):
         self.market_data = MarketDataAdapter()
         self.symbol_standardizer = UniversalSymbolStandardizer()
+        self.account_repo = account_repo
         
-        # Configuration (could be moved to env vars)
-        self.initial_balance = 10000.00
-        self.max_position_pct = 0.10  # 10% of balance per trade
+        # Default configuration
         self.taker_fee = 0.0006  # 0.06% taker fee
-        self.max_leverage = 10
-        self.max_positions = 5
     
     def _get_db_connection(self):
         """Get database connection"""
@@ -49,7 +50,7 @@ class PaperTradingService:
             cursor_factory=RealDictCursor
         )
     
-    async def get_or_create_paper_account(self, config_id: str, user_id: str) -> Dict[str, Any]:
+    async def get_or_create_paper_account(self, config_id: str, user_id: str) -> Account:
         """
         Get existing paper account or create new one for config_id.
         
@@ -58,42 +59,20 @@ class PaperTradingService:
             user_id: User ID
             
         Returns:
-            Paper account data with current balance and statistics
+            Account domain model with current balance and statistics
         """
-        with self._get_db_connection() as conn:
-            with conn.cursor() as cur:
-                # Check if account exists
-                cur.execute("""
-                    SELECT * FROM paper_accounts 
-                    WHERE config_id = %s AND user_id = %s
-                """, (config_id, user_id))
-                
-                account = cur.fetchone()
-                
-                if account:
-                    logger.debug(f"Found existing paper account for config {config_id}")
-                    return dict(account)
-                
-                # Create new account
-                cur.execute("""
-                    INSERT INTO paper_accounts 
-                    (config_id, user_id, initial_balance, current_balance, total_pnl, 
-                     open_positions, total_trades, win_trades, loss_trades)
-                    VALUES (%s, %s, %s, %s, 0, 0, 0, 0, 0)
-                    RETURNING *
-                """, (config_id, user_id, self.initial_balance, self.initial_balance))
-                
-                new_account = cur.fetchone()
-                conn.commit()
-                
-                logger.info(f"Created new paper account for config {config_id} with ${self.initial_balance:,} starting balance")
-                return dict(new_account)
+        return await self.account_repo.get_or_create(
+            config_id=config_id, 
+            user_id=user_id,
+            initial_balance=Money(amount=Decimal("10000.00"), currency="USD")
+        )
     
-    def _calculate_position_size(self, confidence: float, account_balance: Union[float, Decimal]) -> float:
+    def _calculate_position_size(self, config: BotConfig, confidence: float, account_balance: Union[float, Decimal]) -> float:
         """
-        Calculate position size based on confidence score and account balance.
+        Calculate position size based on configuration, confidence score, and account balance.
         
         Args:
+            config: Bot configuration with position sizing settings
             confidence: Confidence score from Decision Module (0.0-1.0)
             account_balance: Current account balance (float or Decimal)
             
@@ -102,14 +81,80 @@ class PaperTradingService:
         """
         # Convert Decimal to float for calculations
         balance = float(account_balance) if isinstance(account_balance, Decimal) else account_balance
-        max_position_usd = balance * self.max_position_pct
-        position_size = confidence * max_position_usd
+        
+        # Use config-based position sizing
+        position_size = config.get_position_size(confidence, balance)
         
         # Minimum position size of $10
         position_size = max(position_size, 10.0)
         
-        logger.debug(f"Position sizing: confidence={confidence:.3f}, balance=${balance:,}, size=${position_size:.2f}")
+        # Don't exceed available balance
+        position_size = min(position_size, balance * 0.95)  # Keep 5% buffer
+        
+        sizing_method = config.trading.position_sizing.method.value
+        logger.debug(f"Position sizing ({sizing_method}): confidence={confidence:.3f}, balance=${balance:,}, size=${position_size:.2f}")
         return position_size
+    
+    async def _check_position_limits(self, config: BotConfig, config_id: str, user_id: str) -> tuple[bool, Optional[str]]:
+        """
+        Check if new position would exceed configured limits.
+        
+        Args:
+            config: Bot configuration with risk management settings
+            config_id: Configuration ID
+            user_id: User ID
+            
+        Returns:
+            (can_open_position, reason_if_not)
+        """
+        max_positions = config.trading.risk_management.max_positions
+        
+        with self._get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Count current open positions
+                cur.execute("""
+                    SELECT COUNT(*) as open_count
+                    FROM paper_trades 
+                    WHERE config_id = %s AND user_id = %s AND status = 'open'
+                """, (config_id, user_id))
+                
+                result = cur.fetchone()
+                open_positions = result['open_count'] if result else 0
+                
+                if open_positions >= max_positions:
+                    return False, f"Maximum positions limit reached ({open_positions}/{max_positions})"
+                
+                return True, None
+    
+    def _apply_default_risk_levels(self, config: BotConfig, intent: Dict[str, Any], entry_price: float) -> Dict[str, Any]:
+        """
+        Apply default stop loss and take profit if not specified in intent.
+        
+        Args:
+            config: Bot configuration with default risk levels
+            intent: Trade intent (modified in place)
+            entry_price: Entry price for the trade
+            
+        Returns:
+            Modified intent with default risk levels applied
+        """
+        side = intent.get("action", "").lower()
+        
+        # Apply default stop loss if not provided
+        if not intent.get("stop_loss_price") and config.trading.risk_management.default_stop_loss_percent:
+            default_stop = config.get_default_stop_loss_price(entry_price, side)
+            if default_stop:
+                intent["stop_loss_price"] = default_stop
+                logger.debug(f"Applied default stop loss: ${default_stop:.2f}")
+        
+        # Apply default take profit if not provided
+        if not intent.get("take_profit_price") and config.trading.risk_management.default_take_profit_percent:
+            default_tp = config.get_default_take_profit_price(entry_price, side)
+            if default_tp:
+                intent["take_profit_price"] = default_tp
+                logger.debug(f"Applied default take profit: ${default_tp:.2f}")
+        
+        return intent
     
     def _calculate_fees(self, size_usd: float) -> float:
         """Calculate trading fees"""
@@ -139,6 +184,15 @@ class PaperTradingService:
             
             logger.info(f"Executing paper trade intent: {action} {symbol} (confidence={confidence:.3f})")
             
+            # Load configuration
+            config = config_repo.get_config(config_id, user_id)
+            if not config:
+                return {
+                    "status": "failed",
+                    "reason": f"Configuration not found: {config_id}",
+                    "trade_id": None
+                }
+            
             # Validate action
             if action not in ["long", "short"]:
                 return {
@@ -151,18 +205,20 @@ class PaperTradingService:
             account = await self.get_or_create_paper_account(config_id, user_id)
             
             # Check if we have enough balance
-            if account["current_balance"] < 10:
+            min_balance = Money(amount=Decimal("10.00"), currency="USD")
+            if not account.can_afford_trade(min_balance):
                 return {
                     "status": "rejected",
-                    "reason": f"Insufficient balance: ${account['current_balance']:.2f}",
+                    "reason": f"Insufficient balance: {account.current_balance}",
                     "trade_id": None
                 }
             
-            # Check position limits
-            if account["open_positions"] >= self.max_positions:
+            # Check position limits using config
+            can_open, limit_reason = await self._check_position_limits(config, config_id, user_id)
+            if not can_open:
                 return {
                     "status": "rejected",
-                    "reason": f"Maximum positions reached: {self.max_positions}",
+                    "reason": limit_reason,
                     "trade_id": None
                 }
             
@@ -178,14 +234,35 @@ class PaperTradingService:
                     "trade_id": None
                 }
             
-            # Calculate position size
-            position_size_usd = self._calculate_position_size(confidence, account["current_balance"])
+            # Apply default risk levels if not provided
+            intent = self._apply_default_risk_levels(config, intent, entry_price)
+            stop_loss = intent.get("stop_loss_price")  # Updated with defaults
+            take_profit = intent.get("take_profit_price")  # Updated with defaults
+            
+            # Calculate position size using configuration
+            position_size_usd = self._calculate_position_size(config, confidence, float(account.current_balance.amount))
             
             # Calculate fees
             fees = self._calculate_fees(position_size_usd)
             
-            # Calculate position size in contracts (for crypto, this is the same as USD size)
-            size_contracts = position_size_usd / entry_price
+            # Reserve balance for the trade (includes fees)
+            trade_cost = Money(amount=Decimal(str(position_size_usd + fees)), currency="USD")
+            try:
+                account.reserve_balance(trade_cost)
+                account.update_position_count(1)  # Open new position
+            except ValueError as e:
+                return {
+                    "status": "rejected",
+                    "reason": f"Cannot reserve balance: {str(e)}",
+                    "trade_id": None
+                }
+            
+            # Get leverage from config
+            leverage = config.trading.leverage
+            
+            # Calculate position size in contracts (adjusted for leverage)
+            # For leveraged positions: more contracts for same USD amount
+            size_contracts = (position_size_usd * leverage) / entry_price
             
             # Create trade record
             trade_id = str(uuid.uuid4())
@@ -201,9 +278,9 @@ class PaperTradingService:
                          confidence_score, reasoning)
                         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
-                        trade_id, account["account_id"], config_id, user_id, decision_id, 
+                        trade_id, str(account.account_id), config_id, user_id, decision_id, 
                         symbol, action, entry_price, entry_price, position_size_usd, 
-                        size_contracts, 1, 0.0, fees, "open", stop_loss, take_profit, 
+                        size_contracts, leverage, 0.0, fees, "open", stop_loss, take_profit, 
                         confidence, reasoning
                     ))
                     
@@ -217,19 +294,15 @@ class PaperTradingService:
                         entry_price, size_contracts, fees
                     ))
                     
-                    # Update account balance and stats
-                    cur.execute("""
-                        UPDATE paper_accounts 
-                        SET current_balance = current_balance - %s,
-                            open_positions = open_positions + 1,
-                            total_trades = total_trades + 1,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE account_id = %s
-                    """, (position_size_usd + fees, account["account_id"]))
-                    
                     conn.commit()
             
-            logger.info(f"Paper trade executed: {trade_id} - {action} {symbol} @ ${entry_price:.2f} (${position_size_usd:.2f})")
+            # Save updated account state after database commit
+            await self.account_repo.save(account)
+            
+            logger.info(
+                f"Paper trade executed: {trade_id} - {action} {symbol} @ ${entry_price:.2f} "
+                f"(${position_size_usd:.2f}) - Account balance: {account.current_balance}"
+            )
             
             return {
                 "status": "executed",
@@ -243,7 +316,7 @@ class PaperTradingService:
                 "confidence_score": confidence,
                 "stop_loss": stop_loss,
                 "take_profit": take_profit,
-                "account_balance": float(account["current_balance"]) - position_size_usd - fees
+                "account_balance": float(account.current_balance.amount)
             }
             
         except Exception as e:
@@ -327,25 +400,31 @@ class PaperTradingService:
                         "sell" if side == "long" else "buy", close_price, size_contracts, close_fees
                     ))
                     
-                    # Update account balance and stats
-                    original_size_usd = float(trade["size_usd"])
-                    balance_return = original_size_usd + net_pnl  # Original position + P&L
-                    
-                    win_increment = 1 if net_pnl > 0 else 0
-                    loss_increment = 1 if net_pnl <= 0 else 0
-                    
-                    cur.execute("""
-                        UPDATE paper_accounts 
-                        SET current_balance = current_balance + %s,
-                            total_pnl = total_pnl + %s,
-                            open_positions = open_positions - 1,
-                            win_trades = win_trades + %s,
-                            loss_trades = loss_trades + %s,
-                            updated_at = CURRENT_TIMESTAMP
-                        WHERE account_id = %s
-                    """, (balance_return, net_pnl, win_increment, loss_increment, trade["account_id"]))
-                    
                     conn.commit()
+            
+            # Update account using domain model
+            account = await self.account_repo.get_by_config_id(
+                config_id=str(trade["config_id"]), 
+                user_id=str(trade["user_id"])
+            )
+            
+            if account:
+                # Return original position size to balance
+                original_size_usd = float(trade["size_usd"])
+                account.release_balance(Money(amount=Decimal(str(original_size_usd)), currency="USD"))
+                
+                # Realize P&L and update statistics
+                pnl_money = Money(amount=Decimal(str(net_pnl)), currency="USD")
+                is_win = net_pnl > 0
+                account.realize_pnl(pnl_money, is_win)
+                
+                # Update position count
+                account.update_position_count(-1)
+                
+                # Save updated account
+                await self.account_repo.save(account)
+            else:
+                logger.error(f"Account not found for trade {trade_id}")
             
             logger.info(f"Paper position closed: {trade_id} - {reason} @ ${close_price:.2f} (P&L: ${net_pnl:.2f})")
             

@@ -1,7 +1,7 @@
 # Dashboard Page Implementation Plan
 
-## Overview
-Create a production-ready dashboard at `/dashboard` by duplicating the demo page and refactoring it to use a clean config_id-based state management system.
+## Overview  
+Create a production-ready dashboard at `/dashboard` by duplicating the demo page and refactoring it to use real user authentication (Supabase) and config_id-based state management with live data.
 
 ## Phase 1: Duplication & Cleanup
 
@@ -86,14 +86,14 @@ All UI Components Subscribe:
 
 ## Phase 3: Data Management
 
-### 3.1 API Integration
+### 3.1 API Integration (Supabase)
 ```typescript
-// Fetch bot-specific data
+// Fetch bot-specific data using Supabase client
 const fetchBotData = async (configId: string) => {
   const [metrics, trades, positions] = await Promise.all([
-    api.getBotMetrics(configId),
-    api.getBotTrades(configId),
-    api.getBotPositions(configId)
+    supabase.from('bot_metrics').select('*').eq('config_id', configId),
+    supabase.from('paper_trades').select('*').eq('config_id', configId),
+    supabase.from('positions').select('*').eq('config_id', configId)
   ])
   return { metrics, trades, positions }
 }
@@ -106,13 +106,17 @@ useEffect(() => {
 }, [selectedConfigId])
 ```
 
-### 3.2 WebSocket Updates
+### 3.2 Real-time Updates (Supabase)
 ```typescript
-// Subscribe to selected bot only
+// Subscribe to selected bot only using Supabase real-time
 useEffect(() => {
   if (selectedConfigId) {
-    ws.subscribe(`bot:${selectedConfigId}`)
-    return () => ws.unsubscribe(`bot:${selectedConfigId}`)
+    const subscription = supabase
+      .channel(`bot:${selectedConfigId}`)
+      .on('postgres_changes', { event: '*', schema: 'public' }, handleUpdate)
+      .subscribe()
+    
+    return () => subscription.unsubscribe()
   }
 }, [selectedConfigId])
 ```
@@ -145,11 +149,11 @@ Extend botStore with:
 
 ## Phase 5: Authentication & Routing
 
-### 5.1 Route Protection
+### 5.1 Route Protection (Supabase Auth)
 ```typescript
 // /app/dashboard/layout.tsx
 export default function DashboardLayout({ children }) {
-  const { user, isLoading } = useAuth()
+  const { user, isLoading } = useSupabaseAuth()
   
   if (isLoading) return <LoadingScreen />
   if (!user) return <Redirect to="/login" />
@@ -158,17 +162,18 @@ export default function DashboardLayout({ children }) {
 }
 ```
 
-### 5.2 User Context
-- Get real user ID from authentication
-- Load user-specific bots only
-- Handle multi-user scenarios properly
+### 5.2 User Context (Supabase)
+- Get real user ID from Supabase Auth
+- Load user-specific bots using Row Level Security
+- Multi-user isolation handled automatically by Supabase RLS
 
 ## Implementation Checklist
 
 ### Prerequisites
-- [ ] Ensure demo page is stable and complete
-- [ ] Document any shared components that need updating
-- [ ] Plan API endpoints needed for dashboard
+- [ ] Supabase project setup with auth configured
+- [ ] Database schema with Row Level Security policies
+- [ ] Remove all mock data from existing components
+- [ ] BotConfig domain models integrated
 
 ### Step-by-Step Implementation
 1. [ ] Create `/app/dashboard` directory

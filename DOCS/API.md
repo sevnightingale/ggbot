@@ -1,7 +1,7 @@
 # GGBots API Documentation
 
-**Last Updated**: 2025-08-14  
-**API Version**: 1.0.0  
+**Last Updated**: 2025-08-27  
+**API Version**: 1.1.0  
 **Base URL**: `https://ggbots-api.nightingale.business`
 
 ## Overview
@@ -116,31 +116,87 @@ Frontend → Main API (port 8000) → Module APIs
 
 ---
 
-## ⚡ Trading Module (`/trading`)
+## ⚡ Paper Trading Engine (`/paper`)
 
-**Purpose**: Hummingbot-based trade execution
+**Purpose**: Professional-grade paper trading with real Hummingbot market data
+
+### Core Trading Endpoints
+
+| Method | Endpoint | Description | Status |
+|--------|----------|-------------|---------|
+| `POST` | `/paper/execute` | Execute paper trade from decision intent | ✅ |
+| `POST` | `/paper/close/{trade_id}` | Close position manually | ✅ |
+| `POST` | `/paper/update-prices` | Trigger position price updates | ✅ |
+| `GET` | `/paper/health` | Service health check and diagnostics | ✅ |
+
+### Portfolio Management Endpoints
+
+| Method | Endpoint | Description | Status |
+|--------|----------|-------------|---------|
+| `GET` | `/paper/positions/{config_id}` | Get open positions with real-time P&L | ✅ |
+| `GET` | `/paper/account/{config_id}` | Account summary with performance analytics | ✅ |
+| `GET` | `/paper/history/{config_id}` | Get closed trade history | ✅ |
+| `GET` | `/paper/analytics/{config_id}` | Detailed performance analytics | ✅ |
+
+### Key Features
+
+- **Real Market Data**: Live prices from Hummingbot API (KuCoin connector)
+- **Isolated Accounts**: $10,000 starting balance per strategy configuration
+- **Automated Risk Management**: 7-second monitoring with auto TP/SL execution
+- **Confidence-based Sizing**: Position size = confidence × max position (10% of balance)
+- **Professional Simulation**: 0.06% taker fees, 0.05% bid/ask spreads
+- **Complete Audit Trail**: Full trade lifecycle tracking and portfolio analytics
+
+### Request/Response Models
+
+**Paper Trading Intent** (from Decision Module):
+```json
+{
+  "decision_id": "uuid",
+  "user_id": "uuid",
+  "config_id": "uuid",
+  "symbol": "BTC/USDT",
+  "action": "long",
+  "confidence": 0.75,
+  "stop_loss_price": 108000,
+  "take_profit_price": 115000,
+  "reasoning": "Strong breakout signal with volume confirmation"
+}
+```
+
+**Position Response**:
+```json
+{
+  "trade_id": "uuid",
+  "symbol": "BTC/USDT", 
+  "side": "long",
+  "entry_price": 111082.3,
+  "current_price": 111200.0,
+  "size_usd": 750.0,
+  "unrealized_pnl": 0.89,
+  "confidence_score": 0.75,
+  "stop_loss": 108000.0,
+  "take_profit": 115000.0,
+  "status": "open"
+}
+```
+
+---
+
+## ⚡ Legacy Trading Module (`/trading`) - DEPRECATED
+
+**Purpose**: Legacy Hummingbot-based trade execution (replaced by Paper Trading)
 
 ### Core Endpoints
 
 | Method | Endpoint | Description | Status |
 |--------|----------|-------------|---------|
-| `POST` | `/webhooks/execute-trade` | Execute trade via webhook | ✅ |
-| `POST` | `/trade/execute` | Direct trade execution | ✅ |
-| `GET` | `/status` | Trading system status | ✅ |
-| `GET` | `/health` | Module health check | ✅ |
-| `GET` | `/` | Root endpoint | ✅ |
+| `POST` | `/webhooks/execute-trade` | Execute trade via webhook | 🚧 **DEPRECATED** |
+| `POST` | `/trade/execute` | Direct trade execution | 🚧 **DEPRECATED** |
+| `GET` | `/status` | Trading system status | 🚧 **DEPRECATED** |
+| `GET` | `/health` | Module health check | 🚧 **DEPRECATED** |
 
-### Hummingbot Integration (`/trading/hummingbot`)
-
-| Method | Endpoint | Description | Status |
-|--------|----------|-------------|---------|
-| `GET` | `/portfolio/{user_id}` | Get user portfolio | ✅ |
-| `GET` | `/positions/{user_id}` | Get active positions | ✅ |
-| `GET` | `/orders/{user_id}` | Get active orders | ✅ |
-| `GET` | `/trades/{user_id}` | Get trade history | ✅ |
-| `GET` | `/dashboard/{user_id}` | Get dashboard data | ✅ |
-| `GET` | `/bot/{instance_name}/status` | Get bot status | ✅ |
-| `GET` | `/system/status` | Get system status | ✅ |
+**Note**: Legacy trading endpoints have been replaced by the new Paper Trading Engine. Use `/paper/*` endpoints for all trading operations.
 
 ### Request/Response Models
 
@@ -256,11 +312,11 @@ Frontend → Main API (port 8000) → Module APIs
 
 ### Critical Issues
 
-1. **Hummingbot Database Connection** ❌
+1. **Hummingbot Database Connection** ✅ **RESOLVED**
    - **Issue**: Test endpoint fails with HTTP 500
    - **Root Cause**: Port discrepancy (API uses 5434, actual is 5433)
    - **Impact**: Connection tests fail, may affect Hummingbot integrations
-   - **Status**: **PARTIALLY FIXED** - Updated test API, documentation corrected
+   - **Status**: **FIXED** - Paper trading engine operational with correct Hummingbot API integration
 
 2. **Hardcoded Config IDs** ⚠️
    - **Location**: `agent_control_api.py:242, 269`
@@ -362,6 +418,36 @@ Frontend → Main API (port 8000) → Module APIs
 
 ---
 
+## 🚀 Recent Updates (v1.1.0 - 2025-08-27)
+
+### Major Feature: Paper Trading Engine
+
+**🎯 Paper Trading System** - Production deployment complete
+- **Real-time market data** integration with Hummingbot API (KuCoin connector)
+- **Professional simulation** with accurate fees (0.06%) and realistic spreads (0.05%)
+- **Isolated accounts** - $10,000 starting balance per strategy configuration
+- **Automated risk management** - 7-second monitoring with auto TP/SL execution
+- **Complete integration** with Decision Module pipeline
+
+**New Endpoints Added**:
+- `POST /paper/execute` - Execute trades from Decision Module intents
+- `GET /paper/positions/{config_id}` - Real-time position monitoring
+- `GET /paper/account/{config_id}` - Portfolio analytics and performance metrics
+- `POST /paper/close/{trade_id}` - Manual position closure
+- `GET /paper/health` - Service diagnostics
+
+**Database Schema Updates**:
+- New paper trading tables: `paper_accounts`, `paper_trades`, `paper_orders`
+- Complete audit trail and trade lifecycle tracking
+- Migration: `0015_create_paper_trading_tables.sql`
+
+**Background Services**:
+- 7-second position monitoring with automatic TP/SL execution
+- Real-time P&L calculation using live market data
+- Background task integrated into main API server
+
+---
+
 ## 📈 API Usage Examples
 
 ### Starting a Trading Bot
@@ -384,19 +470,30 @@ curl -X POST "https://ggbots-api.nightingale.business/api/scheduler/start"
 curl "https://ggbots-api.nightingale.business/api/scheduler/status"
 ```
 
-### Manual Trade Execution
+### Paper Trading Operations
 
 ```bash
-# Execute a trade
-curl -X POST "https://ggbots-api.nightingale.business/trading/trade/execute" \
+# Execute a paper trade via Decision Module webhook
+curl -X POST "https://ggbots-api.nightingale.business/decision/webhooks/trigger-decision" \
   -H "Content-Type: application/json" \
   -d '{
-    "action": "enter_long",
-    "symbol": "BTC/USD",
-    "confidence": 0.8,
-    "stop_loss_price": 45000,
-    "take_profit_price": 52000
+    "user_id": "your-user-id",
+    "config_id": "your-config-id", 
+    "symbol": "BTC/USDT",
+    "timeframes": ["1h"]
   }'
+
+# Check paper trading positions
+curl "https://ggbots-api.nightingale.business/paper/positions/your-config-id"
+
+# Get paper account summary
+curl "https://ggbots-api.nightingale.business/paper/account/your-config-id"
+
+# Close a position manually
+curl -X POST "https://ggbots-api.nightingale.business/paper/close/trade-id"
+
+# Check service health
+curl "https://ggbots-api.nightingale.business/paper/health"
 ```
 
 ### Getting Performance Data
@@ -432,4 +529,4 @@ curl "https://ggbots-api.nightingale.business/test/hummingbot-db"
 - ❌ **Broken**: Currently not working
 - 🚧 **Partial**: Some functionality working
 
-*This documentation reflects the current state of the API as of 2025-08-14. Issues identified should be prioritized for fixes to ensure robust production deployment.*
+*This documentation reflects the current state of the API as of 2025-08-27. The Paper Trading Engine is production-ready and operational with real-time Hummingbot market data integration.*
