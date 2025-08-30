@@ -1,0 +1,67 @@
+{
+  "schema_version": "1.0",
+  
+  "selected_pair": "BTC/USDT",
+  
+  "extraction": {
+    "data_sources": {
+      "technical_indicators": [
+        "RSI_5m", "RSI_15m", "RSI_30m", "RSI_1h", "RSI_4h", "RSI_1d", "RSI_1w",
+        "MACD_5m", "MACD_15m", "MACD_30m", "MACD_1h", "MACD_4h", "MACD_1d", "MACD_1w"
+      ],
+      "fundamental_analysis": [],
+      "sentiment_and_trends": [],
+      "influencer_kol": [],
+      "news_and_regulations": [],
+      "onchain_analytics": []
+    }
+  },
+  
+  "decision": {
+    "analysis_frequency": "1h",
+    "system_prompt": "You are an expert cryptocurrency trader analyzing {SYMBOL} at current price {CURRENT_PRICE}. Your analysis is based on the following market data:\n\n{MARKET_DATA}\n\nProvide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.",
+    "user_prompt": "My trading strategy:\nEnter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods.\n\nCurrent market analysis:\n{MARKET_DATA}\n\nDecision: Based on the above data, should I ENTER, WAIT, or EXIT this position?"
+  },
+  
+  "trading": {
+    "execution_mode": "paper",
+    "leverage": 1,
+    "position_sizing": {
+      "method": "confidence_based",
+      "fixed_amount_usd": 100,
+      "account_percent": 5.0,
+      "max_position_percent": 10.0
+    },
+    "risk_management": {
+      "max_positions": 5,
+      "default_stop_loss_percent": 3.0,
+      "default_take_profit_percent": 6.0,
+      "max_daily_loss_usd": 500
+    },
+    "exchange_config": {
+      "exchange_type": "cex",
+      "selected_exchange": "binance",
+      "api_key": "",
+      "secret_key": ""
+    }
+  },
+  
+  "telegram_integration": {
+    "listener": {
+      "enabled": false,
+      "api_id": "",
+      "api_hash": "",
+      "session_name": "ggbot_session",
+      "source_channels": []
+    },
+    "publisher": {
+      "enabled": false,
+      "bot_token": "",
+      "filter_channel": "",
+      "confidence_threshold": 0.7,
+      "include_reasoning": true,
+      "include_market_context": true,
+      "message_template": "🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}"
+    }
+  }
+}

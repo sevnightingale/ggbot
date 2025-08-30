@@ -1,10 +1,13 @@
-# GGBots Future Roadmap
+# GGBots Future Roadmap (Post-Private Beta)
+
+> **Note**: This roadmap assumes successful V1 private beta launch with Supabase + core domain models. 
+> Some architectural foundations have been established in V1 but require scaling enhancements.
 
 ## 🎯 Core Features Overview
 
 - **Secure User API Keys** – Accept exchange credentials on the frontend, transmit via HTTPS/JWT, AES-encrypt at rest, and spin each bot in an isolated container
-- **Decision Engine Refactoring** – Split 1587-line monolithic decision/engine.py into focused modules for maintainability and testing
-- **Shared Market-Data Cache** – One canonical table plus pre-compute jobs eliminate duplicate API calls and rate-limit grief
+- **Decision Engine Refactoring** – ✅ *V1 Complete:* DecisionEngineV2 built with clean separation of concerns
+- **Universal Market-Data Cache** – Scale beyond current config-specific extraction to shared extraction serving multiple users
 - **Multi-Exchange + Arbitrage** – CCXT abstraction for spot, futures, and DEXs, with a spread-sniper that fires atomic cross-venue orders
 - **Advanced Order & Portfolio Suite** – Iceberg, TWAP/VWAP, OCO, position-sized copy trading, draw-down guards, and global risk caps
 - **Strategy Marketplace** – User-published templates, revenue-share leaderboards, back-tester, and one-click copy trading
@@ -12,8 +15,8 @@
 - **Micro-Services & Scaling** – Extraction, decision, trading, dashboard, and agent-control pods in Kubernetes with Redis, TimescaleDB, and Celery queues
 - **Monitoring & Safety Mesh** – Prometheus, Grafana, distributed tracing, order-reconciliation, circuit breakers, kill switches, and multi-channel alerts
 - **Compliance & Security Stack** – KYC/AML, audit trails, 2FA, HSM-backed key vault, IP whitelists, and multi-sig on fat trades
-- **Symbol-Specific / Multi-Asset Engine** – Per-symbol mode detection, fully parallel extraction-decision-execution loops, ready for portfolio logic
-- **Client Order-ID Reconciliation** – Bullet-proof audit trail, duplicate detection, and automatic fail/retry logic
+- **Symbol-Specific / Multi-Asset Engine** – ✅ *V1 Complete:* DecisionEngineV2 handles per-symbol decisions with multi-position support
+- **Client Order-ID Reconciliation** – ✅ *V1 Complete:* Paper trading system has full audit trail and reconciliation
 - **Multi-Source Extraction Manager** – Plug-in loaders for TradingView, Yahoo Finance, news, on-chain, Telegram, etc., with data-fusion hooks
 - **DevOps & CI/CD** – Git-driven tests, blue/green deploys, auto-rollbacks, and sandbox load tests
 - **Concurrent Indicator Extraction** – Fire async tasks per symbol/timeframe/indicator, slashing latency from ~18s to ~2–3s
@@ -40,32 +43,37 @@
 
 ### 📦 Decision Engine Refactoring
 
-**Problem:** `decision/engine.py` is 1587 lines of mixed responsibilities: database ops, prompt generation, LLM parsing, and business logic all in one class.
+**Status:** ✅ **V1 Complete** – DecisionEngineV2 implemented with clean architecture
 
-**Solution:** Split into focused modules:
-- `decision/data_layer.py` – Database operations (market data, accounts, trades)
-- `decision/prompt_builder.py` – Prompt generation with template system
-- `decision/response_parser.py` – LLM response parsing and validation  
-- `decision/volume_analyzer.py` – Volume confirmation analysis
-- `decision/core_engine.py` – Streamlined orchestration logic
-- `decision/intent_creator.py` – Trading intent generation
+**V1 Achievements:**
+- Clean separation: market data access, LLM calls, decision logic, trading intents
+- Domain model integration with proper exception handling
+- Multi-position support and context preservation
+- Template-based prompt system with variable injection
 
-**Benefits:** Easier testing, cleaner separation of concerns, reduced cognitive load for maintenance
-
-**Priority:** 🔥 **High** – Current size makes debugging and feature additions painful
+**Future Enhancements:**
+- Advanced prompt templating system
+- A/B testing framework for decision strategies
+- Performance optimization for high-frequency decisions
 
 ---
 
-### 🗃️ Shared Market-Data Cache
+### 🗃️ Universal Market-Data Cache
 
-**Problem:** 100 users requesting RSI on BTC/USDT 1h triggered 100 identical API hits.
+**Problem:** At scale, 100 users requesting RSI on BTC/USDT 1h triggers 100 identical API hits.
 
-**Solution:**
-- Central `market_data_shared` table `(symbol, timeframe, source, extracted_at UNIQUE)` with descending index
-- Smart fetch: Query cache → if stale > 1-candle, hit vendor → store once
-- Background workers monitor hot symbols, pre-extract at each close, prune after retention window
+**V1 Current State:** Config-specific extraction per user (appropriate for private beta scale)
+- Each config extracts and stores its own indicator data
+- Database queries by `config_id` for user isolation
+- MarketDataRepository with 30-second freshness checking
 
-**Impact:** 🚀 Cuts paid-API cost by >80% at scale and makes indicator queries instant
+**Future Scaling Solution:**
+- Universal `market_data_shared` table serving all users
+- Smart fetch: Query shared cache → if stale > 1-candle, extract once for all users  
+- Background workers pre-extract popular symbols at each close
+- Migrate from config-specific to universal serving when user base justifies optimization
+
+**Impact:** 🚀 Cuts API costs by >80% at scale and makes indicator queries instant
 
 ---
 
@@ -152,21 +160,33 @@
 
 ### 🔄 Symbol-Specific / Multi-Asset Engine
 
-**Old Bug:** Global mode detection meant BTC open = ETH stuck in MANAGE mode
+**Status:** ✅ **V1 Complete** – DecisionEngineV2 handles per-symbol decisions properly
 
-**Fix:** API now requires symbol, queries open trades per symbol, spawns `asyncio.gather` tasks per asset
+**V1 Achievements:**
+- Symbol-specific decision context and position management
+- Multi-position support per config (no more global mode conflicts)
+- Clean separation of trading logic per asset
 
-**Future:** Portfolio-aware optimizer (cross-asset correlation, capital weighting)
+**Future Enhancements:**
+- Portfolio-aware optimizer (cross-asset correlation, capital weighting)
+- Dynamic asset allocation based on market conditions
+- Cross-symbol arbitrage detection
 
 ---
 
 ### 🧾 Client Order-ID Reconciliation
 
-**Components:**
-- Index on `trade_orders(client_order_id)` for O(1) look-ups
-- Reconciliation service loops: DB → exchange `fetch_order_by_client_id` → bulk-update statuses
-- Audit view `v_complete_trade_audit` links `strategy_runs` → `trades` → `orders` for forensic digs
-- Alert on duplicates, stale pending, missing TP/SL
+**Status:** ✅ **V1 Complete** – Paper trading system has full reconciliation
+
+**V1 Implementation:**
+- Complete audit trail from strategy runs to paper trades
+- Proper trade lifecycle management with timestamps
+- Position tracking with real-time P&L updates
+
+**Future Live Trading Requirements:**
+- Real exchange order reconciliation loops
+- Alert systems for stale/missing orders
+- Multi-exchange order status synchronization
 
 ---
 
