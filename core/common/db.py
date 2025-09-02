@@ -3,7 +3,8 @@ import json
 import psycopg2
 from decimal import Decimal
 from contextlib import contextmanager
-from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+import os
+from urllib.parse import urlparse
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -13,10 +14,35 @@ class DecimalEncoder(json.JSONEncoder):
             return str(obj)  # Convert Decimal to string to preserve precision
         return super(DecimalEncoder, self).default(obj)
 
+def get_database_url():
+    """Get database connection URL, preferring Supabase over legacy config."""
+    supabase_url = os.getenv("SUPABASE_URL")
+    supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
+    
+    if supabase_url and supabase_key:
+        # Parse Supabase URL to get database connection details
+        # Supabase URL format: https://project-ref.supabase.co
+        # Database URL format: postgresql://postgres:[password]@db.project-ref.supabase.co:5432/postgres
+        parsed = urlparse(supabase_url)
+        project_ref = parsed.netloc.split('.')[0]
+        
+        # Get database password from service key (you'll need to set this in .env)
+        db_password = os.getenv("SUPABASE_DB_PASSWORD")
+        if not db_password:
+            raise ValueError("SUPABASE_DB_PASSWORD environment variable required for database connection")
+            
+        # Use transaction pooler for IPv4 compatibility (direct db only has IPv6)
+        return f"postgresql://postgres.{project_ref}:{db_password}@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
+    else:
+        # Fallback to legacy config
+        from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+        return f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
+
 @contextmanager
 def get_db_connection():
     """
     Context manager to safely handle database connections.
+    Automatically uses Supabase if configured, otherwise falls back to legacy config.
     
     Usage:
     with get_db_connection() as conn:
@@ -24,13 +50,8 @@ def get_db_connection():
             cur.execute("SELECT * FROM some_table")
             results = cur.fetchall()
     """
-    conn = psycopg2.connect(
-        dbname=DB_NAME,
-        user=DB_USER,
-        password=DB_PASS,
-        host=DB_HOST,
-        port=DB_PORT
-    )
+    database_url = get_database_url()
+    conn = psycopg2.connect(database_url)
     try:
         yield conn
     finally:
