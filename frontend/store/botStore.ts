@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { devtools, subscribeWithSelector } from 'zustand/middleware'
+import { apiClient } from '@/lib/api'
 
 // Helper functions for V2 API data transformation
 function extractStrategyFromConfig(configData: any): string {
@@ -347,38 +348,25 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          // V2 API integration - Phase 7
-          const v2ApiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8001'
-          const response = await fetch(`${v2ApiUrl}/api/v2/config`)
+          // V2 API integration with authentication
+          const configs = await apiClient.listConfigs()
           
-          if (!response.ok) {
-            throw new Error(`Failed to load bots from V2 API: ${response.status}`)
+          if (!configs || !Array.isArray(configs)) {
+            throw new Error('Invalid response format from configs API')
           }
           
-          const configsData = await response.json()
-          
-          console.log('📊 V2 API Response from /api/v2/config:', configsData)
-          console.log('📊 Type:', typeof configsData, 'Status:', configsData.status)
-          
-          // Handle V2 API response format
-          let botsArray = []
-          if (configsData.status === 'success' && Array.isArray(configsData.configs)) {
-            botsArray = configsData.configs
-          } else {
-            console.warn('⚠️ V2 API returned unexpected format:', configsData)
-          }
-          
-          console.log('📊 Final botsArray from V2:', botsArray)
+          console.log('📊 V2 API Response from /api/v2/config:', configs)
+          console.log('📊 Type:', typeof configs, 'Length:', configs.length)
           
           // Transform V2 config data to frontend Bot interface
-          const transformedBots: Bot[] = botsArray.length > 0 ? botsArray.map((configData: any) => ({
+          const transformedBots: Bot[] = configs.length > 0 ? configs.map((configData: any) => ({
             config_id: configData.config_id,
             instance_name: configData.config_name || `Bot-${configData.config_id.slice(0, 8)}`,
             config_type: 'production', // V2 configs are production by default
             name: configData.config_name || `Bot-${configData.config_id.slice(0, 8)}`,
-            strategy: extractStrategyFromConfig(configData),
-            crypto: extractCryptoFromPair(configData.selected_pair),
-            riskLevel: extractRiskLevel(configData),
+            strategy: extractStrategyFromConfig(configData.config_data),
+            crypto: extractCryptoFromPair(configData.config_data.selected_pair),
+            riskLevel: extractRiskLevel(configData.config_data),
             status: {
               phase: 'inactive', // Will be updated via bot status endpoint
               color: 'gray',

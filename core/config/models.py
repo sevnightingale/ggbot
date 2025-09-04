@@ -71,6 +71,30 @@ class DecisionConfig(BaseModel):
         return v
 
 
+class LLMProvider(str, Enum):
+    """LLM provider enumeration."""
+    OPENAI = "openai"
+    DEEPSEEK = "deepseek"
+    ANTHROPIC = "anthropic"
+
+
+class LLMConfig(BaseModel):
+    """LLM configuration for decision making."""
+    provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider selection")
+    use_platform_keys: bool = Field(default=False, description="Use platform-managed API keys vs user's own keys")
+    openai_api_key: Optional[str] = Field(None, description="User's OpenAI API key (encrypted in vault)")
+    deepseek_api_key: Optional[str] = Field(None, description="User's DeepSeek API key (encrypted in vault)")
+    anthropic_api_key: Optional[str] = Field(None, description="User's Anthropic API key (encrypted in vault)")
+    
+    @field_validator('openai_api_key', 'deepseek_api_key', 'anthropic_api_key')
+    @classmethod
+    def validate_api_key_format(cls, v):
+        """Validate API key format."""
+        if v is not None and not v.startswith('sk-'):
+            raise ValueError("API keys must start with 'sk-'")
+        return v
+
+
 class PositionSizingConfig(BaseModel):
     """Position sizing configuration."""
     method: PositionSizingMethod = Field(default=PositionSizingMethod.CONFIDENCE_BASED, description="Position sizing strategy")
@@ -169,6 +193,7 @@ class BotConfig(BaseModel):
     
     extraction: ExtractionConfig = Field(default_factory=ExtractionConfig, description="Extraction module configuration")
     decision: DecisionConfig = Field(default_factory=DecisionConfig, description="Decision module configuration")
+    llm_config: LLMConfig = Field(default_factory=LLMConfig, description="LLM provider and API key configuration")
     trading: TradingConfig = Field(default_factory=TradingConfig, description="Trading module configuration")
     telegram_integration: TelegramIntegrationConfig = Field(default_factory=TelegramIntegrationConfig, 
                                                           description="Telegram integration configuration")
