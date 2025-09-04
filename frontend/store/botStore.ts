@@ -1,6 +1,31 @@
 import { create } from 'zustand'
 import { devtools, subscribeWithSelector } from 'zustand/middleware'
 
+// Helper functions for V2 API data transformation
+function extractStrategyFromConfig(configData: any): string {
+  // Try to determine strategy from decision prompt or config type
+  const userPrompt = configData.decision?.user_prompt?.toLowerCase() || ''
+  if (userPrompt.includes('rsi')) return 'meanrev'
+  if (userPrompt.includes('macd') || userPrompt.includes('trend')) return 'trend'
+  if (userPrompt.includes('momentum') || userPrompt.includes('breakout')) return 'momentum'
+  return 'ai' // Default for sophisticated strategies
+}
+
+function extractCryptoFromPair(selectedPair: string): string {
+  // Extract crypto from trading pair (e.g., "BTC/USDT" -> "BTC")
+  return selectedPair?.split('/')[0] || 'BTC'
+}
+
+function extractRiskLevel(configData: any): string {
+  // Determine risk level from trading configuration
+  const leverage = configData.trading?.leverage || 1
+  const accountPercent = configData.trading?.position_sizing?.account_percent || 5
+  
+  if (leverage <= 2 && accountPercent <= 3) return 'low'
+  if (leverage <= 5 && accountPercent <= 7) return 'medium'
+  return 'high'
+}
+
 // Bot interfaces aligned with backend config_instances table
 export interface BotStatus {
   phase: 'inactive' | 'idle' | 'extraction' | 'decision' | 'trading'
@@ -322,54 +347,47 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-          const response = await fetch(`${apiUrl}/agent/api/bots`)
+          // V2 API integration - Phase 7
+          const v2ApiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8001'
+          const response = await fetch(`${v2ApiUrl}/api/v2/config`)
           
           if (!response.ok) {
-            throw new Error(`Failed to load bots: ${response.status}`)
+            throw new Error(`Failed to load bots from V2 API: ${response.status}`)
           }
           
-          const botsData = await response.json()
+          const configsData = await response.json()
           
-          console.log('📊 API Response from /agent/api/bots:', botsData)
-          console.log('📊 Type:', typeof botsData, 'Is Array:', Array.isArray(botsData))
+          console.log('📊 V2 API Response from /api/v2/config:', configsData)
+          console.log('📊 Type:', typeof configsData, 'Status:', configsData.status)
           
-          // Handle different API response formats
+          // Handle V2 API response format
           let botsArray = []
-          if (Array.isArray(botsData)) {
-            botsArray = botsData
-          } else if (botsData && typeof botsData === 'object') {
-            // If it's an object with a data property (common API pattern)
-            if (Array.isArray(botsData.data)) {
-              botsArray = botsData.data
-            } else if (Array.isArray(botsData.bots)) {
-              botsArray = botsData.bots
-            } else if (Array.isArray(botsData.items)) {
-              botsArray = botsData.items
-            } else {
-              console.warn('⚠️ API returned object but no array found in data/bots/items properties')
-            }
+          if (configsData.status === 'success' && Array.isArray(configsData.configs)) {
+            botsArray = configsData.configs
+          } else {
+            console.warn('⚠️ V2 API returned unexpected format:', configsData)
           }
           
-          console.log('📊 Final botsArray:', botsArray)
+          console.log('📊 Final botsArray from V2:', botsArray)
           
-          // Transform backend data to frontend Bot interface (only if we have data)
-          const transformedBots: Bot[] = botsArray.length > 0 ? botsArray.map((botData: any) => ({
-            config_id: botData.config_id,
-            instance_name: botData.instance_name || `Bot-${botData.config_id.slice(0, 8)}`,
-            config_type: botData.config_type || 'ggshot',
-            name: botData.config_name || botData.instance_name || `Bot-${botData.config_id.slice(0, 8)}`,
-            strategy: 'meanrev', // Default for now
-            crypto: 'BTC', // Default for now  
-            riskLevel: 'medium', // Default for now
+          // Transform V2 config data to frontend Bot interface
+          const transformedBots: Bot[] = botsArray.length > 0 ? botsArray.map((configData: any) => ({
+            config_id: configData.config_id,
+            instance_name: configData.config_name || `Bot-${configData.config_id.slice(0, 8)}`,
+            config_type: 'production', // V2 configs are production by default
+            name: configData.config_name || `Bot-${configData.config_id.slice(0, 8)}`,
+            strategy: extractStrategyFromConfig(configData),
+            crypto: extractCryptoFromPair(configData.selected_pair),
+            riskLevel: extractRiskLevel(configData),
             status: {
-              phase: botData.status === 'active' ? 'idle' : 'inactive',
-              color: botData.status === 'active' ? 'blue' : 'gray',
-              message: botData.status === 'active' ? 'Loading bot status...' : 'Bot stopped',
+              phase: 'inactive', // Will be updated via bot status endpoint
+              color: 'gray',
+              message: 'Ready to start',
               timestamp: new Date().toISOString()
             },
-            isActive: botData.status === 'active',
-            createdAt: new Date(),
+            isActive: false, // Will be updated via bot status endpoint
+            createdAt: configData.created_at ? new Date(configData.created_at) : new Date(),
+            lastRun: configData.updated_at ? new Date(configData.updated_at) : undefined,
             userId: userId
           })) : []
           
