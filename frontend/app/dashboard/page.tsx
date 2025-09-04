@@ -7,6 +7,8 @@ import FloatingActionButtons from '@/components/FloatingActionButtons'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
+import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 // TODO: Add Supabase auth imports
 // import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
 // import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
@@ -63,6 +65,10 @@ export default function DashboardPage() {
   
   // For now, use real Supabase user ID for Phase 7 testing - replace with real auth
   const userId = "c81933d2-dd86-479d-97db-fad83465362f" // TODO: Replace with user.id from Supabase auth in Phase 5
+  
+  // Supabase client and router for logout
+  const supabase = createClient()
+  const router = useRouter()
   
   // Zustand store hooks
   const { 
@@ -233,6 +239,16 @@ export default function DashboardPage() {
     console.log('Add new bot clicked')
   }
 
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
+
   const toggleReasoningExpansion = (tradeId: string) => {
     setExpandedReasoningIds(prev => {
       const newSet = new Set(prev)
@@ -292,12 +308,20 @@ export default function DashboardPage() {
           <div className="text-6xl mb-4">🤖</div>
           <h2 className="text-xl text-bone-200 mb-2">Welcome to GGBot</h2>
           <p className="text-gray-400 mb-6">You don&apos;t have any bots configured yet. Create your first bot to get started with AI-powered trading.</p>
-          <button
-            onClick={handleFloatingAdd}
-            className="px-6 py-3 bg-bone-200 text-charcoal-900 rounded-lg hover:bg-bone-300 transition-colors"
-          >
-            Create Your First Bot
-          </button>
+          <div className="flex gap-4 flex-col sm:flex-row">
+            <button
+              onClick={handleFloatingAdd}
+              className="px-6 py-3 bg-bone-200 text-charcoal-900 rounded-lg hover:bg-bone-300 transition-colors"
+            >
+              Create Your First Bot
+            </button>
+            <button
+              onClick={handleLogout}
+              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+            >
+              Logout
+            </button>
+          </div>
         </div>
       </div>
     )
