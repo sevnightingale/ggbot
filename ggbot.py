@@ -758,6 +758,121 @@ async def get_data_sources_with_points(
         raise HTTPException(status_code=500, detail=f"Failed to get data sources: {str(e)}")
 
 
+# LLM Credential Management Endpoints
+@app.post("/api/v2/user/llm-credentials")
+async def store_llm_credential(
+    request: Dict[str, str],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Store a user's LLM API credential securely in Vault."""
+    try:
+        from core.auth.vault_utils import store_credential
+        
+        credential_name = request.get("credential_name")
+        provider = request.get("provider") 
+        api_key = request.get("api_key")
+        
+        if not all([credential_name, provider, api_key]):
+            raise HTTPException(status_code=400, detail="Missing required fields: credential_name, provider, api_key")
+        
+        if provider not in ["openai", "deepseek", "anthropic"]:
+            raise HTTPException(status_code=400, detail="Invalid provider. Must be one of: openai, deepseek, anthropic")
+        
+        user_id = current_user.user_id
+        credential_id = await store_credential(user_id, credential_name, provider, api_key)
+        
+        if credential_id is None:
+            raise HTTPException(status_code=500, detail="Failed to store credential")
+        
+        return {
+            "status": "success",
+            "credential_id": credential_id,
+            "message": f"Credential '{credential_name}' stored securely"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to store LLM credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to store credential: {str(e)}")
+
+
+@app.get("/api/v2/user/llm-credentials")
+async def list_llm_credentials(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """List all LLM credentials for the current user (without API keys)."""
+    try:
+        from core.auth.vault_utils import list_credentials
+        
+        user_id = current_user.user_id
+        credentials = await list_credentials(user_id)
+        
+        return {
+            "status": "success",
+            "credentials": credentials,
+            "count": len(credentials)
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to list LLM credentials: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list credentials: {str(e)}")
+
+
+@app.get("/api/v2/user/llm-credentials/{credential_name}")
+async def get_llm_credential(
+    credential_name: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get a specific LLM credential (with API key for internal use only)."""
+    try:
+        from core.auth.vault_utils import get_credential
+        
+        user_id = current_user.user_id
+        credential = await get_credential(user_id, credential_name)
+        
+        if credential is None:
+            raise HTTPException(status_code=404, detail=f"Credential '{credential_name}' not found")
+        
+        return {
+            "status": "success",
+            "credential": credential
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get LLM credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get credential: {str(e)}")
+
+
+@app.delete("/api/v2/user/llm-credentials/{credential_name}")
+async def delete_llm_credential(
+    credential_name: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Delete a user's LLM credential."""
+    try:
+        from core.auth.vault_utils import delete_credential
+        
+        user_id = current_user.user_id
+        success = await delete_credential(user_id, credential_name)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Credential '{credential_name}' not found")
+        
+        return {
+            "status": "success",
+            "message": f"Credential '{credential_name}' deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete LLM credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete credential: {str(e)}")
+
+
 # Bot Data Endpoints for Dashboard
 @app.get("/api/v2/bot/{config_id}/metrics")
 async def get_bot_metrics(

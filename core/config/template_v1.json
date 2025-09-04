@@ -23,6 +23,14 @@
     "user_prompt": "My trading strategy:\nEnter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods.\n\nCurrent market analysis:\n{MARKET_DATA}\n\nDecision: Based on the above data, should I ENTER, WAIT, or EXIT this position?"
   },
   
+  "llm_config": {
+    "provider": "openai",
+    "use_platform_keys": false,
+    "openai_api_key": null,
+    "deepseek_api_key": null,
+    "anthropic_api_key": null
+  },
+  
   "trading": {
     "execution_mode": "paper",
     "leverage": 1,
