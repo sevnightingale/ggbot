@@ -1,0 +1,360 @@
+{
+  "symbol": "BTC/USDT",
+  "timeframe": "1h",
+  "connector": "kucoin",
+  "data_points": 100,
+  "timestamp": "2025-09-03T08:57:24.475524",
+  "indicators": {
+    "rsi": {
+      "indicator": "RSI",
+      "period": 14,
+      "current": {
+        "value": 54.24,
+        "timestamp": "2025-09-03T08:57:24.465853"
+      },
+      "trend": {
+        "direction": "falling",
+        "strength": 0.148,
+        "velocity": 1.093,
+        "acceleration": 1.547,
+        "confidence": 0.08760189958578757
+      },
+      "zones": {
+        "current_zone": "neutral",
+        "overbought": {
+          "level": 70,
+          "status": "far_below",
+          "periods_in_zone": 0,
+          "time_percentage": 2.0
+        },
+        "oversold": {
+          "level": 30,
+          "status": "far_above",
+          "periods_in_zone": 0,
+          "time_percentage": 2.0
+        },
+        "neutral": {
+          "distance_from_50": 4.24,
+          "bias": "bullish"
+        }
+      },
+      "extremes": {
+        "recent_high": {
+          "value": 63.62,
+          "periods_ago": 18,
+          "significance": 1.0
+        },
+        "recent_low": {
+          "value": 50.96,
+          "periods_ago": 3,
+          "significance": 1.0
+        }
+      },
+      "levels": {
+        "recent_crossovers": [],
+        "current_level_distances": {
+          "30": 24.24,
+          "50": 4.24,
+          "70": -15.76
+        }
+      },
+      "patterns": {},
+      "signals": [],
+      "summary": "RSI at 54.2, falling",
+      "confidence": 0.64,
+      "raw_values": [
+        66.05509743205147,
+        54.17664981821556,
+        51.529774643366856,
+        48.2057701410882,
+        60.162951546295794,
+        73.85641249252828,
+        74.65429324572861,
+        65.39085259370918,
+        65.29583115645734,
+        51.08093763138384,
+        49.42634577626103,
+        48.539154041060854,
+        48.029425542667205,
+        56.87977732194098,
+        43.70633981323719,
+        45.06529365209472,
+        41.38115726093881,
+        39.959082058358284,
+        42.81375108663402,
+        44.18419833957911,
+        53.640231991791005,
+        56.27376325892328,
+        57.66572222677902,
+        61.07062647622603,
+        54.425821841878644,
+        58.676648858658936,
+        56.269472825078566,
+        52.30086551770724,
+        39.04661348112202,
+        38.67781458712335,
+        37.455286835012636,
+        29.923242630138912,
+        31.141030114012054,
+        28.06224764519511,
+        39.57296412715763,
+        43.77429241641237,
+        62.86674595647058,
+        64.38097977953844,
+        63.125364032387935,
+        49.49404467713787,
+        51.907598269995596,
+        55.684309589944185,
+        54.628314853277026,
+        56.0143732015937,
+        50.80156233974004,
+        50.67651532049911,
+        52.867758356438564,
+        56.887110976306666,
+        56.4652550805824,
+        50.91709698019675,
+        38.34845725861944,
+        46.846066524136226,
+        55.07616452411167,
+        52.706271772166204,
+        55.5803068313132,
+        63.02516038738662,
+        63.61453297245794,
+        63.298437266291494,
+        62.12519720050581,
+        63.32652635860564,
+        61.172342234172746,
+        62.47229319596868,
+        63.354757890771566,
+        60.11494341123524,
+        52.2906663921131,
+        41.8832360969748,
+        62.32623306951306,
+        63.62009784019521,
+        58.393641673579005,
+        57.84790673721797,
+        58.85516316593649,
+        56.090340392466864,
+        57.39370224619664,
+        61.98193107876039,
+        58.81811969015367,
+        59.762905898078614,
+        59.494425081547924,
+        60.335615039824305,
+        58.33646446240249,
+        60.219138884941174,
+        55.707421755556894,
+        55.41823281232362,
+        50.964042529691035,
+        51.26598896963905,
+        55.964318502030096,
+        54.24394565527344
+      ]
+    },
+    "macd": {
+      "indicator": "MACD",
+      "current": {
+        "macd": 262.1607,
+        "signal": 350.9333,
+        "histogram": -88.7726,
+        "timestamp": "2025-09-03T08:57:24.470369"
+      },
+      "trend": {
+        "direction": "bearish",
+        "strength": 0.7,
+        "momentum": "increasing",
+        "acceleration": 2.3822
+      },
+      "crossovers": {
+        "recent_crossovers": [
+          {
+            "type": "bearish_crossover",
+            "periods_ago": 7,
+            "strength": 1.2932000538361308
+          }
+        ],
+        "latest_crossover": {
+          "type": "bearish_crossover",
+          "periods_ago": 7,
+          "strength": 1.2932000538361308
+        }
+      },
+      "histogram": {
+        "momentum_direction": "increasing",
+        "acceleration": 2.3822,
+        "zero_crossings_recent": 1,
+        "histogram_strength": 88.77260536527791
+      },
+      "zero_line": {
+        "current_position": "above",
+        "distance_from_zero": 262.1607,
+        "time_above_zero_pct": 61.0,
+        "time_below_zero_pct": 14.0
+      },
+      "divergence": null,
+      "signals": [],
+      "confidence": 0.42683625793761704,
+      "summary": "MACD bearish trend with decreasing momentum"
+    },
+    "stochastic": {
+      "indicator": "Stochastic",
+      "current": {
+        "k_percent": 44.23,
+        "d_percent": 41.73,
+        "spread": 2.51,
+        "timestamp": "2025-09-03T08:57:24.473325"
+      },
+      "crossovers": {
+        "recent_crossovers": [
+          {
+            "type": "bullish_crossover",
+            "periods_ago": 1,
+            "strength": 2.5058435602749114,
+            "location": "neutral"
+          },
+          {
+            "type": "bearish_crossover",
+            "periods_ago": 6,
+            "strength": 6.914653899116772,
+            "location": "neutral"
+          },
+          {
+            "type": "bullish_crossover",
+            "periods_ago": 13,
+            "strength": 3.4079565109958736,
+            "location": "neutral"
+          }
+        ],
+        "latest_crossover": {
+          "type": "bullish_crossover",
+          "periods_ago": 1,
+          "strength": 2.5058435602749114,
+          "location": "neutral"
+        },
+        "bars_since_cross": 1
+      },
+      "zones": {
+        "current_zone": "neutral",
+        "overbought": {
+          "level": 80,
+          "status": "below",
+          "streak_length": 0,
+          "time_percentage": 27.6,
+          "exit_analysis": {
+            "recent_exits": [
+              {
+                "periods_ago": 6,
+                "exit_level": 74.59827631761209,
+                "strength": 5.40172368238791
+              }
+            ],
+            "latest_exit": {
+              "periods_ago": 6,
+              "exit_level": 74.59827631761209,
+              "strength": 5.40172368238791
+            }
+          }
+        },
+        "oversold": {
+          "level": 20,
+          "status": "above",
+          "streak_length": 0,
+          "time_percentage": 8.0,
+          "exit_analysis": {
+            "recent_exits": [],
+            "latest_exit": null
+          }
+        },
+        "neutral_bias": "bearish"
+      },
+      "position_rank": {
+        "k_percentile": 10.0,
+        "interpretation": "low"
+      },
+      "momentum": {
+        "k_velocity": -0.77,
+        "k_acceleration": 2.14,
+        "spread_momentum": 3.75,
+        "momentum_interpretation": "sideways_momentum"
+      },
+      "divergence": null,
+      "signals": [
+        {
+          "type": "buy_signal",
+          "strength": "medium",
+          "reason": "Bullish %K/%D crossover in neutral zone",
+          "confidence": 0.6
+        }
+      ],
+      "confidence": 0.575,
+      "summary": "Stochastic %K: 44.2, %D: 41.7. Bullish Crossover 1p ago"
+    },
+    "williams_r": {
+      "indicator": "Williams_R",
+      "current": {
+        "value": -58.85,
+        "timestamp": "2025-09-03T08:57:24.475054"
+      },
+      "zones": {
+        "current_zone": "neutral",
+        "overbought": {
+          "level": -20,
+          "status": "below",
+          "streak_length": 0,
+          "time_percentage": 30.0,
+          "exit_analysis": {
+            "recent_exits": [
+              {
+                "periods_ago": 6,
+                "exit_level": -45.70647683213656,
+                "strength": 25.70647683213656
+              }
+            ],
+            "latest_exit": {
+              "periods_ago": 6,
+              "exit_level": -45.70647683213656,
+              "strength": 25.70647683213656
+            }
+          }
+        },
+        "oversold": {
+          "level": -80,
+          "status": "above",
+          "streak_length": 0,
+          "time_percentage": 10.0,
+          "exit_analysis": {
+            "recent_exits": [],
+            "latest_exit": null
+          }
+        },
+        "neutral_bias": "bearish"
+      },
+      "momentum": {
+        "velocity": 2.98,
+        "acceleration": 3.67,
+        "recent_range": 54.77,
+        "volatility": 27.84,
+        "momentum_interpretation": "upward_momentum"
+      },
+      "patterns": {},
+      "position_rank": {
+        "percentile": 10.0,
+        "interpretation": "low"
+      },
+      "divergence": null,
+      "signals": [],
+      "confidence": 0.633,
+      "summary": "Williams %R at -58.8"
+    }
+  },
+  "config_id": "test_config_123",
+  "ohlcv_summary": {
+    "latest_price": 110984.2,
+    "price_change_24h": 0.4954861142551835,
+    "volume_24h": 2972.5727332899996,
+    "date_range": {
+      "start": "2025-08-30T05:00:00",
+      "end": "2025-09-03T08:00:00"
+    }
+  }
+}

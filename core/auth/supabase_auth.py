@@ -2,14 +2,17 @@
 Supabase Authentication Utilities
 
 Provides backend authentication helpers for JWT token verification and user management.
+Enhanced for V2 orchestrator with FastAPI dependency injection.
 """
 
 import os
 import jwt
 from typing import Optional, Dict, Any
 from functools import wraps
-from fastapi import HTTPException, Request
+from fastapi import HTTPException, Request, Depends, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from supabase import create_client, Client
+from core.common.logger import logger
 
 def create_supabase_client() -> Client:
     """Create and return a Supabase client for backend operations."""
@@ -139,7 +142,91 @@ def get_user_from_token(token: str) -> Optional[Dict[str, Any]]:
     
     return None
 
-# Middleware helper for extracting user context
+# V2 FastAPI Security Scheme
+security = HTTPBearer()
+
+class AuthenticatedUser:
+    """User context extracted from Supabase JWT token for V2 orchestrator."""
+    
+    def __init__(self, user_id: str, email: str, claims: Dict[str, Any]):
+        self.user_id = user_id
+        self.email = email
+        self.claims = claims
+        self._profile = None
+    
+    async def load_profile(self):
+        """Load user profile from database."""
+        if self._profile is None:
+            from core.services.user_service import UserService
+            user_service = UserService()
+            self._profile = await user_service.get_or_create_profile(self.user_id, self.email)
+        return self._profile
+    
+    async def is_premium_user(self) -> bool:
+        """Check if user has premium subscription."""
+        profile = await self.load_profile()
+        return profile.can_use_premium_features if profile else False
+    
+    async def can_use_indicator(self, indicator_name: str) -> bool:
+        """Check if user can access specific indicator."""
+        from core.services.indicator_service import IndicatorService
+        return await IndicatorService.check_indicator_access(self.user_id, indicator_name)
+
+async def get_current_user_v2(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+) -> AuthenticatedUser:
+    """
+    FastAPI dependency to get current authenticated user for V2 orchestrator.
+    
+    Args:
+        credentials: HTTP Bearer token from request
+        
+    Returns:
+        AuthenticatedUser instance with user context
+        
+    Raises:
+        HTTPException: If authentication fails
+    """
+    if not credentials:
+        raise HTTPException(status_code=401, detail="Authentication required")
+    
+    # Verify token and extract claims
+    claims = verify_jwt_token(credentials.credentials)
+    if not claims:
+        raise HTTPException(status_code=401, detail="Invalid token")
+    
+    # Validate required claims
+    user_id = claims.get("sub")
+    email = claims.get("email")
+    
+    if not user_id or not email:
+        raise HTTPException(status_code=401, detail="Invalid token: missing required claims")
+    
+    # Create authenticated user context
+    user = AuthenticatedUser(
+        user_id=user_id,
+        email=email,
+        claims=claims
+    )
+    
+    logger.bind(user_id=user.user_id).debug("User authenticated successfully (V2)")
+    return user
+
+async def require_premium_user_v2(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> AuthenticatedUser:
+    """
+    FastAPI dependency to require premium subscription.
+    """
+    is_premium = await current_user.is_premium_user()
+    if not is_premium:
+        raise HTTPException(
+            status_code=403, 
+            detail="Premium subscription required for this feature"
+        )
+    return current_user
+
+# Middleware helper for extracting user context (Legacy - kept for V1 compatibility)
 class AuthMiddleware:
     """Middleware class for handling authentication in FastAPI apps."""
     
@@ -172,3 +259,38 @@ class AuthMiddleware:
         if not user_id:
             raise HTTPException(status_code=401, detail="Authentication required")
         return user_id
+
+    @staticmethod
+    async def authenticate_request(authorization: str) -> AuthenticatedUser:
+        """
+        Manually authenticate a request with Bearer token for V2.
+        
+        Args:
+            authorization: Authorization header value
+            
+        Returns:
+            AuthenticatedUser instance
+            
+        Raises:
+            HTTPException: If authentication fails
+        """
+        if not authorization or not authorization.startswith("Bearer "):
+            raise HTTPException(status_code=401, detail="Invalid authorization header")
+        
+        token = authorization.split(" ", 1)[1]
+        claims = verify_jwt_token(token)
+        
+        if not claims:
+            raise HTTPException(status_code=401, detail="Invalid token")
+        
+        user_id = claims.get("sub")
+        email = claims.get("email")
+        
+        if not user_id or not email:
+            raise HTTPException(status_code=401, detail="Invalid token claims")
+        
+        return AuthenticatedUser(
+            user_id=user_id,
+            email=email,
+            claims=claims
+        )

@@ -5,6 +5,10 @@ from decimal import Decimal
 from contextlib import contextmanager
 import os
 from urllib.parse import urlparse
+from dotenv import load_dotenv
+
+# Load environment variables
+load_dotenv()
 
 
 class DecimalEncoder(json.JSONEncoder):
