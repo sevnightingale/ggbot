@@ -16,22 +16,22 @@ from .models.value_objects import Symbol
 
 
 class DataSource(Enum):
-    """Supported market data sources."""
+    """Supported market data sources - maps to Supabase data_sources table."""
+    # Core data sources from Supabase data_sources table
+    TECHNICAL_ANALYSIS = "75f6030b-117e-4178-9bfc-5d1c244ccb96"  # Technical Analysis (enabled)
+    SIGNALS_GROUP_CHATS = "3e849fc2-8d37-4b05-a7db-0a198c4b7152"  # Signals in Group Chats (enabled)
+    FUNDAMENTAL_ANALYSIS = "2e651a43-2856-41f1-8826-152ab19f9f39"  # Fundamental Analysis (disabled)
+    SOCIAL_SENTIMENT = "047f40a1-0328-4325-b520-a0395ed1a97d"  # Sentiment & Trends on Social Media (disabled)
+    INFLUENCER_KOL = "c764994d-97bc-45a4-afd8-fd7e6cc02927"  # Influencer/Key Opinion Leaders (disabled)
+    NEWS_REGULATORY = "21b303d2-3351-4100-ae8f-7f3629540aa2"  # News & Regulatory Actions (disabled)
+    ONCHAIN_ANALYTICS = "2b7b5878-1657-4ecc-b6e6-1a14d62fe2f9"  # On-Chain Analytics (disabled)
+    
+    # Legacy source types (backwards compatibility)
     HUMMINGBOT_API = "hummingbot_api"
-    CCXT_EXCHANGE = "ccxt_exchange"
-    GGSHOT_SIGNALS = "ggshot_signals" 
-    CRYPTO_INDICATORS = "crypto_indicators"
     PANDAS_TA = "pandas_ta"
-    VOLUME_PROFILE = "volume_profile"
 
 
-class DataType(Enum):
-    """Types of market data."""
-    OHLCV = "ohlcv"
-    TECHNICAL_INDICATORS = "technical_indicators"
-    VOLUME_ANALYSIS = "volume_analysis"
-    SIGNAL_DATA = "signal_data"
-    PRICE_FEED = "price_feed"
+# Remove DataType enum - replaced by data_source UUID reference
 
 
 class DataFreshness(Enum):
@@ -145,11 +145,15 @@ class MarketDataSnapshot:
     Contains all indicators, price data, and volume analysis for a specific symbol
     and timestamp. Supports universal extraction caching where one snapshot
     serves multiple users.
+    
+    V2 Schema Updates:
+    - data_source now maps to Supabase data_sources UUIDs
+    - Removed data_type (redundant with data_source)
+    - Enhanced for 21 advanced technical analysis preprocessors
     """
     id: str
     symbol: Symbol
     data_source: DataSource
-    data_type: DataType
     extracted_at: datetime
     
     # Core data
@@ -277,14 +281,13 @@ class MarketDataSnapshot:
         cls,
         symbol: Symbol,
         indicators: List[Indicator],
-        source: DataSource = DataSource.PANDAS_TA
+        source: DataSource = DataSource.TECHNICAL_ANALYSIS
     ) -> 'MarketDataSnapshot':
-        """Factory method for technical indicators snapshot."""
+        """Factory method for technical indicators snapshot with V2 schema."""
         snapshot = cls(
             id="",  # Will be generated in __post_init__
             symbol=symbol,
             data_source=source,
-            data_type=DataType.TECHNICAL_INDICATORS,
             extracted_at=datetime.now()
         )
         
@@ -297,12 +300,11 @@ class MarketDataSnapshot:
         symbol: Symbol,
         price_data: PriceData
     ) -> 'MarketDataSnapshot':
-        """Factory method for price data snapshot."""
+        """Factory method for price data snapshot with V2 schema."""
         return cls(
             id="",
             symbol=symbol,
             data_source=price_data.source,
-            data_type=DataType.PRICE_FEED,
             extracted_at=datetime.now(),
             price_data=price_data
         )

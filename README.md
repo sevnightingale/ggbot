@@ -17,10 +17,11 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 ### Core Agent Architecture
 
 **🔍 [Extraction Agent](extraction/)** - Market Intelligence Gathering
+- **V2 System**: 21 advanced preprocessors with pandas-ta integration (12x performance improvement)
 - **Browser automation** via Playwright for TradingView signal interpretation
 - **Technical indicators** via MCP servers (RSI, MACD, 20+ professional indicators)
 - **Multi-source data fusion** from exchanges, news feeds, and sentiment analysis
-- **Real-time market monitoring** with configurable timeframes and symbols
+- **Dual storage**: File system + Supabase database with real-time updates
 
 **🧠 [Decision Agent](decision/)** - AI-Powered Trading Intelligence  
 - **Advanced reasoning LLMs** (DeepSeek R1, GPT-4) for market analysis
@@ -96,10 +97,11 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 ### **[Frontend Platform](frontend/)**
 
 **Professional Next.js application** featuring:
-- **Multi-bot management** with intuitive configuration interfaces
+- **V2 Integration**: Dashboard connected to V2 orchestrator with Supabase auth
+- **Multi-bot management** with intuitive configuration interfaces  
 - **Real-time performance tracking** showing trades, P&L, and analytics
 - **Brutalist design system** optimized for trading professionals
-- **WebSocket placeholder** for future live updates (monitoring being rebuilt)
+- **selectedConfigId architecture** for seamless bot switching and data management
 
 ## Production Features
 
@@ -175,7 +177,8 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 
 ### Planned Updates & Roadmap
 
-- **[DOCS/CONFIG.md](DOCS/CONFIG.md)** - Config system enhancements and validation improvements
+- **[DOCS/CONFIG.md](DOCS/CONFIG.md)** - Config component V2 integration roadmap (Phase 8)
+- **[DOCS/TODO.md](DOCS/TODO.md)** - V2 architecture progress tracking (Phase 7 complete)
 - **[DOCS/TRADING_UPDATE.md](DOCS/TRADING_UPDATE.md)** - Hummingbot integration roadmap (Phases 2-3)
 - **[DOCS/FUTURE.md](DOCS/FUTURE.md)** - Comprehensive platform scaling and feature roadmap
 

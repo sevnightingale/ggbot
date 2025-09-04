@@ -1,228 +1,204 @@
-Verdict
+Here are the **20 highest-value pandas-ta indicators** I’d prioritize (broad coverage of trend, momentum, volatility, and volume; robust across assets/timeframes). For each, I note **how pros actually use it**, then exactly **what to engineer** so your models get signal, not just raw prints.
 
-Architecture direction: good. Clean interfaces, domain models, repo pattern, mode-aware routing.
-Production readiness: not yet. Several correctness/consistency gaps that will bite you.
+---
 
-High-severity issues (fix first)
+1. **RSI (Relative Strength Index)** — momentum/OB/OS + divergence. Pros watch 30/70 (or 20/80 in strong trends), failure swings, and divergence. ([Investopedia][1])
+   **Preprocess features:**
 
-Legacy mode field
-You’re branching on self.config.config_type. That’s the legacy field you’re removing. Use config.mode: Literal["autonomous_trading","signal_validation"] (Enum), or this engine will break the moment you accept D2.
+* Current RSI; distance to 50 (bull/bear regime).
+* Most recent RSI peak/trough value **and** bars since it occurred.
+* Time since last cross of 30/70; count of consecutive bars >70 or <30.
+* Bullish/bearish price–RSI divergence flag (last N swings).
+* RSI slope/acceleration over 3–5 bars.
 
-Timeframe blindness
-Every market decision is timeframe-bound. _get_fresh_market_data(symbol) and the entire flow don’t accept/propagate a timeframe. Your universal cache design requires keys like (symbol, timeframe, candle_close, version). Add timeframe everywhere (engine ctor or method arg) and pass it to repos.
+2. **MACD (12/26/9)** — momentum/trend; signal/zero-line crosses; histogram turns & divergence. ([Investopedia][2], [ChartSchool][3])
+   **Preprocess features:**
 
-Freshness path is a dead end
-_get_fresh_market_data returns None and the caller just errors. This must trigger extraction and await, with concurrency protection:
+* MACD–signal spread; last time it crossed zero.
+* Histogram peak/trough age and size; first derivative sign change (early momentum shift).
+* Divergence flag vs price on last two swing highs/lows.
+* “Regime” (MACD>0 uptrend, <0 downtrend) duration in bars.
 
-Check cache; if stale, acquire per-symbol lock, enqueue extraction, await result (with timeout/backoff).
+3. **Stochastic (%K/%D)** — range momentum; OB/OS 80/20; %K/%D crosses; divergence. ([Investopedia][4])
+   **Preprocess features:**
 
-Never return None unless you’ve tried extraction.
+* %K, %D and their spread; latest cross direction & bars since.
+* Overbought/oversold streak length; exits from OB/OS.
+* Divergence flag with price.
+* %K position rank within last N bars (percentile).
 
-SL/TP lost in transit
-_parse_llm_response extracts stop_loss_price and take_profit_price, but _create_strategy_run throws them away. Later _create_trading_intent tries to read them from decision_context.confidence_factors (where they don’t exist), so they’re always None. Persist them in StrategyRun (or in DecisionContext) and pass through.
+4. **Bollinger Bands (20,2)** — volatility expansion/“walk the band”/squeezes. ([Investopedia][5])
+   **Preprocess features:**
 
-Async/sync mismatch
-You call config_repo.get_config, position_repo.get_active_positions, market_data_repo.get_fresh_data, strategy_run_repo.save without await. If these hit DB/network they should be async. Pick a style and enforce it (prefer async IO; otherwise make them clearly sync repos).
+* %B and BandWidth; BandWidth z-score vs 6-month median (squeeze).
+* Touch/close outside band count over last N bars.
+* Breakout bar body% when exiting a squeeze; follow-through (1–3 bars).
+* Price distance to middle band in ATRs.
 
-LLM client usage + naming
-Docstrings and method name say GPT-5; code uses "gpt-4". Call it _call_llm, make model configurable in BotConfig, and handle provider errors with retries/jitter + idempotency token for decisions.
+5. **ATR (Average True Range)** — volatility sizing/stops; breakout context. ([Investopedia][6])
+   **Preprocess features:**
 
-Medium-severity issues
+* ATR and ATR% (ATR/close).
+* ATR trend (rising/falling) over 14 bars.
+* Volatility stop levels (close ± k\*ATR) and distance from price.
+* “Volatility regime” bucket (e.g., ATR% quintile).
 
-Single-symbol assumption
-self.config.selected_pair suggests one symbol; your product wants multi-symbol/multi-timeframe. Decide now: engine scoped to (config_id, symbol, timeframe) or accept arrays and loop. Don’t hide this in a field named “selected_pair”.
+6. **ADX / DMI (+DI/−DI)** — trend strength & direction filters; >25 means real trend. ([Investopedia][7])
+   **Preprocess features:**
 
-Position management takes first only
-active_positions[0] drops other positions. Either iterate and emit intents per position or push PM orchestration to the scheduler (per-position jobs).
+* ADX value & slope; time spent >25 (or >40 for strong).
+* +DI−−DI spread; last +DI/−DI cross & bars since.
+* Composite “trend-quality” score: (ADX rising) AND (price making HH/HL or LL/LH).
+* Whipsaw risk flag: low ADX (<20) + rangebound.
 
-Prompt system coupling
-Direct .format on self.config.decision.system_prompt/user_prompt assumes those keys exist and strings won’t break. Move to a prompt composer that:
+7. **MFI (Money Flow Index)** — RSI with volume; OB/OS 80/20; divergence. ([Investopedia][8])
+   **Preprocess features:**
 
-Validates template variables,
+* MFI level; time since last 80/20 cross; streak above 80/below 20.
+* MFI vs price divergence flag.
+* “Confirmation” flag: price breakout + rising MFI over last N bars.
 
-Adds standardized headers (symbol, timeframe, candle timestamps),
+8. **OBV (On-Balance Volume)** — participation/accumulation; trend confirmation & divergence. ([ChartSchool][9], [Investopedia][10])
+   **Preprocess features:**
 
-Injects explicit indicator summaries (with units) not free-form strings.
+* OBV slope over 10 bars; break of OBV trendline.
+* Divergence with price at last swing high/low.
+* OBV above/below its EMA; bars since cross.
+* Volume-thrust event: max 3-day OBV change in 3 months.
 
-Price source & symbol format
-_get_current_price mocks CCXT format like "BTC/USDT" while Symbol.internal_format may be Hummingbot (BTC-USDT). Standardize via Symbol value object and adapters; never key maps by free strings.
+9. **VWAP (and Anchored VWAP)** — intraday execution benchmark; dynamic S/R; anchored to events. ([Investopedia][11], [alphatrends.net][12])
+   **Preprocess features:**
 
-Error handling pattern
-Returning {'action':'error'} mixes control and domain. Raise a typed DecisionError and let the orchestrator turn that into retries/circuit-breakers/alerts.
+* Price–VWAP distance (bps) and z-score (session).
+* Time above/below session VWAP; flips count.
+* Anchored VWAPs from major swing highs/lows/earnings gaps; distance & confluence count.
+* First touch/reject outcome stats after open.
 
-Timestamps
-Use datetime.now(timezone.utc) and ISO8601 with “Z”. Don’t put naive datetimes in DB/logs.
+10. **Supertrend** — ATR-based trend overlay; flips on volatility-adjusted breaks. ([Investopedia][13], [Zerodha][14])
+    **Preprocess features:**
 
-Logging
-Include config_id, symbol, timeframe, scenario, strategy_run_id in every log as structured fields.
+* Supertrend direction; bars since last flip; flip frequency last 60 bars.
+* Price distance to line in ATRs; “near-flip” (<0.2 ATR).
+* False-flip filter: require ADX>25 at flip (flag).
+* Consecutive closes beyond line.
 
-Low-severity / polish
+11. **Ichimoku Cloud** — full-stack trend/momentum/S-R: Tenkan/Kijun crosses, price vs cloud, Chikou confirmation, cloud twist. ([Investopedia][15])
+    **Preprocess features:**
 
-Remove unused imports (asyncio, DataFreshness).
+* Price vs cloud (above/inside/below) and cloud thickness (spans distance).
+* Tenkan–Kijun cross direction/recency; “strong/weak” (relative to cloud).
+* Chikou above/below price 26 back; confirmation flag.
+* Future cloud twist within next N bars.
 
-Pull regex compilation out of the loop in _parse_llm_response.
+12. **EMA/SMA Crossovers (e.g., 50/200 “golden/death” cross)** — regime/confirmation. ([Investopedia][16])
+    **Preprocess features:**
 
-Confidence threshold 0.7 → config-driven.
-
-Rename decision_type vs scenario to avoid redundancy.
-
-Minimal concrete changes (illustrative)
-# 1) Mode field
-if self.config.mode == "signal_validation":
-    ...
-elif self.config.mode == "autonomous_trading":
-    ...
-
-# 2) Timeframe propagation (method signatures)
-async def make_decision(self, symbol: Optional[str]=None, timeframe: str="1h", signal_data: Optional[Dict]=None): ...
-market_data = await self._get_fresh_market_data(symbol_obj, timeframe)
-
-# 3) Freshness + extraction trigger
-async def _get_fresh_market_data(self, symbol: Symbol, timeframe: str, max_age_seconds: int = 30):
-    snapshot = await market_data_repo.get_fresh_data(symbol, timeframe, max_age_seconds)
-    if snapshot: return snapshot
-    async with extraction_locks.per_symbol(symbol, timeframe):
-        # double-check after acquiring lock
-        snapshot = await market_data_repo.get_fresh_data(symbol, timeframe, max_age_seconds)
-        if snapshot: return snapshot
-        await extraction_service.extract_all(symbol, timeframe)  # await result or set a short timeout
-        return await market_data_repo.get_fresh_data(symbol, timeframe, max_age_seconds)
-
-# 4) Preserve SL/TP
-decision_data = self._parse_llm_response(llm_response)
-...
-strategy_run = StrategyRun.create_opportunity_analysis(...,
-    stop_loss=decision_data.get("stop_loss_price"),
-    take_profit=decision_data.get("take_profit_price"),
-)
-
-Alignment with your refactor plan
-
-✅ Service layer + domain models: you’re on track.
-
-❌ Still tied to config_type: switch to mode now.
-
-❌ Not compatible yet with universal extraction’s timeframe/candle-aware cache.
-
-⚠️ Prompt system needs the modular composer.
-
-⚠️ Multi-position and multi-symbol scheduling decisions are still implicit; make them explicit in the orchestrator, not ad-hoc in this class.
-
-Final take
-
-Good skeleton; wrong assumptions around mode field, timeframe, and freshness. Fix those three, preserve SL/TP, make repos consistently async, and this becomes a solid DecisionEngine v2 foundation.
-
-You said:
-1) no we actually decided to keep config_type and repurpose it. originally it was to separate the 3 agent configs, then we consolidated to only 1 config with the agents nested so it was legacy, but then we decided it could be repurposed for modes. So config_type = 'autonomous trading' or 'signal validation' modes. 
-2) explain the use of timeframe in the current code more, and what you're proposing, explain more and in simple terms, idk what you're talking about. 
-3) ok. 
-4) good catch.
-5) yeah good catch.
-6) agreed. 
-ChatGPT said:
-
-Got it. Here’s a crisp update addressing each point.
-
-1) config_type
-
-Keeping and repurposing config_type for modes is fine. My only asks:
-
-Make it an Enum ({"autonomous_trading","signal_validation"}), validate at API boundary.
-
-Document it as “mode,” not “type,” in code/docs to prevent old mental models from leaking in.
-
-Add config_version so future mode additions (e.g., “paper_review”) don’t surprise old configs.
-
-2) Timeframe — what’s missing and what I propose (plain English)
-
-What your code does now:
-
-It asks for “fresh market data” without saying which timeframe (1m, 5m, 15m, 1h, 4h…).
-
-Indicators and strategies depend on timeframe (RSI(14) on 1h ≠ RSI(14) on 5m).
-
-Your universal cache idea also depends on timeframe (cache must be keyed by it).
-
-Simple mental model:
-
-Think of each (symbol, timeframe) as a separate “data stream.”
-
-Decisions should run per (symbol, timeframe), and on candle close for that timeframe.
-
-Concretely add:
-
-In config:
-
-primary_timeframe: str (e.g., "15m").
-
-analysis_timeframes: List[str] (optional, for multi-TF inputs like ["15m","1h","4h"]).
-
-In engine signatures (minimal):
-
-make_decision(symbol: Optional[str], timeframe: Optional[str]=None, ...)
-
-If timeframe not provided, use config.primary_timeframe.
-
-In repositories & cache:
-
-market_data_repo.get_fresh_data(symbol, timeframe, ...)
-
-Cache key: (symbol, timeframe, candle_close_ts, feature_version).
-
-In scheduler:
-
-Jobs are per (config_id, symbol, timeframe) and fire on candle close for that timeframe.
-
-No arbitrary “every 30s” polling—tie execution to candle boundaries (with tiny jitter).
-
-For multi-timeframe strategies:
-
-Fetch the primary timeframe as the decision anchor.
-
-Optionally enrich the prompt with higher TF context (e.g., trend from 4h, confirmation from 1h).
-
-Make this explicit in config: mtf_context: {"include": true, "timeframes": ["1h","4h"]}.
-
-The decision context must record exactly which timeframes were used.
-
-3) Freshness/extraction (we agree)
-
-Implement the per-(symbol,timeframe) lock + extraction trigger path. Never return None without attempting extraction and double-checking the cache after the lock.
-
-4) SL/TP propagation (fix)
-
-Parse → include stop_loss/take_profit in StrategyRun (and/or DecisionContext).
-
-Surface them in the trading intent from the stored fields (not confidence_factors).
-
-5) Async consistency (fix)
-
-Pick async for repos or make them explicitly sync—don’t mix. Given DB/IO, go async:
-
-await config_repo.get_config(...)
-
-await position_repo.get_active_positions(...)
-
-await market_data_repo.get_fresh_data(...)
-
-await strategy_run_repo.save(...)
-
-6) LLM client/model (fix)
-
-Rename to _call_llm, model comes from config (and provider in the future).
-
-Add retries with jitter and an idempotency key (config_id + symbol + timeframe + candle_close_ts).
-
-Use UTC timestamps in ISO8601 with Z.
-
-Minimal deltas you can apply now
-
-Add primary_timeframe to BotConfig; pass timeframe through make_decision → _get_fresh_market_data → repos.
-
-Change scheduler to run per (config_id, symbol, timeframe) on candle close.
-
-Promote SL/TP to first-class fields in StrategyRun and trading intents.
-
-Flip repos to async and validate config_type Enum at the API boundary.
-
-Do that, and the engine aligns with your universal extraction + mode-aware orchestration—without a rewrite.
+* Current cross state; bars since cross; slope of slow MA at cross.
+* Price distance to each MA; “stacking” (fast>mid>slow).
+* Pullback depth to rising MA (percent retracement).
+* Failed cross flags (cross + immediate uncross ≤10 bars).
+
+13. **Donchian Channels** — breakout/trend following (Turtle-style). ([Investopedia][17], [ChartSchool][18])
+    **Preprocess features:**
+
+* Distance to 20-bar high/low; days since new breakout.
+* Breakout confirmation: close beyond band by >x% and rising volume.
+* Post-breakout max adverse excursion to opposite band.
+* “Channel squeeze” (upper-lower width in ATRs) percentile.
+
+14. **Keltner Channels** — ATR-based envelopes; breakout + squeeze with BB. ([ChartSchool][19], [StockCharts][20])
+    **Preprocess features:**
+
+* Close vs upper/lower channel; time outside channel.
+* KC width (in ATRs) vs median; BB-inside-KC squeeze flag & bars since “fired.”
+* Breakout body% when clearing channel; follow-through return.
+
+15. **Parabolic SAR** — trend trailing stops; flips indicate possible reversals; works best in trends. ([Investopedia][21])
+    **Preprocess features:**
+
+* Current SAR side; distance in ATRs; acceleration factor used.
+* Bars since last flip; flip frequency (whipsaw risk).
+* Whether price tagged SAR this bar; intrabar penetration flag.
+* Confluence with MA/structure at flip (yes/no).
+
+16. **CCI (Commodity Channel Index)** — mean-reversion extremes (+100/−100) & cycles. ([Investopedia][22])
+    **Preprocess features:**
+
+* CCI level; time outside ±100; re-entry events.
+* Divergence with price; CCI cycle length via zero-cross spacing.
+* CCI percentile vs 1-year distribution.
+
+17. **ROC (Rate of Change / Momentum)** — zero-line crosses; extremes; divergence. ([ChartSchool][23])
+    **Preprocess features:**
+
+* ROC value; last zero cross & bars since.
+* Max/min ROC in last N bars; mean-reversion distance to median.
+* ROC vs return next k bars (rolling calibration feature).
+
+18. **Aroon / Aroon Oscillator** — time-since-high/low; trend emergence/decay. ([ChartSchool][24])
+    **Preprocess features:**
+
+* Aroon Up/Down; oscillator value; time spent >+50 or <−50.
+* “Fresh trend” flag: Aroon Up>90 with Down<10 (or inverse).
+* Bars since last 25-period HH/LL (raw Donchian timing).
+
+19. **Chaikin Money Flow (CMF)** — volume-weighted accumulation; confirm/deny trend strength. ([ChartSchool][25])
+    **Preprocess features:**
+
+* CMF level; streak above 0 (accumulation) or below 0 (distribution).
+* Breakout + positive CMF confirmation flag.
+* CMF divergence with price; CMF vs MFI agreement flag.
+
+20. **Williams %R** — momentum extremes; responsive OB/OS; failure swings. ([Investopedia][26])
+    **Preprocess features:**
+
+* %R level; time in OB (>-20) / OS (<-80); first close back inside.
+* Failure swing patterns (HH in price, lower high in %R, etc.).
+* %R percentile vs last N bars; cross of −50 (momentum tilt).
+
+---
+
+### Why these 20?
+
+They’re **battle-tested, complementary, and interpretable**: momentum (RSI, MACD, Stoch, %R, ROC), **trend** (ADX/DMI, MA crosses, Donchian, Ichimoku, Supertrend, PSAR), **volatility** (ATR, Bollinger, Keltner), and **volume/flow** (OBV, CMF, MFI, VWAP). That mix minimizes redundancy and overfitting while covering how pros actually decide: **trend present? momentum aligned? volatility regime? real participation?** (pandas-ta covers all of these). ([GitHub][27])
+
+---
+
+### Implementation notes (opinionated)
+
+* **Always add recency & regime context** (bars since signal, how long in regime). Static values are near-useless.
+* **Normalize distances in ATRs** so features transfer across assets.
+* **Prefer event flags over thresholds** (e.g., “exited OB after 10-bar stay” beats “RSI=71”).
+* **Divergence detection** (price vs momentum/volume) is high value if you anchor it to recent swing points, not every tick.
+* **Squeeze → expansion** states (BB/KC/ATR) deserve first-class features; most big moves start there. ([ChartSchool][28])
+
+If you want, I can generate **pandas-ta preprocessor code** that outputs exactly these fields in a tidy feature matrix for your pipeline.
+
+[1]: https://www.investopedia.com/articles/active-trading/042114/overbought-or-oversold-use-relative-strength-index-find-out.asp?utm_source=chatgpt.com "RSI Indicator: Buy and Sell Signals"
+[2]: https://www.investopedia.com/articles/forex/05/macddiverge.asp?utm_source=chatgpt.com "How to Trade the MACD"
+[3]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/macd-histogram?utm_source=chatgpt.com "MACD-Histogram - ChartSchool - StockCharts.com"
+[4]: https://www.investopedia.com/articles/technical/073001.asp?utm_source=chatgpt.com "What Is the Stochastic Oscillator and How Is It Used?"
+[5]: https://www.investopedia.com/terms/b/bollingerbands.asp?utm_source=chatgpt.com "Understanding Bollinger Bands: A Key Technical Analysis ..."
+[6]: https://www.investopedia.com/terms/a/atr.asp?utm_source=chatgpt.com "Average True Range (ATR) Formula, What It Means, and ..."
+[7]: https://www.investopedia.com/terms/d/dmi.asp?utm_source=chatgpt.com "Directional Movement Index (DMI) Formula, Calculations ..."
+[8]: https://www.investopedia.com/terms/m/mfi.asp?utm_source=chatgpt.com "Money Flow Index (MFI): Definition and Uses - Investopedia"
+[9]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/on-balance-volume-obv?utm_source=chatgpt.com "On Balance Volume (OBV) - ChartSchool - StockCharts.com"
+[10]: https://www.investopedia.com/articles/active-trading/021115/uncover-market-sentiment-onbalance-volume-obv.asp?utm_source=chatgpt.com "On-Balance Volume Reveals Market Player Strategy"
+[11]: https://www.investopedia.com/terms/v/vwap.asp?utm_source=chatgpt.com "Volume-Weighted Average Price (VWAP): Definition and ..."
+[12]: https://alphatrends.net/anchored-vwap/?utm_source=chatgpt.com "Anchored VWAP"
+[13]: https://www.investopedia.com/supertrend-indicator-7976167?utm_source=chatgpt.com "Supertrend Indicator: What It Is and How It Works"
+[14]: https://zerodha.com/varsity/chapter/supplementary-notes-1/?utm_source=chatgpt.com "Other indicators – Varsity by Zerodha"
+[15]: https://www.investopedia.com/terms/i/ichimokuchart.asp?utm_source=chatgpt.com "Ichimoku Kinko Hyo Indicator & FIve Components Explained"
+[16]: https://www.investopedia.com/ask/answers/121114/what-difference-between-golden-cross-and-death-cross-pattern.asp?utm_source=chatgpt.com "Golden Cross vs. Death Cross: What's the Difference?"
+[17]: https://www.investopedia.com/terms/d/donchianchannels.asp?utm_source=chatgpt.com "Understanding Donchian Channels: Formula, Calculation, ..."
+[18]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/price-channels?utm_source=chatgpt.com "Price Channels - ChartSchool - StockCharts.com"
+[19]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/keltner-channels?utm_source=chatgpt.com "Keltner Channels - ChartSchool - StockCharts.com"
+[20]: https://articles.stockcharts.com/article/articles-chartwatchers-2008-08-using-keltner-channels/?utm_source=chatgpt.com "USING KELTNER CHANNELS"
+[21]: https://www.investopedia.com/trading/introduction-to-parabolic-sar/?utm_source=chatgpt.com "Introduction to the Parabolic SAR"
+[22]: https://www.investopedia.com/investing/timing-trades-with-commodity-channel-index/?utm_source=chatgpt.com "Timing Trades With the Commodity Channel Index"
+[23]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/rate-of-change-roc?utm_source=chatgpt.com "Rate of Change (ROC) - ChartSchool - StockCharts.com"
+[24]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/aroon?utm_source=chatgpt.com "Aroon - ChartSchool - StockCharts.com"
+[25]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/chaikin-money-flow-cmf?utm_source=chatgpt.com "Chaikin Money Flow (CMF) - ChartSchool - StockCharts.com"
+[26]: https://www.investopedia.com/terms/w/williamsr.asp?utm_source=chatgpt.com "Williams %R: Definition, Formula, Uses, and Limitations"
+[27]: https://github.com/xgboosted/pandas-ta-classic?utm_source=chatgpt.com "xgboosted/pandas-ta-classic: Technical Analysis Indicators"
+[28]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/ttm-squeeze?utm_source=chatgpt.com "TTM Squeeze - ChartSchool - StockCharts.com"

@@ -118,15 +118,18 @@ class HummingbotDataClient:
                 
                 data = await response.json()
                 
+                # API returns list of dicts: [{'timestamp': 1756843200.0, 'open': 110805.6, ...}, ...]
+                if not isinstance(data, list):
+                    raise Exception(f"Expected list of candles, got: {type(data)}")
+                
+                if not data:
+                    raise Exception("No candle data returned")
+                
                 # Convert to pandas DataFrame
-                df = pd.DataFrame({
-                    'timestamp': pd.to_datetime(data['timestamp'], unit='ms'),
-                    'open': data['open'],
-                    'high': data['high'], 
-                    'low': data['low'],
-                    'close': data['close'],
-                    'volume': data['volume']
-                })
+                df = pd.DataFrame(data)
+                
+                # Convert timestamp from seconds to datetime
+                df['timestamp'] = pd.to_datetime(df['timestamp'], unit='s')
                 
                 # Sort by timestamp (oldest first)
                 df = df.sort_values('timestamp').reset_index(drop=True)

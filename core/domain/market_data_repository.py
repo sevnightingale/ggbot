@@ -11,7 +11,7 @@ import json
 
 from core.common.db import get_db_connection
 from core.common.logger import logger
-from .market_data import MarketDataSnapshot, DataSource, DataType, DataFreshness, Indicator, PriceData, VolumeData
+from .market_data import MarketDataSnapshot, DataSource, DataFreshness, Indicator, PriceData, VolumeData
 from .models.value_objects import Symbol
 from decimal import Decimal
 
@@ -421,7 +421,6 @@ class MarketDataRepository:
             id=str(record_id),
             symbol=Symbol.from_string(symbol),
             data_source=DataSource(source),
-            data_type=DataType(data_type),
             extracted_at=updated_at,
             indicators=indicators,
             price_data=price_data,

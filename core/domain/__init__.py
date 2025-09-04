@@ -4,13 +4,23 @@ Core Domain Models
 This module contains the domain models and value objects for the GGBot platform.
 Domain models represent business entities and their behavior, independent of 
 infrastructure concerns like databases or APIs.
+
+V1 Schema Update: Added unified decision model, user profiles, and dynamic indicators.
 """
 
 from .models.account import Account
 from .repositories.account_repository import AccountRepository, account_repo  
 from .models.value_objects import Money, Symbol, Confidence, Timeframe
 
-# Strategy and decision tracking
+# Decision tracking (unified model replacing StrategyRun)
+from .decision import (
+    Decision,
+    DecisionAction,
+    DecisionStatus, 
+    DecisionData
+)
+
+# Legacy strategy run model (for backward compatibility during migration)
 from .strategy_run import (
     StrategyRun, 
     DecisionScenario, 
@@ -18,6 +28,22 @@ from .strategy_run import (
     DecisionContext
 )
 from .strategy_run_repository import StrategyRunRepository, strategy_run_repo
+
+# User management and business model
+from .user_profile import (
+    UserProfile,
+    SubscriptionTier,
+    SubscriptionStatus
+)
+
+# Dynamic indicator management
+from .indicator import (
+    Indicator,
+    DataSource,
+    IndicatorCategory,
+    IndicatorStatus,
+    UserIndicatorAccess
+)
 
 # Position and trading
 from .position import (
@@ -32,10 +58,7 @@ from .position_repository import PositionRepository, position_repo
 # Market data and extraction
 from .market_data import (
     MarketDataSnapshot,
-    DataSource,
-    DataType, 
     DataFreshness,
-    Indicator,
     PriceData,
     VolumeData
 )
@@ -51,13 +74,31 @@ __all__ = [
     'Confidence',
     'Timeframe',
     
-    # Strategy tracking
+    # Decision tracking (V1 unified model)
+    'Decision',
+    'DecisionAction',
+    'DecisionStatus',
+    'DecisionData',
+    
+    # Legacy strategy tracking (backward compatibility)
     'StrategyRun',
     'DecisionScenario',
     'DecisionOutcome', 
     'DecisionContext',
     'StrategyRunRepository',
     'strategy_run_repo',
+    
+    # User management and business model
+    'UserProfile',
+    'SubscriptionTier',
+    'SubscriptionStatus',
+    
+    # Dynamic indicator management
+    'Indicator',
+    'DataSource',
+    'IndicatorCategory',
+    'IndicatorStatus',
+    'UserIndicatorAccess',
     
     # Position management
     'Position',
@@ -70,10 +111,7 @@ __all__ = [
     
     # Market data
     'MarketDataSnapshot',
-    'DataSource',
-    'DataType',
     'DataFreshness', 
-    'Indicator',
     'PriceData',
     'VolumeData',
     'MarketDataRepository',
