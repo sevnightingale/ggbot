@@ -96,7 +96,7 @@ export default function LoginPage() {
             providers={[]} // Start with just email, add social providers when you set them up
             view="sign_in"
             showLinks={true}
-            redirectTo={`https://app.ggbots.ai/dashboard`}
+            redirectTo={`https://app.ggbots.ai/auth/callback`}
           />
         </div>
         

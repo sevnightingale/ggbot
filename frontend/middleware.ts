@@ -2,23 +2,26 @@ import { NextRequest, NextResponse } from 'next/server'
 
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
+  const pathname = request.nextUrl.pathname
   
-  // If accessing via app subdomain, rewrite to dashboard routes
+  // If accessing via app subdomain
   if (hostname.startsWith('app.')) {
-    // Handle app.ggbots.ai/login -> /login
-    if (request.nextUrl.pathname === '/login') {
-      return NextResponse.rewrite(new URL('/login', request.url))
+    // Allow auth pages and callbacks through
+    if (pathname === '/login' || pathname === '/signup') {
+      return NextResponse.next()
     }
-    // Handle app.ggbots.ai -> /dashboard
-    if (request.nextUrl.pathname === '/') {
+    
+    // Handle root app subdomain -> dashboard
+    if (pathname === '/') {
       return NextResponse.rewrite(new URL('/dashboard', request.url))
     }
+    
     // All other app subdomain routes go through normally
     return NextResponse.next()
   }
   
-  // Main domain routes to landing
-  if (request.nextUrl.pathname === '/') {
+  // Main domain routing
+  if (pathname === '/') {
     return NextResponse.rewrite(new URL('/landing', request.url))
   }
   
