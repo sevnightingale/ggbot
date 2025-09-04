@@ -53,6 +53,8 @@ export default function SignupPage() {
                     inputPlaceholder: '#9ca3af', // gray-400
                     messageText: '#e3e5e6', // bone-200
                     messageTextDanger: '#ef4444', // red-400 (your status color)
+                    messageBackground: '#1f1f23', // charcoal-800
+                    messageBackgroundDanger: '#2a1f1f', // dark red background
                     anchorTextColor: '#be6a47', // agent-trading orange
                     anchorTextHoverColor: '#a85a3f', // darker agent-trading
                   },
@@ -94,7 +96,7 @@ export default function SignupPage() {
             providers={[]} // Start with just email, add social providers when you set them up
             view="sign_up"
             showLinks={true}
-            redirectTo={`${typeof window !== 'undefined' ? window.location.origin : ''}/dashboard`}
+            redirectTo={`https://app.ggbots.ai/dashboard`}
           />
         </div>
         
