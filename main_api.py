@@ -25,9 +25,9 @@ from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, requ
 async def get_mock_user_for_dev():
     """Mock user for Phase 7 development - replace with real auth in Phase 5."""
     return AuthenticatedUser(
-        user_id="c81933d2-dd86-479d-97db-fad83465362f",  # Real Supabase user ID
+        user_id="00000000-0000-0000-0000-000000000000",  # Real Supabase user ID
         email="user@example.com",  # Placeholder email
-        claims={"sub": "c81933d2-dd86-479d-97db-fad83465362f", "email": "user@example.com"}
+        claims={"sub": "00000000-0000-0000-0000-000000000000", "email": "user@example.com"}
     )
 from core.services.config_service import ConfigService, BotConfigV2, config_service
 from core.services.user_service import UserService, user_service

@@ -61,9 +61,10 @@ class DecisionEngineV2:
     - Direct OpenAI API integration (no custom provider complexity)
     """
     
-    def __init__(self, config_id: str):
+    def __init__(self, config_id: str, user_id: str = None):
         """Initialize decision engine for a specific configuration."""
         self.config_id = config_id
+        self.user_id = user_id
         self.config: Optional[BotConfig] = None
         
         # OpenAI client
@@ -74,10 +75,12 @@ class DecisionEngineV2:
     async def initialize(self) -> None:
         """Load configuration and validate setup."""
         try:
-            self.config = await config_repo.get_config(self.config_id)
+            self.config = config_repo.get_config(self.config_id, self.user_id)
             if not self.config:
                 raise ConfigurationError(f"Configuration {self.config_id} not found")
-            logger.bind(config_id=self.config_id, mode=self.config.config_type).info("Configuration loaded")
+            # Use getattr to safely access config_type, default to "autonomous" if not found
+            config_type = getattr(self.config, 'config_type', 'autonomous')
+            logger.bind(config_id=self.config_id, mode=config_type).info("Configuration loaded")
         except Exception as e:
             logger.bind(config_id=self.config_id).error(f"Failed to load config: {e}")
             raise ConfigurationError(f"Failed to load config {self.config_id}: {e}")

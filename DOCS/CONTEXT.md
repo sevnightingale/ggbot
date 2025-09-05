@@ -1,1 +1,2 @@
-sudo env PATH=$PATH:/usr/bin /home/sev/.npm-global/lib/node_modules/pm2/bin/pm2 startup systemd -u sev --hp /home/sev
+export DEVELOPMENT_MODE=true
+python -m tests.test_full_e2e_integration

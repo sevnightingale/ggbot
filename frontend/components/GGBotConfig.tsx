@@ -199,6 +199,19 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
   )
 }
 
+// Agent Colors from Original Design
+const AGENT_COLORS = {
+  extraction: '#38a1c7',
+  decision: '#2cbe77', 
+  trading: '#be6a47'
+}
+
+// Decision Modes from Original
+const decisionModes = [
+  { value: 'autonomous', label: 'Autonomous Trading', description: 'Generate and execute trades independently' },
+  { value: 'validation', label: 'Signal Validation', description: 'Validate external signals before execution' }
+]
+
 const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfigSaved }) => {
   // UI State
   const [isEditingName, setIsEditingName] = React.useState(false)
@@ -612,7 +625,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                         className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
                       >
                         <h3 className="text-subheader text-bone-200 font-medium">Extraction Agent</h3>
-                        <span className="text-xl transition-transform duration-200" style={{ color: '#38a1c7' }}>
+                        <span className="text-xl transition-transform duration-200" style={{ color: AGENT_COLORS.extraction }}>
                           ▶
                         </span>
                       </button>
@@ -623,7 +636,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                           className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
                         >
                           <h3 className="text-subheader text-bone-200 font-medium">Extraction Agent</h3>
-                          <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: '#38a1c7' }}>
+                          <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: AGENT_COLORS.extraction }}>
                             ▶
                           </span>
                         </div>
@@ -740,7 +753,8 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                       return (
                                         <span
                                           key={dataPointId}
-                                          className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
+                                          className="inline-flex items-center gap-1 px-2 py-1 text-charcoal-900 text-xs rounded"
+                                          style={{ backgroundColor: AGENT_COLORS.extraction }}
                                         >
                                           {dataPoint?.name || dataPointId}
                                           <button
@@ -817,9 +831,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 onClick={() => setDataSourceTab('technical-indicators')}
                                 className={`px-3 py-1 text-xs rounded transition-colors ${
                                   dataSourceTab === 'technical-indicators'
-                                    ? 'bg-agent-extraction text-charcoal-900 font-medium'
+                                    ? 'text-charcoal-900 font-medium'
                                     : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                 }`}
+                                style={{
+                                  backgroundColor: dataSourceTab === 'technical-indicators' ? AGENT_COLORS.extraction : undefined
+                                }}
                               >
                                 Technical Indicators
                               </button>
@@ -827,9 +844,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 onClick={() => setDataSourceTab('signal-providers')}
                                 className={`px-3 py-1 text-xs rounded transition-colors ${
                                   dataSourceTab === 'signal-providers'
-                                    ? 'bg-agent-extraction text-charcoal-900 font-medium'
+                                    ? 'text-charcoal-900 font-medium'
                                     : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                 }`}
+                                style={{
+                                  backgroundColor: dataSourceTab === 'signal-providers' ? AGENT_COLORS.extraction : undefined
+                                }}
                               >
                                 Signal Providers
                               </button>
@@ -837,9 +857,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 onClick={() => setDataSourceTab('news-sentiment')}
                                 className={`px-3 py-1 text-xs rounded transition-colors ${
                                   dataSourceTab === 'news-sentiment'
-                                    ? 'bg-agent-extraction text-charcoal-900 font-medium'
+                                    ? 'text-charcoal-900 font-medium'
                                     : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                 }`}
+                                style={{
+                                  backgroundColor: dataSourceTab === 'news-sentiment' ? AGENT_COLORS.extraction : undefined
+                                }}
                               >
                                 News & Sentiment
                               </button>
@@ -848,7 +871,13 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             {/* Tab Content */}
                             {dataSourceTab === 'technical-indicators' && (
                               <DataSourceSection
-                                dataSources={dataSources.filter(ds => ds.name === 'technical_indicators')}
+                                dataSources={(() => {
+                                  const filtered = dataSources.filter(ds => 
+                                    ds.name === 'technical_indicators' || ds.name === 'Technical Indicators'
+                                  )
+                                  // Fallback: if no technical indicators found, show all data sources for debugging
+                                  return filtered.length > 0 ? filtered : dataSources
+                                })()}
                                 selectedDataPoints={selectedDataPoints}
                                 onToggleDataPoint={handleToggleDataPoint}
                                 isLoading={dataSourcesLoading}
@@ -859,7 +888,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                               <div className="text-center py-8 text-gray-500">
                                 <div className="text-4xl mb-4">📡</div>
                                 <div className="text-sm text-bone-200 mb-2">Signal Providers</div>
-                                <div className="text-xs">External trading signal integration - coming soon</div>
+                                <div className="text-xs">GG-Shot and external signal integration - coming soon</div>
                               </div>
                             )}
                             
@@ -870,7 +899,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                   ds.name === 'sentiment_and_trends' ||
                                   ds.name === 'influencer_kol' ||
                                   ds.name === 'news_and_regulations' ||
-                                  ds.name === 'onchain_analytics'
+                                  ds.name === 'onchain_analytics' ||
+                                  ds.name === 'Fundamental Analysis' ||
+                                  ds.name === 'Sentiment & Trends' ||
+                                  ds.name === 'Influencer/KOL' ||
+                                  ds.name === 'News & Regulations' ||
+                                  ds.name === 'On-Chain Analytics'
                                 )}
                                 selectedDataPoints={selectedDataPoints}
                                 onToggleDataPoint={handleToggleDataPoint}
@@ -883,31 +917,107 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                     )}
                   </div>
 
-                  {/* LLM Configuration Section */}
+                  {/* Decision Agent Section */}
                   <div className="mb-8">
-                    {!expandedSections.has('llm') ? (
+                    {!expandedSections.has('decision') ? (
                       <button
-                        onClick={() => toggleSection('llm')}
+                        onClick={() => toggleSection('decision')}
                         className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
                       >
-                        <h3 className="text-subheader text-bone-200 font-medium">LLM Configuration</h3>
-                        <span className="text-xl transition-transform duration-200" style={{ color: '#9333ea' }}>
+                        <h3 className="text-subheader text-bone-200 font-medium">Decision Agent</h3>
+                        <span className="text-xl transition-transform duration-200" style={{ color: AGENT_COLORS.decision }}>
                           ▶
                         </span>
                       </button>
                     ) : (
                       <div className="bg-charcoal-900 relative ggbot-accordion-expanded">
                         <div 
-                          onClick={() => toggleSection('llm')}
+                          onClick={() => toggleSection('decision')}
                           className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
                         >
-                          <h3 className="text-subheader text-bone-200 font-medium">LLM Configuration</h3>
-                          <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: '#9333ea' }}>
+                          <h3 className="text-subheader text-bone-200 font-medium">Decision Agent</h3>
+                          <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: AGENT_COLORS.decision }}>
                             ▶
                           </span>
                         </div>
                         <div className="p-6 space-y-6">
-                          {/* Tier Status */}
+                          {/* Decision Modes */}
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-footnote text-bone-200 font-medium">DECISION MODE</h4>
+                            </div>
+                            <div className="flex gap-2 flex-wrap mb-4">
+                              {decisionModes.map(mode => (
+                                <button
+                                  key={mode.value}
+                                  onClick={() => {
+                                    updateConfigData(prev => ({
+                                      ...prev,
+                                      decision: {
+                                        ...prev.decision,
+                                        mode: mode.value
+                                      }
+                                    } as any))
+                                  }}
+                                  className={`px-3 py-1 text-xs rounded transition-colors ${
+                                    (configData.decision as any)?.mode === mode.value
+                                      ? 'text-charcoal-900 font-medium'
+                                      : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                                  }`}
+                                  style={{
+                                    backgroundColor: (configData.decision as any)?.mode === mode.value ? AGENT_COLORS.decision : undefined
+                                  }}
+                                >
+                                  {mode.label}
+                                </button>
+                              ))}
+                            </div>
+                            <div className="text-xs text-gray-400">
+                              {decisionModes.find(m => m.value === (configData.decision as any)?.mode)?.description || 
+                               'Choose how the AI makes trading decisions'}
+                            </div>
+                          </div>
+                          
+                          {/* Analysis Frequency */}
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-footnote text-bone-200 font-medium">ANALYSIS FREQUENCY</h4>
+                            </div>
+                            <div className="flex gap-2 flex-wrap">
+                              {frequencyOptions.map(freq => (
+                                <button
+                                  key={freq.value}
+                                  onClick={() => {
+                                    updateConfigData(prev => ({
+                                      ...prev,
+                                      decision: {
+                                        ...prev.decision,
+                                        analysis_frequency: freq.value
+                                      }
+                                    }))
+                                  }}
+                                  className={`px-3 py-1 text-xs rounded transition-colors ${
+                                    configData.decision.analysis_frequency === freq.value
+                                      ? 'text-charcoal-900 font-medium'
+                                      : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                                  }`}
+                                  style={{
+                                    backgroundColor: configData.decision.analysis_frequency === freq.value ? AGENT_COLORS.decision : undefined
+                                  }}
+                                >
+                                  {freq.label}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+
+                          {/* LLM Configuration */}
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-footnote text-bone-200 font-medium">LLM CONFIGURATION</h4>
+                            </div>
+                            
+                            {/* Tier Status */}
                           <div>
                             <div className="flex items-center justify-between mb-4">
                               <h4 className="text-footnote text-bone-200 font-medium">SUBSCRIPTION STATUS</h4>
@@ -1195,7 +1305,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                         className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
                       >
                         <h3 className="text-subheader text-bone-200 font-medium">Trading Agent</h3>
-                        <span className="text-xl transition-transform duration-200" style={{ color: '#be6a47' }}>
+                        <span className="text-xl transition-transform duration-200" style={{ color: AGENT_COLORS.trading }}>
                           ▶
                         </span>
                       </button>
@@ -1206,7 +1316,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                           className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
                         >
                           <h3 className="text-subheader text-bone-200 font-medium">Trading Agent</h3>
-                          <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: '#be6a47' }}>
+                          <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: AGENT_COLORS.trading }}>
                             ▶
                           </span>
                         </div>
@@ -1218,9 +1328,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 onClick={() => setTradingAgentTab('position-sizing')}
                                 className={`px-3 py-1 text-xs rounded transition-colors ${
                                   tradingAgentTab === 'position-sizing'
-                                    ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                                    ? 'text-charcoal-900 font-medium'
                                     : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                 }`}
+                                style={{
+                                  backgroundColor: tradingAgentTab === 'position-sizing' ? AGENT_COLORS.trading : undefined
+                                }}
                               >
                                 Position Sizing
                               </button>
@@ -1228,9 +1341,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 onClick={() => setTradingAgentTab('risk-management')}
                                 className={`px-3 py-1 text-xs rounded transition-colors ${
                                   tradingAgentTab === 'risk-management'
-                                    ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                                    ? 'text-charcoal-900 font-medium'
                                     : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                 }`}
+                                style={{
+                                  backgroundColor: tradingAgentTab === 'risk-management' ? AGENT_COLORS.trading : undefined
+                                }}
                               >
                                 Risk Management
                               </button>
@@ -1238,9 +1354,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 onClick={() => setTradingAgentTab('telegram')}
                                 className={`px-3 py-1 text-xs rounded transition-colors ${
                                   tradingAgentTab === 'telegram'
-                                    ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                                    ? 'text-charcoal-900 font-medium'
                                     : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                 }`}
+                                style={{
+                                  backgroundColor: tradingAgentTab === 'telegram' ? AGENT_COLORS.trading : undefined
+                                }}
                               >
                                 Telegram Publishing
                               </button>
@@ -1248,9 +1367,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 onClick={() => setTradingAgentTab('exchange')}
                                 className={`px-3 py-1 text-xs rounded transition-colors relative ${
                                   tradingAgentTab === 'exchange'
-                                    ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                                    ? 'text-charcoal-900 font-medium'
                                     : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                 }`}
+                                style={{
+                                  backgroundColor: tradingAgentTab === 'exchange' ? AGENT_COLORS.trading : undefined
+                                }}
                                 title="Exchange Connection - Coming Soon"
                               >
                                 Exchange Connection
@@ -1418,9 +1540,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                       }}
                                       className={`px-2 py-1 text-xs rounded transition-colors ${
                                         configData.trading.risk_management.max_positions === num
-                                          ? 'bg-[#be6a47] text-charcoal-900 font-medium'
+                                          ? 'text-charcoal-900 font-medium'
                                           : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                       }`}
+                                      style={{
+                                        backgroundColor: configData.trading.risk_management.max_positions === num ? AGENT_COLORS.trading : undefined
+                                      }}
                                     >
                                       {num}
                                     </button>
@@ -1428,31 +1553,57 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-2 gap-4 items-center">
-                                <span className="text-xs text-gray-400">Default stop loss:</span>
-                                <div className="flex items-center">
-                                  <input
-                                    type="number"
-                                    value={configData.trading.risk_management.default_stop_loss_percent || 3}
-                                    onChange={(e) => {
-                                      updateConfigData(prev => ({
-                                        ...prev,
-                                        trading: {
-                                          ...prev.trading,
-                                          risk_management: {
-                                            ...prev.trading.risk_management,
-                                            default_stop_loss_percent: Number(e.target.value)
+                              <div>
+                                <div className="grid grid-cols-2 gap-4 items-center mb-2">
+                                  <span className="text-xs text-gray-400">Default stop loss:</span>
+                                  <div className="flex items-center">
+                                    <input
+                                      type="number"
+                                      value={configData.trading.risk_management.default_stop_loss_percent || 3}
+                                      onChange={(e) => {
+                                        updateConfigData(prev => ({
+                                          ...prev,
+                                          trading: {
+                                            ...prev.trading,
+                                            risk_management: {
+                                              ...prev.trading.risk_management,
+                                              default_stop_loss_percent: Number(e.target.value)
+                                            }
                                           }
-                                        }
-                                      }))
-                                    }}
-                                    min="0.5"
-                                    max="20"
-                                    step="0.1"
-                                    className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
-                                  />
-                                  <span className="text-bone-200 text-xs ml-2">%</span>
+                                        }))
+                                      }}
+                                      min="0.5"
+                                      max="20"
+                                      step="0.1"
+                                      className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:outline-none transition-colors"
+                                      style={{ borderColor: 'focus' ? AGENT_COLORS.trading : undefined }}
+                                    />
+                                    <span className="text-bone-200 text-xs ml-2">% from entry</span>
+                                  </div>
                                 </div>
+                                <input
+                                  type="range"
+                                  min="0.5"
+                                  max="10"
+                                  step="0.1"
+                                  value={configData.trading.risk_management.default_stop_loss_percent || 3}
+                                  onChange={(e) => {
+                                    updateConfigData(prev => ({
+                                      ...prev,
+                                      trading: {
+                                        ...prev.trading,
+                                        risk_management: {
+                                          ...prev.trading.risk_management,
+                                          default_stop_loss_percent: Number(e.target.value)
+                                        }
+                                      }
+                                    }))
+                                  }}
+                                  className="w-full h-2 bg-charcoal-700 rounded-lg appearance-none cursor-pointer"
+                                  style={{
+                                    background: `linear-gradient(to right, ${AGENT_COLORS.trading} 0%, ${AGENT_COLORS.trading} ${((configData.trading.risk_management.default_stop_loss_percent || 3) / 10) * 100}%, #374151 ${((configData.trading.risk_management.default_stop_loss_percent || 3) / 10) * 100}%, #374151 100%)`
+                                  }}
+                                />
                               </div>
 
                               <div className="grid grid-cols-2 gap-4 items-center">

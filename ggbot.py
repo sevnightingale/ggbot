@@ -24,9 +24,9 @@ from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, requ
 async def get_mock_user_for_dev():
     """Mock user for Phase 7 development - replace with real auth in Phase 5."""
     return AuthenticatedUser(
-        user_id="c81933d2-dd86-479d-97db-fad83465362f",  # Real Supabase user ID
+        user_id="00000000-0000-0000-0000-000000000000",  # Real Supabase user ID
         email="user@example.com",  # Placeholder email
-        claims={"sub": "c81933d2-dd86-479d-97db-fad83465362f", "email": "user@example.com"}
+        claims={"sub": "00000000-0000-0000-0000-000000000000", "email": "user@example.com"}
     )
 from core.services.config_service import ConfigService, BotConfigV2, config_service
 from core.services.user_service import UserService, user_service
@@ -155,15 +155,19 @@ class GGBotOrchestrator:
             # 2. Get or create V2 extraction engine
             extraction_engine = await self._get_extraction_engine(user_id)
             
-            # 3. Get indicator access from config data structure
-            extraction_config = config.config_data.get("extraction", {})
-            data_sources = extraction_config.get("data_sources", {})
+            # 3. Get indicator access from config structure
+            extraction_config = config.extraction or {}
             
-            # Flatten all indicators from data sources
-            requested_indicators = []
-            for category, indicators in data_sources.items():
-                if isinstance(indicators, list):
-                    requested_indicators.extend(indicators)
+            # Handle both new structure (indicators) and old structure (data_sources)  
+            if "indicators" in extraction_config:
+                requested_indicators = extraction_config["indicators"]
+            else:
+                # Fallback to data_sources structure
+                data_sources = extraction_config.get("data_sources", {})
+                requested_indicators = []
+                for category, indicators in data_sources.items():
+                    if isinstance(indicators, list):
+                        requested_indicators.extend(indicators)
             
             if not requested_indicators:
                 # Default to basic indicators if none specified
@@ -236,7 +240,7 @@ class GGBotOrchestrator:
         """Run V2 extraction engine with proper integration."""
         try:
             # Get symbol from config
-            symbol = config.config_data.get("selected_pair", "BTC/USDT")
+            symbol = config.selected_pair or "BTC/USDT"
             
             # Extract using the V2 system with all 21 preprocessors
             result = await extraction_engine.extract_for_symbol(
@@ -256,14 +260,14 @@ class GGBotOrchestrator:
             return {
                 "status": "error",
                 "error": str(e),
-                "symbol": config.config_data.get("selected_pair", "Unknown"),
+                "symbol": config.selected_pair or "Unknown",
                 "indicators": indicators
             }
     
-    async def _get_decision_engine(self, config_id: str) -> DecisionEngineV2:
+    async def _get_decision_engine(self, config_id: str, user_id: str) -> DecisionEngineV2:
         """Get or create V2 decision engine for config."""
         if config_id not in self._decision_engines:
-            engine = DecisionEngineV2(config_id)
+            engine = DecisionEngineV2(config_id, user_id)
             await engine.initialize()
             self._decision_engines[config_id] = engine
         return self._decision_engines[config_id]
@@ -286,10 +290,10 @@ class GGBotOrchestrator:
                 }
             
             # Get or create V2 decision engine
-            decision_engine = await self._get_decision_engine(config_id)
+            decision_engine = await self._get_decision_engine(config_id, config.user_id)
             
             # Get symbol from config
-            symbol = config.config_data.get("selected_pair", "BTC/USDT")
+            symbol = config.selected_pair or "BTC/USDT"
             
             # Run decision using V2 engine with full context management
             decision_result = await decision_engine.make_decision(
@@ -335,9 +339,9 @@ class GGBotOrchestrator:
                     "action": action
                 }
             
-            # Get trading config from config data
-            trading_config = config.config_data.get("trading", {})
-            symbol = config.config_data.get("selected_pair", "BTC/USDT")
+            # Get trading config from config  
+            trading_config = config.trading or {}
+            symbol = config.selected_pair or "BTC/USDT"
             
             # Create comprehensive trading intent for paper trading service
             trading_intent = {
