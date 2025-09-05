@@ -229,15 +229,20 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
     const initializeComponent = async () => {
       if (!isOpen) return
       
+      console.log('GGBotConfig initializing component, isOpen:', isOpen)
       setIsLoading(true)
       setError(null)
       
       try {
+        console.log('🔄 Starting API calls...')
+        
         // Load data sources and user profile in parallel
         const [dataSourcesResponse, userProfileResponse] = await Promise.all([
           apiClient.getDataSourcesWithPoints(),
           apiClient.getUserProfile()
         ])
+        
+        console.log('✅ API calls successful:', { dataSourcesResponse, userProfileResponse })
         
         setDataSources(dataSourcesResponse)
         setUserProfile(userProfileResponse)

@@ -243,8 +243,10 @@ export default function DashboardPage() {
   }
 
   const handleFloatingAdd = () => {
+    console.log('handleFloatingAdd called')
     setSelectedBot(null)
     setIsConfigOpen(true)
+    console.log('isConfigOpen set to true, selectedBot set to null')
   }
 
   // Logout handler
