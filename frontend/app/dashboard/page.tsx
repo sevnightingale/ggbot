@@ -198,6 +198,14 @@ export default function DashboardPage() {
 
   const handleConfigClose = () => {
     setIsConfigOpen(false)
+    setSelectedBot(null)
+  }
+
+  const handleConfigSaved = (configId: string, configName: string) => {
+    // Reload bots to get the newly created one
+    loadBots(userId)
+    // Select the newly created bot
+    setSelectedConfigId(configId)
   }
 
   const handleDeleteBot = async (config_id: string) => {
@@ -235,8 +243,8 @@ export default function DashboardPage() {
   }
 
   const handleFloatingAdd = () => {
-    // TODO: Handle add new bot with GGBotConfig component
-    console.log('Add new bot clicked')
+    setSelectedBot(null)
+    setIsConfigOpen(true)
   }
 
   // Logout handler
@@ -688,6 +696,7 @@ export default function DashboardPage() {
         bot={selectedBot}
         isOpen={isConfigOpen}
         onClose={handleConfigClose}
+        onConfigSaved={handleConfigSaved}
       />
     </div>
   )
