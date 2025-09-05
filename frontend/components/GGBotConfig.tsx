@@ -727,22 +727,29 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             <div className="bg-charcoal-800 border border-charcoal-600 p-3">
                               {selectedDataPoints.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
-                                  {selectedDataPoints.map(dataPointId => (
-                                    <span
-                                      key={dataPointId}
-                                      className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
-                                    >
-                                      {dataPointId}
-                                      <button
-                                        onClick={() => handleToggleDataPoint(dataPointId)}
-                                        className="hover:bg-black/20 rounded"
+                                  {selectedDataPoints.map(dataPointId => {
+                                    // Find the data point name from the data sources
+                                    const dataPoint = dataSources
+                                      .flatMap(source => source.data_points)
+                                      .find(dp => dp.data_point_id === dataPointId)
+                                    
+                                    return (
+                                      <span
+                                        key={dataPointId}
+                                        className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
                                       >
-                                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                          <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                        </svg>
-                                      </button>
-                                    </span>
-                                  ))}
+                                        {dataPoint?.name || dataPointId}
+                                        <button
+                                          onClick={() => handleToggleDataPoint(dataPointId)}
+                                          className="hover:bg-black/20 rounded"
+                                        >
+                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                          </svg>
+                                        </button>
+                                      </span>
+                                    )
+                                  })}
                                 </div>
                               ) : (
                                 <div className="text-gray-500 text-xs">No data sources selected</div>
