@@ -12,7 +12,10 @@ module.exports = {
       max_memory_restart: '1G',
       env: {
         NODE_ENV: 'production',
-        PYTHONPATH: '/home/sev/ggbot'
+        PYTHONPATH: '/home/sev/ggbot',
+        DEVELOPMENT_MODE: 'true',
+        HBOT_USERNAME: 'sev',
+        HBOT_PASSWORD: '7nyhi93cT0Ow2X7S'
       },
       error_file: '/home/sev/.pm2/logs/ggbot-error.log',
       out_file: '/home/sev/.pm2/logs/ggbot-out.log',

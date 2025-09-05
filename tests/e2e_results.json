@@ -1,0 +1,23 @@
+{
+  "start_time": "2025-09-05T10:15:05.517182",
+  "phases": {
+    "health": "\u2705 PASSED",
+    "configuration": "\u2705 PASSED",
+    "websocket": "\u2705 PASSED",
+    "orchestration": "\u2705 PASSED",
+    "trading": "\u2705 PASSED",
+    "database": "\u2705 PASSED",
+    "dashboard": "\u2705 PASSED",
+    "cleanup": "\u2705 PASSED"
+  },
+  "success": true,
+  "error": null,
+  "metrics": {
+    "total_api_calls": 0,
+    "websocket_messages": 0,
+    "orchestration_cycles": 1,
+    "trades_executed": 0,
+    "test_duration_seconds": 1.0675337314605713
+  },
+  "end_time": "2025-09-05T10:15:06.584726"
+}

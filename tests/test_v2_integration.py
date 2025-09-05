@@ -20,7 +20,7 @@ async def test_v2_api_integration():
     # First ensure user profile exists
     print("\n1. Creating test user profile...")
     try:
-        user_id = "c81933d2-dd86-479d-97db-fad83465362f"  # Real Supabase user ID
+        user_id = "3d47c173-9234-47c7-b57b-9159c9df5dbd"  # Real Supabase user ID
         # Get or create user profile
         profile = await user_service.get_or_create_profile(user_id, email="user@example.com")
         print(f"✅ User profile ready: {profile.user_id} (tier: {profile.subscription_tier.value})")
