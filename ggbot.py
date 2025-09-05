@@ -11,11 +11,12 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
+import json
 
 # V2 Core Components
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, require_premium_user_v2
@@ -108,10 +109,15 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware
+# Add CORS middleware - explicit domains to override proxy restrictions
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[
+        "https://app.ggbots.ai",           # New production domain
+        "https://ggbot-app.vercel.app",    # Legacy domain for compatibility
+        "http://localhost:3000",           # Local development
+        "*"                                # Fallback for any other origins
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -990,6 +996,56 @@ async def get_bot_status(
         "message": "Bot status tracking coming soon",
         "config_id": config_id
     }
+
+
+# WebSocket Support for real-time bot status updates
+class WebSocketManager:
+    """Simple WebSocket connection manager."""
+    
+    def __init__(self):
+        self.active_connections: Dict[str, WebSocket] = {}
+    
+    async def connect(self, user_id: str, websocket: WebSocket):
+        """Accept WebSocket connection."""
+        await websocket.accept()
+        self.active_connections[user_id] = websocket
+        
+    def disconnect(self, user_id: str):
+        """Remove WebSocket connection."""
+        if user_id in self.active_connections:
+            del self.active_connections[user_id]
+    
+    async def broadcast_to_user(self, user_id: str, data: dict):
+        """Send data to specific user."""
+        if user_id in self.active_connections:
+            try:
+                await self.active_connections[user_id].send_text(json.dumps(data))
+            except:
+                # Connection closed, remove it
+                self.disconnect(user_id)
+
+
+# Global WebSocket manager
+websocket_manager = WebSocketManager()
+
+
+@app.websocket("/ws/bot-status/{user_id}")
+async def websocket_endpoint(websocket: WebSocket, user_id: str):
+    """WebSocket endpoint for real-time bot status updates."""
+    await websocket_manager.connect(user_id, websocket)
+    
+    try:
+        while True:
+            # Keep connection alive and handle incoming messages
+            data = await websocket.receive_text()
+            # Echo heartbeat messages
+            if data == "heartbeat":
+                await websocket.send_text(json.dumps({
+                    "type": "heartbeat_ack", 
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
+                }))
+    except WebSocketDisconnect:
+        websocket_manager.disconnect(user_id)
 
 
 # Error handlers
