@@ -433,8 +433,8 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-          const response = await fetch(`${apiUrl}/agent/api/bots/${config_id}/start`, {
+          const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
+          const response = await fetch(`${apiUrl}/api/v2/bot/${config_id}/start`, {
             method: 'POST'
           })
           
@@ -456,8 +456,8 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-          const response = await fetch(`${apiUrl}/agent/api/bots/${config_id}/stop`, {
+          const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
+          const response = await fetch(`${apiUrl}/api/v2/bot/${config_id}/stop`, {
             method: 'POST'
           })
           
@@ -479,8 +479,8 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-          const response = await fetch(`${apiUrl}/agent/api/bots/${config_id}`, {
+          const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
+          const response = await fetch(`${apiUrl}/api/v2/bot/${config_id}/status`, {
             method: 'DELETE'
           })
           

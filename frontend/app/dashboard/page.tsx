@@ -112,7 +112,7 @@ export default function DashboardPage() {
     try {
       // TODO: Add auth headers when Phase 5 is complete
       // For now, the backend uses mock authentication with DEVELOPMENT_MODE=true
-      const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8001'
+      const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
       
       const [metricsResponse, tradesResponse, positionsResponse] = await Promise.all([
         fetch(`${baseUrl}/api/v2/bot/${configId}/metrics`).then(r => r.json()),
