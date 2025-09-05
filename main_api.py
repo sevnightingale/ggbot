@@ -1,185 +1,1004 @@
 """
-GGBot Main API Server
+GGBot V2 Orchestrator - Clean Architecture Implementation
 
-Combined API server that includes all modules for simplified prototype deployment.
-In production, these would be split into separate microservices.
+Main orchestrator API that coordinates all V2 modules with Supabase integration.
+Provides unified entry point for autonomous trading with multi-user isolation.
 """
-import os
-import sys
-import signal
+
 import asyncio
-from pathlib import Path
-from contextlib import asynccontextmanager
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
-from fastapi.middleware.cors import CORSMiddleware
-import uvicorn
-import httpx
-import aiohttp
-import json
-from typing import Dict, List, Optional
+import uuid
 from datetime import datetime, timezone
-import random
+from typing import Dict, Any, Optional, List
+from contextlib import asynccontextmanager
 
-# Add project root to path
-sys.path.insert(0, str(Path(__file__).parent))
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel
+import uvicorn
+import json
+
+# V2 Core Components
+from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, require_premium_user_v2
+
+# Development Mock User (TODO: Remove when Phase 5 authentication is complete)
+async def get_mock_user_for_dev():
+    """Mock user for Phase 7 development - replace with real auth in Phase 5."""
+    return AuthenticatedUser(
+        user_id="c81933d2-dd86-479d-97db-fad83465362f",  # Real Supabase user ID
+        email="user@example.com",  # Placeholder email
+        claims={"sub": "c81933d2-dd86-479d-97db-fad83465362f", "email": "user@example.com"}
+    )
+from core.services.config_service import ConfigService, BotConfigV2, config_service
+from core.services.user_service import UserService, user_service
+from core.services.llm_service import LLMService, llm_service
+from core.services.indicator_service import IndicatorService
+from core.common.logger import logger
+
+# V2 Module Integration
+from extraction.v2.extraction_engine import ExtractionEngineV2
+# from decision.v2.decision_engine import DecisionEngineV2  # TODO: Create V2 decision engine
+from trading.paper.service import PaperTradingService
+
+# Domain Models  
+from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
 
 
-# Set up logging before importing other modules
-from core.common.logging_config import setup_logging
-log_file = setup_logging()
+# Pydantic Models for API
+class ConfigCreateRequest(BaseModel):
+    config_name: str
+    selected_pair: str = "BTC/USDT"
+    extraction: Dict[str, Any]
+    decision: Dict[str, Any]
+    trading: Dict[str, Any]
+    telegram_integration: Optional[Dict[str, Any]] = None
 
-# Import scheduler functions
-from core.scheduling.scheduler import initialize_scheduler, shutdown_scheduler
 
-# Bot monitoring components removed - will rebuild simpler monitoring later
+class ConfigUpdateRequest(BaseModel):
+    config_name: Optional[str] = None
+    selected_pair: Optional[str] = None
+    extraction: Optional[Dict[str, Any]] = None
+    decision: Optional[Dict[str, Any]] = None
+    trading: Optional[Dict[str, Any]] = None
+    telegram_integration: Optional[Dict[str, Any]] = None
 
-# Import all the API apps
-from extraction.api import app as extraction_app
-from decision.api import app as decision_app
-# Trading API removed - being rebuilt with new Hummingbot integration
-# Dashboard API removed - legacy and unused
-from core.api.agent_control_api import app as agent_control_app
 
-# Import config API router
-from core.api.config_api import router as config_router
+class OrchestrationResult(BaseModel):
+    status: str
+    config_id: str
+    extraction_result: Optional[Dict[str, Any]] = None
+    decision_result: Optional[Dict[str, Any]] = None
+    trading_result: Optional[Dict[str, Any]] = None
+    execution_time_ms: int
+    timestamp: str
 
-# Import users API router
-from core.api.users_api import router as users_router
 
-# Import test API router
-from core.api.test_api import router as test_router
-
-# Background task for paper trading position monitoring
-async def update_paper_positions_task():
-    """
-    Background task to update paper trading positions every 7 seconds.
-    
-    Features:
-    - Updates real-time prices for all open positions
-    - Calculates unrealized P&L with live market data
-    - Automatically triggers stop loss and take profit orders
-    - Minimal memory footprint (~15KB per cycle)
-    - Responsive risk management (7-second reaction time)
-    """
-    from core.common.logger import logger
-    from trading.paper.service import PaperTradingService
-    
-    logger.info("📊 Starting paper trading position monitor with 7-second intervals")
-    
-    # Initialize service once
-    service = PaperTradingService()
-    
-    # Health check first
-    try:
-        health = await service.health_check()
-        if health["status"] != "healthy":
-            logger.warning(f"Paper trading service health check: {health['status']}")
-    except Exception as e:
-        logger.error(f"Paper trading service health check failed: {e}")
-    
-    cycle_count = 0
-    
-    while True:
-        try:
-            # Update all open positions with current market prices
-            updated_count = await service.update_position_prices()
-            
-            cycle_count += 1
-            
-            # Log every 30 seconds (roughly every 4-5 cycles) to avoid spam
-            if cycle_count % 4 == 0:
-                if updated_count > 0:
-                    logger.debug(f"📈 Updated {updated_count} paper positions (cycle {cycle_count})")
-                else:
-                    logger.debug(f"📊 No positions to update (cycle {cycle_count})")
-            
-            # Log position closures immediately (important events)
-            # This happens inside service.update_position_prices() when stop/take profit triggers
-            
-        except Exception as e:
-            logger.error(f"❌ Paper position update failed (cycle {cycle_count}): {e}")
-            # Continue running despite errors - don't crash the background task
-        
-        # Sleep for 7 seconds - optimal balance of responsiveness vs resource usage
-        await asyncio.sleep(7)
-
+# FastAPI lifespan handler
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    """Handle startup and shutdown events."""
-    from core.common.logger import logger
+    """Handle application startup and shutdown."""
+    logger.info("🚀 Starting GGBot V2 Orchestrator")
     
-    # Startup
-    logger.info("🚀 Starting GGBot API Server with integrated scheduler and paper trading")
-    
-    # Bot monitoring removed - will rebuild simpler monitoring later
-    logger.info("🤖 API server starting without bot monitoring")
-    
-    # Initialize the scheduler (but don't start autonomous mode)
-    success = await initialize_scheduler()
-    if success:
-        logger.info("✅ Scheduler initialized successfully (autonomous mode off)")
-    else:
-        logger.error("❌ Failed to initialize scheduler")
-    
-    # Start paper trading background task for position monitoring
-    paper_trading_task = None
+    # Startup tasks
     try:
-        paper_trading_task = asyncio.create_task(update_paper_positions_task())
-        logger.info("✅ Paper trading position monitor started (7-second intervals)")
+        # Test database connectivity
+        test_user = await user_service.get_profile("test")
+        logger.info("✅ Database connectivity verified")
+        
+        # Test LLM service
+        # await llm_service.test_hosted_keys()
+        logger.info("✅ LLM service initialized")
+        
+        logger.info("🟢 GGBot V2 Orchestrator ready")
+        
     except Exception as e:
-        logger.error(f"❌ Failed to start paper trading monitor: {e}")
+        logger.error(f"❌ Startup failed: {e}")
+        raise
     
-    yield  # App runs here
+    yield
     
-    # Shutdown
-    logger.info("🔄 Shutting down GGBot API Server...")
-    
-    # Cancel paper trading background task
-    if paper_trading_task and not paper_trading_task.done():
-        paper_trading_task.cancel()
-        try:
-            await paper_trading_task
-        except asyncio.CancelledError:
-            logger.info("✅ Paper trading position monitor stopped")
-    
-    # Shutdown the scheduler
-    await shutdown_scheduler()
-    
-    logger.info("✅ Server shutdown complete")
+    # Shutdown tasks
+    logger.info("🔄 Shutting down GGBot V2 Orchestrator")
 
-# Create the main app
+
+# Create FastAPI app
 app = FastAPI(
-    title="GGBot API",
-    description="Combined API for GGBot cryptocurrency trading system",
-    version="1.0.0",
+    title="GGBot V2 Orchestrator",
+    description="Unified orchestrator for autonomous AI trading with Supabase integration",
+    version="2.0.0",
     lifespan=lifespan
 )
 
-# Add CORS middleware for frontend access
+# Add CORS middleware - explicit domains to override proxy restrictions
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Configure appropriately for production
+    allow_origins=[
+        "https://app.ggbots.ai",           # New production domain
+        "https://ggbot-app.vercel.app",    # Legacy domain for compatibility
+        "http://localhost:3000",           # Local development
+        "*"                                # Fallback for any other origins
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# Mount all the sub-applications
-app.mount("/extraction", extraction_app)
-app.mount("/decision", decision_app)
-# Trading API mount removed - being rebuilt with new Hummingbot integration
-# Dashboard mount removed - legacy
-app.mount("/agent", agent_control_app)
+# Services
+class GGBotOrchestrator:
+    """Main orchestrator class coordinating all V2 modules."""
+    
+    def __init__(self):
+        self.config_service = config_service
+        self.llm_service = llm_service
+        self.indicator_service = IndicatorService()
+        self.paper_trading = PaperTradingService()
+        self._log = logger.bind(component="orchestrator")
+    
+    async def run_autonomous_cycle(
+        self,
+        config_id: str,
+        user_id: str
+    ) -> OrchestrationResult:
+        """
+        Run a complete autonomous trading cycle.
+        
+        Args:
+            config_id: Bot configuration ID
+            user_id: User ID for access validation
+            
+        Returns:
+            OrchestrationResult with execution details
+        """
+        start_time = datetime.now(timezone.utc)
+        self._log.info(f"Starting autonomous cycle for config {config_id}")
+        
+        try:
+            # 1. Load user configuration
+            config = await self.config_service.get_config(config_id, user_id)
+            if not config:
+                raise HTTPException(status_code=404, detail="Configuration not found")
+            
+            # 2. Get user's available indicators
+            user_indicators = await self.indicator_service.get_user_available_indicators(user_id)
+            available_indicator_names = [ind["name"] for ind in user_indicators]
+            
+            # 3. Validate requested indicators against user access
+            requested_indicators = config.extraction.get("indicators", [])
+            if isinstance(requested_indicators, dict):
+                # Handle nested indicator structure
+                requested_indicators = []
+                for category, indicators in config.extraction.get("data_sources", {}).items():
+                    if isinstance(indicators, list):
+                        requested_indicators.extend(indicators)
+            
+            # Filter to only allowed indicators
+            allowed_indicators = [
+                ind for ind in requested_indicators 
+                if ind in available_indicator_names
+            ]
+            
+            if not allowed_indicators:
+                raise HTTPException(
+                    status_code=403, 
+                    detail="No accessible indicators found in configuration"
+                )
+            
+            # 4. Run extraction (V2 integration placeholder)
+            extraction_result = await self._run_extraction_v2(
+                config, user_id, allowed_indicators
+            )
+            
+            # 5. Run decision engine (V2 integration placeholder)
+            decision_result = await self._run_decision_v2(
+                config, user_id, extraction_result
+            )
+            
+            # 6. Execute trading if actionable
+            trading_result = await self._run_trading_v2(
+                config, user_id, decision_result
+            )
+            
+            # Calculate execution time
+            end_time = datetime.now(timezone.utc)
+            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            result = OrchestrationResult(
+                status="success",
+                config_id=config_id,
+                extraction_result=extraction_result,
+                decision_result=decision_result,
+                trading_result=trading_result,
+                execution_time_ms=execution_time_ms,
+                timestamp=end_time.isoformat()
+            )
+            
+            self._log.info(f"Autonomous cycle completed in {execution_time_ms}ms")
+            return result
+            
+        except Exception as e:
+            end_time = datetime.now(timezone.utc)
+            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            self._log.error(f"Autonomous cycle failed: {e}")
+            return OrchestrationResult(
+                status="error",
+                config_id=config_id,
+                extraction_result={"error": str(e)},
+                decision_result=None,
+                trading_result=None,
+                execution_time_ms=execution_time_ms,
+                timestamp=end_time.isoformat()
+            )
+    
+    async def _run_extraction_v2(
+        self,
+        config: BotConfigV2,
+        user_id: str,
+        indicators: List[str]
+    ) -> Dict[str, Any]:
+        """Run V2 extraction engine."""
+        try:
+            # Initialize extraction engine with user context
+            extraction_engine = ExtractionEngineV2(
+                user_id=user_id,
+                use_advanced_preprocessing=True,
+                use_database_storage=True
+            )
+            
+            # Extract indicators for the configured symbol
+            result = await extraction_engine.extract_for_symbol(
+                symbol=config.selected_pair,
+                indicators=indicators,
+                timeframe=config.extraction.get("timeframe", "1h"),
+                limit=config.extraction.get("limit", 200),
+                connector=config.extraction.get("connector", "kucoin"),
+                config_id=config.config_id
+            )
+            
+            self._log.info(f"V2 Extraction completed for {config.selected_pair}")
+            return result
+            
+        except Exception as e:
+            self._log.error(f"V2 Extraction failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "symbol": config.selected_pair,
+                "indicators": indicators
+            }
+    
+    async def _run_decision_v2(
+        self,
+        config: BotConfigV2,
+        user_id: str,
+        extraction_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Run V2 decision engine with LLM integration."""
+        try:
+            # Check if extraction was successful
+            if extraction_result.get("status") != "success":
+                return {
+                    "status": "error",
+                    "error": "Extraction failed, cannot make decision",
+                    "action": "wait",
+                    "confidence": 0.0
+                }
+            
+            # Get LLM client based on user subscription
+            llm_client = await self.llm_service.get_llm_client(
+                user_id=user_id,
+                config_id=config.config_id,
+                preferred_provider="openai"  # TODO: Get from config
+            )
+            
+            if not llm_client:
+                return {
+                    "status": "error",
+                    "error": "LLM client not available",
+                    "action": "wait",
+                    "confidence": 0.0
+                }
+            
+            # Prepare decision prompt with extraction data
+            market_data = extraction_result.get("result", {}).get("indicators", {})
+            current_price = extraction_result.get("result", {}).get("ohlcv_summary", {}).get("latest_price", "Unknown")
+            
+            # Format market data for LLM
+            market_data_text = self._format_market_data_for_llm(market_data)
+            
+            # Build prompts from config
+            system_prompt = config.decision.get("system_prompt", "").format(
+                SYMBOL=config.selected_pair,
+                CURRENT_PRICE=current_price,
+                MARKET_DATA=market_data_text
+            )
+            
+            user_prompt = config.decision.get("user_prompt", "").format(
+                SYMBOL=config.selected_pair,
+                CURRENT_PRICE=current_price,
+                MARKET_DATA=market_data_text
+            )
+            
+            # Generate LLM decision
+            llm_response = await llm_client.generate_completion(
+                prompt=user_prompt,
+                system_prompt=system_prompt,
+                temperature=0.7,
+                max_tokens=500
+            )
+            
+            if llm_response.get("status") != "success":
+                return {
+                    "status": "error",
+                    "error": f"LLM generation failed: {llm_response.get('error')}",
+                    "action": "wait",
+                    "confidence": 0.0
+                }
+            
+            # Parse LLM response into structured decision
+            decision_data = self._parse_llm_decision(llm_response.get("content", ""))
+            
+            # Create Decision domain object for audit trail
+            decision = Decision.create_opportunity_analysis(
+                user_id=user_id,
+                config_id=config.config_id,
+                symbol=Symbol(config.selected_pair),
+                action=DecisionAction(decision_data["action"].upper()),
+                confidence=Confidence(decision_data["confidence"]),
+                reasoning=decision_data["reasoning"],
+                prompt=f"System: {system_prompt}\n\nUser: {user_prompt}",
+                market_data=market_data
+            )
+            
+            # TODO: Store decision in decisions table
+            
+            self._log.info(f"V2 Decision completed: {decision_data['action']} with confidence {decision_data['confidence']}")
+            return {
+                "status": "success",
+                "action": decision_data["action"],
+                "confidence": decision_data["confidence"],
+                "reasoning": decision_data["reasoning"],
+                "llm_usage": llm_response.get("usage", {}),
+                "decision_id": decision.decision_id
+            }
+            
+        except Exception as e:
+            self._log.error(f"V2 Decision failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e),
+                "action": "wait",
+                "confidence": 0.0
+            }
+    
+    async def _run_trading_v2(
+        self,
+        config: BotConfigV2,
+        user_id: str,
+        decision_result: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Run V2 trading execution with paper trading."""
+        try:
+            # Check if decision was successful
+            if decision_result.get("status") != "success":
+                return {
+                    "status": "skipped",
+                    "reason": "Decision failed, no trading action"
+                }
+            
+            action = decision_result.get("action", "wait")
+            confidence = decision_result.get("confidence", 0.0)
+            
+            # Skip trading if action is wait
+            if action == "wait":
+                return {
+                    "status": "skipped",
+                    "reason": "Decision was to wait",
+                    "action": action
+                }
+            
+            # Check if trading is enabled in config
+            if config.trading.get("execution_mode") != "paper":
+                return {
+                    "status": "error",
+                    "error": "Only paper trading is supported in V2"
+                }
+            
+            # Create trading intent for paper trading service
+            trading_intent = {
+                "config_id": config.config_id,
+                "user_id": user_id,
+                "symbol": config.selected_pair,
+                "action": action,  # "enter" or "exit"
+                "confidence": confidence,
+                "reasoning": decision_result.get("reasoning", ""),
+                "decision_id": decision_result.get("decision_id"),
+                "position_sizing": config.trading.get("position_sizing", {}),
+                "risk_management": config.trading.get("risk_management", {})
+            }
+            
+            # Execute trade via paper trading service
+            trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
+            
+            self._log.info(f"V2 Trading completed: {trade_result.get('status')}")
+            return trade_result
+            
+        except Exception as e:
+            self._log.error(f"V2 Trading failed: {e}")
+            return {
+                "status": "error",
+                "error": str(e)
+            }
+    
+    def _format_market_data_for_llm(self, market_data: Dict[str, Any]) -> str:
+        """Format market data dictionary for LLM consumption."""
+        if not market_data:
+            return "No market data available."
+        
+        formatted_lines = []
+        for indicator, value in market_data.items():
+            if isinstance(value, dict):
+                # Handle nested indicator data
+                for sub_key, sub_value in value.items():
+                    formatted_lines.append(f"{indicator}_{sub_key}: {sub_value}")
+            else:
+                formatted_lines.append(f"{indicator}: {value}")
+        
+        return "\n".join(formatted_lines)
+    
+    def _parse_llm_decision(self, llm_content: str) -> Dict[str, Any]:
+        """Parse LLM response into structured decision data."""
+        # Simple parsing - in production this would be more sophisticated
+        content = llm_content.lower()
+        
+        # Extract action
+        action = "wait"  # Default
+        if "enter" in content or "buy" in content:
+            action = "enter"
+        elif "exit" in content or "sell" in content:
+            action = "exit"
+        
+        # Extract confidence (look for percentage or decimal)
+        confidence = 0.5  # Default
+        import re
+        confidence_patterns = [
+            r"confidence[:\s]*(\d+(?:\.\d+)?)%",
+            r"confidence[:\s]*(\d+(?:\.\d+)?)",
+            r"(\d+(?:\.\d+)?)%\s*confident",
+            r"(\d+(?:\.\d+)?)\s*confidence"
+        ]
+        
+        for pattern in confidence_patterns:
+            match = re.search(pattern, content)
+            if match:
+                conf_value = float(match.group(1))
+                # Convert percentage to decimal if needed
+                confidence = conf_value / 100 if conf_value > 1.0 else conf_value
+                break
+        
+        # Ensure confidence is in valid range
+        confidence = max(0.0, min(1.0, confidence))
+        
+        return {
+            "action": action,
+            "confidence": confidence,
+            "reasoning": llm_content  # Keep full reasoning
+        }
 
-# Set WebSocket manager for agent control API demo mode
-from core.api.agent_control_api import set_websocket_manager
 
-# Include the config router directly
-app.include_router(config_router)
+# Initialize orchestrator
+orchestrator = GGBotOrchestrator()
 
-# WebSocket connections for future use
-websocket_connections: Dict[str, WebSocket] = {}
 
+# API Endpoints
+@app.get("/")
+async def root():
+    """Root endpoint with API information."""
+    return {
+        "name": "GGBot V2 Orchestrator",
+        "version": "2.0.0",
+        "status": "operational",
+        "features": [
+            "Supabase authentication",
+            "Multi-user isolation",
+            "Subscription-aware LLM clients",
+            "Dynamic indicator management",
+            "V2 module integration (in progress)"
+        ]
+    }
+
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint."""
+    return {
+        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "version": "2.0.0"
+    }
+
+
+# Configuration Management Endpoints
+@app.post("/api/v2/config")
+async def create_config(
+    request: ConfigCreateRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Create a new bot configuration."""
+    config = await config_service.create_config(
+        user_id=current_user.user_id,
+        config_name=request.config_name,
+        config_data=request.dict(exclude={"config_name"})
+    )
+    
+    if not config:
+        raise HTTPException(status_code=400, detail="Failed to create configuration")
+    
+    return {
+        "status": "success",
+        "config": config.to_dict()
+    }
+
+
+@app.get("/api/v2/config")
+async def list_configs(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """List all configurations for the current user."""
+    configs = await config_service.list_configs(current_user.user_id)
+    
+    return {
+        "status": "success",
+        "configs": [config.to_dict() for config in configs],
+        "count": len(configs)
+    }
+
+
+@app.get("/api/v2/config/{config_id}")
+async def get_config(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get a specific configuration."""
+    config = await config_service.get_config(config_id, current_user.user_id)
+    
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+    
+    return {
+        "status": "success",
+        "config": config.to_dict()
+    }
+
+
+@app.put("/api/v2/config/{config_id}")
+async def update_config(
+    config_id: str,
+    request: ConfigUpdateRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Update a configuration."""
+    # Filter out None values
+    update_data = {k: v for k, v in request.dict().items() if v is not None}
+    config_name = update_data.pop("config_name", None)
+    
+    config = await config_service.update_config(
+        config_id=config_id,
+        user_id=current_user.user_id,
+        config_data=update_data,
+        config_name=config_name
+    )
+    
+    if not config:
+        raise HTTPException(status_code=404, detail="Configuration not found or update failed")
+    
+    return {
+        "status": "success",
+        "config": config.to_dict()
+    }
+
+
+@app.delete("/api/v2/config/{config_id}")
+async def delete_config(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Delete a configuration."""
+    success = await config_service.delete_config(config_id, current_user.user_id)
+    
+    if not success:
+        raise HTTPException(status_code=404, detail="Configuration not found")
+    
+    return {
+        "status": "success",
+        "message": "Configuration deleted successfully"
+    }
+
+
+# Orchestration Endpoints
+@app.post("/api/v2/orchestrate/{config_id}")
+async def run_orchestration(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> OrchestrationResult:
+    """Run autonomous trading cycle for a configuration."""
+    result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id)
+    
+    if result.status == "error":
+        raise HTTPException(status_code=500, detail="Orchestration failed")
+    
+    return result
+
+
+# User Management Endpoints
+@app.get("/api/v2/user/profile")
+async def get_user_profile(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get current user profile."""
+    profile = await current_user.load_profile()
+    
+    return {
+        "status": "success",
+        "profile": {
+            "user_id": profile.user_id,
+            "subscription_tier": profile.subscription_tier.value,
+            "subscription_status": profile.subscription_status.value,
+            "can_use_premium_features": profile.can_use_premium_features,
+            "requires_own_llm_keys": profile.requires_own_llm_keys,
+            "can_publish_telegram_signals": profile.can_publish_telegram_signals
+        }
+    }
+
+
+@app.get("/api/v2/user/indicators")
+async def get_user_indicators(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get indicators available to the current user."""
+    indicators = await IndicatorService.get_user_available_indicators(current_user.user_id)
+    
+    return {
+        "status": "success",
+        "indicators": indicators,
+        "count": len(indicators)
+    }
+
+
+@app.get("/api/v2/data-sources-with-points")
+async def get_data_sources_with_points(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get all data sources with their data points for frontend configuration."""
+    try:
+        from core.common.db import get_db_connection
+        
+        # Get user profile to check paid data points
+        profile = await current_user.load_profile()
+        user_paid_points = profile.paid_data_points if hasattr(profile, 'paid_data_points') else []
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Get all data sources with their data points
+                cur.execute("""
+                    SELECT 
+                        ds.source_id,
+                        ds.name as source_name,
+                        ds.display_name as source_display_name,
+                        ds.description as source_description,
+                        ds.enabled as source_enabled,
+                        ds.requires_premium as source_requires_premium,
+                        ds.sort_order as source_sort_order,
+                        dp.data_point_id,
+                        dp.name as point_name,
+                        dp.display_name as point_display_name,
+                        dp.description as point_description,
+                        dp.config_values,
+                        dp.requires_premium as point_requires_premium,
+                        dp.enabled as point_enabled,
+                        dp.sort_order as point_sort_order
+                    FROM data_sources ds
+                    LEFT JOIN data_points dp ON ds.source_id = dp.source_id
+                    WHERE ds.enabled = true AND (dp.enabled IS NULL OR dp.enabled = true)
+                    ORDER BY ds.sort_order ASC, dp.sort_order ASC
+                """)
+                
+                rows = cur.fetchall()
+                
+                # Group by data source
+                sources_dict = {}
+                for row in rows:
+                    source_id = row[0]
+                    
+                    if source_id not in sources_dict:
+                        sources_dict[source_id] = {
+                            "source_id": source_id,
+                            "name": row[1],
+                            "display_name": row[2],
+                            "description": row[3],
+                            "enabled": row[4],
+                            "requires_premium": row[5],
+                            "sort_order": row[6],
+                            "data_points": []
+                        }
+                    
+                    # Add data point if it exists (LEFT JOIN might have nulls)
+                    if row[7] is not None:  # data_point_id
+                        point_requires_premium = row[12]
+                        point_name = row[8]
+                        
+                        # Check if user has access to this data point
+                        has_access = not point_requires_premium or point_name in user_paid_points
+                        
+                        data_point = {
+                            "data_point_id": row[7],
+                            "name": point_name,
+                            "display_name": row[9],
+                            "description": row[10],
+                            "config_values": row[11],
+                            "requires_premium": point_requires_premium,
+                            "enabled": row[13],
+                            "sort_order": row[14],
+                            "has_access": has_access,
+                            "is_locked": point_requires_premium and not has_access
+                        }
+                        
+                        sources_dict[source_id]["data_points"].append(data_point)
+                
+                # Convert to list and sort
+                sources_list = list(sources_dict.values())
+                sources_list.sort(key=lambda x: x["sort_order"])
+                
+                for source in sources_list:
+                    source["data_points"].sort(key=lambda x: x["sort_order"])
+                
+                return {
+                    "status": "success",
+                    "data_sources": sources_list,
+                    "user_paid_points": user_paid_points,
+                    "count": len(sources_list)
+                }
+                
+    except Exception as e:
+        logger.error(f"Failed to get data sources with points: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get data sources: {str(e)}")
+
+
+# LLM Credential Management Endpoints
+@app.post("/api/v2/user/llm-credentials")
+async def store_llm_credential(
+    request: Dict[str, str],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Store a user's LLM API credential securely in Vault."""
+    try:
+        from core.auth.vault_utils import store_credential
+        
+        credential_name = request.get("credential_name")
+        provider = request.get("provider") 
+        api_key = request.get("api_key")
+        
+        if not all([credential_name, provider, api_key]):
+            raise HTTPException(status_code=400, detail="Missing required fields: credential_name, provider, api_key")
+        
+        if provider not in ["openai", "deepseek", "anthropic"]:
+            raise HTTPException(status_code=400, detail="Invalid provider. Must be one of: openai, deepseek, anthropic")
+        
+        user_id = current_user.user_id
+        credential_id = await store_credential(user_id, credential_name, provider, api_key)
+        
+        if credential_id is None:
+            raise HTTPException(status_code=500, detail="Failed to store credential")
+        
+        return {
+            "status": "success",
+            "credential_id": credential_id,
+            "message": f"Credential '{credential_name}' stored securely"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to store LLM credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to store credential: {str(e)}")
+
+
+@app.get("/api/v2/user/llm-credentials")
+async def list_llm_credentials(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """List all LLM credentials for the current user (without API keys)."""
+    try:
+        from core.auth.vault_utils import list_credentials
+        
+        user_id = current_user.user_id
+        credentials = await list_credentials(user_id)
+        
+        return {
+            "status": "success",
+            "credentials": credentials,
+            "count": len(credentials)
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to list LLM credentials: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to list credentials: {str(e)}")
+
+
+@app.get("/api/v2/user/llm-credentials/{credential_name}")
+async def get_llm_credential(
+    credential_name: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get a specific LLM credential (with API key for internal use only)."""
+    try:
+        from core.auth.vault_utils import get_credential
+        
+        user_id = current_user.user_id
+        credential = await get_credential(user_id, credential_name)
+        
+        if credential is None:
+            raise HTTPException(status_code=404, detail=f"Credential '{credential_name}' not found")
+        
+        return {
+            "status": "success",
+            "credential": credential
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get LLM credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get credential: {str(e)}")
+
+
+@app.delete("/api/v2/user/llm-credentials/{credential_name}")
+async def delete_llm_credential(
+    credential_name: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Delete a user's LLM credential."""
+    try:
+        from core.auth.vault_utils import delete_credential
+        
+        user_id = current_user.user_id
+        success = await delete_credential(user_id, credential_name)
+        
+        if not success:
+            raise HTTPException(status_code=404, detail=f"Credential '{credential_name}' not found")
+        
+        return {
+            "status": "success",
+            "message": f"Credential '{credential_name}' deleted successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to delete LLM credential: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to delete credential: {str(e)}")
+
+
+# Bot Data Endpoints for Dashboard
+@app.get("/api/v2/bot/{config_id}/metrics")
+async def get_bot_metrics(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get performance metrics for a bot configuration."""
+    try:
+        # TODO: Implement real metrics calculation from strategy_runs table
+        # For now, return empty metrics structure
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "metrics": {
+                "profit_loss_data": [],  # Array of {date: string, profit: number}
+                "trade_stats": {
+                    "totalTrades": 0,
+                    "winCount": 0,
+                    "lossCount": 0,
+                    "neutralCount": 0,
+                    "winRate": 0,
+                    "lossRate": 0,
+                    "neutralRate": 0,
+                    "avgProfitPerTrade": 0,
+                    "avgLossPerTrade": 0,
+                    "totalProfit": 0,
+                    "avgTradeDuration": "0m"
+                }
+            }
+        }
+    except Exception as e:
+        logger.error(f"Failed to get bot metrics for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get bot metrics")
+
+
+@app.get("/api/v2/bot/{config_id}/positions")
+async def get_bot_positions(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get live positions for a bot configuration."""
+    try:
+        # TODO: Implement real positions query from positions/paper_trades table
+        # For now, return empty positions
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "positions": []  # Array of position objects
+        }
+    except Exception as e:
+        logger.error(f"Failed to get bot positions for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get bot positions")
+
+
+@app.get("/api/v2/bot/{config_id}/trades")
+async def get_bot_trades(
+    config_id: str,
+    limit: int = 100,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get trade history for a bot configuration."""
+    try:
+        # TODO: Implement real trades query from paper_trades/trades table
+        # For now, return empty trades
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "trades": [],  # Array of trade objects
+            "count": 0
+        }
+    except Exception as e:
+        logger.error(f"Failed to get bot trades for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get bot trades")
+
+
+# Bot Lifecycle Endpoints (placeholders for now)
+@app.post("/api/v2/bot/{config_id}/start")
+async def start_bot(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Start a bot (placeholder)."""
+    # TODO: Implement bot lifecycle management
+    return {
+        "status": "success",
+        "message": "Bot start functionality coming soon",
+        "config_id": config_id
+    }
+
+
+@app.post("/api/v2/bot/{config_id}/stop")
+async def stop_bot(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Stop a bot (placeholder)."""
+    # TODO: Implement bot lifecycle management
+    return {
+        "status": "success",
+        "message": "Bot stop functionality coming soon",
+        "config_id": config_id
+    }
+
+
+@app.get("/api/v2/bot/{config_id}/status")
+async def get_bot_status(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get bot status (placeholder)."""
+    # TODO: Implement bot status tracking
+    return {
+        "status": "success",
+        "bot_status": "stopped",
+        "message": "Bot status tracking coming soon",
+        "config_id": config_id
+    }
+
+
+# WebSocket Support for real-time bot status updates
 class WebSocketManager:
     """Simple WebSocket connection manager."""
     
@@ -205,424 +1024,15 @@ class WebSocketManager:
                 # Connection closed, remove it
                 self.disconnect(user_id)
 
+
 # Global WebSocket manager
-manager = WebSocketManager()
+websocket_manager = WebSocketManager()
 
-# Set the WebSocket manager for agent control API demo mode
-set_websocket_manager(manager)
-
-# Include the users router directly
-app.include_router(users_router)
-
-# Include the test router directly
-app.include_router(test_router)
-
-# Paper Trading API Endpoints
-from fastapi import HTTPException
-from pydantic import BaseModel
-from trading.paper.service import PaperTradingService
-from trading.paper.positions import PositionManager
-from trading.paper.market_data import MarketDataAdapter
-
-# Request models
-class TradeIntentRequest(BaseModel):
-    """Request model for trade intent execution"""
-    decision_id: Optional[str] = None
-    user_id: str
-    config_id: str 
-    symbol: str
-    action: str  # 'long' or 'short'
-    confidence: float
-    stop_loss_price: Optional[float] = None
-    take_profit_price: Optional[float] = None
-    reasoning: Optional[str] = ""
-    exchange: Optional[str] = "paper"
-
-@app.post("/paper/execute")
-async def execute_paper_trade(intent: TradeIntentRequest):
-    """Execute paper trade from Decision Module intent"""
-    try:
-        service = PaperTradingService()
-        
-        # Convert Pydantic model to dict for service
-        intent_dict = {
-            "decision_id": intent.decision_id,
-            "user_id": intent.user_id,
-            "config_id": intent.config_id,
-            "symbol": intent.symbol,
-            "action": intent.action,
-            "confidence": intent.confidence,
-            "stop_loss_price": intent.stop_loss_price,
-            "take_profit_price": intent.take_profit_price,
-            "reasoning": intent.reasoning
-        }
-        
-        result = await service.execute_trade_intent(intent_dict)
-        return result
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Paper trade execution failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/paper/positions/{config_id}")
-async def get_paper_positions(config_id: str):
-    """Get all open paper positions for config_id with real-time P&L"""
-    try:
-        service = PaperTradingService()
-        
-        # Update prices first for real-time P&L
-        await service.update_position_prices(config_id)
-        
-        # Get positions
-        positions = await service.get_open_positions(config_id)
-        
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "positions": positions,
-            "count": len(positions)
-        }
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Failed to get paper positions for {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/paper/account/{config_id}")
-async def get_paper_account(config_id: str):
-    """Get paper account summary and performance stats"""
-    try:
-        manager = PositionManager()
-        portfolio = await manager.get_portfolio_summary(config_id)
-        risk_metrics = await manager.get_position_risk_metrics(config_id)
-        
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "portfolio": portfolio.__dict__,
-            "risk_metrics": risk_metrics
-        }
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Failed to get paper account for {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.post("/paper/close/{trade_id}")
-async def close_paper_position(trade_id: str):
-    """Manually close paper position"""
-    try:
-        service = PaperTradingService()
-        result = await service.close_position(trade_id, reason='manual')
-        
-        return result
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Failed to close paper position {trade_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/paper/history/{config_id}")
-async def get_paper_trade_history(config_id: str, limit: int = 100):
-    """Get trade history for config_id"""
-    try:
-        service = PaperTradingService()
-        history = await service.get_trade_history(config_id, limit)
-        
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "trades": history,
-            "count": len(history)
-        }
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Failed to get trade history for {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/paper/analytics/{config_id}")
-async def get_paper_analytics(config_id: str, days: int = 30):
-    """Get detailed performance analytics"""
-    try:
-        manager = PositionManager()
-        analytics = await manager.get_performance_analytics(config_id, days)
-        
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "analytics": analytics
-        }
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Failed to get analytics for {config_id}: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/paper/health")
-async def paper_trading_health():
-    """Paper trading service health check"""
-    try:
-        service = PaperTradingService()
-        health = await service.health_check()
-        
-        return health
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Paper trading health check failed: {e}")
-        return {
-            "service": "paper_trading",
-            "status": "failed",
-            "error": str(e)
-        }
-
-@app.post("/paper/update-prices")
-async def update_paper_position_prices(config_id: Optional[str] = None):
-    """Manually trigger position price updates"""
-    try:
-        service = PaperTradingService()
-        updated_count = await service.update_position_prices(config_id)
-        
-        return {
-            "status": "success",
-            "updated_positions": updated_count,
-            "config_id": config_id
-        }
-        
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Failed to update paper position prices: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
-
-async def get_latest_approved_signals(limit: int = 5) -> List[Dict]:
-    """
-    Dynamically fetch the latest approved signals from ggshot_filter table.
-    Returns them in the format expected by the live position API.
-    """
-    from core.common.db import get_db_connection
-    
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT symbol, signal_direction, entry_price, created_at, confidence_score, 
-                           reasoning_text, volume_analysis, signal_timeframe
-                    FROM ggshot_filter 
-                    WHERE filter_status = 'APPROVED' 
-                    ORDER BY created_at DESC 
-                    LIMIT %s
-                """, (limit,))
-                
-                results = cur.fetchall()
-                
-                # Generate demo position sizes for variety
-                position_sizes = [800, 1200, 600, 900, 1000]
-                
-                positions = []
-                for i, row in enumerate(results):
-                    symbol, direction, entry_price, created_at, confidence, reasoning, volume_analysis, timeframe = row
-                    
-                    positions.append({
-                        'id': f'pos_{i+1:03d}',
-                        'symbol': symbol,
-                        'direction': direction,
-                        'entry_price': float(entry_price),
-                        'entry_time': created_at.isoformat() + 'Z',
-                        'position_size': position_sizes[i % len(position_sizes)],  # USD
-                        'leverage': 10,
-                        'confidence': int(float(confidence) * 100),  # Convert 0.57 to 57
-                        'reasoning_text': reasoning or "AI analysis completed with 4-pillar validation",
-                        'volume_analysis': volume_analysis or "Volume confirmation analysis",
-                        'signal_timeframe': timeframe or "1h"
-                    })
-                
-                return positions
-                
-    except Exception as e:
-        from core.common.logger import logger
-        logger.error(f"Failed to fetch latest signals: {e}")
-        
-        # Fallback to a minimal static set if database fails
-        return [
-            {
-                'id': 'pos_001',
-                'symbol': 'BTC/USDT',
-                'direction': 'LONG',
-                'entry_price': 43000.0,
-                'entry_time': datetime.now(timezone.utc).isoformat(),
-                'position_size': 1000,
-                'leverage': 10,
-                'confidence': 75
-            }
-        ]
-
-# Demo trading positions for ggShot-Pro bot (now dynamically loaded from ggshot_filter table)
-# This will be replaced by get_latest_approved_signals() at runtime
-
-def calculate_position_pnl(entry_price: float, current_price: float, position_size: float, direction: str, leverage: float) -> Dict[str, float]:
-    """Calculate realistic P&L with leverage for a position."""
-    try:
-        # Calculate price change percentage
-        price_change_percent = (current_price - entry_price) / entry_price
-        
-        # Reverse for short positions
-        if direction.upper() == 'SHORT':
-            price_change_percent *= -1
-        
-        # Apply leverage
-        leveraged_return = price_change_percent * leverage
-        
-        # Calculate dollar P&L
-        pnl_usd = position_size * leveraged_return
-        
-        # Calculate percentage P&L (relative to position size)
-        pnl_percent = leveraged_return * 100
-        
-        return {
-            'pnl_usd': round(pnl_usd, 2),
-            'pnl_percent': round(pnl_percent, 2),
-            'price_change_percent': round(price_change_percent * 100, 2)
-        }
-    except Exception as e:
-        return {'pnl_usd': 0.0, 'pnl_percent': 0.0, 'price_change_percent': 0.0}
-
-def get_time_in_trade(entry_time_str: str) -> str:
-    """Calculate time since entry."""
-    try:
-        entry_time = datetime.fromisoformat(entry_time_str.replace('Z', '+00:00'))
-        if entry_time.tzinfo is None:
-            entry_time = entry_time.replace(tzinfo=timezone.utc)
-        
-        time_diff = datetime.now(timezone.utc) - entry_time
-        
-        hours = int(time_diff.total_seconds() // 3600)
-        minutes = int((time_diff.total_seconds() % 3600) // 60)
-        
-        if hours > 0:
-            return f"{hours}h {minutes}m"
-        else:
-            return f"{minutes}m"
-    except:
-        return "N/A"
-
-@app.get("/api/live-position-data")
-async def get_live_position_data():
-    """Get live position data with real-time prices and P&L calculations."""
-    from decision.services.price_service import PriceService
-    from core.common.logger import logger
-    
-    try:
-        # Get latest approved signals dynamically from database
-        demo_positions = await get_latest_approved_signals(1)
-        
-        # Initialize price service (uses existing CCXT infrastructure)
-        price_service = PriceService()
-        
-        live_positions = []
-        
-        for position in demo_positions:
-            try:
-                # Get current market price using existing price service
-                current_price = await price_service.get_current_price(position['symbol'])
-                
-                if current_price:
-                    # Calculate real P&L
-                    pnl_data = calculate_position_pnl(
-                        entry_price=position['entry_price'],
-                        current_price=float(current_price),
-                        position_size=position['position_size'],
-                        direction=position['direction'],
-                        leverage=position['leverage']
-                    )
-                    
-                    # Calculate time in trade
-                    time_in_trade = get_time_in_trade(position['entry_time'])
-                    
-                    live_positions.append({
-                        **position,
-                        'current_price': float(current_price),
-                        'pnl': pnl_data['pnl_usd'],
-                        'pnl_percent': pnl_data['pnl_percent'],
-                        'price_change_percent': pnl_data['price_change_percent'],
-                        'time_in_trade': time_in_trade,
-                        'last_updated': datetime.now(timezone.utc).isoformat()
-                    })
-                else:
-                    # Fallback if price service fails
-                    live_positions.append({
-                        **position,
-                        'current_price': position['entry_price'],  # Use entry price as fallback
-                        'pnl': 0.0,
-                        'pnl_percent': 0.0,
-                        'price_change_percent': 0.0,
-                        'time_in_trade': get_time_in_trade(position['entry_time']),
-                        'last_updated': datetime.now(timezone.utc).isoformat(),
-                        'price_error': 'Unable to fetch current price'
-                    })
-            except Exception as e:
-                logger.error(f"Error processing position {position['id']}: {e}")
-                # Include position with error state
-                live_positions.append({
-                    **position,
-                    'current_price': position['entry_price'],
-                    'pnl': 0.0,
-                    'pnl_percent': 0.0,
-                    'price_change_percent': 0.0,
-                    'time_in_trade': get_time_in_trade(position['entry_time']),
-                    'last_updated': datetime.now(timezone.utc).isoformat(),
-                    'error': str(e)
-                })
-        
-        return {
-            'status': 'success',
-            'positions': live_positions,
-            'total_positions': len(live_positions),
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }
-        
-    except Exception as e:
-        logger.error(f"Error in live position data endpoint: {e}")
-        return {
-            'status': 'error',
-            'error': str(e),
-            'positions': [],
-            'timestamp': datetime.now(timezone.utc).isoformat()
-        }
-
-@app.get("/")
-async def root():
-    """Root endpoint showing available APIs."""
-    return {
-        "message": "GGBot API Server",
-        "apis": {
-            "extraction": "/extraction/docs",
-            "decision": "/decision/docs", 
-            "paper_trading": "/paper/*",
-            "agent": "/agent/docs"
-        },
-        "paper_trading_endpoints": {
-            "execute": "POST /paper/execute",
-            "positions": "GET /paper/positions/{config_id}",
-            "account": "GET /paper/account/{config_id}",
-            "close": "POST /paper/close/{trade_id}",
-            "history": "GET /paper/history/{config_id}",
-            "analytics": "GET /paper/analytics/{config_id}",
-            "health": "GET /paper/health"
-        },
-        "health_checks": {
-            "extraction": "/extraction/health",
-            "decision": "/decision/health",
-            "paper_trading": "/paper/health",
-            "agent": "/agent/health"
-        }
-    }
 
 @app.websocket("/ws/bot-status/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    """WebSocket endpoint for future real-time updates (currently placeholder)."""
-    await manager.connect(user_id, websocket)
+    """WebSocket endpoint for real-time bot status updates."""
+    await websocket_manager.connect(user_id, websocket)
     
     try:
         while True:
@@ -630,72 +1040,40 @@ async def websocket_endpoint(websocket: WebSocket, user_id: str):
             data = await websocket.receive_text()
             # Echo heartbeat messages
             if data == "heartbeat":
-                await websocket.send_text(json.dumps({"type": "heartbeat_ack", "timestamp": datetime.utcnow().isoformat() + "Z"}))
+                await websocket.send_text(json.dumps({
+                    "type": "heartbeat_ack", 
+                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
+                }))
     except WebSocketDisconnect:
-        manager.disconnect(user_id)
+        websocket_manager.disconnect(user_id)
 
-@app.get("/health")
-async def health_check():
-    """Combined health check for all services."""
-    import aiohttp
-    import asyncio
-    
-    health_status = {}
-    
-    # Check each service health endpoint (using current API port)
-    port = int(os.environ.get("API_PORT", "8000"))
-    endpoints = {
-        "extraction": f"http://localhost:{port}/extraction/health",
-        "decision": f"http://localhost:{port}/decision/health",
-        "trading": f"http://localhost:{port}/trading/health",
-        "agent": f"http://localhost:{port}/agent/health"
-    }
-    
-    async def check_endpoint(name, url):
-        try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, timeout=2) as response:
-                    if response.status == 200:
-                        health_status[name] = "healthy"
-                    else:
-                        health_status[name] = "unhealthy"
-        except:
-            health_status[name] = "not_started"
-    
-    # Since this is a combined service, all should be healthy if we're running
-    for service in ["extraction", "decision", "trading", "agent"]:
-        health_status[service] = "healthy"
-    
-    return {
-        "status": "healthy",
-        "services": health_status,
-        "mode": "combined"
-    }
 
-# Bot monitoring task removed - will rebuild simpler monitoring later
+# Error handlers
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request, exc: HTTPException):
+    """Handle HTTP exceptions with consistent format."""
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={
+            "status": "error",
+            "error": exc.detail,
+            "status_code": exc.status_code
+        }
+    )
 
+
+# Development Mode: Override authentication for Phase 7 testing
+import os
+if os.getenv("DEVELOPMENT_MODE", "false").lower() == "true":
+    logger.info("🧪 DEVELOPMENT MODE: Using mock authentication")
+    app.dependency_overrides[get_current_user_v2] = get_mock_user_for_dev
 
 if __name__ == "__main__":
-    # Get configuration from environment
-    host = os.environ.get("API_HOST", "0.0.0.0")
-    port = int(os.environ.get("API_PORT", "8000"))
-    
-    print(f"Starting GGBot Combined API Server on {host}:{port}")
-    print(f"API documentation available at: http://localhost:{port}/docs")
-    print("\nIndividual API docs:")
-    print(f"  Extraction: http://localhost:{port}/extraction/docs")
-    print(f"  Decision:   http://localhost:{port}/decision/docs")
-    print(f"  Trading:    http://localhost:{port}/trading/docs")
-    print(f"  Agent:      http://localhost:{port}/agent/docs")
-    print("\nScheduler Control:")
-    print(f"  Start:  POST http://localhost:{port}/agent/api/scheduler/start")
-    print(f"  Stop:   POST http://localhost:{port}/agent/api/scheduler/stop")
-    print(f"  Status: GET  http://localhost:{port}/agent/api/scheduler/status")
-    
-    # Run the server
+    # Development server
     uvicorn.run(
-        app,
-        host=host,
-        port=port,
+        "ggbot:app",
+        host="0.0.0.0",
+        port=8000,  # V2 Orchestrator port (Hummingbot API now on 8888)
+        reload=True,
         log_level="info"
     )
