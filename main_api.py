@@ -109,19 +109,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# Add CORS middleware - explicit domains to override proxy restrictions
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=[
-        "https://app.ggbots.ai",           # New production domain
-        "https://ggbot-app.vercel.app",    # Legacy domain for compatibility
-        "http://localhost:3000",           # Local development
-        "*"                                # Fallback for any other origins
-    ],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# CORS handled by nginx proxy - no FastAPI CORS middleware needed
 
 # Services
 class GGBotOrchestrator:
