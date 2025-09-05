@@ -8,7 +8,7 @@ interface GGBotConfigProps {
   bot: Bot | null
   isOpen: boolean
   onClose: () => void
-  onConfigSaved?: (configId: string, configName: string) => void
+  onConfigSaved?: (configId: string) => void
 }
 
 // Analysis frequency options
@@ -365,7 +365,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
       setHasChanges(false)
       
       // Notify parent component
-      onConfigSaved?.(savedConfig.config_id, savedConfig.config_name)
+      onConfigSaved?.(savedConfig.config_id)
       
       // Close the config
       onClose()

@@ -201,7 +201,7 @@ export default function DashboardPage() {
     setSelectedBot(null)
   }
 
-  const handleConfigSaved = (configId: string, _configName: string) => {
+  const handleConfigSaved = (configId: string) => {
     // Reload bots to get the newly created one
     loadBots(userId)
     // Select the newly created bot
