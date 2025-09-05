@@ -59,7 +59,6 @@ interface DataSourceSectionProps {
   dataSources: DataSource[]
   selectedDataPoints: string[]
   onToggleDataPoint: (dataPointId: string) => void
-  userProfile: UserProfile | null
   isLoading: boolean
 }
 
@@ -67,7 +66,6 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
   dataSources,
   selectedDataPoints,
   onToggleDataPoint,
-  userProfile: _userProfile,
   isLoading
 }) => {
   const [searchTerm, setSearchTerm] = React.useState('')
@@ -752,7 +750,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             dataSources={dataSources}
                             selectedDataPoints={selectedDataPoints}
                             onToggleDataPoint={handleToggleDataPoint}
-                            userProfile={userProfile}
                             isLoading={dataSourcesLoading}
                           />
                         </div>
