@@ -116,7 +116,7 @@ export interface UserProfile {
 
 export class ApiClient {
   private supabase = createClient()
-  private baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
+  private baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8001'
   
   async getAuthHeaders(): Promise<HeadersInit> {
     const { data: { session } } = await this.supabase.auth.getSession()

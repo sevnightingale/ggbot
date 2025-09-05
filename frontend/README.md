@@ -253,7 +253,7 @@ export async function GET(request: NextRequest) {
 ```typescript
 // Dashboard ready for real API integration
 const fetchBotData = async (configId: string) => {
-  const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
+  const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8001'
   
   const [metricsResponse, tradesResponse, positionsResponse] = await Promise.all([
     fetch(`${baseUrl}/api/v2/bot/${configId}/metrics`),
