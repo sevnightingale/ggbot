@@ -1,0 +1,18 @@
+{
+  "symbol": "BTC/USDT",
+  "timeframe": "1h",
+  "connector": "kucoin",
+  "data_points": 200,
+  "timestamp": "2025-09-05T10:33:10.606856",
+  "indicators": {},
+  "config_id": "379c3b6c-1cb6-46de-a81f-65612ab835e5",
+  "ohlcv_summary": {
+    "latest_price": 112367.9,
+    "price_change_24h": 1.4088485544208398,
+    "volume_24h": 1864.80573379,
+    "date_range": {
+      "start": "2025-08-28T03:00:00",
+      "end": "2025-09-05T10:00:00"
+    }
+  }
+}

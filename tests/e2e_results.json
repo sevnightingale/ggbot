@@ -1,5 +1,5 @@
 {
-  "start_time": "2025-09-05T10:15:05.517182",
+  "start_time": "2025-09-05T11:18:54.461053",
   "phases": {
     "health": "\u2705 PASSED",
     "configuration": "\u2705 PASSED",
@@ -17,7 +17,7 @@
     "websocket_messages": 0,
     "orchestration_cycles": 1,
     "trades_executed": 0,
-    "test_duration_seconds": 1.0675337314605713
+    "test_duration_seconds": 35.555468797683716
   },
-  "end_time": "2025-09-05T10:15:06.584726"
+  "end_time": "2025-09-05T11:19:30.016533"
 }
