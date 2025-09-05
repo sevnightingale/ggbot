@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
@@ -1060,7 +1061,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "ggbot:app",
         host="0.0.0.0",
-        port=8000,  # V2 Orchestrator port (matches nginx configuration)
+        port=8000,  # V2 Orchestrator port (Hummingbot API now on 8888)
         reload=True,
         log_level="info"
     )

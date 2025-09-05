@@ -12,6 +12,7 @@ from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
@@ -108,7 +109,19 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS handled by nginx proxy - no FastAPI CORS middleware needed
+# Add CORS middleware - explicit domains to override proxy restrictions
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "https://app.ggbots.ai",           # New production domain
+        "https://ggbot-app.vercel.app",    # Legacy domain for compatibility
+        "http://localhost:3000",           # Local development
+        "*"                                # Fallback for any other origins
+    ],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Services
 class GGBotOrchestrator:
@@ -1060,7 +1073,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "ggbot:app",
         host="0.0.0.0",
-        port=8000,  # V2 Orchestrator port (matches nginx configuration)
+        port=8001,  # V2 Orchestrator port (separate from Hummingbot API on 8000)
         reload=True,
         log_level="info"
     )
