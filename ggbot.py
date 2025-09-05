@@ -365,60 +365,6 @@ class GGBotOrchestrator:
                 "error": str(e)
             }
     
-    def _format_market_data_for_llm(self, market_data: Dict[str, Any]) -> str:
-        """Format market data dictionary for LLM consumption."""
-        if not market_data:
-            return "No market data available."
-        
-        formatted_lines = []
-        for indicator, value in market_data.items():
-            if isinstance(value, dict):
-                # Handle nested indicator data
-                for sub_key, sub_value in value.items():
-                    formatted_lines.append(f"{indicator}_{sub_key}: {sub_value}")
-            else:
-                formatted_lines.append(f"{indicator}: {value}")
-        
-        return "\n".join(formatted_lines)
-    
-    def _parse_llm_decision(self, llm_content: str) -> Dict[str, Any]:
-        """Parse LLM response into structured decision data."""
-        # Simple parsing - in production this would be more sophisticated
-        content = llm_content.lower()
-        
-        # Extract action
-        action = "wait"  # Default
-        if "enter" in content or "buy" in content:
-            action = "enter"
-        elif "exit" in content or "sell" in content:
-            action = "exit"
-        
-        # Extract confidence (look for percentage or decimal)
-        confidence = 0.5  # Default
-        import re
-        confidence_patterns = [
-            r"confidence[:\s]*(\d+(?:\.\d+)?)%",
-            r"confidence[:\s]*(\d+(?:\.\d+)?)",
-            r"(\d+(?:\.\d+)?)%\s*confident",
-            r"(\d+(?:\.\d+)?)\s*confidence"
-        ]
-        
-        for pattern in confidence_patterns:
-            match = re.search(pattern, content)
-            if match:
-                conf_value = float(match.group(1))
-                # Convert percentage to decimal if needed
-                confidence = conf_value / 100 if conf_value > 1.0 else conf_value
-                break
-        
-        # Ensure confidence is in valid range
-        confidence = max(0.0, min(1.0, confidence))
-        
-        return {
-            "action": action,
-            "confidence": confidence,
-            "reasoning": llm_content  # Keep full reasoning
-        }
 
 
 # Initialize orchestrator
