@@ -221,6 +221,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
   
   // UI state
   const [tradingAgentTab, setTradingAgentTab] = React.useState('risk-management')
+  const [dataSourceTab, setDataSourceTab] = React.useState('technical-indicators')
   const [pairSearchTerm, setPairSearchTerm] = React.useState('')
   const [showPairDropdown, setShowPairDropdown] = React.useState(false)
 
@@ -719,51 +720,164 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             </div>
                           </div>
 
-                          {/* Selected Data Points Summary */}
+                          {/* Selected Data Points Summary with Categorization */}
                           <div>
                             <div className="flex items-center justify-between mb-4">
                               <h4 className="text-footnote text-bone-200 font-medium">SELECTED DATA POINTS</h4>
+                              <span className="text-footnote text-gray-400">{selectedDataPoints.length} selected</span>
                             </div>
                             <div className="bg-charcoal-800 border border-charcoal-600 p-3">
-                              {selectedDataPoints.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {selectedDataPoints.map(dataPointId => {
-                                    // Find the data point name from the data sources
-                                    const dataPoint = dataSources
-                                      .flatMap(source => source.data_points)
-                                      .find(dp => dp.data_point_id === dataPointId)
-                                    
-                                    return (
-                                      <span
-                                        key={dataPointId}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
-                                      >
-                                        {dataPoint?.name || dataPointId}
-                                        <button
-                                          onClick={() => handleToggleDataPoint(dataPointId)}
-                                          className="hover:bg-black/20 rounded"
+                              {/* Technical Indicators */}
+                              {configData.extraction.data_sources.technical_indicators.length > 0 && (
+                                <div className="mb-3">
+                                  <h5 className="text-xs text-gray-400 mb-2">Technical Indicators:</h5>
+                                  <div className="flex flex-wrap gap-2">
+                                    {configData.extraction.data_sources.technical_indicators.map(dataPointId => {
+                                      const dataPoint = dataSources
+                                        .flatMap(source => source.data_points)
+                                        .find(dp => dp.data_point_id === dataPointId)
+                                      
+                                      return (
+                                        <span
+                                          key={dataPointId}
+                                          className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
                                         >
-                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                          </svg>
-                                        </button>
-                                      </span>
-                                    )
-                                  })}
+                                          {dataPoint?.name || dataPointId}
+                                          <button
+                                            onClick={() => handleToggleDataPoint(dataPointId)}
+                                            className="hover:bg-black/20 rounded"
+                                          >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                            </svg>
+                                          </button>
+                                        </span>
+                                      )
+                                    })}
+                                  </div>
                                 </div>
-                              ) : (
+                              )}
+
+                              {/* News & Sentiment Data */}
+                              {(configData.extraction.data_sources.fundamental_analysis.length > 0 ||
+                                configData.extraction.data_sources.sentiment_and_trends.length > 0 ||
+                                configData.extraction.data_sources.influencer_kol.length > 0 ||
+                                configData.extraction.data_sources.news_and_regulations.length > 0 ||
+                                configData.extraction.data_sources.onchain_analytics.length > 0) && (
+                                <div className="mb-3">
+                                  <h5 className="text-xs text-gray-400 mb-2">News & Sentiment:</h5>
+                                  <div className="flex flex-wrap gap-2">
+                                    {[
+                                      ...configData.extraction.data_sources.fundamental_analysis,
+                                      ...configData.extraction.data_sources.sentiment_and_trends,
+                                      ...configData.extraction.data_sources.influencer_kol,
+                                      ...configData.extraction.data_sources.news_and_regulations,
+                                      ...configData.extraction.data_sources.onchain_analytics
+                                    ].map(dataPointId => {
+                                      const dataPoint = dataSources
+                                        .flatMap(source => source.data_points)
+                                        .find(dp => dp.data_point_id === dataPointId)
+                                      
+                                      return (
+                                        <span
+                                          key={dataPointId}
+                                          className="inline-flex items-center gap-1 px-2 py-1 bg-blue-500 text-white text-xs rounded"
+                                        >
+                                          {dataPoint?.name || dataPointId}
+                                          <button
+                                            onClick={() => handleToggleDataPoint(dataPointId)}
+                                            className="hover:bg-black/20 rounded"
+                                          >
+                                            <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                                              <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                                            </svg>
+                                          </button>
+                                        </span>
+                                      )
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {selectedDataPoints.length === 0 && (
                                 <div className="text-gray-500 text-xs">No data sources selected</div>
                               )}
                             </div>
                           </div>
 
-                          {/* Data Source Content */}
-                          <DataSourceSection
-                            dataSources={dataSources}
-                            selectedDataPoints={selectedDataPoints}
-                            onToggleDataPoint={handleToggleDataPoint}
-                            isLoading={dataSourcesLoading}
-                          />
+                          {/* Data Source Selection with Tabs */}
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-footnote text-bone-200 font-medium">DATA SOURCE</h4>
+                            </div>
+                            
+                            {/* Tab Navigation */}
+                            <div className="flex gap-2 flex-wrap mb-6">
+                              <button
+                                onClick={() => setDataSourceTab('technical-indicators')}
+                                className={`px-3 py-1 text-xs rounded transition-colors ${
+                                  dataSourceTab === 'technical-indicators'
+                                    ? 'bg-agent-extraction text-charcoal-900 font-medium'
+                                    : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                                }`}
+                              >
+                                Technical Indicators
+                              </button>
+                              <button
+                                onClick={() => setDataSourceTab('signal-providers')}
+                                className={`px-3 py-1 text-xs rounded transition-colors ${
+                                  dataSourceTab === 'signal-providers'
+                                    ? 'bg-agent-extraction text-charcoal-900 font-medium'
+                                    : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                                }`}
+                              >
+                                Signal Providers
+                              </button>
+                              <button
+                                onClick={() => setDataSourceTab('news-sentiment')}
+                                className={`px-3 py-1 text-xs rounded transition-colors ${
+                                  dataSourceTab === 'news-sentiment'
+                                    ? 'bg-agent-extraction text-charcoal-900 font-medium'
+                                    : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
+                                }`}
+                              >
+                                News & Sentiment
+                              </button>
+                            </div>
+
+                            {/* Tab Content */}
+                            {dataSourceTab === 'technical-indicators' && (
+                              <DataSourceSection
+                                dataSources={dataSources.filter(ds => ds.name === 'technical_indicators')}
+                                selectedDataPoints={selectedDataPoints}
+                                onToggleDataPoint={handleToggleDataPoint}
+                                isLoading={dataSourcesLoading}
+                              />
+                            )}
+                            
+                            {dataSourceTab === 'signal-providers' && (
+                              <div className="text-center py-8 text-gray-500">
+                                <div className="text-4xl mb-4">📡</div>
+                                <div className="text-sm text-bone-200 mb-2">Signal Providers</div>
+                                <div className="text-xs">External trading signal integration - coming soon</div>
+                              </div>
+                            )}
+                            
+                            {dataSourceTab === 'news-sentiment' && (
+                              <DataSourceSection
+                                dataSources={dataSources.filter(ds => 
+                                  ds.name === 'fundamental_analysis' || 
+                                  ds.name === 'sentiment_and_trends' ||
+                                  ds.name === 'influencer_kol' ||
+                                  ds.name === 'news_and_regulations' ||
+                                  ds.name === 'onchain_analytics'
+                                )}
+                                selectedDataPoints={selectedDataPoints}
+                                onToggleDataPoint={handleToggleDataPoint}
+                                isLoading={dataSourcesLoading}
+                              />
+                            )}
+                          </div>
                         </div>
                       </div>
                     )}
