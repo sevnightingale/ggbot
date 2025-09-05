@@ -22,11 +22,6 @@ const frequencyOptions = [
   { value: '1w', label: '1 week' }
 ]
 
-// Decision modes
-const decisionModes = [
-  { value: 'autonomous', label: 'Autonomous Trading', description: 'Generate and execute trades independently' },
-  { value: 'validation', label: 'Signal Validation', description: 'Validate external signals before execution' }
-]
 
 // Trading pairs data - will eventually be dynamic
 const tradingPairs = {
@@ -72,7 +67,7 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
   dataSources,
   selectedDataPoints,
   onToggleDataPoint,
-  userProfile,
+  userProfile: _userProfile,
   isLoading
 }) => {
   const [searchTerm, setSearchTerm] = React.useState('')
@@ -227,12 +222,9 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
   const [dataSourcesLoading, setDataSourcesLoading] = React.useState(true)
   
   // UI state
-  const [selectedDataSource, setSelectedDataSource] = React.useState('Technical Indicators')
   const [tradingAgentTab, setTradingAgentTab] = React.useState('risk-management')
   const [pairSearchTerm, setPairSearchTerm] = React.useState('')
   const [showPairDropdown, setShowPairDropdown] = React.useState(false)
-  const [showPromptPreview, setShowPromptPreview] = React.useState(false)
-  const [connectionStatus, setConnectionStatus] = React.useState<'disconnected' | 'connecting' | 'connected' | 'error'>('disconnected')
 
   // Initialize component
   React.useEffect(() => {
@@ -1174,7 +1166,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                         ...prev.trading,
                                         position_sizing: {
                                           ...prev.trading.position_sizing,
-                                          method: method.value as any
+                                          method: method.value as 'fixed_usd' | 'account_percentage' | 'confidence_based'
                                         }
                                       }
                                     }))
