@@ -313,26 +313,36 @@ export default function DashboardPage() {
   // Show empty state if no bots
   if (userBots.length === 0) {
     return (
-      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
-        <div className="flex flex-col items-center gap-4 max-w-md text-center">
-          <div className="text-6xl mb-4">🤖</div>
-          <h2 className="text-xl text-bone-200 mb-2">Welcome to GGBot</h2>
-          <p className="text-gray-400 mb-6">You don&apos;t have any bots configured yet. Create your first bot to get started with AI-powered trading.</p>
-          <div className="flex gap-4 flex-col sm:flex-row">
-            <button
-              onClick={handleFloatingAdd}
-              className="px-6 py-3 bg-bone-200 text-charcoal-900 rounded-lg hover:bg-bone-300 transition-colors"
-            >
-              Create Your First Bot
-            </button>
-            <button
-              onClick={handleLogout}
-              className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-            >
-              Logout
-            </button>
+      <div className="min-h-screen bg-charcoal-900 relative">
+        <div className="flex items-center justify-center p-8 min-h-screen">
+          <div className="flex flex-col items-center gap-4 max-w-md text-center">
+            <div className="text-6xl mb-4">🤖</div>
+            <h2 className="text-xl text-bone-200 mb-2">Welcome to GGBot</h2>
+            <p className="text-gray-400 mb-6">You don&apos;t have any bots configured yet. Create your first bot to get started with AI-powered trading.</p>
+            <div className="flex gap-4 flex-col sm:flex-row">
+              <button
+                onClick={handleFloatingAdd}
+                className="px-6 py-3 bg-bone-200 text-charcoal-900 rounded-lg hover:bg-bone-300 transition-colors"
+              >
+                Create Your First Bot
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
           </div>
         </div>
+
+        {/* Bottom Sheet Config */}
+        <GGBotConfig 
+          bot={selectedBot}
+          isOpen={isConfigOpen}
+          onClose={handleConfigClose}
+          onConfigSaved={handleConfigSaved}
+        />
       </div>
     )
   }
