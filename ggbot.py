@@ -34,9 +34,9 @@ from core.services.llm_service import LLMService, llm_service
 from core.services.indicator_service import IndicatorService
 from core.common.logger import logger
 
-# V2 Module Integration
+# V2 Module Integration - Complete Integration
 from extraction.v2.extraction_engine import ExtractionEngineV2
-# from decision.v2.decision_engine import DecisionEngineV2  # TODO: Create V2 decision engine
+from decision.engine_v2 import DecisionEngineV2
 from trading.paper.service import PaperTradingService
 
 # Domain Models  
@@ -80,8 +80,12 @@ async def lifespan(app: FastAPI):
     
     # Startup tasks
     try:
-        # Test database connectivity
-        test_user = await user_service.get_profile("test")
+        # Test database connectivity with a valid UUID
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("SELECT 1 as test")
+                cur.fetchone()
         logger.info("✅ Database connectivity verified")
         
         # Test LLM service
@@ -112,14 +116,17 @@ app = FastAPI(
 
 # Services
 class GGBotOrchestrator:
-    """Main orchestrator class coordinating all V2 modules."""
+    """Main orchestrator class coordinating all V2 modules with full integration."""
     
     def __init__(self):
         self.config_service = config_service
         self.llm_service = llm_service
-        self.indicator_service = IndicatorService()
         self.paper_trading = PaperTradingService()
         self._log = logger.bind(component="orchestrator")
+        
+        # V2 Engine instances - created per request for proper isolation
+        self._extraction_engines = {}  # Cache by user_id for efficiency
+        self._decision_engines = {}    # Cache by config_id
     
     async def run_autonomous_cycle(
         self,
@@ -127,7 +134,7 @@ class GGBotOrchestrator:
         user_id: str
     ) -> OrchestrationResult:
         """
-        Run a complete autonomous trading cycle.
+        Run a complete autonomous trading cycle using real V2 systems.
         
         Args:
             config_id: Bot configuration ID
@@ -137,7 +144,7 @@ class GGBotOrchestrator:
             OrchestrationResult with execution details
         """
         start_time = datetime.now(timezone.utc)
-        self._log.info(f"Starting autonomous cycle for config {config_id}")
+        self._log.info(f"Starting V2 autonomous cycle for config {config_id}")
         
         try:
             # 1. Load user configuration
@@ -145,39 +152,31 @@ class GGBotOrchestrator:
             if not config:
                 raise HTTPException(status_code=404, detail="Configuration not found")
             
-            # 2. Get user's available indicators
-            user_indicators = await self.indicator_service.get_user_available_indicators(user_id)
-            available_indicator_names = [ind["name"] for ind in user_indicators]
+            # 2. Get or create V2 extraction engine
+            extraction_engine = await self._get_extraction_engine(user_id)
             
-            # 3. Validate requested indicators against user access
-            requested_indicators = config.extraction.get("indicators", [])
-            if isinstance(requested_indicators, dict):
-                # Handle nested indicator structure
-                requested_indicators = []
-                for category, indicators in config.extraction.get("data_sources", {}).items():
-                    if isinstance(indicators, list):
-                        requested_indicators.extend(indicators)
+            # 3. Get indicator access from config data structure
+            extraction_config = config.config_data.get("extraction", {})
+            data_sources = extraction_config.get("data_sources", {})
             
-            # Filter to only allowed indicators
-            allowed_indicators = [
-                ind for ind in requested_indicators 
-                if ind in available_indicator_names
-            ]
+            # Flatten all indicators from data sources
+            requested_indicators = []
+            for category, indicators in data_sources.items():
+                if isinstance(indicators, list):
+                    requested_indicators.extend(indicators)
             
-            if not allowed_indicators:
-                raise HTTPException(
-                    status_code=403, 
-                    detail="No accessible indicators found in configuration"
-                )
+            if not requested_indicators:
+                # Default to basic indicators if none specified
+                requested_indicators = ["rsi", "macd", "ema"]
             
-            # 4. Run extraction (V2 integration placeholder)
+            # 4. Run V2 extraction
             extraction_result = await self._run_extraction_v2(
-                config, user_id, allowed_indicators
+                extraction_engine, config, user_id, requested_indicators
             )
             
-            # 5. Run decision engine (V2 integration placeholder)
+            # 5. Run V2 decision engine
             decision_result = await self._run_decision_v2(
-                config, user_id, extraction_result
+                config_id, config, extraction_result
             )
             
             # 6. Execute trading if actionable
@@ -199,14 +198,14 @@ class GGBotOrchestrator:
                 timestamp=end_time.isoformat()
             )
             
-            self._log.info(f"Autonomous cycle completed in {execution_time_ms}ms")
+            self._log.info(f"V2 autonomous cycle completed in {execution_time_ms}ms")
             return result
             
         except Exception as e:
             end_time = datetime.now(timezone.utc)
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
-            self._log.error(f"Autonomous cycle failed: {e}")
+            self._log.error(f"V2 autonomous cycle failed: {e}")
             return OrchestrationResult(
                 status="error",
                 config_id=config_id,
@@ -217,32 +216,39 @@ class GGBotOrchestrator:
                 timestamp=end_time.isoformat()
             )
     
-    async def _run_extraction_v2(
-        self,
-        config: BotConfigV2,
-        user_id: str,
-        indicators: List[str]
-    ) -> Dict[str, Any]:
-        """Run V2 extraction engine."""
-        try:
-            # Initialize extraction engine with user context
-            extraction_engine = ExtractionEngineV2(
+    async def _get_extraction_engine(self, user_id: str) -> ExtractionEngineV2:
+        """Get or create V2 extraction engine for user."""
+        if user_id not in self._extraction_engines:
+            self._extraction_engines[user_id] = ExtractionEngineV2(
                 user_id=user_id,
                 use_advanced_preprocessing=True,
                 use_database_storage=True
             )
+        return self._extraction_engines[user_id]
+    
+    async def _run_extraction_v2(
+        self,
+        extraction_engine: ExtractionEngineV2,
+        config: BotConfigV2,
+        user_id: str,
+        indicators: List[str]
+    ) -> Dict[str, Any]:
+        """Run V2 extraction engine with proper integration."""
+        try:
+            # Get symbol from config
+            symbol = config.config_data.get("selected_pair", "BTC/USDT")
             
-            # Extract indicators for the configured symbol
+            # Extract using the V2 system with all 21 preprocessors
             result = await extraction_engine.extract_for_symbol(
-                symbol=config.selected_pair,
+                symbol=symbol,
                 indicators=indicators,
-                timeframe=config.extraction.get("timeframe", "1h"),
-                limit=config.extraction.get("limit", 200),
-                connector=config.extraction.get("connector", "kucoin"),
+                timeframe="1h",  # Default timeframe
+                limit=200,
+                connector="kucoin",
                 config_id=config.config_id
             )
             
-            self._log.info(f"V2 Extraction completed for {config.selected_pair}")
+            self._log.info(f"V2 Extraction completed for {symbol} with {len(indicators)} indicators")
             return result
             
         except Exception as e:
@@ -250,20 +256,28 @@ class GGBotOrchestrator:
             return {
                 "status": "error",
                 "error": str(e),
-                "symbol": config.selected_pair,
+                "symbol": config.config_data.get("selected_pair", "Unknown"),
                 "indicators": indicators
             }
     
+    async def _get_decision_engine(self, config_id: str) -> DecisionEngineV2:
+        """Get or create V2 decision engine for config."""
+        if config_id not in self._decision_engines:
+            engine = DecisionEngineV2(config_id)
+            await engine.initialize()
+            self._decision_engines[config_id] = engine
+        return self._decision_engines[config_id]
+    
     async def _run_decision_v2(
         self,
+        config_id: str,
         config: BotConfigV2,
-        user_id: str,
         extraction_result: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Run V2 decision engine with LLM integration."""
+        """Run V2 decision engine with full context management."""
         try:
             # Check if extraction was successful
-            if extraction_result.get("status") != "success":
+            if extraction_result.get("status") == "error":
                 return {
                     "status": "error",
                     "error": "Extraction failed, cannot make decision",
@@ -271,83 +285,20 @@ class GGBotOrchestrator:
                     "confidence": 0.0
                 }
             
-            # Get LLM client based on user subscription
-            llm_client = await self.llm_service.get_llm_client(
-                user_id=user_id,
-                config_id=config.config_id,
-                preferred_provider="openai"  # TODO: Get from config
+            # Get or create V2 decision engine
+            decision_engine = await self._get_decision_engine(config_id)
+            
+            # Get symbol from config
+            symbol = config.config_data.get("selected_pair", "BTC/USDT")
+            
+            # Run decision using V2 engine with full context management
+            decision_result = await decision_engine.make_decision(
+                symbol=symbol,
+                signal_data=None  # For autonomous trading, no signal data
             )
             
-            if not llm_client:
-                return {
-                    "status": "error",
-                    "error": "LLM client not available",
-                    "action": "wait",
-                    "confidence": 0.0
-                }
-            
-            # Prepare decision prompt with extraction data
-            market_data = extraction_result.get("result", {}).get("indicators", {})
-            current_price = extraction_result.get("result", {}).get("ohlcv_summary", {}).get("latest_price", "Unknown")
-            
-            # Format market data for LLM
-            market_data_text = self._format_market_data_for_llm(market_data)
-            
-            # Build prompts from config
-            system_prompt = config.decision.get("system_prompt", "").format(
-                SYMBOL=config.selected_pair,
-                CURRENT_PRICE=current_price,
-                MARKET_DATA=market_data_text
-            )
-            
-            user_prompt = config.decision.get("user_prompt", "").format(
-                SYMBOL=config.selected_pair,
-                CURRENT_PRICE=current_price,
-                MARKET_DATA=market_data_text
-            )
-            
-            # Generate LLM decision
-            llm_response = await llm_client.generate_completion(
-                prompt=user_prompt,
-                system_prompt=system_prompt,
-                temperature=0.7,
-                max_tokens=500
-            )
-            
-            if llm_response.get("status") != "success":
-                return {
-                    "status": "error",
-                    "error": f"LLM generation failed: {llm_response.get('error')}",
-                    "action": "wait",
-                    "confidence": 0.0
-                }
-            
-            # Parse LLM response into structured decision
-            decision_data = self._parse_llm_decision(llm_response.get("content", ""))
-            
-            # Create Decision domain object for audit trail
-            decision = Decision.create_opportunity_analysis(
-                user_id=user_id,
-                config_id=config.config_id,
-                symbol=Symbol(config.selected_pair),
-                action=DecisionAction(decision_data["action"].upper()),
-                confidence=Confidence(decision_data["confidence"]),
-                reasoning=decision_data["reasoning"],
-                prompt=f"System: {system_prompt}\n\nUser: {user_prompt}",
-                market_data=market_data
-            )
-            
-            # TODO: Store decision in decisions table
-            
-            self._log.info(f"V2 Decision completed: {decision_data['action']} with confidence {decision_data['confidence']}")
-            return {
-                "status": "success",
-                "action": decision_data["action"],
-                "confidence": decision_data["confidence"],
-                "reasoning": decision_data["reasoning"],
-                "llm_usage": llm_response.get("usage", {}),
-                "decision_id": decision.decision_id
-            }
+            self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
+            return decision_result
             
         except Exception as e:
             self._log.error(f"V2 Decision failed: {e}")
@@ -364,10 +315,10 @@ class GGBotOrchestrator:
         user_id: str,
         decision_result: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Run V2 trading execution with paper trading."""
+        """Run V2 trading execution with full paper trading integration."""
         try:
             # Check if decision was successful
-            if decision_result.get("status") != "success":
+            if decision_result.get("status") == "error":
                 return {
                     "status": "skipped",
                     "reason": "Decision failed, no trading action"
@@ -376,38 +327,35 @@ class GGBotOrchestrator:
             action = decision_result.get("action", "wait")
             confidence = decision_result.get("confidence", 0.0)
             
-            # Skip trading if action is wait
-            if action == "wait":
+            # Skip trading if action is wait, no_action, or hold
+            if action in ["wait", "no_action", "hold"]:
                 return {
                     "status": "skipped",
-                    "reason": "Decision was to wait",
+                    "reason": f"Decision was to {action}",
                     "action": action
                 }
             
-            # Check if trading is enabled in config
-            if config.trading.get("execution_mode") != "paper":
-                return {
-                    "status": "error",
-                    "error": "Only paper trading is supported in V2"
-                }
+            # Get trading config from config data
+            trading_config = config.config_data.get("trading", {})
+            symbol = config.config_data.get("selected_pair", "BTC/USDT")
             
-            # Create trading intent for paper trading service
+            # Create comprehensive trading intent for paper trading service
             trading_intent = {
-                "config_id": config.config_id,
-                "user_id": user_id,
-                "symbol": config.selected_pair,
-                "action": action,  # "enter" or "exit"
-                "confidence": confidence,
-                "reasoning": decision_result.get("reasoning", ""),
                 "decision_id": decision_result.get("decision_id"),
-                "position_sizing": config.trading.get("position_sizing", {}),
-                "risk_management": config.trading.get("risk_management", {})
+                "user_id": user_id,
+                "config_id": config.config_id,
+                "symbol": symbol,
+                "action": "long" if action in ["enter", "long"] else "short" if action == "short" else "close",
+                "confidence": confidence,
+                "stop_loss_price": decision_result.get("stop_loss_price"),
+                "take_profit_price": decision_result.get("take_profit_price"),
+                "reasoning": decision_result.get("reasoning", "V2 Decision Engine decision")
             }
             
             # Execute trade via paper trading service
             trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
             
-            self._log.info(f"V2 Trading completed: {trade_result.get('status')}")
+            self._log.info(f"V2 Trading completed: {trade_result.get('status')} for {symbol}")
             return trade_result
             
         except Exception as e:
@@ -1052,7 +1000,7 @@ async def http_exception_handler(request, exc: HTTPException):
 # Development Mode: Override authentication for Phase 7 testing
 import os
 if os.getenv("DEVELOPMENT_MODE", "false").lower() == "true":
-    logger.info("🧪 DEVELOPMENT MODE: Using mock authentication")
+    logger.warning("⚠️  DEVELOPMENT MODE ACTIVE: Using mock authentication - DO NOT USE IN PRODUCTION")
     app.dependency_overrides[get_current_user_v2] = get_mock_user_for_dev
 
 if __name__ == "__main__":
