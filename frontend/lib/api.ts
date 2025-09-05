@@ -96,7 +96,7 @@ export interface DataPoint {
   name: string
   display_name: string
   description: string
-  config_values?: Record<string, any>
+  config_values?: Record<string, unknown>
   requires_premium: boolean
   enabled: boolean
   sort_order: number
@@ -173,7 +173,7 @@ export class ApiClient {
   }
 
   async updateConfig(configId: string, configData: Partial<ConfigData>, configName?: string): Promise<BotConfiguration> {
-    const updateData: any = { ...configData }
+    const updateData: Record<string, unknown> = { ...configData }
     if (configName) {
       updateData.config_name = configName
     }
