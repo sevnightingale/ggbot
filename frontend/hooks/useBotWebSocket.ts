@@ -36,7 +36,7 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
         if (!finalWsUrl) {
           const apiUrl = process.env.NEXT_PUBLIC_API_URL
           if (apiUrl?.includes('localhost')) {
-            finalWsUrl = `ws://localhost:8000/ws/bot-status/${userId}`
+            finalWsUrl = `ws://localhost:8001/ws/bot-status/${userId}`
           } else {
             // For production, use wss protocol
             const host = apiUrl?.replace(/^https?:\/\//, '') || window.location.host
