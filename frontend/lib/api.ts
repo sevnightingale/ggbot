@@ -116,7 +116,7 @@ export interface UserProfile {
 
 export class ApiClient {
   private supabase = createClient()
-  private baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8001'
+  private baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
   
   async getAuthHeaders(): Promise<HeadersInit> {
     const { data: { session } } = await this.supabase.auth.getSession()
@@ -229,28 +229,48 @@ export class ApiClient {
 
   // Data Sources Management  
   async getDataSourcesWithPoints(): Promise<DataSource[]> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/data-sources-with-points`)
+    console.log('🔍 API Call: getDataSourcesWithPoints to', `${this.baseUrl}/api/v2/data-sources-with-points`)
+    
+    try {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/data-sources-with-points`)
+      console.log('📡 Response status:', response.status, response.statusText)
 
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to load data sources: ${error}`)
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ API Error:', error)
+        throw new Error(`Failed to load data sources: ${error}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Data sources loaded:', result)
+      return result.data_sources
+    } catch (err) {
+      console.error('💥 Network error:', err)
+      throw err
     }
-
-    const result = await response.json()
-    return result.data_sources
   }
 
   // User Profile Management
   async getUserProfile(): Promise<UserProfile> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/user/profile`)
+    console.log('🔍 API Call: getUserProfile to', `${this.baseUrl}/api/v2/user/profile`)
+    
+    try {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/user/profile`)
+      console.log('📡 Response status:', response.status, response.statusText)
 
-    if (!response.ok) {
-      const error = await response.text()
-      throw new Error(`Failed to load user profile: ${error}`)
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ API Error:', error)
+        throw new Error(`Failed to load user profile: ${error}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ User profile loaded:', result)
+      return result.profile
+    } catch (err) {
+      console.error('💥 Network error:', err)
+      throw err
     }
-
-    const result = await response.json()
-    return result.profile
   }
 
   // Utility function to check if user can access premium features

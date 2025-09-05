@@ -1017,7 +1017,7 @@ if __name__ == "__main__":
     uvicorn.run(
         "ggbot:app",
         host="0.0.0.0",
-        port=8001,  # Different port from main_api.py
+        port=8000,  # Same port as nginx expects
         reload=True,
         log_level="info"
     )
