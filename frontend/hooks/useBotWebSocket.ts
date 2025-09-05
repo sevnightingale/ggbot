@@ -31,17 +31,11 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
         
         if (!isMounted) return undefined // Component unmounted during load
         
-        // Determine WebSocket URL
+        // Determine WebSocket URL - always use production
         let finalWsUrl = wsUrl
         if (!finalWsUrl) {
-          const apiUrl = process.env.NEXT_PUBLIC_API_URL
-          if (apiUrl?.includes('localhost')) {
-            finalWsUrl = `ws://localhost:8001/ws/bot-status/${userId}`
-          } else {
-            // For production, use wss protocol
-            const host = apiUrl?.replace(/^https?:\/\//, '') || window.location.host
-            finalWsUrl = `wss://${host}/ws/bot-status/${userId}`
-          }
+          // Always use production WebSocket URL
+          finalWsUrl = `wss://ggbots-api.nightingale.business/ws/bot-status/${userId}`
         }
 
         // Connect to WebSocket with demo message callback
