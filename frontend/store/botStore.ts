@@ -5,7 +5,7 @@ import { apiClient } from '@/lib/api'
 // Helper functions for V2 API data transformation
 function extractStrategyFromConfig(configData: any): string {
   // Try to determine strategy from decision prompt or config type
-  const userPrompt = configData.decision?.user_prompt?.toLowerCase() || ''
+  const userPrompt = configData?.decision?.user_prompt?.toLowerCase() || ''
   if (userPrompt.includes('rsi')) return 'meanrev'
   if (userPrompt.includes('macd') || userPrompt.includes('trend')) return 'trend'
   if (userPrompt.includes('momentum') || userPrompt.includes('breakout')) return 'momentum'
