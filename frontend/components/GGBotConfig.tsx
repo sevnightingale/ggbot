@@ -358,7 +358,46 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
         // Load existing config if editing
         if (bot?.config_id) {
           const config = await apiClient.getConfig(bot.config_id)
-          setConfigData(config.config_data)
+          // Ensure loaded config has all required fields with defaults
+          const defaultConfig = createDefaultConfigData()
+          const mergedConfig = {
+            ...defaultConfig,
+            ...config.config_data,
+            // Ensure nested objects are properly merged
+            llm_config: {
+              ...defaultConfig.llm_config,
+              ...config.config_data.llm_config
+            },
+            trading: {
+              ...defaultConfig.trading,
+              ...config.config_data.trading,
+              position_sizing: {
+                ...defaultConfig.trading.position_sizing,
+                ...config.config_data.trading?.position_sizing
+              },
+              risk_management: {
+                ...defaultConfig.trading.risk_management,
+                ...config.config_data.trading?.risk_management
+              },
+              exchange_config: {
+                ...defaultConfig.trading.exchange_config,
+                ...config.config_data.trading?.exchange_config
+              }
+            },
+            telegram_integration: {
+              ...defaultConfig.telegram_integration,
+              ...config.config_data.telegram_integration,
+              listener: {
+                ...defaultConfig.telegram_integration.listener,
+                ...config.config_data.telegram_integration?.listener
+              },
+              publisher: {
+                ...defaultConfig.telegram_integration.publisher,
+                ...config.config_data.telegram_integration?.publisher
+              }
+            }
+          }
+          setConfigData(mergedConfig)
           setBotName(config.config_name)
         } else {
           // New bot - use defaults
