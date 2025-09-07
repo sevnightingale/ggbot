@@ -1,2 +1,7 @@
-export DEVELOPMENT_MODE=true
-python -m tests.test_full_e2e_integration
+1) yes, it should be. ggbots-api.nightingale.business should be set up and working for our actual pm2 service API calls. We should test this maybe. We could create a simple /test page in our frontend to ggbots.ai/test to test all relevant API calls. This is probably a good idea actually. 
+2) We can switch to proper auth, let's get this working properly, I will log in as a real user, I want to interact with te app as a real user. No development mode, no bypassing. 
+3) Idk, actually we need to figure out how to update your postgres mcp tool to use supabase instead (it's currenlty set up with our legacy, managed postgres), idk if that's possible but we need a way for you to check the database for me. Let's figure that out together. 
+4) let's focus on everythign being manual for now, without a schedule. We'll add the orchestartion and scheduling in once we know everythign works properly. We should be able to verify that the tools and buttons and workflows that we WOULD use to turn on and off a ggbot are functional though, like that we can verify the state change or database change, so we can confrim the status of a ggbot, but that status doesn't actually correlate to a scheduling system yet... I just want to spend more time thinking through the nuances of scheduling an intervals before we turn that on fully. 
+5) You need to verify this. I'm not sure yet. We need to do a full review. 
+
+Ok please investigate the items needing further investigate, and let's come up with a plan to address everything, let me know what additonal questions you have for me and any steps you will need me to complete on my end. 

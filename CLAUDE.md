@@ -124,14 +124,6 @@ async with create_indicators_session() as session:
 - **MCP tests**: Tool connectivity and reliability
 - **API tests**: Endpoint functionality
 
-## Current Development Context
-
-### Active Work
-- **Test #3**: Running with 0.65 threshold on reverted July 31st decision engine
-- **Branch Structure**: 
-  - `main`: Stable Test #2 framework 
-  - `dev`: Rebuild environment for extraction/decision/trading overhaul
-
 ### Key Infrastructure Components
 
 **MCP (Model Context Protocol) Servers**
