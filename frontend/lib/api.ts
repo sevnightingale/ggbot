@@ -131,11 +131,12 @@ export interface DataPoint {
 
 export interface UserProfile {
   user_id: string
-  subscription_tier: string
-  subscription_status: string
+  subscription_tier: 'free' | 'ggbase'
+  subscription_status: 'active' | 'cancelled' | 'past_due'
   can_use_premium_features: boolean
   requires_own_llm_keys: boolean
   can_publish_telegram_signals: boolean
+  can_use_signal_validation: boolean
   paid_data_points: string[]
 }
 

@@ -28,7 +28,7 @@ Extends Supabase auth.users with business model fields
 | Column | Type | Nullable | Default | Description |
 |--------|------|----------|---------|-------------|
 | `user_id` | UUID | NO | - | Primary key, references auth.users(id) |
-| `subscription_tier` | subscription_tier | YES | 'free' | Subscription level (free, signals) |
+| `subscription_tier` | subscription_tier | YES | 'free' | Subscription level (free, ggbase) |
 | `subscription_status` | subscription_status | YES | 'active' | Status (active, cancelled, past_due) |
 | `subscription_expires_at` | TIMESTAMPTZ | YES | - | Subscription expiration timestamp |
 | `stripe_customer_id` | VARCHAR(100) | YES | - | Stripe customer identifier |
@@ -359,7 +359,7 @@ System logging (inherited from existing system)
 
 ```sql
 -- Subscription management
-CREATE TYPE subscription_tier AS ENUM ('free', 'signals');
+CREATE TYPE subscription_tier AS ENUM ('free', 'ggbase');
 CREATE TYPE subscription_status AS ENUM ('active', 'cancelled', 'past_due');
 ```
 
