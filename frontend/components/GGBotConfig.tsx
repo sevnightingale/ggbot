@@ -77,6 +77,7 @@ const allDataSources = [
   'onchain_analytics'
 ]
 
+
 interface DataSourceSectionProps {
   dataSources: DataSource[]
   selectedDataPoints: string[]  // Now contains data point names, not IDs
