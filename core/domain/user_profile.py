@@ -15,7 +15,7 @@ import uuid
 class SubscriptionTier(Enum):
     """Available subscription tiers for the freemium business model."""
     FREE = "free"      # Free tier: paper trading with user's LLM keys
-    GGBASE = "ggbase"  # Paid tier: hosted LLM + Telegram signal publishing
+    GGBASE = "ggBase"  # Paid tier: hosted LLM + Telegram signal publishing
 
 
 class SubscriptionStatus(Enum):
