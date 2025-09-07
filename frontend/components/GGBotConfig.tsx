@@ -397,6 +397,18 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
               }
             }
           }
+          // Debug: Log what we loaded vs what we're setting
+          console.log('🔍 Loaded config from API:', {
+            config_type: config.config_data.config_type,
+            schema_version: config.config_data.schema_version,
+            raw_config_data: config.config_data
+          })
+          console.log('🔄 Merged config result:', {
+            config_type: mergedConfig.config_type,
+            schema_version: mergedConfig.schema_version,
+            mergedConfig
+          })
+          
           setConfigData(mergedConfig)
           setBotName(config.config_name)
         } else {
