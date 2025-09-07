@@ -88,15 +88,19 @@ export default function TestPage() {
 
   // API call helper with auth
   const apiCall = async (method: string, endpoint: string, body?: unknown) => {
-    const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}${endpoint}`, {
+    const options: RequestInit = {
       method,
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${token}`
-      },
-      ...(body && { body: JSON.stringify(body) })
-    })
+      }
+    }
 
+    if (body) {
+      options.body = JSON.stringify(body)
+    }
+
+    const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}${endpoint}`, options)
     const data = await response.json()
     return { status: response.status, data }
   }
