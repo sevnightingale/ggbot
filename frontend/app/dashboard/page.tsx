@@ -8,6 +8,7 @@ import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase'
+import type { User } from '@supabase/supabase-js'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
 
@@ -57,8 +58,12 @@ export default function DashboardPage() {
   const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
   const [isLoadingBotData, setIsLoadingBotData] = React.useState(false)
 
+  // Supabase client and router for logout
+  const supabase = createClient()
+  const router = useRouter()
+
   // Real Supabase auth integration
-  const [user, setUser] = React.useState<any>(null)
+  const [user, setUser] = React.useState<User | null>(null)
   const [isLoadingAuth, setIsLoadingAuth] = React.useState(true)
   
   // Get current user from Supabase
@@ -69,13 +74,9 @@ export default function DashboardPage() {
       setIsLoadingAuth(false)
     }
     getUser()
-  }, [])
+  }, [supabase.auth])
   
   const userId = user?.id
-  
-  // Supabase client and router for logout
-  const supabase = createClient()
-  const router = useRouter()
   
   // Zustand store hooks
   const { 
@@ -95,11 +96,11 @@ export default function DashboardPage() {
   }, [loadBots, userId])
   
   // Get user's bots and selected bot
-  const userBots = getBotsByUser(userId)
+  const userBots = userId ? getBotsByUser(userId) : []
   const selectedBotData = selectedConfigId ? getBotById(selectedConfigId) : null
   
   // WebSocket connection for real-time updates (no demo message handler)
-  const { isLoadingBots } = useBotWebSocket(userId)
+  const { isLoadingBots } = useBotWebSocket(userId || '')
   
   // Auto-select first bot if none selected and bots exist
   React.useEffect(() => {
@@ -211,7 +212,9 @@ export default function DashboardPage() {
 
   const handleConfigSaved = (configId: string) => {
     // Reload bots to get the newly created one
-    loadBots(userId)
+    if (userId) {
+      loadBots(userId)
+    }
     // Select the newly created bot
     setSelectedConfigId(configId)
   }
