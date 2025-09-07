@@ -4,16 +4,15 @@
   "selected_pair": "BTC/USDT",
   
   "extraction": {
-    "data_sources": {
-      "technical_indicators": [
-        "RSI_5m", "RSI_15m", "RSI_30m", "RSI_1h", "RSI_4h", "RSI_1d", "RSI_1w",
-        "MACD_5m", "MACD_15m", "MACD_30m", "MACD_1h", "MACD_4h", "MACD_1d", "MACD_1w"
-      ],
-      "fundamental_analysis": [],
-      "sentiment_and_trends": [],
-      "influencer_kol": [],
-      "news_and_regulations": [],
-      "onchain_analytics": []
+    "selected_data_sources": {
+      "technical_analysis": {
+        "data_points": ["RSI", "MACD", "SMA", "EMA", "BB"],
+        "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+      },
+      "signals_group_chats": {
+        "data_points": ["ggShot"],
+        "timeframes": ["1h"]
+      }
     }
   },
   

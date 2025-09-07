@@ -125,8 +125,11 @@
    - ✅ Component height increased to 90vh for better user experience
    - ✅ Custom CSS slider styling with agent-trading orange theming
    
-2. **E2E Pipeline Validation** - ✅ **COMPLETED** (2025-09-07)
+2. **Multi-Timeframe E2E Pipeline** - ✅ **COMPLETED** (2025-09-07)
    - ✅ Full Extraction → Decision → Trading pipeline operational
+   - ✅ **Multi-Timeframe Architecture**: Extraction runs across 7 timeframes (5m, 15m, 30m, 1h, 4h, 1d, 1w)
+   - ✅ **Rich Decision Context**: Decision engine receives consolidated data from all timeframes
+   - ✅ **Enhanced LLM Prompts**: GPT-5 gets comprehensive market analysis across timeframes
    - ✅ GPT-5 integration with Responses API for trading decisions  
    - ✅ Real market data processing with 21 technical indicators
    - ✅ Database persistence for decisions and orchestration results
@@ -173,6 +176,68 @@
 | **22** | SSH | Public | Remote access |
 | **80** | HTTP | Public | Web server |
 | **443** | HTTPS | Public | Secure web server |
+
+---
+
+## 🎯 Multi-Timeframe Architecture (V2.1)
+
+### **Enhanced Trading Pipeline** 
+**Latest Update**: 2025-09-07 - Complete multi-timeframe implementation
+
+#### **Configuration Structure**
+```json
+{
+  "extraction": {
+    "selected_data_sources": {
+      "technical_analysis": {
+        "data_points": ["RSI", "MACD", "BB", "EMA", "SMA"],
+        "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+      }
+    }
+  }
+}
+```
+
+#### **Data Flow Architecture**
+```
+Configuration → Orchestrator → V2 Extraction (7 timeframes) → Market Data (7 rows)
+                                         ↓
+Decision Engine → Multi-timeframe Query → Consolidated Data → Rich LLM Context
+                                         ↓
+GPT-5 Analysis → Trading Decision → Paper Trading Execution
+```
+
+#### **Market Data Storage Pattern**
+- **Separate Rows**: Each timeframe stored as individual `market_data` record
+- **Config Association**: All rows linked to `config_id` for user isolation  
+- **Rich Data**: V2 preprocessors provide sophisticated analysis per timeframe
+- **Decision Consolidation**: Engine queries all timeframes and organizes by timeframe
+
+#### **LLM Prompt Enhancement**
+```
+MARKET ANALYSIS FOR BTC/USDT
+Current Price: $110,984.20
+Timeframes Available: 5m, 15m, 30m, 1h, 4h, 1d, 1w
+
+=== 5M TIMEFRAME ===
+  RSI:
+    Current Value: 54.2
+    Trend: falling
+    Zone: neutral
+    
+=== 1H TIMEFRAME ===
+  RSI:
+    Current Value: 48.7  
+    Trend: sideways
+    Zone: approaching_oversold
+```
+
+**Benefits Achieved**:
+- ✅ Decision engine gets rich context across 7 timeframes
+- ✅ LLM can analyze short-term vs long-term trends  
+- ✅ User prompts can reference specific timeframes naturally
+- ✅ Storage remains clean and queryable per timeframe
+- ✅ Configuration is intuitive ("RSI" = all 7 timeframes)
 
 ---
 
