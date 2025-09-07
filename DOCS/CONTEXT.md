@@ -12,3 +12,70 @@ Additionally, ggShot signal itself is unique. It's not a feature for paid users 
 issue 2 (see image): 
 
 I think we removed the risk management content becasue paper trading doesn't have any actual options here. we'll add this back in later.. so for now maybe we should just remove that section and default to the position sizing section. 
+
+
+
+For perfect two-way syncing, the API should return the raw config_data JSONB structure -
+   no flattening.
+
+  Why This Makes Most Sense:
+
+  Database → Frontend (Reading)
+
+  // Database stores:
+  config_data: {
+    selected_pair: "BTC/USDT",
+    extraction: {...},
+    decision: {...}
+  }
+
+  // API returns exactly that:
+  {
+    config_id: "abc-123",
+    config_name: "My ggbot",
+    config_data: {              // ← Same structure as database
+      selected_pair: "BTC/USDT",
+      extraction: {...},
+      decision: {...}
+    }
+  }
+
+  // Frontend gets exactly what's in database - perfect sync!
+
+  Frontend → Database (Writing)
+
+  // User edits form, frontend has:
+  configData = {
+    selected_pair: "ETH/USDT",  // User changed this
+    extraction: {...},
+    decision: {...}
+  }
+
+  // Frontend sends to API:
+  PUT /api/v2/config/abc-123
+  {
+    config_data: configData     // ← Exact same structure
+  }
+
+  // API stores directly into database:
+  UPDATE configurations
+  SET config_data = {received_config_data}
+  WHERE config_id = 'abc-123'
+
+  Perfect Sync Benefits:
+
+  1. No data transformation = no chance for sync bugs
+  2. What you see is what's stored = perfect fidelity
+  3. Frontend form state = database state = always in sync
+  4. No flattening/nesting conversions = simpler code
+
+  The Fix:
+
+  Update the backend BotConfigV2.to_dict() to return the raw config_data JSONB instead of
+  flattening it. The frontend component already expects this structure, so it would work
+  perfectly.
+
+  This approach ensures 100% sync between form state and database state with zero
+  transformation overhead.
+
+  Does this make sense? Should I update the backend to return raw config_data?

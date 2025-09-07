@@ -42,16 +42,18 @@ class BotConfigV2:
         self.updated_at = updated_at or datetime.now()
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for storage."""
+        """Convert to dictionary for API response - returns raw config_data JSONB structure."""
         return {
             "config_id": self.config_id,
             "user_id": self.user_id,
             "config_name": self.config_name,
-            "selected_pair": self.selected_pair,
-            "extraction": self.extraction,
-            "decision": self.decision,
-            "trading": self.trading,
-            "telegram_integration": self.telegram_integration,
+            "config_data": {
+                "selected_pair": self.selected_pair,
+                "extraction": self.extraction,
+                "decision": self.decision,
+                "trading": self.trading,
+                "telegram_integration": self.telegram_integration,
+            },
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
