@@ -588,6 +588,14 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
     setError(null)
     
     try {
+      // Debug: Log what we're sending
+      console.log('🔧 Saving config with data:', {
+        botName,
+        config_type: configData.config_type,
+        schema_version: configData.schema_version,
+        configData
+      })
+      
       let savedConfig: BotConfiguration
       
       if (bot?.config_id) {
@@ -834,70 +842,54 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                 </div>
               ) : (
                 <>
-                  {/* ggbot Type Selection - Horizontal Layout */}
+                  {/* ggbot Type Toggle - Sliding Switch */}
                   <div className="mb-6">
-                    <div className="mb-3">
-                      <h4 className="text-footnote text-bone-200 font-medium">ggbot TYPE</h4>
+                    <h4 className="text-footnote text-bone-200 font-medium mb-4">ggbot TYPE</h4>
+                    
+                    <div className="flex items-center gap-6">
+                      <span className={`text-sm transition-colors duration-200 ${configData.config_type === 'autonomous_trading' ? 'text-bone-200 font-medium' : 'text-gray-500'}`}>
+                        Autonomous Trading
+                      </span>
+                      
+                      {/* Sliding Switch */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (configData.config_type === 'autonomous_trading' && userProfile?.can_use_signal_validation) {
+                            updateConfigData(prev => ({ ...prev, config_type: 'signal_validation' }))
+                          } else if (configData.config_type === 'signal_validation') {
+                            updateConfigData(prev => ({ ...prev, config_type: 'autonomous_trading' }))
+                          } else if (!userProfile?.can_use_signal_validation) {
+                            alert('Signal Validation requires an upgraded plan')
+                          }
+                        }}
+                        className="relative w-20 h-10 rounded-full bg-charcoal-700 shadow-[inset_4px_4px_8px_rgba(0,0,0,0.8),inset_-2px_-2px_4px_rgba(255,255,255,0.05)] transition-all duration-300 hover:bg-charcoal-600"
+                      >
+                        {/* Sliding Thumb */}
+                        <div className={`absolute top-1 w-8 h-8 rounded-full bg-gradient-to-br from-bone-200 to-bone-300 shadow-[2px_2px_4px_rgba(0,0,0,0.8),-1px_-1px_2px_rgba(255,255,255,0.1)] transition-all duration-300 ${
+                          configData.config_type === 'signal_validation' ? 'translate-x-10' : 'translate-x-1'
+                        }`} />
+                        
+                        {/* Subtle accent when active */}
+                        {configData.config_type === 'signal_validation' && (
+                          <div className="absolute inset-0 rounded-full bg-gradient-to-r from-transparent via-agent-extraction/10 to-agent-extraction/20 transition-opacity duration-300" />
+                        )}
+                      </button>
+                      
+                      <span className={`text-sm transition-colors duration-200 ${configData.config_type === 'signal_validation' ? 'text-bone-200 font-medium' : 'text-gray-500'} ${!userProfile?.can_use_signal_validation ? 'opacity-50' : ''}`}>
+                        Signal Validation 
+                        {!userProfile?.can_use_signal_validation && (
+                          <span className="ml-1 text-orange-400 text-xs">⚡</span>
+                        )}
+                      </span>
                     </div>
                     
-                    {/* Horizontal Radio Options */}
-                    <div className="flex gap-4">
-                      {/* Autonomous Trading Option */}
-                      <label className="flex-1 cursor-pointer">
-                        <div className="flex items-center gap-3 mb-2">
-                          <input
-                            type="radio"
-                            name="config_type"
-                            value="autonomous_trading"
-                            checked={configData.config_type === 'autonomous_trading'}
-                            onChange={(e) => {
-                              updateConfigData(prev => ({
-                                ...prev,
-                                config_type: e.target.value
-                              }))
-                            }}
-                            className="w-4 h-4 text-blue-500 focus:ring-blue-500"
-                          />
-                          <div className="text-xs text-bone-200 font-medium">Autonomous Trading</div>
-                        </div>
-                        <div className="text-xs text-gray-400 ml-7">
-                          AI makes trading decisions automatically based on market analysis
-                        </div>
-                      </label>
-
-                      {/* Signal Validation Option */}
-                      <label className={`flex-1 ${!userProfile?.can_use_signal_validation ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                        <div className="flex items-center gap-3 mb-2">
-                          <input
-                            type="radio"
-                            name="config_type"
-                            value="signal_validation"
-                            checked={configData.config_type === 'signal_validation'}
-                            onChange={(e) => {
-                              if (userProfile?.can_use_signal_validation) {
-                                updateConfigData(prev => ({
-                                  ...prev,
-                                  config_type: e.target.value
-                                }))
-                              } else {
-                                // Show upgrade modal
-                                alert('Signal Validation requires an upgraded plan')
-                              }
-                            }}
-                            disabled={!userProfile?.can_use_signal_validation}
-                            className="w-4 h-4 text-blue-500 focus:ring-blue-500"
-                          />
-                          <div className="text-xs text-bone-200 font-medium">
-                            Signal Validation
-                            {!userProfile?.can_use_signal_validation && (
-                              <span className="ml-2 text-orange-400">(Upgrade Required)</span>
-                            )}
-                          </div>
-                        </div>
-                        <div className="text-xs text-gray-400 ml-7">
-                          Validate and analyze signals from external sources like ggShot
-                        </div>
-                      </label>
+                    {/* Description based on current selection */}
+                    <div className="mt-3 text-xs text-gray-400">
+                      {configData.config_type === 'autonomous_trading' 
+                        ? 'AI makes trading decisions automatically based on market analysis'
+                        : 'Validate and analyze signals from external sources like ggShot'
+                      }
                     </div>
                   </div>
 
