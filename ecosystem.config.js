@@ -13,7 +13,7 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',
-        DEVELOPMENT_MODE: 'true',
+        DEVELOPMENT_MODE: 'false',
         HBOT_USERNAME: 'sev',
         HBOT_PASSWORD: '7nyhi93cT0Ow2X7S'
       },

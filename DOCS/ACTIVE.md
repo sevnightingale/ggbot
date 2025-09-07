@@ -1,8 +1,8 @@
 # 🚀 ACTIVE - GGBots System Status
 
-**Last Updated**: 2025-09-03  
+**Last Updated**: 2025-09-07  
 **System Health**: 🟢 Operational  
-**V2 Architecture**: Phase 7 Frontend-Backend Integration ✅ Complete
+**V2 Architecture**: Phase 8 Full E2E Pipeline ✅ Complete
 
 ---
 
@@ -10,6 +10,7 @@
 - ✅ **Phase 1: Supabase Migration** - Multi-user database with RLS, auth utilities, 15 tables deployed
 - ✅ **Phase 2: V2 Extraction System** - 21 preprocessors, 12x performance improvement, pandas-ta integration
 - ✅ **Phase 7: Frontend-Backend Integration** - Dashboard connected to V2 API, mock auth, full data flow
+- ✅ **Phase 8: Full E2E Pipeline** - Complete Extraction → Decision → Trading pipeline with GPT-5 integration
 
 ---
 
@@ -18,17 +19,29 @@
 ### Production API Endpoints
 | Service | Internal Port | Public URL | SSL | Purpose |
 |---------|--------------|------------|-----|---------|
-| **V2 Orchestrator** | `localhost:8001` | TBD | ✅ | V2 backend with Supabase auth |
-| **ggbots-api** | `localhost:8000` | `https://ggbots-api.nightingale.business` | ✅ | V1 backend API |
+| **V2 Orchestrator** | `localhost:8000` | `https://ggbots-api.nightingale.business` | ✅ | V2 backend with Supabase auth |
 | **Frontend** | N/A | `https://ggbot-app.vercel.app` | ✅ | Next.js application |
 
-### Active API Calls (Most Used)
+### Active API Calls (V2 Endpoints)
 
-**Bot Control** (Currently placeholder - will rebuild)
-- `GET /agent/api/bots` - List all bots for a user (frontend loads on mount)
-- `POST /agent/api/bots/{config_id}/start` - Start bot (with optional `demo_mode`)
-- `POST /agent/api/bots/{config_id}/stop` - Stop bot
-- `WS /ws/bot-status/{user_id}` - WebSocket placeholder (monitoring removed)
+**Configuration Management**
+- `GET /api/v2/config` - List all bot configurations for user
+- `POST /api/v2/config` - Create new bot configuration
+- `GET /api/v2/config/{config_id}` - Get specific configuration
+- `PUT /api/v2/config/{config_id}` - Update configuration
+- `DELETE /api/v2/config/{config_id}` - Delete configuration
+
+**Bot Control & Orchestration**
+- `POST /api/v2/orchestrate/{config_id}` - Run full E2E trading cycle
+- `POST /api/v2/bot/{config_id}/start` - Start bot (placeholder)
+- `POST /api/v2/bot/{config_id}/stop` - Stop bot (placeholder)
+- `GET /api/v2/bot/{config_id}/status` - Get bot status
+- `WS /ws/bot-status/{user_id}` - WebSocket for real-time updates
+
+**Bot Data & Analytics**
+- `GET /api/v2/bot/{config_id}/metrics` - Performance metrics
+- `GET /api/v2/bot/{config_id}/positions` - Live positions
+- `GET /api/v2/bot/{config_id}/trades` - Trade history
 
 **Trading Data**
 - `GET /api/live-position-data` - Fetch current positions with P&L (frontend polls every 15s)
@@ -63,7 +76,7 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|---------|---------|
-| ggbots-api | 🟢 Online | 0% | 200MB | Main API server (FastAPI) |
+| ggbot | 🟢 Online | 0% | 213MB | V2 Orchestrator API server (ggbot.py) |
 | ccxt-mcp-server | 🟢 Online | 0% | 5MB | Crypto price/data provider |
 | ggshot-filter | 🟢 Online | 0% | 25MB | Signal filtering service |
 
@@ -112,11 +125,12 @@
    - ✅ Component height increased to 90vh for better user experience
    - ✅ Custom CSS slider styling with agent-trading orange theming
    
-2. **Next Phase: Backend Integration & Demo Fork**
-   - **Production Version**: Wire up real backend APIs, strip mock data
-   - **Demo Version**: Enhanced mock data for sales/marketing showcase
-   - Configuration persistence with save/load functionality
-   - Real-time validation and error handling from API responses
+2. **E2E Pipeline Validation** - ✅ **COMPLETED** (2025-09-07)
+   - ✅ Full Extraction → Decision → Trading pipeline operational
+   - ✅ GPT-5 integration with Responses API for trading decisions  
+   - ✅ Real market data processing with 21 technical indicators
+   - ✅ Database persistence for decisions and orchestration results
+   - ✅ E2E test suite: `tests/test_full_e2e_integration.py` - validates complete pipeline
    
 2. **Paper Trading Engine** - ✅ **PRODUCTION READY** (2025-08-27)
    - **Status**: **FULLY OPERATIONAL** - Complete paper trading system with Hummingbot integration
@@ -133,7 +147,7 @@
 ### Application Ports
 | Port | Service | Protocol | Access | Purpose |
 |------|---------|----------|--------|---------|
-| **8000** | ggbots-api | HTTP | Public | Main API server (extraction, decision, agent control) |
+| **8000** | V2 Orchestrator (ggbot.py) | HTTP | Public | Complete V2 API server with E2E pipeline |
 | **8080** | code-server | HTTP | Public | VSCode in browser (development environment) |
 
 ### Database Ports
@@ -182,8 +196,11 @@ pm2 list
 pm2 monit
 
 # Logs  
-pm2 logs ggbots-api
+pm2 logs ggbot
 pm2 logs ggshot-filter
+
+# E2E Testing
+python -m tests.test_full_e2e_integration
 
 # Resources
 htop
@@ -192,4 +209,4 @@ df -h
 
 ---
 
-*Last major update: V2 Architecture Phase 7 complete - Dashboard integrated with V2 orchestrator, Supabase auth, full frontend-backend data flow operational (2025-09-03)*
+*Last major update: V2 Architecture Phase 8 complete - Full E2E pipeline operational with GPT-5 decision engine, real market data extraction, paper trading integration (2025-09-07)*
