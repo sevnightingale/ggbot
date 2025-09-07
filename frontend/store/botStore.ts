@@ -4,7 +4,7 @@ import { apiClient } from '@/lib/api'
 
 // Helper functions for V2 API data transformation
 function extractStrategyFromConfig(configData: any): string {
-  // Try to determine strategy from decision prompt or config type
+  // Try to determine strategy from decision prompt (flat structure)
   const userPrompt = configData?.decision?.user_prompt?.toLowerCase() || ''
   if (userPrompt.includes('rsi')) return 'meanrev'
   if (userPrompt.includes('macd') || userPrompt.includes('trend')) return 'trend'
@@ -18,7 +18,7 @@ function extractCryptoFromPair(selectedPair: string): string {
 }
 
 function extractRiskLevel(configData: any): string {
-  // Determine risk level from trading configuration
+  // Determine risk level from trading configuration (flat structure)
   const leverage = configData.trading?.leverage || 1
   const accountPercent = configData.trading?.position_sizing?.account_percent || 5
   
@@ -364,9 +364,9 @@ export const useBotStore = create<BotStore>()(
             instance_name: configData.config_name || `Bot-${configData.config_id.slice(0, 8)}`,
             config_type: 'production', // V2 configs are production by default
             name: configData.config_name || `Bot-${configData.config_id.slice(0, 8)}`,
-            strategy: extractStrategyFromConfig(configData.config_data),
-            crypto: extractCryptoFromPair(configData.config_data.selected_pair),
-            riskLevel: extractRiskLevel(configData.config_data),
+            strategy: extractStrategyFromConfig(configData),
+            crypto: extractCryptoFromPair(configData.selected_pair),
+            riskLevel: extractRiskLevel(configData),
             status: {
               phase: 'inactive', // Will be updated via bot status endpoint
               color: 'gray',
