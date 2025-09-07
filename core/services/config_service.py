@@ -26,6 +26,9 @@ class BotConfigV2:
         extraction: Dict[str, Any],
         decision: Dict[str, Any], 
         trading: Dict[str, Any],
+        config_type: str = "autonomous_trading",
+        schema_version: str = "2.1",
+        llm_config: Optional[Dict[str, Any]] = None,
         telegram_integration: Optional[Dict[str, Any]] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
@@ -37,6 +40,9 @@ class BotConfigV2:
         self.extraction = extraction
         self.decision = decision
         self.trading = trading
+        self.config_type = config_type
+        self.schema_version = schema_version
+        self.llm_config = llm_config or {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}
         self.telegram_integration = telegram_integration or {}
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
@@ -48,10 +54,13 @@ class BotConfigV2:
             "user_id": self.user_id,
             "config_name": self.config_name,
             "config_data": {
+                "schema_version": self.schema_version,
+                "config_type": self.config_type,
                 "selected_pair": self.selected_pair,
                 "extraction": self.extraction,
                 "decision": self.decision,
                 "trading": self.trading,
+                "llm_config": self.llm_config,
                 "telegram_integration": self.telegram_integration,
             },
             "created_at": self.created_at.isoformat() if self.created_at else None,
@@ -69,6 +78,9 @@ class BotConfigV2:
             extraction=data["extraction"],
             decision=data["decision"],
             trading=data["trading"],
+            config_type=data.get("config_type", "autonomous_trading"),
+            schema_version=data.get("schema_version", "2.1"),
+            llm_config=data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
             telegram_integration=data.get("telegram_integration", {}),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
@@ -145,6 +157,9 @@ class ConfigService:
                 extraction=config_data.get("extraction", {}),
                 decision=config_data.get("decision", {}),
                 trading=config_data.get("trading", {}),
+                config_type=config_data.get("config_type", "autonomous_trading"),
+                schema_version=config_data.get("schema_version", "2.1"),
+                llm_config=config_data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                 telegram_integration=config_data.get("telegram_integration", {})
             )
             
@@ -223,6 +238,9 @@ class ConfigService:
                             "extraction": inner_config.get("extraction", {}),
                             "decision": inner_config.get("decision", {}),
                             "trading": inner_config.get("trading", {}),
+                            "config_type": inner_config.get("config_type", "autonomous_trading"),
+                            "schema_version": inner_config.get("schema_version", "2.1"),
+                            "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                             "telegram_integration": inner_config.get("telegram_integration", {}),
                             "created_at": result[1].isoformat() if result[1] else None,
                             "updated_at": result[2].isoformat() if result[2] else None
@@ -285,6 +303,9 @@ class ConfigService:
                                 "extraction": inner_config.get("extraction", {}),
                                 "decision": inner_config.get("decision", {}),
                                 "trading": inner_config.get("trading", {}),
+                                "config_type": inner_config.get("config_type", "autonomous_trading"),
+                                "schema_version": inner_config.get("schema_version", "2.1"),
+                                "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                                 "telegram_integration": inner_config.get("telegram_integration", {}),
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
@@ -345,6 +366,9 @@ class ConfigService:
                 extraction=config_data.get("extraction", existing_config.extraction),
                 decision=config_data.get("decision", existing_config.decision),
                 trading=config_data.get("trading", existing_config.trading),
+                config_type=config_data.get("config_type", existing_config.config_type),
+                schema_version=config_data.get("schema_version", existing_config.schema_version),
+                llm_config=config_data.get("llm_config", existing_config.llm_config),
                 telegram_integration=config_data.get("telegram_integration", existing_config.telegram_integration),
                 created_at=existing_config.created_at,
                 updated_at=datetime.now()
