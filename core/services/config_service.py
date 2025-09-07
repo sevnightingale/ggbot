@@ -211,17 +211,35 @@ class ConfigService:
                     
                     config_data = json.loads(result[0]) if isinstance(result[0], str) else result[0]
                     
-                    # Ensure config has required fields
-                    if "config_id" not in config_data:
-                        config_data["config_id"] = config_id
-                    if "user_id" not in config_data:
-                        config_data["user_id"] = user_id
-                    if "created_at" not in config_data and result[1]:
-                        config_data["created_at"] = result[1].isoformat()
-                    if "updated_at" not in config_data and result[2]:
-                        config_data["updated_at"] = result[2].isoformat()
+                    # Handle nested config_data structure
+                    if "config_data" in config_data:
+                        # New nested structure - extract the inner config_data
+                        inner_config = config_data["config_data"]
+                        flattened_config = {
+                            "config_id": config_id,
+                            "user_id": user_id,
+                            "config_name": config_data.get("config_name", "Untitled Bot"),
+                            "selected_pair": inner_config.get("selected_pair", "BTC/USDT"),
+                            "extraction": inner_config.get("extraction", {}),
+                            "decision": inner_config.get("decision", {}),
+                            "trading": inner_config.get("trading", {}),
+                            "telegram_integration": inner_config.get("telegram_integration", {}),
+                            "created_at": result[1].isoformat() if result[1] else None,
+                            "updated_at": result[2].isoformat() if result[2] else None
+                        }
+                    else:
+                        # Legacy flat structure - ensure required fields
+                        flattened_config = config_data.copy()
+                        if "config_id" not in flattened_config:
+                            flattened_config["config_id"] = config_id
+                        if "user_id" not in flattened_config:
+                            flattened_config["user_id"] = user_id
+                        if "created_at" not in flattened_config and result[1]:
+                            flattened_config["created_at"] = result[1].isoformat()
+                        if "updated_at" not in flattened_config and result[2]:
+                            flattened_config["updated_at"] = result[2].isoformat()
                     
-                    return BotConfigV2.from_dict(config_data)
+                    return BotConfigV2.from_dict(flattened_config)
                     
         except Exception as e:
             self._log.error(f"Failed to get config {config_id}: {e}")
@@ -255,17 +273,35 @@ class ConfigService:
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
                         
-                        # Ensure required fields
-                        config_data["config_id"] = config_id
-                        config_data["user_id"] = user_id
-                        if config_name and "config_name" not in config_data:
-                            config_data["config_name"] = config_name
-                        if created_at:
-                            config_data["created_at"] = created_at.isoformat()
-                        if updated_at:
-                            config_data["updated_at"] = updated_at.isoformat()
+                        # Extract config_data structure and flatten for from_dict
+                        if "config_data" in config_data:
+                            # New nested structure - extract the inner config_data
+                            inner_config = config_data["config_data"]
+                            flattened_config = {
+                                "config_id": config_id,
+                                "user_id": user_id,
+                                "config_name": config_name or config_data.get("config_name", "Untitled Bot"),
+                                "selected_pair": inner_config.get("selected_pair", "BTC/USDT"),
+                                "extraction": inner_config.get("extraction", {}),
+                                "decision": inner_config.get("decision", {}),
+                                "trading": inner_config.get("trading", {}),
+                                "telegram_integration": inner_config.get("telegram_integration", {}),
+                                "created_at": created_at.isoformat() if created_at else None,
+                                "updated_at": updated_at.isoformat() if updated_at else None
+                            }
+                        else:
+                            # Legacy flat structure - use as is
+                            flattened_config = config_data.copy()
+                            flattened_config["config_id"] = config_id
+                            flattened_config["user_id"] = user_id
+                            if config_name and "config_name" not in flattened_config:
+                                flattened_config["config_name"] = config_name
+                            if created_at:
+                                flattened_config["created_at"] = created_at.isoformat()
+                            if updated_at:
+                                flattened_config["updated_at"] = updated_at.isoformat()
                         
-                        configs.append(BotConfigV2.from_dict(config_data))
+                        configs.append(BotConfigV2.from_dict(flattened_config))
             
             self._log.info(f"Listed {len(configs)} configs for user {user_id}")
             return configs
