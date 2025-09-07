@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export default function TestPage() {
-  const [user, setUser] = useState<any>(null)
+  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
   const [token, setToken] = useState<string>('')
-  const [results, setResults] = useState<Record<string, any>>({})
+  const [results, setResults] = useState<Record<string, { success: boolean; status?: number; data?: unknown; error?: string }>>({})
   const [loading, setLoading] = useState(false)
 
   const supabase = createClient()
@@ -154,7 +154,10 @@ export default function TestPage() {
   )
 
   // Results display component
-  const ResultDisplay = ({ testName, result }: { testName: string; result: any }) => (
+  const ResultDisplay = ({ testName, result }: { 
+    testName: string; 
+    result: { success: boolean; status?: number; data?: unknown; error?: string }
+  }) => (
     <div className="border p-4 rounded mb-4">
       <h4 className="font-bold">{testName}</h4>
       {result.success ? (
