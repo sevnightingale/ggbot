@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export default function TestPage() {
-  const [user, setUser] = useState<{ id: string; email: string } | null>(null)
+  const [user, setUser] = useState<{ id: string; email?: string } | null>(null)
   const [token, setToken] = useState<string>('')
   const [results, setResults] = useState<Record<string, { success: boolean; status?: number; data?: unknown; error?: string }>>({})
   const [loading, setLoading] = useState(false)
@@ -143,7 +143,7 @@ export default function TestPage() {
       <h3 className="font-bold">Auth Status</h3>
       {user ? (
         <div>
-          <p>✅ Logged in as: {user.email}</p>
+          <p>✅ Logged in as: {user.email || 'No email'}</p>
           <p>🔑 User ID: {user.id}</p>
           <p>📝 Token: {token ? 'Present' : 'Missing'}</p>
         </div>
