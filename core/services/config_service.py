@@ -155,6 +155,10 @@ class ConfigService:
             # Store in database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    # Generate unique config_type by appending timestamp for multiple configs per user
+                    import time
+                    unique_config_type = f"autonomous_trading_{int(time.time())}"
+                    
                     cur.execute("""
                         INSERT INTO configurations 
                         (config_id, user_id, config_type, config_name, config_data, created_at, updated_at)
@@ -162,7 +166,7 @@ class ConfigService:
                     """, (
                         config_id,
                         user_id,
-                        "autonomous_trading",
+                        unique_config_type,
                         config_name,
                         json.dumps(config.to_dict())
                     ))

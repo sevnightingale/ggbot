@@ -434,7 +434,7 @@ export const useBotStore = create<BotStore>()(
         
         try {
           const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-          const response = await fetch(`${apiUrl}/api/v2/bot/${config_id}/start`, {
+          const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${config_id}/start`, {
             method: 'POST'
           })
           
@@ -457,7 +457,7 @@ export const useBotStore = create<BotStore>()(
         
         try {
           const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-          const response = await fetch(`${apiUrl}/api/v2/bot/${config_id}/stop`, {
+          const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${config_id}/stop`, {
             method: 'POST'
           })
           
@@ -479,14 +479,8 @@ export const useBotStore = create<BotStore>()(
         set({ isLoading: true, error: null })
         
         try {
-          const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-          const response = await fetch(`${apiUrl}/api/v2/bot/${config_id}/status`, {
-            method: 'DELETE'
-          })
-          
-          if (!response.ok) {
-            throw new Error(`Failed to delete bot: ${response.status}`)
-          }
+          // Use the correct config endpoint, not bot status endpoint
+          await apiClient.deleteConfig(config_id)
           
           get().removeBot(config_id)
           set({ isLoading: false })
