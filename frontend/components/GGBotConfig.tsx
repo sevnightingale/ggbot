@@ -57,7 +57,7 @@ const exchangeOptions = [
 
 interface DataSourceSectionProps {
   dataSources: DataSource[]
-  selectedDataPoints: string[]
+  selectedDataPoints: string[]  // Now contains data point names, not IDs
   onToggleDataPoint: (dataPointId: string) => void
   isLoading: boolean
 }
@@ -128,7 +128,7 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
             </h5>
             <div className="space-y-2">
               {source.data_points.map(dataPoint => {
-                const isSelected = selectedDataPoints.includes(dataPoint.data_point_id)
+                const isSelected = selectedDataPoints.includes(dataPoint.name) // Check by name, not ID
                 const canAccess = canAccessDataPoint(dataPoint)
                 const isLocked = dataPoint.is_locked
                 
@@ -218,6 +218,12 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
   const [dataSources, setDataSources] = React.useState<DataSource[]>([])
   const [userProfile, setUserProfile] = React.useState<UserProfile | null>(null)
   const [dataSourcesLoading, setDataSourcesLoading] = React.useState(true)
+
+  // State for credential management (separate from config data)
+  const [userCredentials, setUserCredentials] = React.useState<{ credential_name: string; provider: string; created_at: string }[]>([])
+  const [credentialInput, setCredentialInput] = React.useState<string>('')
+  const [savingCredential, setSavingCredential] = React.useState(false)
+  const [credentialError, setCredentialError] = React.useState<string | null>(null)
   
   // UI state
   const [tradingAgentTab, setTradingAgentTab] = React.useState('risk-management')
@@ -236,16 +242,18 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
       try {
         console.log('🔄 Starting API calls...')
         
-        // Load data sources and user profile in parallel
-        const [dataSourcesResponse, userProfileResponse] = await Promise.all([
+        // Load data sources, user profile, and credentials in parallel
+        const [dataSourcesResponse, userProfileResponse, credentialsResponse] = await Promise.all([
           apiClient.getDataSourcesWithPoints(),
-          apiClient.getUserProfile()
+          apiClient.getUserProfile(),
+          apiClient.listCredentials()
         ])
         
-        console.log('✅ API calls successful:', { dataSourcesResponse, userProfileResponse })
+        console.log('✅ API calls successful:', { dataSourcesResponse, userProfileResponse, credentialsResponse })
         
         setDataSources(dataSourcesResponse)
         setUserProfile(userProfileResponse)
+        setUserCredentials(credentialsResponse)
         
         // Load existing config if editing
         if (bot?.config_id) {
@@ -276,39 +284,107 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
     setHasChanges(true)
   }
 
-  // Get selected data points from config
+  // Get selected data points from config - now using data point names
   const selectedDataPoints = React.useMemo(() => {
-    const technicalIndicators = configData.extraction.data_sources.technical_indicators || []
-    const fundamentalAnalysis = configData.extraction.data_sources.fundamental_analysis || []
-    const sentimentTrends = configData.extraction.data_sources.sentiment_and_trends || []
-    const influencerKol = configData.extraction.data_sources.influencer_kol || []
-    const newsRegulations = configData.extraction.data_sources.news_and_regulations || []
-    const onchainAnalytics = configData.extraction.data_sources.onchain_analytics || []
+    const dataSources = configData.extraction.selected_data_sources
+    const allDataPoints: string[] = []
     
-    return [
-      ...technicalIndicators,
-      ...fundamentalAnalysis,
-      ...sentimentTrends,
-      ...influencerKol,
-      ...newsRegulations,
-      ...onchainAnalytics
-    ]
+    // Extract data point names from all data source categories
+    Object.values(dataSources).forEach(source => {
+      if (source && source.data_points) {
+        allDataPoints.push(...source.data_points)
+      }
+    })
+    
+    return allDataPoints
   }, [configData])
+
+  // Credential management functions
+  const handleSaveCredential = async () => {
+    if (!credentialInput.trim()) return
+
+    setCredentialError(null)
+    setSavingCredential(true)
+    
+    try {
+      await apiClient.storeCredential(configData.llm_config.provider, credentialInput.trim())
+      
+      // Reload credentials and reset input
+      const credentials = await apiClient.listCredentials()
+      setUserCredentials(credentials)
+      setCredentialInput('')
+      
+      // Update config to use own key
+      updateConfigData(prev => ({
+        ...prev,
+        llm_config: {
+          ...prev.llm_config,
+          use_own_key: true,
+          use_platform_keys: false
+        }
+      }))
+      
+    } catch (error) {
+      setCredentialError(error instanceof Error ? error.message : 'Failed to save credential')
+    } finally {
+      setSavingCredential(false)
+    }
+  }
+
+  // Check if user has credential for current provider
+  const hasCredentialForProvider = (provider: string): boolean => {
+    return userCredentials.some(cred => cred.provider === provider)
+  }
+
+  // Handle credential deletion
+  const handleDeleteCredential = async (provider: string) => {
+    try {
+      const credential = userCredentials.find(cred => cred.provider === provider)
+      if (credential) {
+        await apiClient.deleteCredential(credential.credential_name)
+        const credentials = await apiClient.listCredentials()
+        setUserCredentials(credentials)
+        
+        // If this was the current provider, switch back to platform keys
+        if (configData.llm_config.provider === provider) {
+          updateConfigData(prev => ({
+            ...prev,
+            llm_config: {
+              ...prev.llm_config,
+              use_own_key: false,
+              use_platform_keys: true
+            }
+          }))
+        }
+      }
+    } catch (error) {
+      console.error('Failed to delete credential:', error)
+    }
+  }
 
   // Handle data point selection
   const handleToggleDataPoint = (dataPointId: string) => {
     updateConfigData(prev => {
       const newConfig = { ...prev }
-      const configDataSources = newConfig.extraction.data_sources
+      
+      // Find the data point by ID to get its name and source
+      const dataPoint = dataSources
+        .flatMap(source => source.data_points)
+        .find(dp => dp.data_point_id === dataPointId)
+      
+      if (!dataPoint) return newConfig
       
       // Find which data source this data point belongs to
       const sourceInfo = dataSources.find(ds => 
         ds.data_points.some(dp => dp.data_point_id === dataPointId)
       )
       
+      if (!sourceInfo) return newConfig
+      
       // Map data source name to config category
-      const categoryMapping: Record<string, keyof typeof configDataSources> = {
-        'technical_indicators': 'technical_indicators',
+      const categoryMapping: Record<string, keyof typeof newConfig.extraction.selected_data_sources> = {
+        'technical_analysis': 'technical_analysis',
+        'signals_group_chats': 'signals_group_chats',
         'fundamental_analysis': 'fundamental_analysis', 
         'sentiment_and_trends': 'sentiment_and_trends',
         'influencer_kol': 'influencer_kol',
@@ -316,18 +392,34 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
         'onchain_analytics': 'onchain_analytics'
       }
       
-      // Determine category - default to technical_indicators if source not found
-      const category = sourceInfo ? categoryMapping[sourceInfo.name] || 'technical_indicators' : 'technical_indicators'
+      const category = categoryMapping[sourceInfo.name]
+      if (!category) return newConfig
       
-      // Check if already selected
-      const isCurrentlySelected = configDataSources[category].includes(dataPointId)
+      // Initialize the category if it doesn't exist
+      if (!newConfig.extraction.selected_data_sources[category]) {
+        newConfig.extraction.selected_data_sources[category] = {
+          data_points: [],
+          timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"] // Default all timeframes
+        }
+      }
+      
+      const categoryData = newConfig.extraction.selected_data_sources[category]!
+      const dataPointName = dataPoint.name
+      
+      // Check if already selected (by name)
+      const isCurrentlySelected = categoryData.data_points.includes(dataPointName)
       
       if (isCurrentlySelected) {
-        // Remove from category
-        configDataSources[category] = configDataSources[category].filter(id => id !== dataPointId)
+        // Remove data point name
+        categoryData.data_points = categoryData.data_points.filter(name => name !== dataPointName)
+        
+        // If no data points left, remove the entire category
+        if (categoryData.data_points.length === 0) {
+          delete newConfig.extraction.selected_data_sources[category]
+        }
       } else {
-        // Add to category
-        configDataSources[category] = [...configDataSources[category], dataPointId]
+        // Add data point name
+        categoryData.data_points = [...categoryData.data_points, dataPointName]
       }
       
       return newConfig
@@ -727,20 +819,20 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             <div className="bg-charcoal-800 border border-charcoal-600 p-3">
                               {selectedDataPoints.length > 0 ? (
                                 <div className="flex flex-wrap gap-2">
-                                  {selectedDataPoints.map(dataPointId => {
-                                    // Find the data point name from the data sources
+                                  {selectedDataPoints.map(dataPointName => {
+                                    // Find the data point by name to get its ID for removal
                                     const dataPoint = dataSources
                                       .flatMap(source => source.data_points)
-                                      .find(dp => dp.data_point_id === dataPointId)
+                                      .find(dp => dp.name === dataPointName)
                                     
                                     return (
                                       <span
-                                        key={dataPointId}
+                                        key={dataPointName}
                                         className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
                                       >
-                                        {dataPoint?.name || dataPointId}
+                                        {dataPointName}
                                         <button
-                                          onClick={() => handleToggleDataPoint(dataPointId)}
+                                          onClick={() => dataPoint && handleToggleDataPoint(dataPoint.data_point_id)}
                                           className="hover:bg-black/20 rounded"
                                         >
                                           <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
@@ -757,6 +849,19 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             </div>
                           </div>
 
+                          {/* Timeframes Info */}
+                          <div className="bg-blue-900/20 border border-blue-700/50 p-3 rounded">
+                            <div className="flex items-center gap-2">
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-blue-400">
+                                <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>
+                              </svg>
+                              <div>
+                                <div className="text-xs text-blue-400 font-medium">Multi-Timeframe Analysis</div>
+                                <div className="text-xs text-blue-300">All selected indicators analyzed across 7 timeframes (5m, 15m, 30m, 1h, 4h, 1d, 1w) for comprehensive market context</div>
+                              </div>
+                            </div>
+                          </div>
+
                           {/* Data Source Content */}
                           <DataSourceSection
                             dataSources={dataSources}
@@ -769,214 +874,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                     )}
                   </div>
 
-                  {/* LLM Configuration Section */}
-                  <div className="mb-8">
-                    {!expandedSections.has('llm') ? (
-                      <button
-                        onClick={() => toggleSection('llm')}
-                        className="w-full flex items-center justify-between p-6 bg-charcoal-900 relative transition-all duration-300 ggbot-accordion-btn cursor-pointer"
-                      >
-                        <h3 className="text-subheader text-bone-200 font-medium">LLM Configuration</h3>
-                        <span className="text-xl transition-transform duration-200" style={{ color: '#9333ea' }}>
-                          ▶
-                        </span>
-                      </button>
-                    ) : (
-                      <div className="bg-charcoal-900 relative ggbot-accordion-expanded">
-                        <div 
-                          onClick={() => toggleSection('llm')}
-                          className="flex items-center justify-between p-6 cursor-pointer border-b border-charcoal-600"
-                        >
-                          <h3 className="text-subheader text-bone-200 font-medium">LLM Configuration</h3>
-                          <span className="text-xl transition-transform duration-200 rotate-90" style={{ color: '#9333ea' }}>
-                            ▶
-                          </span>
-                        </div>
-                        <div className="p-6 space-y-6">
-                          {/* Tier Status */}
-                          <div>
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="text-footnote text-bone-200 font-medium">SUBSCRIPTION STATUS</h4>
-                            </div>
-                            <div className={`bg-charcoal-800 border p-4 rounded ${
-                              userProfile?.requires_own_llm_keys ? 'border-orange-600' : 'border-green-600'
-                            }`}>
-                              {userProfile?.requires_own_llm_keys ? (
-                                <div className="flex items-center gap-3">
-                                  <div className="w-3 h-3 rounded-full bg-orange-400" />
-                                  <div>
-                                    <div className="text-xs text-orange-400 font-medium">Free Tier - API Keys Required</div>
-                                    <div className="text-xs text-gray-400 mt-1">You need to provide your own LLM API keys. Upgrade to Base tier to use our managed keys.</div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="flex items-center gap-3">
-                                  <div className="w-3 h-3 rounded-full bg-green-400" />
-                                  <div>
-                                    <div className="text-xs text-green-400 font-medium">Paid Tier - Platform Keys Available</div>
-                                    <div className="text-xs text-gray-400 mt-1">You can use our managed LLM keys or provide your own for more control.</div>
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          </div>
-
-                          {/* Provider Selection */}
-                          <div>
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="text-footnote text-bone-200 font-medium">LLM PROVIDER</h4>
-                            </div>
-                            <div className="flex gap-2 flex-wrap mb-4">
-                              <button
-                                onClick={() => {
-                                  updateConfigData(prev => ({
-                                    ...prev,
-                                    llm_config: {
-                                      ...prev.llm_config,
-                                      provider: 'openai'
-                                    }
-                                  }))
-                                }}
-                                className={`px-3 py-1 text-xs rounded transition-colors ${
-                                  configData.llm_config.provider === 'openai'
-                                    ? 'bg-[#9333ea] text-white font-medium'
-                                    : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
-                                }`}
-                              >
-                                OpenAI GPT-4
-                              </button>
-                              <button
-                                onClick={() => {
-                                  updateConfigData(prev => ({
-                                    ...prev,
-                                    llm_config: {
-                                      ...prev.llm_config,
-                                      provider: 'deepseek'
-                                    }
-                                  }))
-                                }}
-                                className={`px-3 py-1 text-xs rounded transition-colors ${
-                                  configData.llm_config.provider === 'deepseek'
-                                    ? 'bg-[#9333ea] text-white font-medium'
-                                    : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
-                                }`}
-                              >
-                                DeepSeek R1
-                              </button>
-                            </div>
-                          </div>
-
-                          {/* API Key Configuration */}
-                          <div>
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="text-footnote text-bone-200 font-medium">API KEY CONFIGURATION</h4>
-                            </div>
-                            
-                            {!userProfile?.requires_own_llm_keys && (
-                              <div className="mb-4">
-                                <label className="flex items-center gap-2 cursor-pointer">
-                                  <input
-                                    type="checkbox"
-                                    checked={configData.llm_config.use_platform_keys}
-                                    onChange={(e) => {
-                                      updateConfigData(prev => ({
-                                        ...prev,
-                                        llm_config: {
-                                          ...prev.llm_config,
-                                          use_platform_keys: e.target.checked
-                                        }
-                                      }))
-                                    }}
-                                    className="w-4 h-4 accent-[#9333ea]"
-                                  />
-                                  <span className="text-xs text-bone-200">Use platform-managed API keys (recommended)</span>
-                                </label>
-                              </div>
-                            )}
-
-                            {(userProfile?.requires_own_llm_keys || !configData.llm_config.use_platform_keys) && (
-                              <div className="bg-charcoal-800 border border-charcoal-600 p-4 rounded space-y-4">
-                                {configData.llm_config.provider === 'openai' && (
-                                  <div>
-                                    <label className="block text-xs text-gray-400 mb-2">OpenAI API Key:</label>
-                                    <input
-                                      type="password"
-                                      value={configData.llm_config.openai_api_key || ''}
-                                      onChange={(e) => {
-                                        updateConfigData(prev => ({
-                                          ...prev,
-                                          llm_config: {
-                                            ...prev.llm_config,
-                                            openai_api_key: e.target.value
-                                          }
-                                        }))
-                                      }}
-                                      placeholder="sk-..."
-                                      className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-3 py-2 text-xs focus:border-[#9333ea] focus:outline-none transition-colors rounded"
-                                    />
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">OpenAI Platform</a>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {configData.llm_config.provider === 'deepseek' && (
-                                  <div>
-                                    <label className="block text-xs text-gray-400 mb-2">DeepSeek API Key:</label>
-                                    <input
-                                      type="password"
-                                      value={configData.llm_config.deepseek_api_key || ''}
-                                      onChange={(e) => {
-                                        updateConfigData(prev => ({
-                                          ...prev,
-                                          llm_config: {
-                                            ...prev.llm_config,
-                                            deepseek_api_key: e.target.value
-                                          }
-                                        }))
-                                      }}
-                                      placeholder="sk-..."
-                                      className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-3 py-2 text-xs focus:border-[#9333ea] focus:outline-none transition-colors rounded"
-                                    />
-                                    <div className="text-xs text-gray-500 mt-1">
-                                      Get your API key from <a href="https://platform.deepseek.com" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">DeepSeek Platform</a>
-                                    </div>
-                                  </div>
-                                )}
-
-                                {userProfile?.requires_own_llm_keys && (
-                                  <div className="bg-orange-900/20 border border-orange-700/50 p-3 rounded">
-                                    <div className="flex items-center gap-2">
-                                      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-orange-400">
-                                        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-                                      </svg>
-                                      <div>
-                                        <div className="text-xs text-orange-400 font-medium">API Key Required</div>
-                                        <div className="text-xs text-orange-300">You must provide your own LLM API key to use AI decision making. Consider upgrading to Base tier for managed keys.</div>
-                                      </div>
-                                    </div>
-                                  </div>
-                                )}
-                              </div>
-                            )}
-                          </div>
-
-                          {/* Security Notice */}
-                          <div className="bg-charcoal-800 border border-charcoal-700 p-3 rounded">
-                            <div className="flex items-center gap-2">
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" className="text-green-400">
-                                <path d="M12,1L3,5V11C3,16.55 6.84,21.74 12,23C17.16,21.74 21,16.55 21,11V5L12,1M10,17L6,13L7.41,11.59L10,14.17L16.59,7.58L18,9L10,17Z"/>
-                              </svg>
-                              <div>
-                                <div className="text-xs text-green-400 font-medium">Secure Storage</div>
-                                <div className="text-xs text-gray-400">All API keys are encrypted using Supabase Vault before storage.</div>
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
 
                   {/* Decision Agent Section */}
                   <div className="mb-8">
@@ -1042,6 +939,211 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                               <div className="mt-1">Using data points: <span className="text-bone-200">{selectedDataPoints.length} selected</span></div>
                               <div className="mt-1">Review frequency: <span className="text-bone-200">Every {frequencyOptions.find(f => f.value === configData.decision.analysis_frequency)?.label.toLowerCase()}</span></div>
                             </div>
+                          </div>
+
+                          {/* LLM Configuration - moved from separate section */}
+                          <div>
+                            <div className="flex items-center justify-between mb-4">
+                              <h4 className="text-footnote text-bone-200 font-medium">AI MODEL CONFIGURATION</h4>
+                            </div>
+                            
+                            {/* Tier Status */}
+                            <div className={`bg-charcoal-800 border p-3 rounded mb-4 ${
+                              userProfile?.requires_own_llm_keys ? 'border-orange-600' : 'border-green-600'
+                            }`}>
+                              {userProfile?.requires_own_llm_keys ? (
+                                <div className="flex items-center gap-3">
+                                  <div className="w-3 h-3 rounded-full bg-orange-400" />
+                                  <div>
+                                    <div className="text-xs text-orange-400 font-medium">Free Tier - Using DeepSeek R1</div>
+                                    <div className="text-xs text-gray-400 mt-1">You can add your own API key for better performance, or upgrade for premium models.</div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-3">
+                                  <div className="w-3 h-3 rounded-full bg-green-400" />
+                                  <div>
+                                    <div className="text-xs text-green-400 font-medium">Paid Tier - Premium Models Available</div>
+                                    <div className="text-xs text-gray-400 mt-1">You can use premium models or provide your own API key for more control.</div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Provider Selection */}
+                            <div className="space-y-3 mb-4">
+                              {[
+                                { id: 'deepseek', name: 'DeepSeek', note: 'Free' },
+                                { id: 'openai', name: 'OpenAI', note: 'GPT-4' },
+                                { id: 'anthropic', name: 'Anthropic', note: 'Claude' },
+                                { id: 'xai', name: 'xAI', note: 'Grok' },
+                                { id: 'google', name: 'Google', note: 'Gemini' }
+                              ].map(provider => (
+                                <label key={provider.id} className="flex items-center gap-3 cursor-pointer">
+                                  <input
+                                    type="radio"
+                                    name="llm_provider"
+                                    value={provider.id}
+                                    checked={configData.llm_config.provider === provider.id}
+                                    onChange={(e) => {
+                                      updateConfigData(prev => ({
+                                        ...prev,
+                                        llm_config: {
+                                          ...prev.llm_config,
+                                          provider: e.target.value,
+                                          use_platform_keys: e.target.value === 'deepseek' || (e.target.value === 'openai' && !userProfile?.requires_own_llm_keys),
+                                          use_own_key: false
+                                        }
+                                      }))
+                                    }}
+                                    className="w-4 h-4 text-agents-decision focus:ring-agents-decision"
+                                  />
+                                  <div className="flex items-center justify-between flex-1">
+                                    <div>
+                                      <div className="text-xs text-bone-200 font-medium">{provider.name}</div>
+                                      <div className="text-xs text-gray-400">{provider.note}</div>
+                                    </div>
+                                    {provider.id === 'deepseek' && (
+                                      <div className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-700">
+                                        Default
+                                      </div>
+                                    )}
+                                  </div>
+                                </label>
+                              ))}
+                            </div>
+
+                            {/* Additional Options for Selected Provider */}
+                            {configData.llm_config.provider === 'openai' && (
+                              <div className="bg-charcoal-800 border border-charcoal-600 p-4 rounded space-y-4 mb-4">
+                                {hasCredentialForProvider('openai') ? (
+                                  // User has saved OpenAI credential
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-green-400" />
+                                      <span className="text-xs text-green-400">Using your saved OpenAI API key</span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleDeleteCredential('openai')}
+                                      className="text-xs text-red-400 hover:underline"
+                                    >
+                                      Remove Key
+                                    </button>
+                                  </div>
+                                ) : userProfile?.requires_own_llm_keys ? (
+                                  // Free user - show upgrade OR add key
+                                  <div className="space-y-3">
+                                    <div className="flex items-center gap-3">
+                                      <button
+                                        disabled
+                                        className="px-4 py-2 bg-blue-600/50 text-blue-300 text-xs rounded cursor-not-allowed opacity-50"
+                                      >
+                                        Upgrade for Managed Keys
+                                      </button>
+                                      <span className="text-xs text-gray-400">OR</span>
+                                    </div>
+                                    
+                                    {/* API Key Input */}
+                                    <div className="space-y-3">
+                                      <div>
+                                        <label className="block text-xs text-gray-400 mb-2">Enter your OpenAI API Key:</label>
+                                        <input
+                                          type="password"
+                                          value={credentialInput}
+                                          onChange={(e) => setCredentialInput(e.target.value)}
+                                          placeholder="sk-..."
+                                          className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision focus:outline-none transition-colors rounded"
+                                        />
+                                      </div>
+                                      
+                                      {credentialError && (
+                                        <div className="text-xs text-red-400">{credentialError}</div>
+                                      )}
+                                      
+                                      <div className="flex items-center justify-between">
+                                        <div className="text-xs text-gray-500">
+                                          Get your API key from <a href="https://platform.openai.com/api-keys" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline">OpenAI Platform</a>
+                                        </div>
+                                        <button
+                                          onClick={handleSaveCredential}
+                                          disabled={!credentialInput.trim() || savingCredential}
+                                          className="px-3 py-2 bg-agents-decision text-charcoal-900 text-xs rounded hover:bg-agents-decision/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                        >
+                                          {savingCredential ? 'Saving...' : 'Save Key'}
+                                        </button>
+                                      </div>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  // Paid user - using managed keys with option to add own
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-green-400" />
+                                      <span className="text-xs text-green-400">Using managed OpenAI keys</span>
+                                    </div>
+                                    <button
+                                      onClick={() => setCredentialInput('')}
+                                      className="text-xs text-blue-400 hover:underline"
+                                    >
+                                      Add my own key instead
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            )}
+
+                            {/* Other providers that need API keys */}
+                            {['anthropic', 'xai', 'google'].includes(configData.llm_config.provider) && (
+                              <div className="bg-charcoal-800 border border-charcoal-600 p-4 rounded space-y-4 mb-4">
+                                {hasCredentialForProvider(configData.llm_config.provider) ? (
+                                  // User has saved credential for this provider
+                                  <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-2">
+                                      <div className="w-2 h-2 rounded-full bg-green-400" />
+                                      <span className="text-xs text-green-400">
+                                        Using your saved {configData.llm_config.provider === 'anthropic' ? 'Anthropic' : configData.llm_config.provider === 'xai' ? 'xAI' : 'Google'} API key
+                                      </span>
+                                    </div>
+                                    <button
+                                      onClick={() => handleDeleteCredential(configData.llm_config.provider)}
+                                      className="text-xs text-red-400 hover:underline"
+                                    >
+                                      Remove Key
+                                    </button>
+                                  </div>
+                                ) : (
+                                  // Need to add API key
+                                  <div className="space-y-3">
+                                    <div>
+                                      <label className="block text-xs text-gray-400 mb-2">
+                                        Enter your {configData.llm_config.provider === 'anthropic' ? 'Anthropic' : configData.llm_config.provider === 'xai' ? 'xAI' : 'Google'} API Key:
+                                      </label>
+                                      <input
+                                        type="password"
+                                        value={credentialInput}
+                                        onChange={(e) => setCredentialInput(e.target.value)}
+                                        placeholder="API key..."
+                                        className="w-full bg-charcoal-900 border border-charcoal-700 text-bone-200 px-3 py-2 text-xs focus:border-agents-decision focus:outline-none transition-colors rounded"
+                                      />
+                                    </div>
+                                    
+                                    {credentialError && (
+                                      <div className="text-xs text-red-400">{credentialError}</div>
+                                    )}
+                                    
+                                    <div className="flex justify-end">
+                                      <button
+                                        onClick={handleSaveCredential}
+                                        disabled={!credentialInput.trim() || savingCredential}
+                                        className="px-3 py-2 bg-agents-decision text-charcoal-900 text-xs rounded hover:bg-agents-decision/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                                      >
+                                        {savingCredential ? 'Saving...' : 'Save Key'}
+                                      </button>
+                                    </div>
+                                  </div>
+                                )}
+                              </div>
+                            )}
                           </div>
 
                           {/* Strategy Configuration */}

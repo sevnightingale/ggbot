@@ -1,48 +1,44 @@
 {
-  "schema_version": "1.0",
+  "schema_version": "2.1",
+  "config_type": "autonomous_trading",
   
   "selected_pair": "BTC/USDT",
   
   "extraction": {
     "selected_data_sources": {
       "technical_analysis": {
-        "data_points": ["RSI", "MACD", "SMA", "EMA", "BB"],
+        "data_points": ["RSI"],
         "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
-      },
-      "signals_group_chats": {
-        "data_points": ["ggShot"],
-        "timeframes": ["1h"]
       }
     }
   },
   
   "decision": {
     "analysis_frequency": "1h",
-    "system_prompt": "You are an expert cryptocurrency trader analyzing {SYMBOL} at current price {CURRENT_PRICE}. Your analysis is based on the following market data:\n\n{MARKET_DATA}\n\nProvide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.",
-    "user_prompt": "My trading strategy:\nEnter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods.\n\nCurrent market analysis:\n{MARKET_DATA}\n\nDecision: Based on the above data, should I ENTER, WAIT, or EXIT this position?"
+    "system_prompt": "You are an expert cryptocurrency trader analyzing {SYMBOL} at current price {CURRENT_PRICE}. Your analysis is based on the following market data:\\n\\n{MARKET_DATA}\\n\\nProvide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.",
+    "user_prompt": "If 1h RSI is below 40, enter long. If 1h RSI is above 60, enter short. Otherwise, wait."
   },
   
   "llm_config": {
-    "provider": "openai",
-    "use_platform_keys": false,
-    "openai_api_key": null,
-    "deepseek_api_key": null,
-    "anthropic_api_key": null
+    "provider": "deepseek",
+    "model": "deepseek-r1",
+    "use_platform_keys": true,
+    "use_own_key": false
   },
   
   "trading": {
     "execution_mode": "paper",
     "leverage": 1,
     "position_sizing": {
-      "method": "confidence_based",
+      "method": "fixed_usd",
       "fixed_amount_usd": 100,
       "account_percent": 5.0,
       "max_position_percent": 10.0
     },
     "risk_management": {
-      "max_positions": 5,
-      "default_stop_loss_percent": 3.0,
-      "default_take_profit_percent": 6.0,
+      "max_positions": 1,
+      "default_stop_loss_percent": 5.0,
+      "default_take_profit_percent": 10.0,
       "max_daily_loss_usd": 500
     },
     "exchange_config": {
@@ -68,7 +64,7 @@
       "confidence_threshold": 0.7,
       "include_reasoning": true,
       "include_market_context": true,
-      "message_template": "🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}"
+      "message_template": "🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\\n{REASONING}"
     }
   }
 }

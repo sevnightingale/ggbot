@@ -92,13 +92,35 @@ logger.bind(user_id="user_id").error("error details")
 ```
 
 ### Database Access
+
+**Note**: Direct PostgreSQL connections via MCP are not available due to IPv6 connectivity issues with Supabase. Use the Supabase REST API or Python client instead. Credentials are stored in `.env` file.
+
 ```python
+# Option 1: Direct PostgreSQL (when network allows)
 from core.common.db import get_db_connection
 
 with get_db_connection() as conn:
     with conn.cursor() as cur:
         cur.execute("SELECT * FROM table")
         results = cur.fetchall()
+
+# Option 2: Supabase REST API (recommended)
+import os
+import requests
+from dotenv import load_dotenv
+
+load_dotenv()
+url = os.getenv('SUPABASE_URL')
+key = os.getenv('SUPABASE_SERVICE_KEY')
+
+headers = {
+    'apikey': key,
+    'Authorization': f'Bearer {key}',
+    'Content-Type': 'application/json'
+}
+
+response = requests.get(f'{url}/rest/v1/table_name', headers=headers)
+data = response.json()
 ```
 
 ### MCP Integration Pattern

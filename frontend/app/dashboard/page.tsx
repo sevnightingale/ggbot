@@ -9,9 +9,7 @@ import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-// TODO: Add Supabase auth imports
-// import { useSupabaseAuth } from '@/hooks/useSupabaseAuth'
-// import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { apiClient } from '@/lib/api'
 
 export default function DashboardPage() {
   // Core state - selectedConfigId as single source of truth
@@ -59,12 +57,21 @@ export default function DashboardPage() {
   const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
   const [isLoadingBotData, setIsLoadingBotData] = React.useState(false)
 
-  // TODO: Add Supabase auth
-  // const { user, isLoading: isLoadingAuth } = useSupabaseAuth()
-  // const supabase = createClientComponentClient()
+  // Real Supabase auth integration
+  const [user, setUser] = React.useState<any>(null)
+  const [isLoadingAuth, setIsLoadingAuth] = React.useState(true)
   
-  // For now, use real Supabase user ID for Phase 7 testing - replace with real auth
-  const userId = "c81933d2-dd86-479d-97db-fad83465362f" // TODO: Replace with user.id from Supabase auth in Phase 5
+  // Get current user from Supabase
+  React.useEffect(() => {
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setIsLoadingAuth(false)
+    }
+    getUser()
+  }, [])
+  
+  const userId = user?.id
   
   // Supabase client and router for logout
   const supabase = createClient()
@@ -80,9 +87,11 @@ export default function DashboardPage() {
     loadBots
   } = useBotStore()
   
-  // Load bots from V2 API on mount
+  // Load bots from V2 API on mount (only when authenticated)
   React.useEffect(() => {
-    loadBots(userId) // Load bots from V2 API with current userId
+    if (userId) {
+      loadBots(userId) // Load bots from V2 API with current userId
+    }
   }, [loadBots, userId])
   
   // Get user's bots and selected bot
@@ -106,18 +115,17 @@ export default function DashboardPage() {
     }
   }, [selectedConfigId])
 
-  // V2 API integration - Phase 7 implementation
+  // V2 API integration with authentication
   const fetchBotData = async (configId: string) => {
     setIsLoadingBotData(true)
     try {
-      // TODO: Add auth headers when Phase 5 is complete
-      // For now, the backend uses mock authentication with DEVELOPMENT_MODE=true
-      const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'http://localhost:8000'
+      const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
       
+      // Use apiClient for authenticated requests
       const [metricsResponse, tradesResponse, positionsResponse] = await Promise.all([
-        fetch(`${baseUrl}/api/v2/bot/${configId}/metrics`).then(r => r.json()),
-        fetch(`${baseUrl}/api/v2/bot/${configId}/trades`).then(r => r.json()),
-        fetch(`${baseUrl}/api/v2/bot/${configId}/positions`).then(r => r.json())
+        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/metrics`).then(r => r.json()),
+        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/trades`).then(r => r.json()),
+        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/positions`).then(r => r.json())
       ])
 
       // Update state with real API data
@@ -290,13 +298,22 @@ export default function DashboardPage() {
     setSelectedConfigId(userBots[prevIndex].config_id)
   }
 
-  // TODO: Add authentication guard
-  // if (isLoadingAuth) {
-  //   return <LoadingScreen />
-  // }
-  // if (!user) {
-  //   return <Redirect to="/login" />
-  // }
+  // Authentication guard
+  if (isLoadingAuth) {
+    return (
+      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-bone-300">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!user) {
+    router.push('/login')
+    return null
+  }
 
   // Show loading state while fetching bots
   if (isLoadingBots) {
