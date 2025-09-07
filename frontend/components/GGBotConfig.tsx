@@ -55,10 +55,22 @@ const exchangeOptions = [
   { value: 'bybit', label: 'Bybit' }
 ]
 
+// Data source display name mapping
+const dataSourceDisplayNames: Record<string, string> = {
+  'technical_analysis': 'Technical Analysis',
+  'signals_group_chats': 'Signals',
+  'fundamental_analysis': 'Fundamental Analysis',
+  'sentiment_and_trends': 'Sentiment & Trends',
+  'influencer_kol': 'Influencer/KOL',
+  'news_and_regulations': 'News & Regulations',
+  'onchain_analytics': 'On-chain Analytics'
+}
+
 interface DataSourceSectionProps {
   dataSources: DataSource[]
   selectedDataPoints: string[]  // Now contains data point names, not IDs
   onToggleDataPoint: (dataPointId: string) => void
+  onShowGgShotModal: () => void
   isLoading: boolean
 }
 
@@ -66,21 +78,25 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
   dataSources,
   selectedDataPoints,
   onToggleDataPoint,
+  onShowGgShotModal,
   isLoading
 }) => {
   const [searchTerm, setSearchTerm] = React.useState('')
+  const [activeTab, setActiveTab] = React.useState<string>('technical_analysis')
 
-  const filteredDataSources = React.useMemo(() => {
-    if (!searchTerm) return dataSources
+  // Get the active data source
+  const activeDataSource = dataSources.find(source => source.name === activeTab)
+  
+  // Filter data points within the active source based on search
+  const filteredDataPoints = React.useMemo(() => {
+    if (!activeDataSource) return []
+    if (!searchTerm) return activeDataSource.data_points
     
-    return dataSources.map(source => ({
-      ...source,
-      data_points: source.data_points.filter(point =>
-        point.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        point.description.toLowerCase().includes(searchTerm.toLowerCase())
-      )
-    })).filter(source => source.data_points.length > 0)
-  }, [dataSources, searchTerm])
+    return activeDataSource.data_points.filter(point =>
+      point.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      point.description.toLowerCase().includes(searchTerm.toLowerCase())
+    )
+  }, [activeDataSource, searchTerm])
 
   const canAccessDataPoint = (dataPoint: DataPoint): boolean => {
     return dataPoint.has_access
@@ -96,17 +112,68 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
 
   return (
     <div>
-      {/* Header and Search */}
+      {/* Header and Selected Count */}
       <div className="flex items-center justify-between mb-4">
         <h4 className="text-xs text-gray-400 font-medium">DATA POINT SELECTION</h4>
         <span className="text-footnote text-gray-400">{selectedDataPoints.length} selected</span>
       </div>
       
-      <div className="flex gap-4 mb-4">
-        <div className="flex-1 relative">
+      {/* Selected Data Points Summary */}
+      <div className="bg-charcoal-800 border border-charcoal-600 p-3 mb-4 rounded">
+        {selectedDataPoints.length > 0 ? (
+          <div className="flex flex-wrap gap-2">
+            {selectedDataPoints.map(dataPointName => {
+              // Find the data point by name to get its ID for removal
+              const dataPoint = dataSources
+                .flatMap(source => source.data_points)
+                .find(dp => dp.name === dataPointName)
+              
+              return (
+                <span
+                  key={dataPointName}
+                  className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
+                >
+                  {dataPointName}
+                  <button
+                    onClick={() => dataPoint && onToggleDataPoint(dataPoint.data_point_id)}
+                    className="hover:bg-black/20 rounded"
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+                      <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                    </svg>
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+        ) : (
+          <div className="text-gray-500 text-xs">No data sources selected</div>
+        )}
+      </div>
+
+      {/* Data Source Tabs */}
+      <div className="mb-4">
+        <div className="flex gap-1 flex-wrap mb-4 border-b border-charcoal-600">
+          {dataSources.map(source => (
+            <button
+              key={source.source_id}
+              onClick={() => setActiveTab(source.name)}
+              className={`px-3 py-2 text-xs transition-colors border-b-2 ${
+                activeTab === source.name
+                  ? 'border-agent-extraction text-agent-extraction bg-agent-extraction/5'
+                  : 'border-transparent text-gray-400 hover:text-bone-200 hover:border-gray-600'
+              }`}
+            >
+              {dataSourceDisplayNames[source.name] || source.name}
+            </button>
+          ))}
+        </div>
+        
+        {/* Search within active tab */}
+        <div className="relative">
           <input
             type="text"
-            placeholder="Search data points..."
+            placeholder={`Search ${dataSourceDisplayNames[activeTab] || activeTab} data points...`}
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
             className="w-full bg-charcoal-800 border border-charcoal-600 text-bone-200 px-3 py-2 text-xs focus:border-agent-extraction focus:outline-none transition-colors"
@@ -119,79 +186,76 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
         </div>
       </div>
 
-      {/* Data Sources Content */}
-      <div className="space-y-6 max-h-96 overflow-y-auto">
-        {filteredDataSources.map(source => (
-          <div key={source.source_id}>
-            <h5 className="text-xs text-bone-200 font-medium mb-3 bg-charcoal-800 px-3 py-2 border-l-2 border-agent-extraction">
-              {source.name.toUpperCase()}
-            </h5>
-            <div className="space-y-2">
-              {source.data_points.map(dataPoint => {
-                const isSelected = selectedDataPoints.includes(dataPoint.name) // Check by name, not ID
-                const canAccess = canAccessDataPoint(dataPoint)
-                const isLocked = dataPoint.is_locked
-                
-                return (
-                  <div key={dataPoint.data_point_id} className="relative">
-                    <button
-                      onClick={() => canAccess && onToggleDataPoint(dataPoint.data_point_id)}
-                      disabled={isLocked}
-                      className={`w-full text-left p-3 border transition-colors relative ${
-                        isSelected && canAccess
-                          ? 'bg-agent-extraction/10 border-agent-extraction text-bone-200'
-                          : isLocked
-                          ? 'bg-charcoal-800/50 border-charcoal-700 text-gray-600 cursor-not-allowed'
-                          : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agent-extraction hover:bg-agent-extraction/5'
-                      }`}
-                    >
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
-                            isSelected && canAccess
-                              ? 'bg-agent-extraction border-agent-extraction'
-                              : 'border-gray-600'
-                          }`}>
-                            {isSelected && canAccess && (
-                              <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
-                                <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
-                              </svg>
-                            )}
-                          </div>
-                          <div>
-                            <div className="text-footnote font-medium flex items-center gap-2">
-                              {dataPoint.name}
-                              {dataPoint.requires_premium && (
-                                <span className="text-xs text-orange-400">Premium</span>
-                              )}
-                            </div>
-                            <div className="text-xs text-gray-400 mt-1">{dataPoint.description}</div>
-                          </div>
-                        </div>
-                        {isLocked && (
-                          <div className="text-orange-400">
-                            🔒
-                          </div>
+      {/* Active Tab Content */}
+      <div className="space-y-2 max-h-64 overflow-y-auto">
+        {filteredDataPoints.map(dataPoint => {
+          const isSelected = selectedDataPoints.includes(dataPoint.name)
+          const canAccess = canAccessDataPoint(dataPoint)
+          const isLocked = dataPoint.is_locked
+          
+          return (
+            <div key={dataPoint.data_point_id} className="relative">
+              <button
+                onClick={() => {
+                  if (!canAccess && dataPoint.name.toLowerCase().includes('ggshot')) {
+                    onShowGgShotModal()
+                  } else if (canAccess) {
+                    onToggleDataPoint(dataPoint.data_point_id)
+                  }
+                }}
+                disabled={isLocked && !dataPoint.name.toLowerCase().includes('ggshot')}
+                className={`w-full text-left p-3 border transition-colors relative ${
+                  isSelected && canAccess
+                    ? 'bg-agent-extraction/10 border-agent-extraction text-bone-200'
+                    : isLocked && !dataPoint.name.toLowerCase().includes('ggshot')
+                    ? 'bg-charcoal-800/50 border-charcoal-700 text-gray-600 cursor-not-allowed'
+                    : 'bg-charcoal-800 border-charcoal-700 text-bone-200 hover:border-agent-extraction hover:bg-agent-extraction/5'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`w-4 h-4 border-2 rounded flex items-center justify-center ${
+                      isSelected && canAccess
+                        ? 'bg-agent-extraction border-agent-extraction'
+                        : 'border-gray-600'
+                    }`}>
+                      {isSelected && canAccess && (
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor" className="text-charcoal-900">
+                          <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/>
+                        </svg>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-footnote font-medium flex items-center gap-2">
+                        {dataPoint.name}
+                        {dataPoint.requires_premium && (
+                          <span className="text-xs text-orange-400">Premium</span>
                         )}
                       </div>
-                    </button>
-                    {isLocked && (
-                      <div className="absolute inset-0 bg-charcoal-900/50 flex items-center justify-center">
-                        <div className="bg-charcoal-800 border border-orange-700 px-3 py-2 rounded text-xs text-orange-400">
-                          Upgrade required
-                        </div>
-                      </div>
-                    )}
+                      <div className="text-xs text-gray-400 mt-1">{dataPoint.description}</div>
+                    </div>
                   </div>
-                )
-              })}
+                  {isLocked && (
+                    <div className="text-orange-400">
+                      🔒
+                    </div>
+                  )}
+                </div>
+              </button>
+              {isLocked && (
+                <div className="absolute inset-0 bg-charcoal-900/50 flex items-center justify-center">
+                  <div className="bg-charcoal-800 border border-orange-700 px-3 py-2 rounded text-xs text-orange-400">
+                    {dataPoint.name.toLowerCase().includes('ggshot') ? 'Click to subscribe' : 'Upgrade required'}
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
-        ))}
+          )
+        })}
         
-        {filteredDataSources.length === 0 && (
+        {filteredDataPoints.length === 0 && (
           <div className="text-center py-8 text-gray-500 text-xs">
-            No data sources found
+            {searchTerm ? 'No matching data points found' : 'No data points available in this category'}
           </div>
         )}
       </div>
@@ -226,9 +290,10 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
   const [credentialError, setCredentialError] = React.useState<string | null>(null)
   
   // UI state
-  const [tradingAgentTab, setTradingAgentTab] = React.useState('risk-management')
+  const [tradingAgentTab, setTradingAgentTab] = React.useState('position-sizing')
   const [pairSearchTerm, setPairSearchTerm] = React.useState('')
   const [showPairDropdown, setShowPairDropdown] = React.useState(false)
+  const [showGgShotModal, setShowGgShotModal] = React.useState(false)
 
   // Initialize component
   React.useEffect(() => {
@@ -695,6 +760,89 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                 </div>
               ) : (
                 <>
+                  {/* Config Type Selection */}
+                  <div className="mb-8">
+                    <div className="bg-charcoal-900 relative ggbot-accordion-expanded">
+                      <div className="p-6 space-y-6">
+                        <div>
+                          <div className="flex items-center justify-between mb-4">
+                            <h4 className="text-footnote text-bone-200 font-medium">BOT TYPE</h4>
+                          </div>
+                          
+                          {/* Bot Type Selection */}
+                          <div className="space-y-3">
+                            {/* Autonomous Trading Option */}
+                            <label className="flex items-center gap-3 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="config_type"
+                                value="autonomous_trading"
+                                checked={configData.config_type === 'autonomous_trading'}
+                                onChange={(e) => {
+                                  updateConfigData(prev => ({
+                                    ...prev,
+                                    config_type: e.target.value
+                                  }))
+                                }}
+                                className="w-4 h-4 text-blue-500 focus:ring-blue-500"
+                              />
+                              <div className="flex items-center justify-between flex-1">
+                                <div>
+                                  <div className="text-xs text-bone-200 font-medium">Autonomous Trading</div>
+                                  <div className="text-xs text-gray-400">AI makes trading decisions automatically based on market analysis</div>
+                                </div>
+                                <div className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-700">
+                                  Available
+                                </div>
+                              </div>
+                            </label>
+
+                            {/* Signal Validation Option */}
+                            <label className={`flex items-center gap-3 ${!userProfile?.can_use_signal_validation ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                              <input
+                                type="radio"
+                                name="config_type"
+                                value="signal_validation"
+                                checked={configData.config_type === 'signal_validation'}
+                                onChange={(e) => {
+                                  if (userProfile?.can_use_signal_validation) {
+                                    updateConfigData(prev => ({
+                                      ...prev,
+                                      config_type: e.target.value
+                                    }))
+                                  }
+                                }}
+                                disabled={!userProfile?.can_use_signal_validation}
+                                className="w-4 h-4 text-blue-500 focus:ring-blue-500"
+                              />
+                              <div className="flex items-center justify-between flex-1">
+                                <div>
+                                  <div className="text-xs text-bone-200 font-medium">Signal Validation</div>
+                                  <div className="text-xs text-gray-400">Validate and analyze signals from external sources like ggShot</div>
+                                </div>
+                                {userProfile?.can_use_signal_validation ? (
+                                  <div className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-700">
+                                    Available
+                                  </div>
+                                ) : (
+                                  <button
+                                    onClick={() => {
+                                      // TODO: Show upgrade modal
+                                      alert('Signal Validation requires an upgraded plan')
+                                    }}
+                                    className="text-xs bg-orange-900/30 text-orange-400 px-2 py-1 rounded border border-orange-700 hover:bg-orange-900/50 transition-colors"
+                                  >
+                                    Upgrade Required
+                                  </button>
+                                )}
+                              </div>
+                            </label>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
                   {/* Extraction Agent Section */}
                   <div className="mb-8">
                     {!expandedSections.has('extraction') ? (
@@ -811,43 +959,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             </div>
                           </div>
 
-                          {/* Selected Data Points Summary */}
-                          <div>
-                            <div className="flex items-center justify-between mb-4">
-                              <h4 className="text-footnote text-bone-200 font-medium">SELECTED DATA POINTS</h4>
-                            </div>
-                            <div className="bg-charcoal-800 border border-charcoal-600 p-3">
-                              {selectedDataPoints.length > 0 ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {selectedDataPoints.map(dataPointName => {
-                                    // Find the data point by name to get its ID for removal
-                                    const dataPoint = dataSources
-                                      .flatMap(source => source.data_points)
-                                      .find(dp => dp.name === dataPointName)
-                                    
-                                    return (
-                                      <span
-                                        key={dataPointName}
-                                        className="inline-flex items-center gap-1 px-2 py-1 bg-agent-extraction text-charcoal-900 text-xs rounded"
-                                      >
-                                        {dataPointName}
-                                        <button
-                                          onClick={() => dataPoint && handleToggleDataPoint(dataPoint.data_point_id)}
-                                          className="hover:bg-black/20 rounded"
-                                        >
-                                          <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-                                            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-                                          </svg>
-                                        </button>
-                                      </span>
-                                    )
-                                  })}
-                                </div>
-                              ) : (
-                                <div className="text-gray-500 text-xs">No data sources selected</div>
-                              )}
-                            </div>
-                          </div>
 
                           {/* Timeframes Info */}
                           <div className="bg-blue-900/20 border border-blue-700/50 p-3 rounded">
@@ -867,6 +978,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             dataSources={dataSources}
                             selectedDataPoints={selectedDataPoints}
                             onToggleDataPoint={handleToggleDataPoint}
+                            onShowGgShotModal={() => setShowGgShotModal(true)}
                             isLoading={dataSourcesLoading}
                           />
                         </div>
@@ -1213,16 +1325,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 Position Sizing
                               </button>
                               <button
-                                onClick={() => setTradingAgentTab('risk-management')}
-                                className={`px-3 py-1 text-xs rounded transition-colors ${
-                                  tradingAgentTab === 'risk-management'
-                                    ? 'bg-[#be6a47] text-charcoal-900 font-medium'
-                                    : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
-                                }`}
-                              >
-                                Risk Management
-                              </button>
-                              <button
                                 onClick={() => setTradingAgentTab('telegram')}
                                 className={`px-3 py-1 text-xs rounded transition-colors ${
                                   tradingAgentTab === 'telegram'
@@ -1250,8 +1352,6 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             <div className="mt-2 text-xs text-gray-400">
                               {tradingAgentTab === 'position-sizing' 
                                 ? 'Configure how much capital to allocate per trade'
-                                : tradingAgentTab === 'risk-management'
-                                ? 'Set position limits and stop loss/take profit defaults'
                                 : tradingAgentTab === 'telegram'
                                 ? 'Configure Telegram publishing for decision signals'
                                 : 'Exchange connection for live trading (coming soon)'}
@@ -1704,6 +1804,64 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
           </div>
         </div>
       </div>
+
+      {/* ggShot Modal */}
+      {showGgShotModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+          <div className="bg-charcoal-900 border border-charcoal-600 rounded-lg max-w-md mx-4 p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg text-bone-200 font-medium">ggShot Premium Signals</h3>
+              <button
+                onClick={() => setShowGgShotModal(false)}
+                className="text-gray-400 hover:text-bone-200 transition-colors"
+              >
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+                </svg>
+              </button>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="bg-orange-900/20 border border-orange-700 p-4 rounded">
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="w-2 h-2 bg-orange-400 rounded-full"></div>
+                  <div className="text-sm text-orange-400 font-medium">External Premium Service</div>
+                </div>
+                <p className="text-sm text-gray-300">
+                  ggShot signals are provided by an external premium service. To access ggShot signals, you need to subscribe directly with them.
+                </p>
+              </div>
+
+              <div className="text-sm text-gray-300">
+                <p className="mb-3">
+                  ggShot provides AI-filtered premium trading signals from 140+ crypto pairs with advanced confidence scoring.
+                </p>
+                <p className="text-xs text-gray-400">
+                  This is a third-party service with its own subscription and pricing.
+                </p>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setShowGgShotModal(false)}
+                  className="flex-1 px-4 py-2 bg-charcoal-700 text-bone-200 text-sm rounded hover:bg-charcoal-600 transition-colors"
+                >
+                  Cancel
+                </button>
+                <a
+                  href="https://t.me/ggshot_filter_bot" 
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1 px-4 py-2 bg-orange-600 text-white text-sm rounded hover:bg-orange-700 transition-colors text-center"
+                  onClick={() => setShowGgShotModal(false)}
+                >
+                  Subscribe to ggShot
+                </a>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
