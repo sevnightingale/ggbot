@@ -4,9 +4,9 @@ import { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 
 export default function TestPage() {
-  const [user, setUser] = useState(null)
-  const [token, setToken] = useState('')
-  const [results, setResults] = useState({})
+  const [user, setUser] = useState<any>(null)
+  const [token, setToken] = useState<string>('')
+  const [results, setResults] = useState<Record<string, any>>({})
   const [loading, setLoading] = useState(false)
 
   const supabase = createClient()
@@ -21,7 +21,7 @@ export default function TestPage() {
       }
     }
     getSession()
-  }, [])
+  }, [supabase.auth])
 
   // Test configuration payloads based on template_v1.json
   const testConfigPayload = {
@@ -87,7 +87,7 @@ export default function TestPage() {
   }
 
   // API call helper with auth
-  const apiCall = async (method: string, endpoint: string, body?: any) => {
+  const apiCall = async (method: string, endpoint: string, body?: unknown) => {
     const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}${endpoint}`, {
       method,
       headers: {
@@ -102,7 +102,7 @@ export default function TestPage() {
   }
 
   // Test functions
-  const runTest = async (testName: string, testFn: () => Promise<any>) => {
+  const runTest = async (testName: string, testFn: () => Promise<unknown>) => {
     setLoading(true)
     try {
       const result = await testFn()
@@ -125,16 +125,17 @@ export default function TestPage() {
   const testGetUserProfile = () => apiCall('GET', '/api/v2/user/profile')
   const testGetDataSources = () => apiCall('GET', '/api/v2/data-sources-with-points')
   
-  const testWithConfigId = async (configId: string) => ({
-    getConfig: await apiCall('GET', `/api/v2/config/${configId}`),
-    orchestrate: await apiCall('POST', `/api/v2/orchestrate/${configId}`),
-    metrics: await apiCall('GET', `/api/v2/bot/${configId}/metrics`),
-    positions: await apiCall('GET', `/api/v2/bot/${configId}/positions`),
-    trades: await apiCall('GET', `/api/v2/bot/${configId}/trades`),
-    startBot: await apiCall('POST', `/api/v2/bot/${configId}/start`),
-    stopBot: await apiCall('POST', `/api/v2/bot/${configId}/stop`),
-    status: await apiCall('GET', `/api/v2/bot/${configId}/status`)
-  })
+  // Advanced tests with config ID (to be used later)
+  // const testWithConfigId = async (configId: string) => ({
+  //   getConfig: await apiCall('GET', `/api/v2/config/${configId}`),
+  //   orchestrate: await apiCall('POST', `/api/v2/orchestrate/${configId}`),
+  //   metrics: await apiCall('GET', `/api/v2/bot/${configId}/metrics`),
+  //   positions: await apiCall('GET', `/api/v2/bot/${configId}/positions`),
+  //   trades: await apiCall('GET', `/api/v2/bot/${configId}/trades`),
+  //   startBot: await apiCall('POST', `/api/v2/bot/${configId}/start`),
+  //   stopBot: await apiCall('POST', `/api/v2/bot/${configId}/stop`),
+  //   status: await apiCall('GET', `/api/v2/bot/${configId}/status`)
+  // })
 
   // Auth status component
   const AuthStatus = () => (
@@ -153,7 +154,7 @@ export default function TestPage() {
   )
 
   // Results display component
-  const ResultDisplay = ({ testName, result }: any) => (
+  const ResultDisplay = ({ testName, result }: { testName: string; result: any }) => (
     <div className="border p-4 rounded mb-4">
       <h4 className="font-bold">{testName}</h4>
       {result.success ? (
