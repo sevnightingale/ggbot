@@ -79,8 +79,25 @@ class BotConfigV2:
         if not self.selected_pair:
             errors.append("selected_pair is required")
         
-        if not self.extraction.get("indicators"):
-            errors.append("extraction.indicators is required")
+        # Support both old (indicators) and new (selected_data_sources) structure
+        if "selected_data_sources" in self.extraction:
+            # New structure validation
+            data_sources = self.extraction.get("selected_data_sources", {})
+            has_valid_data_points = False
+            
+            for source_name, source_config in data_sources.items():
+                if isinstance(source_config, dict) and source_config.get("data_points"):
+                    has_valid_data_points = True
+                    break
+            
+            if not has_valid_data_points:
+                errors.append("extraction.selected_data_sources must contain at least one data source with data_points")
+        elif "indicators" in self.extraction:
+            # Legacy structure validation
+            if not self.extraction.get("indicators"):
+                errors.append("extraction.indicators is required")
+        else:
+            errors.append("extraction must contain either 'selected_data_sources' or 'indicators'")
         
         if not self.decision.get("system_prompt"):
             errors.append("decision.system_prompt is required")

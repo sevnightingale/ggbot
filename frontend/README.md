@@ -414,23 +414,30 @@ configurations             -- Bot configurations with config_data JSONB
 data_sources + data_points -- Dynamic indicator management with premium gating
 ```
 
-#### **Configuration Data Flow**
+#### **Configuration Data Flow (V2.1 Multi-Timeframe)**
 ```typescript
-// Frontend saves structured config
+// Frontend saves structured config with multi-timeframe support
 configData = {
-  schema_version: "1.0",
+  schema_version: "2.1",
   selected_pair: "BTC/USDT",
   extraction: {
-    data_sources: {
-      technical_indicators: ["RSI_5m", "MACD_1h", ...],
-      // ... other categories mapped from database
+    selected_data_sources: {                    // NEW STRUCTURE
+      technical_analysis: {
+        data_points: ["RSI", "MACD", "BB", "EMA", "SMA"],
+        timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+      },
+      signals_group_chats: {
+        data_points: ["ggShot"],
+        timeframes: ["1h"]
+      }
     }
   },
   decision: {
     analysis_frequency: "1h",
-    user_prompt: "Custom strategy..."
+    system_prompt: "You are an expert trader analyzing {SYMBOL}...",
+    user_prompt: "Look at 15m RSI and 1h MACD for confluence..."
   },
-  llm_config: {                    // NEW SECTION
+  llm_config: {                    
     provider: "openai",
     use_platform_keys: false,
     openai_api_key: "sk-...",      // Encrypted in Vault
@@ -445,7 +452,8 @@ configData = {
   }
 }
 
-// Backend validates with Pydantic models and stores as JSONB
+// Backend orchestrator extracts data for ALL 7 timeframes
+// Decision engine gets rich multi-timeframe context for LLM
 // LLM keys encrypted separately in Supabase Vault
 ```
 
@@ -567,6 +575,15 @@ npm run lint     # Passes all linting checks
 git push origin main  # Triggers deployment to https://app.ggbots.ai
 ```
 
+### **📈 Multi-Timeframe Trading Benefits**
+
+**Enhanced Decision Context (V2.1 - 2025-09-07)**:
+- ✅ **7-Timeframe Analysis**: Users configure once, get analysis across 5m → 1w timeframes
+- ✅ **Natural Language Prompts**: "Look at 15m RSI and 4h MACD for trend confirmation"  
+- ✅ **Rich LLM Context**: Decision engine receives comprehensive market view
+- ✅ **Timeframe Convergence**: Identify alignment between short/medium/long-term trends
+- ✅ **Intuitive Configuration**: Select "RSI" → automatically gets RSI across all 7 timeframes
+
 ### **📈 Usage Analytics**
 
 The configuration system now tracks:
@@ -574,6 +591,7 @@ The configuration system now tracks:
 - **Premium Feature Attempts**: Usage metrics for conversion optimization  
 - **API Key Management**: Security event logging
 - **Subscription Tier Analytics**: User behavior by tier
+- **Multi-Timeframe Usage**: Analytics on timeframe combinations and performance
 
 ---
 

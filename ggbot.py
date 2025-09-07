@@ -155,16 +155,32 @@ class GGBotOrchestrator:
             # 2. Get or create V2 extraction engine
             extraction_engine = await self._get_extraction_engine(user_id)
             
-            # 3. Get indicator access from config structure
+            # 3. Extract indicators and timeframes from config structure
             extraction_config = config.extraction or {}
+            requested_indicators = []
+            timeframes = ["1h"]  # Default single timeframe
             
-            # Handle both new structure (indicators) and old structure (data_sources)  
-            if "indicators" in extraction_config:
+            # Handle new structure (selected_data_sources) 
+            if "selected_data_sources" in extraction_config:
+                data_sources = extraction_config.get("selected_data_sources", {})
+                for source_name, source_config in data_sources.items():
+                    if isinstance(source_config, dict):
+                        # Get data points from this source
+                        data_points = source_config.get("data_points", [])
+                        requested_indicators.extend(data_points)
+                        
+                        # Get timeframes from this source (use first source's timeframes)
+                        if not timeframes or timeframes == ["1h"]:
+                            source_timeframes = source_config.get("timeframes", ["1h"])
+                            if source_timeframes:
+                                timeframes = source_timeframes
+                                
+            # Fallback to legacy structures
+            elif "indicators" in extraction_config:
                 requested_indicators = extraction_config["indicators"]
             else:
-                # Fallback to data_sources structure
+                # Fallback to old data_sources structure
                 data_sources = extraction_config.get("data_sources", {})
-                requested_indicators = []
                 for category, indicators in data_sources.items():
                     if isinstance(indicators, list):
                         requested_indicators.extend(indicators)
@@ -173,9 +189,9 @@ class GGBotOrchestrator:
                 # Default to basic indicators if none specified
                 requested_indicators = ["rsi", "macd", "ema"]
             
-            # 4. Run V2 extraction
+            # 4. Run V2 extraction for all timeframes
             extraction_result = await self._run_extraction_v2(
-                extraction_engine, config, user_id, requested_indicators
+                extraction_engine, config, user_id, requested_indicators, timeframes
             )
             
             # 5. Run V2 decision engine
@@ -235,33 +251,66 @@ class GGBotOrchestrator:
         extraction_engine: ExtractionEngineV2,
         config: BotConfigV2,
         user_id: str,
-        indicators: List[str]
+        indicators: List[str],
+        timeframes: List[str] = ["1h"]
     ) -> Dict[str, Any]:
-        """Run V2 extraction engine with proper integration."""
+        """Run V2 extraction engine for multiple timeframes with proper integration."""
         try:
             # Get symbol from config
             symbol = config.selected_pair or "BTC/USDT"
             
-            # Extract using the V2 system with all 21 preprocessors
-            result = await extraction_engine.extract_for_symbol(
-                symbol=symbol,
-                indicators=indicators,
-                timeframe="1h",  # Default timeframe
-                limit=200,
-                connector="kucoin",
-                config_id=config.config_id
-            )
+            # Extract for all timeframes
+            timeframe_results = {}
+            successful_extractions = 0
             
-            self._log.info(f"V2 Extraction completed for {symbol} with {len(indicators)} indicators")
-            return result
+            for timeframe in timeframes:
+                self._log.info(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe})")
+                
+                # Extract using the V2 system with all 21 preprocessors
+                result = await extraction_engine.extract_for_symbol(
+                    symbol=symbol,
+                    indicators=indicators,
+                    timeframe=timeframe,
+                    limit=200,
+                    connector="kucoin",
+                    config_id=config.config_id
+                )
+                
+                timeframe_results[timeframe] = result
+                
+                if result.get("status") == "success":
+                    successful_extractions += 1
+                    self._log.info(f"✅ V2 Extraction completed for {symbol} ({timeframe})")
+                else:
+                    self._log.error(f"❌ V2 Extraction failed for {symbol} ({timeframe}): {result.get('error')}")
+            
+            # Prepare consolidated result
+            overall_result = {
+                "status": "success" if successful_extractions > 0 else "error",
+                "symbol": symbol,
+                "timeframes": timeframe_results,
+                "summary": {
+                    "total_timeframes": len(timeframes),
+                    "successful_extractions": successful_extractions,
+                    "failed_extractions": len(timeframes) - successful_extractions,
+                    "indicators": indicators
+                }
+            }
+            
+            if successful_extractions == 0:
+                overall_result["error"] = "All timeframe extractions failed"
+            
+            self._log.info(f"V2 Multi-timeframe extraction completed: {successful_extractions}/{len(timeframes)} successful")
+            return overall_result
             
         except Exception as e:
-            self._log.error(f"V2 Extraction failed: {e}")
+            self._log.error(f"V2 Multi-timeframe extraction failed: {e}")
             return {
                 "status": "error",
                 "error": str(e),
                 "symbol": config.selected_pair or "Unknown",
-                "indicators": indicators
+                "indicators": indicators,
+                "timeframes": timeframes
             }
     
     async def _get_decision_engine(self, config_id: str, user_id: str) -> DecisionEngineV2:

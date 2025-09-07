@@ -372,6 +372,85 @@ class MarketDataRepository:
         
         return freshness_status
     
+    async def get_multi_timeframe_data(self, symbol: Symbol, config_id: str,
+                                     max_age_seconds: int = 30) -> Optional[Dict[str, Any]]:
+        """
+        Get market data across all timeframes for a config, organized by timeframe.
+        
+        This method supports the new V2 multi-timeframe architecture where data is stored
+        separately per timeframe but needs to be consolidated for decision making.
+        
+        Args:
+            symbol: Symbol to query
+            config_id: Configuration ID
+            max_age_seconds: Maximum age in seconds to consider fresh
+            
+        Returns:
+            Dictionary organized by timeframe with indicators and metadata, or None if no fresh data
+        """
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Get all fresh market data for this config and symbol across timeframes
+                cur.execute("""
+                    SELECT timeframe, data_points, raw_data, updated_at 
+                    FROM market_data 
+                    WHERE symbol = %s 
+                    AND config_id = %s
+                    AND updated_at >= %s
+                    ORDER BY timeframe ASC, updated_at DESC
+                """, (
+                    symbol.internal_format,
+                    config_id,
+                    datetime.now() - timedelta(seconds=max_age_seconds)
+                ))
+                
+                rows = cur.fetchall()
+                if not rows:
+                    logger.info(f"No fresh multi-timeframe data for {symbol.internal_format} (config: {config_id})")
+                    return None
+                
+                # Group by timeframe, taking most recent entry for each
+                timeframe_data = {}
+                latest_price = None
+                oldest_update = None
+                
+                for timeframe, data_points, raw_data, updated_at in rows:
+                    # Only take the first (most recent) entry for each timeframe
+                    if timeframe not in timeframe_data:
+                        indicators = data_points.get("indicators", {}) if data_points else {}
+                        raw_summary = raw_data.get("metadata", {}) if raw_data else {}
+                        
+                        timeframe_data[timeframe] = {
+                            "indicators": indicators,
+                            "raw_summary": raw_summary,
+                            "updated_at": updated_at
+                        }
+                        
+                        # Extract latest price from first timeframe processed
+                        if latest_price is None and raw_summary:
+                            latest_price = raw_summary.get("latest_price")
+                        
+                        # Track oldest update for age calculation
+                        if oldest_update is None or updated_at < oldest_update:
+                            oldest_update = updated_at
+                
+                # Calculate data age
+                age_seconds = (datetime.now() - oldest_update).total_seconds() if oldest_update else 0
+                
+                # Prepare consolidated response
+                result = {
+                    "symbol": symbol.internal_format,
+                    "timeframes": timeframe_data,
+                    "latest_price": latest_price or 0.0,
+                    "data_age_seconds": age_seconds,
+                    "timeframes_available": list(timeframe_data.keys())
+                }
+                
+                logger.info(f"Retrieved multi-timeframe data for {symbol.internal_format} "
+                           f"(config: {config_id}, {len(timeframe_data)} timeframes, age: {age_seconds:.1f}s)")
+                
+                return result
+    
     def _row_to_snapshot(self, row) -> MarketDataSnapshot:
         """Convert database row to MarketDataSnapshot."""
         record_id, symbol, source, data_type, indicators_json, raw_data_json, updated_at = row

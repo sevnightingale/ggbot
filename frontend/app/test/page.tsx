@@ -28,15 +28,15 @@ export default function TestPage() {
     config_name: "Test Bot - API Validation",
     selected_pair: "BTC/USDT",
     extraction: {
-      data_sources: {
-        technical_indicators: [
-          "RSI_15m", "MACD_15m", "BB_15m", "EMA_1h", "SMA_4h"
-        ],
-        fundamental_analysis: [],
-        sentiment_and_trends: [],
-        influencer_kol: [],
-        news_and_regulations: [],
-        onchain_analytics: []
+      selected_data_sources: {
+        technical_analysis: {
+          data_points: ["RSI", "MACD", "BB", "EMA", "SMA"],
+          timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+        },
+        signals_group_chats: {
+          data_points: ["ggShot"],
+          timeframes: ["1h"]
+        }
       }
     },
     decision: {

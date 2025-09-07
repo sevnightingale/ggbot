@@ -83,6 +83,17 @@ result = await engine.extract_for_symbol(
     config_id="your_config_uuid"
 )
 
+# Multi-timeframe extraction (V2.1)
+timeframes = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+for timeframe in timeframes:
+    result = await engine.extract_for_symbol(
+        symbol="BTC/USDT",
+        indicators=["rsi", "macd", "bb"],
+        timeframe=timeframe,
+        config_id="your_config_uuid"
+    )
+    # Each call creates separate market_data row with same config_id
+
 # Extract for multiple symbols
 multi_result = await engine.extract_multiple_symbols(
     symbols=["BTC/USDT", "ETH/USDT", "SOL/USDT"],
@@ -288,6 +299,7 @@ The V2 system implements a **dual storage approach** for maximum reliability and
   - `data_source`: UUID reference to data_sources table
   - `data_points`: JSONB with advanced preprocessor results
   - `raw_data`: JSONB with OHLCV candle data
+- **Multi-timeframe storage (V2.1)**: Each timeframe stored as separate row with same `config_id`
 - **Advanced serialization** handles pandas objects, timestamps, and numpy types
 - **Error isolation** - database failures don't affect file storage
 
@@ -526,6 +538,85 @@ engine = ExtractionEngineV2(
 5. **Switch traffic** - Gradually migrate to V2 system
 6. **Monitor performance** - Verify 12x performance improvement
 7. **Decommission V1** - Remove MCP and Node.js components
+
+---
+
+## 🎯 V2.1 Multi-Timeframe Integration (2025-09-07)
+
+### **Enhanced Orchestrator Integration**
+
+The V2 extraction system now supports **multi-timeframe orchestration** where a single configuration triggers extraction across multiple timeframes:
+
+#### **Configuration Structure**
+```json
+{
+  "extraction": {
+    "selected_data_sources": {
+      "technical_analysis": {
+        "data_points": ["RSI", "MACD", "BB", "EMA", "SMA"],
+        "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+      }
+    }
+  }
+}
+```
+
+#### **Orchestrator Integration Flow**
+```python
+# V2 Orchestrator calls extraction for each timeframe
+for timeframe in config.timeframes:
+    await extraction_engine.extract_for_symbol(
+        symbol="BTC/USDT",
+        indicators=config.indicators,
+        timeframe=timeframe,           # 5m, 15m, 30m, 1h, 4h, 1d, 1w
+        config_id=config.config_id     # Same config_id for all timeframes
+    )
+    # Creates separate market_data row for each timeframe
+```
+
+#### **Database Storage Pattern**
+- **7 Market Data Rows**: One row per timeframe for the same symbol/config
+- **Config Association**: All rows share same `config_id` for grouping
+- **Rich Analysis**: Each row contains full V2 preprocessor analysis for that timeframe
+- **Decision Query**: `SELECT * WHERE config_id = ? AND symbol = ?` returns all timeframes
+
+#### **Decision Engine Integration**
+The decision engine queries all timeframes and consolidates into structured data:
+
+```python
+# Decision engine consolidates multi-timeframe data
+consolidated_data = {
+    "symbol": "BTC/USDT",
+    "timeframes": {
+        "5m": {"indicators": {...}, "raw_summary": {...}},
+        "15m": {"indicators": {...}, "raw_summary": {...}},
+        "1h": {"indicators": {...}, "raw_summary": {...}},
+        # ... all 7 timeframes
+    },
+    "latest_price": 110984.20,
+    "timeframes_available": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+}
+```
+
+#### **Benefits for Trading Decisions**
+- ✅ **Rich Context**: LLM gets comprehensive market view across timeframes
+- ✅ **Flexible Analysis**: Users can reference specific timeframes in prompts
+- ✅ **Trend Convergence**: Identify alignment between short and long-term trends
+- ✅ **Clean Architecture**: Storage and retrieval patterns remain efficient
+- ✅ **Backward Compatible**: Existing single-timeframe configurations still work
+
+### **Integration with Domain Models**
+```python
+# New domain repository method for multi-timeframe access
+from core.domain.market_data_repository import market_data_repo
+
+multi_tf_data = await market_data_repo.get_multi_timeframe_data(
+    symbol=Symbol.from_string("BTC/USDT"),
+    config_id=config_id,
+    max_age_seconds=30
+)
+# Returns timeframe-organized data ready for decision engine
+```
 
 ---
 

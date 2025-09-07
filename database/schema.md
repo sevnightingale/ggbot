@@ -179,12 +179,20 @@ Market data and analysis storage (V2 schema with Supabase integration)
 **RLS**: Users can only access their own market data  
 **Indexes**: user_id, (user_id, symbol, timeframe, updated_at), data_source
 
+**Multi-Timeframe Storage Pattern (V2.1 - 2025-09-07)**:
+- ✅ **Separate Rows Per Timeframe** - Each timeframe stored as individual record
+- ✅ **Config-Based Grouping** - All timeframes for a symbol linked via `config_id`
+- ✅ **Decision Engine Queries** - `SELECT * WHERE config_id = ? AND symbol = ?` returns all timeframes
+- ✅ **Rich Preprocessor Data** - V2 system stores sophisticated analysis in `data_points` JSONB
+- ✅ **Timeframe Organization** - Decision engine consolidates by timeframe for LLM context
+
 **Schema Changes (V2)**:
 - ✅ **Added `data_source`** - UUID foreign key to data_sources table  
 - ✅ **Renamed `indicators` → `data_points`** - More generic for all analysis types
 - ✅ **Removed `data_type`** - Redundant with data_source UUID reference
 - ✅ **Removed legacy `source` field** - Cleaned up unnecessary column
 - ✅ **Enhanced for V2 system** - Supports 21 advanced technical analysis preprocessors with dual storage
+- ✅ **Multi-Timeframe Support** - Orchestrator stores 7 rows per symbol (one per timeframe)
 
 #### `decisions`
 Unified decision audit trail (replaces strategy_runs + ggshot_filter)
@@ -419,6 +427,7 @@ User LLM credentials are encrypted using Supabase Vault:
 **Total Indexes**: 40+  
 **RLS Enabled**: All user tables (performance optimized)  
 
+REAL, LIVE, ACTUAL SUPABASE SCHEMA, THIS IS THE SOURCE OF FUCKING TRUTH:
 
 -- WARNING: This schema is for context only and is not meant to be run.
 -- Table order and constraints may not be valid for execution.

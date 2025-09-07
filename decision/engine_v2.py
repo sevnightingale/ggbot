@@ -165,43 +165,76 @@ class DecisionEngineV2:
         """
         Get fresh market data for this config from the database.
         
+        Retrieves data for all timeframes and consolidates into timeframe-organized structure.
         NOTE: Orchestrator is responsible for ensuring fresh data exists.
-        DecisionEngine just retrieves it from database.
+        DecisionEngine just retrieves and organizes it from database.
         """
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Get the most recent market data for this config and symbol
+                    # Get all market data for this config and symbol across all timeframes
                     cur.execute("""
-                        SELECT raw_data, updated_at 
+                        SELECT timeframe, data_points, raw_data, updated_at 
                         FROM market_data 
                         WHERE config_id = %s AND symbol = %s 
-                        ORDER BY updated_at DESC 
-                        LIMIT 1
+                        ORDER BY timeframe ASC, updated_at DESC
                     """, (self.config_id, symbol))
                     
-                    result = cur.fetchone()
-                    if result:
-                        raw_data, updated_at = result
-                        age_seconds = (datetime.now(timezone.utc) - updated_at).total_seconds()
-                        
-                        logger.bind(
-                            config_id=self.config_id, 
-                            symbol=symbol, 
-                            age_seconds=age_seconds
-                        ).info("Retrieved market data for decision")
-                        
-                        return raw_data
+                    rows = cur.fetchall()
+                    if not rows:
+                        logger.bind(config_id=self.config_id, symbol=symbol).error(
+                            "No market data available - orchestrator should have ensured fresh data"
+                        )
+                        raise MarketDataError(
+                            f"No market data available for {symbol}. "
+                            f"Orchestrator should have triggered extraction and waited for completion."
+                        )
                     
-                    # If no data available, orchestrator failed to ensure freshness
-                    logger.bind(config_id=self.config_id, symbol=symbol).error(
-                        "No market data available - orchestrator should have ensured fresh data"
-                    )
-                    raise MarketDataError(
-                        f"No market data available for {symbol}. "
-                        f"Orchestrator should have triggered extraction and waited for completion."
-                    )
+                    # Group data by timeframe (taking most recent for each timeframe)
+                    timeframe_data = {}
+                    latest_price = None
+                    oldest_update = None
                     
+                    for timeframe, data_points, raw_data, updated_at in rows:
+                        # Only take the first (most recent) entry for each timeframe
+                        if timeframe not in timeframe_data:
+                            timeframe_data[timeframe] = {
+                                "indicators": data_points.get("indicators", {}) if data_points else {},
+                                "raw_summary": raw_data.get("metadata", {}) if raw_data else {},
+                                "updated_at": updated_at
+                            }
+                            
+                            # Extract latest price from first timeframe processed
+                            if latest_price is None and raw_data and raw_data.get("metadata"):
+                                latest_price = raw_data["metadata"].get("latest_price")
+                            
+                            # Track age
+                            if oldest_update is None or updated_at < oldest_update:
+                                oldest_update = updated_at
+                    
+                    # Calculate data age
+                    age_seconds = (datetime.now(timezone.utc) - oldest_update).total_seconds() if oldest_update else 0
+                    
+                    # Prepare consolidated multi-timeframe structure
+                    consolidated_data = {
+                        "symbol": symbol,
+                        "timeframes": timeframe_data,
+                        "latest_price": latest_price or 0.0,
+                        "data_age_seconds": age_seconds,
+                        "timeframes_available": list(timeframe_data.keys())
+                    }
+                    
+                    logger.bind(
+                        config_id=self.config_id, 
+                        symbol=symbol,
+                        timeframes_count=len(timeframe_data),
+                        age_seconds=age_seconds
+                    ).info("Retrieved multi-timeframe market data for decision")
+                    
+                    return consolidated_data
+                    
+        except MarketDataError:
+            raise  # Re-raise domain errors
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to get market data: {e}")
             raise MarketDataError(f"Failed to retrieve market data: {e}")
@@ -328,14 +361,87 @@ class DecisionEngineV2:
         }
     
     def _format_market_data_for_llm(self, market_data: Dict[str, Any]) -> str:
-        """Format market data for LLM consumption."""
+        """Format multi-timeframe market data for LLM consumption."""
         if not market_data:
             return "No market data available"
+        
+        # Handle new multi-timeframe structure
+        if 'timeframes' in market_data:
+            return self._format_multi_timeframe_data(market_data)
+        
+        # Fallback to legacy single-timeframe formatting
+        return self._format_legacy_market_data(market_data)
+    
+    def _format_multi_timeframe_data(self, market_data: Dict[str, Any]) -> str:
+        """Format multi-timeframe market data with rich context."""
+        formatted = []
+        
+        # Header with symbol and current price
+        symbol = market_data.get('symbol', 'Unknown')
+        latest_price = market_data.get('latest_price', 0.0)
+        timeframes = market_data.get('timeframes', {})
+        
+        formatted.append(f"MARKET ANALYSIS FOR {symbol}")
+        formatted.append(f"Current Price: ${latest_price:,.2f}")
+        formatted.append(f"Timeframes Available: {', '.join(market_data.get('timeframes_available', []))}")
+        formatted.append("")
+        
+        # Format each timeframe's data
+        for timeframe, tf_data in timeframes.items():
+            formatted.append(f"=== {timeframe.upper()} TIMEFRAME ===")
             
-        # Simple formatting of the raw market data JSON
+            indicators = tf_data.get("indicators", {})
+            if indicators:
+                for indicator_name, indicator_data in indicators.items():
+                    formatted.append(f"  {indicator_name}:")
+                    
+                    # Format rich indicator data from V2 preprocessors
+                    if isinstance(indicator_data, dict):
+                        if "current" in indicator_data:
+                            formatted.append(f"    Current Value: {indicator_data['current']}")
+                        if "trend" in indicator_data:
+                            trend = indicator_data["trend"]
+                            if isinstance(trend, dict):
+                                direction = trend.get("direction", "unknown")
+                                formatted.append(f"    Trend: {direction}")
+                            else:
+                                formatted.append(f"    Trend: {trend}")
+                        if "signals" in indicator_data:
+                            signals = indicator_data["signals"]
+                            if signals:
+                                formatted.append(f"    Signals: {', '.join(signals)}")
+                        if "zones" in indicator_data:
+                            zones = indicator_data["zones"]
+                            if isinstance(zones, dict):
+                                current_zone = zones.get("current", "unknown")
+                                formatted.append(f"    Zone: {current_zone}")
+                    else:
+                        # Simple numeric value
+                        formatted.append(f"    Value: {indicator_data}")
+                    
+                    formatted.append("")
+            else:
+                formatted.append("  No indicators available for this timeframe")
+                formatted.append("")
+        
+        # Add data freshness info
+        age_seconds = market_data.get('data_age_seconds', 0)
+        if age_seconds < 60:
+            age_str = f"{int(age_seconds)} seconds"
+        elif age_seconds < 3600:
+            age_str = f"{int(age_seconds/60)} minutes"
+        else:
+            age_str = f"{int(age_seconds/3600)} hours"
+            
+        formatted.append(f"Data Age: {age_str}")
+        
+        return "\n".join(formatted)
+    
+    def _format_legacy_market_data(self, market_data: Dict[str, Any]) -> str:
+        """Format legacy single-timeframe market data."""
         formatted = "Market Data:\n"
         
-        # Extract key information from the market data
+        # Extract key information from the legacy market data
         if 'symbol' in market_data:
             formatted += f"Symbol: {market_data['symbol']}\n"
         if 'timeframe' in market_data:
