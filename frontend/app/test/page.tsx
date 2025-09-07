@@ -106,18 +106,18 @@ export default function TestPage() {
   }
 
   // Test functions
-  const runTest = async (testName: string, testFn: () => Promise<unknown>) => {
+  const runTest = async (testName: string, testFn: () => Promise<{ status: number; data: unknown }>) => {
     setLoading(true)
     try {
       const result = await testFn()
       setResults(prev => ({
         ...prev,
-        [testName]: { success: true, ...result }
+        [testName]: { success: true, status: result.status, data: result.data }
       }))
     } catch (error) {
       setResults(prev => ({
         ...prev,
-        [testName]: { success: false, error: error.message }
+        [testName]: { success: false, error: (error as Error).message }
       }))
     }
     setLoading(false)
