@@ -1030,7 +1030,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                     }))
                                   }}
                                   className={`px-3 py-1 text-xs rounded transition-colors ${
-                                    configData.decision.analysis_frequency === freq.value
+                                    configData.decision?.analysis_frequency === freq.value
                                       ? 'bg-agents-decision text-charcoal-900 font-medium'
                                       : 'bg-charcoal-800 text-gray-400 hover:text-bone-200'
                                   }`}
@@ -1049,7 +1049,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             <div className="bg-charcoal-800 border border-charcoal-600 p-3 text-xs text-gray-300">
                               <div>Analyzing: <span className="text-bone-200">{configData.selected_pair}</span></div>
                               <div className="mt-1">Using data points: <span className="text-bone-200">{selectedDataPoints.length} selected</span></div>
-                              <div className="mt-1">Review frequency: <span className="text-bone-200">Every {frequencyOptions.find(f => f.value === configData.decision.analysis_frequency)?.label.toLowerCase()}</span></div>
+                              <div className="mt-1">Review frequency: <span className="text-bone-200">Every {frequencyOptions.find(f => f.value === configData.decision?.analysis_frequency)?.label?.toLowerCase()}</span></div>
                             </div>
                           </div>
 
@@ -1266,7 +1266,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                             <div>
                               <label className="block text-xs text-gray-400 mb-2">Your trading strategy:</label>
                               <textarea
-                                value={configData.decision.user_prompt || ''}
+                                value={configData.decision?.user_prompt || ''}
                                 onChange={(e) => {
                                   updateConfigData(prev => ({
                                     ...prev,

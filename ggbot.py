@@ -580,7 +580,9 @@ async def get_user_profile(
             "subscription_status": profile.subscription_status.value,
             "can_use_premium_features": profile.can_use_premium_features,
             "requires_own_llm_keys": profile.requires_own_llm_keys,
-            "can_publish_telegram_signals": profile.can_publish_telegram_signals
+            "can_publish_telegram_signals": profile.can_publish_telegram_signals,
+            "can_use_signal_validation": profile.can_use_signal_validation,
+            "paid_data_points": profile.paid_data_points
         }
     }
 

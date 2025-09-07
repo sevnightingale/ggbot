@@ -15,7 +15,7 @@ import uuid
 class SubscriptionTier(Enum):
     """Available subscription tiers for the freemium business model."""
     FREE = "free"      # Free tier: paper trading with user's LLM keys
-    SIGNALS = "signals"  # Paid tier: hosted LLM + Telegram signal publishing
+    GGBASE = "ggbase"  # Paid tier: hosted LLM + Telegram signal publishing
 
 
 class SubscriptionStatus(Enum):
@@ -68,14 +68,14 @@ class UserProfile:
         return self.subscription_tier == SubscriptionTier.FREE
     
     @property
-    def is_signals_tier(self) -> bool:
-        """Check if user has signals subscription."""
-        return self.subscription_tier == SubscriptionTier.SIGNALS
+    def is_ggbase_tier(self) -> bool:
+        """Check if user has ggbase subscription."""
+        return self.subscription_tier == SubscriptionTier.GGBASE
     
     @property
     def is_premium_user(self) -> bool:
         """Check if user has any premium subscription."""
-        return self.subscription_tier in [SubscriptionTier.SIGNALS]
+        return self.subscription_tier in [SubscriptionTier.GGBASE]
     
     @property
     def has_active_subscription(self) -> bool:
@@ -111,6 +111,11 @@ class UserProfile:
     @property
     def can_publish_telegram_signals(self) -> bool:
         """Check if user can publish signals to Telegram."""
+        return self.can_use_premium_features
+    
+    @property
+    def can_use_signal_validation(self) -> bool:
+        """Check if user can use signal validation mode."""
         return self.can_use_premium_features
     
     def has_data_point_access(self, data_point_name: str) -> bool:
@@ -153,7 +158,7 @@ class UserProfile:
         expires_at: Optional[datetime] = None
     ) -> None:
         """Upgrade user to signals tier with Stripe integration."""
-        self.subscription_tier = SubscriptionTier.SIGNALS
+        self.subscription_tier = SubscriptionTier.GGBASE
         self.subscription_status = SubscriptionStatus.ACTIVE
         self.stripe_customer_id = stripe_customer_id
         self.stripe_subscription_id = stripe_subscription_id

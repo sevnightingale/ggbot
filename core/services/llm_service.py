@@ -207,8 +207,8 @@ class LLMService:
                 # Free tier: must use user's own API keys from Vault
                 return await self._get_user_llm_client(user_id, config, preferred_provider)
             
-            elif profile.subscription_tier == SubscriptionTier.SIGNALS:
-                # Signals tier: use our hosted API keys
+            elif profile.subscription_tier == SubscriptionTier.GGBASE:
+                # GGBase tier: use our hosted API keys
                 return await self._get_hosted_llm_client(preferred_provider)
             
             else:
