@@ -351,6 +351,10 @@ class ConfigService:
             Updated BotConfigV2 instance if successful, None otherwise
         """
         try:
+            # Debug: Log what we received
+            self._log.info(f"UPDATE CONFIG DEBUG - Received config_data: {config_data}")
+            self._log.info(f"UPDATE CONFIG DEBUG - config_type in data: {config_data.get('config_type', 'NOT_FOUND')}")
+            
             # Get existing config to validate access
             existing_config = await self.get_config(config_id, user_id)
             if not existing_config:

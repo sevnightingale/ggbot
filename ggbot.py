@@ -46,19 +46,25 @@ from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, S
 # Pydantic Models for API
 class ConfigCreateRequest(BaseModel):
     config_name: str
+    schema_version: str = "2.1"
+    config_type: str = "autonomous_trading"
     selected_pair: str = "BTC/USDT"
     extraction: Dict[str, Any]
     decision: Dict[str, Any]
     trading: Dict[str, Any]
+    llm_config: Dict[str, Any]
     telegram_integration: Optional[Dict[str, Any]] = None
 
 
 class ConfigUpdateRequest(BaseModel):
     config_name: Optional[str] = None
+    schema_version: Optional[str] = None
+    config_type: Optional[str] = None
     selected_pair: Optional[str] = None
     extraction: Optional[Dict[str, Any]] = None
     decision: Optional[Dict[str, Any]] = None
     trading: Optional[Dict[str, Any]] = None
+    llm_config: Optional[Dict[str, Any]] = None
     telegram_integration: Optional[Dict[str, Any]] = None
 
 
