@@ -65,3 +65,11 @@ ggshot-*-*-*/
 node_modules/
 package-lock.json
 package.json
+
+# MCP configuration (contains database credentials)
+.mcp.json
+
+# Development files
+installed_packages.txt
+requirements.txt
+CLAUDE.md
