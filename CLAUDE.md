@@ -1,8 +1,10 @@
-# GGBot Development Guide
+# ggbot Development Guide
 
 ## Project Overview
 
-ggbot is an autonomous AI trading platform with a three-agent architecture: Extraction → Decision → Trading. It combines browser automation, advanced reasoning LLMs, and sophisticated execution engines to create autonomous trading agents that operate 24/7.
+ggbots is an autonomous AI trading platform with a three-agent architecture: Extraction → Decision → Trading. It combines browser automation, advanced reasoning LLMs, and sophisticated execution engines to create autonomous trading agents that operate 24/7.
+
+the platform is called ggbots, NOT GGBots. the repo is called ggbot (without the s) which is fine, but the platform itself is called ggbots.ai, and to clarify, NO capital GG. It's lowercase gg, always. 
 
 ## Essential Commands
 

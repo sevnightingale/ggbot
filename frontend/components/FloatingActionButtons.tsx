@@ -63,10 +63,10 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
           </svg>
         </button>
 
-        {/* Add New Bot Button */}
+        {/* Add New ggbot Button */}
         <button
           className="floating-action-btn floating-action-enabled"
-          title="Create New Bot"
+          title="Create New ggbot"
           onClick={() => onAdd?.()}
         >
           <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
