@@ -66,6 +66,17 @@ const dataSourceDisplayNames: Record<string, string> = {
   'onchain_analytics': 'On-chain Analytics'
 }
 
+// All data sources (including coming soon ones)
+const allDataSources = [
+  'technical_analysis',
+  'signals_group_chats', 
+  'fundamental_analysis',
+  'sentiment_and_trends',
+  'influencer_kol',
+  'news_and_regulations',
+  'onchain_analytics'
+]
+
 interface DataSourceSectionProps {
   dataSources: DataSource[]
   selectedDataPoints: string[]  // Now contains data point names, not IDs
@@ -154,17 +165,17 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
       {/* Data Source Tabs */}
       <div className="mb-4">
         <div className="flex gap-1 flex-wrap mb-4 border-b border-charcoal-600">
-          {dataSources.map(source => (
+          {allDataSources.map(sourceName => (
             <button
-              key={source.source_id}
-              onClick={() => setActiveTab(source.name)}
+              key={sourceName}
+              onClick={() => setActiveTab(sourceName)}
               className={`px-3 py-2 text-xs transition-colors border-b-2 ${
-                activeTab === source.name
+                activeTab === sourceName
                   ? 'border-agent-extraction text-agent-extraction bg-agent-extraction/5'
                   : 'border-transparent text-gray-400 hover:text-bone-200 hover:border-gray-600'
               }`}
             >
-              {dataSourceDisplayNames[source.name] || source.name}
+              {dataSourceDisplayNames[sourceName] || sourceName}
             </button>
           ))}
         </div>
@@ -188,7 +199,8 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
 
       {/* Active Tab Content */}
       <div className="space-y-2 max-h-64 overflow-y-auto">
-        {filteredDataPoints.map(dataPoint => {
+        {filteredDataPoints.length > 0 ? (
+          filteredDataPoints.map(dataPoint => {
           const isSelected = selectedDataPoints.includes(dataPoint.name)
           const canAccess = canAccessDataPoint(dataPoint)
           const isLocked = dataPoint.is_locked
@@ -251,11 +263,33 @@ const DataSourceSection: React.FC<DataSourceSectionProps> = ({
               )}
             </div>
           )
-        })}
+        })
+        ) : (
+          // Coming Soon message for data sources without data points
+          <div className="text-center py-12">
+            <div className="bg-charcoal-800 border border-charcoal-600 rounded-lg p-6 max-w-sm mx-auto">
+              <div className="text-orange-400 text-sm font-medium mb-2">
+                {dataSourceDisplayNames[activeTab]} - Coming Soon
+              </div>
+              <div className="text-gray-400 text-xs mb-4">
+                {activeTab === 'fundamental_analysis' && 'Financial metrics, earnings data, and company fundamentals'}
+                {activeTab === 'sentiment_and_trends' && 'Social media sentiment analysis and trending topics'}
+                {activeTab === 'influencer_kol' && 'Key opinion leader insights and influencer signals'}
+                {activeTab === 'news_and_regulations' && 'Breaking news analysis and regulatory updates'}
+                {activeTab === 'onchain_analytics' && 'Blockchain metrics, whale movements, and on-chain data'}
+                {activeTab === 'signals_group_chats' && 'Premium trading signals from verified sources'}
+                {activeTab === 'technical_analysis' && 'Technical indicators and chart analysis'}
+              </div>
+              <div className="text-xs text-gray-500">
+                We&apos;re working hard to bring you these advanced data sources
+              </div>
+            </div>
+          </div>
+        )}
         
-        {filteredDataPoints.length === 0 && (
+        {filteredDataPoints.length === 0 && searchTerm && (
           <div className="text-center py-8 text-gray-500 text-xs">
-            {searchTerm ? 'No matching data points found' : 'No data points available in this category'}
+            No matching data points found
           </div>
         )}
       </div>
@@ -328,7 +362,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
         } else {
           // New bot - use defaults
           setConfigData(createDefaultConfigData())
-          setBotName('New Bot')
+          setBotName('New ggbot')
         }
         
       } catch (error) {
@@ -760,86 +794,70 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                 </div>
               ) : (
                 <>
-                  {/* Config Type Selection */}
-                  <div className="mb-8">
-                    <div className="bg-charcoal-900 relative ggbot-accordion-expanded">
-                      <div className="p-6 space-y-6">
-                        <div>
-                          <div className="flex items-center justify-between mb-4">
-                            <h4 className="text-footnote text-bone-200 font-medium">BOT TYPE</h4>
-                          </div>
-                          
-                          {/* Bot Type Selection */}
-                          <div className="space-y-3">
-                            {/* Autonomous Trading Option */}
-                            <label className="flex items-center gap-3 cursor-pointer">
-                              <input
-                                type="radio"
-                                name="config_type"
-                                value="autonomous_trading"
-                                checked={configData.config_type === 'autonomous_trading'}
-                                onChange={(e) => {
-                                  updateConfigData(prev => ({
-                                    ...prev,
-                                    config_type: e.target.value
-                                  }))
-                                }}
-                                className="w-4 h-4 text-blue-500 focus:ring-blue-500"
-                              />
-                              <div className="flex items-center justify-between flex-1">
-                                <div>
-                                  <div className="text-xs text-bone-200 font-medium">Autonomous Trading</div>
-                                  <div className="text-xs text-gray-400">AI makes trading decisions automatically based on market analysis</div>
-                                </div>
-                                <div className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-700">
-                                  Available
-                                </div>
-                              </div>
-                            </label>
+                  {/* ggbot Type Selection - Horizontal Layout */}
+                  <div className="mb-6">
+                    <div className="mb-3">
+                      <h4 className="text-footnote text-bone-200 font-medium">ggbot TYPE</h4>
+                    </div>
+                    
+                    {/* Horizontal Radio Options */}
+                    <div className="flex gap-4">
+                      {/* Autonomous Trading Option */}
+                      <label className="flex-1 cursor-pointer">
+                        <div className="flex items-center gap-3 mb-2">
+                          <input
+                            type="radio"
+                            name="config_type"
+                            value="autonomous_trading"
+                            checked={configData.config_type === 'autonomous_trading'}
+                            onChange={(e) => {
+                              updateConfigData(prev => ({
+                                ...prev,
+                                config_type: e.target.value
+                              }))
+                            }}
+                            className="w-4 h-4 text-blue-500 focus:ring-blue-500"
+                          />
+                          <div className="text-xs text-bone-200 font-medium">Autonomous Trading</div>
+                        </div>
+                        <div className="text-xs text-gray-400 ml-7">
+                          AI makes trading decisions automatically based on market analysis
+                        </div>
+                      </label>
 
-                            {/* Signal Validation Option */}
-                            <label className={`flex items-center gap-3 ${!userProfile?.can_use_signal_validation ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-                              <input
-                                type="radio"
-                                name="config_type"
-                                value="signal_validation"
-                                checked={configData.config_type === 'signal_validation'}
-                                onChange={(e) => {
-                                  if (userProfile?.can_use_signal_validation) {
-                                    updateConfigData(prev => ({
-                                      ...prev,
-                                      config_type: e.target.value
-                                    }))
-                                  }
-                                }}
-                                disabled={!userProfile?.can_use_signal_validation}
-                                className="w-4 h-4 text-blue-500 focus:ring-blue-500"
-                              />
-                              <div className="flex items-center justify-between flex-1">
-                                <div>
-                                  <div className="text-xs text-bone-200 font-medium">Signal Validation</div>
-                                  <div className="text-xs text-gray-400">Validate and analyze signals from external sources like ggShot</div>
-                                </div>
-                                {userProfile?.can_use_signal_validation ? (
-                                  <div className="text-xs bg-green-900/30 text-green-400 px-2 py-1 rounded border border-green-700">
-                                    Available
-                                  </div>
-                                ) : (
-                                  <button
-                                    onClick={() => {
-                                      // TODO: Show upgrade modal
-                                      alert('Signal Validation requires an upgraded plan')
-                                    }}
-                                    className="text-xs bg-orange-900/30 text-orange-400 px-2 py-1 rounded border border-orange-700 hover:bg-orange-900/50 transition-colors"
-                                  >
-                                    Upgrade Required
-                                  </button>
-                                )}
-                              </div>
-                            </label>
+                      {/* Signal Validation Option */}
+                      <label className={`flex-1 ${!userProfile?.can_use_signal_validation ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+                        <div className="flex items-center gap-3 mb-2">
+                          <input
+                            type="radio"
+                            name="config_type"
+                            value="signal_validation"
+                            checked={configData.config_type === 'signal_validation'}
+                            onChange={(e) => {
+                              if (userProfile?.can_use_signal_validation) {
+                                updateConfigData(prev => ({
+                                  ...prev,
+                                  config_type: e.target.value
+                                }))
+                              } else {
+                                // Show upgrade modal
+                                alert('Signal Validation requires an upgraded plan')
+                              }
+                            }}
+                            disabled={!userProfile?.can_use_signal_validation}
+                            className="w-4 h-4 text-blue-500 focus:ring-blue-500"
+                          />
+                          <div className="text-xs text-bone-200 font-medium">
+                            Signal Validation
+                            {!userProfile?.can_use_signal_validation && (
+                              <span className="ml-2 text-orange-400">(Upgrade Required)</span>
+                            )}
                           </div>
                         </div>
-                      </div>
+                        <div className="text-xs text-gray-400 ml-7">
+                          Validate and analyze signals from external sources like ggShot
+                        </div>
+                      </label>
                     </div>
                   </div>
 
