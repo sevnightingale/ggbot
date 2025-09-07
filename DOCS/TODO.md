@@ -2,6 +2,43 @@
 
 ## 🎯 **PRIORITY #1: Free Tier Paper Trading - Production Ready**
 
+### **Phase 0: Frontend-Backend Integration** ✅ **COMPLETED 2025-09-07**
+
+#### **Critical Structure Fixes**
+- [x] **claude**: Fixed ConfigData interface to match V2.1 multi-timeframe structure
+- [x] **claude**: Updated `extraction.data_sources` → `extraction.selected_data_sources` 
+- [x] **claude**: Changed `technical_indicators` → `technical_analysis`
+- [x] **claude**: Fixed `handleToggleDataPoint` to save indicator names ("RSI") not UUIDs
+- [x] **claude**: Added multi-timeframe note: "All selected indicators analyzed across 7 timeframes"
+
+#### **Authentication & Security**
+- [x] **claude**: Removed hardcoded user ID, implemented real Supabase auth
+- [x] **claude**: Added authentication guards with loading states in dashboard
+- [x] **claude**: Updated all API calls to use authenticated apiClient instead of direct fetch
+- [x] **claude**: Fixed bot store API endpoints (start/stop/delete) with proper auth headers
+- [x] **claude**: Fixed deleteBot endpoint to use correct `/api/v2/config/{config_id}`
+
+#### **LLM Credential Management** 🔐
+- [x] **claude**: Implemented proper credential storage with Supabase Vault encryption
+- [x] **claude**: Added credential management API calls (store/list/delete) to apiClient
+- [x] **claude**: Removed API keys from config_data JSONB structure (security fix)
+- [x] **claude**: Created separate credential input with "Save Key" button
+- [x] **claude**: Added credential loading and real-time UI updates
+- [x] **claude**: Moved LLM config into Decision Agent section (better UX)
+
+#### **Configuration System Improvements**
+- [x] **claude**: Updated default config to use DeepSeek R1 (free, no API key needed)
+- [x] **claude**: Implemented elegant radio button LLM provider selection
+- [x] **claude**: Added upgrade prompts for premium providers (OpenAI GPT-4)
+- [x] **claude**: Updated `core/config/template_v1.json` to match V2.1 structure
+- [x] **claude**: Fixed schema version `1.0` → `2.1` and added `config_type` field
+
+#### **Data Structure Alignment**
+- [x] **claude**: All frontend data structures now match backend expectations exactly
+- [x] **claude**: Multi-timeframe config: user selects "RSI" → system analyzes 7 timeframes
+- [x] **claude**: Proper category mapping: technical_analysis, signals_group_chats, etc.
+- [x] **claude**: Fixed bot store config transformation for V2 API responses
+
 ### **Phase 1: ggShot Integration & Config Type Support** 
 
 #### **ggShot Premium Access Control** 
