@@ -44,11 +44,18 @@ export default function TestPage() {
       system_prompt: "You are an expert cryptocurrency trader analyzing {SYMBOL} at current price {CURRENT_PRICE}. Your analysis is based on the following market data:\n\n{MARKET_DATA}\n\nProvide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.",
       user_prompt: "My trading strategy:\nEnter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods.\n\nCurrent market analysis:\n{MARKET_DATA}\n\nDecision: Based on the above data, should I ENTER, WAIT, or EXIT this position?"
     },
+    llm_config: {
+      provider: "openai",
+      use_platform_keys: true,
+      openai_api_key: null,
+      deepseek_api_key: null,
+      anthropic_api_key: null
+    },
     trading: {
       execution_mode: "paper",
       leverage: 1,
       position_sizing: {
-        method: "fixed_amount_usd",
+        method: "confidence_based",
         fixed_amount_usd: 50,
         account_percent: 5.0,
         max_position_percent: 10.0
