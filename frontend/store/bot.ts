@@ -477,34 +477,72 @@ export const useBotStore = create<BotState>((set, get) => ({
   },
 
   startScheduler: async () => {
+    const currentBotId = get().currentBotId
+    if (!currentBotId) {
+      set({ error: 'No bot selected' })
+      return
+    }
+
     set({ isLoading: true, error: null })
     try {
-      // Mock start scheduler
-      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
+      // Call real V2 API to start the bot
+      const result = await api.startBot(currentBotId)
+      console.log('Bot started:', result)
+      
+      // Update config state to 'active' and scheduler status
+      const state = get()
+      const updatedBots = state.availableBots.map(bot =>
+        bot.config_id === currentBotId 
+          ? { ...bot, state: 'active' as const, updated_at: new Date().toISOString() }
+          : bot
+      )
+      
       set({ 
+        availableBots: updatedBots,
+        currentConfig: state.currentConfig ? { ...state.currentConfig, state: 'active' } : null,
         schedulerStatus: { is_running: true },
         isLoading: false 
       })
     } catch (error) {
+      console.error('Failed to start bot:', error)
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to start scheduler',
+        error: error instanceof Error ? error.message : 'Failed to start bot',
         isLoading: false 
       })
     }
   },
 
   stopScheduler: async () => {
+    const currentBotId = get().currentBotId
+    if (!currentBotId) {
+      set({ error: 'No bot selected' })
+      return
+    }
+
     set({ isLoading: true, error: null })
     try {
-      // Mock stop scheduler
-      await new Promise(resolve => setTimeout(resolve, 500)) // Simulate API delay
+      // Call real V2 API to stop the bot
+      const result = await api.stopBot(currentBotId)
+      console.log('Bot stopped:', result)
+      
+      // Update config state to 'inactive' and scheduler status
+      const state = get()
+      const updatedBots = state.availableBots.map(bot =>
+        bot.config_id === currentBotId 
+          ? { ...bot, state: 'inactive' as const, updated_at: new Date().toISOString() }
+          : bot
+      )
+      
       set({ 
+        availableBots: updatedBots,
+        currentConfig: state.currentConfig ? { ...state.currentConfig, state: 'inactive' } : null,
         schedulerStatus: { is_running: false },
         isLoading: false 
       })
     } catch (error) {
+      console.error('Failed to stop bot:', error)
       set({ 
-        error: error instanceof Error ? error.message : 'Failed to stop scheduler',
+        error: error instanceof Error ? error.message : 'Failed to stop bot',
         isLoading: false 
       })
     }

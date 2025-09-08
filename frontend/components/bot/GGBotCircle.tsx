@@ -27,7 +27,10 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   const [editName, setEditName] = useState('')
   
   const currentBotName = currentConfig?.config_name || 'Loading...'
-  const isRunning = status?.is_running || false
+  const botState = currentConfig?.state || 'inactive' // Database state: 'active' or 'inactive'
+  
+  // Execution status from WebSocket (only when botState is 'active')
+  const executionStatus = botState === 'active' ? status?.current_phase || null : null // 'extracting', 'deciding', 'trading'
   
   // Remove the problematic loadBots useEffect - MainDashboard handles initial loading
   
@@ -51,7 +54,8 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   
   // Check if all agents are configured
   const allConfigured = Object.values(agentStatuses).every(status => status === 'configured')
-  const canStart = allConfigured && !isRunning
+  const canStart = allConfigured && botState === 'inactive'
+  const canStop = botState === 'active'
 
   const handleLeftNav = async () => {
     if (currentBotIndex > 0) {
@@ -78,7 +82,7 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
   }
 
   const handleStartStop = async () => {
-    if (isRunning) {
+    if (canStop) {
       await stopScheduler()
     } else if (canStart) {
       await startScheduler()
@@ -140,65 +144,68 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
             <div className="flex flex-col items-center">
               {/* Large Circle Emblem */}
               <div 
-                className={`w-32 h-32 rounded-full bg-bone-200/90 border-2 border-bone-200/90 relative flex items-center justify-center transition-all duration-300 ${
-                  isRunning ? 'animate-pulse' : ''
+                className={`ggbot-circle ${
+                  executionStatus === 'extracting' ? 'ggbot-extracting' :
+                  executionStatus === 'deciding' ? 'ggbot-deciding' :
+                  executionStatus === 'trading' ? 'ggbot-trading' :
+                  botState === 'active' ? 'ggbot-idle' :
+                  'ggbot-inactive'
                 }`}
-                style={{
-                  backgroundImage: `
-                    radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.95) 0%, rgba(227, 229, 230, 0.85) 100%),
-                    url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23161618' fill-opacity='0.05'%3E%3Ccircle cx='7' cy='7' r='1'/%3E%3Ccircle cx='53' cy='53' r='1'/%3E%3Ccircle cx='23' cy='43' r='1'/%3E%3Ccircle cx='37' cy='17' r='1'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")
-                  `,
-                  boxShadow: isRunning 
-                    ? '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(227, 229, 230, 0.1), 0 0 30px rgba(44, 190, 119, 0.6), 0 0 60px rgba(44, 190, 119, 0.3)'
-                    : '0 4px 20px rgba(0, 0, 0, 0.4), inset 0 2px 10px rgba(227, 229, 230, 0.1)'
-                }}
               >
-                {/* Status indicator ring - enhanced when running */}
-                {isRunning && (
-                  <div className="absolute inset-1 rounded-full border-2 border-green-400 animate-pulse" 
-                       style={{
-                         boxShadow: '0 0 20px rgba(44, 190, 119, 0.8), inset 0 0 20px rgba(44, 190, 119, 0.2)'
-                       }} />
-                )}
+                <div className="ggbot-inner">
+                  <div className="ggbot-name">{currentBotName}</div>
+                  <div className="ggbot-status-label">
+                    <span className={`ggbot-status-indicator ${
+                      executionStatus === 'extracting' ? 'ggbot-status-extracting' :
+                      executionStatus === 'deciding' ? 'ggbot-status-deciding' :
+                      executionStatus === 'trading' ? 'ggbot-status-trading' :
+                      botState === 'active' ? 'ggbot-status-active' :
+                      'ggbot-status-inactive'
+                    }`}>
+                      {botState === 'active' ? '●' : botState === 'inactive' ? '○' : '●'}
+                    </span>
+                    <span className="ggbot-status-text">
+                      {executionStatus || (botState === 'active' ? 'active' : botState)}
+                    </span>
+                  </div>
+                </div>
                 
-                {/* Bot Name Inside Circle */}
-                <div className="flex items-center space-x-1 z-10">
-                  {isEditingName ? (
-                    <div className="flex items-center space-x-1">
+                {/* Edit functionality - positioned over the name */}
+                <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-30">
+                  {isEditingName && (
+                    <div className="flex items-center space-x-1 bg-charcoal-800/90 p-2 rounded">
                       <input
                         type="text"
                         value={editName}
                         onChange={(e) => setEditName(e.target.value)}
-                        className="bg-charcoal-800/90 border border-charcoal-700 px-2 py-1 text-charcoal-900 text-sm font-bold w-20 text-center"
+                        className="bg-charcoal-700 border border-charcoal-600 px-2 py-1 text-bone-200 text-sm font-bold w-24 text-center rounded"
                         autoFocus
                       />
                       <button
                         onClick={handleNameSave}
-                        className="text-charcoal-700 hover:text-charcoal-900"
+                        className="text-green-400 hover:text-green-300"
                       >
                         <Check size={14} />
                       </button>
                       <button
                         onClick={handleNameCancel}
-                        className="text-red-600 hover:text-red-700"
+                        className="text-red-400 hover:text-red-300"
                       >
                         <X size={14} />
                       </button>
                     </div>
-                  ) : (
-                    <div className="flex items-center space-x-1">
-                      <span className="font-display font-bold text-sm text-charcoal-900">
-                        {currentBotName}
-                      </span>
-                      <button
-                        onClick={handleNameEdit}
-                        className="text-charcoal-700 hover:text-charcoal-900"
-                      >
-                        <Edit3 size={12} />
-                      </button>
-                    </div>
                   )}
                 </div>
+                
+                {/* Edit button - positioned in corner */}
+                {!isEditingName && (
+                  <button
+                    onClick={handleNameEdit}
+                    className="absolute top-2 right-2 text-bone-300 hover:text-bone-200 z-30"
+                  >
+                    <Edit3 size={14} />
+                  </button>
+                )}
               </div>
             </div>
 
@@ -245,21 +252,21 @@ export function GGBotCircle({ status }: GGBotCircleProps) {
           <div className="relative group">
             <button
               onClick={handleStartStop}
-              disabled={!canStart && !isRunning}
+              disabled={!canStart && !canStop}
               className={`p-4 rounded-full transition-all duration-300 relative ${
-                isRunning
+                canStop
                   ? 'bg-red-600/20 hover:bg-red-600/30 text-red-400 hover:text-red-300'
                   : canStart
                     ? 'bg-bone-200/20 hover:bg-bone-200/30 text-bone-200 hover:text-bone-100'
                     : 'bg-charcoal-700/50 text-bone-500/50 cursor-not-allowed'
               }`}
             >
-              {isRunning ? <Square size={24} /> : <Play size={24} />}
+              {canStop ? <Square size={24} /> : <Play size={24} />}
             </button>
             {/* Floating Label */}
             <div className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-200 pointer-events-none">
               <div className="bg-charcoal-800 border border-bone-200/60 px-2 py-1 text-xs text-bone-200 whitespace-nowrap">
-                {isRunning ? 'STOP' : canStart ? 'START' : 'Configure agents first'}
+                {canStop ? 'STOP' : canStart ? 'START' : 'Configure agents first'}
               </div>
             </div>
           </div>

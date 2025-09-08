@@ -351,10 +351,6 @@ class ConfigService:
             Updated BotConfigV2 instance if successful, None otherwise
         """
         try:
-            # Debug: Log what we received
-            self._log.info(f"UPDATE CONFIG DEBUG - Received config_data: {config_data}")
-            self._log.info(f"UPDATE CONFIG DEBUG - config_type in data: {config_data.get('config_type', 'NOT_FOUND')}")
-            
             # Get existing config to validate access
             existing_config = await self.get_config(config_id, user_id)
             if not existing_config:
@@ -503,6 +499,79 @@ class ConfigService:
         }
         
         return await self.create_config(user_id, config_name, default_config_data)
+    
+    async def set_bot_state(
+        self,
+        config_id: str,
+        user_id: str,
+        state: str
+    ) -> bool:
+        """
+        Update the state field for a bot configuration.
+        
+        Args:
+            config_id: Configuration ID
+            user_id: User ID for access validation
+            state: New state ('active' or 'inactive')
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        if state not in ['active', 'inactive']:
+            self._log.error(f"Invalid state: {state}. Must be 'active' or 'inactive'")
+            return False
+            
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE configurations 
+                        SET state = %s, updated_at = CURRENT_TIMESTAMP
+                        WHERE config_id = %s AND user_id = %s
+                    """, (state, config_id, user_id))
+                    
+                    if cur.rowcount > 0:
+                        conn.commit()
+                        self._log.info(f"Updated config {config_id} state to {state}")
+                        return True
+                    else:
+                        self._log.warning(f"No config found to update: {config_id}")
+                        return False
+                        
+        except Exception as e:
+            self._log.error(f"Failed to set bot state for {config_id}: {e}")
+            return False
+    
+    async def get_bot_state(
+        self,
+        config_id: str,
+        user_id: str
+    ) -> Optional[str]:
+        """
+        Get the current state of a bot configuration.
+        
+        Args:
+            config_id: Configuration ID
+            user_id: User ID for access validation
+            
+        Returns:
+            Current state ('active' or 'inactive') or None if not found
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT state 
+                        FROM configurations 
+                        WHERE config_id = %s AND user_id = %s
+                    """, (config_id, user_id))
+                    
+                    result = cur.fetchone()
+                    return result[0] if result else None
+                    
+        except Exception as e:
+            self._log.error(f"Failed to get bot state for {config_id}: {e}")
+            return None
 
 
 # Convenience instance

@@ -161,21 +161,25 @@ class ApiClient {
     })
   }
 
-  // Scheduler APIs
-  async startScheduler(): Promise<ApiResponse<{ message: string }>> {
-    return this.request('/agent/api/scheduler/start', {
+  // Bot Control APIs (V2 Scheduler)
+  async startBot(configId: string): Promise<ApiResponse<{ status: string, config_id: string, timeframe: string }>> {
+    return this.request(`/api/v2/bot/${configId}/start`, {
       method: 'POST',
     })
   }
 
-  async stopScheduler(): Promise<ApiResponse<{ message: string }>> {
-    return this.request('/agent/api/scheduler/stop', {
+  async stopBot(configId: string): Promise<ApiResponse<{ status: string, config_id: string }>> {
+    return this.request(`/api/v2/bot/${configId}/stop`, {
       method: 'POST',
     })
+  }
+
+  async getBotStatus(configId: string): Promise<{ status: string, bot_status: string, config_id: string }> {
+    return this.request(`/api/v2/bot/${configId}/status`)
   }
 
   async getSchedulerStatus(): Promise<SchedulerStatus> {
-    return this.request('/agent/api/scheduler/status')
+    return this.request('/api/v2/scheduler/status')
   }
 
   // Dashboard APIs

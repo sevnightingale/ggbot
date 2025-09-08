@@ -56,6 +56,7 @@ export interface UnifiedConfig {
     decision: DecisionConfig
     trading: TradingConfig
   }
+  state: 'active' | 'inactive'  // New database field for scheduler state
   created_at: string
   updated_at: string
   editable: boolean
@@ -97,6 +98,7 @@ export interface PerformanceData {
 // Scheduler types
 export interface SchedulerStatus {
   is_running: boolean
+  current_phase?: 'extracting' | 'deciding' | 'trading' | null  // Current execution phase
   last_run?: string
   next_run?: string
   error?: string

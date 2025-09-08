@@ -92,9 +92,13 @@ class DecisionEngineV2:
             await self.initialize()
         
         try:
-            # For now, just handle autonomous trading (opportunity analysis)
-            # TODO: Re-enable signal validation and position management later
-            return await self._handle_autonomous_trading(symbol)
+            # Route based on config type and signal data presence
+            config_type = getattr(self.config, 'config_type', 'autonomous_trading')
+            
+            if config_type == "signal_validation" and signal_data:
+                return await self._handle_signal_validation(symbol, signal_data)
+            else:
+                return await self._handle_autonomous_trading(symbol)
                 
         except (DecisionError, MarketDataError, ConfigurationError, LLMError):
             # Re-raise domain-specific errors (they're already logged)
@@ -103,8 +107,46 @@ class DecisionEngineV2:
             logger.bind(config_id=self.config_id).error(f"Unexpected decision error: {e}")
             raise DecisionError(f"Decision making failed: {e}")
     
-    # TODO: Re-implement signal validation mode when domain objects are available
-    # async def _handle_signal_validation(...)
+    async def _handle_signal_validation(self, symbol: str, signal_data: Dict) -> Dict[str, Any]:
+        """
+        Handle signal validation mode - validate external signal using current market data.
+        
+        Process:
+        1. Get fresh market data for signal's symbol
+        2. Build signal validation prompt (4-pillar ggShot framework)
+        3. Call GPT-5 for validation decision
+        4. Create signal validation decision record
+        5. Return trading intent
+        """
+        # Get fresh market data for signal's symbol
+        market_data = await self._get_fresh_market_data(symbol)
+        if not market_data:
+            return self._create_error_intent(f"No market data available for signal {symbol}")
+        
+        # Get current price
+        current_price = await self._get_current_price(symbol)
+        
+        # Build signal validation prompt
+        prompt = self._build_signal_validation_prompt(
+            symbol, signal_data, market_data, current_price
+        )
+        
+        # Call GPT-5 for validation
+        llm_response = await self._call_gpt5(prompt)
+        
+        # Parse response
+        decision_data = self._parse_llm_response(llm_response)
+        
+        # Save signal validation decision to database
+        decision_id = await self._save_signal_decision_to_db(
+            symbol, decision_data, signal_data, market_data, 
+            current_price, prompt, llm_response
+        )
+        
+        # Return signal validation intent
+        return self._create_signal_validation_intent(
+            decision_id, symbol, decision_data, signal_data
+        )
     
     async def _handle_autonomous_trading(self, symbol: Optional[str] = None) -> Dict[str, Any]:
         """
@@ -271,8 +313,54 @@ class DecisionEngineV2:
             )
             return Decimal("100.00")
     
-    # TODO: Re-implement signal validation prompt when needed
-    # def _build_signal_validation_prompt(...)
+    def _build_signal_validation_prompt(
+        self, 
+        symbol: str,
+        signal_data: Dict,
+        market_data: Dict[str, Any],
+        current_price: Decimal
+    ) -> str:
+        """Build signal validation prompt using user's configured strategy."""
+        
+        signal_context = self._format_signal_for_llm(signal_data)
+        market_context = self._format_market_data_for_llm(market_data)
+        
+        # Use user's configured system and user prompts, but inject signal context
+        system_prompt = self.config.decision.system_prompt.format(
+            SYMBOL=symbol,
+            CURRENT_PRICE=f"${current_price:,.2f}",
+            MARKET_DATA=market_context
+        )
+        
+        user_prompt = self.config.decision.user_prompt.format(
+            SYMBOL=symbol,
+            CURRENT_PRICE=f"${current_price:,.2f}",
+            MARKET_DATA=market_context
+        )
+        
+        # Add signal context to the user's strategy
+        signal_validation_prompt = f"""
+{system_prompt}
+
+## EXTERNAL SIGNAL TO VALIDATE
+{signal_context}
+
+## YOUR TASK
+{user_prompt}
+
+Based on your trading strategy above, should this external signal be validated or rejected?
+
+## OUTPUT FORMAT
+ACTION: [validate/reject]
+CONFIDENCE: [0.000-1.000]
+STOP_LOSS: [price or use signal default]
+TAKE_PROFIT: [price or use signal default]
+
+REASONING:
+[Apply your configured strategy to explain your decision]
+"""
+        
+        return signal_validation_prompt
     
     def _build_opportunity_analysis_prompt(self, symbol: str,
                                          market_data: Dict[str, Any],
@@ -457,15 +545,22 @@ class DecisionEngineV2:
         
         return formatted
     
-    def _format_signal_data_for_llm(self, signal_data: Dict) -> str:
+    def _format_signal_for_llm(self, signal_data: Dict) -> str:
         """Format signal data for LLM consumption."""
         return f"""
-Signal Information:
-- Signal Type: {signal_data.get('type', 'Unknown')}
-- Direction: {signal_data.get('direction', 'Unknown')}
-- Confidence: {signal_data.get('confidence', 'Unknown')}
+SIGNAL DETAILS:
 - Source: {signal_data.get('source', 'Unknown')}
-- Raw Message: {signal_data.get('message', 'No message provided')[:500]}...
+- Symbol: {signal_data.get('symbol', 'Unknown')}
+- Direction: {signal_data.get('direction', 'Unknown')}
+- Timeframe: {signal_data.get('timeframe', 'Unknown')}
+- Confidence: {signal_data.get('confidence', 0):.1%}
+- Entry Zone: {signal_data.get('entry_zone', 'N/A')}
+- Stop Loss: {signal_data.get('stop_loss', 'N/A')}
+- Take Profit: {signal_data.get('take_profit', 'N/A')}
+- Reasoning: {signal_data.get('reasoning', 'No reasoning provided')}
+
+ORIGINAL MESSAGE:
+{signal_data.get('raw_message', 'No original message available')[:500]}...
 """
     
     async def _call_gpt5(self, prompt: str) -> str:
@@ -540,9 +635,93 @@ Signal Information:
         
         return parsed
     
-    # TODO: Re-implement strategy run creation when domain objects are available
-    # async def _create_strategy_run(...)
-    # def _create_trading_intent(...)
+    async def _save_signal_decision_to_db(
+        self, 
+        symbol: str, 
+        decision_data: Dict[str, Any],
+        signal_data: Dict,
+        market_data: Dict[str, Any], 
+        current_price: Decimal,
+        prompt: str, 
+        llm_response: str
+    ) -> str:
+        """Save signal validation decision to the decisions table."""
+        decision_id = str(uuid.uuid4())
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO decisions (
+                            decision_id, user_id, config_id, symbol, action, status,
+                            confidence, reasoning, prompt, market_data, decision_data,
+                            created_at
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                    """, (
+                        decision_id,
+                        self.user_id,
+                        self.config_id,
+                        symbol,
+                        decision_data.get('action', 'no_action'),
+                        'completed',
+                        decision_data.get('confidence', 0.5),
+                        decision_data.get('reasoning', llm_response),
+                        prompt,
+                        json.dumps(market_data),
+                        json.dumps({
+                            'signal_source': signal_data.get('source'),
+                            'signal_data': signal_data,
+                            'validation_framework': '4-pillar',
+                            'current_price': float(current_price)
+                        }),
+                        datetime.now(timezone.utc)
+                    ))
+                    
+                    logger.bind(
+                        config_id=self.config_id,
+                        decision_id=decision_id,
+                        symbol=symbol,
+                        action=decision_data.get('action')
+                    ).info("Signal validation decision saved to database")
+                    
+                    return decision_id
+                    
+        except Exception as e:
+            logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save signal decision: {e}")
+            raise DecisionError(f"Failed to save signal decision to database: {e}")
+    
+    def _create_signal_validation_intent(
+        self, 
+        decision_id: str, 
+        symbol: str,
+        decision_data: Dict[str, Any], 
+        signal_data: Dict
+    ) -> Dict[str, Any]:
+        """Create signal validation trading intent."""
+        return {
+            'decision_id': decision_id,
+            'config_id': self.config_id,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'decision_type': 'signal_validation',
+            'symbol': symbol,
+            'signal_source': signal_data.get('source'),
+            
+            # Core decision data
+            'action': decision_data.get('action', 'no_action'),
+            'confidence': decision_data.get('confidence', 0.5),
+            'reasoning': decision_data.get('reasoning', 'No reasoning provided'),
+            
+            # Trade parameters (use signal defaults if not overridden by decision)
+            'stop_loss_price': decision_data.get('stop_loss_price') or signal_data.get('stop_loss'),
+            'take_profit_price': decision_data.get('take_profit_price') or signal_data.get('take_profit'),
+            
+            # Signal context
+            'original_signal': signal_data.get('raw_message', ''),
+            'signal_confidence': signal_data.get('confidence', 0.0),
+            'signal_timeframe': signal_data.get('timeframe'),
+        }
     
     def _create_error_intent(self, error_message: str) -> Dict[str, Any]:
         """Create error intent."""
