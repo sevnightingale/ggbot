@@ -1,0 +1,76 @@
+{
+  "schema_version": "2.1",
+  "config_type": "signal_validation",
+  "config_name": "ggShot Signal Validation",
+  
+  "selected_pair": "BTC/USDT",
+  
+  "extraction": {
+    "selected_data_sources": {
+      "technical_analysis": {
+        "data_points": ["RSI", "MACD", "BollingerBands"],
+        "timeframes": ["1h"]
+      },
+      "signals": {
+        "data_points": ["ggshot"],
+        "signal_sources": ["ggshot_telegram"]
+      }
+    }
+  },
+  
+  "decision": {
+    "analysis_frequency": "signal_driven",
+    "system_prompt": "You are an expert cryptocurrency trader analyzing {SYMBOL} at current price {CURRENT_PRICE}. Your analysis is based on the following market data: {MARKET_DATA}. You are validating external signals against your trading strategy. Provide clear, reasoned responses about whether to validate or reject the signal.",
+    "user_prompt": "If RSI is below 30, validate LONG signals. If RSI is above 70, validate SHORT signals. Otherwise, reject signals. Be decisive in your validation."
+  },
+  
+  "llm_config": {
+    "provider": "platform_hosted",
+    "model": "gpt-5",
+    "use_platform_keys": true,
+    "use_own_key": false
+  },
+  
+  "trading": {
+    "execution_mode": "paper",
+    "leverage": 1,
+    "position_sizing": {
+      "method": "confidence_based",
+      "base_amount_usd": 100,
+      "confidence_multiplier": 2.0,
+      "max_position_percent": 10.0
+    },
+    "risk_management": {
+      "max_positions": 3,
+      "confidence_threshold": 0.6,
+      "default_stop_loss_percent": 5.0,
+      "default_take_profit_percent": 10.0,
+      "max_daily_loss_usd": 500
+    },
+    "exchange_config": {
+      "exchange_type": "cex",
+      "selected_exchange": "binance",
+      "api_key": "",
+      "secret_key": ""
+    }
+  },
+  
+  "telegram_integration": {
+    "listener": {
+      "enabled": false,
+      "api_id": "",
+      "api_hash": "",
+      "session_name": "signal_validation_session",
+      "source_channels": []
+    },
+    "publisher": {
+      "enabled": true,
+      "user_channel_id": "",
+      "channel_name": "My Trading Signals",
+      "confidence_threshold": 0.6,
+      "include_reasoning": true,
+      "include_market_context": true,
+      "message_template": "enhanced_signal_validation"
+    }
+  }
+}

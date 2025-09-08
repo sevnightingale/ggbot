@@ -25,18 +25,55 @@ module.exports = {
       max_restarts: 10,
       restart_delay: 4000
     },
-    // Uncomment these when ready to add more services
-    /*
+    // Signal processing services (V2 ggShot integration)
     {
-      name: 'ggshot-filter',
-      script: '/home/sev/ggbot/ggshot/filter_service.py',
+      name: 'signal-listener',
+      script: '/home/sev/ggbot/signals/listener_service.py',
       interpreter: '/home/sev/ggbot/.venv/bin/python',
       cwd: '/home/sev/ggbot',
       instances: 1,
       exec_mode: 'fork',
       autorestart: true,
-      watch: false
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        SERVICE_TYPE: 'signal_listener'
+      },
+      error_file: '/home/sev/.pm2/logs/signal-listener-error.log',
+      out_file: '/home/sev/.pm2/logs/signal-listener-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '10s',
+      max_restarts: 10,
+      restart_delay: 4000
     },
+    {
+      name: 'signal-publisher', 
+      script: '/home/sev/ggbot/signals/publishing_service.py',
+      interpreter: '/home/sev/ggbot/.venv/bin/python',
+      cwd: '/home/sev/ggbot',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '300M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        SERVICE_TYPE: 'signal_publisher'
+      },
+      error_file: '/home/sev/.pm2/logs/signal-publisher-error.log',
+      out_file: '/home/sev/.pm2/logs/signal-publisher-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '10s',
+      max_restarts: 10,
+      restart_delay: 4000
+    }
+    // Uncomment when ready to add more services
+    /*
     {
       name: 'ccxt-mcp-server',
       script: '/home/sev/ggbot/core/mcp/servers/ccxt_mcp_server.py',

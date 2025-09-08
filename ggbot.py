@@ -7,6 +7,7 @@ Provides unified entry point for autonomous trading with multi-user isolation.
 
 import asyncio
 import uuid
+import os
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
@@ -16,6 +17,20 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
 import json
+
+# APScheduler imports
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+import redis.asyncio as redis
+
+# Scheduler utilities
+from core.scheduler import (
+    cron_for,
+    last_closed_close_ts,
+    get_misfire_grace_time,
+    format_redis_idempotency_key,
+    get_redis_ttl_for_timeframe
+)
 
 # V2 Core Components
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, require_premium_user_v2
@@ -98,6 +113,13 @@ async def lifespan(app: FastAPI):
         # await llm_service.test_hosted_keys()
         logger.info("✅ LLM service initialized")
         
+        # Start APScheduler
+        scheduler.start()
+        logger.info("✅ APScheduler started")
+        
+        # Reconcile active bots from database
+        await reconcile_active_bots()
+        
         logger.info("🟢 GGBot V2 Orchestrator ready")
         
     except Exception as e:
@@ -108,6 +130,11 @@ async def lifespan(app: FastAPI):
     
     # Shutdown tasks
     logger.info("🔄 Shutting down GGBot V2 Orchestrator")
+    
+    # Shutdown scheduler
+    if scheduler.running:
+        scheduler.shutdown(wait=False)
+        logger.info("✅ APScheduler shutdown")
 
 
 # Create FastAPI app
@@ -137,14 +164,20 @@ class GGBotOrchestrator:
     async def run_autonomous_cycle(
         self,
         config_id: str,
-        user_id: str
+        user_id: str,
+        signal_data: Optional[Dict] = None,
+        override_symbol: Optional[str] = None,
+        override_timeframe: Optional[str] = None
     ) -> OrchestrationResult:
         """
-        Run a complete autonomous trading cycle using real V2 systems.
+        Run a complete trading cycle (autonomous or signal validation).
         
         Args:
             config_id: Bot configuration ID
             user_id: User ID for access validation
+            signal_data: Signal data for validation mode
+            override_symbol: Dynamic symbol override for signals
+            override_timeframe: Dynamic timeframe override for signals
             
         Returns:
             OrchestrationResult with execution details
@@ -158,42 +191,35 @@ class GGBotOrchestrator:
             if not config:
                 raise HTTPException(status_code=404, detail="Configuration not found")
             
-            # 2. Get or create V2 extraction engine
+            # 2. Route based on config type
+            if config.config_type == "signal_validation" and signal_data:
+                return await self._run_signal_validation_cycle(
+                    config, signal_data, override_symbol, override_timeframe
+                )
+            else:
+                return await self._run_autonomous_trading_cycle(config)
+            
+        except Exception as e:
+            end_time = datetime.now(timezone.utc)
+            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            self._log.error(f"V2 orchestration failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Orchestration failed: {str(e)}")
+            
+    async def _run_autonomous_trading_cycle(self, config: BotConfigV2) -> OrchestrationResult:
+        """Run traditional autonomous trading cycle."""
+        start_time = datetime.now(timezone.utc)
+        user_id = config.user_id
+        config_id = config.config_id
+        
+        try:
+            # Get or create V2 extraction engine
             extraction_engine = await self._get_extraction_engine(user_id)
             
-            # 3. Extract indicators and timeframes from config structure
+            # Extract indicators and timeframes from config structure
             extraction_config = config.extraction or {}
-            requested_indicators = []
-            timeframes = ["1h"]  # Default single timeframe
-            
-            # Handle new structure (selected_data_sources) 
-            if "selected_data_sources" in extraction_config:
-                data_sources = extraction_config.get("selected_data_sources", {})
-                for source_name, source_config in data_sources.items():
-                    if isinstance(source_config, dict):
-                        # Get data points from this source
-                        data_points = source_config.get("data_points", [])
-                        requested_indicators.extend(data_points)
-                        
-                        # Get timeframes from this source (use first source's timeframes)
-                        if not timeframes or timeframes == ["1h"]:
-                            source_timeframes = source_config.get("timeframes", ["1h"])
-                            if source_timeframes:
-                                timeframes = source_timeframes
-                                
-            # Fallback to legacy structures
-            elif "indicators" in extraction_config:
-                requested_indicators = extraction_config["indicators"]
-            else:
-                # Fallback to old data_sources structure
-                data_sources = extraction_config.get("data_sources", {})
-                for category, indicators in data_sources.items():
-                    if isinstance(indicators, list):
-                        requested_indicators.extend(indicators)
-            
-            if not requested_indicators:
-                # Default to basic indicators if none specified
-                requested_indicators = ["rsi", "macd", "ema"]
+            requested_indicators = self._extract_indicators_from_config(extraction_config)
+            timeframes = self._extract_timeframes_from_config(extraction_config)
             
             # 4. Run V2 extraction for all timeframes
             extraction_result = await self._run_extraction_v2(
@@ -242,6 +268,161 @@ class GGBotOrchestrator:
                 timestamp=end_time.isoformat()
             )
     
+    async def _run_signal_validation_cycle(
+        self,
+        config: BotConfigV2,
+        signal_data: Dict,
+        override_symbol: Optional[str] = None,
+        override_timeframe: Optional[str] = None
+    ) -> OrchestrationResult:
+        """Run signal validation cycle for external signals."""
+        start_time = datetime.now(timezone.utc)
+        user_id = config.user_id
+        config_id = config.config_id
+        
+        try:
+            # Extract symbol and timeframe from signal or override
+            symbol = override_symbol or signal_data.get('symbol') or config.selected_pair
+            timeframe = override_timeframe or signal_data.get('timeframe') or '1h'
+            
+            if not symbol:
+                raise ValueError("No symbol specified for signal validation")
+            
+            self._log.info(f"Running signal validation for {symbol} ({timeframe})")
+            
+            # Get indicators from user's config (same as autonomous trading)
+            extraction_config = config.extraction or {}
+            signal_indicators = self._extract_indicators_from_config(extraction_config)
+            
+            # Get or create extraction engine
+            extraction_engine = await self._get_extraction_engine(user_id)
+            
+            # Run extraction for signal's symbol/timeframe
+            extraction_result = await self._run_extraction_v2(
+                extraction_engine, config, user_id, 
+                signal_indicators, [timeframe],
+                override_symbol=symbol
+            )
+            
+            # Run decision with signal context
+            decision_result = await self._run_decision_v2(
+                config_id, config, extraction_result, signal_data
+            )
+            
+            # Execute trading if signal is validated
+            trading_result = await self._run_trading_v2(
+                config, user_id, decision_result
+            )
+            
+            # Check if signal should be published to telegram
+            if self._should_publish_signal(config, decision_result):
+                await self._trigger_signal_publishing(
+                    config, signal_data, decision_result
+                )
+            
+            # Calculate execution time
+            end_time = datetime.now(timezone.utc)
+            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            result = OrchestrationResult(
+                status="success",
+                config_id=config_id,
+                extraction_result=extraction_result,
+                decision_result=decision_result,
+                trading_result=trading_result,
+                execution_time_ms=execution_time_ms,
+                timestamp=end_time.isoformat()
+            )
+            
+            self._log.info(f"Signal validation completed in {execution_time_ms}ms")
+            return result
+            
+        except Exception as e:
+            end_time = datetime.now(timezone.utc)
+            execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
+            
+            self._log.error(f"Signal validation failed: {e}")
+            return OrchestrationResult(
+                status="error",
+                config_id=config_id,
+                extraction_result={"error": str(e)},
+                decision_result=None,
+                trading_result=None,
+                execution_time_ms=execution_time_ms,
+                timestamp=end_time.isoformat()
+            )
+    
+    def _extract_indicators_from_config(self, extraction_config: Dict) -> List[str]:
+        """Extract indicators from user's extraction config."""
+        requested_indicators = []
+        
+        # Handle new structure (selected_data_sources) 
+        if "selected_data_sources" in extraction_config:
+            data_sources = extraction_config.get("selected_data_sources", {})
+            for source_name, source_config in data_sources.items():
+                if isinstance(source_config, dict) and source_name != "signals":
+                    # Get data points from non-signal sources
+                    data_points = source_config.get("data_points", [])
+                    requested_indicators.extend(data_points)
+                        
+        # Fallback to legacy structures
+        elif "indicators" in extraction_config:
+            requested_indicators = extraction_config["indicators"]
+        else:
+            # Fallback to old data_sources structure
+            data_sources = extraction_config.get("data_sources", {})
+            for category, indicators in data_sources.items():
+                if isinstance(indicators, list):
+                    requested_indicators.extend(indicators)
+        
+        if not requested_indicators:
+            # Default to basic indicators if none specified
+            requested_indicators = ["rsi", "macd", "ema"]
+            
+        return requested_indicators
+    
+    def _extract_timeframes_from_config(self, extraction_config: Dict) -> List[str]:
+        """Extract timeframes from user's extraction config."""
+        timeframes = ["1h"]  # Default single timeframe
+        
+        # Handle new structure (selected_data_sources)
+        if "selected_data_sources" in extraction_config:
+            data_sources = extraction_config.get("selected_data_sources", {})
+            for source_name, source_config in data_sources.items():
+                if isinstance(source_config, dict) and source_name != "signals":
+                    # Get timeframes from this source (use first source's timeframes)
+                    if timeframes == ["1h"]:  # Only override default
+                        source_timeframes = source_config.get("timeframes", ["1h"])
+                        if source_timeframes:
+                            timeframes = source_timeframes
+                            break
+        
+        return timeframes
+    
+    def _should_publish_signal(self, config: BotConfigV2, decision_result: Dict) -> bool:
+        """Check if signal should be published to telegram."""
+        telegram_config = config.telegram_integration or {}
+        publisher_config = telegram_config.get('publisher', {})
+        
+        if not publisher_config.get('enabled', False):
+            return False
+            
+        # Check confidence threshold
+        confidence_threshold = publisher_config.get('confidence_threshold', 0.6)
+        signal_confidence = decision_result.get('confidence', 0.0)
+        
+        return signal_confidence >= confidence_threshold
+    
+    async def _trigger_signal_publishing(
+        self,
+        config: BotConfigV2,
+        signal_data: Dict,
+        decision_result: Dict
+    ) -> None:
+        """Trigger signal publishing (placeholder for future publishing service)."""
+        # TODO: Integrate with signal publishing service when created
+        self._log.info(f"Signal publishing triggered for config {config.config_id}")
+    
     async def _get_extraction_engine(self, user_id: str) -> ExtractionEngineV2:
         """Get or create V2 extraction engine for user."""
         if user_id not in self._extraction_engines:
@@ -258,12 +439,13 @@ class GGBotOrchestrator:
         config: BotConfigV2,
         user_id: str,
         indicators: List[str],
-        timeframes: List[str] = ["1h"]
+        timeframes: List[str] = ["1h"],
+        override_symbol: Optional[str] = None
     ) -> Dict[str, Any]:
         """Run V2 extraction engine for multiple timeframes with proper integration."""
         try:
-            # Get symbol from config
-            symbol = config.selected_pair or "BTC/USDT"
+            # Get symbol from override or config
+            symbol = override_symbol or config.selected_pair or "BTC/USDT"
             
             # Extract for all timeframes
             timeframe_results = {}
@@ -331,7 +513,8 @@ class GGBotOrchestrator:
         self,
         config_id: str,
         config: BotConfigV2,
-        extraction_result: Dict[str, Any]
+        extraction_result: Dict[str, Any],
+        signal_data: Optional[Dict] = None
     ) -> Dict[str, Any]:
         """Run V2 decision engine with full context management."""
         try:
@@ -347,13 +530,13 @@ class GGBotOrchestrator:
             # Get or create V2 decision engine
             decision_engine = await self._get_decision_engine(config_id, config.user_id)
             
-            # Get symbol from config
-            symbol = config.selected_pair or "BTC/USDT"
+            # Get symbol from config or signal data
+            symbol = signal_data.get('symbol') if signal_data else config.selected_pair or "BTC/USDT"
             
             # Run decision using V2 engine with full context management
             decision_result = await decision_engine.make_decision(
                 symbol=symbol,
-                signal_data=None  # For autonomous trading, no signal data
+                signal_data=signal_data  # Pass signal data for validation mode
             )
             
             self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
@@ -428,6 +611,181 @@ class GGBotOrchestrator:
 
 # Initialize orchestrator
 orchestrator = GGBotOrchestrator()
+
+
+# APScheduler Setup and Job Functions
+scheduler = AsyncIOScheduler()
+execution_semaphore = asyncio.Semaphore(50)  # Global concurrency limit
+
+
+async def run_once(user_id: str, config_id: str, timeframe: str):
+    """
+    Job function executed by APScheduler for each bot.
+    Implements Redis idempotency and calls the orchestrator.
+    """
+    close_ts = last_closed_close_ts(timeframe)
+    key = format_redis_idempotency_key(user_id, config_id, timeframe, close_ts)
+    
+    # Redis client setup
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
+    redis_client = redis.from_url(redis_url, decode_responses=True)
+    
+    async with execution_semaphore:
+        try:
+            # Try to acquire idempotency lock with appropriate TTL
+            ttl = get_redis_ttl_for_timeframe(timeframe)
+            if not await redis_client.set(key, "executing", ex=ttl, nx=True):
+                logger.info(f"Skipping execution for {user_id}:{config_id}:{timeframe}:{close_ts} - already executed")
+                return  # Already executing/executed
+            
+            # Get job info for next fire time
+            job_id = f"bot:{user_id}:{config_id}:{timeframe}"
+            job = scheduler.get_job(job_id)
+            next_fire = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+            
+            # Broadcast running status
+            await websocket_manager.broadcast_to_user(user_id, {
+                "type": "bot_status_update",
+                "config_id": config_id,
+                "status": "running",
+                "current_phase": "extracting",
+                "close_ts": close_ts,
+                "next_fire_at": next_fire
+            })
+            
+            try:
+                # Run the autonomous cycle
+                result = await orchestrator.run_autonomous_cycle(config_id, user_id)
+                
+                # Broadcast completion
+                await websocket_manager.broadcast_to_user(user_id, {
+                    "type": "bot_status_update",
+                    "config_id": config_id,
+                    "status": "completed",
+                    "close_ts": close_ts,
+                    "next_fire_at": next_fire,
+                    "execution_time_ms": result.execution_time_ms
+                })
+                
+                # Mark as completed in Redis
+                await redis_client.set(key, "completed", ex=ttl)
+                logger.info(f"Completed execution for {user_id}:{config_id}:{timeframe}:{close_ts} in {result.execution_time_ms}ms")
+                
+            except Exception as e:
+                # Broadcast error
+                await websocket_manager.broadcast_to_user(user_id, {
+                    "type": "bot_status_update",
+                    "config_id": config_id,
+                    "status": "error",
+                    "error": str(e),
+                    "close_ts": close_ts,
+                    "next_fire_at": next_fire
+                })
+                
+                logger.error(f"Execution failed for {user_id}:{config_id}:{timeframe}:{close_ts}: {e}")
+                # Leave key as "executing" to prevent retries on same candle
+                
+        finally:
+            await redis_client.aclose()
+
+
+def add_bot_job(user_id: str, config_id: str, timeframe: str, jitter: int = 15):
+    """
+    Add a scheduled job for a bot configuration.
+    
+    Args:
+        user_id: User ID
+        config_id: Configuration ID  
+        timeframe: Trading timeframe
+        jitter: Random jitter in seconds (default 15)
+    """
+    trigger = cron_for(timeframe)
+    job_id = f"bot:{user_id}:{config_id}:{timeframe}"
+    misfire_grace = get_misfire_grace_time(timeframe)
+    
+    scheduler.add_job(
+        func=run_once,
+        trigger=trigger,
+        id=job_id,
+        args=[user_id, config_id, timeframe],
+        replace_existing=True,
+        max_instances=1,
+        coalesce=True,
+        misfire_grace_time=misfire_grace,
+        jitter=jitter,
+    )
+    
+    logger.info(f"Added scheduler job {job_id} with {timeframe} cadence")
+
+
+def remove_bot_job(user_id: str, config_id: str, timeframe: str):
+    """Remove a scheduled job for a bot configuration."""
+    job_id = f"bot:{user_id}:{config_id}:{timeframe}"
+    try:
+        scheduler.remove_job(job_id)
+        logger.info(f"Removed scheduler job {job_id}")
+        return True
+    except Exception as e:
+        logger.warning(f"Failed to remove job {job_id}: {e}")
+        return False
+
+
+async def reconcile_active_bots():
+    """
+    Reconcile active bots from database on startup.
+    Schedules jobs for all configurations with state='active'.
+    """
+    try:
+        from core.common.db import get_db_connection
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Get all active bot configurations
+                cur.execute("""
+                    SELECT config_id, user_id, config_data 
+                    FROM configurations 
+                    WHERE state = 'active'
+                """)
+                
+                active_configs = cur.fetchall()
+                scheduled_count = 0
+                
+                for row in active_configs:
+                    config_id, user_id, config_data = row
+                    
+                    try:
+                        # Extract timeframe from config_data
+                        if isinstance(config_data, dict):
+                            decision_config = config_data.get("decision", {})
+                            timeframe = decision_config.get("analysis_frequency", "1h")
+                        else:
+                            timeframe = "1h"  # Default fallback
+                        
+                        # Schedule the bot
+                        add_bot_job(user_id, config_id, timeframe)
+                        scheduled_count += 1
+                        
+                    except Exception as e:
+                        logger.error(f"Failed to schedule bot {config_id} for user {user_id}: {e}")
+                
+                logger.info(f"✅ Reconciled {scheduled_count} active bots from database")
+                
+    except Exception as e:
+        logger.error(f"Failed to reconcile active bots: {e}")
+
+
+def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
+    """
+    Extract analysis_frequency (timeframe) from bot config.
+    
+    Args:
+        config: Bot configuration dictionary
+        
+    Returns:
+        Timeframe string (defaults to "1h")
+    """
+    decision_config = config.get("decision", {})
+    return decision_config.get("analysis_frequency", "1h")
 
 
 # API Endpoints
@@ -902,13 +1260,54 @@ async def start_bot(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Start a bot (placeholder)."""
-    # TODO: Implement bot lifecycle management
-    return {
-        "status": "success",
-        "message": "Bot start functionality coming soon",
-        "config_id": config_id
-    }
+    """Start a bot by scheduling its autonomous trading cycle."""
+    try:
+        # Get bot configuration
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+        
+        # Check if already active
+        current_state = await config_service.get_bot_state(config_id, current_user.user_id)
+        if current_state == 'active':
+            return {
+                "status": "already_active",
+                "message": "Bot is already running",
+                "config_id": config_id
+            }
+        
+        # Extract timeframe from config
+        config_dict = config.to_dict()
+        timeframe = extract_timeframe_from_config(config_dict)
+        
+        # Schedule the bot job
+        add_bot_job(current_user.user_id, config_id, timeframe)
+        
+        # Update state to active
+        success = await config_service.set_bot_state(config_id, current_user.user_id, 'active')
+        if not success:
+            # Remove the job if state update failed
+            remove_bot_job(current_user.user_id, config_id, timeframe)
+            raise HTTPException(status_code=500, detail="Failed to update bot state")
+        
+        # Get next run time for response
+        job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
+        job = scheduler.get_job(job_id)
+        next_run = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+        
+        return {
+            "status": "started",
+            "config_id": config_id,
+            "timeframe": timeframe,
+            "next_run": next_run,
+            "message": f"Bot scheduled for {timeframe} trading"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to start bot {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to start bot: {str(e)}")
 
 
 @app.post("/api/v2/bot/{config_id}/stop")
@@ -916,13 +1315,89 @@ async def stop_bot(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Stop a bot (placeholder)."""
-    # TODO: Implement bot lifecycle management
-    return {
-        "status": "success",
-        "message": "Bot stop functionality coming soon",
-        "config_id": config_id
-    }
+    """Stop a bot by removing its scheduled job and updating state."""
+    try:
+        # Get bot configuration
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+        
+        # Check if already inactive
+        current_state = await config_service.get_bot_state(config_id, current_user.user_id)
+        if current_state == 'inactive':
+            return {
+                "status": "already_stopped",
+                "message": "Bot is already stopped",
+                "config_id": config_id
+            }
+        
+        # Extract timeframe from config
+        config_dict = config.to_dict()
+        timeframe = extract_timeframe_from_config(config_dict)
+        
+        # Remove the scheduled job
+        job_removed = remove_bot_job(current_user.user_id, config_id, timeframe)
+        
+        # Update state to inactive
+        success = await config_service.set_bot_state(config_id, current_user.user_id, 'inactive')
+        if not success:
+            logger.warning(f"Job removed but failed to update state for bot {config_id}")
+        
+        return {
+            "status": "stopped",
+            "config_id": config_id,
+            "timeframe": timeframe,
+            "job_removed": job_removed,
+            "message": "Bot stopped successfully"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to stop bot {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to stop bot: {str(e)}")
+
+
+@app.get("/api/v2/scheduler/status")
+async def get_scheduler_status(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get scheduler status and active jobs for the current user."""
+    try:
+        # Get all active jobs for the current user
+        user_jobs = [
+            job for job in scheduler.get_jobs() 
+            if job.id.startswith(f"bot:{current_user.user_id}:")
+        ]
+        
+        # Format job information
+        jobs_info = []
+        for job in user_jobs:
+            # Parse job ID to extract config_id and timeframe
+            parts = job.id.split(":")
+            if len(parts) >= 4:
+                config_id = parts[2]
+                timeframe = parts[3]
+                
+                jobs_info.append({
+                    "job_id": job.id,
+                    "config_id": config_id,
+                    "timeframe": timeframe,
+                    "next_run": job.next_run_time.isoformat() + "Z" if job.next_run_time else None,
+                    "misfire_grace_time": job.misfire_grace_time
+                })
+        
+        return {
+            "status": "success",
+            "scheduler_running": scheduler.running,
+            "active_bots": len(user_jobs),
+            "jobs": jobs_info,
+            "total_jobs_in_scheduler": len(scheduler.get_jobs())
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get scheduler status: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get scheduler status: {str(e)}")
 
 
 @app.get("/api/v2/bot/{config_id}/status")

@@ -1,204 +1,149 @@
-Here are the **20 highest-value pandas-ta indicators** I’d prioritize (broad coverage of trend, momentum, volatility, and volume; robust across assets/timeframes). For each, I note **how pros actually use it**, then exactly **what to engineer** so your models get signal, not just raw prints.
+Here’s a crisp, opinionated review. Short version: your direction is right (Option B), but switch to **CronTrigger-based, cadence-first scheduling**, add **idempotency**, **startup reconciliation**, **distributed single-leader** protection, and **timeframe-aware misfire/jitter**. Your current date-reschedule loop will drift and can stall after downtime.
 
----
+# Verdict
 
-1. **RSI (Relative Strength Index)** — momentum/OB/OS + divergence. Pros watch 30/70 (or 20/80 in strong trends), failure swings, and divergence. ([Investopedia][1])
-   **Preprocess features:**
+* ✅ Keep: APScheduler 3.11, candle alignment philosophy, WS status hooks, 3-bot/user limit, V2 orchestrator entrypoint.
+* ❌ Change now: (1) date-trigger self-rescheduling; (2) weekly/daily time calc; (3) 30s misfire; (4) in-memory `active_bots`; (5) manual DB cleanup; (6) lack of duplicate-run guards; (7) no HA plan.
 
-* Current RSI; distance to 50 (bull/bear regime).
-* Most recent RSI peak/trough value **and** bars since it occurred.
-* Time since last cross of 30/70; count of consecutive bars >70 or <30.
-* Bullish/bearish price–RSI divergence flag (last N swings).
-* RSI slope/acceleration over 3–5 bars.
+# Highest-impact fixes (do these first)
 
-2. **MACD (12/26/9)** — momentum/trend; signal/zero-line crosses; histogram turns & divergence. ([Investopedia][2], [ChartSchool][3])
-   **Preprocess features:**
+1. **Use CronTrigger, not date→reschedule loop.**
+   Cadence must not depend on task duration. Cron avoids drift and “skip-a-candle” after long runs.
 
-* MACD–signal spread; last time it crossed zero.
-* Histogram peak/trough age and size; first derivative sign change (early momentum shift).
-* Divergence flag vs price on last two swing highs/lows.
-* “Regime” (MACD>0 uptrend, <0 downtrend) duration in bars.
+   * 5m: `CronTrigger(minute="*/5", second=30, timezone="UTC")`
+   * 15m: `minute="0,15,30,45", second=30`
+   * 30m: `minute="0,30", second=30`
+   * 1h: `minute=0, second=30`
+   * 4h: `hour="0,4,8,12,16,20", minute=0, second=30`
+   * 1d: `hour=0, minute=0, second=30`
+   * 1w (crypto): **confirm with your data source**; common practice is **Mon 00:00 UTC**, but some feeds use **Sun 00:00 UTC**. Make it a per-exchange setting.
+   * Add **`jitter=5-15` seconds** to spread load and avoid thundering herd.
 
-3. **Stochastic (%K/%D)** — range momentum; OB/OS 80/20; %K/%D crosses; divergence. ([Investopedia][4])
-   **Preprocess features:**
+2. **Add idempotency keyed by candle.**
+   Every autonomous cycle should carry `(config_id, timeframe, close_ts)` and the orchestrator must ensure it executes at most once (persist a “seen/executed” row or Redis key TTL). This makes duplicates harmless (crashes, retries, HA).
 
-* %K, %D and their spread; latest cross direction & bars since.
-* Overbought/oversold streak length; exits from OB/OS.
-* Divergence flag with price.
-* %K position rank within last N bars (percentile).
+3. **Timeframe-aware misfire grace (not 30s flat).**
 
-4. **Bollinger Bands (20,2)** — volatility expansion/“walk the band”/squeezes. ([Investopedia][5])
-   **Preprocess features:**
+   * 5m: 120s
+   * 15m: 180s
+   * 30m/1h: 300s
+   * 4h+: 600–900s
+     Rationale: network hiccups, queueing, cold starts.
 
-* %B and BandWidth; BandWidth z-score vs 6-month median (squeeze).
-* Touch/close outside band count over last N bars.
-* Breakout bar body% when exiting a squeeze; follow-through (1–3 bars).
-* Price distance to middle band in ATRs.
+4. **Startup reconciliation (self-heal).**
+   On process start, **rebuild jobs from persisted bot configs**, not from `active_bots` memory. Scan configs where autonomous mode is on and (re)attach proper CronTriggers. Without this, any bot is silently “off” after a long downtime (your date jobs would’ve been skipped).
 
-5. **ATR (Average True Range)** — volatility sizing/stops; breakout context. ([Investopedia][6])
-   **Preprocess features:**
+5. **Single leader / HA.**
+   APScheduler’s SQLAlchemy job store is **not** a distributed lock. If you run two app instances with the scheduler enabled, both will fire. Pick one:
 
-* ATR and ATR% (ATR/close).
-* ATR trend (rising/falling) over 14 bars.
-* Volatility stop levels (close ± k\*ATR) and distance from price.
-* “Volatility regime” bucket (e.g., ATR% quintile).
+   * Run scheduler in a **singleton** process (e.g., one deployment with a **DB advisory lock** to self-elect leader).
+   * Or implement a minimal **Postgres advisory lock** around each fire (lock by `(config_id, close_ts)`), which still benefits from idempotency.
 
-6. **ADX / DMI (+DI/−DI)** — trend strength & direction filters; >25 means real trend. ([Investopedia][7])
-   **Preprocess features:**
+6. **Persist bot registry; don’t mutate the jobs table.**
 
-* ADX value & slope; time spent >25 (or >40 for strong).
-* +DI−−DI spread; last +DI/−DI cross & bars since.
-* Composite “trend-quality” score: (ADX rising) AND (price making HH/HL or LL/LH).
-* Whipsaw risk flag: low ADX (<20) + rangebound.
+   * `active_bots` must be a DB/Redis record (user\_id→{configs}) so it survives restarts and powers the reconciliation.
+   * **Remove** the manual “delete from apscheduler\_jobs…” cleanup. APScheduler manages its own rows; your query risks nuking live jobs. If you need history, write **your own run\_log** table and log per execution there.
 
-7. **MFI (Money Flow Index)** — RSI with volume; OB/OS 80/20; divergence. ([Investopedia][8])
-   **Preprocess features:**
+# Specific bugs / correctness issues
 
-* MFI level; time since last 80/20 cross; streak above 80/below 20.
-* MFI vs price divergence flag.
-* “Confirmation” flag: price breakout + rising MFI over last N bars.
+* **Weekly calc bug** in `get_next_candle_close`: On Mon 14:00 UTC, it computes the *past* midnight. Your guard `if days_until_monday == 0 and now.hour == 0 and now.minute < interval_minutes:` is always true for 1w (10080) at 00\:xx and doesn’t handle later Monday hours—leading to “past run\_date → immediate/misfire.” If you keep helper math, always `while next_close <= now: next_close += delta`.
+* **Drift** with date+reschedule: if a 5m job overruns to T+7m, your `now`-based next calculation will schedule at T+10m, **skipping a candle**. Cron fixes this by anchoring to the cadence.
+* **Hardcoded delay (30s)**: Some venues/data paths need longer for final OHLCV availability. Make this **per exchange + timeframe**, e.g., 30–90s; optionally probe readiness (e.g., check last closed candle timestamp before running).
+* **Job IDs**: Use `f"bot:{user_id}:{config_id}"` to avoid any cross-tenant collision.
+* **Health “running\_jobs”**: Counting jobs with `next_run_time` ≠ None is not “running.” Track live executions via APScheduler event listeners and your own counters.
 
-8. **OBV (On-Balance Volume)** — participation/accumulation; trend confirmation & divergence. ([ChartSchool][9], [Investopedia][10])
-   **Preprocess features:**
+# Proposed skeleton (Cron + idempotency + HA)
 
-* OBV slope over 10 bars; break of OBV trendline.
-* Divergence with price at last swing high/low.
-* OBV above/below its EMA; bars since cross.
-* Volume-thrust event: max 3-day OBV change in 3 months.
+```python
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.triggers.cron import CronTrigger
+from zoneinfo import ZoneInfo
 
-9. **VWAP (and Anchored VWAP)** — intraday execution benchmark; dynamic S/R; anchored to events. ([Investopedia][11], [alphatrends.net][12])
-   **Preprocess features:**
+UTC = ZoneInfo("UTC")
 
-* Price–VWAP distance (bps) and z-score (session).
-* Time above/below session VWAP; flips count.
-* Anchored VWAPs from major swing highs/lows/earnings gaps; distance & confluence count.
-* First touch/reject outcome stats after open.
+def cron_for(timeframe: str, second: int):
+    m = {
+        "5m":  "*/5", "15m": "0,15,30,45", "30m": "0,30",
+        "1h":  "0",   "4h":  None,         "1d":  None,  "1w": None
+    }
+    if timeframe == "4h":
+        return CronTrigger(hour="0,4,8,12,16,20", minute=0, second=second, timezone=UTC)
+    if timeframe == "1d":
+        return CronTrigger(hour=0, minute=0, second=second, timezone=UTC)
+    if timeframe == "1w":
+        # make this configurable per exchange: "mon" vs "sun"
+        return CronTrigger(day_of_week="mon", hour=0, minute=0, second=second, timezone=UTC)
+    if (mm := m.get(timeframe)) is None:
+        raise ValueError(f"Unsupported timeframe {timeframe}")
+    return CronTrigger(minute=mm, second=second, timezone=UTC)
 
-10. **Supertrend** — ATR-based trend overlay; flips on volatility-adjusted breaks. ([Investopedia][13], [Zerodha][14])
-    **Preprocess features:**
+async def schedule_bot(config_id: str, user_id: str, timeframe: str, delay_s: int, misfire_s: int, jitter_s: int):
+    trig = cron_for(timeframe, second=delay_s)
+    scheduler.add_job(
+        func=run_once,
+        trigger=trig,
+        id=f"bot:{user_id}:{config_id}",
+        args=[config_id, user_id, timeframe],
+        max_instances=1,
+        misfire_grace_time=misfire_s,
+        coalesce=True,
+        jitter=jitter_s,
+        replace_existing=True,
+    )
 
-* Supertrend direction; bars since last flip; flip frequency last 60 bars.
-* Price distance to line in ATRs; “near-flip” (<0.2 ATR).
-* False-flip filter: require ADX>25 at flip (flag).
-* Consecutive closes beyond line.
+async def run_once(config_id, user_id, timeframe):
+    close_ts = compute_last_closed_candle_ts(timeframe)  # from the SAME data source you trade on
+    key = f"idemp:{config_id}:{timeframe}:{close_ts}"
+    if await redis.setnx(key, "1"):
+        await redis.expire(key, 7 * 24 * 3600)
+        await ws.broadcast(user_id, {"type":"bot_status_update","config_id":config_id,"status":"running"})
+        try:
+            await orchestrator.run_autonomous_cycle(config_id, user_id, close_ts=close_ts)
+            await ws.broadcast(user_id, {"type":"bot_status_update","config_id":config_id,"status":"completed"})
+        except Exception as e:
+            await ws.broadcast(user_id, {"type":"bot_status_update","config_id":config_id,"status":"error","error":str(e)})
+    # else: duplicate fire; safely ignored
+```
 
-11. **Ichimoku Cloud** — full-stack trend/momentum/S-R: Tenkan/Kijun crosses, price vs cloud, Chikou confirmation, cloud twist. ([Investopedia][15])
-    **Preprocess features:**
+**Leader election (simple Postgres advisory lock):**
 
-* Price vs cloud (above/inside/below) and cloud thickness (spans distance).
-* Tenkan–Kijun cross direction/recency; “strong/weak” (relative to cloud).
-* Chikou above/below price 26 back; confirmation flag.
-* Future cloud twist within next N bars.
+```python
+# on startup
+with pg_connection() as conn:
+    got_lock = conn.execute("SELECT pg_try_advisory_lock(42)").scalar()
+if not got_lock:
+    log.info("Another leader active; scheduler disabled in this instance")
+else:
+    scheduler.start()
+```
 
-12. **EMA/SMA Crossovers (e.g., 50/200 “golden/death” cross)** — regime/confirmation. ([Investopedia][16])
-    **Preprocess features:**
+# Resource & concurrency notes
 
-* Current cross state; bars since cross; slope of slow MA at cross.
-* Price distance to each MA; “stacking” (fast>mid>slow).
-* Pullback depth to rising MA (percent retracement).
-* Failed cross flags (cross + immediate uncross ≤10 bars).
+* You’re on AsyncIO. Prefer running the orchestrator **as async**; avoid shifting to threadpool unless you have CPU-bound work.
+* Add a **global concurrency semaphore** (e.g., 50) around orchestration to cap bursts at candle boundaries.
+* Expose Prometheus: `executions_total`, `executions_failed_total`, `exec_latency_seconds` (Histogram), `missed_runs_total`, `ws_broadcast_latency_ms`.
 
-13. **Donchian Channels** — breakout/trend following (Turtle-style). ([Investopedia][17], [ChartSchool][18])
-    **Preprocess features:**
+# WebSocket & UX
 
-* Distance to 20-bar high/low; days since new breakout.
-* Breakout confirmation: close beyond band by >x% and rising volume.
-* Post-breakout max adverse excursion to opposite band.
-* “Channel squeeze” (upper-lower width in ATRs) percentile.
+* Send `next_fire_at` (from Cron’s `get_next_fire_time`) on every status event so the UI is always correct, even after restarts.
+* Include `close_ts` in the message so users see which candle was processed.
 
-14. **Keltner Channels** — ATR-based envelopes; breakout + squeeze with BB. ([ChartSchool][19], [StockCharts][20])
-    **Preprocess features:**
+# Testing upgrades
 
-* Close vs upper/lower channel; time outside channel.
-* KC width (in ATRs) vs median; BB-inside-KC squeeze flag & bars since “fired.”
-* Breakout body% when clearing channel; follow-through return.
+* Make time calc functions accept `now: datetime` for deterministic tests.
+* Add **property tests**: for any `now`, next fire time is in the future and within `(interval + delay]`.
+* Add **HA tests**: simulate two schedulers; confirm idempotency + advisory lock prevent double trades.
 
-15. **Parabolic SAR** — trend trailing stops; flips indicate possible reversals; works best in trends. ([Investopedia][21])
-    **Preprocess features:**
+# Config/data alignment (important)
 
-* Current SAR side; distance in ATRs; acceleration factor used.
-* Bars since last flip; flip frequency (whipsaw risk).
-* Whether price tagged SAR this bar; intrabar penetration flag.
-* Confluence with MA/structure at flip (yes/no).
+* **Align to your data provider’s candle boundaries** (exchange or aggregator). Don’t assume weekly = Mon 00:00 UTC universally. Derive `close_ts` from “last closed candle” API and drive idempotency off that.
 
-16. **CCI (Commodity Channel Index)** — mean-reversion extremes (+100/−100) & cycles. ([Investopedia][22])
-    **Preprocess features:**
+# Remove / adjust
 
-* CCI level; time outside ±100; re-entry events.
-* Divergence with price; CCI cycle length via zero-cross spacing.
-* CCI percentile vs 1-year distribution.
+* ❌ Manual deletion from `apscheduler_jobs` — risky and unnecessary.
+* ❌ `active_bots` in memory as source of truth — persist instead.
+* ⚠️ `misfire_grace_time=30` — raise per table above.
 
-17. **ROC (Rate of Change / Momentum)** — zero-line crosses; extremes; divergence. ([ChartSchool][23])
-    **Preprocess features:**
+# Final recommendation
 
-* ROC value; last zero cross & bars since.
-* Max/min ROC in last N bars; mean-reversion distance to median.
-* ROC vs return next k bars (rolling calibration feature).
-
-18. **Aroon / Aroon Oscillator** — time-since-high/low; trend emergence/decay. ([ChartSchool][24])
-    **Preprocess features:**
-
-* Aroon Up/Down; oscillator value; time spent >+50 or <−50.
-* “Fresh trend” flag: Aroon Up>90 with Down<10 (or inverse).
-* Bars since last 25-period HH/LL (raw Donchian timing).
-
-19. **Chaikin Money Flow (CMF)** — volume-weighted accumulation; confirm/deny trend strength. ([ChartSchool][25])
-    **Preprocess features:**
-
-* CMF level; streak above 0 (accumulation) or below 0 (distribution).
-* Breakout + positive CMF confirmation flag.
-* CMF divergence with price; CMF vs MFI agreement flag.
-
-20. **Williams %R** — momentum extremes; responsive OB/OS; failure swings. ([Investopedia][26])
-    **Preprocess features:**
-
-* %R level; time in OB (>-20) / OS (<-80); first close back inside.
-* Failure swing patterns (HH in price, lower high in %R, etc.).
-* %R percentile vs last N bars; cross of −50 (momentum tilt).
-
----
-
-### Why these 20?
-
-They’re **battle-tested, complementary, and interpretable**: momentum (RSI, MACD, Stoch, %R, ROC), **trend** (ADX/DMI, MA crosses, Donchian, Ichimoku, Supertrend, PSAR), **volatility** (ATR, Bollinger, Keltner), and **volume/flow** (OBV, CMF, MFI, VWAP). That mix minimizes redundancy and overfitting while covering how pros actually decide: **trend present? momentum aligned? volatility regime? real participation?** (pandas-ta covers all of these). ([GitHub][27])
-
----
-
-### Implementation notes (opinionated)
-
-* **Always add recency & regime context** (bars since signal, how long in regime). Static values are near-useless.
-* **Normalize distances in ATRs** so features transfer across assets.
-* **Prefer event flags over thresholds** (e.g., “exited OB after 10-bar stay” beats “RSI=71”).
-* **Divergence detection** (price vs momentum/volume) is high value if you anchor it to recent swing points, not every tick.
-* **Squeeze → expansion** states (BB/KC/ATR) deserve first-class features; most big moves start there. ([ChartSchool][28])
-
-If you want, I can generate **pandas-ta preprocessor code** that outputs exactly these fields in a tidy feature matrix for your pipeline.
-
-[1]: https://www.investopedia.com/articles/active-trading/042114/overbought-or-oversold-use-relative-strength-index-find-out.asp?utm_source=chatgpt.com "RSI Indicator: Buy and Sell Signals"
-[2]: https://www.investopedia.com/articles/forex/05/macddiverge.asp?utm_source=chatgpt.com "How to Trade the MACD"
-[3]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/macd-histogram?utm_source=chatgpt.com "MACD-Histogram - ChartSchool - StockCharts.com"
-[4]: https://www.investopedia.com/articles/technical/073001.asp?utm_source=chatgpt.com "What Is the Stochastic Oscillator and How Is It Used?"
-[5]: https://www.investopedia.com/terms/b/bollingerbands.asp?utm_source=chatgpt.com "Understanding Bollinger Bands: A Key Technical Analysis ..."
-[6]: https://www.investopedia.com/terms/a/atr.asp?utm_source=chatgpt.com "Average True Range (ATR) Formula, What It Means, and ..."
-[7]: https://www.investopedia.com/terms/d/dmi.asp?utm_source=chatgpt.com "Directional Movement Index (DMI) Formula, Calculations ..."
-[8]: https://www.investopedia.com/terms/m/mfi.asp?utm_source=chatgpt.com "Money Flow Index (MFI): Definition and Uses - Investopedia"
-[9]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/on-balance-volume-obv?utm_source=chatgpt.com "On Balance Volume (OBV) - ChartSchool - StockCharts.com"
-[10]: https://www.investopedia.com/articles/active-trading/021115/uncover-market-sentiment-onbalance-volume-obv.asp?utm_source=chatgpt.com "On-Balance Volume Reveals Market Player Strategy"
-[11]: https://www.investopedia.com/terms/v/vwap.asp?utm_source=chatgpt.com "Volume-Weighted Average Price (VWAP): Definition and ..."
-[12]: https://alphatrends.net/anchored-vwap/?utm_source=chatgpt.com "Anchored VWAP"
-[13]: https://www.investopedia.com/supertrend-indicator-7976167?utm_source=chatgpt.com "Supertrend Indicator: What It Is and How It Works"
-[14]: https://zerodha.com/varsity/chapter/supplementary-notes-1/?utm_source=chatgpt.com "Other indicators – Varsity by Zerodha"
-[15]: https://www.investopedia.com/terms/i/ichimokuchart.asp?utm_source=chatgpt.com "Ichimoku Kinko Hyo Indicator & FIve Components Explained"
-[16]: https://www.investopedia.com/ask/answers/121114/what-difference-between-golden-cross-and-death-cross-pattern.asp?utm_source=chatgpt.com "Golden Cross vs. Death Cross: What's the Difference?"
-[17]: https://www.investopedia.com/terms/d/donchianchannels.asp?utm_source=chatgpt.com "Understanding Donchian Channels: Formula, Calculation, ..."
-[18]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/price-channels?utm_source=chatgpt.com "Price Channels - ChartSchool - StockCharts.com"
-[19]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-overlays/keltner-channels?utm_source=chatgpt.com "Keltner Channels - ChartSchool - StockCharts.com"
-[20]: https://articles.stockcharts.com/article/articles-chartwatchers-2008-08-using-keltner-channels/?utm_source=chatgpt.com "USING KELTNER CHANNELS"
-[21]: https://www.investopedia.com/trading/introduction-to-parabolic-sar/?utm_source=chatgpt.com "Introduction to the Parabolic SAR"
-[22]: https://www.investopedia.com/investing/timing-trades-with-commodity-channel-index/?utm_source=chatgpt.com "Timing Trades With the Commodity Channel Index"
-[23]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/rate-of-change-roc?utm_source=chatgpt.com "Rate of Change (ROC) - ChartSchool - StockCharts.com"
-[24]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/aroon?utm_source=chatgpt.com "Aroon - ChartSchool - StockCharts.com"
-[25]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/chaikin-money-flow-cmf?utm_source=chatgpt.com "Chaikin Money Flow (CMF) - ChartSchool - StockCharts.com"
-[26]: https://www.investopedia.com/terms/w/williamsr.asp?utm_source=chatgpt.com "Williams %R: Definition, Formula, Uses, and Limitations"
-[27]: https://github.com/xgboosted/pandas-ta-classic?utm_source=chatgpt.com "xgboosted/pandas-ta-classic: Technical Analysis Indicators"
-[28]: https://chartschool.stockcharts.com/table-of-contents/technical-indicators-and-overlays/technical-indicators/ttm-squeeze?utm_source=chatgpt.com "TTM Squeeze - ChartSchool - StockCharts.com"
+Adopt **Option B** but implement with **CronTrigger + idempotency + startup reconciliation + leader election**, not date-rescheduling. This gives you **zero drift, safe HA, clean recovery, and predictable cadence**, which is exactly what trading bots need.

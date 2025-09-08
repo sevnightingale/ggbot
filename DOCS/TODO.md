@@ -1,67 +1,136 @@
-# TODO_V2.md - GGBot V2 Final Implementation
+# TODO_NEW.md - GGBot V2 Updated Implementation Plan
 
-## 🎯 **PRIORITY #1: Free Tier Paper Trading - Production Ready**
+## 🎯 **IMMEDIATE HIGH PRIORITY**
 
-### **Phase 0: Frontend-Backend Integration** ✅ **COMPLETED 2025-09-07**
+### **Phase 1: Scheduler Implementation & Paper Trading Verification**
 
-#### **Critical Structure Fixes**
-- [x] **claude**: Fixed ConfigData interface to match V2.1 multi-timeframe structure
-- [x] **claude**: Updated `extraction.data_sources` → `extraction.selected_data_sources` 
-- [x] **claude**: Changed `technical_indicators` → `technical_analysis`
-- [x] **claude**: Fixed `handleToggleDataPoint` to save indicator names ("RSI") not UUIDs
-- [x] **claude**: Added multi-timeframe note: "All selected indicators analyzed across 7 timeframes"
+#### **Scheduler Research & Architecture** 🕐
+- [ ] **claude**: Research candle-close based scheduling vs time-based scheduling
+  - Investigate market data APIs for candle close events
+  - Compare APScheduler triggers vs WebSocket candle events
+  - Analyze multi-exchange timing coordination (different close times)
+  - Document pros/cons of each approach with recommendations
+- [ ] **claude**: Design multi-user, multi-bot scheduler architecture
+  - Each bot runs on independent `analysis_frequency` from config
+  - Multiple bots per user run simultaneously (not staggered)
+  - Handle timezone considerations and market hours
+  - Plan resource management for concurrent bot executions
+- [ ] **claude**: Implement APScheduler integration with V2 orchestrator
+  - Add scheduler service to main API server (`ggbot.py`)
+  - Create bot start/stop endpoints that add/remove scheduled jobs
+  - Integrate with existing bot status WebSocket system
+  - Test job persistence and recovery after server restarts
+- [ ] **claude**: Test scheduler with real bot configurations
+  - Verify analysis_frequency settings (5m, 15m, 30m, 1h, 4h, 1d, 1w) work correctly
+  - Test multiple bots running simultaneously
+  - Monitor resource usage and performance impact
 
-#### **Authentication & Security**
-- [x] **claude**: Removed hardcoded user ID, implemented real Supabase auth
-- [x] **claude**: Added authentication guards with loading states in dashboard
-- [x] **claude**: Updated all API calls to use authenticated apiClient instead of direct fetch
-- [x] **claude**: Fixed bot store API endpoints (start/stop/delete) with proper auth headers
-- [x] **claude**: Fixed deleteBot endpoint to use correct `/api/v2/config/{config_id}`
+#### **Paper Trading Engine Verification** 📊
+- [ ] **claude**: Audit existing paper trading implementation vs README.md
+  - Verify all endpoints are working: `/paper/execute`, `/paper/positions`, etc.
+  - Test MarketDataAdapter connectivity to Hummingbot API
+  - Confirm background position monitoring is running (7-second intervals)
+  - Check database schema matches documentation
+- [ ] **claude**: End-to-end paper trading test
+  - Create test bot config and trigger orchestration
+  - Verify decision → paper trading → database flow
+  - Confirm position tracking, P&L calculation, stop/take profit execution
+  - Test multiple paper accounts isolation
+- [ ] **claude**: Integration with V2 orchestrator
+  - Verify decision module calls correct paper trading webhook
+  - Test trade intent format matches expected schema
+  - Confirm confidence-based position sizing works
+  - Validate risk management triggers
 
-#### **LLM Credential Management** 🔐
-- [x] **claude**: Implemented proper credential storage with Supabase Vault encryption
-- [x] **claude**: Added credential management API calls (store/list/delete) to apiClient
-- [x] **claude**: Removed API keys from config_data JSONB structure (security fix)
-- [x] **claude**: Created separate credential input with "Save Key" button
-- [x] **claude**: Added credential loading and real-time UI updates
-- [x] **claude**: Moved LLM config into Decision Agent section (better UX)
+### **Phase 2: Dashboard Data Flow & Real-time Updates**
 
-#### **Configuration System Improvements**
-- [x] **claude**: Updated default config to use DeepSeek R1 (free, no API key needed)
-- [x] **claude**: Implemented elegant radio button LLM provider selection
-- [x] **claude**: Added upgrade prompts for premium providers (OpenAI GPT-4)
-- [x] **claude**: Updated `core/config/template_v1.json` to match V2.1 structure
-- [x] **claude**: Fixed schema version `1.0` → `2.1` and added `config_type` field
+#### **Dashboard API Integration Audit** 📈
+- [ ] **claude**: Review all 4 dashboard cards (PnL, trades, positions, performance)
+  - Map each card to correct V2 API endpoints
+  - Verify data transformation from API response to UI display
+  - Check error handling for missing/invalid data
+  - Test with real paper trading data
+- [ ] **claude**: WebSocket monitoring system verification
+  - Confirm bot status updates work end-to-end
+  - Test real-time position updates during paper trading
+  - Verify WebSocket connection reliability and reconnection
+  - Check performance impact of real-time updates
+- [ ] **claude**: Database query optimization
+  - Review paper_trades, paper_accounts, paper_orders queries
+  - Ensure proper indexing for performance
+  - Test concurrent access from multiple users
+  - Optimize slow queries identified in testing
 
-#### **Data Structure Alignment**
-- [x] **claude**: All frontend data structures now match backend expectations exactly
-- [x] **claude**: Multi-timeframe config: user selects "RSI" → system analyzes 7 timeframes
-- [x] **claude**: Proper category mapping: technical_analysis, signals_group_chats, etc.
-- [x] **claude**: Fixed bot store config transformation for V2 API responses
+### **Phase 3: ggShot Signal Processing Pipeline**
 
-### **Phase 1: ggShot Integration & Config Type Support** 
+#### **Signal Validation Mode Architecture** 🔄
+- [ ] **claude**: Design dynamic orchestrator API
+  - Update `/api/v2/orchestrate/{config_id}` to accept config_type parameter
+  - Add support for dynamic symbol/timeframe parameters (vs static config)
+  - Design signal_validation vs autonomous_trading workflow differences
+  - Plan backward compatibility with existing autonomous_trading configs
+- [ ] **claude**: Implement signal_validation orchestrator behavior
+  - Dynamic symbol: Accept symbol in API call instead of reading from config
+  - Dynamic timeframes: Accept timeframes array in API call
+  - Dynamic system prompt: Use signal-specific prompts vs config prompts
+  - Preserve user decision context while allowing signal overrides
+- [ ] **claude**: ggShot signal format conversion
+  - Recreate ggshot/README.md workflow using base configs + signal_validation mode
+  - Convert ggShot signals to standard orchestrator API calls
+  - Map ggShot signal types to decision prompts and timeframes
+  - Handle ggShot confidence scores and reasoning
+- [ ] **claude**: Telegram listener integration
+  - Update telegram listener to trigger signal_validation orchestrator calls
+  - Design signal routing: which signals go to which user configs
+  - Implement signal filtering and user subscription management
+  - Test end-to-end: Telegram → Signal Processing → Orchestrator → Trading
 
-#### **ggShot Premium Access Control** 
-- [ ] **claude**: Verify `paid_data_points` field logic is implemented in frontend GGBotConfig
-- [ ] **claude**: Check if ggShot indicator shows as locked for free tier users in data source selection
-- [ ] **claude**: Test that users with `paid_data_points = ['ggshot']` can access ggShot indicator
-- [ ] **claude**: Implement ggShot access control validation in backend data sources endpoint
+#### **ggShot Premium Access Control** 🔐
+- [ ] **claude**: Verify paid_data_points UI logic in GGBotConfig
+  - Confirm ggShot data source shows as locked for free users
+  - Test users with paid_data_points = ['ggshot'] can access ggShot
+  - Implement proper upgrade prompts for ggShot access
+- [ ] **claude**: Backend access control validation
+  - Add ggShot access validation to data sources endpoint
+  - Ensure signal_validation configs require proper permissions
+  - Test access control across different subscription tiers
 
-#### **Signal Validation Config Type**
-- [ ] **claude**: Add `signal_validation` as config_type option in backend Pydantic models
-- [ ] **claude**: Update GGBotConfig frontend to show different UI based on config_type
-- [ ] **claude**: Implement Signal Validation mode UI in GGBotConfig (vs autonomous_trading mode)
-- [ ] **claude**: Update `core/config/template_v1.json` to include signal_validation template
-- [ ] **claude**: Test config creation flow for both autonomous_trading and signal_validation types
+---
 
-#### **ggShot Signal Processing Infrastructure**
-- [ ] **claude**: Create `ggshot/config_converter.py` to convert signal data to standard BotConfig
-- [ ] **claude**: Update extraction module to support Signal Validation mode with ggShot indicator
-- [ ] **claude**: Integrate ggShot signal processing into V2 orchestrator flow
-- [ ] **claude**: Test signal validation flow: Signal → Config → Orchestrator → Decision
+## 🎯 **MEDIUM PRIORITY**
 
-### **Phase 2: Real-time Status System**
+### **Phase 4: Core UX Improvements**
 
+#### **Top Navigation System** 🧭
+- [ ] **claude**: Design and implement top navigation bar
+  - Logo placement (ggbots.ai branding)
+  - Profile dropdown with user info
+  - Account settings page
+  - Logout functionality
+  - Responsive hamburger menu for mobile
+- [ ] **claude**: Create profile/account settings pages
+  - User profile information and editing
+  - Subscription tier display and management
+  - LLM credential management interface
+  - Email/password change functionality
+
+#### **Production Features**
+- [ ] **claude**: Turn on actual ggbot paper trading demonstration
+  - Create demo bot configuration with realistic settings
+  - Start bot and document full trading cycle
+  - Capture screenshots/video of live trading
+  - Verify P&L updates, position management, trade history
+- [ ] **claude**: Landing page redesign implementation
+  - Implement new design assets and layout
+  - Update copy and messaging for V2 features
+  - Add demo/preview functionality
+  - Optimize for conversion and onboarding
+
+---
+
+## 🎯 **LOWER PRIORITY (Polish & Optimization)**
+
+### **Phase 5: Real-time Status System** 📡
 #### **Status Message Research & Design**
 - [ ] **claude**: Review current orchestration logs to identify status update points
 - [ ] **claude**: Design 4-5 word status messages for each phase:
@@ -85,9 +154,9 @@
 - [ ] **claude**: Update frontend WebSocket connection to use V2 backend
 - [ ] **claude**: Test WebSocket status flow end-to-end
 
-### **Phase 3: Comprehensive End-to-End Testing**
+### **Phase 6: Comprehensive Testing & Documentation** 📋
 
-#### **Full Lifecycle Test - No Mocks, No Placeholders**
+#### **End-to-End Testing**
 - [ ] **claude**: Create `tests/test_complete_user_lifecycle.py`
   - User signup → email verification → login
   - Create first bot configuration (autonomous_trading)  
@@ -106,8 +175,6 @@
 - [ ] **claude**: Test V2 backend performance under load
 - [ ] **claude**: Verify database RLS policies prevent data leakage between users
 
-### **Phase 4: Documentation Updates**
-
 #### **API Documentation**
 - [ ] **claude**: Generate complete V2 API documentation with all endpoints
 - [ ] **claude**: Document authentication flow and JWT token usage
@@ -121,11 +188,45 @@
 - [ ] **claude**: Update `frontend/README.md` with latest features
 - [ ] **claude**: Document ggShot integration approach
 
----
+### **Phase 7: Code Cleanup & Optimization** 🧹
+- [ ] **claude**: Methodical V1 legacy code removal
+  - Audit all files for V1 references and unused imports
+  - Remove old extraction/, decision/, trading/ modules (keep V2 versions)
+  - Clean up unused configuration files and templates
+  - Remove hardcoded demo values and mock data
+  - Preserve ggshot/ for re-integration
+  - Test thoroughly after each cleanup phase
 
-## 🔄 **PRIORITY #2: Business Model Completion** (Later)
+### **Phase 6: Advanced UX Features** ✨
+- [ ] **claude**: Typeform-style bot creation survey
+  - Design multi-step wizard with progress bar
+  - Break configuration into logical sections/questions
+  - Add helpful explanations and tooltips
+  - Implement smooth transitions and animations
+  - A/B test against current configuration flow
+- [ ] **claude**: Mobile responsiveness optimization
+  - Redesign dashboard layout for mobile screens
+  - Optimize bot circle component for touch interfaces
+  - Implement mobile-friendly navigation
+  - Test across different device sizes and orientations
+- [ ] **claude**: Design and visibility improvements
+  - Research background texture and contrast options
+  - Implement light mode theme option
+  - Improve visibility in high-light conditions
+  - Test accessibility and readability improvements
+  - Update VIBE.md with new design patterns
 
-### **Phase 5: Stripe Integration** 
+### **Phase 7: Small UI/UX Refinements** 🎨
+- [ ] **sev**: Create list of specific UI/UX tweaks needed
+- [ ] **claude**: Implement UI/UX improvements from list
+  - Fix spacing, alignment, and visual inconsistencies
+  - Improve button states and hover effects
+  - Refine animations and transitions
+  - Polish loading states and error messages
+
+### **Phase 8: Business Model Features** 💰
+
+#### **Stripe Integration**
 - [ ] **sev**: Set up Stripe account and configure API keys
 - [ ] **sev**: Define pricing for Base/Signals tier
 - [ ] **claude**: Implement Stripe subscription creation endpoints
@@ -135,7 +236,7 @@
 - [ ] **claude**: Add `@requires_subscription` decorator for feature gating
 - [ ] **claude**: Test subscription lifecycle end-to-end
 
-### **Phase 6: Telegram Integration**
+#### **Per-Bot Telegram Publishing**
 - [ ] **sev**: Research telegram bot infrastructure for per-bot channel publishing
 - [ ] **sev**: Decide on existing bot reuse vs new bot creation
 - [ ] **claude**: Adapt existing telegram infrastructure for multi-bot channels
@@ -143,202 +244,92 @@
 - [ ] **claude**: Integrate telegram publishing with V2 orchestrator decisions
 - [ ] **claude**: Test telegram signal publishing for Base tier users
 
-### **Phase 7: Advanced Features**
+#### **Advanced Features**
 - [ ] **claude**: Add Google/GitHub OAuth social authentication
-- [ ] **claude**: Implement user profile management pages
 - [ ] **claude**: Add advanced bot analytics and performance tracking
-- [ ] **claude**: Create mobile-responsive optimizations
-
-### **Phase 8: Code Cleanup & Polish**
-- [ ] **claude**: Remove all remaining demo hardcoded values
-- [ ] **claude**: Clean up legacy code and unused files
 - [ ] **claude**: Add comprehensive error boundaries
 - [ ] **claude**: Implement proper logging throughout
-- [ ] **sev**: Review mobile responsiveness of dashboard
-- [ ] **claude**: Add user feedback messages for all actions
 - [ ] **sev**: Final testing of complete user journey
 - [ ] **sev**: Deploy to staging environment for beta testing
 
 ---
 
-## 📋 **CRITICAL SUCCESS CRITERIA**
+## 📋 **COMPLETED ACHIEVEMENTS** ✅
 
-### **Free Tier Must Work Perfectly**
-- ✅ User signup/login/email verification
-- ✅ Bot configuration with technical indicators (**Fixed 2025-09-07**)
-- ✅ Paper trading execution with virtual $10k accounts
-- ✅ Real-time status updates showing bot progress (WebSocket working)
-- ✅ Dashboard showing trade history and performance (**Fixed auth 2025-09-07**)
-- ✅ Own LLM API key requirement working (**Proper encryption 2025-09-07**)
-- ✅ Premium features properly locked with upgrade prompts
-
-### **Architecture Must Be Clean**  
-- ✅ No mock data, no hardcoded values, no placeholders (**Frontend alignment complete**)
-- ✅ All API calls authenticated with real Supabase JWT tokens (**Fixed 2025-09-07**)
-- ✅ RLS policies preventing cross-user data access
-- ✅ Error handling and recovery for all failure scenarios
-- ✅ Performance acceptable for multi-user concurrent usage
-
-### **Business Model Foundation Ready**
-- ✅ Subscription tier system functional (even if Stripe not connected)
-- ✅ Premium feature gating working (**LLM provider selection complete**)
-- ✅ User profile system supporting subscription management
-- ✅ Infrastructure ready for Stripe integration
-- ✅ Secure credential management with Supabase Vault (**Added 2025-09-07**)
-
-### **CURRENT COMPLETION STATUS: ~85%**
-**✅ CORE FOUNDATION COMPLETE:** All critical success criteria working
-**✅ PHASE 0 COMPLETE:** Frontend-backend integration and credential management (2025-09-07)
-**🔄 PHASE 1 IN PROGRESS:** ggShot premium access control UI needed
-**❌ REMAINING:** Testing suite, documentation, business model features
+### **Phase 0: Frontend-Backend Integration** ✅ **COMPLETED 2025-09-07**
+- ✅ Fixed ConfigData structure alignment with V2.1 schema
+- ✅ Implemented real Supabase authentication throughout
+- ✅ Added proper LLM credential encryption via Supabase Vault
+- ✅ Fixed config_type persistence with sliding switch UI design
+- ✅ Updated all API models to support new fields (config_type, schema_version, llm_config)
+- ✅ Resolved Pydantic validation dropping config fields
+- ✅ Implemented neumorphic sliding switch matching VIBE.md aesthetics
 
 ---
 
-## 🚀 **DEPLOYMENT CHECKLIST**
+## 🔧 **ARCHITECTURE CONSIDERATIONS**
 
-### **Pre-Production Validation**
-- [ ] **claude**: All tests passing with real data
-- [ ] **claude**: Frontend builds successfully for production
-- [ ] **claude**: V2 backend passes health checks
-- [ ] **claude**: Database performance acceptable
-- [ ] **claude**: All environment variables configured correctly
-- [ ] **sev**: Domain and SSL certificates working
-- [ ] **sev**: Email delivery working for verification emails
+### **Scheduler Design Decisions**
+- **Candle-Close vs Time-Based**: Need to research market data APIs and timing precision
+- **Multi-Bot Coordination**: Simultaneous execution may strain resources - need monitoring
+- **Job Persistence**: APScheduler with database jobstore for restart recovery
+- **Market Hours**: Consider crypto 24/7 vs traditional market scheduling
 
-### **Go-Live Readiness**
-- [ ] **sev**: Backup strategy in place for database
-- [ ] **sev**: Monitoring and alerting configured
-- [ ] **sev**: Error logging and debugging accessible
-- [ ] **claude**: User onboarding flow tested end-to-end
-- [ ] **claude**: Customer support documentation prepared
+### **ggShot Integration Complexity**
+- **Dynamic Orchestrator**: Major change from static config to dynamic signal parameters
+- **Signal Routing**: Need user subscription management for signal distribution
+- **Prompt Engineering**: Different system prompts for signal validation vs autonomous trading
+- **Backward Compatibility**: Ensure existing autonomous_trading configs still work
 
----
+### **Real-Time Data Challenges**
+- **WebSocket Scaling**: Multiple users with multiple bots = many concurrent connections
+- **Database Load**: Real-time position updates may impact query performance
+- **State Synchronization**: Frontend state must stay in sync with backend changes
+- **Error Recovery**: WebSocket disconnections need graceful handling
 
-## 🔧 **TECHNICAL IMPLEMENTATION DETAILS** (Added 2025-09-07)
-
-### **Frontend-Backend Integration Fixes**
-
-#### **Critical Issues Resolved**
-**Problem**: Frontend was sending wrong data structure and all API calls were unauthenticated
-**Solution**: Complete alignment of data structures and authentication implementation
-
-**Before (Broken):**
-```typescript
-// Wrong structure sent to backend
-extraction: {
-  data_sources: {
-    technical_indicators: ["uuid-id-1", "uuid-id-2"]  // Wrong format!
-  }
-}
-
-// No authentication
-fetch(`/api/v2/bot/${configId}/metrics`)  // ❌ No auth headers
-```
-
-**After (Working):**
-```typescript
-// Correct V2.1 structure
-extraction: {
-  selected_data_sources: {
-    technical_analysis: {
-      data_points: ["RSI", "MACD"],  // Indicator names
-      timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
-    }
-  }
-}
-
-// Authenticated calls
-apiClient.authenticatedFetch(`/api/v2/bot/${configId}/metrics`)  // ✅ With JWT
-```
-
-#### **LLM Credential Security Implementation**
-
-**Problem**: API keys were being stored in plaintext in config_data JSONB
-**Solution**: Proper Supabase Vault encryption with separate credential management
-
-**Security Flow:**
-```typescript
-// 1. User enters API key in UI
-credentialInput = "sk-actual-api-key"
-
-// 2. Separate save operation (not part of config save)
-await apiClient.storeCredential("openai", credentialInput)
-
-// 3. Backend encrypts via Supabase Vault
-// user_llm_credentials table stores vault_secret_id (not plaintext)
-
-// 4. Config only references capability, no keys
-llm_config: {
-  provider: "openai",
-  use_own_key: true  // References encrypted credential
-}
-```
-
-### **Multi-Timeframe Architecture**
-
-#### **User Experience Design**
-**Concept**: User selects "RSI" → System analyzes RSI across 7 timeframes automatically
-
-**Implementation:**
-- Frontend: User checks "RSI" checkbox
-- Backend: Extraction runs RSI_5m, RSI_15m, RSI_30m, RSI_1h, RSI_4h, RSI_1d, RSI_1w
-- Decision: LLM receives rich context: "RSI shows oversold on 15m but neutral on 4h"
-- Config: Clean structure with automatic timeframe expansion
-
-#### **Database Pattern**
-```sql
--- Multiple market_data rows per extraction run
-market_data (symbol: BTC/USDT, timeframe: 5m, config_id: abc, data_points: {...})
-market_data (symbol: BTC/USDT, timeframe: 15m, config_id: abc, data_points: {...})
-market_data (symbol: BTC/USDT, timeframe: 30m, config_id: abc, data_points: {...})
--- ... 7 total rows
-
--- Decision engine queries all: SELECT * WHERE config_id = 'abc' AND symbol = 'BTC/USDT'
--- Result: Rich multi-timeframe context for LLM analysis
-```
-
-### **Configuration System UX Improvements**
-
-#### **LLM Provider Selection (Before/After)**
-
-**Before**: Complex button system with confusing states
-**After**: Clean radio button list with progressive disclosure
-
-```typescript
-// New elegant flow
-🔘 DeepSeek (Free) - Default ✓
-○ OpenAI (GPT-4)     → Shows "Upgrade" OR "Add API Key" 
-○ Anthropic (Claude) → Shows "Add API Key"
-○ xAI (Grok)         → Shows "Add API Key"
-○ Google (Gemini)    → Shows "Add API Key"
-```
-
-#### **Default Configuration Strategy**
-**Goal**: Minimal friction for new users, but functional enough to demonstrate value
-
-**Approach**:
-- Single indicator (RSI) - simple but effective
-- Basic strategy: "If 1h RSI below 40, enter long" - will actually trade
-- DeepSeek R1 default - free, no API key needed
-- Conservative risk settings - safe for learning
+### **Paper Trading Validation**
+- **Market Data Quality**: Verify Hummingbot API provides accurate, timely prices
+- **Risk Management**: Test stop/take profit execution under various market conditions
+- **Performance Isolation**: Ensure multiple paper accounts don't interfere
+- **Data Consistency**: P&L calculations must match across all interfaces
 
 ---
 
-## 📝 **NOTES**
+## 📊 **SUCCESS METRICS**
 
-### **Key Architecture Decisions Made**
-- **V2 Clean Break**: Complete parallel implementation instead of incremental migration
-- **Supabase-First**: Authentication, database, real-time, and vault all through Supabase
-- **Paper Trading Focus**: Free tier provides full value without real money risk
-- **Config-Based Architecture**: ggShot integrated into standard configuration system
-- **Premium Feature Gating**: Database-driven access control with `paid_data_points`
+### **Immediate Goals (Phase 1-3)**
+- [ ] **Functional Scheduler**: Bots start/stop on schedule with correct frequency
+- [ ] **Live Paper Trading**: Users can watch bots make real trades with live P&L
+- [ ] **Real-Time Dashboard**: All 4 cards show live, accurate data
+- [ ] **ggShot Integration**: Signal validation mode processes signals → trades
 
-### **Deferred Until Post-Launch**
-- **Exchange API Integration**: Coming in Full/Autonomous tier
-- **Advanced Analytics**: Performance optimization and user behavior tracking  
-- **Mobile App**: React Native version with shared authentication
-- **Usage-Based Pricing**: Simple tier-based pricing for now
+### **Medium-Term Goals (Phase 4-5)**
+- [ ] **Professional UI**: Top nav, profile management, clean codebase
+- [ ] **Production Demo**: Full working demo for user onboarding
+- [ ] **Code Quality**: No legacy code, proper error handling, optimized queries
+
+### **Long-Term Polish (Phase 6-7)**  
+- [ ] **Mobile Optimized**: Responsive design works well on all devices
+- [ ] **Accessibility**: Light mode, high contrast, readable in all conditions
+- [ ] **User Experience**: Typeform flow, smooth animations, intuitive interface
 
 ---
 
-**FOCUS: Get free tier working perfectly → validate business model → scale premium features** 🎯
+## 🚀 **DEPLOYMENT READINESS**
+
+### **Current Status**: ~85% Complete
+- ✅ **Core Foundation**: Authentication, configuration, data structures aligned
+- ✅ **Paper Trading Engine**: Built and ready for testing
+- ✅ **Frontend-Backend Sync**: Config persistence and API integration working
+- 🔄 **Scheduler & Real-Time**: Need implementation and verification
+- ❌ **ggShot Integration**: Requires signal processing pipeline rebuild
+- ❌ **Testing & Polish**: End-to-end validation and UX improvements needed
+
+### **Go-Live Criteria**
+1. **Scheduler working** - Users can start/stop bots that trade on schedule
+2. **Paper trading visible** - Dashboard shows live trading activity and P&L
+3. **Data flow verified** - All dashboard metrics accurate and real-time
+4. **ggShot integrated** - Signal validation mode processes external signals
+5. **Code clean** - No legacy code, proper error handling, production ready
+
+**Target**: Complete Phases 1-3 for production readiness, Phases 4-7 for polish and growth.
