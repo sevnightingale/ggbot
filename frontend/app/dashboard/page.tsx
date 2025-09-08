@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import GGBot from '@/components/GGBot'
 import GGBotConfig from '@/components/GGBotConfig'
 import FloatingActionButtons from '@/components/FloatingActionButtons'
@@ -96,7 +96,10 @@ export default function DashboardPage() {
   }, [loadBots, userId])
   
   // Get user's bots and selected bot
-  const userBots = userId ? getBotsByUser(userId) : []
+  const userBots = useMemo(() => 
+    userId ? getBotsByUser(userId) : [], 
+    [userId, getBotsByUser]
+  )
   const selectedBotData = selectedConfigId ? getBotById(selectedConfigId) : null
   
   // WebSocket connection for real-time updates (no demo message handler)

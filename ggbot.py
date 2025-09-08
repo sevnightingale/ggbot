@@ -754,12 +754,8 @@ async def reconcile_active_bots():
                     config_id, user_id, config_data = row
                     
                     try:
-                        # Extract timeframe from config_data
-                        if isinstance(config_data, dict):
-                            decision_config = config_data.get("decision", {})
-                            timeframe = decision_config.get("analysis_frequency", "1h")
-                        else:
-                            timeframe = "1h"  # Default fallback
+                        # Extract timeframe from config_data using the proper extraction function
+                        timeframe = extract_timeframe_from_config(config_data)
                         
                         # Schedule the bot
                         add_bot_job(user_id, config_id, timeframe)
@@ -779,12 +775,19 @@ def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
     Extract analysis_frequency (timeframe) from bot config.
     
     Args:
-        config: Bot configuration dictionary
+        config: Bot configuration dictionary (may be nested)
         
     Returns:
         Timeframe string (defaults to "1h")
     """
-    decision_config = config.get("decision", {})
+    # Handle nested config structure from database
+    if "config_data" in config:
+        inner_config = config["config_data"]
+        decision_config = inner_config.get("decision", {})
+    else:
+        # Handle flat config structure
+        decision_config = config.get("decision", {})
+    
     return decision_config.get("analysis_frequency", "1h")
 
 
@@ -875,10 +878,18 @@ async def update_config(
     request: ConfigUpdateRequest,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Update a configuration."""
+    """Update a configuration and automatically reschedule if active."""
     # Filter out None values
     update_data = {k: v for k, v in request.dict().items() if v is not None}
     config_name = update_data.pop("config_name", None)
+    
+    # Check if this is an active bot before update
+    current_state = await config_service.get_bot_state(config_id, current_user.user_id)
+    was_active = current_state == 'active'
+    
+    # Get old config to compare timeframes
+    old_config = await config_service.get_config(config_id, current_user.user_id)
+    old_timeframe = extract_timeframe_from_config(old_config.to_dict()) if old_config else None
     
     config = await config_service.update_config(
         config_id=config_id,
@@ -890,10 +901,53 @@ async def update_config(
     if not config:
         raise HTTPException(status_code=404, detail="Configuration not found or update failed")
     
-    return {
+    # If bot was active, check if timeframe changed and reschedule if needed
+    reschedule_info = None
+    if was_active and scheduler.running:
+        new_timeframe = extract_timeframe_from_config(config.to_dict())
+        
+        if old_timeframe != new_timeframe:
+            logger.info(f"Timeframe changed from {old_timeframe} to {new_timeframe} for active bot {config_id}")
+            
+            # Remove old job
+            if old_timeframe:
+                old_removed = remove_bot_job(current_user.user_id, config_id, old_timeframe)
+            else:
+                old_removed = True
+            
+            # Add new job with new timeframe
+            add_bot_job(current_user.user_id, config_id, new_timeframe)
+            
+            # Get next run time for response
+            job_id = f"bot:{current_user.user_id}:{config_id}:{new_timeframe}"
+            job = scheduler.get_job(job_id)
+            next_run = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+            
+            reschedule_info = {
+                "rescheduled": True,
+                "old_timeframe": old_timeframe,
+                "new_timeframe": new_timeframe,
+                "next_run": next_run
+            }
+            
+            # Broadcast schedule change via WebSocket
+            await websocket_manager.broadcast_to_user(current_user.user_id, {
+                "type": "bot_schedule_updated",
+                "config_id": config_id,
+                "old_timeframe": old_timeframe,
+                "new_timeframe": new_timeframe,
+                "next_run": next_run
+            })
+    
+    response = {
         "status": "success",
         "config": config.to_dict()
     }
+    
+    if reschedule_info:
+        response["schedule_update"] = reschedule_info
+    
+    return response
 
 
 @app.delete("/api/v2/config/{config_id}")
@@ -1398,6 +1452,43 @@ async def get_scheduler_status(
     except Exception as e:
         logger.error(f"Failed to get scheduler status: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get scheduler status: {str(e)}")
+
+
+@app.post("/api/v2/scheduler/reconcile")
+async def manual_reconcile(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Manually trigger scheduler reconciliation (admin function)."""
+    try:
+        if not scheduler.running:
+            raise HTTPException(status_code=503, detail="Scheduler is not running")
+        
+        # Store counts before reconciliation
+        jobs_before = len(scheduler.get_jobs())
+        user_jobs_before = len([j for j in scheduler.get_jobs() if j.id.startswith(f"bot:{current_user.user_id}:")])
+        
+        # Run reconciliation
+        await reconcile_active_bots()
+        
+        # Check counts after
+        jobs_after = len(scheduler.get_jobs())
+        user_jobs_after = len([j for j in scheduler.get_jobs() if j.id.startswith(f"bot:{current_user.user_id}:")])
+        
+        return {
+            "status": "success",
+            "message": "Reconciliation completed",
+            "jobs_before": jobs_before,
+            "jobs_after": jobs_after,
+            "user_jobs_before": user_jobs_before,
+            "user_jobs_after": user_jobs_after,
+            "change": jobs_after - jobs_before
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Manual reconciliation failed: {e}")
+        raise HTTPException(status_code=500, detail=f"Reconciliation failed: {str(e)}")
 
 
 @app.get("/api/v2/bot/{config_id}/status")
