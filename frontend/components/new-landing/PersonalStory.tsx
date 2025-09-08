@@ -18,7 +18,7 @@ export default function PersonalStory() {
                   <div className="w-16 h-16 bg-bone-200/20 rounded-full"></div>
                 </div>
                 <p className="text-xs text-bone-200/50 text-center mt-2">
-                  [Sev's photo placeholder]
+                  [Sev&apos;s photo placeholder]
                 </p>
               </div>
 
@@ -37,7 +37,7 @@ export default function PersonalStory() {
                   </a>
                 </div>
                 <p className="text-lg text-bone-200/80 mb-6">
-                  I'm sev
+                  I&apos;m sev
                 </p>
               </div>
             </div>
@@ -45,7 +45,7 @@ export default function PersonalStory() {
             {/* Letter content */}
             <div className="space-y-6 text-bone-200/80 leading-relaxed">
               <p>
-                I've been a crypto day trader for the last 5 years. I've tried many bots, lost $1,500 in 
+                I&apos;ve been a crypto day trader for the last 5 years. I&apos;ve tried many bots, lost $1,500 in 
                 experimenting with them, and ultimately found they created more work for me.
               </p>
 
@@ -54,9 +54,9 @@ export default function PersonalStory() {
                   <strong className="text-bone-200">The problem with bots are:</strong>
                 </p>
                 <ol className="list-decimal list-inside space-y-2 ml-4">
-                  <li>They don't adapt to changing market conditions</li>
+                  <li>They don&apos;t adapt to changing market conditions</li>
                   <li>They follow rigid rules with zero reasoning</li>
-                  <li>They can't think beyond the data you hardcode in</li>
+                  <li>They can&apos;t think beyond the data you hardcode in</li>
                 </ol>
               </div>
 
@@ -81,7 +81,7 @@ export default function PersonalStory() {
 
               <div className="pt-6 border-t border-bone-200/20">
                 <p className="text-bone-200/70 italic">
-                  I'm building this with input from experienced traders who understand the frustrations of existing solutions. 
+                  I&apos;m building this with input from experienced traders who understand the frustrations of existing solutions. 
                   <strong className="text-bone-200 not-italic"> Come join our journey</strong> as we create AI that trades like humans think.
                 </p>
               </div>
