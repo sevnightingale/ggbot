@@ -242,7 +242,7 @@ class GGBotOrchestrator:
             
             result = OrchestrationResult(
                 status="success",
-                config_id=config_id,
+                config_id=str(config_id),
                 extraction_result=extraction_result,
                 decision_result=decision_result,
                 trading_result=trading_result,
@@ -260,7 +260,7 @@ class GGBotOrchestrator:
             self._log.error(f"V2 autonomous cycle failed: {e}")
             return OrchestrationResult(
                 status="error",
-                config_id=config_id,
+                config_id=str(config_id),
                 extraction_result={"error": str(e)},
                 decision_result=None,
                 trading_result=None,
@@ -326,7 +326,7 @@ class GGBotOrchestrator:
             
             result = OrchestrationResult(
                 status="success",
-                config_id=config_id,
+                config_id=str(config_id),
                 extraction_result=extraction_result,
                 decision_result=decision_result,
                 trading_result=trading_result,
@@ -344,7 +344,7 @@ class GGBotOrchestrator:
             self._log.error(f"Signal validation failed: {e}")
             return OrchestrationResult(
                 status="error",
-                config_id=config_id,
+                config_id=str(config_id),
                 extraction_result={"error": str(e)},
                 decision_result=None,
                 trading_result=None,
