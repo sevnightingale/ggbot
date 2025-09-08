@@ -40,12 +40,16 @@ class SupabaseStorage:
     
     def _make_serializable(self, data: Any) -> Any:
         """
-        Convert pandas and numpy objects to JSON-serializable format.
+        Convert pandas, numpy, and UUID objects to JSON-serializable format.
         """
+        import uuid
+        
         if isinstance(data, dict):
             return {key: self._make_serializable(value) for key, value in data.items()}
         elif isinstance(data, list):
             return [self._make_serializable(item) for item in data]
+        elif isinstance(data, uuid.UUID):
+            return str(data)
         elif isinstance(data, pd.Timestamp):
             return data.isoformat()
         elif isinstance(data, pd.Series):
