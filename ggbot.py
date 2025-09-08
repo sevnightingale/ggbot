@@ -429,7 +429,8 @@ class GGBotOrchestrator:
             self._extraction_engines[user_id] = ExtractionEngineV2(
                 user_id=user_id,
                 use_advanced_preprocessing=True,
-                use_database_storage=True
+                use_database_storage=True,
+                use_file_storage=False  # Disable file storage for production (prevents bloat)
             )
         return self._extraction_engines[user_id]
     
