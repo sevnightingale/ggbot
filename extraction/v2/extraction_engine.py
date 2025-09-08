@@ -28,29 +28,41 @@ class ExtractionEngineV2:
     using pandas-ta with simple analytical preprocessing.
     """
     
-    def __init__(self, user_id: str = DEFAULT_USER_ID, use_advanced_preprocessing: bool = True, use_database_storage: bool = True):
+    def __init__(self, user_id: str = DEFAULT_USER_ID, use_advanced_preprocessing: bool = True, use_database_storage: bool = True, use_file_storage: bool = False):
         """
-        Initialize extraction engine with dual storage (files + Supabase).
+        Initialize extraction engine with configurable storage options.
         
         Args:
             user_id: User ID for configuration and logging
             use_advanced_preprocessing: Enable sophisticated analysis preprocessing
             use_database_storage: Store results to Supabase database
+            use_file_storage: Store results to local files (useful for debugging, disable for production)
         """
         self.user_id = user_id
         self.use_database_storage = use_database_storage
+        self.use_file_storage = use_file_storage
         
         # Core components
         self.data_client = HummingbotDataClient()
         self.indicators = TechnicalIndicators(use_advanced_preprocessing=use_advanced_preprocessing)
         
-        # Dual storage system
-        self.file_storage = FileStorage(base_dir=f"extraction_results/{user_id}")
+        # Configurable storage system
+        self.file_storage = FileStorage(base_dir=f"extraction_results/{user_id}") if use_file_storage else None
         self.supabase_storage = SupabaseStorage() if use_database_storage else None
         
         self._log = logger.bind(user_id=user_id, component="extraction_v2")
         mode = "advanced" if use_advanced_preprocessing else "simple"
-        storage = "dual (files+database)" if use_database_storage else "files only"
+        
+        # Determine storage description
+        storage_parts = []
+        if use_database_storage:
+            storage_parts.append("database")
+        if use_file_storage:
+            storage_parts.append("files")
+        if not storage_parts:
+            storage_parts.append("none")
+        storage = " + ".join(storage_parts)
+        
         self._log.info(f"Initialized ExtractionEngineV2 with {mode} preprocessing, {storage} storage")
     
     async def extract_for_symbol(
@@ -116,12 +128,18 @@ class ExtractionEngineV2:
             # Step 4: Store results (dual storage)
             storage_results = {}
             
-            # File storage (always enabled)
-            stored_path = self.file_storage.save_extraction_result(extraction_result, "single")
-            storage_results["file"] = {
-                "status": "success" if stored_path else "error",
-                "path": stored_path
-            }
+            # File storage (optional)
+            if self.use_file_storage and self.file_storage:
+                stored_path = self.file_storage.save_extraction_result(extraction_result, "single")
+                storage_results["file"] = {
+                    "status": "success" if stored_path else "error",
+                    "path": stored_path
+                }
+            else:
+                storage_results["file"] = {
+                    "status": "disabled",
+                    "path": None
+                }
             
             # Database storage (if enabled)
             if self.supabase_storage:
@@ -209,8 +227,11 @@ class ExtractionEngineV2:
                 }
             }
             
-            batch_path = self.file_storage.save_extraction_result(batch_result, "config")
-            batch_result["file_path"] = batch_path
+            if self.use_file_storage and self.file_storage:
+                batch_path = self.file_storage.save_extraction_result(batch_result, "config")
+                batch_result["file_path"] = batch_path
+            else:
+                batch_result["file_path"] = None
             
             return batch_result
             
@@ -293,8 +314,11 @@ class ExtractionEngineV2:
             }
         }
         
-        batch_path = self.file_storage.save_multiple_results(results, f"{len(symbols)}_symbols")
-        batch_result["file_path"] = batch_path
+        if self.use_file_storage and self.file_storage:
+            batch_path = self.file_storage.save_multiple_results(results, f"{len(symbols)}_symbols")
+            batch_result["file_path"] = batch_path
+        else:
+            batch_result["file_path"] = None
         
         return batch_result
     
