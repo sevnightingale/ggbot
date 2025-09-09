@@ -81,7 +81,7 @@ class UserService:
                         SELECT subscription_tier, subscription_status, subscription_expires_at,
                                stripe_customer_id, stripe_subscription_id,
                                telegram_user_id, telegram_username, telegram_chat_id,
-                               monthly_signal_count, created_at, updated_at
+                               monthly_signal_count, paid_data_points, created_at, updated_at
                         FROM user_profiles
                         WHERE user_id = %s
                     """, (user_id,))
@@ -101,8 +101,9 @@ class UserService:
                         telegram_username=result[6],
                         telegram_chat_id=result[7],
                         monthly_signal_count=result[8] or 0,
-                        created_at=result[9],
-                        updated_at=result[10]
+                        paid_data_points=result[9] or [],
+                        created_at=result[10],
+                        updated_at=result[11]
                     )
                     
         except Exception as e:

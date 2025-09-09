@@ -1,174 +1,174 @@
-Here’s the blunt take: your template is a solid “container,” but it’s not production-ready for autonomous use. Three critical gaps:
+Here’s the straight read, Sev: solid UX and lots of functionality, but there are a few **logic bugs**, **state-mutation risks**, and **DX/security** gaps that will bite you in prod.
 
-1. It’s unstructured. Inputs are free-text blobs; output isn’t machine-robust.
-2. It’s ambiguous. “hold” vs “wait”; no explicit entry/position sizing hooks though your goal says the strategy defines them.
-3. It lacks guardrails. No staleness checks, missing-indicator handling, or “don’t hallucinate metrics not in data.”
+# Verdict
 
-Below is a tighter, drop-in replacement that keeps your “user supplies the strategy” philosophy while making it reliable for an execution pipeline.
+Good scaffolding. Needs fixes before you trust it with user configs and API keys.
 
----
+## Blockers / Bugs
 
-# What to fix (strongly recommended)
+* **Selection by name (not ID) = incorrect toggles & key collisions.**
+  You store selected data points by **name** and render chips keyed by `dataPointName`. If two sources share a name, removing a chip may toggle the wrong point, and React keys will collide. Store selections as `{source, id}` and render keys as `${source}:${id}`.
+* **Shallow “immutable” update mutates nested objects.**
+  `newConfig = { ...prev }` then mutating `newConfig.extraction.selected_data_sources[category]` mutates nested references from `prev`. It works by chance (top-level object changes) but breaks memoization and can introduce heisenbugs. Use an immutable update (Immer) or deep-clone only the branch you change.
+* **Race/leak on async init.**
+  `initializeComponent()` doesn’t cancel if the sheet closes mid-flight. You also don’t clear the open/close timeouts. Both can set state after unmount.
+* **Default numeric values use `||` instead of `??`.**
+  `value={x || 100}` treats `0` as falsy; 0% is legitimate in some fields. Use `??` + explicit min validation.
+* **Variable shadowing.**
+  In `selectedDataPoints` memo you create `const dataSources = configData.extraction.selected_data_sources`, shadowing the `dataSources` state (array). This is confusing and error-prone; rename to `selectedSources`.
+* **Reset naming inconsistency.**
+  New bot name toggles between **“New ggbot”** and **“New Bot”**. Pick one.
+* **“alert” in 2025 UX.**
+  `alert('Signal Validation requires an upgraded plan')` is a jarring blocking UI; you already have patterns for inline gates.
 
-* **JSON-only output** with a strict schema; reject anything else.
-* **Single neutral no-trade state** (“WAIT”), not “hold” vs “wait.”
-* **Guardrails:** If required indicators are missing or data is stale, return `WAIT` with `data_status.complete=false`.
-* **Evidence not chain-of-thought:** cite specific indicator values + timeframe (structured), no long prose.
-* **Numeric types:** prices/confidence are numbers, not strings; fixed precision.
-* **Strategy-driven fields:** allow the user’s strategy to define timeframe priority, entry logic, and position sizing; the template should just surface those.
-* **Action set control:** allow caller to pass `allowed_actions` (e.g., disallow SHORT if the venue can’t short).
-* **Signal freshness:** include `as_of` and `valid_until`.
-* **RR/Risk sanity check:** if R\:R < strategy minimum (e.g., 1.5), force `WAIT`.
+## Risky Patterns / Security
 
----
+* **API keys in a shared input state.**
+  One `credentialInput` for all providers = accidental reuse/leak across tabs. Use provider-scoped state or clear on provider change. Never log credential operations.
+* **Console logging sensitive payloads.**
+  You `console.log` API responses and errors broadly; these often include user data. Strip before prod.
 
-# Improved prompt template (drop-in)
+## Performance
 
-```python
-def build_opportunity_analysis_prompt(
-    symbol: str,
-    current_price: float,
-    market_data_json: str,      # JSON string: per-timeframe indicators (see schema note)
-    volume_analysis_json: str,  # JSON string: volume/OBV/VPVR, etc.
-    user_strategy: str,         # Free text OR JSON; user defines how to trade
-    as_of_iso: str,             # ISO8601 timestamp for the data snapshot
-    allowed_actions: str = "LONG,SHORT,WAIT",  # comma-separated
-    stale_minutes: int = 5
-) -> str:
-    """
-    Build an opportunity-analysis prompt that treats the user_strategy as the ONLY source of trading logic.
-    This template enforces structured I/O and guardrails for autonomous use.
-    """
+* **O(n²) chip render lookups.**
+  Each chip does a `.flatMap(...).find(...)`. Build a `Map<data_point_id -> DataPoint>` once via `useMemo`.
+* **Potentially large lists.**
+  Pairs and data points should be **virtualized** (e.g., `react-window`) to keep scroll silky.
 
-    return f"""
-You are an execution-grade crypto opportunity evaluator. You DO NOT invent strategy rules.
-You strictly apply the user's strategy to the supplied, structured market data.
+## Accessibility & UX
 
-## CONTEXT
-- Instrument: {symbol}
-- Current Price: {current_price}
-- Data As-Of: {as_of_iso}
-- Allowed Actions: {allowed_actions}
-- Stale Threshold (minutes): {stale_minutes}
+* **Modal/bottom sheet should be a real dialog.**
+  Add `role="dialog" aria-modal="true"`, label it, trap focus, close on `Esc`.
+* **Dropdown should be a combobox/listbox.**
+  Current click-out handler is fine, but use a `ref`+containment (not `document.querySelector`/`closest` strings) and add keyboard navigation.
+* **Buttons need aria-labels.**
+  Icon-only buttons (save/reset/exit/chips) should have `aria-label`.
 
-## MARKET DATA (STRUCTURED, DO NOT REINTERPRET SHAPE)
-market_data_json:
-{market_data_json}
+## High-impact fixes (snippets)
 
-volume_analysis_json:
-{volume_analysis_json}
+### 1) Immutable nested updates (Immer)
 
-## USER STRATEGY (SOURCE OF TRUTH)
-The user defines how to trade (timeframe priority, entry rules, stop/TP rules, position sizing).
-Use ONLY these rules. If rules are ambiguous or required indicators are missing, return WAIT with rationale.
-user_strategy:
-{user_strategy}
+```ts
+import { produce } from 'immer';
 
-## RULES YOU MUST FOLLOW
-1) Do not use indicators or timeframes not present in market_data_json/volume_analysis_json.
-2) If any indicator required by the user strategy is missing OR data is older than {stale_minutes} minutes from {as_of_iso}, set action=WAIT and data_status.complete=false.
-3) Respect Allowed Actions: if SHORT not allowed, you cannot output SHORT.
-4) If the user strategy specifies timeframe precedence (e.g., 4h > 1h > 15m), follow it strictly.
-5) Confidence is a real number in [0,1], calibrated by the user strategy’s confluence rules. If the strategy doesn’t define calibration, keep confidence ≤ 0.6.
-6) Only propose trades with a strategy-compliant stop and target; if R:R below the strategy minimum, output WAIT.
-7) Output STRICT JSON only. No extra text.
+const updateConfigData = (updater: (draft: ConfigData) => void) => {
+  setConfigData(prev => produce(prev, draft => { updater(draft) }));
+  setHasChanges(true);
+};
 
-## OUTPUT JSON SCHEMA (STRICT)
-Return exactly this shape and nothing else:
+// Example: toggle data point by {source, id}
+updateConfigData(d => {
+  const sel = d.extraction.selected_data_sources;
+  const category = sourceInfo.name as keyof typeof sel;
 
-{{
-  "action": "LONG" | "SHORT" | "WAIT",
-  "confidence": number,                         # 0.000–1.000
-  "entry": {{
-    "type": "MARKET" | "LIMIT" | "STOP" | null,
-    "price": number | null,
-    "valid_until": "ISO8601" | null
-  }},
-  "stop_loss": number | null,
-  "take_profit": [number, ...] | null,          # allow multiple targets if the strategy uses scales
-  "position_size": {{
-    "units": number | null,
-    "notional": number | null
-  }} | null,
-  "evidence": [                                  # cite exact evidence, not chain-of-thought
-    {{
-      "timeframe": "5m|15m|30m|1h|4h|1d|1w",
-      "indicator": "RSI|MACD|EMA50|... (as in data)",
-      "value": number,
-      "rule_evaluated": "e.g., RSI>70",
-      "status": "met|not_met"
-    }}
-  ],
-  "risk_reward": {{
-    "rr": number | null,
-    "atr": number | null
-  }},
-  "data_status": {{
-    "as_of": "{as_of_iso}",
-    "complete": true | false,
-    "missing_indicators": [ "..." ]
-  }}
-}}
+  sel[category] ??= { data_points: [], timeframes: ["5m","15m","30m","1h","4h","1d","1w"] };
+  const dpKey = `${category}:${dataPoint.data_point_id}`;
 
-## EVALUATION INSTRUCTIONS
-- Apply the user_strategy exactly. If it specifies entries/position sizing, populate those fields. If it says the executor determines size elsewhere, set position_size to null.
-- If the strategy uses fixed offsets (e.g., SL = entry - 1.5 * ATR(14)), compute them from provided data.
-- Keep numbers to sensible precision for {symbol}. Do NOT round away risk controls.
-- If signals conflict per the strategy’s precedence rules, prefer higher-priority timeframe; otherwise WAIT.
-
-Return STRICT JSON only.
-"""
+  const arr = sel[category]!.data_points as string[]; // now store KEYS, not names
+  const idx = arr.indexOf(dpKey);
+  if (idx >= 0) arr.splice(idx, 1); else arr.push(dpKey);
+});
 ```
 
----
+### 2) Store/render by **unique key**, not name
 
-# Minimal market\_data schema (example your data pipeline should supply)
+```ts
+// Build a quick index
+const dpIndex = React.useMemo(() => {
+  const map = new Map<string, DataPoint & { source: string }>();
+  for (const s of dataSources)
+    for (const dp of s.data_points)
+      map.set(`${s.name}:${dp.data_point_id}`, { ...dp, source: s.name });
+  return map;
+}, [dataSources]);
 
-Keep your inputs structured so the LLM can’t misread them:
-
-```json
-{
-  "5m": {"price": 123.45, "rsi": 73.2, "macd": {"line": 0.004, "signal": 0.001, "hist": 0.003}, "ema": {"20": 122.8, "50": 121.9}, "atr": 0.9, "volume": 1_234_567},
-  "15m": {...},
-  "1h": {...},
-  "4h": {...},
-  "1d": {...}
-}
+// Selected chip render (unique key + safe removal)
+{selectedDataPoints.map(dpKey => {
+  const dp = dpIndex.get(dpKey);
+  if (!dp) return null;
+  return (
+    <span key={dpKey} /* ... */>
+      {dp.name}
+      <button onClick={() => handleToggleDataPoint(dp.data_point_id, dp.source)} aria-label={`Remove ${dp.name}`}>
+        …
+      </button>
+    </span>
+  );
+})}
 ```
 
-And volume:
+### 3) Cancel async init + clear timeouts
 
-```json
-{
-  "obv": 1234567,
-  "vpvr": [{"price": 120.0, "volume": 2_000_000}, {"price": 124.0, "volume": 1_100_000}],
-  "delta": {"buy": 600000, "sell": 500000}
-}
+```ts
+React.useEffect(() => {
+  if (!isOpen) return;
+  let cancelled = false;
+  const tShow = setTimeout(() => setIsVisible(true), 50);
+
+  (async () => {
+    try {
+      setIsLoading(true); setError(null);
+      const [ds, profile, creds] = await Promise.all([
+        apiClient.getDataSourcesWithPoints(),
+        apiClient.getUserProfile(),
+        apiClient.listCredentials()
+      ]);
+      if (cancelled) return;
+      setDataSources(ds); setUserProfile(profile); setUserCredentials(creds);
+      // ...
+    } catch (e) {
+      if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load configuration');
+    } finally {
+      if (!cancelled) { setIsLoading(false); setDataSourcesLoading(false); }
+    }
+  })();
+
+  return () => { cancelled = true; clearTimeout(tShow); };
+}, [isOpen, bot?.config_id]);
 ```
+
+### 4) Replace `||` with `??` for numeric inputs
+
+```tsx
+value={configData.trading.position_sizing.fixed_amount_usd ?? 100}
+```
+
+### 5) Safer outside-click with ref
+
+```ts
+const dropdownRef = React.useRef<HTMLDivElement>(null);
+React.useEffect(() => {
+  if (!showPairDropdown) return;
+  const onDown = (e: MouseEvent) => {
+    if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+      setShowPairDropdown(false); setPairSearchTerm('');
+    }
+  };
+  document.addEventListener('mousedown', onDown);
+  return () => document.removeEventListener('mousedown', onDown);
+}, [showPairDropdown]);
+```
+
+### 6) Dialog a11y
+
+```tsx
+<div role="dialog" aria-modal="true" aria-labelledby="ggbot-config-title" className="fixed inset-0 …">
+  …
+  <h2 id="ggbot-config-title"> {botName} </h2>
+</div>
+```
+
+### 7) Virtualize long lists
+
+Swap the mapped lists for `react-window` (`FixedSizeList`) to keep memory/paint costs down.
+
+## Smaller polish
+
+* Add `onKeyDown` handlers for Enter/Escape in inputs and menus.
+* Inline “upgrade required” instead of `alert`.
+* Clear `credentialInput` on provider switch; show per-provider controlled inputs.
+* Remove broad `console.log` in production builds.
 
 ---
 
-# Optional: suggest a structured strategy format (users can still paste prose)
-
-If you want to make strategy entry painless but unambiguous, support a JSON shape like:
-
-```json
-{
-  "timeframe_priority": ["4h", "1h", "15m"],
-  "rules": [
-    {"timeframe": "4h", "indicator": "MACD", "op": "crossover", "direction": "bullish"},
-    {"timeframe": "15m", "indicator": "RSI", "op": ">", "threshold": 70}
-  ],
-  "risk": {"min_rr": 1.8, "sl_via": "ATR", "atr_mult": 1.5},
-  "entry": {"type": "LIMIT", "source": "prev_high_break + tick"},
-  "position_sizing": {"method": "fixed_risk", "risk_pct": 0.5}
-}
-```
-
----
-
-## Verdict
-
-* **Concept:** Good bones. Clear separation of “strategy (user)” vs “container (template)”.
-* **Blocking issues for autonomy:** unstructured I/O, ambiguous actions, no guardrails.
-* **After these fixes:** You’ll have an execution-grade container where the user only drops in a strategy and data, and the LLM outputs deterministic, parseable decisions—no extra prompt-engineering required.
+If you fix the **ID-vs-name selection**, **immutability**, and **async cleanup**, you’ll eliminate 80% of the risk. Add a11y and virtualization for finish-quality.
