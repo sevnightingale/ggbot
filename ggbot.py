@@ -1069,7 +1069,7 @@ async def get_data_sources_with_points(
         
         # Get user profile to check paid data points
         profile = await current_user.load_profile()
-        user_paid_points = profile.paid_data_points if hasattr(profile, 'paid_data_points') else []
+        paid_data_points = profile.paid_data_points if hasattr(profile, 'paid_data_points') else []
         
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -1122,7 +1122,7 @@ async def get_data_sources_with_points(
                         point_name = row[8]
                         
                         # Check if user has access to this data point
-                        has_access = not point_requires_premium or point_name in user_paid_points
+                        has_access = not point_requires_premium or point_name in paid_data_points
                         
                         data_point = {
                             "data_point_id": row[7],
@@ -1149,7 +1149,7 @@ async def get_data_sources_with_points(
                 return {
                     "status": "success",
                     "data_sources": sources_list,
-                    "user_paid_points": user_paid_points,
+                    "paid_data_points": paid_data_points,
                     "count": len(sources_list)
                 }
                 

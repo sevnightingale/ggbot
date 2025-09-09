@@ -187,18 +187,18 @@ class DataSourceWithPoints:
         """Get free (non-premium) data points."""
         return [dp for dp in self.data_points if not dp.is_premium]
     
-    def filter_by_user_access(self, user_paid_points: list[str]) -> list[DataPoint]:
+    def filter_by_user_access(self, paid_data_points: list[str]) -> list[DataPoint]:
         """
         Filter data points by user's premium access.
         
         Args:
-            user_paid_points: List of data point names user has access to
+            paid_data_points: List of data point names user has access to
             
         Returns:
             List of data points user can access (free + paid ones they have)
         """
         accessible = []
         for dp in self.get_available_points():
-            if not dp.is_premium or dp.name in user_paid_points:
+            if not dp.is_premium or dp.name in paid_data_points:
                 accessible.append(dp)
         return accessible

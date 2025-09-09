@@ -34,7 +34,7 @@ You strictly apply the user's trading strategy below. Do not invent additional r
 
 If market data appears stale or incomplete, return 'wait' with reasoning.
 
-Use your trading strategy above to analyze the provided market data and identify trading opportunities. If your strategy specifies certain timeframes (like "15min RSI > 70" or "4hr MACD crossover"), focus on that timeframe's data while having full context of all timeframes available.
+Use your trading strategy above to analyze the provided market data and identify trading opportunities. If your strategy specifies certain timeframes or indicators, focus on that data while having full context of all timeframes available.
 
 Based on your analysis:
 - Is there a trading opportunity (long/short) or should you wait?
