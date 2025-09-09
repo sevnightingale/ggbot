@@ -88,8 +88,8 @@ class AccessControlService:
                     if not publisher_config.get('enabled', False):
                         return None
                     
-                    # Check for user-provided channel ID
-                    user_channel_id = publisher_config.get('user_channel_id')
+                    # Check for user-provided channel ID (frontend uses 'filter_channel')
+                    user_channel_id = publisher_config.get('filter_channel') or publisher_config.get('user_channel_id')
                     if not user_channel_id:
                         return None
                     
@@ -342,6 +342,52 @@ async def publish_validated_signal(
     return await service.publish_validated_signal(
         config_id, user_id, signal_data, decision_result
     )
+
+
+# Orchestrator integration function
+async def publish_signal_to_telegram(
+    config_id: str,
+    user_id: str, 
+    signal_data: Dict,
+    decision_result: Dict
+) -> bool:
+    """Publish signal to telegram - called by orchestrator after signal validation."""
+    try:
+        # Get user's bot token from their config
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT config_data 
+                    FROM configurations 
+                    WHERE config_id = %s
+                """, (config_id,))
+                
+                result = cur.fetchone()
+                if not result:
+                    logger.warning(f"Config {config_id} not found")
+                    return False
+                
+                config_data = result[0]
+                telegram_config = config_data.get('telegram_integration', {})
+                publisher_config = telegram_config.get('publisher', {})
+                bot_token = publisher_config.get('bot_token')
+                
+                if not bot_token:
+                    logger.warning(f"No bot token configured for config {config_id}")
+                    return False
+        
+        # Create a temporary service instance with user's bot token
+        service = SignalPublishingService()
+        service.bot_token = bot_token  # Override with user's token
+        service.telegram_bot = TelegramBot(bot_token)  # Create new bot with user's token
+        
+        return await service.publish_validated_signal(
+            config_id, user_id, signal_data, decision_result
+        )
+        
+    except Exception as e:
+        logger.error(f"Failed to publish signal to telegram: {e}")
+        return False
 
 
 async def main():

@@ -553,6 +553,9 @@ TAKE_PROFIT: [price or null]
             performance_status = "Strong Loser"
         
         # Format the position summary
+        stop_loss_text = f"${position_data['stop_loss']:,.2f}" if position_data['stop_loss'] else 'None set'
+        take_profit_text = f"${position_data['take_profit']:,.2f}" if position_data['take_profit'] else 'None set'
+        
         position_summary = f"""
 CURRENT POSITION DETAILS:
 Position Type: {side.upper()} {position_data['symbol']}
@@ -566,8 +569,8 @@ Duration: {hours_held:.1f} hours
 ORIGINAL TRADE CONTEXT:
 Entry Reasoning: {position_data['entry_reasoning']}
 Entry Confidence: {position_data['entry_confidence']:.1%}
-Stop Loss: ${position_data['stop_loss']:,.2f}" if position_data['stop_loss'] else "None set"}
-Take Profit: ${position_data['take_profit']:,.2f}" if position_data['take_profit'] else "None set"}
+Stop Loss: {stop_loss_text}
+Take Profit: {take_profit_text}
 """
         
         return position_summary
