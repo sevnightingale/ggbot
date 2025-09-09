@@ -1348,6 +1348,66 @@ async def get_bot_trades(
         raise HTTPException(status_code=500, detail="Failed to get bot trades")
 
 
+@app.get("/api/v2/bot/{config_id}/account")
+async def get_bot_account(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get account summary for a bot configuration."""
+    try:
+        from trading.paper.supabase_service import SupabasePaperTradingService
+        
+        service = SupabasePaperTradingService()
+        
+        # Get account summary
+        account_summary = await service.get_account_summary(config_id)
+        
+        if "error" in account_summary:
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "account": {
+                    "initial_balance": 10000.0,
+                    "current_balance": 10000.0,
+                    "total_pnl": 0.0,
+                    "open_positions": 0,
+                    "total_trades": 0,
+                    "win_trades": 0,
+                    "loss_trades": 0,
+                    "win_rate": 0.0,
+                    "total_return_pct": 0.0
+                }
+            }
+        
+        # Calculate additional metrics
+        initial_balance = account_summary.get("initial_balance", 10000.0)
+        current_balance = account_summary.get("current_balance", 10000.0)
+        total_pnl = account_summary.get("total_pnl", 0.0)
+        
+        # Total return percentage
+        total_return_pct = ((current_balance - initial_balance) / initial_balance * 100) if initial_balance > 0 else 0.0
+        
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "account": {
+                "initial_balance": initial_balance,
+                "current_balance": current_balance,
+                "total_pnl": total_pnl,
+                "open_positions": account_summary.get("open_positions", 0),
+                "total_trades": account_summary.get("total_trades", 0),
+                "win_trades": account_summary.get("win_trades", 0),
+                "loss_trades": account_summary.get("loss_trades", 0),
+                "win_rate": account_summary.get("win_rate", 0.0),
+                "total_return_pct": round(total_return_pct, 2)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get account for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get account")
+
+
 # Bot Lifecycle Endpoints (placeholders for now)
 @app.post("/api/v2/bot/{config_id}/start")
 async def start_bot(
