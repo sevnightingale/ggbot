@@ -236,6 +236,12 @@ class GGBotOrchestrator:
                 config, user_id, decision_result
             )
             
+            # 7. Publish to telegram if configured
+            if self._should_publish_signal(config, decision_result):
+                await self._trigger_signal_publishing(
+                    config, {}, decision_result  # Empty signal_data for autonomous trading
+                )
+            
             # Calculate execution time
             end_time = datetime.now(timezone.utc)
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
@@ -419,9 +425,27 @@ class GGBotOrchestrator:
         signal_data: Dict,
         decision_result: Dict
     ) -> None:
-        """Trigger signal publishing (placeholder for future publishing service)."""
-        # TODO: Integrate with signal publishing service when created
-        self._log.info(f"Signal publishing triggered for config {config.config_id}")
+        """Trigger signal publishing to user's Telegram channel."""
+        try:
+            # Import the publishing service function
+            from signals.publishing_service import publish_signal_to_telegram
+            
+            success = await publish_signal_to_telegram(
+                config_id=config.config_id,
+                user_id=config.user_id,
+                signal_data=signal_data,
+                decision_result=decision_result
+            )
+            
+            if success:
+                self._log.info(f"Successfully published signal for config {config.config_id}")
+            else:
+                self._log.warning(f"Failed to publish signal for config {config.config_id}")
+                
+        except ImportError:
+            self._log.warning("Publishing service not available - signals not published")
+        except Exception as e:
+            self._log.error(f"Error publishing signal for config {config.config_id}: {e}")
     
     async def _get_extraction_engine(self, user_id: str) -> ExtractionEngineV2:
         """Get or create V2 extraction engine for user."""
