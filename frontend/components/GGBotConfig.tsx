@@ -1400,7 +1400,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                 title="Exchange Connection - Coming Soon"
                               >
                                 Exchange Connection
-                                <span className="absolute -top-1 -right-1 bg-orange-500 text-white text-xs px-1 py-0.5 rounded text-[10px] leading-none">
+                                <span className="absolute -top-1 -right-2 bg-orange-500 text-white text-xs px-1.5 py-0.5 rounded text-[10px] leading-none">
                                   Soon
                                 </span>
                               </button>
@@ -1453,7 +1453,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                               {configData.trading.position_sizing.method === 'fixed_usd' && (
                                 <div className="grid grid-cols-2 gap-4 items-center">
                                   <span className="text-xs text-gray-400">Amount per trade:</span>
-                                  <div className="flex items-center">
+                                  <div className="flex items-center justify-start">
                                     <span className="text-bone-200 text-xs mr-2">$</span>
                                     <input
                                       type="number"
@@ -1472,7 +1472,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                       }}
                                       min="10"
                                       step="10"
-                                      className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-[#be6a47] focus:outline-none transition-colors"
+                                      className="bg-charcoal-900 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-20 focus:border-[#be6a47] focus:outline-none transition-colors rounded"
                                     />
                                   </div>
                                 </div>
@@ -1480,7 +1480,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                               {configData.trading.position_sizing.method === 'account_percentage' && (
                                 <div className="grid grid-cols-2 gap-4 items-center">
                                   <span className="text-xs text-gray-400">Percentage of account:</span>
-                                  <div className="flex items-center">
+                                  <div className="flex items-center justify-start">
                                     <input
                                       type="number"
                                       value={configData.trading.position_sizing.account_percent || 5}
@@ -1499,7 +1499,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                       min="0.1"
                                       max="50"
                                       step="0.1"
-                                      className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                                      className="bg-charcoal-900 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors rounded"
                                     />
                                     <span className="text-bone-200 text-xs ml-2">%</span>
                                   </div>
@@ -1508,7 +1508,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                               {configData.trading.position_sizing.method === 'confidence_based' && (
                                 <div className="grid grid-cols-2 gap-4 items-center">
                                   <span className="text-xs text-gray-400">Max position size:</span>
-                                  <div className="flex items-center">
+                                  <div className="flex items-center justify-start">
                                     <input
                                       type="number"
                                       value={configData.trading.position_sizing.max_position_percent || 10}
@@ -1527,7 +1527,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                       min="1"
                                       max="25"
                                       step="1"
-                                      className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                                      className="bg-charcoal-900 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors rounded"
                                     />
                                     <span className="text-bone-200 text-xs ml-2">% when confidence = 100%</span>
                                   </div>
@@ -1537,7 +1537,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                           </div>
 
                           {/* Risk Management */}
-                          <div>
+                          <div className="mt-6">
                             <div className="flex items-center justify-between mb-4">
                               <h4 className="text-footnote text-bone-200 font-medium">RISK MANAGEMENT</h4>
                             </div>
@@ -1574,7 +1574,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
 
                               <div className="grid grid-cols-2 gap-4 items-center">
                                 <span className="text-xs text-gray-400">Default stop loss:</span>
-                                <div className="flex items-center">
+                                <div className="flex items-center justify-start">
                                   <input
                                     type="number"
                                     value={configData.trading.risk_management.default_stop_loss_percent || 3}
@@ -1593,7 +1593,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                     min="0.5"
                                     max="20"
                                     step="0.1"
-                                    className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                                    className="bg-charcoal-900 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors rounded"
                                   />
                                   <span className="text-bone-200 text-xs ml-2">%</span>
                                 </div>
@@ -1601,7 +1601,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
 
                               <div className="grid grid-cols-2 gap-4 items-center">
                                 <span className="text-xs text-gray-400">Default take profit:</span>
-                                <div className="flex items-center">
+                                <div className="flex items-center justify-start">
                                   <input
                                     type="number"
                                     value={configData.trading.risk_management.default_take_profit_percent || 6}
@@ -1620,7 +1620,7 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                                     min="0.5"
                                     max="50"
                                     step="0.1"
-                                    className="bg-charcoal-800 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors"
+                                    className="bg-charcoal-900 border border-charcoal-600 text-bone-200 px-2 py-1 text-xs w-16 focus:border-[#be6a47] focus:outline-none transition-colors rounded"
                                   />
                                   <span className="text-bone-200 text-xs ml-2">%</span>
                                 </div>
