@@ -375,6 +375,30 @@ export function createDefaultConfigData(): ConfigData {
         technical_analysis: {
           data_points: ["RSI"], // Single indicator for minimal friction
           timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"] // All 7 timeframes
+        },
+        signals_group_chats: {
+          data_points: [], // Empty by default
+          timeframes: ["15m"]
+        },
+        fundamental_analysis: {
+          data_points: [],
+          timeframes: ["1d"]
+        },
+        sentiment_and_trends: {
+          data_points: [],
+          timeframes: ["1h"]
+        },
+        influencer_kol: {
+          data_points: [],
+          timeframes: ["1h"]
+        },
+        news_and_regulations: {
+          data_points: [],
+          timeframes: ["1d"]
+        },
+        onchain_analytics: {
+          data_points: [],
+          timeframes: ["1h"]
         }
       }
     },

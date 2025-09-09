@@ -24,8 +24,7 @@ class Money(BaseModel):
     @classmethod
     def validate_amount(cls, v):
         """Ensure amount has reasonable precision"""
-        if v < 0:
-            raise ValueError("Amount cannot be negative")
+        # Allow negative amounts for trading P&L (losses are real business data)
         return v.quantize(Decimal('0.00000001'))  # 8 decimal places
     
     @field_validator('currency')

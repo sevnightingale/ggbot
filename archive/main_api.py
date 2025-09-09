@@ -875,31 +875,60 @@ async def get_bot_metrics(
 ) -> Dict[str, Any]:
     """Get performance metrics for a bot configuration."""
     try:
-        # TODO: Implement real metrics calculation from strategy_runs table
-        # For now, return empty metrics structure
+        from trading.paper.supabase_service import SupabasePaperTradingService
+        from api.paper_trading import _calculate_daily_pnl, _calculate_trade_statistics
+        
+        service = SupabasePaperTradingService()
+        
+        # Get account summary
+        account_summary = await service.get_account_summary(config_id)
+        if "error" in account_summary:
+            # No account exists yet - return empty metrics
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "metrics": {
+                    "profit_loss_data": [],
+                    "trade_stats": {
+                        "totalTrades": 0,
+                        "winCount": 0,
+                        "lossCount": 0,
+                        "neutralCount": 0,
+                        "winRate": 0.0,
+                        "lossRate": 0.0,
+                        "neutralRate": 0.0,
+                        "avgProfitPerTrade": 0.0,
+                        "avgLossPerTrade": 0.0,
+                        "totalProfit": 0.0,
+                        "avgTradeDuration": "0m"
+                    }
+                }
+            }
+        
+        # Get trade history for P&L calculation
+        trade_history = await service.get_trade_history(config_id, limit=1000)
+        
+        # Calculate profit/loss data points (daily aggregation)
+        profit_loss_data = _calculate_daily_pnl(trade_history)
+        
+        # Calculate detailed trade statistics
+        trade_stats = _calculate_trade_statistics(trade_history, account_summary)
+        
         return {
             "status": "success",
             "config_id": config_id,
             "metrics": {
-                "profit_loss_data": [],  # Array of {date: string, profit: number}
-                "trade_stats": {
-                    "totalTrades": 0,
-                    "winCount": 0,
-                    "lossCount": 0,
-                    "neutralCount": 0,
-                    "winRate": 0,
-                    "lossRate": 0,
-                    "neutralRate": 0,
-                    "avgProfitPerTrade": 0,
-                    "avgLossPerTrade": 0,
-                    "totalProfit": 0,
-                    "avgTradeDuration": "0m"
-                }
+                "profit_loss_data": profit_loss_data,
+                "trade_stats": trade_stats,
+                "account_balance": account_summary.get("current_balance", 0.0),
+                "total_pnl": account_summary.get("total_pnl", 0.0),
+                "initial_balance": account_summary.get("initial_balance", 10000.0)
             }
         }
+        
     except Exception as e:
-        logger.error(f"Failed to get bot metrics for {config_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get bot metrics")
+        logger.error(f"Failed to get paper trading metrics for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get metrics: {str(e)}")
 
 
 @app.get("/api/v2/bot/{config_id}/positions")
@@ -909,16 +938,60 @@ async def get_bot_positions(
 ) -> Dict[str, Any]:
     """Get live positions for a bot configuration."""
     try:
-        # TODO: Implement real positions query from positions/paper_trades table
-        # For now, return empty positions
+        from trading.paper.supabase_service import SupabasePaperTradingService
+        from datetime import datetime
+        
+        service = SupabasePaperTradingService()
+        
+        # Get open positions
+        positions = await service.get_open_positions(config_id)
+        
+        # Format positions for dashboard
+        formatted_positions = []
+        for pos in positions:
+            # Calculate current P&L and other metrics
+            entry_price = float(pos["entry_price"])
+            current_price = float(pos.get("current_price", entry_price))
+            size_usd = float(pos["size_usd"])
+            side = pos["side"]
+            
+            # Calculate P&L
+            size_contracts = size_usd / entry_price
+            if side == "long":
+                pnl = (current_price - entry_price) * size_contracts
+            else:
+                pnl = (entry_price - current_price) * size_contracts
+            
+            # Calculate time in trade
+            opened_at = datetime.fromisoformat(pos["opened_at"].replace('Z', '+00:00'))
+            time_diff = datetime.now() - opened_at
+            time_in_trade = f"{int(time_diff.total_seconds() // 60)}m"
+            
+            formatted_positions.append({
+                "id": pos["trade_id"],
+                "symbol": pos["symbol"],
+                "direction": side.upper(),
+                "pnl": round(pnl, 2),
+                "positionSize": round(size_usd, 2),
+                "entryPrice": round(entry_price, 2),
+                "currentPrice": round(current_price, 2),
+                "timeInTrade": time_in_trade,
+                "leverage": pos.get("leverage", 1),
+                "confidence": round((pos.get("confidence_score", 0.0) or 0.0) * 100, 1),
+                "reasoning_text": "Paper trading position",
+                "volume_analysis": "Real-time Hummingbot data",
+                "signal_timeframe": "1h"
+            })
+        
         return {
             "status": "success",
             "config_id": config_id,
-            "positions": []  # Array of position objects
+            "positions": formatted_positions
         }
+        
     except Exception as e:
-        logger.error(f"Failed to get bot positions for {config_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get bot positions")
+        logger.error(f"Failed to get paper trading positions for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get positions: {str(e)}")
 
 
 @app.get("/api/v2/bot/{config_id}/trades")
@@ -929,17 +1002,103 @@ async def get_bot_trades(
 ) -> Dict[str, Any]:
     """Get trade history for a bot configuration."""
     try:
-        # TODO: Implement real trades query from paper_trades/trades table
-        # For now, return empty trades
+        from trading.paper.supabase_service import SupabasePaperTradingService
+        
+        service = SupabasePaperTradingService()
+        
+        # Get trade history
+        trades = await service.get_trade_history(config_id, limit=limit)
+        
+        # Format trades for dashboard (only closed trades)
+        formatted_trades = []
+        for trade in trades:
+            if trade["status"] == "closed":
+                entry_price = float(trade["entry_price"])
+                size_usd = float(trade["size_usd"])
+                pnl = float(trade.get("realized_pnl", 0.0))
+                
+                formatted_trades.append({
+                    "symbol": trade["symbol"],
+                    "direction": trade["side"].upper(),
+                    "pnl": round(pnl, 2),
+                    "positionSize": round(size_usd, 2),
+                    "entryPrice": round(entry_price, 2),
+                    "closePrice": round(float(trade.get("current_price", entry_price)), 2),
+                    "openedAt": trade["opened_at"],
+                    "closedAt": trade.get("closed_at"),
+                    "confidence": round((trade.get("confidence_score", 0.0) or 0.0) * 100, 1)
+                })
+        
         return {
             "status": "success",
             "config_id": config_id,
-            "trades": [],  # Array of trade objects
-            "count": 0
+            "trades": formatted_trades,
+            "count": len(formatted_trades)
         }
+        
     except Exception as e:
-        logger.error(f"Failed to get bot trades for {config_id}: {e}")
-        raise HTTPException(status_code=500, detail="Failed to get bot trades")
+        logger.error(f"Failed to get paper trading trades for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get trades: {str(e)}")
+
+
+@app.get("/api/v2/bot/{config_id}/account")
+async def get_paper_trading_account(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get paper trading account summary for a bot configuration."""
+    try:
+        from trading.paper.supabase_service import SupabasePaperTradingService
+        
+        service = SupabasePaperTradingService()
+        
+        # Get account summary
+        account_summary = await service.get_account_summary(config_id)
+        
+        if "error" in account_summary:
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "account": {
+                    "initial_balance": 10000.0,
+                    "current_balance": 10000.0,
+                    "total_pnl": 0.0,
+                    "open_positions": 0,
+                    "total_trades": 0,
+                    "win_trades": 0,
+                    "loss_trades": 0,
+                    "win_rate": 0.0,
+                    "total_return_pct": 0.0
+                }
+            }
+        
+        # Calculate additional metrics
+        initial_balance = account_summary.get("initial_balance", 10000.0)
+        current_balance = account_summary.get("current_balance", 10000.0)
+        total_pnl = account_summary.get("total_pnl", 0.0)
+        
+        # Total return percentage
+        total_return_pct = ((current_balance - initial_balance) / initial_balance * 100) if initial_balance > 0 else 0.0
+        
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "account": {
+                "initial_balance": initial_balance,
+                "current_balance": current_balance,
+                "total_pnl": total_pnl,
+                "open_positions": account_summary.get("open_positions", 0),
+                "total_trades": account_summary.get("total_trades", 0),
+                "win_trades": account_summary.get("win_trades", 0),
+                "loss_trades": account_summary.get("loss_trades", 0),
+                "win_rate": account_summary.get("win_rate", 0.0),
+                "total_return_pct": round(total_return_pct, 2)
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get paper trading account for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get account: {str(e)}")
 
 
 # Bot Lifecycle Endpoints (placeholders for now)

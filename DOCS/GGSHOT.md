@@ -155,7 +155,7 @@ SELECT c.config_id, c.user_id
 FROM configurations c
 JOIN user_profiles up ON c.user_id = up.user_id
 WHERE c.config_type = 'signal_validation'
-  AND c.config_data->'extraction'->'selected_data_sources' ? 'signals'
+  AND c.config_data->'extraction'->'selected_data_sources' ? 'signals_group_chats'
   AND 'ggshot' = ANY(up.paid_data_points)
 ```
 
@@ -439,9 +439,9 @@ class SignalPublishingService:
         "data_points": ["RSI", "MACD", "Aroon", "BollingerBands", "VWAP"],
         "timeframes": ["15m", "1h", "4h"]
       },
-      "signals": {
+      "signals_group_chats": {
         "data_points": ["ggshot"],
-        "signal_sources": ["ggshot_telegram"]
+        "timeframes": ["15m"]
       }
     }
   },
@@ -548,8 +548,8 @@ SELECT DISTINCT
 FROM configurations c
 JOIN user_profiles up ON c.user_id = up.user_id  
 WHERE c.config_type = 'signal_validation'
-  AND c.config_data->'extraction'->'selected_data_sources' ? 'signals'
-  AND c.config_data->'extraction'->'selected_data_sources'->'signals'->'data_points' @> '["ggshot"]'
+  AND c.config_data->'extraction'->'selected_data_sources' ? 'signals_group_chats'
+  AND c.config_data->'extraction'->'selected_data_sources'->'signals_group_chats'->'data_points' @> '["ggshot"]'
   AND 'ggshot' = ANY(up.paid_data_points)
   AND up.subscription_tier = 'ggBase'
   AND up.subscription_status = 'active';
@@ -782,7 +782,7 @@ ORDER BY date DESC;
 1. **`signals/listener_service.py`** - Generic signal listener service with ggShot support
 2. **`signals/publishing_service.py`** - Telegram publishing service for validated signals  
 3. **`signals/__init__.py`** - Package initialization for signals module
-4. **`core/config/template_signal_validation.json`** - Configuration template for signal validation
+4. **Universal template usage** - `template_v1.json` now supports both autonomous and signal validation modes
 
 #### **Existing Files Modified:**
 1. **`ggbot.py`** - Enhanced orchestrator with signal validation support
@@ -929,7 +929,7 @@ If implementation needs to be reverted, follow these steps:
 1. **Remove new files:**
    ```bash
    rm -rf /home/sev/ggbot/signals/
-   rm /home/sev/ggbot/core/config/template_signal_validation.json
+   # Note: template_signal_validation.json removed - now using universal template_v1.json
    ```
 
 2. **Restore ggbot.py:**
