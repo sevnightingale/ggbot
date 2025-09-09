@@ -582,13 +582,28 @@ class GGBotOrchestrator:
             trading_config = config.trading or {}
             symbol = config.selected_pair or "BTC/USDT"
             
+            # Map decision actions to trading actions
+            if action in ["enter", "long"]:
+                trading_action = "long"
+            elif action == "short":
+                trading_action = "short"
+            elif action in ["exit", "close"]:
+                trading_action = "close"
+            else:
+                # Fallback for unexpected actions - skip trading
+                return {
+                    "status": "skipped",
+                    "reason": f"Unknown action: {action}",
+                    "action": action
+                }
+            
             # Create comprehensive trading intent for paper trading service
             trading_intent = {
                 "decision_id": decision_result.get("decision_id"),
                 "user_id": user_id,
                 "config_id": config.config_id,
                 "symbol": symbol,
-                "action": "long" if action in ["enter", "long"] else "short" if action == "short" else "close",
+                "action": trading_action,
                 "confidence": confidence,
                 "stop_loss_price": decision_result.get("stop_loss_price"),
                 "take_profit_price": decision_result.get("take_profit_price"),

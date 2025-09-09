@@ -15,6 +15,7 @@ import openai
 from core.common.logger import logger
 from core.config import ConfigRepository, BotConfig, config_repo
 from core.common.db import get_db_connection
+from decision.providers.ccxt_provider import CCXTPriceProvider
 import uuid
 import json
 
@@ -126,6 +127,9 @@ class DecisionEngineV2:
         # Get current price
         current_price = await self._get_current_price(symbol)
         
+        # Get volume confirmation analysis
+        volume_analysis = await self._get_volume_confirmation(symbol, signal_data.get('timeframe', '1h'))
+        
         # Build signal validation prompt
         prompt = self._build_signal_validation_prompt(
             symbol, signal_data, market_data, current_price
@@ -185,8 +189,11 @@ class DecisionEngineV2:
         # Step 2: Get current price
         current_price = await self._get_current_price(symbol)
         
+        # Step 2.5: Get volume confirmation analysis
+        volume_analysis = await self._get_volume_confirmation(symbol, '1h')  # Default timeframe for autonomous
+        
         # Step 3: Build prompt from template
-        prompt = self._build_opportunity_analysis_prompt(symbol, market_data, current_price)
+        prompt = await self._build_opportunity_analysis_prompt(symbol, market_data, current_price, volume_analysis)
         
         # Step 4: Call GPT-5
         llm_response = await self._call_gpt5(prompt)
@@ -329,13 +336,15 @@ class DecisionEngineV2:
         system_prompt = self.config.decision.system_prompt.format(
             SYMBOL=symbol,
             CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=market_context
+            MARKET_DATA=market_context,
+            VOLUME_ANALYSIS=volume_analysis
         )
         
         user_prompt = self.config.decision.user_prompt.format(
             SYMBOL=symbol,
             CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=market_context
+            MARKET_DATA=market_context,
+            VOLUME_ANALYSIS=volume_analysis
         )
         
         # Add signal context to the user's strategy
@@ -348,37 +357,53 @@ class DecisionEngineV2:
 ## YOUR TASK
 {user_prompt}
 
-Based on your trading strategy above, should this external signal be validated or rejected?
+Based on your trading strategy above, what action should be taken for this external signal?
 
 ## OUTPUT FORMAT
-ACTION: [validate/reject]
+ACTION: [long/short/hold/wait]
 CONFIDENCE: [0.000-1.000]
-STOP_LOSS: [price or use signal default]
-TAKE_PROFIT: [price or use signal default]
-
-REASONING:
-[Apply your configured strategy to explain your decision]
+REASONING: [Apply your configured strategy to explain your decision]
+STOP_LOSS: [price or null]
+TAKE_PROFIT: [price or null]
 """
         
         return signal_validation_prompt
     
-    def _build_opportunity_analysis_prompt(self, symbol: str,
-                                         market_data: Dict[str, Any],
-                                         current_price: Decimal) -> str:
+    async def _build_opportunity_analysis_prompt(self, symbol: str,
+                                                market_data: Dict[str, Any],
+                                                current_price: Decimal,
+                                                volume_analysis: str) -> str:
         """Build opportunity analysis prompt from template."""
         system_prompt = self.config.decision.system_prompt.format(
             SYMBOL=symbol,
             CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=self._format_market_data_for_llm(market_data)
+            MARKET_DATA=self._format_market_data_for_llm(market_data),
+            VOLUME_ANALYSIS=volume_analysis
         )
         
         user_prompt = self.config.decision.user_prompt.format(
             SYMBOL=symbol,
             CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=self._format_market_data_for_llm(market_data)
+            MARKET_DATA=self._format_market_data_for_llm(market_data),
+            VOLUME_ANALYSIS=volume_analysis
         )
         
-        return f"{system_prompt}\n\nUser: {user_prompt}"
+        # Add standardized output format to opportunity analysis
+        opportunity_prompt = f"""
+{system_prompt}
+
+## YOUR TASK
+{user_prompt}
+
+## OUTPUT FORMAT
+ACTION: [long/short/hold/wait]
+CONFIDENCE: [0.000-1.000]
+REASONING: [Explain your analysis and decision]
+STOP_LOSS: [price or null]
+TAKE_PROFIT: [price or null]
+"""
+        
+        return opportunity_prompt
     
     # TODO: Re-implement position management prompt when needed
     # def _build_position_management_prompt(...)
@@ -388,6 +413,15 @@ REASONING:
                                    prompt: str, llm_response: str) -> str:
         """Save decision to the decisions table."""
         decision_id = str(uuid.uuid4())
+        
+        # Map decision actions to schema-compliant actions
+        raw_action = decision_data.get('action', 'no_action')
+        if raw_action in ['long', 'short', 'enter']:
+            schema_action = 'enter'
+        elif raw_action in ['exit', 'close']:
+            schema_action = 'exit'
+        else:  # wait, no_action, hold, etc.
+            schema_action = 'wait'
         
         try:
             with get_db_connection() as conn:
@@ -405,13 +439,13 @@ REASONING:
                         self.user_id,
                         self.config_id,
                         symbol,
-                        decision_data.get('action', 'no_action'),
+                        schema_action,  # Use schema-compliant action
                         'completed',
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
                         prompt,
-                        json.dumps(market_data),
-                        json.dumps(decision_data),
+                        json.dumps(market_data, default=str),
+                        json.dumps({**decision_data, 'raw_action': raw_action}, default=str),  # Preserve original action in decision_data
                         datetime.now(timezone.utc)
                     ))
                     
@@ -433,6 +467,7 @@ REASONING:
         """Create simplified trading intent."""
         return {
             'decision_id': decision_id,
+            'user_id': self.user_id,
             'config_id': self.config_id,
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'decision_type': 'opportunity_analysis',
@@ -581,30 +616,46 @@ ORIGINAL MESSAGE:
             raise
     
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
-        """Parse LLM response into structured decision data."""
-        # Simple parsing - look for structured output
+        """Parse LLM response into structured decision data with standardized format."""
+        # Initialize with defaults
         parsed = {
-            'action': 'no_action',
+            'action': 'wait',  # Default to wait instead of no_action
             'confidence': 0.5,
-            'reasoning': response,
+            'reasoning': '',
             'stop_loss_price': None,
             'take_profit_price': None
         }
         
-        lines = response.upper().split('\n')
+        lines = response.split('\n')
+        reasoning_lines = []
+        in_reasoning_section = False
         
         for line in lines:
-            line = line.strip()
+            line_upper = line.strip().upper()
+            line_orig = line.strip()
             
-            if 'ACTION:' in line:
-                action = line.split('ACTION:')[1].strip().lower()
-                if action in ['long', 'short', 'hold', 'close', 'no_action', 'validate']:
-                    parsed['action'] = action
+            # Parse ACTION (required)
+            if 'ACTION:' in line_upper:
+                action = line_upper.split('ACTION:')[1].strip().lower()
+                # Standardized actions: long, short, hold, wait
+                # Handle synonyms: buy->long, sell->short, no_action->wait
+                if action in ['long', 'buy']:
+                    parsed['action'] = 'long'
+                elif action in ['short', 'sell']:
+                    parsed['action'] = 'short'
+                elif action in ['hold', 'wait', 'no_action']:
+                    parsed['action'] = 'wait'
+                elif action in ['close', 'exit']:
+                    parsed['action'] = 'close'
+                else:
+                    # Keep original if it's a valid action, otherwise default to wait
+                    if action in ['long', 'short', 'hold', 'wait', 'close']:
+                        parsed['action'] = action
             
-            elif 'CONFIDENCE:' in line:
+            # Parse CONFIDENCE (required)
+            elif 'CONFIDENCE:' in line_upper:
                 try:
-                    conf_str = line.split('CONFIDENCE:')[1].strip()
-                    # Extract number (handle both 0.8 and 80% formats)
+                    conf_str = line_upper.split('CONFIDENCE:')[1].strip()
                     import re
                     numbers = re.findall(r'\d*\.?\d+', conf_str)
                     if numbers:
@@ -613,25 +664,57 @@ ORIGINAL MESSAGE:
                 except:
                     pass
             
-            elif 'STOP_LOSS:' in line or 'STOP LOSS:' in line:
+            # Parse REASONING (required) - can be multi-line
+            elif 'REASONING:' in line_upper:
+                in_reasoning_section = True
+                reasoning_content = line_orig.split('REASONING:')[1].strip()
+                if reasoning_content:
+                    reasoning_lines.append(reasoning_content)
+            
+            # Parse STOP_LOSS (optional)
+            elif 'STOP_LOSS:' in line_upper or 'STOP LOSS:' in line_upper:
                 try:
-                    sl_str = line.split('LOSS:')[1].strip()
-                    import re
-                    numbers = re.findall(r'\d+\.?\d*', sl_str)
-                    if numbers:
-                        parsed['stop_loss_price'] = float(numbers[0])
+                    sl_str = line_upper.split('LOSS:')[1].strip()
+                    # Handle "null" or "none" cases
+                    if sl_str.lower() in ['null', 'none', 'n/a']:
+                        parsed['stop_loss_price'] = None
+                    else:
+                        import re
+                        numbers = re.findall(r'\d+\.?\d*', sl_str)
+                        if numbers:
+                            parsed['stop_loss_price'] = float(numbers[0])
                 except:
                     pass
             
-            elif 'TAKE_PROFIT:' in line or 'TAKE PROFIT:' in line:
+            # Parse TAKE_PROFIT (optional)
+            elif 'TAKE_PROFIT:' in line_upper or 'TAKE PROFIT:' in line_upper:
                 try:
-                    tp_str = line.split('PROFIT:')[1].strip()
-                    import re
-                    numbers = re.findall(r'\d+\.?\d*', tp_str)
-                    if numbers:
-                        parsed['take_profit_price'] = float(numbers[0])
+                    tp_str = line_upper.split('PROFIT:')[1].strip()
+                    # Handle "null" or "none" cases
+                    if tp_str.lower() in ['null', 'none', 'n/a']:
+                        parsed['take_profit_price'] = None
+                    else:
+                        import re
+                        numbers = re.findall(r'\d+\.?\d*', tp_str)
+                        if numbers:
+                            parsed['take_profit_price'] = float(numbers[0])
                 except:
                     pass
+            
+            # Continue collecting reasoning lines
+            elif in_reasoning_section and line_orig.strip():
+                # Stop if we hit another header
+                if any(header in line_upper for header in ['ACTION:', 'CONFIDENCE:', 'STOP_LOSS:', 'TAKE_PROFIT:']):
+                    in_reasoning_section = False
+                else:
+                    reasoning_lines.append(line_orig)
+        
+        # Compile reasoning
+        if reasoning_lines:
+            parsed['reasoning'] = ' '.join(reasoning_lines).strip()
+        else:
+            # Fallback to full response if no reasoning section found
+            parsed['reasoning'] = response.strip()
         
         return parsed
     
@@ -647,6 +730,15 @@ ORIGINAL MESSAGE:
     ) -> str:
         """Save signal validation decision to the decisions table."""
         decision_id = str(uuid.uuid4())
+        
+        # Map signal validation actions to schema-compliant actions
+        raw_action = decision_data.get('action', 'wait')
+        if raw_action in ['long', 'short']:
+            schema_action = 'enter'
+        elif raw_action in ['close', 'exit']:
+            schema_action = 'exit'
+        else:  # wait, hold, etc.
+            schema_action = 'wait'
         
         try:
             with get_db_connection() as conn:
@@ -664,7 +756,7 @@ ORIGINAL MESSAGE:
                         self.user_id,
                         self.config_id,
                         symbol,
-                        decision_data.get('action', 'no_action'),
+                        schema_action,  # Use schema-compliant action
                         'completed',
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
@@ -674,7 +766,8 @@ ORIGINAL MESSAGE:
                             'signal_source': signal_data.get('source'),
                             'signal_data': signal_data,
                             'validation_framework': '4-pillar',
-                            'current_price': float(current_price)
+                            'current_price': float(current_price),
+                            'raw_action': raw_action  # Preserve original action
                         }),
                         datetime.now(timezone.utc)
                     ))
@@ -702,6 +795,7 @@ ORIGINAL MESSAGE:
         """Create signal validation trading intent."""
         return {
             'decision_id': decision_id,
+            'user_id': self.user_id,
             'config_id': self.config_id,
             'timestamp': datetime.now(timezone.utc).isoformat(),
             'decision_type': 'signal_validation',
@@ -723,6 +817,97 @@ ORIGINAL MESSAGE:
             'signal_timeframe': signal_data.get('timeframe'),
         }
     
+    def _get_dynamic_volume_period(self, timeframe: str) -> int:
+        """
+        Get dynamic period for volume average calculation based on timeframe.
+        
+        Args:
+            timeframe: Signal timeframe (e.g., '5m', '30m', '1h', '4h')
+            
+        Returns:
+            int: Number of periods for volume average (20-50 range)
+        """
+        timeframe_periods = {
+            '5m': 50,   # ~4 hours of data
+            '15m': 50,  # ~12.5 hours of data
+            '30m': 50,  # ~25 hours of data
+            '1h': 35,   # ~35 hours of data
+            '4h': 20,   # ~3.3 days of data
+            '1d': 20,   # ~20 days of data
+        }
+        
+        # Default to 30 if timeframe not recognized
+        return timeframe_periods.get(timeframe, 30)
+    
+    async def _get_volume_confirmation(self, symbol: str, timeframe: str = '1h') -> str:
+        """
+        Get volume confirmation analysis using CCXT provider.
+        Based on ggShot founder's guidance on volume thresholds.
+        
+        Args:
+            symbol: Trading symbol to analyze
+            timeframe: Timeframe for volume analysis (matches signal timeframe)
+            
+        Returns:
+            Formatted string with volume analysis and confidence level
+        """
+        try:
+            # Initialize CCXT provider
+            ccxt_provider = CCXTPriceProvider()
+            
+            # Get dynamic period based on timeframe
+            period = self._get_dynamic_volume_period(timeframe)
+            
+            # Get volume data with dynamic period and signal's native timeframe
+            volume_data = await ccxt_provider.get_current_volume_data(symbol, period=period, timeframe=timeframe)
+            
+            if not volume_data:
+                return "N/A (volume data unavailable from exchanges)"
+            
+            current_volume = volume_data['current_volume']
+            average_volume = volume_data['average_volume']
+            volume_ratio = volume_data['volume_ratio']
+            
+            # Calculate percentage above average
+            volume_increase_pct = (volume_ratio - 1.0) * 100
+            
+            # Determine volume confidence level - softer interpretation for LLM reasoning
+            if volume_increase_pct < 10:
+                confidence_level = "Insignificant"
+                confidence_desc = "The signal is weak or 'sluggish'"
+            elif volume_increase_pct < 30:
+                confidence_level = "Easy Confirmation" 
+                confidence_desc = "Entry with risk is possible"
+            elif volume_increase_pct < 60:
+                confidence_level = "Good Confirmation"
+                confidence_desc = "Volume supports the move"
+            elif volume_increase_pct < 100:
+                confidence_level = "Strong Confirmation"
+                confidence_desc = "Confident entry"
+            else:
+                confidence_level = "Very Strong Momentum"
+                confidence_desc = "Often indicates breakout"
+            
+            # Format the volume analysis with clear period context
+            period_used = volume_data.get('period_used', 30)
+            volume_analysis = f"""Timeframe: {timeframe} | Period: {period_used} candles
+Current Volume: {current_volume:,.0f} (last completed {timeframe} candle)
+Average Volume: {average_volume:,.0f} ({period_used}-period average)
+Volume Ratio: {volume_ratio:.2f}x | Above Average: {volume_increase_pct:+.1f}%
+Confirmation Level: {confidence_level} - {confidence_desc}"""
+            
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                f"Volume analysis for {symbol} ({timeframe}, {period_used} periods): {volume_increase_pct:+.1f}% above average ({confidence_level})"
+            )
+            
+            return volume_analysis
+            
+        except Exception as e:
+            logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
+                f"Failed to get volume confirmation for {symbol}: {e}"
+            )
+            return f"N/A (volume analysis failed: {str(e)})"
+
     def _create_error_intent(self, error_message: str) -> Dict[str, Any]:
         """Create error intent."""
         return {

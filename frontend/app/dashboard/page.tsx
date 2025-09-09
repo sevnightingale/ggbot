@@ -33,6 +33,14 @@ export default function DashboardPage() {
     totalProfit: 0,
     avgTradeDuration: '0m'
   })
+  
+  // Paper trading account state
+  const [paperAccountData, setPaperAccountData] = React.useState({
+    initial_balance: 10000.0,
+    current_balance: 10000.0,
+    total_pnl: 0.0,
+    total_return_pct: 0.0
+  })
   const [livePositions, setLivePositions] = React.useState<Array<{
     id?: string;
     symbol: string;
@@ -123,10 +131,12 @@ export default function DashboardPage() {
       const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
       
       // Use apiClient for authenticated requests
-      const [metricsResponse, tradesResponse, positionsResponse] = await Promise.all([
+      const [metricsResponse, tradesResponse, positionsResponse, accountResponse] = await Promise.all([
         apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/metrics`).then(r => r.json()),
         apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/trades`).then(r => r.json()),
-        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/positions`).then(r => r.json())
+        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/positions`).then(r => r.json()),
+        // Add account endpoint call (we'll create this)
+        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/account`).then(r => r.json()).catch(() => ({ status: 'error' }))
       ])
 
       // Update state with real API data
@@ -145,6 +155,26 @@ export default function DashboardPage() {
           avgLossPerTrade: 0,
           totalProfit: 0,
           avgTradeDuration: '0m'
+        })
+        
+        // Update paper account data from metrics
+        setPaperAccountData({
+          initial_balance: metrics.initial_balance || 10000.0,
+          current_balance: metrics.account_balance || 10000.0,
+          total_pnl: metrics.total_pnl || 0.0,
+          total_return_pct: metrics.initial_balance > 0 ? 
+            (((metrics.account_balance || 10000.0) - (metrics.initial_balance || 10000.0)) / (metrics.initial_balance || 10000.0)) * 100 : 0.0
+        })
+      }
+      
+      // Also update paper account data from account endpoint if available
+      if (accountResponse.status === 'success') {
+        const account = accountResponse.account
+        setPaperAccountData({
+          initial_balance: account.initial_balance || 10000.0,
+          current_balance: account.current_balance || 10000.0,
+          total_pnl: account.total_pnl || 0.0,
+          total_return_pct: account.total_return_pct || 0.0
         })
       }
 
@@ -304,7 +334,7 @@ export default function DashboardPage() {
   // Authentication guard
   if (isLoadingAuth) {
     return (
-      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-bone-300">Loading...</p>
@@ -321,7 +351,7 @@ export default function DashboardPage() {
   // Show loading state while fetching bots
   if (isLoadingBots) {
     return (
-      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-bone-300">Loading bots...</p>
@@ -333,7 +363,7 @@ export default function DashboardPage() {
   // Show empty state if no bots
   if (userBots.length === 0) {
     return (
-      <div className="min-h-screen bg-charcoal-900 relative">
+      <div className="min-h-screen bg-charcoal-700 relative">
         <div className="flex items-center justify-center p-8 min-h-screen">
           <div className="flex flex-col items-center gap-4 max-w-md text-center">
             <div className="text-6xl mb-4">🤖</div>
@@ -372,7 +402,7 @@ export default function DashboardPage() {
   // const currentIndex = selectedConfigId ? userBots.findIndex(b => b.config_id === selectedConfigId) : 0
 
   return (
-    <div className="min-h-screen bg-charcoal-900 relative">
+    <div className="min-h-screen bg-charcoal-700 relative">
       {/* 3-Column Layout with Sharp Dividers */}
       <div className="min-h-screen flex items-center justify-center p-8">
         <div className="w-full max-w-[1680px] mx-auto grid grid-cols-[1fr_400px_1fr] gap-8 relative">
@@ -381,53 +411,93 @@ export default function DashboardPage() {
           <div className="hidden lg:block">
             <div className="flex flex-col min-h-[500px] gap-6">
               
-              {/* Profit/Loss Chart Card */}
-              <div className="relative p-3 corner-top-left flex-1 min-h-[280px]">
-                <h3 className="text-subheader text-bone-200 mb-4">Profit/Loss</h3>
+              {/* Combined Paper Trading Account & Profit/Loss Chart Card */}
+              <div className="relative p-3 corner-top-left flex-1 min-h-[320px] shadow-lg shadow-black/10">
+                <h3 className="text-subheader text-bone-200 mb-4">Paper Trading Performance</h3>
                 <div className="gradient-divider mb-4"></div>
+                
                 {isLoadingBotData ? (
-                  <div className="h-[200px] flex items-center justify-center">
+                  <div className="h-[240px] flex items-center justify-center">
                     <div className="w-6 h-6 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
                   </div>
-                ) : userProfitLossData.length > 0 ? (
-                  <div className="h-[200px]">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={userProfitLossData}>
-                        <XAxis 
-                          dataKey="date" 
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: '#9ca3af' }}
-                        />
-                        <YAxis 
-                          axisLine={false}
-                          tickLine={false}
-                          tick={{ fontSize: 12, fill: '#9ca3af' }}
-                          tickFormatter={(value) => `$${value}`}
-                        />
-                        <Line 
-                          type="monotone" 
-                          dataKey="profit" 
-                          stroke="#10b981" 
-                          strokeWidth={2}
-                          dot={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
                 ) : (
-                  <div className="h-[200px] flex items-center justify-center text-gray-500">
-                    <div className="text-center">
-                      <div className="text-2xl mb-2">📈</div>
-                      <p>No trading history yet</p>
-                      <p className="text-xs">Start your bot to see performance data</p>
+                  <div className="space-y-4">
+                    {/* Account Summary Section */}
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-footnote text-gray-400">Balance</span>
+                          <span className="text-footnote text-bone-200 font-medium">${paperAccountData.current_balance.toFixed(2)}</span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-footnote text-gray-400">P&L</span>
+                          <span className={`text-footnote font-medium ${
+                            paperAccountData.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {paperAccountData.total_pnl >= 0 ? '+' : ''}${paperAccountData.total_pnl.toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <span className="text-footnote text-gray-400">Return</span>
+                          <span className={`text-footnote font-medium ${
+                            paperAccountData.total_return_pct >= 0 ? 'text-green-400' : 'text-red-400'
+                          }`}>
+                            {paperAccountData.total_return_pct >= 0 ? '+' : ''}{paperAccountData.total_return_pct.toFixed(2)}%
+                          </span>
+                        </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-footnote text-gray-400">Started</span>
+                          <span className="text-footnote text-gray-400">${paperAccountData.initial_balance.toFixed(0)}</span>
+                        </div>
+                      </div>
                     </div>
+                    
+                    <div className="gradient-divider"></div>
+                    
+                    {/* Chart Section */}
+                    {userProfitLossData.length > 0 ? (
+                      <div className="h-[140px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={userProfitLossData}>
+                            <XAxis 
+                              dataKey="date" 
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 12, fill: '#9ca3af' }}
+                            />
+                            <YAxis 
+                              axisLine={false}
+                              tickLine={false}
+                              tick={{ fontSize: 12, fill: '#9ca3af' }}
+                              tickFormatter={(value) => `$${value}`}
+                            />
+                            <Line 
+                              type="monotone" 
+                              dataKey="profit" 
+                              stroke="#10b981" 
+                              strokeWidth={2}
+                              dot={false}
+                            />
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    ) : (
+                      <div className="h-[140px] flex items-center justify-center text-gray-500">
+                        <div className="text-center">
+                          <div className="text-2xl mb-2">📈</div>
+                          <p className="text-footnote">No trading history yet</p>
+                          <p className="text-xs">Start your bot to see performance data</p>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
               
               {/* Trade Statistics Card */}
-              <div className="relative p-3 corner-top-left min-h-[200px]">
+              <div className="relative p-3 corner-bottom-left min-h-[200px] shadow-lg shadow-black/10">
                 <h3 className="text-subheader text-bone-200 mb-4">Trade Statistics</h3>
                 <div className="gradient-divider mb-4"></div>
                 {isLoadingBotData ? (
@@ -541,7 +611,7 @@ export default function DashboardPage() {
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Open Trades Table */}
-              <div className="relative p-3 corner-top-right flex-1 min-h-[320px]">
+              <div className="relative p-3 corner-top-right flex-1 min-h-[320px] shadow-lg shadow-black/10">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-subheader text-bone-200">Open Trades</h3>
                   <span className="text-footnote text-gray-500">
@@ -588,7 +658,7 @@ export default function DashboardPage() {
                         return (
                           <React.Fragment key={tradeId}>
                             <tr 
-                              className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''} cursor-pointer hover:bg-gray-700/30 transition-colors`}
+                              className={`${index % 2 === 1 ? 'bg-gray-600 bg-opacity-30' : ''} cursor-pointer hover:bg-gray-500/30 transition-colors`}
                               onClick={() => toggleReasoningExpansion(tradeId)}
                             >
                               <td className={`py-1 pr-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
@@ -613,7 +683,7 @@ export default function DashboardPage() {
                             
                             {/* AI Reasoning Expansion */}
                             {isExpanded && (
-                              <tr className="bg-charcoal-800/50">
+                              <tr className="bg-charcoal-600/50">
                                 <td colSpan={7} className="p-3">
                                   <div className="space-y-3">
                                     <div className="flex items-center gap-2 border-b border-charcoal-600 pb-2">
@@ -660,7 +730,7 @@ export default function DashboardPage() {
               </div>
               
               {/* Closed Trades Table */}
-              <div className="relative p-3 corner-top-right flex-1 min-h-[320px]">
+              <div className="relative p-3 corner-bottom-right flex-1 min-h-[320px] shadow-lg shadow-black/10">
                 <h3 className="text-subheader text-bone-200 mb-4">Closed Trades</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
@@ -694,7 +764,7 @@ export default function DashboardPage() {
                         </tr>
                       ) : (
                         closedTrades.map((trade, index) => (
-                          <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-800 bg-opacity-30' : ''}`}>
+                          <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-600 bg-opacity-30' : ''}`}>
                             <td className={`py-1 pr-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                               {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(0)}
                             </td>

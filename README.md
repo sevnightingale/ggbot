@@ -6,12 +6,16 @@ ggbots is a production-ready platform for creating, customizing, and deploying f
 
 ## Architecture Overview
 
-The ggbots platform implements a **three-agent autonomous trading pipeline** where specialized AI agents collaborate to deliver human-like trading intelligence:
+The ggbots platform implements a **three-agent autonomous trading pipeline** with **autonomous scheduling** and **signal validation** capabilities:
 
 ```
 Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchange
      ↑              ↓               ↓              ↓           ↓
    Sources     Market Analysis   AI Reasoning   Execution   Results
+     
+External Signals → Signal Validation → Decision Agent → Trading Agent → Exchange
+     ↑                    ↓                ↓              ↓           ↓
+  ggShot/TV        4-Pillar Analysis   AI Reasoning   Execution   Results
 ```
 
 ### Core Agent Architecture
@@ -69,22 +73,26 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 - **CCXT MCP Server**: Universal exchange connectivity and market data
 - **Unified tool interface** for consistent agent-to-service communication
 
+**⏰ [Autonomous Scheduler](core/scheduler/)** - Production-Ready Bot Scheduling
+- **APScheduler integration** with Redis idempotency for zero-drift execution
+- **Multi-timeframe support**: 5m, 15m, 30m, 1h, 4h, 1d with candle alignment
+- **Startup reconciliation** automatically restores active bots
+- **Real-time WebSocket updates** with next execution timestamps
+
 **🎯 [Symbol Standardization](core/symbols/)** - Universal Trading Pair Management
 - **141 trading pairs** with comprehensive format support across all systems
 - **Multi-format conversion**: ggShot (`BTCUSDT`) ↔ CCXT (`BTC/USDT`) ↔ Hummingbot (`BTC-USDT`)
 - **Validation and suggestions** for format errors and unsupported symbols
-- **Future-proof architecture** for platform-wide symbol consistency
 
-**📊 Monitoring & Observability** (Currently being rebuilt)
-- **Position tracking** via database queries
-- **Performance analytics** with P&L calculation and risk metrics  
-- **Health checks** via API endpoints
-- *Note: Complex bot monitoring system removed for simplification*
+**📊 Monitoring & Observability**
+- **Position tracking** via database queries with real-time P&L
+- **Performance analytics** with comprehensive trade lifecycle tracking
+- **Health checks** via API endpoints and WebSocket status broadcasts
 
 **⚙️ [Configuration Management](core/config/)**
 - **JSON blob configuration system** with template-based setup
-- **Config-ID architecture** for user isolation (enhancement planned)
-- **Environment variable integration** and validation (enhancement planned)
+- **Config-ID architecture** with multi-user isolation
+- **State persistence** for autonomous bot management
 
 ### **[Database Layer](database/)**
 
@@ -107,11 +115,18 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 
 ### Live Production Systems
 
-**🎯 [ggShot Integration](ggshot/)** - Production Signal Processing
-- **140+ cryptocurrency pairs** with automated signal filtering
-- **Real-time Telegram integration** for signal ingestion and distribution
-- **Advanced filtering system** with confidence scoring and market context
-- **Production deployment** processing live trading signals daily
+**🎯 [ggShot Signal Validation](signals/)** - V2 Production Signal Processing
+- **Generic signal framework** with ggShot as first implementation
+- **User-configured validation strategies** replacing hardcoded 4-pillar analysis
+- **Real-time Telegram integration** with publishing to user-specified channels
+- **Premium business model** gating via ggBase subscription tier
+- **Complete V2 integration** using standard extraction → decision → trading pipeline
+
+**🤖 [Autonomous Scheduling](core/scheduler/)** - Production Bot Management
+- **Zero-drift execution** aligned to market candle boundaries
+- **Redis-based idempotency** preventing duplicate trades across restarts
+- **Multi-timeframe bots** running 5m to daily cadences simultaneously
+- **Real-time config updates** without service restarts
 
 **📈 [TradingView Automation](extraction/sources/tradingview/)**
 - **Browser-based chart analysis** with visual signal interpretation

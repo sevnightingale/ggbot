@@ -292,6 +292,7 @@ def load_config_from_dict(config_dict: Dict[str, Any]) -> BotConfig:
     Load configuration from dictionary (e.g., from database JSONB).
     
     Handles both V1 (flat) and V2 (nested) config structures.
+    Filters out database metadata fields like config_type.
     
     Args:
         config_dict: Configuration dictionary from database
@@ -310,8 +311,18 @@ def load_config_from_dict(config_dict: Dict[str, Any]) -> BotConfig:
         # Add any top-level fields that belong in BotConfig
         if "selected_pair" in config_dict and "selected_pair" not in core_config:
             core_config["selected_pair"] = config_dict["selected_pair"]
+        
+        # Filter out database metadata fields from core_config
+        valid_fields = {
+            "schema_version", "selected_pair", "extraction", "decision", 
+            "llm_config", "trading", "telegram_integration"
+        }
+        filtered_config = {
+            key: value for key, value in core_config.items() 
+            if key in valid_fields
+        }
             
-        return BotConfig(**core_config)
+        return BotConfig(**filtered_config)
     else:
         # Handle V1 flat config structure - filter out metadata fields
         valid_fields = {
@@ -320,6 +331,7 @@ def load_config_from_dict(config_dict: Dict[str, Any]) -> BotConfig:
         }
         
         # Filter config_dict to only include valid BotConfig fields
+        # Exclude database metadata fields like config_type
         filtered_config = {
             key: value for key, value in config_dict.items() 
             if key in valid_fields

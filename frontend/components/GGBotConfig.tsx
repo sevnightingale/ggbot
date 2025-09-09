@@ -848,9 +848,23 @@ const GGBotConfig: React.FC<GGBotConfigProps> = ({ bot, isOpen, onClose, onConfi
                         type="button"
                         onClick={() => {
                           if (configData.config_type === 'autonomous_trading' && userProfile?.can_use_signal_validation) {
-                            updateConfigData(prev => ({ ...prev, config_type: 'signal_validation' }))
+                            updateConfigData(prev => ({ 
+                              ...prev, 
+                              config_type: 'signal_validation',
+                              decision: {
+                                ...prev.decision,
+                                analysis_frequency: 'signal_driven'
+                              }
+                            }))
                           } else if (configData.config_type === 'signal_validation') {
-                            updateConfigData(prev => ({ ...prev, config_type: 'autonomous_trading' }))
+                            updateConfigData(prev => ({ 
+                              ...prev, 
+                              config_type: 'autonomous_trading',
+                              decision: {
+                                ...prev.decision,
+                                analysis_frequency: '1h'
+                              }
+                            }))
                           } else if (!userProfile?.can_use_signal_validation) {
                             alert('Signal Validation requires an upgraded plan')
                           }
