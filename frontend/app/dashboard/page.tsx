@@ -426,19 +426,23 @@ export default function DashboardPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <div className="flex justify-between items-center">
-                          <span className="text-footnote text-gray-400">Balance</span>
-                          <span className="text-footnote text-bone-200 font-medium">${paperAccountData.current_balance.toFixed(2)}</span>
+                          <span className="text-footnote text-gray-400">Started</span>
+                          <span className="text-footnote text-gray-400">${paperAccountData.initial_balance.toLocaleString('en-US', {maximumFractionDigits: 0})}</span>
                         </div>
+                        <div className="flex justify-between items-center">
+                          <span className="text-footnote text-gray-400">Balance</span>
+                          <span className="text-footnote text-bone-200 font-medium">${paperAccountData.current_balance.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}</span>
+                        </div>
+                      </div>
+                      <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-footnote text-gray-400">P&L</span>
                           <span className={`text-footnote font-medium ${
                             paperAccountData.total_pnl >= 0 ? 'text-green-400' : 'text-red-400'
                           }`}>
-                            {paperAccountData.total_pnl >= 0 ? '+' : ''}${paperAccountData.total_pnl.toFixed(2)}
+                            {paperAccountData.total_pnl >= 0 ? '+' : ''}${paperAccountData.total_pnl.toLocaleString('en-US', {minimumFractionDigits: 2, maximumFractionDigits: 2})}
                           </span>
                         </div>
-                      </div>
-                      <div className="space-y-2">
                         <div className="flex justify-between items-center">
                           <span className="text-footnote text-gray-400">Return</span>
                           <span className={`text-footnote font-medium ${
@@ -446,10 +450,6 @@ export default function DashboardPage() {
                           }`}>
                             {paperAccountData.total_return_pct >= 0 ? '+' : ''}{paperAccountData.total_return_pct.toFixed(2)}%
                           </span>
-                        </div>
-                        <div className="flex justify-between items-center">
-                          <span className="text-footnote text-gray-400">Started</span>
-                          <span className="text-footnote text-gray-400">${paperAccountData.initial_balance.toFixed(0)}</span>
                         </div>
                       </div>
                     </div>

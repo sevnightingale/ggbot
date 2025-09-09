@@ -166,9 +166,21 @@ class DecisionEngineV2:
         if not trading_symbol:
             return self._create_error_intent("No trading symbol specified")
         
-        # For now, skip position management and just do opportunity analysis
-        # TODO: Re-enable position management later
-        return await self._handle_opportunity_analysis(trading_symbol)
+        # Check for active position to determine routing
+        active_position = await self._get_active_position(trading_symbol, self.config_id)
+        
+        if active_position:
+            # Route to position management
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                f"Routing to position management for existing {active_position['side']} position in {trading_symbol}"
+            )
+            return await self._handle_position_management(trading_symbol, active_position)
+        else:
+            # Route to opportunity analysis
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                f"No active position found, routing to opportunity analysis for {trading_symbol}"
+            )
+            return await self._handle_opportunity_analysis(trading_symbol)
     
     async def _handle_opportunity_analysis(self, symbol: str) -> Dict[str, Any]:
         """
@@ -405,8 +417,160 @@ TAKE_PROFIT: [price or null]
         
         return opportunity_prompt
     
-    # TODO: Re-implement position management prompt when needed
-    # def _build_position_management_prompt(...)
+    async def _handle_position_management(self, symbol: str, position_data: Dict) -> Dict[str, Any]:
+        """
+        Handle position management for existing position.
+        
+        Process:
+        1. Get fresh market data
+        2. Get current price
+        3. Get volume analysis
+        4. Build position management prompt with trade context
+        5. Call GPT-5 for position decision
+        6. Create position management decision record
+        7. Return position management intent
+        """
+        # Step 1: Get fresh market data
+        market_data = await self._get_fresh_market_data(symbol)
+        if not market_data:
+            return self._create_error_intent(f"No fresh market data available for {symbol}")
+        
+        # Step 2: Get current price
+        current_price = await self._get_current_price(symbol)
+        
+        # Step 2.5: Get volume confirmation analysis
+        volume_analysis = await self._get_volume_confirmation(symbol, '1h')  # Default timeframe for position management
+        
+        # Step 3: Build position management prompt with context
+        prompt = await self._build_position_management_prompt(
+            symbol, position_data, market_data, current_price, volume_analysis
+        )
+        
+        # Step 4: Call GPT-5
+        llm_response = await self._call_gpt5(prompt)
+        
+        # Step 5: Parse response
+        decision_data = self._parse_llm_response(llm_response)
+        
+        # Step 6: Save decision to database (with parent decision link)
+        decision_id = await self._save_position_decision_to_db(
+            symbol, decision_data, position_data, market_data, 
+            current_price, prompt, llm_response
+        )
+        
+        # Step 7: Return position management intent
+        return self._create_position_management_intent(
+            decision_id, symbol, decision_data, position_data
+        )
+
+    async def _build_position_management_prompt(
+        self, 
+        symbol: str,
+        position_data: Dict,
+        market_data: Dict[str, Any],
+        current_price: Decimal,
+        volume_analysis: str
+    ) -> str:
+        """Build position management prompt with trade context and performance data."""
+        
+        # Format position context for LLM
+        position_context = self._format_position_data_for_llm(position_data, current_price)
+        market_context = self._format_market_data_for_llm(market_data)
+        
+        # Use user's configured prompts with position-specific context
+        system_prompt = self.config.decision.system_prompt.format(
+            SYMBOL=symbol,
+            CURRENT_PRICE=f"${current_price:,.2f}",
+            MARKET_DATA=market_context,
+            VOLUME_ANALYSIS=volume_analysis,
+            POSITION_DATA=position_context
+        )
+        
+        user_prompt = self.config.decision.user_prompt.format(
+            SYMBOL=symbol,
+            CURRENT_PRICE=f"${current_price:,.2f}",
+            MARKET_DATA=market_context,
+            VOLUME_ANALYSIS=volume_analysis,
+            POSITION_DATA=position_context
+        )
+        
+        # Add position management context
+        position_management_prompt = f"""
+{system_prompt}
+
+## ACTIVE POSITION TO MANAGE
+{position_context}
+
+## YOUR TASK
+{user_prompt}
+
+You are managing an existing position. Based on current market conditions and your trading strategy, should you hold or close this position?
+
+## OUTPUT FORMAT
+ACTION: [close/exit/hold/wait]
+CONFIDENCE: [0.000-1.000]
+REASONING: [Explain your position management decision]
+STOP_LOSS: [price or null]
+TAKE_PROFIT: [price or null]
+"""
+        
+        return position_management_prompt
+    
+    def _format_position_data_for_llm(self, position_data: Dict, current_price: Decimal) -> str:
+        """Format position data for LLM consumption with performance context."""
+        
+        # Calculate performance metrics
+        entry_price = position_data['entry_price']
+        unrealized_pnl = position_data['unrealized_pnl']
+        size_usd = position_data['size_usd']
+        side = position_data['side']
+        
+        # Calculate percentage gain/loss
+        if side == 'buy':
+            pnl_percentage = ((float(current_price) - entry_price) / entry_price) * 100
+        else:  # sell/short
+            pnl_percentage = ((entry_price - float(current_price)) / entry_price) * 100
+        
+        # Calculate position duration
+        from datetime import datetime, timezone
+        opened_at = position_data['opened_at']
+        if isinstance(opened_at, str):
+            opened_at = datetime.fromisoformat(opened_at.replace('Z', '+00:00'))
+        
+        duration = datetime.now(timezone.utc) - opened_at
+        hours_held = duration.total_seconds() / 3600
+        
+        # Format performance status
+        if pnl_percentage > 5:
+            performance_status = "Strong Winner"
+        elif pnl_percentage > 1:
+            performance_status = "Winning"
+        elif pnl_percentage > -1:
+            performance_status = "Break-even"
+        elif pnl_percentage > -5:
+            performance_status = "Losing"
+        else:
+            performance_status = "Strong Loser"
+        
+        # Format the position summary
+        position_summary = f"""
+CURRENT POSITION DETAILS:
+Position Type: {side.upper()} {position_data['symbol']}
+Entry Price: ${entry_price:,.2f}
+Current Price: ${current_price:,.2f}
+Position Size: ${size_usd:,.2f}
+Unrealized P&L: ${unrealized_pnl:+.2f} ({pnl_percentage:+.1f}%)
+Performance: {performance_status}
+Duration: {hours_held:.1f} hours
+
+ORIGINAL TRADE CONTEXT:
+Entry Reasoning: {position_data['entry_reasoning']}
+Entry Confidence: {position_data['entry_confidence']:.1%}
+Stop Loss: ${position_data['stop_loss']:,.2f}" if position_data['stop_loss'] else "None set"}
+Take Profit: ${position_data['take_profit']:,.2f}" if position_data['take_profit'] else "None set"}
+"""
+        
+        return position_summary
     
     async def _save_decision_to_db(self, symbol: str, decision_data: Dict[str, Any], 
                                    market_data: Dict[str, Any], current_price: Decimal,
@@ -839,6 +1003,80 @@ ORIGINAL MESSAGE:
         # Default to 30 if timeframe not recognized
         return timeframe_periods.get(timeframe, 30)
     
+    async def _get_active_position(self, symbol: str, config_id: str) -> Optional[Dict]:
+        """
+        Check for active position for this symbol and config.
+        
+        Args:
+            symbol: Trading symbol to check
+            config_id: Configuration ID for position isolation
+            
+        Returns:
+            Position data dict if active position exists, None otherwise
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Query for open position with entry decision context
+                    cur.execute("""
+                        SELECT 
+                            pt.trade_id,
+                            pt.symbol,
+                            pt.side,
+                            pt.entry_price,
+                            pt.current_price,
+                            pt.size_usd,
+                            pt.unrealized_pnl,
+                            pt.opened_at,
+                            pt.stop_loss,
+                            pt.take_profit,
+                            pt.confidence_score,
+                            d.reasoning as entry_reasoning,
+                            d.confidence as entry_confidence,
+                            d.decision_data as entry_decision_data
+                        FROM paper_trades pt
+                        LEFT JOIN decisions d ON pt.decision_id = d.decision_id
+                        WHERE pt.config_id = %s 
+                          AND pt.symbol = %s 
+                          AND pt.status = 'open'
+                        ORDER BY pt.opened_at DESC
+                        LIMIT 1
+                    """, (config_id, symbol))
+                    
+                    row = cur.fetchone()
+                    if not row:
+                        return None
+                    
+                    # Convert to dict with position details
+                    position_data = {
+                        'trade_id': row[0],
+                        'symbol': row[1],
+                        'side': row[2],  # 'buy' or 'sell'
+                        'entry_price': float(row[3]),
+                        'current_price': float(row[4]) if row[4] else float(row[3]),
+                        'size_usd': float(row[5]),
+                        'unrealized_pnl': float(row[6]) if row[6] else 0.0,
+                        'opened_at': row[7],
+                        'stop_loss': float(row[8]) if row[8] else None,
+                        'take_profit': float(row[9]) if row[9] else None,
+                        'confidence_score': float(row[10]) if row[10] else 0.0,
+                        'entry_reasoning': row[11] if row[11] else 'No reasoning available',
+                        'entry_confidence': float(row[12]) if row[12] else 0.0,
+                        'entry_decision_data': row[13] if row[13] else {}
+                    }
+                    
+                    logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                        f"Found active position for {symbol}: {position_data['side']} ${position_data['size_usd']:.2f}, P&L: ${position_data['unrealized_pnl']:.2f}"
+                    )
+                    
+                    return position_data
+                    
+        except Exception as e:
+            logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
+                f"Failed to check for active position {symbol}: {e}"
+            )
+            return None
+
     async def _get_volume_confirmation(self, symbol: str, timeframe: str = '1h') -> str:
         """
         Get volume confirmation analysis using CCXT provider.
@@ -907,6 +1145,108 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                 f"Failed to get volume confirmation for {symbol}: {e}"
             )
             return f"N/A (volume analysis failed: {str(e)})"
+
+    async def _save_position_decision_to_db(
+        self, 
+        symbol: str, 
+        decision_data: Dict[str, Any],
+        position_data: Dict,
+        market_data: Dict[str, Any], 
+        current_price: Decimal,
+        prompt: str, 
+        llm_response: str
+    ) -> str:
+        """Save position management decision to the decisions table with position context."""
+        decision_id = str(uuid.uuid4())
+        
+        # Map position management actions to schema-compliant actions
+        raw_action = decision_data.get('action', 'wait')
+        if raw_action in ['close', 'exit']:
+            schema_action = 'exit'
+        else:  # wait, hold, etc.
+            schema_action = 'wait'
+        
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO decisions (
+                            decision_id, user_id, config_id, symbol, action, status,
+                            confidence, reasoning, prompt, market_data, decision_data,
+                            parent_decision_id, created_at
+                        ) VALUES (
+                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
+                        )
+                    """, (
+                        decision_id,
+                        self.user_id,
+                        self.config_id,
+                        symbol,
+                        schema_action,  # Use schema-compliant action
+                        'completed',
+                        decision_data.get('confidence', 0.5),
+                        decision_data.get('reasoning', llm_response),
+                        prompt,
+                        json.dumps(market_data),
+                        json.dumps({
+                            'decision_type': 'position_management',
+                            'position_data': position_data,
+                            'current_price': float(current_price),
+                            'raw_action': raw_action,  # Preserve original action
+                            **decision_data
+                        }),
+                        position_data.get('entry_decision_id'),  # Link to original entry decision
+                        datetime.now(timezone.utc)
+                    ))
+                    
+                    logger.bind(
+                        config_id=self.config_id,
+                        decision_id=decision_id,
+                        symbol=symbol,
+                        action=decision_data.get('action'),
+                        trade_id=position_data.get('trade_id')
+                    ).info("Position management decision saved to database")
+                    
+                    return decision_id
+                    
+        except Exception as e:
+            logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save position decision: {e}")
+            raise DecisionError(f"Failed to save position decision to database: {e}")
+
+    def _create_position_management_intent(
+        self, 
+        decision_id: str, 
+        symbol: str,
+        decision_data: Dict[str, Any], 
+        position_data: Dict
+    ) -> Dict[str, Any]:
+        """Create position management trading intent."""
+        return {
+            'decision_id': decision_id,
+            'user_id': self.user_id,
+            'config_id': self.config_id,
+            'timestamp': datetime.now(timezone.utc).isoformat(),
+            'decision_type': 'position_management',
+            'symbol': symbol,
+            
+            # Core decision data
+            'action': decision_data.get('action', 'wait'),
+            'confidence': decision_data.get('confidence', 0.5),
+            'reasoning': decision_data.get('reasoning', 'No reasoning provided'),
+            
+            # Trade parameters
+            'stop_loss_price': decision_data.get('stop_loss_price'),
+            'take_profit_price': decision_data.get('take_profit_price'),
+            
+            # Position context for trading engine
+            'trade_id': position_data.get('trade_id'),
+            'existing_position': {
+                'entry_price': position_data.get('entry_price'),
+                'size_usd': position_data.get('size_usd'),
+                'side': position_data.get('side'),
+                'unrealized_pnl': position_data.get('unrealized_pnl')
+            }
+        }
 
     def _create_error_intent(self, error_message: str) -> Dict[str, Any]:
         """Create error intent."""
