@@ -412,7 +412,7 @@ export default function DashboardPage() {
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Combined Paper Trading Account & Profit/Loss Chart Card */}
-              <div className="relative p-3 corner-top-left flex-1 min-h-[320px] shadow-2xl shadow-black/20">
+              <div className="relative p-3 corner-top-left flex-1 min-h-[320px] shadow-lg shadow-black/10">
                 <h3 className="text-subheader text-bone-200 mb-4">Paper Trading Performance</h3>
                 <div className="gradient-divider mb-4"></div>
                 
@@ -497,7 +497,7 @@ export default function DashboardPage() {
               </div>
               
               {/* Trade Statistics Card */}
-              <div className="relative p-3 corner-bottom-left min-h-[200px] shadow-2xl shadow-black/20">
+              <div className="relative p-3 corner-bottom-left min-h-[200px] shadow-lg shadow-black/10">
                 <h3 className="text-subheader text-bone-200 mb-4">Trade Statistics</h3>
                 <div className="gradient-divider mb-4"></div>
                 {isLoadingBotData ? (
@@ -611,7 +611,7 @@ export default function DashboardPage() {
             <div className="flex flex-col min-h-[500px] gap-6">
               
               {/* Open Trades Table */}
-              <div className="relative p-3 corner-top-right flex-1 min-h-[320px] shadow-2xl shadow-black/20">
+              <div className="relative p-3 corner-top-right flex-1 min-h-[320px] shadow-lg shadow-black/10">
                 <div className="flex justify-between items-center mb-4">
                   <h3 className="text-subheader text-bone-200">Open Trades</h3>
                   <span className="text-footnote text-gray-500">
@@ -730,7 +730,7 @@ export default function DashboardPage() {
               </div>
               
               {/* Closed Trades Table */}
-              <div className="relative p-3 corner-bottom-right flex-1 min-h-[320px] shadow-2xl shadow-black/20">
+              <div className="relative p-3 corner-bottom-right flex-1 min-h-[320px] shadow-lg shadow-black/10">
                 <h3 className="text-subheader text-bone-200 mb-4">Closed Trades</h3>
                 <div className="gradient-divider mb-4"></div>
                 <div className="overflow-x-auto overflow-y-auto max-h-[260px]">

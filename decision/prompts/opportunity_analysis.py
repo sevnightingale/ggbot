@@ -30,6 +30,10 @@ Current volume analysis for trade confirmation:
 {user_strategy}
 
 ## TASK INSTRUCTIONS
+You strictly apply the user's trading strategy below. Do not invent additional rules or override the strategy's logic. Do not reference indicators or data not provided in the market data above. If your strategy requires indicators not available, return 'wait' and explain what's missing.
+
+If market data appears stale or incomplete, return 'wait' with reasoning.
+
 Use your trading strategy above to analyze the provided market data and identify trading opportunities. If your strategy specifies certain timeframes (like "15min RSI > 70" or "4hr MACD crossover"), focus on that timeframe's data while having full context of all timeframes available.
 
 Based on your analysis:
@@ -37,7 +41,7 @@ Based on your analysis:
 - How confident are you in this opportunity?
 - What stop loss and take profit levels align with your strategy?
 
-Your reasoning should reference specific indicators from the market data that align with your trading strategy and support your decision.
+Your reasoning should cite specific indicator values from the market data that triggered your strategy's rules.
 
 ## OUTPUT FORMAT
 ACTION: [long/short/hold/wait]
