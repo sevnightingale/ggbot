@@ -16,6 +16,9 @@ from core.common.logger import logger
 from core.config import ConfigRepository, BotConfig, config_repo
 from core.common.db import get_db_connection
 from decision.providers.ccxt_provider import CCXTPriceProvider
+from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
+from decision.prompts.signal_validation import build_signal_validation_prompt
+from decision.prompts.position_management import build_position_management_prompt
 import uuid
 import json
 
@@ -131,8 +134,8 @@ class DecisionEngineV2:
         volume_analysis = await self._get_volume_confirmation(symbol, signal_data.get('timeframe', '1h'))
         
         # Build signal validation prompt
-        prompt = self._build_signal_validation_prompt(
-            symbol, signal_data, market_data, current_price
+        prompt = await self._build_signal_validation_prompt(
+            symbol, signal_data, market_data, current_price, volume_analysis
         )
         
         # Call GPT-5 for validation
@@ -332,90 +335,45 @@ class DecisionEngineV2:
             )
             return Decimal("100.00")
     
-    def _build_signal_validation_prompt(
+    async def _build_signal_validation_prompt(
         self, 
         symbol: str,
         signal_data: Dict,
         market_data: Dict[str, Any],
-        current_price: Decimal
+        current_price: Decimal,
+        volume_analysis: str
     ) -> str:
-        """Build signal validation prompt using user's configured strategy."""
+        """Build signal validation prompt using template."""
         
         signal_context = self._format_signal_for_llm(signal_data)
         market_context = self._format_market_data_for_llm(market_data)
+        user_strategy = self.config.decision.strategy
         
-        # Use user's configured system and user prompts, but inject signal context
-        system_prompt = self.config.decision.system_prompt.format(
-            SYMBOL=symbol,
-            CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=market_context,
-            VOLUME_ANALYSIS=volume_analysis
+        return build_signal_validation_prompt(
+            symbol=symbol,
+            current_price=f"${current_price:,.2f}",
+            market_data=market_context,
+            volume_analysis=volume_analysis,
+            signal_context=signal_context,
+            user_strategy=user_strategy
         )
-        
-        user_prompt = self.config.decision.user_prompt.format(
-            SYMBOL=symbol,
-            CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=market_context,
-            VOLUME_ANALYSIS=volume_analysis
-        )
-        
-        # Add signal context to the user's strategy
-        signal_validation_prompt = f"""
-{system_prompt}
-
-## EXTERNAL SIGNAL TO VALIDATE
-{signal_context}
-
-## YOUR TASK
-{user_prompt}
-
-Based on your trading strategy above, what action should be taken for this external signal?
-
-## OUTPUT FORMAT
-ACTION: [long/short/hold/wait]
-CONFIDENCE: [0.000-1.000]
-REASONING: [Apply your configured strategy to explain your decision]
-STOP_LOSS: [price or null]
-TAKE_PROFIT: [price or null]
-"""
-        
-        return signal_validation_prompt
     
     async def _build_opportunity_analysis_prompt(self, symbol: str,
                                                 market_data: Dict[str, Any],
                                                 current_price: Decimal,
                                                 volume_analysis: str) -> str:
         """Build opportunity analysis prompt from template."""
-        system_prompt = self.config.decision.system_prompt.format(
-            SYMBOL=symbol,
-            CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=self._format_market_data_for_llm(market_data),
-            VOLUME_ANALYSIS=volume_analysis
+        
+        market_context = self._format_market_data_for_llm(market_data)
+        user_strategy = self.config.decision.strategy
+        
+        return build_opportunity_analysis_prompt(
+            symbol=symbol,
+            current_price=f"${current_price:,.2f}",
+            market_data=market_context,
+            volume_analysis=volume_analysis,
+            user_strategy=user_strategy
         )
-        
-        user_prompt = self.config.decision.user_prompt.format(
-            SYMBOL=symbol,
-            CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=self._format_market_data_for_llm(market_data),
-            VOLUME_ANALYSIS=volume_analysis
-        )
-        
-        # Add standardized output format to opportunity analysis
-        opportunity_prompt = f"""
-{system_prompt}
-
-## YOUR TASK
-{user_prompt}
-
-## OUTPUT FORMAT
-ACTION: [long/short/hold/wait]
-CONFIDENCE: [0.000-1.000]
-REASONING: [Explain your analysis and decision]
-STOP_LOSS: [price or null]
-TAKE_PROFIT: [price or null]
-"""
-        
-        return opportunity_prompt
     
     async def _handle_position_management(self, symbol: str, position_data: Dict) -> Dict[str, Any]:
         """
@@ -471,50 +429,21 @@ TAKE_PROFIT: [price or null]
         current_price: Decimal,
         volume_analysis: str
     ) -> str:
-        """Build position management prompt with trade context and performance data."""
+        """Build position management prompt from template."""
         
         # Format position context for LLM
         position_context = self._format_position_data_for_llm(position_data, current_price)
         market_context = self._format_market_data_for_llm(market_data)
+        user_strategy = self.config.decision.strategy
         
-        # Use user's configured prompts with position-specific context
-        system_prompt = self.config.decision.system_prompt.format(
-            SYMBOL=symbol,
-            CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=market_context,
-            VOLUME_ANALYSIS=volume_analysis,
-            POSITION_DATA=position_context
+        return build_position_management_prompt(
+            symbol=symbol,
+            current_price=f"${current_price:,.2f}",
+            market_data=market_context,
+            volume_analysis=volume_analysis,
+            position_data=position_context,
+            user_strategy=user_strategy
         )
-        
-        user_prompt = self.config.decision.user_prompt.format(
-            SYMBOL=symbol,
-            CURRENT_PRICE=f"${current_price:,.2f}",
-            MARKET_DATA=market_context,
-            VOLUME_ANALYSIS=volume_analysis,
-            POSITION_DATA=position_context
-        )
-        
-        # Add position management context
-        position_management_prompt = f"""
-{system_prompt}
-
-## ACTIVE POSITION TO MANAGE
-{position_context}
-
-## YOUR TASK
-{user_prompt}
-
-You are managing an existing position. Based on current market conditions and your trading strategy, should you hold or close this position?
-
-## OUTPUT FORMAT
-ACTION: [close/exit/hold/wait]
-CONFIDENCE: [0.000-1.000]
-REASONING: [Explain your position management decision]
-STOP_LOSS: [price or null]
-TAKE_PROFIT: [price or null]
-"""
-        
-        return position_management_prompt
     
     def _format_position_data_for_llm(self, position_data: Dict, current_price: Decimal) -> str:
         """Format position data for LLM consumption with performance context."""
