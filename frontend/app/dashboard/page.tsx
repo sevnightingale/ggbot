@@ -111,7 +111,8 @@ export default function DashboardPage() {
       console.log('📡 Dashboard loading bots for userId:', userId)
       loadBots(userId) // Load bots from V2 API with current userId
     }
-  }, [userId]) // Only re-run when userId changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId]) // Only depend on userId to prevent infinite re-renders
   
   // Get user's bots and selected bot (with proper error handling)
   const userBots = React.useMemo(() => {
