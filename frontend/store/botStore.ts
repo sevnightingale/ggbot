@@ -386,14 +386,13 @@ export const useBotStore = create<BotStore>()(
               const statusData = await apiClient.getBotStatus(bot.config_id)
               
               const isActive = statusData.bot_status === 'active'
-              const isScheduled = statusData.is_scheduled || false
               
               return {
                 ...bot,
                 isActive: isActive,
                 status: {
-                  phase: isActive ? 'idle' : 'inactive',
-                  color: isActive ? 'blue' : 'gray',
+                  phase: isActive ? 'idle' as const : 'inactive' as const,
+                  color: isActive ? 'blue' as const : 'gray' as const,
                   message: isActive ? 
                     (statusData.next_run ? `Next run: ${new Date(statusData.next_run).toLocaleTimeString()}` : 'Running') : 
                     'Ready to start',
