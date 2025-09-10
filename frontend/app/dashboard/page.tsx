@@ -105,19 +105,28 @@ export default function DashboardPage() {
     loadBots
   } = useBotStore()
   
-  // Bots are loaded by the WebSocket hook, no need to duplicate the call here
-  // React.useEffect(() => {
-  //   if (userId) {
-  //     loadBots(userId) // Load bots from V2 API with current userId
-  //   }
-  // }, [userId]) // Removed - WebSocket hook handles bot loading
+  // Load bots from V2 API on mount (only when authenticated)
+  React.useEffect(() => {
+    if (userId) {
+      console.log('📡 Dashboard loading bots for userId:', userId)
+      loadBots(userId) // Load bots from V2 API with current userId
+    }
+  }, [userId]) // Only re-run when userId changes
   
-  // Get user's bots and selected bot
-  const userBots = React.useMemo(() => userId ? getBotsByUser(userId) : [], [userId]) // Remove getBotsByUser dependency to prevent infinite re-renders
+  // Get user's bots and selected bot (with proper error handling)
+  const userBots = React.useMemo(() => {
+    if (!userId) {
+      console.log('🚫 No userId available, returning empty bots array')
+      return []
+    }
+    const bots = getBotsByUser(userId)
+    console.log(`📊 Dashboard found ${bots.length} bots for userId: ${userId}`)
+    return bots
+  }, [userId, getBotsByUser])
   const selectedBotData = selectedConfigId ? getBotById(selectedConfigId) : null
   
-  // WebSocket connection for real-time updates (no demo message handler)
-  const { isLoadingBots } = useBotWebSocket(userId || '')
+  // WebSocket connection for real-time updates (only when userId is available)
+  const { isLoadingBots } = useBotWebSocket(userId) // Don't pass empty string
   
   // Auto-select first bot if none selected and bots exist
   React.useEffect(() => {

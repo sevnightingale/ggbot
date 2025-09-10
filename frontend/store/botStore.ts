@@ -345,6 +345,13 @@ export const useBotStore = create<BotStore>()(
 
       // API Actions
       loadBots: async (userId: string) => {
+        // Guard against empty or invalid userId
+        if (!userId || userId.trim() === '') {
+          console.warn('⚠️ loadBots called with empty userId, skipping...')
+          return
+        }
+        
+        console.log('🚀 loadBots starting for userId:', userId)
         set({ isLoading: true, error: null })
         
         try {
@@ -376,7 +383,7 @@ export const useBotStore = create<BotStore>()(
             isActive: false, // Will be updated via bot status endpoint
             createdAt: configData.created_at ? new Date(configData.created_at) : new Date(),
             lastRun: configData.updated_at ? new Date(configData.updated_at) : undefined,
-            userId: userId
+            userId: userId // Ensure userId is set correctly
           })) : []
           
           // Load real bot status for each bot
@@ -406,18 +413,26 @@ export const useBotStore = create<BotStore>()(
           }))
           
           // Clear existing bots for this user and add new ones
-          const newBots = new Map(get().bots)
-          // Remove existing user bots
+          const currentState = get()
+          const newBots = new Map(currentState.bots)
+          
+          // Remove existing bots for this specific user only
+          let removedCount = 0
           for (const [configId, bot] of newBots) {
             if (bot.userId === userId) {
               newBots.delete(configId)
+              removedCount++
             }
           }
+          console.log(`🗑️ Removed ${removedCount} existing bots for userId: ${userId}`)
+          
           // Add new bots with real status
           botsWithStatus.forEach(bot => {
+            console.log(`➕ Adding bot ${bot.name} (${bot.config_id}) for userId: ${userId}`)
             newBots.set(bot.config_id, bot)
           })
           
+          console.log(`✅ loadBots completed. Total bots in store: ${newBots.size}`)
           set({ bots: newBots, isLoading: false })
           
         } catch (error) {
