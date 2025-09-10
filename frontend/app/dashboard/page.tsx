@@ -105,12 +105,12 @@ export default function DashboardPage() {
     loadBots
   } = useBotStore()
   
-  // Load bots from V2 API on mount (only when authenticated)
-  React.useEffect(() => {
-    if (userId) {
-      loadBots(userId) // Load bots from V2 API with current userId
-    }
-  }, [userId]) // Remove loadBots dependency to prevent infinite re-renders
+  // Bots are loaded by the WebSocket hook, no need to duplicate the call here
+  // React.useEffect(() => {
+  //   if (userId) {
+  //     loadBots(userId) // Load bots from V2 API with current userId
+  //   }
+  // }, [userId]) // Removed - WebSocket hook handles bot loading
   
   // Get user's bots and selected bot
   const userBots = React.useMemo(() => userId ? getBotsByUser(userId) : [], [userId]) // Remove getBotsByUser dependency to prevent infinite re-renders
