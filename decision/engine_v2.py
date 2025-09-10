@@ -347,7 +347,7 @@ class DecisionEngineV2:
         
         signal_context = self._format_signal_for_llm(signal_data)
         market_context = self._format_market_data_for_llm(market_data)
-        user_strategy = self.config.decision.strategy
+        user_strategy = getattr(self.config.decision, 'user_prompt', getattr(self.config.decision, 'strategy', 'Default trading strategy'))
         
         return build_signal_validation_prompt(
             symbol=symbol,
@@ -365,7 +365,7 @@ class DecisionEngineV2:
         """Build opportunity analysis prompt from template."""
         
         market_context = self._format_market_data_for_llm(market_data)
-        user_strategy = self.config.decision.strategy
+        user_strategy = getattr(self.config.decision, 'user_prompt', getattr(self.config.decision, 'strategy', 'Default trading strategy'))
         
         return build_opportunity_analysis_prompt(
             symbol=symbol,
@@ -434,7 +434,7 @@ class DecisionEngineV2:
         # Format position context for LLM
         position_context = self._format_position_data_for_llm(position_data, current_price)
         market_context = self._format_market_data_for_llm(market_data)
-        user_strategy = self.config.decision.strategy
+        user_strategy = getattr(self.config.decision, 'user_prompt', getattr(self.config.decision, 'strategy', 'Default trading strategy'))
         
         return build_position_management_prompt(
             symbol=symbol,

@@ -27,6 +27,10 @@ function formatNextRunTime(nextRunString: string): string {
     // If it's within an hour, show relative time
     if (timeDiff < 60 * 60 * 1000) {
       const minutes = Math.floor(timeDiff / (1000 * 60))
+      // If less than 1 minute, show "Running soon"
+      if (minutes < 1) {
+        return 'Running soon'
+      }
       return `Next run: ${minutes}m`
     }
     
