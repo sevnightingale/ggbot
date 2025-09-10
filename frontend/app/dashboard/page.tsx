@@ -110,10 +110,10 @@ export default function DashboardPage() {
     if (userId) {
       loadBots(userId) // Load bots from V2 API with current userId
     }
-  }, [loadBots, userId])
+  }, [userId]) // Remove loadBots dependency to prevent infinite re-renders
   
   // Get user's bots and selected bot
-  const userBots = React.useMemo(() => userId ? getBotsByUser(userId) : [], [userId, getBotsByUser])
+  const userBots = React.useMemo(() => userId ? getBotsByUser(userId) : [], [userId]) // Remove getBotsByUser dependency to prevent infinite re-renders
   const selectedBotData = selectedConfigId ? getBotById(selectedConfigId) : null
   
   // WebSocket connection for real-time updates (no demo message handler)
