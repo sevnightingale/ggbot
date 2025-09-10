@@ -628,7 +628,22 @@ Take Profit: {take_profit_text}
                         if "signals" in indicator_data:
                             signals = indicator_data["signals"]
                             if signals:
-                                formatted.append(f"    Signals: {', '.join(signals)}")
+                                # Handle both string lists and dict lists
+                                if isinstance(signals, list) and len(signals) > 0:
+                                    if isinstance(signals[0], dict):
+                                        # Convert dict signals to strings
+                                        signal_strings = []
+                                        for signal in signals:
+                                            if isinstance(signal, dict):
+                                                signal_strings.append(str(signal.get('type', signal.get('name', str(signal)))))
+                                            else:
+                                                signal_strings.append(str(signal))
+                                        formatted.append(f"    Signals: {', '.join(signal_strings)}")
+                                    else:
+                                        # Already strings
+                                        formatted.append(f"    Signals: {', '.join(str(s) for s in signals)}")
+                                else:
+                                    formatted.append(f"    Signals: {signals}")
                         if "zones" in indicator_data:
                             zones = indicator_data["zones"]
                             if isinstance(zones, dict):
