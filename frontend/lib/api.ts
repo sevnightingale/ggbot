@@ -300,7 +300,15 @@ export class ApiClient {
   }
 
   // Bot Status Management
-  async getBotStatus(configId: string): Promise<any> {
+  async getBotStatus(configId: string): Promise<{
+    status: string
+    config_id: string
+    bot_status: 'active' | 'inactive'
+    is_scheduled: boolean
+    next_run?: string
+    timeframe: string
+    scheduler_job_exists: boolean
+  }> {
     console.log('🔍 API Call: getBotStatus to', `${this.baseUrl}/api/v2/bot/${configId}/status`)
     
     try {

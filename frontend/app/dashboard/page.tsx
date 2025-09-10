@@ -56,29 +56,24 @@ export default function DashboardPage() {
     volume_analysis?: string;
     signal_timeframe?: string;
   }>>([])
-  const [closedTrades, setClosedTrades] = React.useState<Array<{
-    symbol: string;
-    direction: string;
-    pnl: number;
-    positionSize: number;
-    entryPrice: number;
-  }>>([])
   const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
   const [isLoadingBotData, setIsLoadingBotData] = React.useState(false)
 
   // Decision history state
-  const [decisionHistory, setDecisionHistory] = React.useState<Array<{
+  interface DecisionHistoryItem {
     decision_id: string;
     symbol: string;
     action: string;
     confidence: number;
     reasoning: string;
     prompt?: string;
-    market_data?: any;
-    decision_data?: any;
+    market_data?: Record<string, unknown>;
+    decision_data?: Record<string, unknown>;
     created_at: string;
-  }>>([])
-  const [selectedDecision, setSelectedDecision] = React.useState<any>(null)
+  }
+  
+  const [decisionHistory, setDecisionHistory] = React.useState<DecisionHistoryItem[]>([])
+  const [selectedDecision, setSelectedDecision] = React.useState<DecisionHistoryItem | null>(null)
 
   // Supabase client and router for logout
   const supabase = createClient()
@@ -118,7 +113,7 @@ export default function DashboardPage() {
   }, [loadBots, userId])
   
   // Get user's bots and selected bot
-  const userBots = userId ? getBotsByUser(userId) : []
+  const userBots = React.useMemo(() => userId ? getBotsByUser(userId) : [], [userId, getBotsByUser])
   const selectedBotData = selectedConfigId ? getBotById(selectedConfigId) : null
   
   // WebSocket connection for real-time updates (no demo message handler)
@@ -198,9 +193,7 @@ export default function DashboardPage() {
         setLivePositions(positionsResponse.positions || [])
       }
 
-      if (tradesResponse.status === 'success') {
-        setClosedTrades(tradesResponse.trades || [])
-      }
+      // Trades response processing removed - using decision history instead
 
       if (decisionsResponse.status === 'success') {
         setDecisionHistory(decisionsResponse.decisions || [])
@@ -231,7 +224,6 @@ export default function DashboardPage() {
         avgTradeDuration: '0m'
       })
       setLivePositions([])
-      setClosedTrades([])
       setDecisionHistory([])
     } finally {
       setIsLoadingBotData(false)
