@@ -1408,6 +1408,83 @@ async def get_bot_account(
         raise HTTPException(status_code=500, detail="Failed to get account")
 
 
+@app.get("/api/v2/bot/{config_id}/decisions")
+async def get_bot_decisions(
+    config_id: str,
+    limit: int = 50,
+    hours_back: int = 24,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get decision history for a bot configuration."""
+    try:
+        from core.common.db import get_db_connection
+        
+        # Validate config belongs to user
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Query decisions for this config in the last N hours, ordered by newest first
+                cur.execute("""
+                    SELECT 
+                        decision_id,
+                        symbol,
+                        action,
+                        status,
+                        confidence,
+                        reasoning,
+                        prompt,
+                        market_data,
+                        decision_data,
+                        created_at
+                    FROM decisions 
+                    WHERE config_id = %s 
+                        AND user_id = %s
+                        AND created_at >= NOW() - INTERVAL '%s hours'
+                    ORDER BY created_at DESC
+                    LIMIT %s
+                """, (config_id, current_user.user_id, hours_back, limit))
+                
+                rows = cur.fetchall()
+                
+                # Transform database rows to API format
+                decisions = []
+                for row in rows:
+                    decisions.append({
+                        "decision_id": str(row['decision_id']),
+                        "symbol": row['symbol'],
+                        "action": row['action'],
+                        "status": row['status'],
+                        "confidence": float(row['confidence']) if row['confidence'] else 0.0,
+                        "reasoning": row['reasoning'],
+                        "prompt": row['prompt'],
+                        "market_data": row['market_data'],
+                        "decision_data": row['decision_data'],
+                        "created_at": row['created_at'].isoformat() if row['created_at'] else None
+                    })
+                
+                logger.info(f"✅ Retrieved {len(decisions)} decisions for config {config_id}")
+                
+                return {
+                    "status": "success",
+                    "config_id": config_id,
+                    "decisions": decisions,
+                    "count": len(decisions),
+                    "filters": {
+                        "limit": limit,
+                        "hours_back": hours_back
+                    }
+                }
+                
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get decisions for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail="Failed to get decisions")
+
+
 # Bot Lifecycle Endpoints (placeholders for now)
 @app.post("/api/v2/bot/{config_id}/start")
 async def start_bot(
@@ -1596,14 +1673,37 @@ async def get_bot_status(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Get bot status (placeholder)."""
-    # TODO: Implement bot status tracking
-    return {
-        "status": "success",
-        "bot_status": "stopped",
-        "message": "Bot status tracking coming soon",
-        "config_id": config_id
-    }
+    """Get bot status with real scheduler state."""
+    try:
+        # Get bot state from database
+        state = await config_service.get_bot_state(config_id, current_user.user_id)
+        config = await config_service.get_config(config_id, current_user.user_id)
+        
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+            
+        # Extract timeframe from config
+        config_dict = config.to_dict()
+        timeframe = extract_timeframe_from_config(config_dict)
+        
+        # Check if job exists in scheduler
+        job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
+        job = scheduler.get_job(job_id)
+        next_run = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+        
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "bot_status": state or "inactive",  # 'active' or 'inactive'
+            "is_scheduled": job is not None,
+            "next_run": next_run,
+            "timeframe": timeframe,
+            "scheduler_job_exists": job is not None
+        }
+        
+    except Exception as e:
+        logger.error(f"Failed to get bot status for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get bot status: {str(e)}")
 
 
 # WebSocket Support for real-time bot status updates
