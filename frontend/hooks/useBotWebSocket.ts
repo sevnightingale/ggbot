@@ -5,23 +5,33 @@ import { useBotStore } from '@/store/botStore'
  * Custom hook to manage WebSocket connection for bot status updates
  * This will integrate with your backend WebSocket service
  */
-export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: (data: Record<string, unknown>) => void) {
-  // Get only the state we need, not the functions (to prevent re-renders)
-  const isLoading = useBotStore(state => state.isLoading)
-  const userBots = useBotStore(state => state.getBotsByUser(userId))
+export function useBotWebSocket(userId: string | undefined, wsUrl?: string, onDemoMessage?: (data: Record<string, unknown>) => void) {
+  const { 
+    loadBots, 
+    connectWebSocket, 
+    disconnectWebSocket, 
+    isWebSocketConnected, 
+    subscribeToBot, 
+    getBotsByUser,
+    isLoading
+  } = useBotStore()
+  
+  const userBots = userId ? getBotsByUser(userId) : []
   
   useEffect(() => {
+    // Don't initialize WebSocket until we have a valid userId
+    if (!userId) {
+      console.log('⏳ WebSocket hook waiting for userId...')
+      return
+    }
+
     let isMounted = true
     
     const initializeConnection = async (): Promise<(() => void) | undefined> => {
       try {
         console.log('🔗 Initializing bot WebSocket connection for user:', userId)
         
-        // First, load bots from the API
-        console.log('📡 Loading bots from API...')
-        await useBotStore.getState().loadBots(userId)
-        
-        if (!isMounted) return undefined // Component unmounted during load
+        if (!isMounted) return undefined // Component unmounted during initialization
         
         // Determine WebSocket URL - always use production
         let finalWsUrl = wsUrl
@@ -32,16 +42,17 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
 
         // Connect to WebSocket with demo message callback
         console.log('🔌 Connecting to WebSocket:', finalWsUrl)
-        await useBotStore.getState().connectWebSocket(userId, finalWsUrl, onDemoMessage)
+        await connectWebSocket(userId, finalWsUrl, onDemoMessage)
         
         if (!isMounted) return undefined
         
         // Subscribe to all user's bots after connection
         const subscribeTimer = setTimeout(() => {
-          if (isMounted) {
-            const currentBots = useBotStore.getState().getBotsByUser(userId)
+          if (isMounted && userId) {
+            const currentBots = getBotsByUser(userId)
+            console.log(`📡 Subscribing to ${currentBots.length} bots for WebSocket updates`)
             currentBots.forEach(bot => {
-              useBotStore.getState().subscribeToBot(bot.config_id)
+              subscribeToBot(bot.config_id)
             })
           }
         }, 1000) // Wait 1 second for connection to establish
@@ -64,12 +75,12 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
     return () => {
       isMounted = false
       cleanupPromise.then(cleanup => cleanup?.())
-      useBotStore.getState().disconnectWebSocket(userId)
+      disconnectWebSocket(userId)
     }
   }, [userId, wsUrl]) // Removed dependencies that cause reconnection loops
 
   return {
-    isConnected: useBotStore(state => state.isWebSocketConnected(userId)),
+    isConnected: isWebSocketConnected(userId),
     userBots,
     isLoadingBots: isLoading
   }
