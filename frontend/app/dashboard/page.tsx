@@ -114,16 +114,13 @@ export default function DashboardPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId]) // Only depend on userId to prevent infinite re-renders
   
-  // Get user's bots and selected bot (with proper error handling)
-  const userBots = React.useMemo(() => {
-    if (!userId) {
-      console.log('🚫 No userId available, returning empty bots array')
-      return []
-    }
-    const bots = getBotsByUser(userId)
-    console.log(`📊 Dashboard found ${bots.length} bots for userId: ${userId}`)
-    return bots
-  }, [userId, getBotsByUser])
+  // Get user's bots directly from store (reactive to store changes)
+  const userBots = userId ? getBotsByUser(userId) : []
+  
+  // Log when bots change for debugging
+  React.useEffect(() => {
+    console.log(`📊 Dashboard found ${userBots.length} bots for userId: ${userId}`)
+  }, [userBots.length, userId])
   const selectedBotData = selectedConfigId ? getBotById(selectedConfigId) : null
   
   // WebSocket connection for real-time updates (only when userId is available)
