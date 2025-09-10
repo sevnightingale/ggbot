@@ -6,17 +6,9 @@ import { useBotStore } from '@/store/botStore'
  * This will integrate with your backend WebSocket service
  */
 export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: (data: Record<string, unknown>) => void) {
-  const { 
-    loadBots, 
-    connectWebSocket, 
-    disconnectWebSocket, 
-    isWebSocketConnected, 
-    subscribeToBot, 
-    getBotsByUser,
-    isLoading
-  } = useBotStore()
-  
-  const userBots = getBotsByUser(userId)
+  // Get only the state we need, not the functions (to prevent re-renders)
+  const isLoading = useBotStore(state => state.isLoading)
+  const userBots = useBotStore(state => state.getBotsByUser(userId))
   
   useEffect(() => {
     let isMounted = true
@@ -27,7 +19,7 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
         
         // First, load bots from the API
         console.log('📡 Loading bots from API...')
-        await loadBots(userId)
+        await useBotStore.getState().loadBots(userId)
         
         if (!isMounted) return undefined // Component unmounted during load
         
@@ -40,16 +32,16 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
 
         // Connect to WebSocket with demo message callback
         console.log('🔌 Connecting to WebSocket:', finalWsUrl)
-        await connectWebSocket(userId, finalWsUrl, onDemoMessage)
+        await useBotStore.getState().connectWebSocket(userId, finalWsUrl, onDemoMessage)
         
         if (!isMounted) return undefined
         
         // Subscribe to all user's bots after connection
         const subscribeTimer = setTimeout(() => {
           if (isMounted) {
-            const currentBots = getBotsByUser(userId)
+            const currentBots = useBotStore.getState().getBotsByUser(userId)
             currentBots.forEach(bot => {
-              subscribeToBot(bot.config_id)
+              useBotStore.getState().subscribeToBot(bot.config_id)
             })
           }
         }, 1000) // Wait 1 second for connection to establish
@@ -72,12 +64,12 @@ export function useBotWebSocket(userId: string, wsUrl?: string, onDemoMessage?: 
     return () => {
       isMounted = false
       cleanupPromise.then(cleanup => cleanup?.())
-      disconnectWebSocket(userId)
+      useBotStore.getState().disconnectWebSocket(userId)
     }
   }, [userId, wsUrl]) // Removed dependencies that cause reconnection loops
 
   return {
-    isConnected: isWebSocketConnected(userId),
+    isConnected: useBotStore(state => state.isWebSocketConnected(userId)),
     userBots,
     isLoadingBots: isLoading
   }
