@@ -2,6 +2,42 @@ import { create } from 'zustand'
 import { devtools, subscribeWithSelector } from 'zustand/middleware'
 import { apiClient } from '@/lib/api'
 
+// Helper function to format next run time safely
+function formatNextRunTime(nextRunString: string): string {
+  try {
+    // Clean up the date string - remove trailing 'Z' if there's already timezone info
+    let cleanDateString = nextRunString
+    if (nextRunString.includes('+') && nextRunString.endsWith('Z')) {
+      cleanDateString = nextRunString.slice(0, -1)
+    }
+    
+    const nextRun = new Date(cleanDateString)
+    if (isNaN(nextRun.getTime())) {
+      return 'Schedule pending'
+    }
+    
+    const now = new Date()
+    const timeDiff = nextRun.getTime() - now.getTime()
+    
+    // If it's in the past, show "Running soon"
+    if (timeDiff < 0) {
+      return 'Running soon'
+    }
+    
+    // If it's within an hour, show relative time
+    if (timeDiff < 60 * 60 * 1000) {
+      const minutes = Math.floor(timeDiff / (1000 * 60))
+      return `Next run: ${minutes}m`
+    }
+    
+    // Otherwise show the time
+    return `Next run: ${nextRun.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+  } catch (error) {
+    console.error('Error formatting next run time:', nextRunString, error)
+    return 'Schedule pending'
+  }
+}
+
 // Helper functions for V2 API data transformation
 function extractStrategyFromConfig(configData: any): string {
   // Try to determine strategy from decision prompt (nested config_data structure)
@@ -401,7 +437,7 @@ export const useBotStore = create<BotStore>()(
                   phase: isActive ? 'idle' as const : 'inactive' as const,
                   color: isActive ? 'blue' as const : 'gray' as const,
                   message: isActive ? 
-                    (statusData.next_run ? `Next run: ${new Date(statusData.next_run).toLocaleTimeString()}` : 'Running') : 
+                    (statusData.next_run ? `Next run: ${formatNextRunTime(statusData.next_run)}` : 'Running') : 
                     'Ready to start',
                   timestamp: new Date().toISOString()
                 }
