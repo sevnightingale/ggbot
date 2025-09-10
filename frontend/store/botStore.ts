@@ -370,7 +370,7 @@ export const useBotStore = create<BotStore>()(
             status: {
               phase: 'inactive', // Will be updated via bot status endpoint
               color: 'gray',
-              message: 'Ready to start',
+              message: 'Loading status...',
               timestamp: new Date().toISOString()
             },
             isActive: false, // Will be updated via bot status endpoint
@@ -378,6 +378,33 @@ export const useBotStore = create<BotStore>()(
             lastRun: configData.updated_at ? new Date(configData.updated_at) : undefined,
             userId: userId
           })) : []
+          
+          // Load real bot status for each bot
+          console.log(`🔄 Loading status for ${transformedBots.length} bots...`)
+          const botsWithStatus = await Promise.all(transformedBots.map(async (bot) => {
+            try {
+              const statusData = await apiClient.getBotStatus(bot.config_id)
+              
+              const isActive = statusData.bot_status === 'active'
+              const isScheduled = statusData.is_scheduled || false
+              
+              return {
+                ...bot,
+                isActive: isActive,
+                status: {
+                  phase: isActive ? 'idle' : 'inactive',
+                  color: isActive ? 'blue' : 'gray',
+                  message: isActive ? 
+                    (statusData.next_run ? `Next run: ${new Date(statusData.next_run).toLocaleTimeString()}` : 'Running') : 
+                    'Ready to start',
+                  timestamp: new Date().toISOString()
+                }
+              }
+            } catch (error) {
+              console.error(`❌ Failed to get status for bot ${bot.config_id}:`, error)
+              return bot // Return original bot if status call fails
+            }
+          }))
           
           // Clear existing bots for this user and add new ones
           const newBots = new Map(get().bots)
@@ -387,8 +414,8 @@ export const useBotStore = create<BotStore>()(
               newBots.delete(configId)
             }
           }
-          // Add new bots
-          transformedBots.forEach(bot => {
+          // Add new bots with real status
+          botsWithStatus.forEach(bot => {
             newBots.set(bot.config_id, bot)
           })
           
@@ -430,22 +457,33 @@ export const useBotStore = create<BotStore>()(
       },
 
       startBot: async (config_id: string) => {
+        console.log(`🚀 Starting bot ${config_id}...`)
         set({ isLoading: true, error: null })
         
         try {
           const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+          console.log(`📡 POST ${apiUrl}/api/v2/bot/${config_id}/start`)
+          
           const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${config_id}/start`, {
             method: 'POST'
           })
           
+          console.log(`📡 Start bot response:`, response.status, response.statusText)
+          
           if (!response.ok) {
-            throw new Error(`Failed to start bot: ${response.status}`)
+            const errorText = await response.text()
+            console.error(`❌ Start bot API error:`, errorText)
+            throw new Error(`Failed to start bot: ${response.status} - ${errorText}`)
           }
+          
+          const result = await response.json()
+          console.log(`✅ Bot started successfully:`, result)
           
           get().setBotActive(config_id, true)
           set({ isLoading: false })
           
         } catch (error) {
+          console.error(`❌ Failed to start bot ${config_id}:`, error)
           const errorMessage = error instanceof Error ? error.message : 'Failed to start bot'
           set({ error: errorMessage, isLoading: false })
           throw error
@@ -453,22 +491,33 @@ export const useBotStore = create<BotStore>()(
       },
 
       stopBot: async (config_id: string) => {
+        console.log(`⏹️ Stopping bot ${config_id}...`)
         set({ isLoading: true, error: null })
         
         try {
           const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+          console.log(`📡 POST ${apiUrl}/api/v2/bot/${config_id}/stop`)
+          
           const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${config_id}/stop`, {
             method: 'POST'
           })
           
+          console.log(`📡 Stop bot response:`, response.status, response.statusText)
+          
           if (!response.ok) {
-            throw new Error(`Failed to stop bot: ${response.status}`)
+            const errorText = await response.text()
+            console.error(`❌ Stop bot API error:`, errorText)
+            throw new Error(`Failed to stop bot: ${response.status} - ${errorText}`)
           }
+          
+          const result = await response.json()
+          console.log(`✅ Bot stopped successfully:`, result)
           
           get().setBotActive(config_id, false)
           set({ isLoading: false })
           
         } catch (error) {
+          console.error(`❌ Failed to stop bot ${config_id}:`, error)
           const errorMessage = error instanceof Error ? error.message : 'Failed to stop bot'
           set({ error: errorMessage, isLoading: false })
           throw error

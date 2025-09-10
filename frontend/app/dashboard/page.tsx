@@ -66,6 +66,20 @@ export default function DashboardPage() {
   const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
   const [isLoadingBotData, setIsLoadingBotData] = React.useState(false)
 
+  // Decision history state
+  const [decisionHistory, setDecisionHistory] = React.useState<Array<{
+    decision_id: string;
+    symbol: string;
+    action: string;
+    confidence: number;
+    reasoning: string;
+    prompt?: string;
+    market_data?: any;
+    decision_data?: any;
+    created_at: string;
+  }>>([])
+  const [selectedDecision, setSelectedDecision] = React.useState<any>(null)
+
   // Supabase client and router for logout
   const supabase = createClient()
   const router = useRouter()
@@ -131,12 +145,14 @@ export default function DashboardPage() {
       const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
       
       // Use apiClient for authenticated requests
-      const [metricsResponse, tradesResponse, positionsResponse, accountResponse] = await Promise.all([
+      const [metricsResponse, tradesResponse, positionsResponse, accountResponse, decisionsResponse] = await Promise.all([
         apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/metrics`).then(r => r.json()),
         apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/trades`).then(r => r.json()),
         apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/positions`).then(r => r.json()),
         // Add account endpoint call (we'll create this)
-        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/account`).then(r => r.json()).catch(() => ({ status: 'error' }))
+        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/account`).then(r => r.json()).catch(() => ({ status: 'error' })),
+        // Add decisions endpoint call
+        apiClient.authenticatedFetch(`${baseUrl}/api/v2/bot/${configId}/decisions`).then(r => r.json()).catch(() => ({ status: 'error' }))
       ])
 
       // Update state with real API data
@@ -186,10 +202,15 @@ export default function DashboardPage() {
         setClosedTrades(tradesResponse.trades || [])
       }
 
+      if (decisionsResponse.status === 'success') {
+        setDecisionHistory(decisionsResponse.decisions || [])
+      }
+
       console.log('✅ V2 API data loaded:', {
         metrics: metricsResponse,
         trades: tradesResponse,
-        positions: positionsResponse
+        positions: positionsResponse,
+        decisions: decisionsResponse
       })
       
     } catch (error) {
@@ -211,6 +232,7 @@ export default function DashboardPage() {
       })
       setLivePositions([])
       setClosedTrades([])
+      setDecisionHistory([])
     } finally {
       setIsLoadingBotData(false)
     }
@@ -729,56 +751,83 @@ export default function DashboardPage() {
                 </div>
               </div>
               
-              {/* Closed Trades Table */}
+              {/* TODO: Bring back closed trades in combined trades card later */}
+              {/* 
               <div className="relative p-3 corner-bottom-right flex-1 min-h-[320px] shadow-lg shadow-black/10">
                 <h3 className="text-subheader text-bone-200 mb-4">Closed Trades</h3>
                 <div className="gradient-divider mb-4"></div>
-                <div className="overflow-x-auto overflow-y-auto max-h-[260px]">
-                  <table className="w-full text-footnote">
-                    <thead className="text-gray-400 border-b border-gray-700">
-                      <tr>
-                        <th className="text-left py-1 pr-2">PnL</th>
-                        <th className="text-left py-1 px-1">Symbol</th>
-                        <th className="text-left py-1 px-1">Size</th>
-                        <th className="text-left py-1 px-1">Dir</th>
-                        <th className="text-left py-1 pl-1">Entry</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {closedTrades.length === 0 ? (
-                        <tr>
-                          <td colSpan={5} className="text-center py-8 text-gray-500">
-                            {isLoadingBotData ? (
-                              <div className="flex flex-col items-center gap-2">
-                                <div className="w-6 h-6 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
-                                <span>Loading trade history...</span>
-                              </div>
-                            ) : (
-                              <div className="flex flex-col items-center gap-2">
-                                <span className="text-2xl">📋</span>
-                                <span>No closed trades yet</span>
-                                <span className="text-xs">Trade history will appear here</span>
-                              </div>
-                            )}
-                          </td>
-                        </tr>
+                ... closed trades table content ...
+              </div>
+              */}
+
+              {/* Your ggbots Activity Card */}
+              <div className="relative p-3 corner-bottom-right flex-1 min-h-[320px] shadow-lg shadow-black/10">
+                <div className="flex justify-between items-center mb-4">
+                  <h3 className="text-subheader text-bone-200">Your ggbots Activity</h3>
+                  <span className="text-footnote text-gray-500">
+                    {decisionHistory.length > 0 ? `${decisionHistory.length} decision${decisionHistory.length !== 1 ? 's' : ''}` : 'No activity'}
+                  </span>
+                </div>
+                <div className="gradient-divider mb-4"></div>
+                <div className="overflow-y-auto max-h-[260px]">
+                  {decisionHistory.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      {isLoadingBotData ? (
+                        <div className="flex flex-col items-center gap-2">
+                          <div className="w-6 h-6 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
+                          <span>Loading activity...</span>
+                        </div>
                       ) : (
-                        closedTrades.map((trade, index) => (
-                          <tr key={index} className={`${index % 2 === 1 ? 'bg-gray-600 bg-opacity-30' : ''}`}>
-                            <td className={`py-1 pr-2 ${trade.pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                              {trade.pnl >= 0 ? '+' : ''}{trade.pnl.toFixed(0)}
-                            </td>
-                            <td className="py-1 px-1 text-bone-200">{trade.symbol.replace('/USDT', '')}</td>
-                            <td className="py-1 px-1 text-gray-400">{trade.positionSize}</td>
-                            <td className={`py-1 px-1 ${trade.direction === 'LONG' ? 'text-green-400' : 'text-red-400'}`}>
-                              {trade.direction.slice(0, 1)}
-                            </td>
-                            <td className="py-1 pl-1 text-gray-400">{trade.entryPrice.toFixed(3)}</td>
-                          </tr>
-                        ))
+                        <div className="flex flex-col items-center gap-2">
+                          <span className="text-2xl">🧠</span>
+                          <span>No activity yet</span>
+                          <span className="text-xs">Decision history will appear here</span>
+                        </div>
                       )}
-                    </tbody>
-                  </table>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {decisionHistory.map((decision, index) => (
+                        <div
+                          key={decision.decision_id}
+                          className={`p-3 rounded-lg cursor-pointer hover:bg-gray-600/30 transition-colors border border-gray-700/50 ${
+                            index % 2 === 1 ? 'bg-gray-600/20' : ''
+                          }`}
+                          onClick={() => setSelectedDecision(decision)}
+                        >
+                          <div className="flex items-center justify-between mb-2">
+                            <div className="flex items-center gap-3">
+                              <span className="text-footnote text-gray-400">
+                                {new Date(decision.created_at).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
+                              </span>
+                              <span className={`text-footnote font-medium px-2 py-1 rounded ${
+                                decision.action === 'enter' && decision.decision_data?.direction === 'LONG' ? 'bg-green-500/20 text-green-400' :
+                                decision.action === 'enter' && decision.decision_data?.direction === 'SHORT' ? 'bg-red-500/20 text-red-400' :
+                                decision.action === 'exit' ? 'bg-blue-500/20 text-blue-400' :
+                                'bg-gray-500/20 text-gray-400'
+                              }`}>
+                                {decision.action === 'enter' 
+                                  ? `ENTER ${decision.decision_data?.direction || 'TRADE'}`
+                                  : decision.action.toUpperCase()}
+                              </span>
+                              <span className="text-footnote text-bone-300">
+                                {decision.symbol.replace('/USDT', '')}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <span className="text-footnote text-gray-400">
+                                {Math.round((decision.confidence || 0) * 100)}%
+                              </span>
+                              <span className="text-agent-extraction">▶</span>
+                            </div>
+                          </div>
+                          <div className="text-xs text-gray-400 truncate">
+                            {decision.reasoning?.substring(0, 120)}...
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
@@ -790,6 +839,127 @@ export default function DashboardPage() {
       {userBots.length > 0 && (
         <div className="absolute bottom-4 left-4 text-footnote text-gray-400">
           Showing {userBots.length} bot{userBots.length !== 1 ? 's' : ''} • Selected: {currentBot.name}
+        </div>
+      )}
+
+      {/* Decision Detail Modal */}
+      {selectedDecision && (
+        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+          <div className="bg-charcoal-700 rounded-lg max-w-4xl max-h-[90vh] overflow-y-auto w-full">
+            <div className="p-6">
+              {/* Modal Header */}
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-4">
+                  <span className="text-2xl">🧠</span>
+                  <div>
+                    <h2 className="text-xl text-bone-200 font-display">Decision Details</h2>
+                    <p className="text-gray-400 text-footnote">
+                      {new Date(selectedDecision.created_at).toLocaleString()}
+                    </p>
+                  </div>
+                </div>
+                <button 
+                  onClick={() => setSelectedDecision(null)}
+                  className="text-gray-400 hover:text-bone-200 text-2xl"
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* Decision Summary */}
+              <div className="mb-6 p-4 bg-charcoal-600 rounded-lg">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                  <div>
+                    <span className="text-gray-400 text-footnote">Action</span>
+                    <div className={`text-footnote font-medium px-2 py-1 rounded mt-1 inline-block ${
+                      selectedDecision.action === 'enter' && selectedDecision.decision_data?.direction === 'LONG' ? 'bg-green-500/20 text-green-400' :
+                      selectedDecision.action === 'enter' && selectedDecision.decision_data?.direction === 'SHORT' ? 'bg-red-500/20 text-red-400' :
+                      selectedDecision.action === 'exit' ? 'bg-blue-500/20 text-blue-400' :
+                      'bg-gray-500/20 text-gray-400'
+                    }`}>
+                      {selectedDecision.action === 'enter' 
+                        ? `ENTER ${selectedDecision.decision_data?.direction || 'TRADE'}`
+                        : selectedDecision.action.toUpperCase()}
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 text-footnote">Symbol</span>
+                    <div className="text-bone-200 font-medium">{selectedDecision.symbol}</div>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 text-footnote">Confidence</span>
+                    <div className="text-bone-200 font-medium">
+                      {Math.round((selectedDecision.confidence || 0) * 100)}%
+                    </div>
+                  </div>
+                  <div>
+                    <span className="text-gray-400 text-footnote">Decision ID</span>
+                    <div className="text-gray-400 text-xs font-mono">
+                      {selectedDecision.decision_id.substring(0, 8)}...
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* AI Reasoning */}
+              <div className="mb-6">
+                <h3 className="text-bone-200 font-medium mb-3 flex items-center gap-2">
+                  <span className="text-agent-decision">🤖</span>
+                  AI Reasoning
+                </h3>
+                <div className="bg-charcoal-800 p-4 rounded-lg">
+                  <div className="text-bone-200 text-sm leading-relaxed whitespace-pre-wrap">
+                    {selectedDecision.reasoning || 'No reasoning provided'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Market Data Context */}
+              {selectedDecision.market_data && (
+                <div className="mb-6">
+                  <h3 className="text-bone-200 font-medium mb-3 flex items-center gap-2">
+                    <span className="text-agent-extraction">📊</span>
+                    Market Context
+                  </h3>
+                  <div className="bg-charcoal-800 p-4 rounded-lg">
+                    <pre className="text-xs text-gray-300 overflow-x-auto">
+                      {JSON.stringify(selectedDecision.market_data, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* Decision Data */}
+              {selectedDecision.decision_data && (
+                <div className="mb-6">
+                  <h3 className="text-bone-200 font-medium mb-3 flex items-center gap-2">
+                    <span className="text-agent-trading">⚡</span>
+                    Decision Parameters
+                  </h3>
+                  <div className="bg-charcoal-800 p-4 rounded-lg">
+                    <pre className="text-xs text-gray-300 overflow-x-auto">
+                      {JSON.stringify(selectedDecision.decision_data, null, 2)}
+                    </pre>
+                  </div>
+                </div>
+              )}
+
+              {/* LLM Prompt */}
+              {selectedDecision.prompt && (
+                <div className="mb-6">
+                  <h3 className="text-bone-200 font-medium mb-3 flex items-center gap-2">
+                    <span>💬</span>
+                    LLM Prompt
+                  </h3>
+                  <div className="bg-charcoal-800 p-4 rounded-lg">
+                    <div className="text-xs text-gray-300 leading-relaxed whitespace-pre-wrap max-h-64 overflow-y-auto">
+                      {selectedDecision.prompt}
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       )}
 
