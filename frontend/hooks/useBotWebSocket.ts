@@ -7,7 +7,6 @@ import { useBotStore } from '@/store/botStore'
  */
 export function useBotWebSocket(userId: string | undefined, wsUrl?: string, onDemoMessage?: (data: Record<string, unknown>) => void) {
   const { 
-    loadBots, 
     connectWebSocket, 
     disconnectWebSocket, 
     isWebSocketConnected, 
@@ -80,7 +79,7 @@ export function useBotWebSocket(userId: string | undefined, wsUrl?: string, onDe
   }, [userId, wsUrl]) // Removed dependencies that cause reconnection loops
 
   return {
-    isConnected: isWebSocketConnected(userId),
+    isConnected: userId ? isWebSocketConnected(userId) : false,
     userBots,
     isLoadingBots: isLoading
   }
