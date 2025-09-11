@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '@/lib/api'
 
 interface Position {
@@ -41,7 +41,7 @@ export function useBotActivity(botId: string | null): UseBotActivityReturn {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const fetchActivity = async (configId: string) => {
+  const fetchActivity = useCallback(async (configId: string): Promise<void> => {
     try {
       setIsLoading(true)
       setError(null)
@@ -87,9 +87,9 @@ export function useBotActivity(botId: string | null): UseBotActivityReturn {
     } finally {
       setIsLoading(false)
     }
-  }
+  }, [])
 
-  const refetch = async () => {
+  const refetch = async (): Promise<void> => {
     if (botId) {
       await fetchActivity(botId)
     }
@@ -106,8 +106,9 @@ export function useBotActivity(botId: string | null): UseBotActivityReturn {
       setActivity(null)
       setError(null)
       setIsLoading(false)
+      return () => {} // Empty cleanup function
     }
-  }, [botId])
+  }, [botId, fetchActivity])
 
   return {
     activity,

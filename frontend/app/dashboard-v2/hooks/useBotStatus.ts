@@ -3,7 +3,7 @@
 import { useMemo } from 'react'
 import { useSchedulerStatus } from './useSchedulerStatus'
 import { useCountdownTimer } from './useCountdownTimer'
-import { useBotWebSocket } from '@/hooks/useBotWebSocket'
+import { Bot } from '@/store/botStore'
 
 interface BotStatusReturn {
   isActive: boolean
@@ -15,37 +15,27 @@ interface BotStatusReturn {
   countdown: string | null
 }
 
-interface BotConfig {
-  config_id: string
-  user_id: string
-  state: 'active' | 'inactive'
-  name: string
-}
-
-export function useBotStatus(
-  botConfig: BotConfig | null,
-  webSocketStatus: any = null
-): BotStatusReturn {
+export function useBotStatus(bot: Bot | null): BotStatusReturn {
   const { schedulerStatus } = useSchedulerStatus()
   
   // Find this bot's job in scheduler status
   const botJob = useMemo(() => {
-    if (!botConfig || !schedulerStatus?.active_jobs) return null
-    return schedulerStatus.active_jobs.find(job => job.config_id === botConfig.config_id)
-  }, [schedulerStatus, botConfig?.config_id])
+    if (!bot || !schedulerStatus?.active_jobs) return null
+    return schedulerStatus.active_jobs.find(job => job.config_id === bot.config_id)
+  }, [schedulerStatus, bot])
 
   // Get countdown timer for next run
   const { countdown } = useCountdownTimer(botJob?.next_run || null)
 
-  // Determine bot status with priority: WebSocket > Scheduler > Database
+  // Determine bot status with priority: WebSocket (bot.status) > Scheduler > Default
   const botStatus = useMemo(() => {
-    if (!botConfig) {
+    if (!bot) {
       return {
         isActive: false,
         currentState: 'inactive' as const,
         nextRun: null,
         isExecuting: false,
-        message: null,
+        message: 'No bot selected',
         showSpinner: false,
         countdown: null
       }
@@ -53,17 +43,20 @@ export function useBotStatus(
 
     // Check if bot has scheduler job (indicates it's truly active)
     const hasSchedulerJob = Boolean(botJob)
-    const isActive = botConfig.state === 'active' && hasSchedulerJob
+    const isActive = bot.isActive && hasSchedulerJob
 
-    // Priority 1: WebSocket status (real-time execution)
-    if (webSocketStatus?.phase && webSocketStatus.phase !== 'idle') {
+    // Priority 1: WebSocket status from bot.status (real-time execution)
+    const currentPhase = bot.status?.phase || 'inactive'
+    const isExecuting = ['extraction', 'decision', 'trading'].includes(currentPhase)
+
+    if (isExecuting) {
       return {
         isActive,
-        currentState: webSocketStatus.phase,
+        currentState: currentPhase,
         nextRun: botJob?.next_run || null,
         isExecuting: true,
-        message: webSocketStatus.message || 'Processing...',
-        showSpinner: webSocketStatus.showSpinner ?? true,
+        message: bot.status?.message || 'Processing...',
+        showSpinner: bot.status?.showSpinner ?? true,
         countdown: null // No countdown during execution
       }
     }
@@ -75,7 +68,7 @@ export function useBotStatus(
         currentState: 'idle' as const,
         nextRun: botJob?.next_run || null,
         isExecuting: false,
-        message: countdown || 'Monitoring market conditions...',
+        message: countdown || bot.status?.message || 'Monitoring market conditions...',
         showSpinner: false,
         countdown
       }
@@ -87,11 +80,11 @@ export function useBotStatus(
       currentState: 'inactive' as const,
       nextRun: null,
       isExecuting: false,
-      message: 'Bot inactive',
+      message: bot.status?.message || 'Bot inactive',
       showSpinner: false,
       countdown: null
     }
-  }, [botConfig, botJob, webSocketStatus, countdown])
+  }, [bot, botJob, countdown])
 
   return botStatus
 }
