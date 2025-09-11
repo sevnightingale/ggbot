@@ -874,14 +874,14 @@ ORIGINAL MESSAGE:
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
                         prompt,
-                        json.dumps(market_data),
+                        json.dumps(market_data, default=str),
                         json.dumps({
                             'signal_source': signal_data.get('source'),
                             'signal_data': signal_data,
                             'validation_framework': '4-pillar',
                             'current_price': float(current_price),
                             'raw_action': raw_action  # Preserve original action
-                        }),
+                        }, default=str),
                         datetime.now(timezone.utc)
                     ))
                     
@@ -1189,14 +1189,14 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
                         prompt,
-                        json.dumps(market_data),
+                        json.dumps(market_data, default=str),
                         json.dumps({
                             'decision_type': 'position_management',
                             'position_data': position_data,
                             'current_price': float(current_price),
                             'raw_action': raw_action,  # Preserve original action
                             **decision_data
-                        }),
+                        }, default=str),
                         position_data.get('entry_decision_id'),  # Link to original entry decision
                         datetime.now(timezone.utc)
                     ))

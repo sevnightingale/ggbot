@@ -8,7 +8,7 @@ Advanced Bollinger Bands preprocessing with squeeze analysis, bandwidth tracking
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -30,41 +30,47 @@ class BollingerBandsPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive Bollinger Bands analysis
         """
-        if len(upper_band) < 5 or len(prices) < 5:
+        # Align all series and handle NaN values
+        df = pd.DataFrame({
+            "price": prices, 
+            "upper": upper_band, 
+            "middle": middle_band, 
+            "lower": lower_band
+        }).dropna()
+        
+        if len(df) < 5:
             return {"error": "Insufficient data for Bollinger Bands analysis"}
         
-        current_price = float(prices.iloc[-1])
-        current_upper = float(upper_band.iloc[-1])
-        current_middle = float(middle_band.iloc[-1])
-        current_lower = float(lower_band.iloc[-1])
+        # Extract current values safely
+        current_price = float(df["price"].iloc[-1])
+        current_upper = float(df["upper"].iloc[-1])
+        current_middle = float(df["middle"].iloc[-1])
+        current_lower = float(df["lower"].iloc[-1])
         
-        # Position analysis (%B calculation)
-        position_analysis = self._analyze_price_position(prices, upper_band, middle_band, lower_band)
+        # Guard against zero-division
+        width = max(current_upper - current_lower, 1e-12)
+        denom_mid = current_middle if abs(current_middle) > 1e-12 else 1e-12
+        
+        # Position analysis (%B calculation) - pass clean data
+        position_analysis = self._analyze_price_position(df)
         
         # Bandwidth analysis
-        bandwidth_analysis = self._analyze_bandwidth(upper_band, middle_band, lower_band)
+        bandwidth_analysis = self._analyze_bandwidth(df)
         
-        # Squeeze analysis
-        squeeze_analysis = self._analyze_squeeze_conditions(upper_band, lower_band, middle_band)
+        # Squeeze analysis - pass Series explicitly
+        squeeze_analysis = self._analyze_squeeze_conditions(df["upper"], df["lower"], df["middle"])
         
-        # Band touching analysis
-        band_touch_analysis = self._analyze_band_touches(prices, upper_band, lower_band)
+        # Band touching analysis - pass Series explicitly
+        band_touch_analysis = self._analyze_band_touches(df["price"], df["upper"], df["lower"])
         
         # Volatility analysis
-        volatility_analysis = self._analyze_volatility_patterns(upper_band, lower_band, middle_band)
+        volatility_analysis = self._analyze_volatility_patterns(df)
         
-        # Trend analysis
-        trend_analysis = self._analyze_trend_with_bands(prices, middle_band)
+        # Trend analysis - pass Series explicitly
+        trend_analysis = self._analyze_trend_with_bands(df["price"], df["middle"])
         
-        # Pattern analysis
-        pattern_analysis = self._analyze_bollinger_patterns(prices, upper_band, middle_band, lower_band)
-        
-        # Signal generation
-        signals = self._generate_bollinger_signals(current_price, current_upper, current_middle, current_lower,
-                                                  position_analysis, squeeze_analysis, band_touch_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_bollinger_confidence(position_analysis, bandwidth_analysis, squeeze_analysis)
+        # Pattern analysis - pass Series explicitly
+        pattern_analysis = self._analyze_bollinger_patterns(df["price"], df["upper"], df["middle"], df["lower"])
         
         return {
             "indicator": "Bollinger_Bands",
@@ -73,33 +79,53 @@ class BollingerBandsPreprocessor(BasePreprocessor):
                 "upper_band": round(current_upper, 4),
                 "middle_band": round(current_middle, 4),
                 "lower_band": round(current_lower, 4),
-                "bandwidth": round((current_upper - current_lower) / current_middle * 100, 2),
-                "percent_b": round((current_price - current_lower) / (current_upper - current_lower), 3),
-                "timestamp": datetime.now().isoformat()
+                "bandwidth": round((current_upper - current_lower) / denom_mid * 100, 2),
+                "percent_b": round((current_price - current_lower) / width, 3),
+                "timestamp": datetime.now(timezone.utc).isoformat()
             },
-            "position": position_analysis,
-            "bandwidth": bandwidth_analysis,
-            "squeeze": squeeze_analysis,
-            "band_touches": band_touch_analysis,
+            "context": {
+                "position": position_analysis["position"],
+                "percent_b": position_analysis["percent_b"],
+                "distance_from_middle": position_analysis["distance_from_middle"],
+                "distance_from_middle_pct": position_analysis["distance_from_middle_pct"]
+            },
+            "levels": {
+                "upper_band": round(current_upper, 4),
+                "middle_band": round(current_middle, 4),
+                "lower_band": round(current_lower, 4),
+                "bandwidth_level": bandwidth_analysis.get("level", "unknown"),
+                "bandwidth_percentile": bandwidth_analysis.get("percentile", 50)
+            },
+            "squeeze": {
+                "is_squeeze": squeeze_analysis["is_squeeze"],
+                "squeeze_periods": squeeze_analysis["squeeze_periods"],
+                "squeeze_quality": squeeze_analysis["squeeze_quality"],
+                "expansion_potential": squeeze_analysis["expansion_potential"]
+            },
+            "band_touches": {
+                "recent_touches": band_touch_analysis["recent_touches"],
+                "total_touches": band_touch_analysis["total_touches"],
+                "upper_touches": band_touch_analysis["upper_touches"],
+                "lower_touches": band_touch_analysis["lower_touches"],
+                "touch_frequency": band_touch_analysis["touch_frequency"]
+            },
             "volatility": volatility_analysis,
             "trend": trend_analysis,
             "patterns": pattern_analysis,
-            "signals": signals,
-            "confidence": confidence,
             "summary": self._generate_bollinger_summary(current_price, current_upper, current_middle, 
                                                        current_lower, position_analysis, squeeze_analysis)
         }
     
-    def _analyze_price_position(self, prices: pd.Series, upper_band: pd.Series, 
-                               middle_band: pd.Series, lower_band: pd.Series) -> Dict[str, Any]:
+    def _analyze_price_position(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Analyze price position relative to Bollinger Bands."""
-        current_price = prices.iloc[-1]
-        current_upper = upper_band.iloc[-1]
-        current_middle = middle_band.iloc[-1]
-        current_lower = lower_band.iloc[-1]
+        current_price = df["price"].iloc[-1]
+        current_upper = df["upper"].iloc[-1]
+        current_middle = df["middle"].iloc[-1]
+        current_lower = df["lower"].iloc[-1]
         
-        # %B calculation
-        percent_b = (current_price - current_lower) / (current_upper - current_lower)
+        # %B calculation with zero-division guard
+        width = max(current_upper - current_lower, 1e-12)
+        percent_b = (current_price - current_lower) / width
         
         # Position classification
         if percent_b > 1.0:
@@ -116,19 +142,20 @@ class BollingerBandsPreprocessor(BasePreprocessor):
             position = "below_lower"
         
         # %B momentum
-        if len(prices) >= 5:
-            prev_percent_b = ((prices.iloc[-5] - lower_band.iloc[-5]) / 
-                             (upper_band.iloc[-5] - lower_band.iloc[-5]))
+        if len(df) >= 5:
+            prev_width = max(df["upper"].iloc[-5] - df["lower"].iloc[-5], 1e-12)
+            prev_percent_b = (df["price"].iloc[-5] - df["lower"].iloc[-5]) / prev_width
             percent_b_change = percent_b - prev_percent_b
         else:
             percent_b_change = 0
         
-        # Distance from middle
+        # Distance from middle with zero-division guard
+        denom_mid = current_middle if abs(current_middle) > 1e-12 else 1e-12
         distance_from_middle = current_price - current_middle
-        distance_pct = (distance_from_middle / current_middle) * 100
+        distance_pct = (distance_from_middle / denom_mid) * 100
         
         # Position history analysis
-        position_history = self._analyze_position_history(prices, upper_band, middle_band, lower_band)
+        position_history = self._analyze_position_history(df)
         
         return {
             "percent_b": round(percent_b, 3),
@@ -139,14 +166,14 @@ class BollingerBandsPreprocessor(BasePreprocessor):
             "position_history": position_history
         }
     
-    def _analyze_position_history(self, prices: pd.Series, upper_band: pd.Series, 
-                                 middle_band: pd.Series, lower_band: pd.Series) -> Dict[str, Any]:
+    def _analyze_position_history(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Analyze historical price position within bands."""
-        if len(prices) < 20:
+        if len(df) < 20:
             return {"insufficient_data": True}
         
-        # Calculate %B for all periods
-        percent_b_series = (prices - lower_band) / (upper_band - lower_band)
+        # Calculate %B for all periods with zero-division guard
+        width_series = np.maximum(df["upper"] - df["lower"], 1e-12)
+        percent_b_series = (df["price"] - df["lower"]) / width_series
         
         # Time spent in different zones
         above_upper = sum(1 for b in percent_b_series if b > 1.0)
@@ -165,22 +192,28 @@ class BollingerBandsPreprocessor(BasePreprocessor):
             "percent_b_volatility": round(percent_b_series.std(), 3)
         }
     
-    def _analyze_bandwidth(self, upper_band: pd.Series, middle_band: pd.Series, lower_band: pd.Series) -> Dict[str, Any]:
+    def _analyze_bandwidth(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Analyze Bollinger Band bandwidth."""
-        bandwidth = (upper_band - lower_band) / middle_band * 100
-        current_bandwidth = bandwidth.iloc[-1]
+        # Calculate bandwidth with zero-division guard - keep as Series
+        denom = df["middle"].where(df["middle"].abs() >= 1e-12)
+        bw = ((df["upper"] - df["lower"]) / denom * 100).dropna()
+        
+        if len(bw) == 0:
+            return {"error": "No valid bandwidth data"}
+        
+        current_bandwidth = bw.iloc[-1]
         
         # Bandwidth statistics
-        mean_bandwidth = bandwidth.mean()
-        std_bandwidth = bandwidth.std()
-        max_bandwidth = bandwidth.max()
-        min_bandwidth = bandwidth.min()
+        mean_bandwidth = bw.mean()
+        std_bandwidth = bw.std()
+        max_bandwidth = bw.max()
+        min_bandwidth = bw.min()
         
         # Bandwidth percentile
-        bandwidth_percentile = self._calculate_position_rank(bandwidth, lookback=len(bandwidth))
+        bandwidth_percentile = self._calculate_position_rank(bw, lookback=len(bw))
         
         # Bandwidth trend
-        bandwidth_velocity = self._calculate_velocity(bandwidth, 3)
+        bandwidth_velocity = self._calculate_velocity(bw, 3)
         
         # Bandwidth classification
         if current_bandwidth > mean_bandwidth + std_bandwidth:
@@ -208,40 +241,47 @@ class BollingerBandsPreprocessor(BasePreprocessor):
     
     def _analyze_squeeze_conditions(self, upper_band: pd.Series, lower_band: pd.Series, middle_band: pd.Series) -> Dict[str, Any]:
         """Analyze Bollinger Band squeeze conditions."""
-        bandwidth = (upper_band - lower_band) / middle_band * 100
-        current_bandwidth = bandwidth.iloc[-1]
+        # Guard against zero division and handle NaNs
+        denom = middle_band.where(middle_band.abs() >= 1e-12)  # keep as Series
+        bw = ((upper_band - lower_band) / denom * 100).dropna()
+        
+        if len(bw) == 0:
+            return {
+                "is_squeeze": False, 
+                "squeeze_periods": 0, 
+                "squeeze_threshold": 0.0,
+                "expansion_potential": 0.0, 
+                "recent_bandwidth_change_pct": 0.0,
+                "squeeze_quality": "weak"
+            }
+        
+        current_bandwidth = bw.iloc[-1]
         
         # Squeeze threshold (typically 20-period low bandwidth)
-        if len(bandwidth) >= 20:
-            squeeze_threshold = bandwidth.rolling(20).min().iloc[-1]
+        if len(bw) >= 20:
+            squeeze_threshold = bw.rolling(20).min().iloc[-1]
             is_squeeze = current_bandwidth <= squeeze_threshold * 1.05  # 5% tolerance
         else:
             # Fallback: use statistical method
-            mean_bandwidth = bandwidth.mean()
-            std_bandwidth = bandwidth.std()
+            mean_bandwidth = bw.mean()
+            std_bandwidth = bw.std()
             squeeze_threshold = mean_bandwidth - std_bandwidth
             is_squeeze = current_bandwidth <= squeeze_threshold
         
         # Squeeze duration
         squeeze_periods = 0
         if is_squeeze:
-            for i in range(len(bandwidth) - 1, -1, -1):
-                if bandwidth.iloc[i] <= squeeze_threshold * 1.05:
+            for i in range(len(bw) - 1, -1, -1):
+                if bw.iloc[i] <= squeeze_threshold * 1.05:
                     squeeze_periods += 1
                 else:
                     break
         
         # Post-squeeze expansion potential
-        if squeeze_periods > 0:
-            expansion_potential = min(1.0, squeeze_periods / 10)  # Max at 10 periods
-        else:
-            expansion_potential = 0.0
+        expansion_potential = min(1.0, squeeze_periods / 10) if squeeze_periods else 0.0
         
         # Recent bandwidth change
-        if len(bandwidth) >= 5:
-            recent_change = ((bandwidth.iloc[-1] / bandwidth.iloc[-5]) - 1) * 100
-        else:
-            recent_change = 0.0
+        recent_change = ((bw.iloc[-1] / bw.iloc[-5]) - 1) * 100 if len(bw) >= 5 else 0.0
         
         return {
             "is_squeeze": is_squeeze,
@@ -275,8 +315,8 @@ class BollingerBandsPreprocessor(BasePreprocessor):
             upper = upper_band.iloc[i]
             lower = lower_band.iloc[i]
             
-            # Upper band touch
-            if abs(price - upper) / upper <= touch_threshold:
+            # Upper band touch - guard against zero division
+            if abs(price - upper) / max(abs(upper), 1e-12) <= touch_threshold:
                 touches.append({
                     "index": i,
                     "type": "upper",
@@ -285,8 +325,8 @@ class BollingerBandsPreprocessor(BasePreprocessor):
                     "periods_ago": len(prices) - 1 - i
                 })
             
-            # Lower band touch
-            elif abs(price - lower) / lower <= touch_threshold:
+            # Lower band touch - guard against zero division
+            elif abs(price - lower) / max(abs(lower), 1e-12) <= touch_threshold:
                 touches.append({
                     "index": i,
                     "type": "lower",
@@ -311,16 +351,20 @@ class BollingerBandsPreprocessor(BasePreprocessor):
             "touch_frequency": len(touches) / len(prices) if len(prices) > 0 else 0
         }
     
-    def _analyze_volatility_patterns(self, upper_band: pd.Series, lower_band: pd.Series, middle_band: pd.Series) -> Dict[str, Any]:
+    def _analyze_volatility_patterns(self, df: pd.DataFrame) -> Dict[str, Any]:
         """Analyze volatility patterns using band width."""
-        bandwidth = (upper_band - lower_band) / middle_band * 100
+        # Calculate bandwidth with zero-division guard
+        denom_series = np.where(np.abs(df["middle"]) < 1e-12, np.nan, df["middle"])
+        bandwidth = (df["upper"] - df["lower"]) / denom_series * 100
+        bandwidth = bandwidth.dropna()
         
         if len(bandwidth) < 10:
             return {}
         
-        # Volatility cycles
-        peaks = self._find_peaks(bandwidth, prominence=bandwidth.std() * 0.5)
-        troughs = self._find_troughs(bandwidth, prominence=bandwidth.std() * 0.5)
+        # Volatility cycles - fix double-scaled prominence bug
+        # Base class already scales by std, so pass unitless factor
+        peaks = self._find_peaks(bandwidth, prominence=0.5)
+        troughs = self._find_troughs(bandwidth, prominence=0.5)
         
         # Current volatility state
         current_bw = bandwidth.iloc[-1]
@@ -359,7 +403,10 @@ class BollingerBandsPreprocessor(BasePreprocessor):
         
         # Price vs middle band
         price_vs_middle = "above" if current_price > current_middle else "below"
-        distance_pct = ((current_price - current_middle) / current_middle) * 100
+        
+        # Guard against middle=0 division
+        denom = current_middle if abs(current_middle) > 1e-12 else 1e-12
+        distance_pct = ((current_price - current_middle) / denom) * 100
         
         # Middle band slope (trend)
         if len(middle_band) >= 5:
@@ -466,97 +513,16 @@ class BollingerBandsPreprocessor(BasePreprocessor):
         
         return None
     
-    def _generate_bollinger_signals(self, price: float, upper: float, middle: float, lower: float,
-                                   position_analysis: Dict, squeeze_analysis: Dict, 
-                                   band_touch_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate Bollinger Band signals."""
-        signals = []
-        
-        # Position-based signals
-        percent_b = position_analysis["percent_b"]
-        position = position_analysis["position"]
-        
-        if position == "above_upper":
-            signals.append({
-                "type": "overbought_signal",
-                "strength": "medium",
-                "reason": f"Price above upper band (%B: {percent_b:.2f})",
-                "confidence": 0.7
-            })
-        elif position == "below_lower":
-            signals.append({
-                "type": "oversold_signal",
-                "strength": "medium", 
-                "reason": f"Price below lower band (%B: {percent_b:.2f})",
-                "confidence": 0.7
-            })
-        
-        # Squeeze signals
-        if squeeze_analysis["is_squeeze"]:
-            squeeze_quality = squeeze_analysis["squeeze_quality"]
-            if squeeze_quality in ["excellent", "good"]:
-                signals.append({
-                    "type": "squeeze_breakout_setup",
-                    "strength": "medium",
-                    "reason": f"{squeeze_quality.title()} squeeze for {squeeze_analysis['squeeze_periods']} periods",
-                    "confidence": 0.8 if squeeze_quality == "excellent" else 0.7
-                })
-        
-        # Band touch signals
-        latest_touch = band_touch_analysis.get("latest_touch")
-        if latest_touch and latest_touch["periods_ago"] <= 2:
-            touch_type = latest_touch["type"]
-            signals.append({
-                "type": f"{touch_type}_band_touch",
-                "strength": "low",
-                "reason": f"Recent {touch_type} band touch {latest_touch['periods_ago']} periods ago",
-                "confidence": 0.6
-            })
-        
-        # %B momentum signals
-        percent_b_change = position_analysis["percent_b_change_5p"]
-        if abs(percent_b_change) > 0.3:
-            direction = "bullish" if percent_b_change > 0 else "bearish"
-            signals.append({
-                "type": f"percent_b_momentum_{direction}",
-                "strength": "low",
-                "reason": f"%B moving {direction}ly ({percent_b_change:+.2f} over 5 periods)",
-                "confidence": 0.5
-            })
-        
-        return signals
-    
-    def _calculate_bollinger_confidence(self, position_analysis: Dict, bandwidth_analysis: Dict, 
-                                       squeeze_analysis: Dict) -> float:
-        """Calculate Bollinger Bands analysis confidence."""
-        confidence_factors = []
-        
-        # Position clarity factor
-        percent_b = abs(position_analysis["percent_b"] - 0.5)  # Distance from center
-        position_clarity = min(1.0, percent_b * 2)  # Max when %B is 0 or 1
-        confidence_factors.append(position_clarity)
-        
-        # Bandwidth factor (higher bandwidth = more reliable signals)
-        bandwidth_percentile = bandwidth_analysis["percentile"]
-        bandwidth_factor = bandwidth_percentile / 100
-        confidence_factors.append(bandwidth_factor)
-        
-        # Squeeze factor (squeezes increase breakout confidence)
-        if squeeze_analysis["is_squeeze"]:
-            squeeze_quality = squeeze_analysis["squeeze_quality"]
-            quality_scores = {"excellent": 0.9, "good": 0.7, "moderate": 0.5, "weak": 0.3}
-            confidence_factors.append(quality_scores.get(squeeze_quality, 0.3))
-        else:
-            confidence_factors.append(0.6)  # Neutral for non-squeeze
-        
-        return round(np.mean(confidence_factors), 3)
     
     def _generate_bollinger_summary(self, price: float, upper: float, middle: float, lower: float,
                                    position_analysis: Dict, squeeze_analysis: Dict) -> str:
         """Generate human-readable Bollinger Bands summary."""
         percent_b = position_analysis["percent_b"]
         position = position_analysis["position"]
-        bandwidth = (upper - lower) / middle * 100
+        
+        # Guard against middle=0 division
+        denom = middle if abs(middle) > 1e-12 else 1e-12
+        bandwidth = (upper - lower) / denom * 100
         
         summary = f"BB: Price {price:.4f}, %B {percent_b:.2f} ({position.replace('_', ' ')})"
         summary += f", BW {bandwidth:.2f}%"

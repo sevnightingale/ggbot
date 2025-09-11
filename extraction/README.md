@@ -609,3 +609,7 @@ Analysis: ggShot Indicator Extraction Flow
       "indicators": indicator_results  # Also in indicators column
   }
 
+
+
+rsi
+bbands

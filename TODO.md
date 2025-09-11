@@ -1,7 +1,7 @@
 # TODO_V2.md - Focused Implementation Plan
 
-**Status**: Manual testing phase - verify core functionality before automation  
-**Priority**: End-to-end verification → Real-time updates → Scheduler automation
+**Status**: Core pipeline operational ✅ - Backend monitoring COMPLETE ✅ - Frontend integration pending  
+**Priority**: Add decisions broadcasting → Frontend WebSocket integration → LLM provider system → Scheduler automation
 
 
 ## CRITICAL - Paper Trading Foundation
@@ -20,7 +20,8 @@
 - [x] Test extraction phase: market data fetching and indicators (working - all 7 timeframes)
 - [x] Test decision phase: AI reasoning and trade intent generation (working - decision saved)
 - [x] Test trading phase: paper trade execution and database updates (working - service mismatch fixed)
-- [x] Verify WebSocket state transitions during execution phases (working - bot_status messages)
+- [x] Verify WebSocket state transitions during execution phases (working - complete bot_status flow)
+- [x] Test complete manual trigger flow (working - extraction → decision → trading → completed)
 - [ ] Confirm database updates (positions, trades, accounts) (enhanced by monitoring service)
 
 
@@ -36,24 +37,61 @@
 - [ ] Add proper model parameter handling (deepseek-reasoner, gpt-4o-mini, etc.)
 - [ ] Test LLM provider switching and API key resolution
 
-## HIGH - Comprehensive Monitoring Service
+## HIGH - Full WebSocket Monitoring Service (Backend Complete ✅)
 
-- [ ] Create core/monitoring/service.py - unified monitoring service
-- [ ] Implement PositionMonitor (7-second intervals):
-  - [ ] Update all open position prices via market data
-  - [ ] Calculate unrealized P&L for all positions
-  - [ ] Trigger stop loss/take profit execution
-  - [ ] Broadcast position_update WebSocket messages
-- [ ] Implement MetricsCalculator (30-second intervals):
-  - [ ] Calculate real-time account balances and performance
-  - [ ] Broadcast metrics_update WebSocket messages
-- [ ] Integrate monitoring service into ggbot.py lifespan
-- [ ] Extend WebSocketManager to handle multiple message types:
-  - [ ] position_update, metrics_update, trade_executed, decision_made
-  - [ ] Keep existing bot_status messages unchanged
-- [ ] Add position price update method to SupabasePaperTradingService
+**WebSocket Infrastructure Verified ✅ - Backend monitoring service COMPLETE ✅**
+
+- [x] Fix manual trigger to broadcast bot_status WebSocket messages
+- [x] Create core/monitoring/service.py - unified monitoring service ✅
+- [x] Implement PositionMonitor (7-second intervals) ✅:
+  - [x] Update all open position prices via market data ✅
+  - [x] Calculate unrealized P&L for all positions ✅
+  - [x] Trigger stop loss/take profit execution ✅
+  - [x] Broadcast position_update WebSocket messages ✅
+- [x] Implement metrics and scheduler monitoring ✅:
+  - [x] scheduler_status → WebSocket every 7s ✅
+  - [x] bot_metrics → WebSocket every 7s ✅
+- [x] Extend WebSocketManager to handle multiple message types ✅:
+  - [x] position_update, metrics_update, scheduler_update ✅
+  - [x] Keep existing bot_status messages unchanged ✅
+- [x] Integrate monitoring service into ggbot.py lifespan ✅
+- [x] Set up separate logging for monitoring service ✅
+- [ ] Add decisions broadcasting to complete activity data (eliminate useBotActivity polling)
+
+## IMMEDIATE FIXES - Current Execution Issues
+
+- [x] Add 7-second delay between extraction and decision phases for better UX
+- [x] Fix datetime serialization error in decision engine (_save_position_decision_to_db)
+- [x] Fix Pydantic numpy.int64 serialization error in OrchestrationResult
+- [x] Fix missing 'trading' and 'completed' WebSocket messages for complete UI state flow
+- [x] Fix 504 Gateway Timeout errors preventing manual trigger execution
+
+## NEXT - Complete WebSocket Integration (Replace Polling)
+
+**Backend broadcasting positions/metrics/scheduler ✅ - Decisions + Frontend handlers pending**
+
+### Backend - Add Decisions Broadcasting
+- [ ] Add `_get_recent_decisions()` method to monitoring service
+- [ ] Include decisions in activity data (positions + decisions together)
+- [ ] Broadcast decisions_update or enhance position_update message
+- [ ] Test decisions appear in WebSocket stream every 7 seconds
+
+### Frontend - WebSocket Handler Integration  
+- [ ] Update frontend to handle all new WebSocket message types:
+  - [ ] position_update messages in botStore.ts
+  - [ ] metrics_update messages in botStore.ts  
+  - [ ] scheduler_update messages in botStore.ts
+  - [ ] decisions_update messages (or enhanced activity data)
+- [ ] Remove frontend setInterval polling hooks:
+  - [ ] Remove `setInterval(fetchSchedulerStatus, 30000)` from useSchedulerStatus.ts
+  - [ ] Remove `setInterval(() => fetchActivity(botId), 30000)` from useBotActivity.ts
+- [ ] Add new store methods to botStore.ts:
+  - [ ] updateBotPositions(configId, positions)
+  - [ ] updateBotMetrics(configId, metrics) 
+  - [ ] updateSchedulerStatus(schedulerStatus)
+  - [ ] updateBotActivity(configId, {positions, decisions})
 - [ ] Test complete monitoring service with live data
-- [ ] Verify frontend receives all real-time updates
+- [ ] Verify real-time updates eliminate need for polling
 
 ## BACKEND - API & Database
 
@@ -126,10 +164,18 @@
 - ✅ Multi-timeframe extraction (fixed - all 7 timeframes now processing)
 - ✅ Paper trading foreign key constraint (fixed - service mismatch resolved)
 - ✅ Position indexing error (fixed - added RealDictCursor to get_bot_positions)
+- ✅ Pydantic numpy.int64 serialization (fixed - custom serializer in OrchestrationResult)
+- ✅ 504 Gateway Timeout errors (fixed - serialization now working)
+- ✅ Missing WebSocket state transitions (fixed - complete extraction → decision → trading → completed flow)
 
 **Core Pipeline Verified**: 
 - ✅ Click ⚡ → see extraction logs for ALL 7 timeframes → decision gets multi-timeframe data → paper trade executes → database updated
-- ✅ All phases complete without errors
+- ✅ All phases complete without errors, full WebSocket flow working
 - ✅ Multi-timeframe market data flows through the entire system
+- ✅ Manual trigger fully operational with proper UI feedback
 
-**Next Focus**: Build comprehensive monitoring service for real-time position updates and dashboard feeds.
+**Backend Monitoring 95% Complete**: Real-time position updates, metrics, and scheduler data streaming via WebSocket every 7 seconds. Separate log files: `orchestrator.log` (business logic), `monitoring.log` (background tasks), `ggbot.log` (system). Missing: decisions broadcasting.
+
+**Next Focus**: Add decisions to monitoring service, then frontend WebSocket integration to replace HTTP polling and complete real-time dashboard experience.
+
+**Logs Show**: `get_bot_decisions` being called every 30-60 seconds from frontend HTTP polling - this will be eliminated once decisions are broadcast via WebSocket.

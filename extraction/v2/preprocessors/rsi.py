@@ -8,7 +8,7 @@ pattern recognition, divergence detection, and professional signal generation.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -31,29 +31,31 @@ class RSIPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive RSI analysis
         """
-        if len(rsi_values) < 5:
+        # Use clean data to avoid NaN issues
+        clean = rsi_values.dropna()
+        if len(clean) < 5:
             return {"error": "Insufficient data for RSI analysis"}
         
-        current = float(rsi_values.iloc[-1])
+        current = float(clean.iloc[-1])
         
-        # Advanced trend analysis
-        trend_analysis = self._analyze_trend(rsi_values)
+        # Advanced trend analysis using clean data
+        trend_analysis = self._analyze_trend(clean)
         
         # Velocity and momentum
-        velocity = self._calculate_velocity(rsi_values)
-        acceleration = self._calculate_acceleration(rsi_values)
+        velocity = self._calculate_velocity(clean)
+        acceleration = self._calculate_acceleration(clean)
         
         # Zone analysis
-        zone_analysis = self._analyze_zones(rsi_values, 70, 30)
+        zone_analysis = self._analyze_zones(clean, 70, 30)
         
         # Pattern recognition
-        patterns = self._detect_rsi_patterns(rsi_values, prices)
+        patterns = self._detect_rsi_patterns(clean, prices)
         
         # Level analysis
-        level_analysis = self._analyze_key_levels(rsi_values, [30, 50, 70])
+        level_analysis = self._analyze_key_levels(clean, [30, 50, 70])
         
         # Recent extremes
-        extremes = self._find_recent_extremes(rsi_values)
+        extremes = self._find_recent_extremes(clean)
         
         # Generate sophisticated summary
         summary = self._generate_rsi_summary(
@@ -65,17 +67,20 @@ class RSIPreprocessor(BasePreprocessor):
             "period": period,
             "current": {
                 "value": round(current, 2),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             },
-            "trend": {
-                "direction": trend_analysis["direction"],
-                "strength": round(trend_analysis["strength"], 3),
-                "velocity": round(velocity, 3),
-                "acceleration": round(acceleration, 3),
-                "confidence": trend_analysis["confidence"]
+            "context": {
+                "trend": {
+                    "direction": trend_analysis["direction"],
+                    "strength": round(trend_analysis["strength"], 3),
+                    "velocity": round(velocity, 3),
+                    "acceleration": round(acceleration, 3)
+                },
+                "ma5": round(clean.iloc[-5:].mean(), 2) if len(clean) >= 5 else None,
+                "ma10": round(clean.iloc[-10:].mean(), 2) if len(clean) >= 10 else None,
+                "volatility": round(clean.std(), 3)
             },
-            "zones": {
-                "current_zone": zone_analysis["current_zone"],
+            "levels": {
                 "overbought": {
                     "level": 70,
                     "status": zone_analysis["overbought_status"],
@@ -89,9 +94,12 @@ class RSIPreprocessor(BasePreprocessor):
                     "time_percentage": zone_analysis["oversold_percentage"]
                 },
                 "neutral": {
-                    "distance_from_50": round(current - 50, 2),
-                    "bias": "bullish" if current > 50 else "bearish"
-                }
+                    "level": 50,
+                    "status": "above" if current > 50 else "below",
+                    "distance": round(current - 50, 2)
+                },
+                "key_levels": [30, 50, 70],
+                "recent_crossovers": level_analysis.get("recent_crossovers", [])
             },
             "extremes": {
                 "recent_high": {
@@ -105,12 +113,9 @@ class RSIPreprocessor(BasePreprocessor):
                     "significance": extremes["low_significance"]
                 }
             },
-            "levels": level_analysis,
             "patterns": patterns,
-            "signals": self._generate_rsi_signals(current, trend_analysis, zone_analysis, patterns),
             "summary": summary,
-            "confidence": self._calculate_analysis_confidence(rsi_values, trend_analysis, patterns),
-            "raw_values": rsi_values.dropna().tolist()
+            "raw": clean.tolist()
         }
     
     def _detect_rsi_patterns(self, rsi_values: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:
@@ -127,8 +132,8 @@ class RSIPreprocessor(BasePreprocessor):
         if momentum:
             patterns["momentum"] = momentum
         
-        # Divergence patterns (if prices provided)
-        if prices is not None and len(prices) == len(rsi_values):
+        # Divergence patterns (if prices provided) - remove strict length check
+        if prices is not None:
             divergence = self._detect_rsi_divergence(rsi_values, prices)
             if divergence:
                 patterns["divergence"] = divergence
@@ -136,127 +141,109 @@ class RSIPreprocessor(BasePreprocessor):
         return patterns
     
     def _detect_reversal_pattern(self, values: pd.Series) -> Optional[Dict[str, Any]]:
-        """Detect potential reversal patterns."""
-        if len(values) < 5:
+        """Detect potential reversal patterns using volatility-scaled peak/trough detection."""
+        clean = values.dropna()
+        if len(clean) < 5:
             return None
         
-        recent = values.iloc[-5:].values
-        current = recent[-1]
+        current = clean.iloc[-1]
         
-        # Look for double tops/bottoms in overbought/oversold zones
+        # Use base class volatility-scaled peak/trough finders
         if current > 70:  # Overbought zone
-            peaks = []
-            for i in range(1, len(recent) - 1):
-                if recent[i] > recent[i-1] and recent[i] > recent[i+1]:
-                    peaks.append((i, recent[i]))
+            peaks = self._find_peaks(clean.iloc[-20:], prominence=1)  # Look back 20 periods
+            # Require at least 2 peaks with minimum separation
+            valid_peaks = [p for p in peaks if p["periods_ago"] >= 2]
             
-            if len(peaks) >= 2:
+            if len(valid_peaks) >= 2:
                 return {
                     "type": "double_top_reversal",
                     "confidence": 0.7,
+                    "peak_count": len(valid_peaks),
                     "description": f"Potential bearish reversal pattern in overbought zone"
                 }
         
         elif current < 30:  # Oversold zone
-            troughs = []
-            for i in range(1, len(recent) - 1):
-                if recent[i] < recent[i-1] and recent[i] < recent[i+1]:
-                    troughs.append((i, recent[i]))
+            troughs = self._find_troughs(clean.iloc[-20:], prominence=1)  # Look back 20 periods
+            # Require at least 2 troughs with minimum separation
+            valid_troughs = [t for t in troughs if t["periods_ago"] >= 2]
             
-            if len(troughs) >= 2:
+            if len(valid_troughs) >= 2:
                 return {
                     "type": "double_bottom_reversal",
                     "confidence": 0.7,
+                    "trough_count": len(valid_troughs),
                     "description": f"Potential bullish reversal pattern in oversold zone"
                 }
         
         return None
     
     def _detect_momentum_pattern(self, values: pd.Series) -> Optional[Dict[str, Any]]:
-        """Detect momentum patterns."""
-        if len(values) < 10:
+        """Detect momentum patterns with scale-independent thresholds."""
+        clean = values.dropna()
+        if len(clean) < 10:
             return None
         
-        velocity = self._calculate_velocity(values)
-        acceleration = self._calculate_acceleration(values)
+        velocity = self._calculate_velocity(clean)
+        acceleration = self._calculate_acceleration(clean)
         
-        if abs(velocity) > 5:  # Strong momentum threshold
+        # Normalize velocity by RSI standard deviation for scale independence
+        rsi_std = clean.std() + 1e-12
+        normalized_velocity = velocity / rsi_std
+        
+        if abs(normalized_velocity) > 0.5:  # Normalized momentum threshold (0.5 standard deviations)
             return {
                 "type": f"strong_{'bullish' if velocity > 0 else 'bearish'}_momentum",
                 "velocity": round(velocity, 3),
+                "normalized_velocity": round(normalized_velocity, 3),
                 "acceleration": round(acceleration, 3),
-                "confidence": min(1.0, abs(velocity) / 10),
+                "confidence": min(1.0, abs(normalized_velocity) / 1.0),
                 "description": f"Strong {'bullish' if velocity > 0 else 'bearish'} momentum detected"
             }
         
         return None
     
     def _detect_rsi_divergence(self, rsi_values: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
-        """Detect RSI-price divergence."""
-        if len(rsi_values) < 20 or len(prices) < 20:
+        """Detect RSI-price divergence with robust NaN handling and scale normalization."""
+        if prices is None:
             return None
         
-        # Look at recent trends
-        recent_periods = 10
-        rsi_recent = rsi_values.iloc[-recent_periods:]
-        price_recent = prices.iloc[-recent_periods:]
+        recent = 10
         
-        # Calculate trend slopes
-        rsi_slope = np.polyfit(range(len(rsi_recent)), rsi_recent.values, 1)[0]
-        price_slope = np.polyfit(range(len(price_recent)), price_recent.values, 1)[0]
+        # Align data and handle NaN/mismatched indices
+        df = pd.DataFrame({"rsi": rsi_values, "price": prices}).dropna()
+        if len(df) < recent:
+            return None
         
-        # Check for divergence
-        if rsi_slope > 0.5 and price_slope < -0.1:  # RSI rising, price falling
+        df = df.iloc[-recent:]
+        x = np.arange(len(df))
+        
+        # Calculate normalized slopes to handle scale differences
+        rsi_std = df["rsi"].std() + 1e-12
+        price_std = df["price"].std() + 1e-12
+        
+        rsi_slope = np.polyfit(x, df["rsi"].values, 1)[0] / rsi_std
+        price_slope = np.polyfit(x, df["price"].values, 1)[0] / price_std
+        
+        # Check for divergence with normalized thresholds
+        if rsi_slope > 0.5 and price_slope < -0.5:  # RSI strengthening, price weakening
             return {
                 "type": "bullish_divergence",
                 "confidence": 0.6,
                 "rsi_slope": round(rsi_slope, 3),
-                "price_slope": round(price_slope, 6),
-                "description": "RSI showing strength while price weakening - potential bullish divergence"
+                "price_slope": round(price_slope, 3),
+                "description": "RSI strengthening while price weakens"
             }
-        elif rsi_slope < -0.5 and price_slope > 0.1:  # RSI falling, price rising
+        elif rsi_slope < -0.5 and price_slope > 0.5:  # RSI weakening, price strengthening
             return {
                 "type": "bearish_divergence", 
                 "confidence": 0.6,
                 "rsi_slope": round(rsi_slope, 3),
-                "price_slope": round(price_slope, 6),
-                "description": "RSI showing weakness while price rising - potential bearish divergence"
+                "price_slope": round(price_slope, 3),
+                "description": "RSI weakening while price rises"
             }
         
         return None
     
-    def _generate_rsi_signals(self, current: float, trend: Dict, zones: Dict, patterns: Dict) -> List[Dict[str, Any]]:
-        """Generate actionable RSI signals."""
-        signals = []
-        
-        # Overbought/Oversold signals
-        if current > 70 and trend["direction"] == "falling":
-            signals.append({
-                "type": "sell_signal",
-                "strength": "medium",
-                "reason": "RSI overbought and turning down",
-                "confidence": 0.7
-            })
-        
-        if current < 30 and trend["direction"] == "rising":
-            signals.append({
-                "type": "buy_signal", 
-                "strength": "medium",
-                "reason": "RSI oversold and turning up",
-                "confidence": 0.7
-            })
-        
-        # Pattern-based signals
-        if "reversal" in patterns:
-            pattern = patterns["reversal"]
-            signals.append({
-                "type": "reversal_warning",
-                "strength": "high" if pattern["confidence"] > 0.7 else "medium",
-                "reason": pattern["description"],
-                "confidence": pattern["confidence"]
-            })
-        
-        return signals
     
     def _generate_rsi_summary(self, current: float, trend: Dict, extremes: Dict, 
                              zones: Dict, patterns: Dict) -> str:

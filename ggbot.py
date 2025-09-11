@@ -14,10 +14,11 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_serializer
 import uvicorn
 import json
 import psycopg2.extras
+import numpy as np
 
 # APScheduler imports
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -48,7 +49,47 @@ from core.services.config_service import ConfigService, BotConfigV2, config_serv
 from core.services.user_service import UserService, user_service
 from core.services.llm_service import LLMService, llm_service
 from core.services.indicator_service import IndicatorService
-from core.common.logger import logger
+from core.common.logger import logger as base_logger
+
+# Set up orchestrator-specific logger for core trading activities
+def is_orchestrator_log(record):
+    """Filter for important orchestrator and trading activities only."""
+    service = record["extra"].get("service")
+    message = record.get("message", "")
+    function_name = record.get("function", "")
+    
+    # Only include orchestrator service logs
+    if service == "orchestrator":
+        # Exclude WebSocket broadcast spam
+        if "WebSocket" in message or "broadcast" in function_name:
+            return False
+        return True
+    
+    # Include critical extraction/decision/trading logs regardless of service
+    important_messages = [
+        "Manual trigger", "V2 autonomous cycle", "V2 Extraction completed", 
+        "V2 Decision completed", "Paper trade executed", "Position closed",
+        "Extraction complete", "Decision saved", "Trading result"
+    ]
+    
+    if any(msg in message for msg in important_messages):
+        return True
+    
+    return False
+
+base_logger.add(
+    "/home/sev/ggbot/logs/orchestrator.log",
+    filter=is_orchestrator_log,
+    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}",
+    rotation="50 MB",      # Larger rotation for important logs
+    retention="7 days",    # Keep longer for business analysis
+    compression="gz",
+    enqueue=True,
+    level="INFO"
+)
+
+# Create orchestrator logger for core business logic
+logger = base_logger.bind(service="orchestrator")
 
 # V2 Module Integration - Complete Integration
 from extraction.v2.extraction_engine import ExtractionEngineV2
@@ -84,6 +125,21 @@ class ConfigUpdateRequest(BaseModel):
     telegram_integration: Optional[Dict[str, Any]] = None
 
 
+def serialize_numpy_types(obj):
+    """Recursively convert numpy types to Python native types."""
+    if isinstance(obj, (np.integer)):
+        return int(obj)
+    elif isinstance(obj, (np.floating)):
+        return float(obj)
+    elif isinstance(obj, (np.ndarray)):
+        return obj.tolist()
+    elif isinstance(obj, dict):
+        return {key: serialize_numpy_types(value) for key, value in obj.items()}
+    elif isinstance(obj, list):
+        return [serialize_numpy_types(item) for item in obj]
+    else:
+        return obj
+
 class OrchestrationResult(BaseModel):
     status: str
     config_id: str
@@ -92,6 +148,13 @@ class OrchestrationResult(BaseModel):
     trading_result: Optional[Dict[str, Any]] = None
     execution_time_ms: int
     timestamp: str
+    
+    @field_serializer('extraction_result', 'decision_result', 'trading_result')
+    def serialize_results(self, value):
+        """Convert numpy types to JSON-serializable Python types."""
+        if value is None:
+            return None
+        return serialize_numpy_types(value)
 
 
 # FastAPI lifespan handler
@@ -99,6 +162,10 @@ class OrchestrationResult(BaseModel):
 async def lifespan(app: FastAPI):
     """Handle application startup and shutdown."""
     logger.info("🚀 Starting GGBot V2 Orchestrator")
+    
+    # Initialize monitoring service variables
+    monitoring_service = None
+    monitoring_task = None
     
     # Startup tasks
     try:
@@ -118,6 +185,12 @@ async def lifespan(app: FastAPI):
         scheduler.start()
         logger.info("✅ APScheduler started")
         
+        # Start monitoring service
+        from core.monitoring.service import MonitoringService
+        monitoring_service = MonitoringService(websocket_manager)
+        monitoring_task = asyncio.create_task(monitoring_service.start())
+        logger.info("✅ Monitoring service started (7-second intervals)")
+        
         # Reconcile active bots from database
         await reconcile_active_bots()
         
@@ -131,6 +204,17 @@ async def lifespan(app: FastAPI):
     
     # Shutdown tasks
     logger.info("🔄 Shutting down GGBot V2 Orchestrator")
+    
+    # Shutdown monitoring service
+    if monitoring_service and monitoring_task:
+        await monitoring_service.stop()
+        if not monitoring_task.done():
+            monitoring_task.cancel()
+            try:
+                await monitoring_task
+            except asyncio.CancelledError:
+                pass
+        logger.info("✅ Monitoring service stopped")
     
     # Shutdown scheduler
     if scheduler.running:
@@ -225,6 +309,7 @@ class GGBotOrchestrator:
             
             # 4. Run V2 extraction for all timeframes
             if websocket_manager:
+                self._log.info(f"🔌 About to broadcast extracting status to user {user_id}")
                 await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
                     config_id=config_id,
                     execution_phase="extracting", 
@@ -234,6 +319,9 @@ class GGBotOrchestrator:
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id, requested_indicators, timeframes
             )
+            
+            # Allow users to see extraction phase for 7 seconds (better UX)
+            await asyncio.sleep(7)
             
             # 5. Run V2 decision engine
             if websocket_manager:
@@ -247,12 +335,18 @@ class GGBotOrchestrator:
                 config_id, config, extraction_result
             )
             
-            # 6. Execute trading if actionable
-            if websocket_manager and decision_result.get('action') not in ['wait', 'no_action', 'hold']:
+            # 6. Execute trading (always broadcast status)
+            if websocket_manager:
+                action = decision_result.get('action', 'wait')
+                if action in ['wait', 'no_action', 'hold']:
+                    message = f"Holding position - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
+                else:
+                    message = f"Executing {action} decision..."
+                
                 await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
                     config_id=config_id,
                     execution_phase="trading",
-                    message=f"Executing {decision_result.get('action', 'trade')} decision..."
+                    message=message
                 ))
             
             trading_result = await self._run_trading_v2(
@@ -278,6 +372,14 @@ class GGBotOrchestrator:
                 execution_time_ms=execution_time_ms,
                 timestamp=end_time.isoformat()
             )
+            
+            # 8. Send completion status
+            if websocket_manager:
+                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="completed",
+                    message=f"Cycle completed in {execution_time_ms/1000:.1f}s"
+                ))
             
             self._log.info(f"V2 autonomous cycle completed in {execution_time_ms}ms")
             return result
@@ -339,7 +441,20 @@ class GGBotOrchestrator:
                 config_id, config, extraction_result, signal_data
             )
             
-            # Execute trading if signal is validated
+            # Execute trading (always broadcast status)
+            if websocket_manager:
+                action = decision_result.get('action', 'wait')
+                if action in ['wait', 'no_action', 'hold']:
+                    message = f"Signal rejected - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
+                else:
+                    message = f"Signal validated - executing {action} decision..."
+                
+                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="trading",
+                    message=message
+                ))
+            
             trading_result = await self._run_trading_v2(
                 config, user_id, decision_result
             )
@@ -363,6 +478,14 @@ class GGBotOrchestrator:
                 execution_time_ms=execution_time_ms,
                 timestamp=end_time.isoformat()
             )
+            
+            # Send completion status
+            if websocket_manager:
+                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="completed",
+                    message=f"Signal validation completed in {execution_time_ms/1000:.1f}s"
+                ))
             
             self._log.info(f"Signal validation completed in {execution_time_ms}ms")
             return result
@@ -1063,7 +1186,7 @@ async def run_orchestration(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> OrchestrationResult:
     """Run autonomous trading cycle for a configuration."""
-    result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id)
+    result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id, websocket_manager=websocket_manager)
     
     if result.status == "error":
         raise HTTPException(status_code=500, detail="Orchestration failed")
@@ -1333,7 +1456,7 @@ async def get_bot_metrics(
         from core.common.db import get_db_connection
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 # Query paper account summary
                 cur.execute("""
                     SELECT initial_balance, current_balance, total_pnl, 
@@ -1897,6 +2020,7 @@ def create_bot_status_message(
         message = phase_messages.get(frontend_phase, 'Processing...')
     
     return {
+        "type": "bot_status_update",
         "config_id": config_id,
         "status": {
             "phase": frontend_phase,
@@ -1930,7 +2054,12 @@ class WebSocketManager:
         logger.info(f"🔌 Attempting WebSocket broadcast to user {user_id}. Active connections: {list(self.active_connections.keys())}")
         if user_id in self.active_connections:
             try:
-                logger.info(f"📡 Sending WebSocket message to {user_id}: {data.get('status', {}).get('phase', 'unknown')}")
+                message_type = data.get('type', 'bot_status_update')
+                if message_type == 'bot_status_update':
+                    content = data.get('status', {}).get('phase', 'unknown')
+                else:
+                    content = message_type
+                logger.info(f"📡 Sending WebSocket message to {user_id}: {content}")
                 await self.active_connections[user_id].send_text(json.dumps(data))
             except Exception as e:
                 logger.error(f"❌ WebSocket send failed for {user_id}: {e}")

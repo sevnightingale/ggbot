@@ -34,37 +34,52 @@ class BasePreprocessor:
         if len(values) < periods + 1:
             return 0.0
         
-        current = values.iloc[-1]
-        previous = values.iloc[-(periods + 1)]
+        # Drop NaN values for calculation
+        clean_values = values.dropna()
+        if len(clean_values) < periods + 1:
+            return 0.0
+        
+        current = clean_values.iloc[-1]
+        previous = clean_values.iloc[-(periods + 1)]
         return (current - previous) / periods
     
     def _calculate_acceleration(self, values: pd.Series, periods: int = 6) -> float:
         """Calculate acceleration (change in velocity)."""
-        if len(values) < periods + 3:
+        # Drop NaN values first
+        clean_values = values.dropna()
+        if len(clean_values) < periods + 3:
             return 0.0
         
-        recent_velocity = self._calculate_velocity(values.iloc[-3:], 2)
-        past_velocity = self._calculate_velocity(values.iloc[-(periods+3):-(periods)], 2)
+        recent_velocity = self._calculate_velocity(clean_values.iloc[-3:], 2)
+        past_velocity = self._calculate_velocity(clean_values.iloc[-(periods+3):-(periods)], 2)
         
         return recent_velocity - past_velocity
     
     def _analyze_trend(self, values: pd.Series, periods: List[int] = [5, 10, 20]) -> Dict[str, Any]:
         """Sophisticated trend analysis using multiple timeframes."""
-        if len(values) < max(periods):
+        # Drop NaN values first
+        clean_values = values.dropna()
+        if len(clean_values) < max(periods):
             return {"direction": "unknown", "strength": 0, "confidence": 0}
         
         trends = {}
+        data_std = clean_values.std()
+        
         for period in periods:
-            if len(values) >= period:
-                recent = values.iloc[-period:].values
-                slope = np.polyfit(range(len(recent)), recent, 1)[0]
-                trends[f"ma{period}"] = slope
+            if len(clean_values) >= period:
+                recent = clean_values.iloc[-period:].values
+                if len(recent) > 1 and not np.any(np.isnan(recent)):
+                    slope = np.polyfit(range(len(recent)), recent, 1)[0]
+                    # Normalize slope by data standard deviation
+                    normalized_slope = slope / (data_std + 1e-12)
+                    trends[f"ma{period}"] = normalized_slope
         
         # Weighted trend calculation
         if trends:
             weighted_trend = sum(slope * (1/period) for period, slope in 
-                               [(int(k[2:]), v) for k, v in trends.items()]) / sum(1/p for p in periods if len(values) >= p)
+                               [(int(k[2:]), v) for k, v in trends.items()]) / sum(1/p for p in periods if len(clean_values) >= p)
             
+            # Use normalized thresholds (0.1 standard deviations)
             direction = "rising" if weighted_trend > 0.1 else "falling" if weighted_trend < -0.1 else "sideways"
             strength = min(abs(weighted_trend), 1.0)
             
@@ -87,57 +102,90 @@ class BasePreprocessor:
     
     def _find_peaks(self, values: pd.Series, prominence: float = 2) -> List[Dict[str, Any]]:
         """Find peaks in a series."""
+        # Drop NaN values and get clean array
+        clean_values = values.dropna()
+        if len(clean_values) < 3:
+            return []
+        
+        values_array = clean_values.values
         peaks = []
-        values_array = values.values
+        
+        # Use volatility-scaled prominence
+        data_std = np.std(values_array)
+        scaled_prominence = prominence * data_std if data_std > 0 else prominence
         
         for i in range(1, len(values_array) - 1):
-            if (values_array[i] > values_array[i-1] and 
+            if (not np.isnan(values_array[i]) and 
+                not np.isnan(values_array[i-1]) and 
+                not np.isnan(values_array[i+1]) and
+                values_array[i] > values_array[i-1] and 
                 values_array[i] > values_array[i+1] and
-                values_array[i] - min(values_array[i-1], values_array[i+1]) >= prominence):
+                values_array[i] - min(values_array[i-1], values_array[i+1]) >= scaled_prominence):
                 peaks.append({
                     "index": i,
                     "value": values_array[i],
-                    "periods_ago": len(values) - 1 - i
+                    "periods_ago": len(clean_values) - 1 - i
                 })
         
         return peaks
     
     def _find_troughs(self, values: pd.Series, prominence: float = 2) -> List[Dict[str, Any]]:
         """Find troughs in a series.""" 
+        # Drop NaN values and get clean array
+        clean_values = values.dropna()
+        if len(clean_values) < 3:
+            return []
+        
+        values_array = clean_values.values
         troughs = []
-        values_array = values.values
+        
+        # Use volatility-scaled prominence
+        data_std = np.std(values_array)
+        scaled_prominence = prominence * data_std if data_std > 0 else prominence
         
         for i in range(1, len(values_array) - 1):
-            if (values_array[i] < values_array[i-1] and
+            if (not np.isnan(values_array[i]) and 
+                not np.isnan(values_array[i-1]) and 
+                not np.isnan(values_array[i+1]) and
+                values_array[i] < values_array[i-1] and
                 values_array[i] < values_array[i+1] and  
-                max(values_array[i-1], values_array[i+1]) - values_array[i] >= prominence):
+                max(values_array[i-1], values_array[i+1]) - values_array[i] >= scaled_prominence):
                 troughs.append({
                     "index": i,
                     "value": values_array[i],
-                    "periods_ago": len(values) - 1 - i
+                    "periods_ago": len(clean_values) - 1 - i
                 })
         
         return troughs
     
     def _find_recent_extremes(self, values: pd.Series, lookback: int = 20) -> Dict[str, Any]:
         """Find recent extreme values with significance analysis."""
-        lookback = min(lookback, len(values))
-        recent_values = values.iloc[-lookback:]
+        # Drop NaN values first
+        clean_values = values.dropna()
+        if len(clean_values) == 0:
+            return {"high_value": 0, "high_periods_ago": 0, "high_significance": 0,
+                   "low_value": 0, "low_periods_ago": 0, "low_significance": 0}
         
-        high_idx = recent_values.idxmax()
-        low_idx = recent_values.idxmin()
+        lookback = min(lookback, len(clean_values))
+        recent_values = clean_values.iloc[-lookback:]
         
-        high_value = recent_values[high_idx]
-        low_value = recent_values[low_idx]
+        # Use positional indices instead of label-based to avoid duplicate index issues
+        recent_array = recent_values.values
+        high_pos = np.argmax(recent_array)
+        low_pos = np.argmin(recent_array)
         
-        # Calculate periods ago
-        high_periods_ago = len(values) - 1 - values.index.get_loc(high_idx)
-        low_periods_ago = len(values) - 1 - values.index.get_loc(low_idx)
+        high_value = recent_array[high_pos]
+        low_value = recent_array[low_pos]
+        
+        # Calculate periods ago using positional indices
+        high_periods_ago = len(recent_values) - 1 - high_pos
+        low_periods_ago = len(recent_values) - 1 - low_pos
         
         # Significance calculation
-        current = values.iloc[-1]
-        high_significance = min(1.0, abs(high_value - current) / (np.std(recent_values) + 0.001))
-        low_significance = min(1.0, abs(low_value - current) / (np.std(recent_values) + 0.001))
+        current = clean_values.iloc[-1]
+        recent_std = np.std(recent_array)
+        high_significance = min(1.0, abs(high_value - current) / (recent_std + 0.001))
+        low_significance = min(1.0, abs(low_value - current) / (recent_std + 0.001))
         
         return {
             "high_value": high_value,
@@ -154,7 +202,13 @@ class BasePreprocessor:
     
     def _analyze_zones(self, values: pd.Series, upper_threshold: float, lower_threshold: float) -> Dict[str, Any]:
         """Analyze time spent in different zones."""
-        current = values.iloc[-1]
+        # Drop NaN values for analysis
+        clean_values = values.dropna()
+        if len(clean_values) == 0:
+            return {"current_zone": "unknown", "overbought_status": "unknown", "oversold_status": "unknown", 
+                   "periods_overbought": 0, "periods_oversold": 0, "overbought_percentage": 0, "oversold_percentage": 0}
+        
+        current = clean_values.iloc[-1]
         
         # Current zone
         if current >= upper_threshold:
@@ -164,47 +218,52 @@ class BasePreprocessor:
         else:
             current_zone = "neutral"
         
-        # Time analysis
-        total_periods = len(values)
-        overbought_periods = sum(1 for v in values if v >= upper_threshold)
-        oversold_periods = sum(1 for v in values if v <= lower_threshold)
+        # Time analysis (clean_values already has NaNs removed)
+        total_periods = len(clean_values)
+        overbought_periods = sum(1 for v in clean_values if v >= upper_threshold)
+        oversold_periods = sum(1 for v in clean_values if v <= lower_threshold)
         
         # Current streak analysis
         periods_overbought = 0
         periods_oversold = 0
         
-        for i in range(len(values) - 1, -1, -1):
-            if current_zone == "overbought" and values.iloc[i] >= upper_threshold:
+        for i in range(len(clean_values) - 1, -1, -1):
+            val = clean_values.iloc[i]
+            if current_zone == "overbought" and val >= upper_threshold:
                 periods_overbought += 1
-            elif current_zone == "oversold" and values.iloc[i] <= lower_threshold:
+            elif current_zone == "oversold" and val <= lower_threshold:
                 periods_oversold += 1
             else:
                 break
         
+        # Calculate indicator-specific far threshold (percentage of range)
+        range_size = upper_threshold - lower_threshold
+        far_threshold = range_size * 0.15 if range_size > 0 else 15  # 15% of range or fallback to 15
+        
         return {
             "current_zone": current_zone,
-            "overbought_status": self._get_zone_status(current, upper_threshold, "above"),
-            "oversold_status": self._get_zone_status(current, lower_threshold, "below"),
+            "overbought_status": self._get_zone_status(current, upper_threshold, "above", far_threshold),
+            "oversold_status": self._get_zone_status(current, lower_threshold, "below", far_threshold),
             "periods_overbought": periods_overbought,
             "periods_oversold": periods_oversold,
             "overbought_percentage": round((overbought_periods / total_periods) * 100, 1),
             "oversold_percentage": round((oversold_periods / total_periods) * 100, 1)
         }
     
-    def _get_zone_status(self, value: float, threshold: float, direction: str) -> str:
-        """Get descriptive zone status."""
+    def _get_zone_status(self, value: float, threshold: float, direction: str, far_threshold: float = 15) -> str:
+        """Get descriptive zone status with configurable thresholds."""
         diff = abs(value - threshold)
         
         if direction == "above":
             if value > threshold:
-                return "far_above" if diff > 15 else "above"
+                return "far_above" if diff > far_threshold else "above"
             else:
-                return "far_below" if diff > 15 else "below"
+                return "far_below" if diff > far_threshold else "below"
         else:  # below
             if value < threshold:
-                return "far_below" if diff > 15 else "below"
+                return "far_below" if diff > far_threshold else "below"
             else:
-                return "far_above" if diff > 15 else "above"
+                return "far_above" if diff > far_threshold else "above"
     
     # ==================================================================================
     # CROSSOVER AND LEVEL ANALYSIS
@@ -277,9 +336,13 @@ class BasePreprocessor:
     
     def _calculate_position_rank(self, values: pd.Series, lookback: int = 20) -> float:
         """Calculate position rank within last N bars (percentile)."""
-        lookback = min(lookback, len(values))
-        recent_values = values.iloc[-lookback:]
-        current = values.iloc[-1]
+        clean = values.dropna()
+        if len(clean) == 0:
+            return 0.0
+        
+        lookback = min(lookback, len(clean))
+        recent_values = clean.iloc[-lookback:]
+        current = recent_values.iloc[-1]
         
         rank = (recent_values < current).sum() / len(recent_values) * 100
         return rank

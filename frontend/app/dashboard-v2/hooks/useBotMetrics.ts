@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { apiClient } from '@/lib/api'
+import { useBotStore } from '@/store/botStore'
 
 interface BotMetrics {
   balance: number
@@ -30,7 +31,9 @@ interface UseBotMetricsReturn {
 }
 
 export function useBotMetrics(botId: string | null): UseBotMetricsReturn {
-  const [metrics, setMetrics] = useState<BotMetrics | null>(null)
+  // Read from store (updated via WebSocket)
+  const bot = useBotStore(state => botId ? state.getBotById(botId) : null)
+  const metrics = bot?.metrics || null
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -62,13 +65,14 @@ export function useBotMetrics(botId: string | null): UseBotMetricsReturn {
         recentTrades: data.recent_trades || []
       }
 
-      setMetrics(transformedMetrics)
+      // Store data in botStore instead of local state
+      useBotStore.getState().updateBotMetrics(configId, transformedMetrics)
     } catch (err) {
       console.error('Failed to fetch bot metrics:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch metrics')
       
-      // Provide fallback data for development
-      setMetrics({
+      // Provide fallback data to store
+      const fallbackMetrics = {
         balance: 10000,
         totalPnL: 0,
         totalTrades: 0,
@@ -77,7 +81,8 @@ export function useBotMetrics(botId: string | null): UseBotMetricsReturn {
         maxDrawdown: 0,
         sharpeRatio: 0,
         recentTrades: []
-      })
+      }
+      useBotStore.getState().updateBotMetrics(configId, fallbackMetrics)
     } finally {
       setIsLoading(false)
     }
