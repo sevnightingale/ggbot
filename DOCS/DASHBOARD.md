@@ -286,107 +286,395 @@ Frontend expects:
 }
 ```
 
-## 📋 Prioritized Issue Resolution Plan
+## 🚀 **NEW ARCHITECTURE PLAN: Complete Dashboard Rebuild**
 
-### Phase 1: Critical System Integration (HIGH PRIORITY)
+### **Strategy**: Build from Scratch vs. Refactor
+We will create a **new dashboard** with proper React architecture instead of trying to refactor the 974-line monolith. This ensures clean separation of concerns and proper state management from the start.
 
-#### Issue 1.1: Fix WebSocket Message Format Alignment
-**Location**: `ggbot.py` WebSocket broadcasts
-**Action**: Standardize message format to match frontend expectations
+---
+
+## 📋 **Implementation Phases**
+
+### **Phase 1: Architecture Foundation**
+**Goal**: Establish proper component structure and data flow
+
+#### Step 1.1: Create New Dashboard Structure
+**Location**: `frontend/app/dashboard-v2/` (parallel development)
+**Action**: Build proper React architecture with component separation
+
+```typescript
+// New file structure:
+dashboard-v2/
+├── page.tsx              // Simple coordination layer
+├── components/
+│   ├── BotSelector.tsx    // Center column - bot management
+│   ├── PerformancePanel.tsx // Left column - metrics & charts
+│   ├── ActivityPanel.tsx  // Right column - live data
+│   ├── CountdownTimer.tsx // Timer component for idle state
+│   └── DecisionModal.tsx  // Decision history modal
+├── hooks/
+│   ├── useBotStatus.tsx   // Bot state + scheduler integration
+│   ├── useCountdownTimer.tsx // Live countdown logic
+│   ├── useBotMetrics.tsx  // Performance data fetching
+│   └── useSchedulerStatus.tsx // APScheduler integration
+└── types/
+    └── dashboard.ts       // Shared type definitions
+```
+
+#### Step 1.2: Define Component Responsibilities
+**BotSelector** (Center Column):
+- Bot selection and navigation
+- Start/stop button logic
+- GGBot circle with real-time states
+- Countdown timer when idle
+- WebSocket status updates
+
+**PerformancePanel** (Left Column):
+- Paper trading account summary
+- Profit/loss charts
+- Trade statistics
+- Independent data fetching and error handling
+
+**ActivityPanel** (Right Column):
+- Live positions table
+- Decision history
+- Real-time updates
+- Modal for decision details
+
+#### Step 1.3: Page-Level Coordination
+**New dashboard page responsibilities** (minimal):
+- User authentication guard
+- Global layout and responsive design  
+- Bot selection state coordination
+- Error boundaries for each section
+
+```typescript
+// Clean page structure (~100 lines max)
+export default function DashboardV2Page() {
+  const { user } = useAuth()
+  const [selectedBotId, setSelectedBotId] = useState<string | null>(null)
+  
+  return (
+    <div className="dashboard-grid">
+      <ErrorBoundary fallback={<PerformanceError />}>
+        <PerformancePanel botId={selectedBotId} />
+      </ErrorBoundary>
+      
+      <ErrorBoundary fallback={<BotSelectorError />}>
+        <BotSelector 
+          selectedBotId={selectedBotId}
+          onSelect={setSelectedBotId}
+        />
+      </ErrorBoundary>
+      
+      <ErrorBoundary fallback={<ActivityError />}>
+        <ActivityPanel botId={selectedBotId} />
+      </ErrorBoundary>
+    </div>
+  )
+}
+```
+
+---
+
+### **Phase 2: Scheduler Integration**
+**Goal**: Connect frontend to APScheduler for real-time countdown timers
+
+#### Step 2.1: Backend API Enhancements
+**Enhance `/api/v2/scheduler/status`**:
 ```python
-# Change from:
-"current_phase": "extracting"
-# To:
-"phase": "extraction"
+# Return per-bot scheduler information
+{
+  "status": "success",
+  "active_bots": [
+    {
+      "config_id": "uuid",
+      "timeframe": "1h", 
+      "next_run": "2025-09-10T15:30:30Z",
+      "last_run": "2025-09-10T14:30:30Z",
+      "is_running": false
+    }
+  ]
+}
 ```
 
-#### Issue 1.2: Connect Backend Phases to Frontend States
-**Location**: `useBotWebSocket.ts` message handler
-**Action**: Add message handler to update bot store with proper state mapping
+**Enhance bot start/stop endpoints**:
+- Ensure database `state` field updates
+- Confirm APScheduler job creation/removal
+- Return next run time in response
+
+#### Step 2.2: Custom Hooks for Scheduler Integration
+
+**useSchedulerStatus()** - Query scheduler on page load:
 ```typescript
-const handleWebSocketMessage = (data: any) => {
-  if (data.type === 'bot_status_update') {
-    updateBotStatus(data.config_id, {
-      phase: mapBackendPhaseToFrontend(data.current_phase),
-      message: generatePhaseMessage(data),
-      showSpinner: data.status === 'running'
-    })
+export function useSchedulerStatus(userId: string) {
+  return useQuery(['scheduler-status', userId], async () => {
+    const response = await apiClient.get('/api/v2/scheduler/status')
+    return response.data
+  }, {
+    refetchInterval: 30000 // Check every 30 seconds
+  })
+}
+```
+
+**useCountdownTimer()** - Live countdown for idle bots:
+```typescript
+export function useCountdownTimer(nextRun: string | null) {
+  const [countdown, setCountdown] = useState<string | null>(null)
+  
+  useEffect(() => {
+    if (!nextRun) return
+    
+    const interval = setInterval(() => {
+      const now = new Date()
+      const target = new Date(nextRun)
+      const diff = target.getTime() - now.getTime()
+      
+      if (diff <= 0) {
+        setCountdown("Starting soon...")
+      } else {
+        const minutes = Math.floor(diff / 60000)
+        const seconds = Math.floor((diff % 60000) / 1000)
+        setCountdown(`Next run in ${minutes}m ${seconds}s`)
+      }
+    }, 1000)
+    
+    return () => clearInterval(interval)
+  }, [nextRun])
+  
+  return countdown
+}
+```
+
+#### Step 2.3: Bot Status Integration
+**useBotStatus()** - Combine scheduler + WebSocket + database state:
+```typescript
+export function useBotStatus(botId: string) {
+  // Get bot config and database state
+  const { data: botConfig } = useBotConfig(botId)
+  
+  // Get scheduler status
+  const { data: schedulerStatus } = useSchedulerStatus(botConfig?.user_id)
+  
+  // Get real-time updates via WebSocket
+  const { status } = useWebSocketStatus(botId)
+  
+  // Combine all sources of truth
+  const isActive = useMemo(() => {
+    const schedJob = schedulerStatus?.active_bots?.find(b => b.config_id === botId)
+    return Boolean(schedJob) && botConfig?.state === 'active'
+  }, [schedulerStatus, botConfig, botId])
+  
+  const nextRun = useMemo(() => {
+    const schedJob = schedulerStatus?.active_bots?.find(b => b.config_id === botId)
+    return schedJob?.next_run
+  }, [schedulerStatus, botId])
+  
+  // Current state priority: WebSocket (real-time) > Scheduler > Database
+  const currentState = status?.phase || (isActive ? 'idle' : 'inactive')
+  
+  return {
+    isActive,
+    currentState,
+    nextRun,
+    isExecuting: ['extraction', 'decision', 'trading'].includes(currentState),
+    message: status?.message
   }
 }
 ```
 
-#### Issue 1.3: Implement State Transition Logic
-**Location**: `frontend/store/botStore.ts`
-**Action**: Add state transition validation and CSS class mapping
-```typescript
-const updateBotStatus = (configId: string, newStatus: BotStatus) => {
-  // Validate state transitions
-  // Update CSS classes
-  // Trigger animations
-}
-```
+---
 
-### Phase 2: Component Architecture Refactor (MEDIUM PRIORITY)
+### **Phase 3: Real-Time State Management**
+**Goal**: Connect WebSocket updates to proper CSS state transitions
 
-#### Issue 2.1: Extract Reusable Components
-**Action**: Split monolithic dashboard into focused components
-- `PerformancePanel.tsx`
-- `ActivityPanel.tsx` 
-- `BotSelector.tsx`
-- `DecisionModal.tsx`
-
-#### Issue 2.2: Implement Custom Hooks
-**Action**: Extract business logic into focused hooks
-- `useBot(configId)` - Single bot management
-- `useBotData(configId)` - Data fetching
-- `useBotStatus(configId)` - Status management
-
-#### Issue 2.3: Add React.memo and Performance Optimizations
-**Action**: Prevent unnecessary re-renders
-```typescript
-export default React.memo(PerformancePanel)
-const memoizedBotStatus = useMemo(() => calculateStatus(bot), [bot])
-```
-
-### Phase 3: Error Handling & Resilience (MEDIUM PRIORITY)
-
-#### Issue 3.1: Replace Promise.all with Individual Error Handling
-**Location**: `dashboard/page.tsx:150-158`
-**Action**: 
-```typescript
-// Replace Promise.all with individual try-catch blocks
-const fetchBotData = async (configId: string) => {
-  const results = {
-    metrics: await safeApiCall(() => fetchMetrics(configId)),
-    positions: await safeApiCall(() => fetchPositions(configId)),
-    // ... etc
+#### Step 3.1: WebSocket Message Format (Already Fixed)
+✅ **COMPLETED**: Backend now sends proper format:
+```json
+{
+  "config_id": "uuid",
+  "status": {
+    "phase": "extraction",     // Maps to CSS classes
+    "color": "blue",
+    "message": "Extracting indicators...",
+    "showSpinner": true,
+    "context": {}
   }
 }
 ```
 
-#### Issue 3.2: Add Error Boundaries
-**Action**: Wrap components in error boundaries to prevent crashes
+#### Step 3.2: State Transition Logic
+**Enhanced WebSocket handling**:
 ```typescript
-<ErrorBoundary fallback={<ErrorFallback />}>
-  <PerformancePanel />
-</ErrorBoundary>
+// In BotSelector component
+export function BotSelector({ selectedBotId, onSelect }) {
+  const { bots } = useBots()
+  const { isConnected } = useWebSocket()
+  
+  return (
+    <div className="bot-selector">
+      {bots.map(bot => (
+        <BotCard 
+          key={bot.id}
+          bot={bot}
+          isSelected={selectedBotId === bot.id}
+          onSelect={onSelect}
+        />
+      ))}
+    </div>
+  )
+}
+
+function BotCard({ bot, isSelected, onSelect }) {
+  const { 
+    isActive, 
+    currentState, 
+    nextRun, 
+    isExecuting, 
+    message 
+  } = useBotStatus(bot.id)
+  
+  const countdown = useCountdownTimer(nextRun)
+  
+  // Determine display message
+  const displayMessage = useMemo(() => {
+    if (isExecuting) return message // Real-time execution message
+    if (isActive && countdown) return countdown // "Next run in 2m34s"
+    if (isActive) return "Monitoring market conditions..."
+    return "Bot inactive"
+  }, [isExecuting, message, isActive, countdown])
+  
+  return (
+    <div className={`bot-card ${isSelected ? 'selected' : ''}`}>
+      <GGBot
+        name={bot.name}
+        status={currentState}           // idle/extraction/decision/trading/inactive
+        message={displayMessage}
+        showSpinner={isExecuting}
+        onClick={() => onSelect(bot.id)}
+      />
+      
+      <BotControls
+        botId={bot.id}
+        isActive={isActive}
+        onStart={handleStart}
+        onStop={handleStop}
+      />
+    </div>
+  )
+}
 ```
 
-#### Issue 3.3: Implement Retry Logic
-**Action**: Add exponential backoff for failed API calls
+---
 
-### Phase 4: State Management Consolidation (LOW PRIORITY)
+### **Phase 4: Testing & Validation**
+**Goal**: Ensure the new system works end-to-end
 
-#### Issue 4.1: Establish Single Source of Truth
-**Action**: Make bot store the authoritative state source
-- Database stores persistent state
-- Store manages runtime state
-- Components read from store only
+#### Step 4.1: Integration Testing
+**User Journey Tests**:
+1. **Page Load** → Query scheduler status → Show active bots with countdowns
+2. **Start Bot** → API call → Job scheduled → Countdown appears
+3. **Job Execution** → WebSocket updates → State transitions (idle→extraction→decision→trading→idle)
+4. **Stop Bot** → API call → Job removed → Shows inactive state
 
-#### Issue 4.2: Add State Synchronization
-**Action**: Ensure all state sources stay synchronized
-- WebSocket updates → Store updates → Database updates
-- Conflict resolution for concurrent updates
+#### Step 4.2: State Synchronization Validation
+**Multi-source Truth Verification**:
+- Database state = 'active'
+- APScheduler job exists
+- Frontend shows countdown timer
+- WebSocket updates work during execution
+
+#### Step 4.3: Performance Testing
+- Dashboard loads in <2 seconds
+- Countdown updates without lag
+- State transitions are smooth
+- No memory leaks during extended use
+
+---
+
+### **Phase 5: Migration & Cleanup**
+**Goal**: Replace old dashboard and clean up codebase
+
+#### Step 5.1: Route Switchover
+```typescript
+// Update app/dashboard/page.tsx to redirect to new version
+import { redirect } from 'next/navigation'
+
+export default function OldDashboard() {
+  redirect('/dashboard-v2')
+}
+```
+
+#### Step 5.2: Cleanup
+- Move `dashboard-v2` to `dashboard`
+- Remove old 974-line component
+- Update all navigation links
+- Clean up unused imports/dependencies
+
+---
+
+## 🎯 **Expected User Experience Flow**
+
+### **Page Load**
+```
+User visits /dashboard
+    ↓
+Frontend queries: /api/v2/config + /api/v2/scheduler/status
+    ↓
+Shows bot grid with proper states:
+├── Active bots: Countdown timers "Next run in 3m47s"
+├── Inactive bots: "Bot inactive" 
+└── WebSocket connection established
+```
+
+### **Bot Execution Cycle**
+```
+APScheduler job fires
+    ↓
+WebSocket: "extraction" → Blue spinning circle
+    ↓  
+WebSocket: "decision" → Green spinning circle
+    ↓
+WebSocket: "trading" → Orange spinning circle  
+    ↓
+WebSocket: "idle" → White pulsing circle + countdown timer
+```
+
+### **User Interaction**
+```
+User clicks "Start Bot"
+    ↓
+API call: POST /api/v2/bot/{id}/start
+    ↓
+Backend: Creates APScheduler job + Updates database
+    ↓
+Frontend: Queries scheduler status → Shows countdown timer
+```
+
+---
+
+## 📊 **Success Metrics**
+
+### **Technical Goals**
+- [ ] Page load: Database + Scheduler queries complete in <2s
+- [ ] Real-time updates: WebSocket → CSS transitions in <500ms  
+- [ ] Countdown accuracy: Timer updates within 1s of actual time
+- [ ] State synchronization: 100% accuracy between DB/Scheduler/Frontend
+
+### **User Experience Goals**  
+- [ ] Visual feedback: Bot states clearly indicate activity level
+- [ ] Countdown timers: Users can see exactly when next execution occurs
+- [ ] Smooth animations: State transitions use beautiful CSS system
+- [ ] Error resilience: Individual component failures don't crash dashboard
+
+---
+
+**Phase 1 Target**: Complete new dashboard structure with proper component separation
+**Phase 2 Target**: Countdown timers working with real APScheduler integration  
+**Phase 3 Target**: WebSocket state transitions using full CSS animation system
+**Migration Target**: Replace old dashboard completely
+
+This approach gives us a **clean foundation** to build on rather than fighting the existing monolithic component.
 
 ## 🧪 Testing Strategy
 
