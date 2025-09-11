@@ -24,13 +24,8 @@ cd frontend && npm install
 
 ### Development Commands
 ```bash
-# Main API server
-python main_api.py
-
-# Individual modules
-python extraction/run_extraction.py
-python decision/run_api.py
-python -m extraction.scheduled_extraction --update
+# V2 Orchestrator (Main API server)
+python ggbot.py
 
 # Frontend
 cd frontend && npm run dev     # Development
@@ -44,17 +39,10 @@ python -m pytest tests/
 
 ### Process Management (PM2)
 ```bash
-# Start all services
-pm2 start ecosystem.config.js
-
-# Individual services
-pm2 start ggbots-api
-pm2 start ggshot-filter
-pm2 start ccxt-mcp-server
-
-# Status and logs
+# Status and logs (V2 system)
 pm2 status
-pm2 logs ggbots-api
+pm2 logs ggbot          # Main V2 orchestrator
+pm2 restart ggbot       # Restart after code changes
 ```
 
 ## Architecture Overview
@@ -67,13 +55,12 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 ```
 
 ### Module Structure
-- **`extraction/`** - Browser automation + technical indicators via MCP servers
-- **`decision/`** - AI reasoning with DeepSeek R1/GPT-4 for trade decisions
-- **`trading/`** - Hummingbot integration for professional execution
-- **`core/`** - Shared infrastructure (MCP, config, database, scheduling)
-- **`frontend/`** - Next.js multi-bot management interface
-- **`ggshot/`** - Production signal processing (140+ crypto pairs, Telegram integration)
-- **`database/`** - PostgreSQL schema with migrations
+- **`ggbot.py`** - Main V2 orchestrator with APScheduler and WebSocket
+- **`extraction/v2/`** - Pure Python technical analysis using pandas-ta
+- **`decision/engine_v2.py`** - GPT-5 reasoning with user customization  
+- **`trading/paper/`** - Supabase paper trading with position management
+- **`core/`** - Config system, database connections, scheduler utils
+- **`frontend/dashboard-v2/`** - Real-time React dashboard
 - **`tests/`** - Comprehensive test suite with end-to-end validation
 
 ## Development Guidelines
@@ -95,10 +82,10 @@ logger.bind(user_id="user_id").error("error details")
 
 ### Database Access
 
-**Note**: Direct PostgreSQL connections via MCP are not available due to IPv6 connectivity issues with Supabase. Use the Supabase REST API or Python client instead. Credentials are stored in `.env` file.
+**V2 uses Supabase for all database operations**. Use direct PostgreSQL connections via `core.common.db` for V2 orchestrator.
 
 ```python
-# Option 1: Direct PostgreSQL (when network allows)
+# V2 standard - Direct Supabase PostgreSQL
 from core.common.db import get_db_connection
 
 with get_db_connection() as conn:
@@ -106,36 +93,17 @@ with get_db_connection() as conn:
         cur.execute("SELECT * FROM table")
         results = cur.fetchall()
 
-# Option 2: Supabase REST API (recommended)
-import os
-import requests
-from dotenv import load_dotenv
-
-load_dotenv()
-url = os.getenv('SUPABASE_URL')
-key = os.getenv('SUPABASE_SERVICE_KEY')
-
-headers = {
-    'apikey': key,
-    'Authorization': f'Bearer {key}',
-    'Content-Type': 'application/json'
-}
-
-response = requests.get(f'{url}/rest/v1/table_name', headers=headers)
-data = response.json()
+# For specific integrations - Supabase client
+from trading.paper.supabase_service import SupabasePaperTradingService
+service = SupabasePaperTradingService()
 ```
 
-### MCP Integration Pattern
+### V2 Data Flow Pattern
 ```python
-from core.mcp.client import MCPClient
-from core.mcp.session import create_indicators_session
-
-async with create_indicators_session() as session:
-    # Use snake_case for tool names
-    result = await session.call_tool("calculate_rsi", {
-        "symbol": "BTC/USDT",
-        "timeframe": "15m"
-    })
+# V2 orchestrator sequential execution pattern
+extraction_result = await self._run_extraction_v2(...)
+decision_result = await self._run_decision_v2(config, extraction_result)  
+trading_result = await self._run_trading_v2(config, decision_result)
 ```
 
 ## Testing Guidelines
@@ -150,20 +118,20 @@ async with create_indicators_session() as session:
 
 ### Key Infrastructure Components
 
-**MCP (Model Context Protocol) Servers**
-- `core/mcp/servers/ccxt_mcp_server.py` - Exchange connectivity
-- `core/mcp/servers/indicators_mcp_server.py` - Technical indicators
-- Always use async context managers and snake_case naming for MCP connections
+**V2 Orchestrator (`ggbot.py`)**
+- FastAPI server with APScheduler integration
+- WebSocket real-time status broadcasting  
+- Multi-user isolation with authentication
 
 **Configuration System**
-- JSON blob configuration in PostgreSQL `configurations` table
+- Supabase `configurations` table with JSONB config_data
 - Config-ID architecture enables multiple bots per user
-- Templates in `core/config/`
+- V2 templates with llm_config and subscription tiers
 
 **Database Layer**
 - Multi-user isolation with `user_id` + `config_id` architecture
-- Complete audit trail via `strategy_runs` table
-- Universal trade lifecycle tracking in `trades` table
+- Paper trading tables: `paper_accounts`, `paper_trades`
+- Decision audit trail in `decisions` table
 
 ## CRITICAL RULES
 
@@ -177,17 +145,19 @@ async with create_indicators_session() as session:
 
 ### Environment Variables
 ```bash
-# Database
+# Database (Supabase)
 DATABASE_URL=postgresql://...
+SUPABASE_URL=https://...
+SUPABASE_SERVICE_KEY=xxx
 
 # LLM APIs
 OPENAI_API_KEY=xxx
 DEEPSEEK_API_KEY=xxx
 
-# Exchange APIs (testnet)
-BITMEX_API_KEY=xxx
-BITMEX_SECRET=xxx
-BITMEX_TESTNET=true
+# Hummingbot Integration
+HBOT_USERNAME=xxx
+HBOT_PASSWORD=xxx
+HUMMINGBOT_API_URL=http://localhost:8888
 ```
 
 ## Production Context
@@ -197,10 +167,6 @@ BITMEX_TESTNET=true
 - **API Endpoints**: Main backend at `https://ggbots-api.nightingale.business`
 - **Frontend**: Next.js app at `https://ggbot-app.vercel.app`
 
-### Symbol Mapping
-- Internal format: `BTC/USDT`
-- BitMEX format: `BTC/USDT:USDT` (handled automatically)
-- Minimum order size: 100 contracts on BitMEX
 
 ### Risk Management
 - Position sizing based on AI confidence scoring
@@ -219,9 +185,6 @@ BITMEX_TESTNET=true
 - Application logs: `logs/ggbot.log` (rotated, compressed)
 - PM2 logs: `pm2 logs [service-name]`
 
-## Documentation References
-- **Architecture**: `DOCS/OVERVIEW.md`
-- **Current Status**: `ACTIVE.md`
-- **Module READMEs**: `extraction/README.md`, `decision/README.md`, etc.
-
-When working with this codebase, prioritize understanding the three-agent pipeline flow and always respect the security requirements around credential management.
+## Documentation References 
+- **Architecture**: `README.md`
+- **Current Status**: `ACTIVE.md`, `TODO.md`
