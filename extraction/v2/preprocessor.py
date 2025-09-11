@@ -94,6 +94,10 @@ class TechnicalAnalysisPreprocessor:
             current_middle = float(middle.iloc[-1])
             current_lower = float(lower.iloc[-1])
             
+            # Protect against divide-by-zero
+            width = max(current_upper - current_lower, 1e-12)
+            denom_mid = current_middle if abs(current_middle) > 1e-12 else 1e-12
+            
             return {
                 "indicator": "Bollinger_Bands",
                 "current": {
@@ -101,8 +105,8 @@ class TechnicalAnalysisPreprocessor:
                     "upper": round(current_upper, 4),
                     "middle": round(current_middle, 4), 
                     "lower": round(current_lower, 4),
-                    "bandwidth": round((current_upper - current_lower) / current_middle * 100, 2),
-                    "percent_b": round((current_price - current_lower) / (current_upper - current_lower), 3)
+                    "bandwidth": round((current_upper - current_lower) / denom_mid * 100, 2),
+                    "percent_b": round((current_price - current_lower) / width, 3)
                 },
                 "analysis": {
                     "position": self._get_bb_position(current_price, current_upper, current_middle, current_lower),
