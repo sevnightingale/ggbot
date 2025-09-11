@@ -98,7 +98,7 @@ export function useBotMetrics(botId: string | null): UseBotMetricsReturn {
     if (botId) {
       fetchMetrics(botId)
     } else {
-      setMetrics(null)
+      // Clear any existing errors when no botId
       setError(null)
       setIsLoading(false)
     }
