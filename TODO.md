@@ -1,205 +1,143 @@
-# TODO_V2.md - Focused Implementation Plan
+# TODO.md - ggbots Implementation Plan
 
-**Status**: Core pipeline operational ✅ - Backend monitoring COMPLETE ✅ - Frontend WebSocket integration COMPLETE ✅  
-**Priority**: Fix config fallback masking failures → Frontend config saving investigation → Deploy WebSocket changes → LLM provider system
+**Status**: Core V2 pipeline operational, WebSocket monitoring complete, ready for ggShot integration and dashboard enhancements
 
+## 🚨 **HIGHEST PRIORITY - ggShot Signal Integration**
 
-## CRITICAL - Paper Trading Foundation
+**Timeline**: 1-2 days - Critical for production revenue stream
 
-- [x] Foreign key constraint issue identified (config_id exists but FK violation occurs)
-- [x] Fixed service mismatch: orchestrator now uses SupabasePaperTradingService consistently
-- [ ] Test complete end-to-end flow with paper trading after fix
-- [x] Re-integrate 7-second position monitor from legacy API (now part of comprehensive monitoring service)  
-- [ ] Confirm MarketDataAdapter connects to Hummingbot API
-- [ ] Test position updates with real market data (will be tested with monitoring service)
-- [ ] Verify stop loss / take profit execution (integrated into PositionMonitor)
-- [ ] Confirm P&L calculations are accurate (part of MetricsCalculator)
+- [ ] **Re-integrate ggShot filter service** 
+  - [ ] Restore `signals/listener_service.py` and `signals/publishing_service.py` 
+  - [ ] Update PM2 configuration to start signal services
+  - [ ] Test signal filtering pipeline with live ggShot data
+  - [ ] Verify premium user gating through subscription system
 
-## HIGH - End-to-End Flow Verification
+- [ ] **Enable signal validation mode**
+  - [ ] Test signal_validation vs autonomous_trading config modes
+  - [ ] Verify V2 orchestrator processes ggShot signals correctly
+  - [ ] Test decision engine with signal validation prompts
+  - [ ] Confirm Telegram publishing integration works
 
-- [x] Test extraction phase: market data fetching and indicators (working - all 7 timeframes)
-- [x] Test decision phase: AI reasoning and trade intent generation (working - decision saved)
-- [x] Test trading phase: paper trade execution and database updates (working - service mismatch fixed)
-- [x] Verify WebSocket state transitions during execution phases (working - complete bot_status flow)
-- [x] Test complete manual trigger flow (working - extraction → decision → trading → completed)
-- [ ] Confirm database updates (positions, trades, accounts) (enhanced by monitoring service)
+- [ ] **Production signal pipeline testing**
+  - [ ] Test end-to-end: ggShot signal → filter → decision → Telegram publish
+  - [ ] Verify multi-user signal isolation and premium access
+  - [ ] Test signal processing performance under load
+  - [ ] Monitor signal latency and accuracy
 
+## 🔧 **HIGH PRIORITY - Backend API Gaps** 
 
-## CRITICAL - LLM Provider System (V2 Gap)
+**Timeline**: 1-2 days - Required for complete dashboard functionality
 
-- [ ] Fix V2 decision engine LLM provider selection (currently hard-coded to OpenAI)
-- [ ] Restore LLM provider factory from legacy (DeepSeek, OpenAI, Anthropic providers)
-- [ ] Implement user LLM preference from config_data.llm_config
-- [ ] Add subscription tier-based LLM routing:
-  - [ ] Free users → DeepSeek (our API key from .env)
-  - [ ] Paid users → User choice (their vault credentials OR our API keys)
-- [ ] Integrate Supabase vault credential retrieval for user's own API keys
-- [ ] Add proper model parameter handling (deepseek-reasoner, gpt-4o-mini, etc.)
-- [ ] Test LLM provider switching and API key resolution
+- [ ] **Fix API endpoint implementations**
+  - [ ] `GET /api/v2/bot/{id}/metrics` - Add paper_accounts database query
+  - [ ] `GET /api/v2/bot/{id}/positions` - Add paper_trades open positions query  
+  - [ ] `GET /api/v2/bot/{id}/trades` - Add trade history query
+  - [ ] `GET /api/v2/scheduler/status` - Fix response format (`jobs` → `active_jobs`)
 
-## HIGH - Full WebSocket Monitoring Service (Backend Complete ✅)
+- [ ] **Test API endpoints with real data**
+  - [ ] Verify metrics endpoint returns proper account summaries
+  - [ ] Confirm positions endpoint shows live P&L data
+  - [ ] Test trade history with pagination support
+  - [ ] Validate user isolation across all endpoints
 
-**WebSocket Infrastructure Verified ✅ - Backend monitoring service COMPLETE ✅**
+## 🎨 **HIGH PRIORITY - Dashboard Enhancement**
 
-- [x] Fix manual trigger to broadcast bot_status WebSocket messages
-- [x] Create core/monitoring/service.py - unified monitoring service ✅
-- [x] Implement PositionMonitor (7-second intervals) ✅:
-  - [x] Update all open position prices via market data ✅
-  - [x] Calculate unrealized P&L for all positions ✅
-  - [x] Trigger stop loss/take profit execution ✅
-  - [x] Broadcast position_update WebSocket messages ✅
-- [x] Implement metrics and scheduler monitoring ✅:
-  - [x] scheduler_status → WebSocket every 7s ✅
-  - [x] bot_metrics → WebSocket every 7s ✅
-- [x] Extend WebSocketManager to handle multiple message types ✅:
-  - [x] position_update, metrics_update, scheduler_update ✅
-  - [x] Keep existing bot_status messages unchanged ✅
-- [x] Integrate monitoring service into ggbot.py lifespan ✅
-- [x] Set up separate logging for monitoring service ✅
-- [x] Add decisions broadcasting to complete activity data (eliminate useBotActivity polling) ✅
+**Timeline**: 3-5 days - Restore dashboard sophistication from old version
 
-## IMMEDIATE FIXES - Current Execution Issues
+- [ ] **Restore rich position display**
+  - [ ] 7-column position table (P&L, Symbol, Size, Dir, Entry, Price, Time)
+  - [ ] Expandable AI reasoning with confidence scores
+  - [ ] Show leverage, stop loss, take profit levels
+  - [ ] Display time in trade and position details
 
-- [x] Add 7-second delay between extraction and decision phases for better UX
-- [x] Fix datetime serialization error in decision engine (_save_position_decision_to_db)
-- [x] Fix Pydantic numpy.int64 serialization error in OrchestrationResult
-- [x] Fix missing 'trading' and 'completed' WebSocket messages for complete UI state flow
-- [x] Fix 504 Gateway Timeout errors preventing manual trigger execution
+- [ ] **Implement performance charts**
+  - [ ] Add Recharts integration to PerformancePanel
+  - [ ] Create cumulative P&L chart from trade history
+  - [ ] Add account balance over time visualization
+  - [ ] Show trade distribution and win/loss ratios
 
-## CRITICAL - Config Data Saving Issue  
+- [ ] **Restore decision intelligence**
+  - [ ] Decision detail modal with full reasoning
+  - [ ] Market data context display
+  - [ ] LLM prompt and parameters view
+  - [ ] Confidence breakdown and signal analysis
 
-**Fallback masking removed ✅ - Frontend config saving broken - Empty decision data in DB**
+- [ ] **Advanced metrics calculation**
+  - [ ] Max drawdown calculation from balance history
+  - [ ] Sharpe ratio from return series
+  - [ ] Profit factor (gross profit / gross loss)
+  - [ ] Win/loss streaks and trade distribution
 
-### Root Cause Analysis
-- **Database shows**: `decision: {}` (empty) for config `18665f58-fb3c-4655-a648-449427be0073`
-- **User updated**: RSI thresholds from 40/60 to 50/50 in frontend  
-- **System used**: Hardcoded fallback template with 40/60 thresholds (now removed)
-- **Issue**: Frontend config save/update not properly writing decision data to database
+## 🔧 **MEDIUM PRIORITY - LLM Provider System**
 
-### Investigation Required
-- [ ] Check frontend config save API calls and payload structure
-- [ ] Verify backend config update endpoints handle decision data correctly
-- [ ] Test complete config save/load cycle from frontend to database
-- [ ] Ensure config validation doesn't strip decision data
+**Timeline**: 2-3 days - User flexibility and cost optimization
 
-### Backend - System Reliability Improvements COMPLETE ✅
-- [x] Add `_get_recent_decisions()` method to monitoring service ✅
-- [x] Include decisions in metrics monitoring loop ✅  
-- [x] Broadcast `decisions_update` messages every 7 seconds ✅
-- [x] Remove dangerous fallback logic from decision engine ✅
-- [x] Disable template fallback files (template_v1.json.DISABLED_FALLBACK) ✅
-- [x] Add explicit error handling for missing config data ✅
+- [ ] **Fix V2 decision engine LLM provider selection**
+  - [ ] Restore LLM provider factory (DeepSeek, OpenAI, Anthropic)
+  - [ ] Implement user LLM preference from config_data.llm_config
+  - [ ] Add subscription tier-based routing (free → DeepSeek, paid → user choice)
+  - [ ] Integrate Supabase vault credential retrieval for user API keys
 
-### Frontend - WebSocket Handler Integration COMPLETE ✅ 
-- [x] Update frontend to handle all new WebSocket message types:
-  - [x] position_update messages in botStore.ts ✅
-  - [x] metrics_update messages in botStore.ts ✅
-  - [x] scheduler_update messages in botStore.ts ✅
-  - [x] decisions_update messages in botStore.ts ✅
-- [x] Remove frontend setInterval polling hooks:
-  - [x] Remove `setInterval(fetchSchedulerStatus, 30000)` from useSchedulerStatus.ts ✅
-  - [x] Remove `setInterval(() => fetchActivity(botId), 30000)` from useBotActivity.ts ✅
-- [x] Add new store methods to botStore.ts:
-  - [x] updateBotPositions(configId, positions) ✅
-  - [x] updateBotMetrics(configId, metrics) ✅
-  - [x] updateSchedulerStatus(schedulerStatus) ✅
-  - [x] updateBotDecisions(configId, decisions) ✅
-- [x] Update hooks to read from store instead of HTTP APIs ✅
+- [ ] **Test LLM provider switching**
+  - [ ] Verify model parameter handling (deepseek-reasoner, gpt-4o-mini)
+  - [ ] Test API key resolution and fallback logic
+  - [ ] Validate decision quality across different providers
 
-### Current Priority - Config Data Integrity
-- [ ] **Investigate frontend config save process** - Why is decision data empty in DB?
-- [ ] **Test manual trigger** - Should now fail explicitly with clear error about missing user_prompt
-- [ ] **Fix config data structure** - Ensure decision section saves properly with user strategy
-- [ ] **Deploy frontend WebSocket changes** - Once config saving is fixed
-- [ ] **End-to-end testing** - Complete config save → manual trigger → real-time monitoring flow
+## 🔧 **MEDIUM PRIORITY - Frontend Polish**
 
-## BACKEND - API & Database
+**Timeline**: 2-3 days - UX improvements and error handling
 
-- [ ] Audit database schema vs current implementation (paper_accounts, paper_trades)
-- [ ] Test all dashboard API endpoints with real data
-- [ ] Verify user isolation in paper trading system
-- [ ] Add proper error handling throughout paper trading service
-- [ ] Confirm Supabase vs PostgreSQL compatibility
+- [ ] **Error boundaries and resilience**
+  - [ ] Add error boundaries around dashboard panels
+  - [ ] Implement graceful API failure handling
+  - [ ] Create retry mechanisms for recoverable errors
+  - [ ] Add fallback UI for component failures
 
-## FRONTEND - Dashboard Issues
+- [ ] **Component improvements**
+  - [ ] Remove hard-coded bot ID from FloatingActionButtons
+  - [ ] Add virtual scrolling for >10 bots scenario
+  - [ ] Fix any remaining hard-coded values or demo data
+  - [ ] Optimize performance for large bot lists
 
-- [ ] Add Recharts performance charts to PerformancePanel
-- [ ] Remove hard-coded bot ID from FloatingActionButtons
-- [ ] Add error boundaries around dashboard panels
-- [ ] Test virtual scrolling for >10 bots scenario
-- [ ] Fix any remaining hard-coded values or demo data
+## 📱 **LOW PRIORITY - Mobile Responsive Design**
 
-## SCHEDULER - After Manual Testing Works
+**Timeline**: 1-2 weeks - Complete mobile experience
 
-- [ ] Re-enable scheduler once manual testing is solid
-- [ ] Verify reconciliation restores active bots on startup
-- [ ] Test scheduler with multiple bots and timeframes
-- [ ] Confirm job persistence across restarts
-- [ ] Add admin controls for scheduler management
+- [ ] **Mobile layout architecture**
+  - [ ] Transform three-column desktop to single column mobile
+  - [ ] Implement 70%-width slide-in drawers
+  - [ ] Create bottom tab system for drawer triggers
+  - [ ] Add touch gestures for carousel navigation
 
-## INTEGRATION - ggShot & Production
+- [ ] **Mobile-specific adaptations**
+  - [ ] Optimize components for narrow screen widths
+  - [ ] Touch-friendly interaction zones
+  - [ ] Performance optimization for mobile devices
 
-- [ ] Verify ggShot signal processing pipeline
-- [ ] Test signal_validation mode vs autonomous_trading
-- [ ] Confirm premium access controls for ggShot
-- [ ] Update Telegram integration for V2 orchestrator
-- [ ] Test multi-user isolation and data security
+## 🔧 **ONGOING - System Maintenance**
 
-## TESTING & VALIDATION
+- [ ] **Config data integrity**
+  - [ ] Investigate frontend config save process issues
+  - [ ] Fix decision data saving to database
+  - [ ] Test complete config save/load cycle
 
-- [ ] Create comprehensive end-to-end test suite
-- [ ] Test error scenarios and recovery mechanisms
-- [ ] Validate performance under load (multiple bots)
-- [ ] Cross-browser compatibility testing
-- [ ] Mobile responsive design implementation
+- [ ] **Testing and validation**
+  - [ ] Create comprehensive end-to-end test suite
+  - [ ] Validate performance under load (multiple bots)
+  - [ ] Cross-browser compatibility testing
 
-## CODE REFACTORING & CLEANUP
-
-- [ ] Refactor GGBotConfig monolithic component into smaller components
-  - [ ] Split into ExtractionConfig, DecisionConfig, TradingConfig components
-  - [ ] Extract form state management into custom hooks
-  - [ ] Separate API merge logic from UI components
-  - [ ] Create reusable ConfigSection wrapper component
-  - [ ] Move modal and review summary to separate components
-- [ ] Move delete button from FloatingActionButtons into GGBotConfig (safety improvement)
-- [ ] Clean up legacy code references throughout codebase
-- [ ] Remove unused imports and dead code from V1 transition
-
-## DEPLOYMENT READINESS
-
-- [ ] Update documentation to reflect current implementation
-- [ ] Set up proper monitoring and alerting
-- [ ] Create deployment runbook
-- [ ] Plan user migration strategy
+- [ ] **Deployment readiness**
+  - [ ] Update documentation to reflect current implementation
+  - [ ] Set up proper monitoring and alerting
+  - [ ] Create deployment runbook
 
 ---
 
-## Current Focus: Multi-Timeframe Extraction Issue
+## 🎯 **COMPLETION TIMELINE**
 
-**Status**: Core pipeline complete ✅ End-to-end flow working ✅ Next: Real-time monitoring
+**Week 1**: ggShot integration (1-2 days) + Backend APIs (1-2 days) + Dashboard enhancement start  
+**Week 2**: Dashboard enhancement completion + LLM provider system  
+**Week 3**: Frontend polish + Testing and validation  
+**Week 4+**: Mobile responsive design (as needed)
 
-**Issues Resolved**:
-- ✅ Database persistence (fixed - added conn.commit())
-- ✅ Decision retrieval API (fixed - added RealDictCursor) 
-- ✅ Multi-timeframe extraction (fixed - all 7 timeframes now processing)
-- ✅ Paper trading foreign key constraint (fixed - service mismatch resolved)
-- ✅ Position indexing error (fixed - added RealDictCursor to get_bot_positions)
-- ✅ Pydantic numpy.int64 serialization (fixed - custom serializer in OrchestrationResult)
-- ✅ 504 Gateway Timeout errors (fixed - serialization now working)
-- ✅ Missing WebSocket state transitions (fixed - complete extraction → decision → trading → completed flow)
-
-**Core Pipeline Verified**: 
-- ✅ Click ⚡ → see extraction logs for ALL 7 timeframes → decision gets multi-timeframe data → paper trade executes → database updated
-- ✅ All phases complete without errors, full WebSocket flow working
-- ✅ Multi-timeframe market data flows through the entire system
-- ✅ Manual trigger fully operational with proper UI feedback
-
-**Backend Monitoring COMPLETE**: Real-time position updates, metrics, scheduler data, AND decisions streaming via WebSocket every 7 seconds. Separate log files: `orchestrator.log` (business logic), `monitoring.log` (background tasks), `ggbot.log` (system). ✅
-
-**Frontend WebSocket Integration COMPLETE**: All hooks updated to use store data, HTTP polling removed, WebSocket handlers implemented for all 4 message types. ✅
-
-**CRITICAL ISSUE FIXED**: Removed dangerous fallback logic that was masking config failures with hardcoded RSI 40/60 thresholds. System now fails explicitly instead of silently using wrong data. ✅
-
-**Current Issue**: Config data saving in frontend - database shows empty `decision: {}` instead of user's RSI 50/50 strategy. Need to investigate frontend config update/save process.
-
-**Next Focus**: Fix frontend config saving → Deploy WebSocket changes → Test complete real-time flow
+**Focus**: Get ggShot revenue stream operational, then enhance dashboard to match old sophistication level

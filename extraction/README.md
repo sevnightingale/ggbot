@@ -615,3 +615,4 @@ rsi
 bbands
 adx
 aroon
+atr

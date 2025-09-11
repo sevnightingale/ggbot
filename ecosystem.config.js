@@ -44,7 +44,13 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',
-        SERVICE_TYPE: 'signal_listener'
+        SERVICE_TYPE: 'signal_listener',
+        TG_API_ID: process.env.TG_API_ID,
+        TG_API_HASH: process.env.TG_API_HASH,
+        GGSHOT_CHANNEL: process.env.GGSHOT_CHANNEL,
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
       },
       error_file: '/home/sev/.pm2/logs/signal-listener-error.log',
       out_file: '/home/sev/.pm2/logs/signal-listener-out.log',
@@ -67,7 +73,10 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',
-        SERVICE_TYPE: 'signal_publisher'
+        SERVICE_TYPE: 'signal_publisher',
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
       },
       error_file: '/home/sev/.pm2/logs/signal-publisher-error.log',
       out_file: '/home/sev/.pm2/logs/signal-publisher-out.log',
