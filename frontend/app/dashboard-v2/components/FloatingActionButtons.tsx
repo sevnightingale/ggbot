@@ -8,6 +8,7 @@ interface FloatingActionButtonsProps {
   className?: string
   onStart?: (config_id: string) => void
   onDelete?: (config_id: string) => void
+  onManualTrigger?: (config_id: string) => void
   onAdd?: () => void
   demoStarted?: boolean
 }
@@ -17,6 +18,7 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
   className = '',
   onStart,
   onDelete,
+  onManualTrigger,
   onAdd,
   demoStarted = false
 }) => {
@@ -49,6 +51,17 @@ const FloatingActionButtons: React.FC<FloatingActionButtonsProps> = ({
               <path d="M8 5v14l11-7z"/>
             </svg>
           )}
+        </button>
+
+        {/* Manual Trigger Button */}
+        <button
+          className="floating-action-btn floating-action-enabled"
+          title="Manual Trigger (Test Run)"
+          onClick={() => onManualTrigger?.(currentBot.config_id)}
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M7 2v11h3v9l7-12h-4l4-8z"/>
+          </svg>
         </button>
 
         {/* Delete Button */}

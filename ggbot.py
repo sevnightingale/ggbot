@@ -704,7 +704,7 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
             # Get job info for next fire time
             job_id = f"bot:{user_id}:{config_id}:{timeframe}"
             job = scheduler.get_job(job_id)
-            next_fire = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+            next_fire = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
             
             # Broadcast running status - now properly formatted for frontend
             status_message = create_bot_status_message(
@@ -992,7 +992,7 @@ async def update_config(
             # Get next run time for response
             job_id = f"bot:{current_user.user_id}:{config_id}:{new_timeframe}"
             job = scheduler.get_job(job_id)
-            next_run = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+            next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
             
             reschedule_info = {
                 "rescheduled": True,
@@ -1644,7 +1644,7 @@ async def start_bot(
         # Get next run time for response
         job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
         job = scheduler.get_job(job_id)
-        next_run = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+        next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
         
         return {
             "status": "started",
@@ -1734,7 +1734,7 @@ async def get_scheduler_status(
                     "job_id": job.id,
                     "config_id": config_id,
                     "timeframe": timeframe,
-                    "next_run": job.next_run_time.isoformat() + "Z" if job.next_run_time else None,
+                    "next_run": job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job.next_run_time else None,
                     "misfire_grace_time": job.misfire_grace_time
                 })
         
@@ -1809,7 +1809,7 @@ async def get_bot_status(
         # Check if job exists in scheduler
         job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
         job = scheduler.get_job(job_id)
-        next_run = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
+        next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
         
         return {
             "status": "success",
@@ -1909,12 +1909,17 @@ class WebSocketManager:
     
     async def broadcast_to_user(self, user_id: str, data: dict):
         """Send data to specific user."""
+        logger.info(f"🔌 Attempting WebSocket broadcast to user {user_id}. Active connections: {list(self.active_connections.keys())}")
         if user_id in self.active_connections:
             try:
+                logger.info(f"📡 Sending WebSocket message to {user_id}: {data.get('status', {}).get('phase', 'unknown')}")
                 await self.active_connections[user_id].send_text(json.dumps(data))
-            except:
+            except Exception as e:
+                logger.error(f"❌ WebSocket send failed for {user_id}: {e}")
                 # Connection closed, remove it
                 self.disconnect(user_id)
+        else:
+            logger.warning(f"⚠️ No active WebSocket connection for user {user_id}")
 
 
 # Global WebSocket manager
