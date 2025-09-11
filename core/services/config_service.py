@@ -215,7 +215,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_data, created_at, updated_at
+                        SELECT config_data, created_at, updated_at, config_type
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -225,6 +225,7 @@ class ConfigService:
                         return None
                     
                     config_data = json.loads(result[0]) if isinstance(result[0], str) else result[0]
+                    db_config_type = result[3] or "autonomous_trading"  # Use config_type from database
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -238,7 +239,7 @@ class ConfigService:
                             "extraction": inner_config.get("extraction", {}),
                             "decision": inner_config.get("decision", {}),
                             "trading": inner_config.get("trading", {}),
-                            "config_type": inner_config.get("config_type", "autonomous_trading"),
+                            "config_type": db_config_type,  # Use database value
                             "schema_version": inner_config.get("schema_version", "2.1"),
                             "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                             "telegram_integration": inner_config.get("telegram_integration", {}),
@@ -252,6 +253,8 @@ class ConfigService:
                             flattened_config["config_id"] = config_id
                         if "user_id" not in flattened_config:
                             flattened_config["user_id"] = user_id
+                        # Always use database config_type
+                        flattened_config["config_type"] = db_config_type
                         if "created_at" not in flattened_config and result[1]:
                             flattened_config["created_at"] = result[1].isoformat()
                         if "updated_at" not in flattened_config and result[2]:
@@ -385,11 +388,12 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         UPDATE configurations
-                        SET config_name = %s, config_data = %s, updated_at = NOW()
+                        SET config_name = %s, config_data = %s, config_type = %s, updated_at = NOW()
                         WHERE config_id = %s AND user_id = %s
                     """, (
                         updated_config.config_name,
                         json.dumps(updated_config.to_dict()),
+                        updated_config.config_type,
                         config_id,
                         user_id
                     ))

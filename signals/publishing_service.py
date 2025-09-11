@@ -118,8 +118,8 @@ class TelegramBot:
             payload = {
                 "chat_id": chat_id,
                 "text": text,
-                "disable_web_page_preview": True,
-                "parse_mode": "HTML"  # Allow basic HTML formatting
+                "disable_web_page_preview": True
+                # No parse_mode - plain text like old ggShot format
             }
             
             async with aiohttp.ClientSession() as session:
@@ -258,39 +258,65 @@ class SignalPublishingService:
         signal_data: Dict,
         decision_result: Dict
     ) -> str:
-        """Format validated signal for telegram publishing."""
+        """Format validated signal for telegram publishing - matches old ggShot format."""
         
         action = decision_result.get('action', 'unknown').upper()
         confidence = decision_result.get('confidence', 0.0)
-        symbol = signal_data.get('symbol', 'Unknown')
-        source = signal_data.get('source', 'Unknown').upper()
         
-        # Determine status and emoji
+        # Determine status and emoji (matching old ggShot format)
         is_validated = action in ['VALIDATE', 'LONG', 'SHORT', 'ENTER']
         status_emoji = "✅" if is_validated else "❌"
-        status_text = "VALIDATED" if is_validated else "REJECTED"
+        status_text = "APPROVED" if is_validated else "REJECTED"
         
-        # Format message with HTML
-        message = f"""
-{status_emoji} <b>Signal {status_text}</b>
-
-<b>Symbol:</b> {symbol}
-<b>Source:</b> {source} Signal
-<b>Direction:</b> {signal_data.get('direction', 'Unknown')}
-<b>Confidence:</b> {confidence:.1%}
-
-<b>Analysis Summary:</b>
-{decision_result.get('reasoning', 'No analysis provided')[:300]}...
-
-<b>Trade Parameters:</b>
-• Entry: {signal_data.get('entry_zone', {}).get('mid', 'N/A')}
-• Stop Loss: {decision_result.get('stop_loss_price') or signal_data.get('stop_loss', 'N/A')}
-• Take Profit: {decision_result.get('take_profit_price') or signal_data.get('take_profit', 'N/A')}
-
-<i>🤖 Validated by ggbots.ai</i>
-"""
+        # Get confidence threshold from config or use default
+        confidence_threshold = 0.65  # Default ggShot threshold
         
-        return message.strip()
+        # Build message parts (matching old ggShot structure)
+        message_parts = [
+            f"{status_emoji} Filter: {status_text} - Confidence: {confidence:.1%}",
+            ""
+        ]
+        
+        # Original signal (if available)
+        raw_message = signal_data.get('raw_message', '')
+        if raw_message and raw_message != "Manual trigger initiated by user":
+            message_parts.extend([
+                raw_message.strip(),
+                ""
+            ])
+        else:
+            # For manual triggers or missing raw message, create a summary
+            symbol = signal_data.get('symbol', 'Unknown')
+            direction = signal_data.get('direction', 'Unknown')
+            source = signal_data.get('source', 'unknown')
+            
+            if source == 'manual_trigger':
+                signal_summary = f"Manual validation test for {symbol} - {direction} signal analysis"
+            else:
+                signal_summary = f"{source.upper()} signal for {symbol} - {direction} direction"
+            
+            message_parts.extend([
+                signal_summary,
+                ""
+            ])
+        
+        # Reasoning (matching old format)
+        reasoning = decision_result.get('reasoning', 'No analysis provided')
+        message_parts.extend([
+            "Reasoning:",
+            reasoning.strip(),
+            ""
+        ])
+        
+        # Summary details (matching old ggShot format)
+        message_parts.extend([
+            "Summary:",
+            f"• Confidence Score: {confidence:.3f}",
+            f"• Threshold: {confidence_threshold}",
+            f"• Status: {status_text}"
+        ])
+        
+        return "\n".join(message_parts)
     
     async def _update_signal_metrics(self, user_id: str, decision_result: Dict) -> None:
         """Update user's signal publishing usage metrics."""
