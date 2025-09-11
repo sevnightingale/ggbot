@@ -302,9 +302,8 @@ class ConfigRepository:
             
         except Exception as e:
             logger.error(f"Error loading template v{version}: {e}")
-            # Return default config as fallback
-            config = create_default_config()
-            return config
+            # NO FALLBACK - fail explicitly instead of masquerading failure
+            raise RuntimeError(f"Failed to load template v{version}: {e}. Fix the template or provide valid config data.")
     
     def get_default_config_for_type(self, config_type: str) -> BotConfig:
         """
