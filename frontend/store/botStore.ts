@@ -351,16 +351,41 @@ export const useBotStore = create<BotStore>()(
               // NEW: Position updates (real-time P&L)
               if (data.type === 'position_update') {
                 const config_id = data.config_id
+                console.log(`🔍 FRONTEND DEBUG: Received position_update for ${config_id}`)
+                console.log(`🔍 FRONTEND DEBUG: Position data:`, data.positions)
                 if (config_id && data.positions) {
-                  get().updateBotPositions(config_id, data.positions)
+                  // Transform snake_case backend data to camelCase for frontend
+                  const transformedPositions = data.positions.map((pos: any) => ({
+                    ...pos,
+                    unrealizedPnL: pos.unrealized_pnl || 0,  // Convert snake_case to camelCase
+                    realizedPnL: pos.realized_pnl || 0,
+                    entryPrice: pos.entry_price || 0,
+                    currentPrice: pos.current_price || 0,
+                    sizeUsd: pos.size_usd || 0,
+                    stopLoss: pos.stop_loss || 0,
+                    takeProfit: pos.take_profit || 0,
+                    confidenceScore: pos.confidence_score || 0,
+                    openedAt: pos.opened_at,
+                    closedAt: pos.closed_at
+                  }))
+                  console.log(`🔍 FRONTEND DEBUG: Transformed positions:`, transformedPositions)
+                  console.log(`🔍 FRONTEND DEBUG: First position unrealizedPnL: ${transformedPositions[0]?.unrealizedPnL}`)
+                  get().updateBotPositions(config_id, transformedPositions)
+                } else {
+                  console.log(`🔍 FRONTEND DEBUG: Missing config_id or positions data`)
                 }
               }
               
               // NEW: Metrics updates (account/performance data)
               if (data.type === 'metrics_update') {
                 const config_id = data.config_id
+                console.log(`🔍 FRONTEND DEBUG: Received metrics_update for ${config_id}`)
+                console.log(`🔍 FRONTEND DEBUG: Metrics data:`, data.metrics)
                 if (config_id && data.metrics) {
+                  console.log(`🔍 FRONTEND DEBUG: Updating bot metrics - balance: ${data.metrics.balance}, totalPnL: ${data.metrics.totalPnL}`)
                   get().updateBotMetrics(config_id, data.metrics)
+                } else {
+                  console.log(`🔍 FRONTEND DEBUG: Missing config_id or metrics data`)
                 }
               }
               
