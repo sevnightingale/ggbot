@@ -278,10 +278,34 @@ class GGBotOrchestrator:
                 raise HTTPException(status_code=404, detail="Configuration not found")
             
             # 2. Route based on config type
-            if config.config_type == "signal_validation" and signal_data:
-                return await self._run_signal_validation_cycle(
-                    config, signal_data, override_symbol, override_timeframe, websocket_manager
-                )
+            if config.config_type == "signal_validation":
+                if signal_data:
+                    # Real signal from external source
+                    return await self._run_signal_validation_cycle(
+                        config, signal_data, override_symbol, override_timeframe, websocket_manager
+                    )
+                else:
+                    # Manual trigger - create mock signal for testing
+                    from signals.listener_service import SignalData
+                    from datetime import datetime, timezone
+                    
+                    mock_signal = SignalData(
+                        source="manual_trigger",
+                        symbol=override_symbol or config.selected_pair,
+                        direction="LONG",  # Default for testing
+                        timeframe="1h",    # Default for testing  
+                        confidence=0.8,    # Default for testing
+                        entry_zone={"low": 0, "high": 0, "mid": 0},  # Will be ignored in manual trigger
+                        stop_loss=0,       # Will be ignored in manual trigger
+                        take_profit=0,     # Will be ignored in manual trigger
+                        reasoning="Manual trigger test - no real signal",
+                        raw_message="Manual trigger initiated by user",
+                        metadata={"manual_trigger": True},
+                        timestamp=datetime.now(timezone.utc)
+                    )
+                    return await self._run_signal_validation_cycle(
+                        config, mock_signal, override_symbol, override_timeframe, websocket_manager
+                    )
             else:
                 return await self._run_autonomous_trading_cycle(config, websocket_manager)
             
