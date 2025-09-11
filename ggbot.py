@@ -167,7 +167,8 @@ class GGBotOrchestrator:
         user_id: str,
         signal_data: Optional[Dict] = None,
         override_symbol: Optional[str] = None,
-        override_timeframe: Optional[str] = None
+        override_timeframe: Optional[str] = None,
+        websocket_manager = None
     ) -> OrchestrationResult:
         """
         Run a complete trading cycle (autonomous or signal validation).
@@ -194,10 +195,10 @@ class GGBotOrchestrator:
             # 2. Route based on config type
             if config.config_type == "signal_validation" and signal_data:
                 return await self._run_signal_validation_cycle(
-                    config, signal_data, override_symbol, override_timeframe
+                    config, signal_data, override_symbol, override_timeframe, websocket_manager
                 )
             else:
-                return await self._run_autonomous_trading_cycle(config)
+                return await self._run_autonomous_trading_cycle(config, websocket_manager)
             
         except Exception as e:
             end_time = datetime.now(timezone.utc)
@@ -206,7 +207,7 @@ class GGBotOrchestrator:
             self._log.error(f"V2 orchestration failed: {e}")
             raise HTTPException(status_code=500, detail=f"Orchestration failed: {str(e)}")
             
-    async def _run_autonomous_trading_cycle(self, config: BotConfigV2) -> OrchestrationResult:
+    async def _run_autonomous_trading_cycle(self, config: BotConfigV2, websocket_manager = None) -> OrchestrationResult:
         """Run traditional autonomous trading cycle."""
         start_time = datetime.now(timezone.utc)
         user_id = config.user_id
@@ -222,16 +223,37 @@ class GGBotOrchestrator:
             timeframes = self._extract_timeframes_from_config(extraction_config)
             
             # 4. Run V2 extraction for all timeframes
+            if websocket_manager:
+                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="extracting", 
+                    message=f"Extracting {len(requested_indicators)} indicators for {config.selected_pair}..."
+                ))
+            
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id, requested_indicators, timeframes
             )
             
             # 5. Run V2 decision engine
+            if websocket_manager:
+                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="deciding",
+                    message="AI analyzing market conditions and signals..."
+                ))
+            
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result
             )
             
             # 6. Execute trading if actionable
+            if websocket_manager and decision_result.get('action') not in ['wait', 'no_action', 'hold']:
+                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="trading",
+                    message=f"Executing {decision_result.get('action', 'trade')} decision..."
+                ))
+            
             trading_result = await self._run_trading_v2(
                 config, user_id, decision_result
             )
@@ -279,7 +301,8 @@ class GGBotOrchestrator:
         config: BotConfigV2,
         signal_data: Dict,
         override_symbol: Optional[str] = None,
-        override_timeframe: Optional[str] = None
+        override_timeframe: Optional[str] = None,
+        websocket_manager = None
     ) -> OrchestrationResult:
         """Run signal validation cycle for external signals."""
         start_time = datetime.now(timezone.utc)
@@ -683,44 +706,52 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
             job = scheduler.get_job(job_id)
             next_fire = job.next_run_time.isoformat() + "Z" if job and job.next_run_time else None
             
-            # Broadcast running status
-            await websocket_manager.broadcast_to_user(user_id, {
-                "type": "bot_status_update",
-                "config_id": config_id,
-                "status": "running",
-                "current_phase": "extracting",
-                "close_ts": close_ts,
-                "next_fire_at": next_fire
-            })
+            # Broadcast running status - now properly formatted for frontend
+            status_message = create_bot_status_message(
+                config_id=config_id,
+                execution_phase="extracting",
+                message="Starting bot execution...",
+                context={
+                    "close_ts": close_ts,
+                    "next_fire_at": next_fire
+                }
+            )
+            await websocket_manager.broadcast_to_user(user_id, status_message)
             
             try:
-                # Run the autonomous cycle
-                result = await orchestrator.run_autonomous_cycle(config_id, user_id)
+                # Run the autonomous cycle with WebSocket updates
+                result = await orchestrator.run_autonomous_cycle(config_id, user_id, websocket_manager=websocket_manager)
                 
-                # Broadcast completion
-                await websocket_manager.broadcast_to_user(user_id, {
-                    "type": "bot_status_update",
-                    "config_id": config_id,
-                    "status": "completed",
-                    "close_ts": close_ts,
-                    "next_fire_at": next_fire,
-                    "execution_time_ms": result.execution_time_ms
-                })
+                # Broadcast completion - properly formatted for frontend
+                completion_message = create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="completed",
+                    message=f"Bot cycle completed in {result.execution_time_ms}ms",
+                    context={
+                        "close_ts": close_ts,
+                        "next_fire_at": next_fire,
+                        "execution_time_ms": result.execution_time_ms
+                    }
+                )
+                await websocket_manager.broadcast_to_user(user_id, completion_message)
                 
                 # Mark as completed in Redis
                 await redis_client.set(key, "completed", ex=ttl)
                 logger.info(f"Completed execution for {user_id}:{config_id}:{timeframe}:{close_ts} in {result.execution_time_ms}ms")
                 
             except Exception as e:
-                # Broadcast error
-                await websocket_manager.broadcast_to_user(user_id, {
-                    "type": "bot_status_update",
-                    "config_id": config_id,
-                    "status": "error",
-                    "error": str(e),
-                    "close_ts": close_ts,
-                    "next_fire_at": next_fire
-                })
+                # Broadcast error - properly formatted for frontend
+                error_message = create_bot_status_message(
+                    config_id=config_id,
+                    execution_phase="error",
+                    message=f"Bot execution failed: {str(e)}",
+                    context={
+                        "error": str(e),
+                        "close_ts": close_ts,
+                        "next_fire_at": next_fire
+                    }
+                )
+                await websocket_manager.broadcast_to_user(user_id, error_message)
                 
                 logger.error(f"Execution failed for {user_id}:{config_id}:{timeframe}:{close_ts}: {e}")
                 # Leave key as "executing" to prevent retries on same candle
@@ -1707,6 +1738,70 @@ async def get_bot_status(
 
 
 # WebSocket Support for real-time bot status updates
+def create_bot_status_message(
+    config_id: str, 
+    execution_phase: str,
+    message: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Create properly formatted WebSocket status message for frontend consumption.
+    
+    Args:
+        config_id: Bot configuration ID
+        execution_phase: Backend phase (extracting, deciding, trading, completed, idle)
+        message: Optional status message
+        context: Additional context data
+    
+    Returns:
+        Formatted message matching frontend expectations
+    """
+    # Map backend phases to frontend phases
+    phase_mapping = {
+        'extracting': 'extraction',
+        'deciding': 'decision', 
+        'trading': 'trading',
+        'completed': 'idle',
+        'idle': 'idle',
+        'error': 'inactive'
+    }
+    
+    # Map phases to colors
+    color_mapping = {
+        'extraction': 'blue',
+        'decision': 'green',
+        'trading': 'orange', 
+        'idle': 'blue',
+        'inactive': 'gray'
+    }
+    
+    frontend_phase = phase_mapping.get(execution_phase, 'inactive')
+    color = color_mapping.get(frontend_phase, 'gray')
+    
+    # Generate appropriate message if none provided
+    if not message:
+        phase_messages = {
+            'extraction': 'Analyzing market data and indicators...',
+            'decision': 'AI processing signals and validation...',
+            'trading': 'Executing trading decision...',
+            'idle': 'Monitoring market conditions...',
+            'inactive': 'Bot stopped'
+        }
+        message = phase_messages.get(frontend_phase, 'Processing...')
+    
+    return {
+        "config_id": config_id,
+        "status": {
+            "phase": frontend_phase,
+            "color": color,
+            "message": message,
+            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+            "showSpinner": frontend_phase in ['extraction', 'decision', 'trading'],
+            "context": context or {}
+        }
+    }
+
+
 class WebSocketManager:
     """Simple WebSocket connection manager."""
     
