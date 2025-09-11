@@ -1,8 +1,22 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-01-08  
-**System Health**: 🟢 Operational  
+**Last Updated**: 2025-09-11 (V2 transition phase)  
+**System Health**: 🟡 Operational (missing components)  
 **V2 Architecture**: Complete - Full E2E Pipeline with Autonomous Scheduling
+
+---
+
+## 🔄 V2 Architecture Transition
+
+**Current Status**: V2 implementation complete but codebase cleanup in progress
+
+**Module Status**:
+- `extraction/` - Legacy code + `v2/` folder (use v2)
+- `decision/` - Legacy code + V2 engine integrated (use V2 engine)
+- `trading/` - Current and up-to-date
+- `core/` - V2 architecture (scheduler, config, etc.)
+
+**Legacy cleanup pending** - old modules preserved for reference during transition
 
 ---
 
@@ -38,9 +52,7 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|--------|---------|
-| ggbot | 🟢 Online | 0% | 218MB | V2 Orchestrator API server (ggbot.py) with APScheduler |
-| ccxt-mcp-server | 🟢 Online | 0% | 5MB | Crypto price/data provider |
-| ggshot-filter | 🟢 Online | 0% | 25MB | Signal filtering service |
+| ggbot | 🟢 Online | 0% | 218MB | V2 Orchestrator API server with integrated scheduler |
 
 ### Infrastructure Services
 | Service | Status | Port | Purpose |
@@ -72,7 +84,7 @@
 ### **Paper Trading Engine**
 - **Real Hummingbot integration** with KuCoin market data
 - **$10,000 isolated accounts** per configuration
-- **7-second monitoring** with automatic TP/SL execution
+- **❌ 7-second monitoring** MISSING (needs re-integration)
 - **Confidence-based position sizing**
 
 ---
@@ -113,12 +125,12 @@
 
 ## 🔄 Background Tasks
 
-- **Paper Trading Monitor**: ACTIVE (7-second position updates with auto TP/SL execution)
-- **ggShot Filter Service**: ACTIVE (processing signals 24/7)
-- **Autonomous Trading**: ACTIVE (scheduled bot execution with APScheduler)
+- **Paper Trading Monitor**: ❌ MISSING (needs re-integration from legacy)
+- **ggShot Filter Service**: ❌ REMOVED (functionality integrated into V2)
+- **Autonomous Trading**: ✅ ACTIVE (scheduled bot execution with APScheduler)
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
-- **Demo Mode**: On-demand (45-second sequences with real ggshot_filter data)
+- **Demo Mode**: On-demand (V2 orchestrator integration)
 
 ---
 
@@ -131,7 +143,6 @@ pm2 monit
 
 # Logs  
 pm2 logs ggbot
-pm2 logs ggshot-filter
 
 # E2E Testing
 python -m tests.test_full_e2e_integration
@@ -164,10 +175,10 @@ df -h
 
 ## 🎯 Current Focus
 
-### 🟢 Live Production Service
-**ggShot Signal Filtering** - Processing ~10-12 signals/day with enhanced validation
-**Autonomous Scheduling** - Multi-timeframe bots running with zero-drift execution
-**Paper Trading Engine** - Real-time position management with Hummingbot integration
+### 🟡 Production Status (Transition Phase)
+**Autonomous Scheduling** - ✅ Multi-timeframe bots running with zero-drift execution
+**Paper Trading Engine** - ❌ Missing real-time position monitoring (manual testing phase)
+**V2 Dashboard** - ✅ Real-time UI with countdown timers and WebSocket integration
 
 ---
 

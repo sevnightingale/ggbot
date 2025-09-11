@@ -150,6 +150,31 @@ export default function DashboardV2Page() {
     }
   }
 
+  const handleManualTrigger = async (config_id: string) => {
+    try {
+      console.log('🔥 Manual trigger started for bot:', config_id)
+      
+      // Call the orchestrator API directly for manual testing
+      const response = await fetch(`/api/v2/orchestrate/${config_id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include'
+      })
+      
+      if (response.ok) {
+        const result = await response.json()
+        console.log('⚡ Manual trigger result:', result)
+      } else {
+        const error = await response.text()
+        console.error('❌ Manual trigger failed:', error)
+      }
+    } catch (error) {
+      console.error('❌ Manual trigger error:', error)
+    }
+  }
+
   const handleAddBot = () => {
     setSelectedBot(null)
     setIsConfigOpen(true)
@@ -308,6 +333,7 @@ export default function DashboardV2Page() {
                   currentBot={currentBot}
                   onStart={handleFloatingStart}
                   onDelete={handleDeleteBot}
+                  onManualTrigger={handleManualTrigger}
                   onAdd={handleAddBot}
                 />
               )}
