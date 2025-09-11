@@ -6,6 +6,7 @@ import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 import { useBotStatus } from './hooks/useBotStatus'
 import { useRouter } from 'next/navigation'
+import { apiClient } from '@/lib/apiClient'
 import type { User } from '@supabase/supabase-js'
 
 // Local components
@@ -154,14 +155,18 @@ export default function DashboardV2Page() {
     try {
       console.log('🔥 Manual trigger started for bot:', config_id)
       
-      // Call the orchestrator API directly for manual testing
-      const response = await fetch(`/api/v2/orchestrate/${config_id}`, {
+      // Use same authentication method as startBot/stopBot
+      const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+      console.log(`📡 POST ${apiUrl}/api/v2/orchestrate/${config_id}`)
+      
+      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/orchestrate/${config_id}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-        },
-        credentials: 'include'
+        }
       })
+      
+      console.log(`📡 Manual trigger response:`, response.status, response.statusText)
       
       if (response.ok) {
         const result = await response.json()

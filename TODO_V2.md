@@ -26,6 +26,18 @@
 - [ ] Verify WebSocket state transitions during execution phases
 - [ ] Confirm database updates (positions, trades, accounts)
 
+## CRITICAL - LLM Provider System (V2 Gap)
+
+- [ ] Fix V2 decision engine LLM provider selection (currently hard-coded to OpenAI)
+- [ ] Restore LLM provider factory from legacy (DeepSeek, OpenAI, Anthropic providers)
+- [ ] Implement user LLM preference from config_data.llm_config
+- [ ] Add subscription tier-based LLM routing:
+  - [ ] Free users → DeepSeek (our API key from .env)
+  - [ ] Paid users → User choice (their vault credentials OR our API keys)
+- [ ] Integrate Supabase vault credential retrieval for user's own API keys
+- [ ] Add proper model parameter handling (deepseek-reasoner, gpt-4o-mini, etc.)
+- [ ] Test LLM provider switching and API key resolution
+
 ## MEDIUM - Real-Time Updates
 
 - [ ] Fix WebSocket state broadcasting during orchestrator execution
