@@ -220,9 +220,8 @@ BITMEX_TESTNET=true
 - PM2 logs: `pm2 logs [service-name]`
 
 ## Documentation References
-- **Architecture**: `DOCS/OVERVIEW.md`, `DOCS/FLOW.md`
-- **Current Status**: `DOCS/ACTIVE.md`
-- **Testing**: `tests/TEST.md`
+- **Architecture**: `DOCS/OVERVIEW.md`
+- **Current Status**: `ACTIVE.md`
 - **Module READMEs**: `extraction/README.md`, `decision/README.md`, etc.
 
 When working with this codebase, prioritize understanding the three-agent pipeline flow and always respect the security requirements around credential management.

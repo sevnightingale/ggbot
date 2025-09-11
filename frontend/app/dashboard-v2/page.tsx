@@ -6,7 +6,7 @@ import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 import { useBotStatus } from './hooks/useBotStatus'
 import { useRouter } from 'next/navigation'
-import { apiClient } from '@/lib/apiClient'
+import { apiClient } from '@/lib/api'
 import type { User } from '@supabase/supabase-js'
 
 // Local components
