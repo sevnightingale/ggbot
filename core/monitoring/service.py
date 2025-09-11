@@ -249,14 +249,43 @@ class MonitoringService:
             # Calculate performance metrics
             total_trades = len(recent_trades)
             winning_trades = len([t for t in recent_trades if float(t.get('realized_pnl', 0)) > 0])
-            win_rate = (winning_trades / total_trades * 100) if total_trades > 0 else 0
+            win_rate = (winning_trades / total_trades) if total_trades > 0 else 0
             
+            # Calculate total PnL
+            total_pnl = sum(float(t.get('realized_pnl', 0)) for t in recent_trades)
+            avg_trade = total_pnl / total_trades if total_trades > 0 else 0
+            
+            # Transform to match frontend interface (useBotMetrics.ts)
             return {
-                "account_summary": account_summary,
-                "total_trades": total_trades,
-                "winning_trades": winning_trades,
-                "win_rate": win_rate,
-                "last_updated": datetime.now(timezone.utc).isoformat()
+                # Direct properties (not nested) to match frontend BotMetrics interface
+                "balance": float(account_summary.get("balance", 10000)),
+                "totalPnL": total_pnl + float(account_summary.get("unrealized_pnl", 0)),
+                "totalTrades": total_trades,
+                "winRate": win_rate,  # As decimal (0.0-1.0), not percentage
+                "avgTrade": avg_trade,
+                "maxDrawdown": 0,  # TODO: Calculate from trade history
+                "sharpeRatio": 0,  # TODO: Calculate from returns
+                "recentTrades": [
+                    {
+                        "id": str(t.get('trade_id', '')),
+                        "symbol": t.get('symbol', ''),
+                        "side": t.get('side', ''),
+                        "quantity": float(t.get('quantity', 0)),
+                        "price": float(t.get('entry_price', 0)),
+                        "pnl": float(t.get('realized_pnl', 0)),
+                        "timestamp": t.get('opened_at', '').isoformat() if hasattr(t.get('opened_at', ''), 'isoformat') else str(t.get('opened_at', ''))
+                    }
+                    for t in recent_trades[:10]  # Last 10 trades
+                ],
+                "last_updated": datetime.now(timezone.utc).isoformat(),
+                
+                # Keep original structure for backward compatibility if needed
+                "_original": {
+                    "account_summary": account_summary,
+                    "total_trades": total_trades,
+                    "winning_trades": winning_trades,
+                    "win_rate": win_rate
+                }
             }
             
         except Exception as e:
