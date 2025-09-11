@@ -8,7 +8,7 @@ and trend quality assessment using ADX, +DI, and -DI components.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -34,38 +34,35 @@ class ADXPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive ADX analysis
         """
-        if len(adx) < 5:
+        # Clean input data
+        clean_adx = adx.dropna()
+        if len(clean_adx) < 5:
             return {"error": "Insufficient data for ADX analysis"}
         
-        current_adx = float(adx.iloc[-1])
-        current_plus_di = float(plus_di.iloc[-1]) if plus_di is not None else None
-        current_minus_di = float(minus_di.iloc[-1]) if minus_di is not None else None
+        # Clean optional DI series
+        clean_plus_di = plus_di.dropna() if plus_di is not None else None
+        clean_minus_di = minus_di.dropna() if minus_di is not None else None
         
-        # Trend strength analysis
-        trend_strength_analysis = self._analyze_trend_strength(adx)
+        current_adx = float(clean_adx.iloc[-1])
+        current_plus_di = float(clean_plus_di.iloc[-1]) if clean_plus_di is not None else None
+        current_minus_di = float(clean_minus_di.iloc[-1]) if clean_minus_di is not None else None
+        
+        # Trend strength analysis - use clean data
+        trend_strength_analysis = self._analyze_trend_strength(clean_adx)
         
         # Directional analysis (if DI values available)
         directional_analysis = {}
-        if plus_di is not None and minus_di is not None:
-            directional_analysis = self._analyze_directional_movement(plus_di, minus_di)
+        if clean_plus_di is not None and clean_minus_di is not None:
+            directional_analysis = self._analyze_directional_movement(clean_plus_di, clean_minus_di)
         
         # ADX momentum analysis
-        momentum_analysis = self._analyze_adx_momentum(adx)
+        momentum_analysis = self._analyze_adx_momentum(clean_adx)
         
         # Pattern analysis
-        pattern_analysis = self._analyze_adx_patterns(adx, plus_di, minus_di)
+        pattern_analysis = self._analyze_adx_patterns(clean_adx, clean_plus_di, clean_minus_di)
         
         # Position rank analysis
-        position_rank = self._calculate_position_rank(adx, lookback=20)
-        
-        # Trend quality assessment
-        trend_quality = self._assess_trend_quality(current_adx, directional_analysis, momentum_analysis)
-        
-        # Signal generation
-        signals = self._generate_adx_signals(current_adx, trend_strength_analysis, directional_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_adx_confidence(adx, directional_analysis, momentum_analysis)
+        position_rank = self._calculate_position_rank(clean_adx, lookback=20)
         
         return {
             "indicator": "ADX",
@@ -73,19 +70,36 @@ class ADXPreprocessor(BasePreprocessor):
                 "adx": round(current_adx, 2),
                 "plus_di": round(current_plus_di, 2) if current_plus_di is not None else None,
                 "minus_di": round(current_minus_di, 2) if current_minus_di is not None else None,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             },
-            "trend_strength": trend_strength_analysis,
+            "context": {
+                "trend_strength": trend_strength_analysis["current_strength"],
+                "strength_value": trend_strength_analysis["strength_value"],
+                "description": trend_strength_analysis["description"],
+                "trend_evolution": trend_strength_analysis["trend_evolution"],
+                "directional_bias": directional_analysis.get("current_bias"),
+                "directional_strength": directional_analysis.get("directional_strength")
+            },
+            "levels": {
+                "current_strength": trend_strength_analysis["current_strength"],
+                "weak_threshold": 20,
+                "strong_threshold": 25,
+                "very_strong_threshold": 40,
+                "extreme_threshold": 60
+            },
+            "trend_strength": {
+                "strength_percentage": round((current_adx / 100) * 100, 1),
+                "strong_trend_percentage": trend_strength_analysis["strong_trend_percentage"],
+                "weak_trend_percentage": trend_strength_analysis["weak_trend_percentage"],
+                "consistency": trend_strength_analysis["strength_consistency"]
+            },
             "directional": directional_analysis,
             "momentum": momentum_analysis,
             "patterns": pattern_analysis,
-            "trend_quality": trend_quality,
             "position_rank": {
                 "percentile": round(position_rank, 1),
                 "interpretation": self._interpret_position_rank(position_rank)
             },
-            "signals": signals,
-            "confidence": confidence,
             "summary": self._generate_adx_summary(current_adx, current_plus_di, current_minus_di, 
                                                  trend_strength_analysis, directional_analysis)
         }
@@ -156,7 +170,7 @@ class ADXPreprocessor(BasePreprocessor):
         mean_adx = adx.mean()
         std_adx = adx.std()
         
-        if mean_adx == 0:
+        if abs(mean_adx) < 1e-12:
             return 0.0
         
         cv = std_adx / mean_adx
@@ -343,27 +357,27 @@ class ADXPreprocessor(BasePreprocessor):
         
         recent_adx = adx.iloc[-8:]
         
-        # Find local maxima and minima
-        peaks = self._find_peaks(recent_adx, prominence=3)
-        troughs = self._find_troughs(recent_adx, prominence=3)
+        # Find local maxima and minima using base class methods
+        peaks = self._find_peaks(recent_adx, prominence=1.0)  # Use normalized prominence
+        troughs = self._find_troughs(recent_adx, prominence=1.0)
         
         if peaks:
             latest_peak = peaks[-1]
-            if latest_peak["index"] >= len(recent_adx) - 3:  # Recent peak
+            if latest_peak["periods_ago"] <= 3:  # Recent peak
                 return {
                     "type": "peak",
                     "value": round(latest_peak["value"], 2),
-                    "periods_ago": len(recent_adx) - 1 - latest_peak["index"],
+                    "periods_ago": latest_peak["periods_ago"],
                     "description": f"ADX peaked at {latest_peak['value']:.1f}, trend may be weakening"
                 }
         
         if troughs:
             latest_trough = troughs[-1]
-            if latest_trough["index"] >= len(recent_adx) - 3:  # Recent trough
+            if latest_trough["periods_ago"] <= 3:  # Recent trough
                 return {
                     "type": "trough",
                     "value": round(latest_trough["value"], 2),
-                    "periods_ago": len(recent_adx) - 1 - latest_trough["index"],
+                    "periods_ago": latest_trough["periods_ago"],
                     "description": f"ADX bottomed at {latest_trough['value']:.1f}, trend may be strengthening"
                 }
         
@@ -480,83 +494,6 @@ class ADXPreprocessor(BasePreprocessor):
         }
         return descriptions.get(rating, "Unknown quality rating")
     
-    def _generate_adx_signals(self, adx_value: float, trend_strength: Dict, directional_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate ADX-based trading signals."""
-        signals = []
-        
-        # Trend strength signals
-        if trend_strength["current_strength"] == "strong" and trend_strength["trend_evolution"] == "strengthening":
-            direction = directional_analysis.get("current_bias", "unknown") if directional_analysis else "unknown"
-            if direction != "unknown":
-                signals.append({
-                    "type": f"trend_following_{direction}",
-                    "strength": "strong",
-                    "reason": f"Strong and strengthening trend (ADX: {adx_value:.1f}) with {direction} bias",
-                    "confidence": 0.8
-                })
-        
-        # Trend exhaustion signals
-        elif adx_value > 50 and trend_strength["trend_evolution"] == "weakening":
-            signals.append({
-                "type": "trend_exhaustion_warning",
-                "strength": "medium",
-                "reason": f"Very high ADX ({adx_value:.1f}) starting to weaken, potential reversal",
-                "confidence": 0.6
-            })
-        
-        # Range-bound signals
-        elif adx_value < 20 and trend_strength["current_strength"] == "weak":
-            signals.append({
-                "type": "range_bound_market",
-                "strength": "medium",
-                "reason": f"Low ADX ({adx_value:.1f}) indicates ranging/consolidating market",
-                "confidence": 0.7
-            })
-        
-        # Directional signals
-        if directional_analysis and "crossovers" in directional_analysis:
-            latest_cross = directional_analysis["crossovers"].get("latest_crossover")
-            if latest_cross and latest_cross["periods_ago"] <= 2 and adx_value >= 20:
-                signals.append({
-                    "type": f"directional_{latest_cross['type']}",
-                    "strength": "medium",
-                    "reason": f"Recent DI {latest_cross['type']} with adequate trend strength",
-                    "confidence": 0.65
-                })
-        
-        return signals
-    
-    def _calculate_adx_confidence(self, adx: pd.Series, directional_analysis: Dict, momentum_analysis: Dict) -> float:
-        """Calculate ADX analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor
-        data_factor = min(1.0, len(adx) / 30)
-        confidence_factors.append(data_factor)
-        
-        # ADX level factor (higher ADX = higher confidence in trend analysis)
-        current_adx = adx.iloc[-1]
-        adx_factor = min(1.0, current_adx / 40)
-        confidence_factors.append(adx_factor)
-        
-        # Directional clarity factor
-        if directional_analysis and "directional_strength" in directional_analysis:
-            dir_strength = directional_analysis["directional_strength"]
-            dir_factor = min(1.0, dir_strength / 15)
-            confidence_factors.append(dir_factor)
-        
-        # Momentum consistency factor
-        if momentum_analysis and "momentum_quality" in momentum_analysis:
-            momentum_quality = momentum_analysis["momentum_quality"]
-            if momentum_quality == "high_quality_momentum":
-                momentum_factor = 0.9
-            elif momentum_quality == "moderate_quality_momentum":
-                momentum_factor = 0.7
-            else:
-                momentum_factor = 0.5
-            confidence_factors.append(momentum_factor)
-        
-        return round(np.mean(confidence_factors), 3)
     
     def _generate_adx_summary(self, adx_value: float, plus_di: float, minus_di: float,
                              trend_strength: Dict, directional_analysis: Dict) -> str:

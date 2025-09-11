@@ -227,3 +227,12 @@ Each state uses different prompt templates with the same underlying user strateg
 
 
 1) 
+
+
+const ws = new WebSocket('wss://ggbots-api.nightingale.business/ws/bot-status/3d47c173-9234-47c7-b57b-9159c9df5dbd');ws.onopen = () => { console.log('Connected!'); ws.send('heartbeat'); };ws.onmessage = (event) => { console.log('Received:', event.data); };
+
+
+1) well, can you first explain how does our monitoring service work across multiple configs and multiple users? that might help clarify this.
+2) this is a critical qeustion, we NEED to monitor positions in the background so that we can trigger stop loss and take profits in our paper trading system. However for the rest, perforamnce metrics, decision activity.. these dont' need to be monitoring unless a user is connected. If they don't add too much bloat maybe we just keep them all together but idk, we should discuss the consdierations.
+3) what sort of resource limitations do you forsee? rough estimates? I'm hoping to just service an inital 20-25 users, maybe 75 ggbots total. What would that look like? just rough estimates is fine. Also is this sync or async? all users get served simultanously right?
+4) eh, it is still a prototype, so let's just tackle errors as they come up.

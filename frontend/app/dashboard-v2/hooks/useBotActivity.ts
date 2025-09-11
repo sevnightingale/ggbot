@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { apiClient } from '@/lib/api'
+import { useBotStore } from '@/store/botStore'
 
 interface Position {
   symbol: string
@@ -37,9 +38,17 @@ interface UseBotActivityReturn {
 }
 
 export function useBotActivity(botId: string | null): UseBotActivityReturn {
-  const [activity, setActivity] = useState<BotActivity | null>(null)
+  // Read from store (updated via WebSocket)
+  const bot = useBotStore(state => botId ? state.getBotById(botId) : null)
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  // Combine store data into activity object
+  const activity: BotActivity | null = bot ? {
+    positions: bot.positions || [],
+    decisions: bot.decisions || [],
+    lastUpdate: bot.lastPositionUpdate || bot.lastDecisionUpdate || new Date().toISOString()
+  } : null
 
   const fetchActivity = useCallback(async (configId: string): Promise<void> => {
     try {
@@ -67,23 +76,17 @@ export function useBotActivity(botId: string | null): UseBotActivityReturn {
         decisions = (decisionsData.decisions || []).slice(0, 10) // Show last 10 decisions
       }
 
-      const activityData: BotActivity = {
-        positions,
-        decisions,
-        lastUpdate: new Date().toISOString()
-      }
-
-      setActivity(activityData)
+      // Store data in botStore instead of local state
+      useBotStore.getState().updateBotPositions(configId, positions)
+      useBotStore.getState().updateBotDecisions(configId, decisions)
+      
     } catch (err) {
       console.error('Failed to fetch bot activity:', err)
       setError(err instanceof Error ? err.message : 'Failed to fetch activity')
       
-      // Provide fallback empty data
-      setActivity({
-        positions: [],
-        decisions: [],
-        lastUpdate: new Date().toISOString()
-      })
+      // Provide fallback empty data to store
+      useBotStore.getState().updateBotPositions(configId, [])
+      useBotStore.getState().updateBotDecisions(configId, [])
     } finally {
       setIsLoading(false)
     }
@@ -97,16 +100,15 @@ export function useBotActivity(botId: string | null): UseBotActivityReturn {
 
   useEffect(() => {
     if (botId) {
+      // Initial fetch only - WebSocket will handle real-time updates
       fetchActivity(botId)
-
-      // Set up polling every 30 seconds for live updates
-      const interval = setInterval(() => fetchActivity(botId), 30000)
-      return () => clearInterval(interval)
+      
+      // Polling removed - now handled by WebSocket in botStore
+      // Real-time updates via position_update and decisions_update messages every 7 seconds
     } else {
       setActivity(null)
       setError(null)
       setIsLoading(false)
-      return () => {} // Empty cleanup function
     }
   }, [botId, fetchActivity])
 

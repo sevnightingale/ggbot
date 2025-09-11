@@ -7,8 +7,17 @@ signal generation, and confidence scoring.
 """
 
 from .rsi import RSIPreprocessor
-from .macd import MACDPreprocessor
-from .stochastic import StochasticPreprocessor
+
+# Import core preprocessors with error handling
+try:
+    from .macd import MACDPreprocessor
+except ImportError:
+    MACDPreprocessor = None
+
+try:
+    from .stochastic import StochasticPreprocessor
+except ImportError:
+    StochasticPreprocessor = None
 
 # Import additional preprocessors as they are implemented
 try:
@@ -114,8 +123,13 @@ class PreprocessorFactory:
         """Register all available preprocessors."""
         # Core preprocessors (always available)
         self._preprocessors['rsi'] = RSIPreprocessor()
-        self._preprocessors['macd'] = MACDPreprocessor() 
-        self._preprocessors['stochastic'] = StochasticPreprocessor()
+        
+        # Core preprocessors with safety checks
+        if MACDPreprocessor:
+            self._preprocessors['macd'] = MACDPreprocessor()
+        
+        if StochasticPreprocessor:
+            self._preprocessors['stochastic'] = StochasticPreprocessor()
         
         # Optional preprocessors (if implemented)
         if WilliamsRPreprocessor:

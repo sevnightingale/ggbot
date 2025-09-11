@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { apiClient } from '@/lib/api'
+import { useBotStore } from '@/store/botStore'
 
 interface SchedulerJob {
   job_id: string
@@ -26,14 +27,16 @@ interface UseSchedulerStatusReturn {
 }
 
 export function useSchedulerStatus(): UseSchedulerStatusReturn {
-  const [schedulerStatus, setSchedulerStatus] = useState<SchedulerStatus | null>(null)
+  // Use store's scheduler status (updated via WebSocket)
+  const schedulerStatus = useBotStore(state => state.schedulerStatus)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
   const fetchSchedulerStatus = async () => {
     try {
       const response = await apiClient.getSchedulerStatus()
-      setSchedulerStatus(response)
+      // Update store directly instead of local state
+      useBotStore.getState().updateSchedulerStatus(response)
       setError(null)
     } catch (err) {
       console.error('Failed to fetch scheduler status:', err)
@@ -49,13 +52,11 @@ export function useSchedulerStatus(): UseSchedulerStatusReturn {
   }
 
   useEffect(() => {
-    // Initial fetch
+    // Initial fetch only - WebSocket will handle real-time updates
     fetchSchedulerStatus()
-
-    // Set up polling every 30 seconds
-    const interval = setInterval(fetchSchedulerStatus, 30000)
-
-    return () => clearInterval(interval)
+    
+    // Polling removed - now handled by WebSocket in botStore
+    // Real-time updates via scheduler_update messages every 7 seconds
   }, [])
 
   return {

@@ -104,6 +104,14 @@ export interface Bot {
   status: BotStatus
   isActive: boolean        // Maps to config_instances.status = 'active'
   
+  // Real-time data (from WebSocket)
+  positions?: any[]        // Live positions with P&L
+  metrics?: any           // Account/performance data
+  decisions?: any[]       // Recent decisions
+  lastPositionUpdate?: string
+  lastMetricsUpdate?: string
+  lastDecisionUpdate?: string
+  
   // Metadata
   createdAt: Date
   lastRun?: Date
@@ -121,6 +129,7 @@ interface BotStore {
   // State
   bots: Map<string, Bot>           // Keyed by config_id
   connections: Map<string, WebSocketConnection>  // Keyed by userId
+  schedulerStatus: any | null      // Global scheduler status
   isLoading: boolean
   error: string | null
   
@@ -135,6 +144,12 @@ interface BotStore {
   // Status Management Actions
   updateBotStatus: (config_id: string, status: BotStatus) => void
   setBotActive: (config_id: string, isActive: boolean) => void
+  
+  // Real-time WebSocket Update Actions
+  updateBotPositions: (config_id: string, positions: any[]) => void
+  updateBotMetrics: (config_id: string, metrics: any) => void
+  updateBotDecisions: (config_id: string, decisions: any[]) => void
+  updateSchedulerStatus: (schedulerStatus: any) => void
   
   // WebSocket Management Actions
   connectWebSocket: (userId: string, wsUrl: string, onDemoMessage?: (data: Record<string, unknown>) => void) => Promise<void>
@@ -160,6 +175,7 @@ export const useBotStore = create<BotStore>()(
       // Initial State
       bots: new Map(),
       connections: new Map(),
+      schedulerStatus: null,
       isLoading: false,
       error: null,
 
@@ -228,6 +244,48 @@ export const useBotStore = create<BotStore>()(
         return { bots: newBots }
       }),
 
+      // Real-time WebSocket Update Actions
+      updateBotPositions: (config_id: string, positions: any[]) => set((state) => {
+        const newBots = new Map(state.bots)
+        const bot = newBots.get(config_id)
+        if (bot) {
+          newBots.set(config_id, { 
+            ...bot, 
+            positions,
+            lastPositionUpdate: new Date().toISOString()
+          })
+        }
+        return { bots: newBots }
+      }),
+
+      updateBotMetrics: (config_id: string, metrics: any) => set((state) => {
+        const newBots = new Map(state.bots)
+        const bot = newBots.get(config_id)
+        if (bot) {
+          newBots.set(config_id, { 
+            ...bot, 
+            metrics,
+            lastMetricsUpdate: new Date().toISOString()
+          })
+        }
+        return { bots: newBots }
+      }),
+
+      updateBotDecisions: (config_id: string, decisions: any[]) => set((state) => {
+        const newBots = new Map(state.bots)
+        const bot = newBots.get(config_id)
+        if (bot) {
+          newBots.set(config_id, { 
+            ...bot, 
+            decisions,
+            lastDecisionUpdate: new Date().toISOString()
+          })
+        }
+        return { bots: newBots }
+      }),
+
+      updateSchedulerStatus: (schedulerStatus: any) => set({ schedulerStatus }),
+
       // WebSocket Management Actions
       connectWebSocket: async (userId: string, wsUrl: string, onDemoMessage?: (data: Record<string, unknown>) => void) => {
         const state = get()
@@ -287,6 +345,37 @@ export const useBotStore = create<BotStore>()(
                     showSpinner: ['extraction', 'decision', 'trading'].includes(data.status.phase),
                     context: data.status.context
                   })
+                }
+              }
+              
+              // NEW: Position updates (real-time P&L)
+              if (data.type === 'position_update') {
+                const config_id = data.config_id
+                if (config_id && data.positions) {
+                  get().updateBotPositions(config_id, data.positions)
+                }
+              }
+              
+              // NEW: Metrics updates (account/performance data)
+              if (data.type === 'metrics_update') {
+                const config_id = data.config_id
+                if (config_id && data.metrics) {
+                  get().updateBotMetrics(config_id, data.metrics)
+                }
+              }
+              
+              // NEW: Decisions updates (replaces HTTP polling)
+              if (data.type === 'decisions_update') {
+                const config_id = data.config_id
+                if (config_id && data.decisions) {
+                  get().updateBotDecisions(config_id, data.decisions)
+                }
+              }
+              
+              // NEW: Scheduler updates (replaces HTTP polling)
+              if (data.type === 'scheduler_update') {
+                if (data.scheduler_status) {
+                  get().updateSchedulerStatus(data.scheduler_status)
                 }
               }
             } catch (error) {
