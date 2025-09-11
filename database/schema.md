@@ -450,6 +450,7 @@ CREATE TABLE public.configurations (
   config_data jsonb NOT NULL,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  state text NOT NULL DEFAULT 'inactive'::text CHECK (state = ANY (ARRAY['active'::text, 'inactive'::text])),
   CONSTRAINT configurations_pkey PRIMARY KEY (config_id),
   CONSTRAINT configurations_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
@@ -495,9 +496,9 @@ CREATE TABLE public.decisions (
   parent_decision_id uuid,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT decisions_pkey PRIMARY KEY (decision_id),
-  CONSTRAINT decisions_parent_fkey FOREIGN KEY (parent_decision_id) REFERENCES public.decisions(decision_id),
+  CONSTRAINT decisions_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id),
   CONSTRAINT decisions_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
-  CONSTRAINT decisions_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id)
+  CONSTRAINT decisions_parent_fkey FOREIGN KEY (parent_decision_id) REFERENCES public.decisions(decision_id)
 );
 CREATE TABLE public.logs (
   log_id integer NOT NULL DEFAULT nextval('logs_log_id_seq'::regclass),
@@ -520,8 +521,8 @@ CREATE TABLE public.market_data (
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   data_source uuid,
   CONSTRAINT market_data_pkey PRIMARY KEY (id),
-  CONSTRAINT market_data_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id),
-  CONSTRAINT market_data_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  CONSTRAINT market_data_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT market_data_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id)
 );
 CREATE TABLE public.paper_accounts (
   account_id uuid NOT NULL DEFAULT uuid_generate_v4(),

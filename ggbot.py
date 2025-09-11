@@ -1312,28 +1312,64 @@ async def get_bot_metrics(
 ) -> Dict[str, Any]:
     """Get performance metrics for a bot configuration."""
     try:
-        # TODO: Implement real metrics calculation from strategy_runs table
-        # For now, return empty metrics structure
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "metrics": {
-                "profit_loss_data": [],  # Array of {date: string, profit: number}
-                "trade_stats": {
-                    "totalTrades": 0,
-                    "winCount": 0,
-                    "lossCount": 0,
-                    "neutralCount": 0,
-                    "winRate": 0,
-                    "lossRate": 0,
-                    "neutralRate": 0,
-                    "avgProfitPerTrade": 0,
-                    "avgLossPerTrade": 0,
-                    "totalProfit": 0,
-                    "avgTradeDuration": "0m"
+        from core.common.db import get_db_connection
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Query paper account summary
+                cur.execute("""
+                    SELECT initial_balance, current_balance, total_pnl, 
+                           total_trades, win_trades, loss_trades
+                    FROM paper_accounts 
+                    WHERE config_id = %s AND user_id = %s
+                """, (config_id, current_user.user_id))
+                
+                account = cur.fetchone()
+                if not account:
+                    # Return default metrics if no account exists yet
+                    return {
+                        "status": "success",
+                        "config_id": config_id,
+                        "account": {
+                            "balance": 10000.0,
+                            "total_pnl": 0.0
+                        },
+                        "performance": {
+                            "total_trades": 0,
+                            "win_rate": 0.0,
+                            "avg_trade": 0.0
+                        }
+                    }
+                
+                # Calculate additional metrics from paper_trades
+                cur.execute("""
+                    SELECT AVG(realized_pnl) as avg_trade,
+                           COUNT(*) as closed_trades,
+                           AVG(EXTRACT(EPOCH FROM (closed_at - opened_at))/3600) as avg_duration_hours
+                    FROM paper_trades 
+                    WHERE config_id = %s AND user_id = %s AND status = 'closed'
+                """, (config_id, current_user.user_id))
+                
+                trade_stats = cur.fetchone()
+                
+                win_rate = float(account['win_trades']) / float(account['total_trades']) if account['total_trades'] > 0 else 0.0
+                
+                return {
+                    "status": "success",
+                    "config_id": config_id,
+                    "account": {
+                        "balance": float(account['current_balance']),
+                        "total_pnl": float(account['total_pnl'])
+                    },
+                    "performance": {
+                        "total_trades": account['total_trades'],
+                        "win_trades": account['win_trades'],
+                        "loss_trades": account['loss_trades'],
+                        "win_rate": round(win_rate, 3),
+                        "avg_trade": float(trade_stats['avg_trade'] or 0) if trade_stats else 0.0
+                    }
                 }
-            }
-        }
+                
     except Exception as e:
         logger.error(f"Failed to get bot metrics for {config_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get bot metrics")
@@ -1346,13 +1382,39 @@ async def get_bot_positions(
 ) -> Dict[str, Any]:
     """Get live positions for a bot configuration."""
     try:
-        # TODO: Implement real positions query from positions/paper_trades table
-        # For now, return empty positions
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "positions": []  # Array of position objects
-        }
+        from core.common.db import get_db_connection
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT symbol, side, entry_price, current_price, size_usd, 
+                           unrealized_pnl, leverage, opened_at
+                    FROM paper_trades 
+                    WHERE config_id = %s AND user_id = %s AND status = 'open'
+                    ORDER BY opened_at DESC
+                """, (config_id, current_user.user_id))
+                
+                positions = []
+                for row in cur.fetchall():
+                    # Map database side to display format
+                    side_display = "LONG" if row['side'].lower() == 'buy' else "SHORT"
+                    
+                    positions.append({
+                        "symbol": row['symbol'],
+                        "side": side_display,
+                        "size": float(row['size_usd']),
+                        "entryPrice": float(row['entry_price']),
+                        "currentPrice": float(row['current_price'] or row['entry_price']),
+                        "unrealizedPnL": float(row['unrealized_pnl'] or 0),
+                        "timestamp": row['opened_at'].isoformat() + "Z"
+                    })
+                
+                return {
+                    "status": "success",
+                    "config_id": config_id,
+                    "positions": positions
+                }
+                
     except Exception as e:
         logger.error(f"Failed to get bot positions for {config_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get bot positions")
@@ -1366,14 +1428,41 @@ async def get_bot_trades(
 ) -> Dict[str, Any]:
     """Get trade history for a bot configuration."""
     try:
-        # TODO: Implement real trades query from paper_trades/trades table
-        # For now, return empty trades
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "trades": [],  # Array of trade objects
-            "count": 0
-        }
+        from core.common.db import get_db_connection
+        
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT trade_id, symbol, side, entry_price, size_usd, realized_pnl,
+                           opened_at, closed_at, confidence_score, status
+                    FROM paper_trades 
+                    WHERE config_id = %s AND user_id = %s
+                    ORDER BY opened_at DESC
+                    LIMIT %s
+                """, (config_id, current_user.user_id, limit))
+                
+                trades = []
+                for row in cur.fetchall():
+                    trades.append({
+                        "id": str(row['trade_id']),
+                        "symbol": row['symbol'],
+                        "side": row['side'],
+                        "quantity": float(row['size_usd']),
+                        "price": float(row['entry_price']),
+                        "pnl": float(row['realized_pnl'] or 0),
+                        "timestamp": row['opened_at'].isoformat() + "Z",
+                        "closed_at": row['closed_at'].isoformat() + "Z" if row['closed_at'] else None,
+                        "confidence": float(row['confidence_score'] or 0),
+                        "status": row['status']
+                    })
+                
+                return {
+                    "status": "success", 
+                    "config_id": config_id,
+                    "trades": trades,
+                    "count": len(trades)
+                }
+                
     except Exception as e:
         logger.error(f"Failed to get bot trades for {config_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get bot trades")
@@ -1652,8 +1741,8 @@ async def get_scheduler_status(
         return {
             "status": "success",
             "scheduler_running": scheduler.running,
-            "active_bots": len(user_jobs),
-            "jobs": jobs_info,
+            "active_jobs": jobs_info,
+            "job_count": len(user_jobs),
             "total_jobs_in_scheduler": len(scheduler.get_jobs())
         }
         
