@@ -8,7 +8,7 @@ and Aroon Up/Down oscillator pattern recognition.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -34,99 +34,88 @@ class AroonPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive Aroon analysis
         """
-        if len(aroon_up) < 5 or len(aroon_down) < 5:
+        # Align & drop NaNs once
+        df = pd.DataFrame({"up": aroon_up, "down": aroon_down}).dropna()
+        if len(df) < 5:
             return {"error": "Insufficient data for Aroon analysis"}
-        
-        current_aroon_up = float(aroon_up.iloc[-1])
-        current_aroon_down = float(aroon_down.iloc[-1])
-        
-        # Oscillator analysis
-        oscillator_analysis = self._analyze_aroon_oscillator(aroon_up, aroon_down)
-        
-        # Trend analysis
-        trend_analysis = self._analyze_aroon_trend(aroon_up, aroon_down, current_aroon_up, current_aroon_down)
-        
-        # Crossover analysis
-        crossover_analysis = self._analyze_aroon_crossovers(aroon_up, aroon_down)
-        
-        # Strength analysis
-        strength_analysis = self._analyze_aroon_strength(aroon_up, aroon_down)
-        
-        # Pattern analysis
-        pattern_analysis = self._analyze_aroon_patterns(aroon_up, aroon_down)
-        
-        # Parallel analysis (when both indicators move together)
-        parallel_analysis = self._analyze_parallel_movement(aroon_up, aroon_down)
-        
-        # Divergence analysis
+
+        up, down = df["up"], df["down"]
+        current_up = float(up.iloc[-1])
+        current_down = float(down.iloc[-1])
+
+        # Analyses (use aligned, clean series)
+        oscillator_analysis = self._analyze_aroon_oscillator(up, down)
+        trend_analysis = self._analyze_aroon_trend(up, down, current_up, current_down)
+        crossover_analysis = self._analyze_aroon_crossovers(up, down)
+        strength_analysis = self._analyze_aroon_strength(up, down)
+        pattern_analysis = self._analyze_aroon_patterns(up, down)
+        parallel_analysis = self._analyze_parallel_movement(up, down)
         divergence = None
         if prices is not None:
-            divergence = self._detect_aroon_divergence(aroon_up, aroon_down, prices)
-        
-        # Signal generation
-        signals = self._generate_aroon_signals(current_aroon_up, current_aroon_down, 
-                                              trend_analysis, crossover_analysis, strength_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_aroon_confidence(aroon_up, aroon_down, trend_analysis, strength_analysis)
-        
+            divergence = self._detect_aroon_divergence(up, down, prices)
+
+        # Evidence (analysis clarity/consistency/data quality)
+        evidence = {
+            # clarity: how unambiguous the state is (normalize separation 0..1)
+            "clarity": round(min(1.0, abs(current_up - current_down) / 100.0), 3),
+            # consistency: proportion of last 10 bars with same up>down relationship
+            "consistency": round(self._calculate_aroon_trend_consistency(up, down), 3),
+            # data quality: sample size heuristic
+            "data_quality": round(min(1.0, len(df) / 200.0), 3),
+        }
+
         return {
             "indicator": "Aroon",
             "current": {
-                "aroon_up": round(current_aroon_up, 2),
-                "aroon_down": round(current_aroon_down, 2),
-                "oscillator": round(current_aroon_up - current_aroon_down, 2),
-                "timestamp": datetime.now().isoformat()
+                "aroon_up": round(current_up, 2),
+                "aroon_down": round(current_down, 2),
+                "oscillator": round(current_up - current_down, 2),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
             },
-            "trend": trend_analysis,
-            "oscillator": oscillator_analysis,
-            "crossovers": crossover_analysis,
-            "strength": strength_analysis,
+            "context": {
+                "trend": trend_analysis,
+                "strength": strength_analysis,
+                "parallel_movement": parallel_analysis
+            },
+            "levels": {
+                "oscillator": oscillator_analysis,
+                "crossovers": crossover_analysis
+            },
             "patterns": pattern_analysis,
-            "parallel_movement": parallel_analysis,
             "divergence": divergence,
-            "signals": signals,
-            "confidence": confidence,
-            "summary": self._generate_aroon_summary(current_aroon_up, current_aroon_down, 
-                                                   trend_analysis, oscillator_analysis)
+            "evidence": evidence,
+            "summary": self._generate_aroon_summary(current_up, current_down, trend_analysis, oscillator_analysis),
+            "raw": {"aroon_up": up.tolist()[-200:], "aroon_down": down.tolist()[-200:]},
         }
     
     def _analyze_aroon_oscillator(self, aroon_up: pd.Series, aroon_down: pd.Series) -> Dict[str, Any]:
         """Analyze Aroon Oscillator (Aroon Up - Aroon Down)."""
-        oscillator = aroon_up - aroon_down
-        current_osc = oscillator.iloc[-1]
-        
-        # Oscillator zones
-        if current_osc > 50:
-            zone = "strong_bullish"
-        elif current_osc > 20:
-            zone = "bullish"
-        elif current_osc > -20:
-            zone = "neutral"
-        elif current_osc > -50:
-            zone = "bearish"
-        else:
-            zone = "strong_bearish"
-        
-        # Oscillator momentum
-        osc_velocity = self._calculate_velocity(oscillator, 3)
-        osc_acceleration = self._calculate_acceleration(oscillator, 5)
-        
-        # Zero line analysis
-        zero_crossings = self._count_zero_crossings(oscillator)
-        time_above_zero = sum(1 for v in oscillator if v > 0)
-        time_below_zero = sum(1 for v in oscillator if v < 0)
-        total_periods = len(oscillator)
-        
+        osc = (aroon_up - aroon_down).dropna()
+        current_osc = osc.iloc[-1]
+
+        if current_osc > 50:   zone = "strong_bullish"
+        elif current_osc > 20: zone = "bullish"
+        elif current_osc > -20: zone = "neutral"
+        elif current_osc > -50: zone = "bearish"
+        else: zone = "strong_bearish"
+
+        vel = self._calculate_velocity(osc, 3)
+        acc = self._calculate_acceleration(osc, 5)
+
+        zero_x = self._count_zero_crossings(osc)
+        tot = len(osc)
+        above = int((osc > 0).sum())
+        below = int((osc < 0).sum())
+
         return {
             "current_value": round(current_osc, 2),
             "zone": zone,
-            "velocity": round(osc_velocity, 2),
-            "acceleration": round(osc_acceleration, 2),
-            "zero_crossings": zero_crossings,
-            "time_above_zero_pct": round((time_above_zero / total_periods) * 100, 1),
-            "time_below_zero_pct": round((time_below_zero / total_periods) * 100, 1),
-            "oscillator_interpretation": self._interpret_oscillator(current_osc, osc_velocity)
+            "velocity": round(vel, 2),
+            "acceleration": round(acc, 2),
+            "zero_crossings": zero_x,
+            "time_above_zero_pct": round(above / tot * 100, 1),
+            "time_below_zero_pct": round(below / tot * 100, 1),
+            "oscillator_interpretation": self._interpret_oscillator(current_osc, vel),
         }
     
     def _count_zero_crossings(self, oscillator: pd.Series) -> int:
@@ -508,135 +497,53 @@ class AroonPreprocessor(BasePreprocessor):
     
     def _detect_aroon_divergence(self, aroon_up: pd.Series, aroon_down: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
         """Detect Aroon-price divergence patterns."""
-        if len(aroon_up) < 15 or len(prices) < 15:
+        merged = pd.DataFrame({
+            "osc": (aroon_up - aroon_down),
+            "price": prices,
+        }).dropna()
+        if len(merged) < 15:
             return None
-        
-        recent_periods = 10
-        aroon_osc = (aroon_up - aroon_down).iloc[-recent_periods:]
-        price_recent = prices.iloc[-recent_periods:]
-        
-        # Find peaks and troughs
-        osc_peaks = self._find_peaks(aroon_osc, prominence=10)
-        osc_troughs = self._find_troughs(aroon_osc, prominence=10)
-        price_peaks = self._find_peaks(price_recent)
-        price_troughs = self._find_troughs(price_recent)
+
+        recent = merged.iloc[-10:]
+        osc = recent["osc"]
+        px = recent["price"]
+
+        # Base peak/trough finders already scale by std → use unitless factor
+        osc_peaks = self._find_peaks(osc, prominence=0.5)
+        osc_troughs = self._find_troughs(osc, prominence=0.5)
+        px_peaks = self._find_peaks(px, prominence=0.5)
+        px_troughs = self._find_troughs(px, prominence=0.5)
         
         # Bearish divergence: price higher highs, Aroon oscillator lower highs
-        if len(osc_peaks) >= 2 and len(price_peaks) >= 2:
+        if len(osc_peaks) >= 2 and len(px_peaks) >= 2:
             latest_osc_peak = osc_peaks[-1]
             prev_osc_peak = osc_peaks[-2]
-            latest_price_peak = price_peaks[-1]
-            prev_price_peak = price_peaks[-2]
+            latest_price_peak = px_peaks[-1]
+            prev_price_peak = px_peaks[-2]
             
             if (latest_price_peak["value"] > prev_price_peak["value"] and 
                 latest_osc_peak["value"] < prev_osc_peak["value"]):
                 return {
                     "type": "bearish_divergence",
-                    "confidence": 0.7,
                     "description": "Price making higher highs while Aroon oscillator making lower highs"
                 }
         
         # Bullish divergence: price lower lows, Aroon oscillator higher lows
-        if len(osc_troughs) >= 2 and len(price_troughs) >= 2:
+        if len(osc_troughs) >= 2 and len(px_troughs) >= 2:
             latest_osc_trough = osc_troughs[-1]
             prev_osc_trough = osc_troughs[-2]
-            latest_price_trough = price_troughs[-1]
-            prev_price_trough = price_troughs[-2]
+            latest_price_trough = px_troughs[-1]
+            prev_price_trough = px_troughs[-2]
             
             if (latest_price_trough["value"] < prev_price_trough["value"] and
                 latest_osc_trough["value"] > prev_osc_trough["value"]):
                 return {
                     "type": "bullish_divergence",
-                    "confidence": 0.7,
                     "description": "Price making lower lows while Aroon oscillator making higher lows"
                 }
         
         return None
     
-    def _generate_aroon_signals(self, aroon_up: float, aroon_down: float, 
-                               trend_analysis: Dict, crossover_analysis: Dict, 
-                               strength_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate Aroon trading signals."""
-        signals = []
-        
-        # Trend-based signals
-        current_trend = trend_analysis["current_trend"]
-        trend_quality = trend_analysis["trend_quality"]
-        
-        if "strong" in current_trend and trend_quality in ["excellent", "good"]:
-            direction = "buy" if "up" in current_trend else "sell"
-            signals.append({
-                "type": f"trend_{direction}_signal",
-                "strength": "strong",
-                "reason": f"Strong Aroon {current_trend} with {trend_quality} quality",
-                "confidence": 0.8
-            })
-        
-        # Crossover signals
-        latest_crossover = crossover_analysis.get("latest_crossover")
-        if latest_crossover and latest_crossover["periods_ago"] <= 3:
-            crossover_type = latest_crossover["type"]
-            signal_type = "buy_signal" if "bullish" in crossover_type else "sell_signal"
-            
-            # Higher confidence for crossovers at extreme levels
-            location = latest_crossover["location"]
-            confidence = 0.8 if location in ["high_levels", "low_levels"] else 0.6
-            
-            signals.append({
-                "type": signal_type,
-                "strength": "medium",
-                "reason": f"Recent Aroon {crossover_type} at {location}",
-                "confidence": confidence
-            })
-        
-        # Strength-based signals
-        combined_strength = strength_analysis["combined_strength"]
-        if combined_strength == "very_strong":
-            dominant = strength_analysis["dominant_indicator"]
-            direction = "buy" if dominant == "aroon_up" else "sell"
-            
-            signals.append({
-                "type": f"strength_{direction}_signal",
-                "strength": "medium",
-                "reason": f"Very strong {dominant.replace('_', ' ')} reading",
-                "confidence": 0.7
-            })
-        
-        # Consolidation signals
-        if aroon_up < 50 and aroon_down < 50:
-            signals.append({
-                "type": "consolidation_signal",
-                "strength": "low",
-                "reason": "Both Aroon indicators below 50, potential consolidation",
-                "confidence": 0.6
-            })
-        
-        return signals
-    
-    def _calculate_aroon_confidence(self, aroon_up: pd.Series, aroon_down: pd.Series,
-                                   trend_analysis: Dict, strength_analysis: Dict) -> float:
-        """Calculate Aroon analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor
-        data_factor = min(1.0, len(aroon_up) / 30)
-        confidence_factors.append(data_factor)
-        
-        # Trend quality factor
-        trend_quality = trend_analysis.get("trend_quality", "poor")
-        quality_scores = {"excellent": 0.9, "good": 0.7, "fair": 0.5, "poor": 0.3}
-        confidence_factors.append(quality_scores.get(trend_quality, 0.3))
-        
-        # Strength consistency factor
-        combined_strength = strength_analysis.get("combined_strength", "weak")
-        strength_scores = {"very_strong": 0.9, "strong": 0.7, "moderate": 0.5, "weak": 0.4, "very_weak": 0.3}
-        confidence_factors.append(strength_scores.get(combined_strength, 0.3))
-        
-        # Trend consistency factor
-        trend_consistency = trend_analysis.get("trend_consistency", 0.5)
-        confidence_factors.append(trend_consistency)
-        
-        return round(np.mean(confidence_factors), 3)
     
     def _generate_aroon_summary(self, aroon_up: float, aroon_down: float,
                                trend_analysis: Dict, oscillator_analysis: Dict) -> str:

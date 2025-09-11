@@ -613,3 +613,5 @@ Analysis: ggShot Indicator Extraction Flow
 
 rsi
 bbands
+adx
+aroon
