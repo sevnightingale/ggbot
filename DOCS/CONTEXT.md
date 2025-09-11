@@ -236,3 +236,214 @@ const ws = new WebSocket('wss://ggbots-api.nightingale.business/ws/bot-status/00
 2) this is a critical qeustion, we NEED to monitor positions in the background so that we can trigger stop loss and take profits in our paper trading system. However for the rest, perforamnce metrics, decision activity.. these dont' need to be monitoring unless a user is connected. If they don't add too much bloat maybe we just keep them all together but idk, we should discuss the consdierations.
 3) what sort of resource limitations do you forsee? rough estimates? I'm hoping to just service an inital 20-25 users, maybe 75 ggbots total. What would that look like? just rough estimates is fine. Also is this sync or async? all users get served simultanously right?
 4) eh, it is still a prototype, so let's just tackle errors as they come up.
+
+
+
+📊 Comprehensive Data Mapping Analysis
+
+  Current Database Schema vs Frontend Display
+
+  🏦 Paper Trading Database Schema (Rich Data Available)
+
+  paper_accounts table:
+  - account_id, config_id, user_id
+  - initial_balance, current_balance, total_pnl
+  - open_positions, total_trades, win_trades, loss_trades
+  - created_at, updated_at
+
+  paper_trades table (VERY RICH):
+  - trade_id, account_id, config_id, user_id, decision_id
+  - symbol, side, entry_price, current_price, size_usd, size_contracts
+  - leverage, unrealized_pnl, realized_pnl, fees
+  - status, stop_loss, take_profit, confidence_score, reasoning
+  - opened_at, closed_at, close_reason, last_updated
+
+  paper_orders table (Audit Trail):
+  - order_id, trade_id, order_type, side
+  - requested_price, filled_price, size, fees
+  - status, created_at, filled_at
+
+  decisions table:
+  - decision_id, config_id, symbol, action, status
+  - confidence, reasoning, market_data, decision_data
+  - created_at
+
+  ---
+  🎯 Current Frontend Components vs Available Data
+
+  Dashboard V2 vs Old Dashboard - Data Gaps
+
+  V2 PerformancePanel (BASIC):
+  - balance: number
+  - totalPnL: number
+  - totalTrades: number
+  - winRate: number
+  - avgTrade: number
+  - maxDrawdown: number (TODO)
+  - sharpeRatio: number (TODO)
+
+  V2 ActivityPanel (MINIMAL):
+  - positions: { symbol, side, size, entryPrice, currentPrice, unrealizedPnL }
+  - decisions: { timestamp, action, reasoning, confidence }
+
+  Old Dashboard (MUCH RICHER):
+  - Complex position table with 7 columns: PnL, Symbol, Size, Dir, Entry, Price, Time
+  - Expandable AI reasoning with confidence, signal timeframe, volume analysis
+  - Decision history with detailed market context
+  - Performance charts and trade statistics
+  - Account summary with return percentages
+
+  ---
+  🔄 Backend Monitoring Service - Available Data
+
+  Real-time WebSocket Updates:
+  // Position updates (every 7s)
+  {
+    trade_id, user_id, account_id, config_id, decision_id,
+    symbol, side, entry_price, current_price, size_usd,
+    leverage, unrealized_pnl, realized_pnl, status,
+    stop_loss, take_profit, confidence_score, opened_at, closed_at
+  }
+
+  // Metrics updates  
+  {
+    balance, totalPnL, totalTrades, winRate, avgTrade,
+    recentTrades: [{ id, symbol, side, quantity, price, pnl, timestamp }]
+  }
+
+  // Decisions updates
+  {
+    decision_id, symbol, action, status, confidence, reasoning, created_at
+  }
+
+  ---
+  ⚠️ MAJOR DATA GAPS & OPPORTUNITIES
+
+  Missing from V2 Components:
+
+  1. Rich Position Display:
+    - ❌ Position size (size_usd, size_contracts)
+    - ❌ Leverage display
+    - ❌ Stop loss / Take profit levels
+    - ❌ Time in trade calculation
+    - ❌ Confidence score display
+    - ❌ Entry price vs current price comparison
+    - ❌ Fees tracking
+  2. Advanced Performance Metrics:
+    - ❌ Max drawdown calculation
+    - ❌ Sharpe ratio
+    - ❌ Win/loss streak tracking
+    - ❌ Average trade duration
+    - ❌ Return percentages
+    - ❌ Performance charts over time
+  3. Decision Intelligence:
+    - ❌ Full decision reasoning display
+    - ❌ Market data context
+    - ❌ Decision parameters
+    - ❌ LLM prompt details
+    - ❌ Signal timeframe context
+  4. Trade Lifecycle:
+    - ❌ Order audit trail
+    - ❌ Close reasons (TP/SL/manual)
+    - ❌ Fill prices vs requested prices
+    - ❌ Slippage tracking
+
+  ---
+  🚀 Recommended Frontend Enhancements
+
+  1. Enhanced Position Table (Use Old Dashboard Style)
+
+  interface EnhancedPosition {
+    // Current + Missing
+    trade_id: string
+    symbol: string
+    side: 'long' | 'short'
+    size_usd: number
+    size_contracts?: number
+    leverage: number
+    entry_price: number
+    current_price: number
+    unrealized_pnl: number
+    stop_loss?: number
+    take_profit?: number
+    confidence_score: number
+    time_in_trade: string  // Calculate from opened_at
+    reasoning?: string
+    fees: number
+  }
+
+  2. Rich Performance Metrics
+
+  interface RichMetrics {
+    // Current
+    balance: number
+    totalPnL: number
+    totalTrades: number
+    winRate: number
+    avgTrade: number
+
+    // Add these from database
+    maxDrawdown: number
+    sharpeRatio: number
+    totalFees: number
+    winStreak: number
+    lossStreak: number
+    avgTradeDuration: string
+    returnPct: number
+    profitFactor: number
+  }
+
+  3. Decision Detail Modal (Restore from Old)
+
+  - Full reasoning display
+  - Market data context
+  - Decision parameters
+  - Confidence breakdown
+  - Performance impact
+
+  4. Account Summary Enhancement
+
+  interface AccountSummary {
+    initial_balance: number
+    current_balance: number
+    total_pnl: number
+    total_return_pct: number
+    open_positions: number
+    total_trades: number
+    win_trades: number
+    loss_trades: number
+    win_rate_pct: number
+    total_fees: number
+  }
+
+  ---
+  🔧 Backend Calculation Opportunities
+
+  Calculate from Available Data:
+
+  1. Max Drawdown - Track peak-to-trough balance
+  2. Sharpe Ratio - Risk-adjusted returns
+  3. Profit Factor - Gross profit / Gross loss
+  4. Time in Trade - opened_at to current_time
+  5. Average Trade Duration - Closed trades analysis
+  6. Win/Loss Streaks - Sequential trade analysis
+
+  Real-time Updates Needed:
+
+  1. Portfolio-level unrealized P&L - Sum all open positions
+  2. Current balance including unrealized - Balance + unrealized P&L
+  3. Risk metrics - Portfolio exposure, leverage usage
+  4. Performance attribution - P&L by symbol, timeframe
+
+  ---
+  💡 Key Recommendations
+
+  1. Restore Old Dashboard Complexity - V2 is too simplified vs the rich old version
+  2. Use Database Schema Fully - We have WAY more data than we're displaying
+  3. Enhance Monitoring Service - Calculate advanced metrics in real-time
+  4. Rich Position Display - Show all available position data
+  5. Decision Intelligence - Restore full reasoning and context display
+
+  The V2 dashboard is significantly dumbed down compared to what we had before and what
+  the database supports. We should enhance it to match the old dashboard's richness while
+  keeping the new WebSocket architecture.

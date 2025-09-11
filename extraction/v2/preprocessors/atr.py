@@ -8,7 +8,7 @@ and stop-loss level recommendations based on market volatility.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -32,130 +32,106 @@ class ATRPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive ATR analysis
         """
-        if len(atr) < 5:
+        atr_clean = atr.dropna()
+        if len(atr_clean) < 5:
             return {"error": "Insufficient data for ATR analysis"}
-        
-        current_atr = float(atr.iloc[-1])
-        
-        # Volatility analysis
-        volatility_analysis = self._analyze_volatility_levels(atr, prices)
-        
-        # Trend analysis
-        atr_trend_analysis = self._analyze_atr_trend(atr)
-        
-        # Volatility cycles
-        cycle_analysis = self._analyze_volatility_cycles(atr)
-        
-        # Relative volatility analysis
-        relative_analysis = self._analyze_relative_volatility(atr)
-        
-        # Stop loss analysis
-        stop_loss_analysis = self._analyze_stop_loss_levels(atr, prices) if prices is not None else {}
-        
-        # Breakout analysis
-        breakout_analysis = self._analyze_breakout_potential(atr)
-        
-        # Signal generation
-        signals = self._generate_atr_signals(current_atr, volatility_analysis, atr_trend_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_atr_confidence(atr, volatility_analysis)
-        
+        current_atr = float(atr_clean.iloc[-1])
+
+        # Align with price only if provided
+        price_aligned = None
+        atr_aligned = atr_clean
+        if prices is not None:
+            df = pd.DataFrame({"atr": atr, "price": prices}).dropna()
+            if len(df) >= 5:
+                atr_aligned = df["atr"]
+                price_aligned = df["price"]
+
+        volatility_analysis = self._analyze_volatility_levels(atr_aligned, price_aligned)
+        atr_trend_analysis = self._analyze_atr_trend(atr_clean)
+        cycle_analysis = self._analyze_volatility_cycles(atr_clean)
+        relative_analysis = self._analyze_relative_volatility(atr_clean)
+        stop_loss_analysis = self._analyze_stop_loss_levels(atr_aligned, price_aligned) if price_aligned is not None else {}
+        breakout_analysis = self._analyze_breakout_potential(atr_clean)
+
+        # analysis-only evidence (no trading confidence)
+        std = atr_clean.std() + 1e-12
+        evidence = {
+            "clarity": round(min(1.0, abs(current_atr - atr_clean.mean()) / std), 3),
+            "consistency": round(min(1.0, abs(self._calculate_velocity(atr_clean, 3)) / std), 3),
+            "data_quality": round(min(1.0, len(atr_clean) / 200.0), 3),
+        }
+
         return {
             "indicator": "ATR",
             "current": {
                 "value": round(current_atr, 6),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": datetime.now(timezone.utc).isoformat()
             },
-            "volatility": volatility_analysis,
-            "trend": atr_trend_analysis,
-            "cycles": cycle_analysis,
-            "relative": relative_analysis,
-            "stop_loss": stop_loss_analysis,
-            "breakout": breakout_analysis,
-            "signals": signals,
-            "confidence": confidence,
-            "summary": self._generate_atr_summary(current_atr, volatility_analysis, atr_trend_analysis)
+            "context": {
+                "trend": atr_trend_analysis,
+                "relative": relative_analysis,
+                "breakout": breakout_analysis
+            },
+            "levels": {
+                "volatility": volatility_analysis,
+                "cycles": cycle_analysis,
+                "stop_loss": stop_loss_analysis
+            },
+            "evidence": evidence,
+            "summary": self._generate_atr_summary(current_atr, volatility_analysis, atr_trend_analysis),
+            "raw": {"atr": atr_clean.tolist()[-200:]},
         }
     
     def _analyze_volatility_levels(self, atr: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:
         """Analyze current volatility levels."""
-        current_atr = atr.iloc[-1]
-        
-        # Statistical analysis
-        mean_atr = atr.mean()
-        std_atr = atr.std()
-        max_atr = atr.max()
-        min_atr = atr.min()
-        
-        # Percentile analysis
-        percentile_rank = self._calculate_position_rank(atr, lookback=len(atr))
-        
-        # Volatility level classification
-        if current_atr > mean_atr + 2 * std_atr:
-            volatility_level = "extremely_high"
-        elif current_atr > mean_atr + std_atr:
-            volatility_level = "high"
-        elif current_atr > mean_atr:
-            volatility_level = "above_average"
-        elif current_atr > mean_atr - std_atr:
-            volatility_level = "below_average"
-        else:
-            volatility_level = "low"
-        
-        # Relative to price analysis
-        relative_atr = None
+        clean = atr.dropna()
+        current_atr = float(clean.iloc[-1])
+        mean_atr = float(clean.mean())
+        std_atr = float(clean.std())
+        max_atr = float(clean.max())
+        min_atr = float(clean.min())
+
+        percentile_rank = self._calculate_position_rank(clean, lookback=len(clean))
+
+        # levels
+        if current_atr > mean_atr + 2*std_atr: level = "extremely_high"
+        elif current_atr > mean_atr + std_atr: level = "high"
+        elif current_atr > mean_atr:           level = "above_average"
+        elif current_atr > mean_atr - std_atr: level = "below_average"
+        else:                                   level = "low"
+
+        rel_price = None
         if prices is not None:
-            current_price = prices.iloc[-1]
-            relative_atr = (current_atr / current_price) * 100
-        
+            rel_df = pd.DataFrame({"atr": atr, "price": prices}).dropna()
+            if len(rel_df):
+                cp = float(rel_df["price"].iloc[-1])
+                rel_price = (current_atr / (cp if abs(cp) > 1e-12 else 1e-12)) * 100
+
+        denom = mean_atr if abs(mean_atr) > 1e-12 else 1e-12
         return {
-            "current_level": volatility_level,
+            "current_level": level,
             "percentile_rank": round(percentile_rank, 1),
-            "relative_to_mean": round((current_atr / mean_atr - 1) * 100, 2),
-            "relative_to_price_pct": round(relative_atr, 3) if relative_atr is not None else None,
-            "statistical": {
-                "mean": round(mean_atr, 6),
-                "std": round(std_atr, 6),
-                "max": round(max_atr, 6),
-                "min": round(min_atr, 6)
-            }
+            "relative_to_mean": round((current_atr / denom - 1) * 100, 2),
+            "relative_to_price_pct": round(rel_price, 3) if rel_price is not None else None,
+            "statistical": {"mean": round(mean_atr, 6), "std": round(std_atr, 6),
+                            "max": round(max_atr, 6), "min": round(min_atr, 6)},
         }
     
     def _analyze_atr_trend(self, atr: pd.Series) -> Dict[str, Any]:
         """Analyze ATR trend characteristics."""
-        if len(atr) < 5:
+        clean = atr.dropna()
+        if len(clean) < 5: 
             return {}
-        
-        # ATR velocity and acceleration
-        velocity = self._calculate_velocity(atr, 3)
-        acceleration = self._calculate_acceleration(atr, 6)
-        
-        # Trend direction
-        if velocity > 0.001:
-            trend_direction = "rising"
-        elif velocity < -0.001:
-            trend_direction = "falling"
-        else:
-            trend_direction = "stable"
-        
-        # Trend strength
-        velocity_magnitude = abs(velocity)
-        std_atr = atr.std()
-        trend_strength = min(1.0, velocity_magnitude / (std_atr * 0.1)) if std_atr > 0 else 0
-        
-        # Recent trend consistency
-        recent_atr = atr.iloc[-5:] if len(atr) >= 5 else atr
-        consistency = self._calculate_trend_consistency(recent_atr)
-        
-        return {
-            "direction": trend_direction,
-            "velocity": round(velocity, 6),
-            "acceleration": round(acceleration, 6),
-            "strength": round(trend_strength, 3),
-            "consistency": round(consistency, 3),
-            "interpretation": self._interpret_atr_trend(trend_direction, trend_strength, consistency)
-        }
+        vel = self._calculate_velocity(clean, 3)
+        acc = self._calculate_acceleration(clean, 6)
+        direction = "rising" if vel > 0 else "falling" if vel < 0 else "stable"
+        std = clean.std()
+        strength = min(1.0, abs(vel) / (std + 1e-12))
+        recent = clean.iloc[-5:] if len(clean) >= 5 else clean
+        consistency = self._calculate_trend_consistency(recent)
+        return {"direction": direction, "velocity": round(vel, 6), "acceleration": round(acc, 6),
+                "strength": round(strength, 3), "consistency": round(consistency, 3),
+                "interpretation": self._interpret_atr_trend(direction, strength, consistency)}
     
     def _calculate_trend_consistency(self, values: pd.Series) -> float:
         """Calculate consistency of ATR trend."""
@@ -189,12 +165,13 @@ class ATRPreprocessor(BasePreprocessor):
     
     def _analyze_volatility_cycles(self, atr: pd.Series) -> Dict[str, Any]:
         """Analyze volatility cycles and patterns."""
-        if len(atr) < 20:
+        clean = atr.dropna()
+        if len(clean) < 20:
             return {"insufficient_data": True}
         
-        # Find volatility peaks and troughs
-        peaks = self._find_peaks(atr, prominence=atr.std() * 0.5)
-        troughs = self._find_troughs(atr, prominence=atr.std() * 0.5)
+        # Find volatility peaks and troughs - base scales by std, pass unitless factor
+        peaks = self._find_peaks(clean, prominence=0.5)
+        troughs = self._find_troughs(clean, prominence=0.5)
         
         # Cycle analysis
         cycle_detected = len(peaks) >= 2 or len(troughs) >= 2
@@ -233,24 +210,19 @@ class ATRPreprocessor(BasePreprocessor):
     
     def _analyze_relative_volatility(self, atr: pd.Series) -> Dict[str, Any]:
         """Analyze ATR relative to its own history."""
-        if len(atr) < 10:
+        clean = atr.dropna()
+        if len(clean) < 10:
             return {}
-        
-        current_atr = atr.iloc[-1]
-        
-        # Different timeframe comparisons
-        periods = [5, 10, 20, 50] if len(atr) >= 50 else [min(p, len(atr)) for p in [5, 10, 20] if p <= len(atr)]
-        
-        comparisons = {}
-        for period in periods:
-            if period <= len(atr):
-                period_mean = atr.iloc[-period:].mean()
-                relative_change = ((current_atr / period_mean) - 1) * 100
-                comparisons[f"{period}p_avg"] = round(relative_change, 2)
-        
-        # Volatility regime classification
-        long_term_mean = atr.iloc[-min(50, len(atr)):].mean()
-        regime_ratio = current_atr / long_term_mean
+        current_atr = float(clean.iloc[-1])
+        periods = [p for p in (5, 10, 20, 50) if p <= len(clean)]
+        comps = {}
+        for p in periods:
+            mean_p = float(clean.iloc[-p:].mean())
+            denom = mean_p if abs(mean_p) > 1e-12 else 1e-12
+            comps[f"{p}p_avg"] = round((current_atr / denom - 1) * 100, 2)
+        lt_mean = float(clean.iloc[-min(50, len(clean)):].mean())
+        denom = lt_mean if abs(lt_mean) > 1e-12 else 1e-12
+        regime_ratio = current_atr / denom
         
         if regime_ratio > 1.5:
             regime = "high_volatility"
@@ -264,15 +236,19 @@ class ATRPreprocessor(BasePreprocessor):
             regime = "normal_volatility"
         
         return {
-            "comparisons": comparisons,
+            "comparisons": comps,
             "regime": regime,
             "regime_ratio": round(regime_ratio, 3)
         }
     
     def _analyze_stop_loss_levels(self, atr: pd.Series, prices: pd.Series) -> Dict[str, Any]:
         """Analyze ATR-based stop loss recommendations."""
-        current_atr = atr.iloc[-1]
-        current_price = prices.iloc[-1]
+        df = pd.DataFrame({"atr": atr, "price": prices}).dropna()
+        if len(df) == 0: 
+            return {}
+        current_atr = float(df["atr"].iloc[-1])
+        current_price = float(df["price"].iloc[-1])
+        price_denom = max(abs(current_price), 1e-12)
         
         # Multiple ATR multipliers for different strategies
         multipliers = [1.0, 1.5, 2.0, 2.5, 3.0]
@@ -282,7 +258,7 @@ class ATRPreprocessor(BasePreprocessor):
             stop_distance = current_atr * mult
             long_stop = current_price - stop_distance
             short_stop = current_price + stop_distance
-            stop_pct = (stop_distance / current_price) * 100
+            stop_pct = (stop_distance / price_denom) * 100
             
             stop_levels[f"{mult}x_atr"] = {
                 "long_stop": round(long_stop, 6),
@@ -326,132 +302,29 @@ class ATRPreprocessor(BasePreprocessor):
     
     def _analyze_breakout_potential(self, atr: pd.Series) -> Dict[str, Any]:
         """Analyze breakout potential based on ATR patterns."""
-        if len(atr) < 10:
+        clean = atr.dropna()
+        if len(clean) < 10: 
             return {}
-        
-        current_atr = atr.iloc[-1]
-        recent_atr = atr.iloc[-5:]  # Last 5 periods
-        
-        # Volatility squeeze detection (low ATR)
-        mean_atr = atr.mean()
-        std_atr = atr.std()
-        
-        squeeze_threshold = mean_atr - 0.5 * std_atr
-        squeeze_detected = current_atr < squeeze_threshold
-        
-        # Expansion potential
-        if squeeze_detected:
-            # How long has volatility been compressed?
-            squeeze_periods = 0
-            for i in range(len(atr) - 1, -1, -1):
-                if atr.iloc[i] < squeeze_threshold:
+        current_atr = float(clean.iloc[-1])
+        recent = clean.iloc[-5:]
+        mean_atr = float(clean.mean())
+        std_atr = float(clean.std())
+        squeeze_thr = mean_atr - 0.5*std_atr
+        squeeze = current_atr < squeeze_thr
+        squeeze_periods = 0
+        if squeeze:
+            for i in range(len(clean)-1, -1, -1):
+                if clean.iloc[i] < squeeze_thr: 
                     squeeze_periods += 1
-                else:
+                else: 
                     break
-            
-            expansion_potential = min(1.0, squeeze_periods / 10)  # Max at 10 periods
-        else:
-            expansion_potential = 0.0
-            squeeze_periods = 0
-        
-        # Recent volatility change
-        if len(recent_atr) >= 2:
-            recent_change = ((recent_atr.iloc[-1] / recent_atr.iloc[0]) - 1) * 100
-        else:
-            recent_change = 0.0
-        
-        return {
-            "squeeze_detected": squeeze_detected,
-            "squeeze_periods": squeeze_periods,
-            "expansion_potential": round(expansion_potential, 3),
-            "recent_volatility_change_pct": round(recent_change, 2),
-            "breakout_setup": squeeze_detected and squeeze_periods >= 3
-        }
+        expansion = min(1.0, squeeze_periods / 10) if squeeze_periods else 0.0
+        recent_change = ((recent.iloc[-1] / (recent.iloc[0] if abs(recent.iloc[0]) > 1e-12 else 1e-12)) - 1) * 100 if len(recent) >= 2 else 0.0
+        return {"squeeze_detected": squeeze, "squeeze_periods": squeeze_periods,
+                "expansion_potential": round(expansion, 3),
+                "recent_volatility_change_pct": round(recent_change, 2),
+                "breakout_setup": squeeze and squeeze_periods >= 3}
     
-    def _generate_atr_signals(self, current_atr: float, volatility_analysis: Dict, trend_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate ATR-based signals."""
-        signals = []
-        
-        # Volatility level signals
-        volatility_level = volatility_analysis["current_level"]
-        
-        if volatility_level == "extremely_high":
-            signals.append({
-                "type": "high_volatility_warning",
-                "strength": "high",
-                "reason": "ATR at extremely high levels, increased risk",
-                "confidence": 0.8
-            })
-        elif volatility_level == "low":
-            signals.append({
-                "type": "low_volatility_alert",
-                "strength": "medium",
-                "reason": "ATR at low levels, potential breakout setup",
-                "confidence": 0.7
-            })
-        
-        # Trend signals
-        if trend_analysis:
-            trend_interpretation = trend_analysis.get("interpretation", "")
-            
-            if "expanding_strongly" in trend_interpretation:
-                signals.append({
-                    "type": "volatility_expansion",
-                    "strength": "medium",
-                    "reason": "ATR expanding strongly, momentum building",
-                    "confidence": 0.7
-                })
-            elif "contracting_strongly" in trend_interpretation:
-                signals.append({
-                    "type": "volatility_contraction",
-                    "strength": "medium", 
-                    "reason": "ATR contracting strongly, potential squeeze",
-                    "confidence": 0.7
-                })
-        
-        # Percentile rank signals
-        percentile_rank = volatility_analysis.get("percentile_rank", 50)
-        
-        if percentile_rank > 90:
-            signals.append({
-                "type": "extreme_volatility_high",
-                "strength": "high",
-                "reason": f"ATR in top {100-percentile_rank:.0f}% of range",
-                "confidence": 0.8
-            })
-        elif percentile_rank < 10:
-            signals.append({
-                "type": "extreme_volatility_low",
-                "strength": "medium",
-                "reason": f"ATR in bottom {percentile_rank:.0f}% of range",
-                "confidence": 0.7
-            })
-        
-        return signals
-    
-    def _calculate_atr_confidence(self, atr: pd.Series, volatility_analysis: Dict) -> float:
-        """Calculate ATR analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor
-        data_factor = min(1.0, len(atr) / 30)
-        confidence_factors.append(data_factor)
-        
-        # Data stability factor (ATR is generally stable)
-        std_atr = atr.std()
-        mean_atr = atr.mean()
-        stability_factor = max(0.5, min(1.0, 1.0 - (std_atr / mean_atr))) if mean_atr > 0 else 0.5
-        confidence_factors.append(stability_factor)
-        
-        # Clear signal factor
-        percentile_rank = volatility_analysis.get("percentile_rank", 50)
-        if percentile_rank > 80 or percentile_rank < 20:
-            signal_clarity = 0.8
-        else:
-            signal_clarity = 0.6
-        confidence_factors.append(signal_clarity)
-        
-        return round(np.mean(confidence_factors), 3)
     
     def _generate_atr_summary(self, current_atr: float, volatility_analysis: Dict, trend_analysis: Dict) -> str:
         """Generate human-readable ATR summary."""

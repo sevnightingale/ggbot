@@ -104,13 +104,10 @@ class MonitoringService:
                         if updated_count > 0:
                             # Get fresh positions to broadcast
                             positions = await self._get_positions(config_id)
-                            logger.info(f"🔍 POSITION MONITOR DEBUG: Got {len(positions)} positions from _get_positions for {config_id}")
                             
                             # Only broadcast if user is connected
                             if user_id in self.ws_manager.active_connections:
                                 await self._broadcast_position_update(user_id, config_id, positions)
-                            else:
-                                logger.info(f"🔍 POSITION MONITOR DEBUG: User {user_id} not connected, skipping broadcast")
                                 
                     except Exception as e:
                         logger.error(f"❌ Position update failed for {config_id}: {e}")
@@ -158,13 +155,10 @@ class MonitoringService:
                         
                     try:
                         # Calculate metrics
-                        logger.info(f"🔍 METRICS LOOP DEBUG: Calculating metrics for {config_id}")
                         metrics = await self._calculate_metrics(config_id)
-                        logger.info(f"🔍 METRICS LOOP DEBUG: Calculated metrics keys: {list(metrics.keys()) if metrics else 'None'}")
                         
                         # Get recent decisions (replaces HTTP polling)
                         decisions = await self._get_recent_decisions(config_id)
-                        logger.info(f"🔍 DECISIONS DEBUG: Got {len(decisions)} decisions for {config_id}")
                         
                         # Broadcast metrics update
                         await self._broadcast_metrics_update(user_id, config_id, metrics)
@@ -267,7 +261,6 @@ class MonitoringService:
             # Total P&L = realized from closed trades + unrealized from open positions
             total_pnl = realized_pnl + unrealized_pnl
             
-            logger.info(f"🔍 PNL DEBUG: Realized PnL: {realized_pnl}, Unrealized PnL: {unrealized_pnl}, Total: {total_pnl}")
             
             # Transform to match frontend interface (useBotMetrics.ts)
             return {
@@ -309,12 +302,8 @@ class MonitoringService:
     async def _get_positions(self, config_id: str) -> List[Dict[str, Any]]:
         """Get current positions for a config (extracted from existing endpoint)."""
         try:
-            logger.info(f"🔍 GET_POSITIONS DEBUG: Calling paper_trading.get_open_positions for {config_id}")
             positions = await self.paper_trading.get_open_positions(config_id)
-            logger.info(f"🔍 GET_POSITIONS DEBUG: Raw positions from service: {positions}")
-            result = positions if positions else []
-            logger.info(f"🔍 GET_POSITIONS DEBUG: Returning {len(result)} positions")
-            return result
+            return positions if positions else []
             
         except Exception as e:
             logger.error(f"❌ Failed to get positions for {config_id}: {e}")
@@ -431,19 +420,16 @@ class MonitoringService:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             
-            # DEBUGGING: Log the actual positions data being sent
-            logger.info(f"🔍 POSITION DEBUG: Sending {len(positions)} positions for {config_id}")
-            logger.info(f"🔍 POSITION DEBUG: Raw positions data: {positions}")
-            
             await self.ws_manager.broadcast_to_user(user_id, message)
             
-            # Always log position updates now for debugging
+            # Only log position updates occasionally to reduce spam
             if hasattr(self, 'position_broadcast_count'):
                 self.position_broadcast_count += 1
             else:
                 self.position_broadcast_count = 1
             
-            logger.info(f"📡 Position update #{self.position_broadcast_count} sent to {user_id} for {config_id} with {len(positions)} positions")
+            if self.position_broadcast_count % 10 == 0:
+                logger.info(f"📡 Position update #{self.position_broadcast_count} sent to {user_id} for {config_id}")
             
         except Exception as e:
             logger.error(f"❌ Failed to broadcast position update: {e}")
@@ -458,14 +444,9 @@ class MonitoringService:
                 "timestamp": datetime.now(timezone.utc).isoformat()
             }
             
-            # DEBUGGING: Log the actual metrics data being sent
-            logger.info(f"🔍 METRICS DEBUG: Sending metrics for {config_id}")
-            logger.info(f"🔍 METRICS DEBUG: Balance: {metrics.get('balance', 'MISSING')}")
-            logger.info(f"🔍 METRICS DEBUG: Total PnL: {metrics.get('totalPnL', 'MISSING')}")
-            logger.info(f"🔍 METRICS DEBUG: Raw metrics: {metrics}")
-            
             await self.ws_manager.broadcast_to_user(user_id, message)
-            logger.info(f"📡 Metrics update sent to {user_id} for {config_id}")
+            # Reduced logging for metrics updates
+            pass
             
         except Exception as e:
             logger.error(f"❌ Failed to broadcast metrics update: {e}")

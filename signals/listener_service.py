@@ -95,7 +95,7 @@ class GGShotSignalSource(SignalSource):
             # Create session in project directory
             session_dir = os.path.join(PROJECT_DIR, 'sessions')
             os.makedirs(session_dir, exist_ok=True)
-            session_path = os.path.join(session_dir, 'signal_listener_session')
+            session_path = os.path.join(session_dir, 'ggshot_session')
             
             self.client = TelegramClient(session_path, self.api_id, self.api_hash)
             await self.client.start()
