@@ -1,10 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { createBrowserClient } from '@/lib/supabase-client'
-import { useBotStore } from '@/store/botStore'
+import { createClient } from '@/lib/supabase'
+import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
 import { useBotStatus } from './hooks/useBotStatus'
+import { useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
 
 // Local components
 import GGBot from './components/GGBot'
@@ -14,48 +16,73 @@ import PerformancePanel from './components/PerformancePanel'
 import ActivityPanel from './components/ActivityPanel'
 
 export default function DashboardV2Page() {
-  // Authentication
-  const supabase = createBrowserClient()
-  const [userId, setUserId] = useState<string | undefined>(undefined)
+  // Authentication (matching old dashboard)
+  const supabase = createClient()
+  const router = useRouter()
+  const [user, setUser] = useState<User | null>(null)
+  const [isLoadingAuth, setIsLoadingAuth] = useState(true)
 
   // Bot store and state
-  const { userBots, loadBots, startBot, stopBot, deleteBot, getBotById } = useBotStore()
+  const { 
+    getBotsByUser,
+    getBotById,
+    startBot,
+    stopBot,
+    deleteBot,
+    loadBots
+  } = useBotStore()
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
-  const [selectedBot, setSelectedBot] = useState<any | null>(null)
+  const [selectedBot, setSelectedBot] = useState<Bot | null>(null)
 
-  // WebSocket connection
-  const { isConnected: isWebSocketConnected } = useBotWebSocket(userId)
-
-  // Get current bot data
-  const currentBotConfig = selectedConfigId ? getBotById(selectedConfigId) : userBots[0] || null
-  
-  // Get unified bot status using our new hook
-  const botStatus = useBotStatus(currentBotConfig)
-
-  // Initialize user and load bots
+  // Get current user from Supabase (matching old dashboard)
   useEffect(() => {
-    const initializeUser = async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (session?.user?.id) {
-          setUserId(session.user.id)
-          await loadBots(session.user.id)
-        }
-      } catch (error) {
-        console.error('Failed to initialize user:', error)
-      }
+    const getUser = async () => {
+      const { data: { user } } = await supabase.auth.getUser()
+      setUser(user)
+      setIsLoadingAuth(false)
     }
+    getUser()
+  }, [supabase.auth])
 
-    initializeUser()
-  }, [supabase, loadBots])
+  const userId = user?.id
 
-  // Auto-select first bot when bots are loaded
+  // Load bots from V2 API on mount (matching old dashboard pattern)
   useEffect(() => {
-    if (userBots.length > 0 && !selectedConfigId) {
+    if (userId) {
+      console.log('📡 Dashboard V2 loading bots for userId:', userId)
+      loadBots(userId)
+    }
+  }, [userId, loadBots])
+
+  // Get user's bots directly from store (reactive to store changes)
+  const userBots = userId ? getBotsByUser(userId) : []
+
+  // WebSocket connection for real-time updates
+  const { isConnected: isWebSocketConnected, isLoadingBots } = useBotWebSocket(userId)
+
+  // Auto-select first bot if none selected and bots exist
+  useEffect(() => {
+    if (!selectedConfigId && userBots.length > 0) {
       setSelectedConfigId(userBots[0].config_id)
     }
-  }, [userBots.length, selectedConfigId])
+  }, [selectedConfigId, userBots])
+
+  // Get current bot data
+  const currentBot = selectedConfigId ? getBotById(selectedConfigId) : userBots[0] || null
+  
+  // Get unified bot status using our corrected hook
+  const botStatus = useBotStatus(currentBot || null)
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
 
   // Bot navigation functions
   const nextBot = () => {
@@ -73,7 +100,7 @@ export default function DashboardV2Page() {
   }
 
   // Bot action handlers
-  const handleBotClick = (bot: any) => {
+  const handleBotClick = (bot: Bot) => {
     setSelectedBot(bot)
     setIsConfigOpen(true)
   }
@@ -128,133 +155,184 @@ export default function DashboardV2Page() {
     setIsConfigOpen(true)
   }
 
-  // Loading state
-  if (!userId) {
+  // Authentication guard (matching old dashboard)
+  if (isLoadingAuth) {
     return (
-      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center">
-        <div className="text-bone-200">Loading...</div>
+      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-bone-300">Loading...</p>
+        </div>
+      </div>
+    )
+  }
+  
+  if (!user) {
+    router.push('/login')
+    return null
+  }
+
+  // Show loading state while fetching bots
+  if (isLoadingBots) {
+    return (
+      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center p-8">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-bone-300">Loading bots...</p>
+        </div>
       </div>
     )
   }
 
-  // No bots state
+  // Show empty state if no bots (matching old dashboard)
   if (userBots.length === 0) {
     return (
-      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center">
-        <div className="text-center">
-          <div className="text-bone-200 text-xl mb-4">No bots configured</div>
-          <button
-            onClick={handleAddBot}
-            className="bg-blue-600 hover:bg-blue-700 text-white px-6 py-2 rounded"
-          >
-            Create Your First Bot
-          </button>
+      <div className="min-h-screen bg-charcoal-700 relative">
+        <div className="flex items-center justify-center p-8 min-h-screen">
+          <div className="flex flex-col items-center gap-4 max-w-md text-center">
+            <div className="text-6xl mb-4">🤖</div>
+            <h2 className="text-xl text-bone-200 mb-2">Welcome to GGBot Dashboard V2</h2>
+            <p className="text-gray-400 mb-6">You don&apos;t have any bots configured yet. Create your first bot to get started with AI-powered trading.</p>
+            <div className="flex gap-4 flex-col sm:flex-row">
+              <button
+                onClick={handleAddBot}
+                className="px-6 py-3 bg-bone-200 text-charcoal-900 rounded-lg hover:bg-bone-300 transition-colors"
+              >
+                Create Your First Bot
+              </button>
+              <button
+                onClick={handleLogout}
+                className="px-6 py-3 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Bottom Sheet Config */}
+        <GGBotConfig 
+          bot={selectedBot}
+          isOpen={isConfigOpen}
+          onClose={handleConfigClose}
+          onConfigSaved={handleConfigSaved}
+        />
       </div>
     )
   }
 
   return (
-    <div className="min-h-screen bg-charcoal-900 p-6">
-      {/* Three Column Grid Layout */}
-      <div className="dashboard-grid h-full grid grid-cols-4 gap-6 max-w-7xl mx-auto">
-        
-        {/* Left Column - Performance Panel */}
-        <div className="col-span-1">
-          <React.Suspense fallback={<div>Loading performance...</div>}>
+    <div className="min-h-screen bg-charcoal-700 relative">
+      {/* 3-Column Layout with Sharp Dividers (matching old dashboard) */}
+      <div className="min-h-screen flex items-center justify-center p-8">
+        <div className="w-full max-w-[1680px] mx-auto grid grid-cols-[1fr_400px_1fr] gap-8 relative">
+          
+          {/* Left Column - Performance Panel */}
+          <div className="hidden lg:block">
             <PerformancePanel 
               botId={selectedConfigId} 
-              className="h-full"
+              className="min-h-[500px]"
             />
-          </React.Suspense>
-        </div>
+          </div>
 
-        {/* Center Column - Bot Carousel */}
-        <div className="col-span-2 flex flex-col items-center justify-center">
-          
-          {/* WebSocket Status Indicator */}
-          <div className="mb-4">
-            <div className={`text-sm ${isWebSocketConnected ? 'text-green-400' : 'text-red-400'}`}>
-              WebSocket: {isWebSocketConnected ? 'Connected' : 'Disconnected'}
+          {/* Center Column - Bot Carousel (matching old dashboard layout) */}
+          <div className="flex flex-col items-center justify-center">
+            
+            {/* WebSocket & Debug Status */}
+            <div className="mb-4 text-center">
+              <div className={`text-xs ${isWebSocketConnected ? 'text-green-400' : 'text-red-400'}`}>
+                WebSocket: {isWebSocketConnected ? 'Connected' : 'Disconnected'}
+              </div>
+              {/* Debug info */}
+              <div className="text-xs text-gray-500 mt-1">
+                Status: {botStatus.currentState} | Active: {botStatus.isActive ? 'Yes' : 'No'}
+              </div>
             </div>
-          </div>
 
-          {/* GGBot with navigation arrows */}
-          <div className="flex items-center gap-10 mb-6 px-4">
-            <button 
-              className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
-                userBots.length <= 1
-                  ? 'text-bone-500 cursor-not-allowed opacity-50' 
-                  : 'text-bone-300 hover:text-bone-200 hover:scale-110'
-              }`}
-              onClick={prevBot}
-              disabled={userBots.length <= 1}
-            >
-              ‹
-            </button>
-            
-            <GGBot
-              name={currentBotConfig?.name || 'Bot'}
-              status={botStatus.currentState}
-              message={botStatus.message || ''}
-              showSpinner={botStatus.showSpinner}
-              onClick={() => currentBotConfig && handleBotClick(currentBotConfig)}
-            />
-            
-            <button 
-              className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
-                userBots.length <= 1
-                  ? 'text-bone-500 cursor-not-allowed opacity-50' 
-                  : 'text-bone-300 hover:text-bone-200 hover:scale-110'
-              }`}
-              onClick={nextBot}
-              disabled={userBots.length <= 1}
-            >
-              ›
-            </button>
-          </div>
+            {/* GGBot with flanking arrows (matching old dashboard) */}
+            <div className="flex items-center gap-10 mb-6 px-4">
+              <button 
+                className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
+                  userBots.length <= 1
+                    ? 'text-bone-500 cursor-not-allowed opacity-50' 
+                    : 'text-bone-300 hover:text-bone-200 hover:scale-110'
+                }`}
+                onClick={prevBot}
+                disabled={userBots.length <= 1}
+              >
+                ‹
+              </button>
+              
+              <GGBot
+                name={currentBot?.name || 'Bot'}
+                status={botStatus.currentState}
+                message={botStatus.message || ''}
+                showSpinner={botStatus.showSpinner}
+                onClick={() => currentBot && handleBotClick(currentBot)}
+              />
+              
+              <button 
+                className={`text-4xl transition-all duration-200 min-w-[44px] min-h-[44px] flex items-center justify-center ${
+                  userBots.length <= 1
+                    ? 'text-bone-500 cursor-not-allowed opacity-50' 
+                    : 'text-bone-300 hover:text-bone-200 hover:scale-110'
+                }`}
+                onClick={nextBot}
+                disabled={userBots.length <= 1}
+              >
+                ›
+              </button>
+            </div>
 
-          {/* Dots Navigation */}
-          <div className="flex justify-center mb-4">
-            <div className="flex items-center gap-3">
-              {userBots.map((bot) => (
-                <button
-                  key={bot.config_id}
-                  className={`w-3 h-3 rounded-full transition-all duration-200 ${
-                    bot.config_id === selectedConfigId
-                      ? 'bg-bone-200'
-                      : 'bg-bone-500 hover:bg-bone-300'
-                  }`}
-                  onClick={() => setSelectedConfigId(bot.config_id)}
+            {/* Dots navigation (matching old dashboard) */}
+            <div className="flex justify-center mb-4">
+              <div className="flex items-center gap-3">
+                {userBots.map((bot) => (
+                  <button
+                    key={bot.config_id}
+                    className={`w-3 h-3 rounded-full transition-all duration-200 ${
+                      bot.config_id === selectedConfigId
+                        ? 'bg-bone-200'
+                        : 'bg-bone-500 hover:bg-bone-300'
+                    }`}
+                    onClick={() => setSelectedConfigId(bot.config_id)}
+                  />
+                ))}
+              </div>
+            </div>
+
+            {/* Floating Action Buttons - positioned below dots */}
+            <div>
+              {currentBot && (
+                <FloatingActionButtons 
+                  currentBot={currentBot}
+                  onStart={handleFloatingStart}
+                  onDelete={handleDeleteBot}
+                  onAdd={handleAddBot}
                 />
-              ))}
+              )}
             </div>
           </div>
 
-          {/* Floating Action Buttons */}
-          {currentBotConfig && (
-            <FloatingActionButtons
-              currentBot={currentBotConfig}
-              onStart={handleFloatingStart}
-              onDelete={handleDeleteBot}
-              onAdd={handleAddBot}
-            />
-          )}
-        </div>
-
-        {/* Right Column - Activity Panel */}
-        <div className="col-span-1">
-          <React.Suspense fallback={<div>Loading activity...</div>}>
+          {/* Right Column - Activity Panel */}
+          <div className="hidden lg:block">
             <ActivityPanel 
               botId={selectedConfigId}
-              className="h-full"
+              className="min-h-[500px]"
             />
-          </React.Suspense>
+          </div>
         </div>
       </div>
 
-      {/* Configuration Modal */}
-      <GGBotConfig
+      {/* Bot Count Info (matching old dashboard) */}
+      {userBots.length > 0 && currentBot && (
+        <div className="absolute bottom-4 left-4 text-footnote text-gray-400">
+          Showing {userBots.length} bot{userBots.length !== 1 ? 's' : ''} • Selected: {currentBot.name}
+        </div>
+      )}
+
+      {/* Bottom Sheet Config */}
+      <GGBotConfig 
         bot={selectedBot}
         isOpen={isConfigOpen}
         onClose={handleConfigClose}

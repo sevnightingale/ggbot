@@ -391,6 +391,38 @@ export class ApiClient {
       return false
     }
   }
+
+  // Scheduler Management
+  async getSchedulerStatus(): Promise<{
+    status: string
+    scheduler_running: boolean
+    active_jobs: Array<{
+      job_id: string
+      config_id: string
+      timeframe: string
+      next_run: string | null
+      misfire_grace_time: number
+    }>
+    job_count: number
+  }> {
+    console.log('🔍 API Call: getSchedulerStatus to', `${this.baseUrl}/api/v2/scheduler/status`)
+    
+    try {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/scheduler/status`)
+      console.log('📡 Response status:', response.status, response.statusText)
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ API Error:', error)
+        throw new Error(`Failed to get scheduler status: ${error}`)
+      }
+      const result = await response.json()
+      console.log('✅ Scheduler status loaded:', result)
+      return result
+    } catch (err) {
+      console.error('💥 Network error:', err)
+      throw err
+    }
+  }
 }
 
 export const apiClient = new ApiClient()
