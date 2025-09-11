@@ -798,11 +798,57 @@ class GGBotOrchestrator:
                 "reasoning": decision_result.get("reasoning", "V2 Decision Engine decision")
             }
             
-            # Execute trade via paper trading service
-            trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
-            
-            self._log.info(f"V2 Trading completed: {trade_result.get('status')} for {symbol}")
-            return trade_result
+            # Handle different trading actions
+            if trading_action == "close":
+                # For close actions, we need to close existing positions
+                # First, get any open positions for this symbol and config
+                try:
+                    # Check if there are open positions for this config and symbol
+                    open_positions = []
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("""
+                                SELECT trade_id, symbol, side FROM paper_trades 
+                                WHERE config_id = %s AND symbol = %s AND status = 'open'
+                                ORDER BY opened_at DESC LIMIT 1
+                            """, (config.config_id, symbol))
+                            result = cur.fetchone()
+                            if result:
+                                open_positions.append({
+                                    'trade_id': result[0],
+                                    'symbol': result[1], 
+                                    'side': result[2]
+                                })
+                    
+                    if not open_positions:
+                        return {
+                            "status": "skipped",
+                            "reason": f"No open positions to close for {symbol}",
+                            "action": "close"
+                        }
+                    
+                    # Close the most recent open position
+                    position = open_positions[0]
+                    trade_result = await self.paper_trading.close_position(
+                        position['trade_id'], 
+                        reason="ai_decision"
+                    )
+                    
+                    self._log.info(f"V2 Position closed: {trade_result.get('status')} for {symbol}")
+                    return trade_result
+                    
+                except Exception as e:
+                    self._log.error(f"Failed to close position for {symbol}: {e}")
+                    return {
+                        "status": "error",
+                        "error": f"Failed to close position: {str(e)}"
+                    }
+            else:
+                # For long/short actions, execute normal trade
+                trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
+                
+                self._log.info(f"V2 Trading completed: {trade_result.get('status')} for {symbol}")
+                return trade_result
             
         except Exception as e:
             self._log.error(f"V2 Trading failed: {e}")

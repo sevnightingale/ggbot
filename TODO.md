@@ -1,7 +1,7 @@
 # TODO_V2.md - Focused Implementation Plan
 
-**Status**: Core pipeline operational ✅ - Backend monitoring COMPLETE ✅ - Frontend integration pending  
-**Priority**: Add decisions broadcasting → Frontend WebSocket integration → LLM provider system → Scheduler automation
+**Status**: Core pipeline operational ✅ - Backend monitoring COMPLETE ✅ - Frontend WebSocket integration COMPLETE ✅  
+**Priority**: Restart frontend server → Test real-time updates → LLM provider system → Scheduler automation
 
 
 ## CRITICAL - Paper Trading Foundation
@@ -56,7 +56,7 @@
   - [x] Keep existing bot_status messages unchanged ✅
 - [x] Integrate monitoring service into ggbot.py lifespan ✅
 - [x] Set up separate logging for monitoring service ✅
-- [ ] Add decisions broadcasting to complete activity data (eliminate useBotActivity polling)
+- [x] Add decisions broadcasting to complete activity data (eliminate useBotActivity polling) ✅
 
 ## IMMEDIATE FIXES - Current Execution Issues
 
@@ -66,32 +66,39 @@
 - [x] Fix missing 'trading' and 'completed' WebSocket messages for complete UI state flow
 - [x] Fix 504 Gateway Timeout errors preventing manual trigger execution
 
-## NEXT - Complete WebSocket Integration (Replace Polling)
+## IMMEDIATE - Complete WebSocket Integration Testing
 
-**Backend broadcasting positions/metrics/scheduler ✅ - Decisions + Frontend handlers pending**
+**Backend broadcasting ALL data ✅ - Frontend handlers implemented ✅ - Testing pending**
 
-### Backend - Add Decisions Broadcasting
-- [ ] Add `_get_recent_decisions()` method to monitoring service
-- [ ] Include decisions in activity data (positions + decisions together)
-- [ ] Broadcast decisions_update or enhance position_update message
-- [ ] Test decisions appear in WebSocket stream every 7 seconds
+### Backend - Decisions Broadcasting COMPLETE ✅
+- [x] Add `_get_recent_decisions()` method to monitoring service ✅
+- [x] Include decisions in metrics monitoring loop ✅
+- [x] Broadcast `decisions_update` messages every 7 seconds ✅
+- [x] Test decisions appear in WebSocket stream ✅
 
-### Frontend - WebSocket Handler Integration  
-- [ ] Update frontend to handle all new WebSocket message types:
-  - [ ] position_update messages in botStore.ts
-  - [ ] metrics_update messages in botStore.ts  
-  - [ ] scheduler_update messages in botStore.ts
-  - [ ] decisions_update messages (or enhanced activity data)
-- [ ] Remove frontend setInterval polling hooks:
-  - [ ] Remove `setInterval(fetchSchedulerStatus, 30000)` from useSchedulerStatus.ts
-  - [ ] Remove `setInterval(() => fetchActivity(botId), 30000)` from useBotActivity.ts
-- [ ] Add new store methods to botStore.ts:
-  - [ ] updateBotPositions(configId, positions)
-  - [ ] updateBotMetrics(configId, metrics) 
-  - [ ] updateSchedulerStatus(schedulerStatus)
-  - [ ] updateBotActivity(configId, {positions, decisions})
-- [ ] Test complete monitoring service with live data
-- [ ] Verify real-time updates eliminate need for polling
+### Frontend - WebSocket Handler Integration COMPLETE ✅ 
+- [x] Update frontend to handle all new WebSocket message types:
+  - [x] position_update messages in botStore.ts ✅
+  - [x] metrics_update messages in botStore.ts ✅
+  - [x] scheduler_update messages in botStore.ts ✅
+  - [x] decisions_update messages in botStore.ts ✅
+- [x] Remove frontend setInterval polling hooks:
+  - [x] Remove `setInterval(fetchSchedulerStatus, 30000)` from useSchedulerStatus.ts ✅
+  - [x] Remove `setInterval(() => fetchActivity(botId), 30000)` from useBotActivity.ts ✅
+- [x] Add new store methods to botStore.ts:
+  - [x] updateBotPositions(configId, positions) ✅
+  - [x] updateBotMetrics(configId, metrics) ✅
+  - [x] updateSchedulerStatus(schedulerStatus) ✅
+  - [x] updateBotDecisions(configId, decisions) ✅
+- [x] Update hooks to read from store instead of HTTP APIs ✅
+
+### Testing - Frontend Server Restart Required
+- [ ] **RESTART FRONTEND SERVER** - Changes need to take effect
+- [ ] Verify HTTP polling stops (no more `get_bot_decisions` in logs)
+- [ ] Test real-time dashboard updates every 7 seconds
+- [ ] Confirm position P&L updates in real-time
+- [ ] Verify scheduler status updates without polling
+- [ ] Test decisions appear immediately in activity panel
 
 ## BACKEND - API & Database
 
@@ -174,8 +181,10 @@
 - ✅ Multi-timeframe market data flows through the entire system
 - ✅ Manual trigger fully operational with proper UI feedback
 
-**Backend Monitoring 95% Complete**: Real-time position updates, metrics, and scheduler data streaming via WebSocket every 7 seconds. Separate log files: `orchestrator.log` (business logic), `monitoring.log` (background tasks), `ggbot.log` (system). Missing: decisions broadcasting.
+**Backend Monitoring COMPLETE**: Real-time position updates, metrics, scheduler data, AND decisions streaming via WebSocket every 7 seconds. Separate log files: `orchestrator.log` (business logic), `monitoring.log` (background tasks), `ggbot.log` (system). ✅
 
-**Next Focus**: Add decisions to monitoring service, then frontend WebSocket integration to replace HTTP polling and complete real-time dashboard experience.
+**Frontend WebSocket Integration COMPLETE**: All hooks updated to use store data, HTTP polling removed, WebSocket handlers implemented for all 4 message types. ✅
 
-**Logs Show**: `get_bot_decisions` being called every 30-60 seconds from frontend HTTP polling - this will be eliminated once decisions are broadcast via WebSocket.
+**Next Focus**: Restart frontend server to activate changes, then test complete real-time dashboard experience.
+
+**Expected Result**: Once frontend restarts, `get_bot_decisions` HTTP polling will stop and dashboard will update every 7 seconds via WebSocket instead of 30-second polling.

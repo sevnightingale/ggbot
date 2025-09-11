@@ -11,10 +11,11 @@ This document outlines the comprehensive real-time monitoring service for the gg
 - **Position monitoring**: Updates every 7 seconds with P&L calculations and stop-loss/take-profit triggers
 - **Metrics monitoring**: Account summary and performance data broadcast via WebSocket
 - **Scheduler monitoring**: Real-time scheduler status updates
-- **WebSocket broadcasting**: Three message types operational:
+- **WebSocket broadcasting**: Four message types operational:
   - `position_update` - Open positions with unrealized P&L
   - `metrics_update` - Account metrics and performance
   - `scheduler_update` - Scheduler status and active jobs
+  - `decisions_update` - Recent trading decisions (NEW)
 - **Separate logging**: `monitoring.log` with aggressive rotation (10MB, 2 days, gzipped)
 - **Resource efficient**: ~7% CPU, ~15MB RAM for 75 bots
 
@@ -24,11 +25,12 @@ This document outlines the comprehensive real-time monitoring service for the gg
 - **Paper trading**: Executing trades with correct service
 - **WebSocket status flow**: Complete extraction → decision → trading → completed
 
-### ⚠️ Frontend Integration Pending
-- **HTTP polling still active**: `useBotActivity.ts` and `useSchedulerStatus.ts` poll every 30 seconds
-- **Decisions not broadcast**: Need to add decisions to monitoring service
-- **WebSocket handlers missing**: Frontend needs handlers for new message types
-- **Store methods needed**: `updateBotPositions()`, `updateBotMetrics()`, `updateSchedulerStatus()`
+### ✅ Frontend Integration COMPLETE
+- **HTTP polling removed**: `useBotActivity.ts` and `useSchedulerStatus.ts` no longer poll (restart required)
+- **Decisions broadcasting active**: Backend now broadcasts `decisions_update` every 7 seconds
+- **WebSocket handlers implemented**: Frontend handles all 4 message types in botStore.ts
+- **Store methods added**: `updateBotPositions()`, `updateBotMetrics()`, `updateSchedulerStatus()`, `updateBotDecisions()`
+- **Hooks updated**: All hooks now read from store instead of HTTP APIs
 
 ## Architecture Design
 
@@ -67,6 +69,13 @@ This document outlines the comprehensive real-time monitoring service for the gg
 {
   "type": "scheduler_update",
   "scheduler_status": {...},
+  "timestamp": "..."
+}
+
+{
+  "type": "decisions_update",
+  "config_id": "...",
+  "decisions": [...],
   "timestamp": "..."
 }
 
@@ -195,10 +204,10 @@ if monitoring_task and not monitoring_task.done():
     logger.info("✅ Monitoring service stopped")
 ```
 
-### ⏳ Phase 3: Frontend WebSocket Handler Updates (PENDING)
+### ✅ Phase 3: Frontend WebSocket Handler Updates (COMPLETE)
 **File**: `frontend/store/botStore.ts`
 
-**MISSING**: Need to add decisions to backend monitoring service before implementing frontend
+**IMPLEMENTED**: All WebSocket handlers and store methods added, HTTP polling removed
 
 ```typescript
 // Extend existing message handler
@@ -274,22 +283,29 @@ updateSchedulerStatus: (schedulerStatus: SchedulerStatus) => {
 }
 ```
 
-### ⏳ Phase 4: Remove HTTP Polling (PENDING)
-**Files to modify**:
-- `frontend/app/dashboard-v2/hooks/useSchedulerStatus.ts` - Remove `setInterval(fetchSchedulerStatus, 30000)`
-- `frontend/app/dashboard-v2/hooks/useBotActivity.ts` - Remove `setInterval(() => fetchActivity(botId), 30000)` 
-- `frontend/app/dashboard-v2/hooks/useBotMetrics.ts` - Add store integration for real-time updates
+### ✅ Phase 4: Remove HTTP Polling (COMPLETE)
+**Files modified**:
+- `frontend/app/dashboard-v2/hooks/useSchedulerStatus.ts` - Removed `setInterval(fetchSchedulerStatus, 30000)` ✅
+- `frontend/app/dashboard-v2/hooks/useBotActivity.ts` - Removed `setInterval(() => fetchActivity(botId), 30000)` ✅
+- `frontend/app/dashboard-v2/hooks/useBotMetrics.ts` - Added store integration for real-time updates ✅
 
-Replace with WebSocket-only data flow.
+WebSocket-only data flow implemented.
 
-### 🔄 Phase 5: Add Decisions Broadcasting (NEXT STEP)
+### ✅ Phase 5: Add Decisions Broadcasting (COMPLETE)
 **File**: `core/monitoring/service.py`
 
+**Implemented**:
+- Added `_get_recent_decisions()` method to fetch from `decisions` table ✅
+- Integrated decisions into metrics monitoring loop ✅
+- Broadcasting `decisions_update` messages every 7 seconds ✅
+- Frontend handlers process decisions and store in botStore ✅
+
+### 🔄 Phase 6: Testing and Activation (CURRENT)
 **Requirements**:
-- Fetch recent decisions from `decisions` table (last 10 per config)
-- Include in metrics monitor loop or create separate decisions monitor
-- Broadcast as part of activity data or separate `decisions_update` message
-- Link decisions to trades via `decision_id` foreign key
+- **Restart frontend development server** - Code changes need to take effect
+- Verify HTTP polling stops (monitor logs for `get_bot_decisions`)
+- Test real-time dashboard updates every 7 seconds
+- Confirm position P&L, metrics, scheduler, and decisions update live
 
 ## Existing Position Monitor (Reference)
 
