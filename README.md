@@ -22,16 +22,17 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 **🔍 [Extraction Agent](extraction/)** - Market Intelligence Gathering
 - **V2 System**: 21 advanced preprocessors with pandas-ta integration (12x performance improvement)
-- **Browser automation** via Playwright for TradingView signal interpretation
-- **Technical indicators** via MCP servers (RSI, MACD, 20+ professional indicators)
-- **Multi-source data fusion** from exchanges, news feeds, and sentiment analysis
-- **Dual storage**: File system + Supabase database with real-time updates
+- **Direct Hummingbot API**: Real-time market data without MCP overhead
+- **Technical indicators**: Pure Python pandas-ta integration (RSI, MACD, 20+ professional indicators)
+- **Multi-timeframe analysis**: 5m, 15m, 30m, 1h, 4h, 1d with consolidated data
+- **Supabase database storage**: Real-time updates with orchestrator integration
 
 **🧠 [Decision Agent](decision/)** - AI-Powered Trading Intelligence  
-- **Advanced reasoning LLMs** (DeepSeek R1, GPT-4) for market analysis
-- **Natural language strategies** that adapt dynamically to market conditions
+- **GPT-5 Integration**: High-effort reasoning via OpenAI Responses API
+- **Template-based prompts**: Opportunity analysis, signal validation, position management
 - **Multi-mode operation**: New trade discovery + Active trade management
-- **Risk-aware decision making** with confidence scoring and position sizing
+- **User customization**: Natural language strategy definition with config integration
+- **Risk-aware decisions**: Confidence scoring and position sizing algorithms
 
 **⚡ [Trading Agent](trading/)** - Precision Execution Engine
 - **Paper Trading Engine** - Professional-grade simulation with real Hummingbot market data
@@ -48,36 +49,33 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
 │                     Next.js Frontend                           │
-│                   (Multi-Bot Management)                       │
+│                 (Dashboard V2 + Real-time UI)                  │
 ├─────────────────────────────────────────────────────────────────┤
-│                 Central API Orchestration                      │
-│                    (main_api.py)                               │
+│                 V2 Orchestrator (ggbot.py)                     │
+│              APScheduler + WebSocket + FastAPI                 │
 │              ┌─────────────┬─────────────┬─────────────┐       │
-│              │ Agent APIs  │ Dashboard   │ Config Mgmt │       │
-│              │             │ Analytics   │             │       │
-├──────────────┼─────────────┼─────────────┼─────────────┼───────┤
 │              │ Extraction  │ Decision    │ Trading     │       │
-│              │ Modules     │ Modules     │ Modules     │       │
+│              │    V2       │ Engine V2   │ Paper API   │       │
 ├──────────────┼─────────────┼─────────────┼─────────────┼───────┤
 │                   Core Infrastructure                          │
 │  ┌─────────────┬─────────────┬─────────────┬─────────────┐     │
-│  │ MCP Servers │ Monitoring  │ Config Mgmt │ Database    │     │
-│  │             │ & Alerts    │             │ (PostgreSQL)│     │
+│  │ Hummingbot  │ Monitoring  │ Config Mgmt │ Database    │     │
+│  │ API         │ & Alerts    │             │ (Supabase)  │     │
 └──┴─────────────┴─────────────┴─────────────┴─────────────┴─────┘
 ```
 
 ### **[Core Infrastructure](core/)**
 
-**🔧 [MCP Servers](core/mcp/)** - Standardized Tool Integration
-- **Crypto Indicators MCP**: 20 professionally preprocessed technical indicators
-- **CCXT MCP Server**: Universal exchange connectivity and market data
-- **Unified tool interface** for consistent agent-to-service communication
+**🔧 [Data Integration](extraction/v2/)** - Direct API Connections
+- **Hummingbot API**: Real-time market data and price feeds (localhost:8888)
+- **pandas-ta Library**: 20+ technical indicators with pure Python processing
+- **Supabase Database**: Real-time data storage and retrieval
 
-**⏰ [Autonomous Scheduler](core/scheduler/)** - Production-Ready Bot Scheduling
-- **APScheduler integration** with Redis idempotency for zero-drift execution
+**⏰ [Autonomous Scheduler](core/scheduler/)** - V2 Orchestrator Integration
+- **APScheduler integration** in ggbot.py for zero-drift execution
 - **Multi-timeframe support**: 5m, 15m, 30m, 1h, 4h, 1d with candle alignment
-- **Startup reconciliation** automatically restores active bots
-- **Real-time WebSocket updates** with next execution timestamps
+- **Startup reconciliation** automatically restores active bots from Supabase
+- **Real-time WebSocket updates** with countdown timers and execution status
 
 **🎯 [Symbol Standardization](core/symbols/)** - Universal Trading Pair Management
 - **141 trading pairs** with comprehensive format support across all systems
@@ -96,31 +94,31 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 ### **[Database Layer](database/)**
 
-**Production-ready PostgreSQL schema** supporting:
+**Production-ready Supabase PostgreSQL** supporting:
 - **Multi-user isolation** with user_id + config_id architecture
-- **Complete audit trail** via strategy_runs for decision transparency
-- **Universal trade lifecycle** tracking from signal to settlement
+- **Paper trading tables**: paper_accounts, paper_trades with real-time updates
+- **Decision audit trail** via decisions table for full transparency
 - **Migration system** for schema evolution and deployment
 
 ### **[Frontend Platform](frontend/)**
 
 **Professional Next.js application** featuring:
-- **V2 Integration**: Dashboard connected to V2 orchestrator with Supabase auth
+- **Dashboard V2**: Real-time interface connected to ggbot.py orchestrator
 - **Multi-bot management** with intuitive configuration interfaces  
-- **Real-time performance tracking** showing trades, P&L, and analytics
-- **Brutalist design system** optimized for trading professionals
-- **selectedConfigId architecture** for seamless bot switching and data management
+- **Real-time performance tracking** with WebSocket updates and countdown timers
+- **Manual testing tools**: Lightning bolt trigger for orchestrator debugging
+- **Supabase authentication** with JWT token-based API access
 
 ## Production Features
 
 ### Live Production Systems
 
 **🎯 [ggShot Signal Validation](signals/)** - V2 Production Signal Processing
-- **Generic signal framework** with ggShot as first implementation
-- **User-configured validation strategies** replacing hardcoded 4-pillar analysis
-- **Real-time Telegram integration** with publishing to user-specified channels
-- **Premium business model** gating via ggBase subscription tier
-- **Complete V2 integration** using standard extraction → decision → trading pipeline
+- **Signal validation mode** integrated into V2 decision engine
+- **Template-based prompt system** for flexible signal analysis
+- **Real-time Telegram integration** with publishing capabilities
+- **Premium business model** with subscription-based access
+- **V2 orchestrator integration** using extraction → decision → trading pipeline
 
 **🤖 [Autonomous Scheduling](core/scheduler/)** - Production Bot Management
 - **Zero-drift execution** aligned to market candle boundaries

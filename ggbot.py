@@ -17,6 +17,7 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import uvicorn
 import json
+import psycopg2.extras
 
 # APScheduler imports
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -52,7 +53,7 @@ from core.common.logger import logger
 # V2 Module Integration - Complete Integration
 from extraction.v2.extraction_engine import ExtractionEngineV2
 from decision.engine_v2 import DecisionEngineV2
-from trading.paper.service import PaperTradingService
+from trading.paper.supabase_service import SupabasePaperTradingService
 
 # Domain Models  
 from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
@@ -154,7 +155,7 @@ class GGBotOrchestrator:
     def __init__(self):
         self.config_service = config_service
         self.llm_service = llm_service
-        self.paper_trading = PaperTradingService()
+        self.paper_trading = SupabasePaperTradingService()
         self._log = logger.bind(component="orchestrator")
         
         # V2 Engine instances - created per request for proper isolation
@@ -417,15 +418,32 @@ class GGBotOrchestrator:
         # Handle new structure (selected_data_sources)
         if "selected_data_sources" in extraction_config:
             data_sources = extraction_config.get("selected_data_sources", {})
+            
+            # First, try to get timeframes from technical_analysis (most common case)
+            if "technical_analysis" in data_sources:
+                ta_config = data_sources["technical_analysis"]
+                if isinstance(ta_config, dict):
+                    ta_timeframes = ta_config.get("timeframes", [])
+                    if ta_timeframes:
+                        timeframes = ta_timeframes
+                        self._log.debug(f"Found {len(timeframes)} timeframes from technical_analysis: {timeframes}")
+                        return timeframes
+            
+            # Fallback: collect all unique timeframes from all sources with data_points
+            all_timeframes = set()
             for source_name, source_config in data_sources.items():
                 if isinstance(source_config, dict) and source_name != "signals":
-                    # Get timeframes from this source (use first source's timeframes)
-                    if timeframes == ["1h"]:  # Only override default
-                        source_timeframes = source_config.get("timeframes", ["1h"])
-                        if source_timeframes:
-                            timeframes = source_timeframes
-                            break
+                    # Only include sources that have actual data_points configured
+                    data_points = source_config.get("data_points", [])
+                    if data_points:  # Only consider sources with actual indicators
+                        source_timeframes = source_config.get("timeframes", [])
+                        all_timeframes.update(source_timeframes)
+            
+            if all_timeframes:
+                timeframes = list(all_timeframes)
+                self._log.debug(f"Found {len(timeframes)} timeframes from all sources: {timeframes}")
         
+        self._log.debug(f"Using timeframes: {timeframes}")
         return timeframes
     
     def _should_publish_signal(self, config: BotConfigV2, decision_result: Dict) -> bool:
@@ -1385,7 +1403,7 @@ async def get_bot_positions(
         from core.common.db import get_db_connection
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
                     SELECT symbol, side, entry_price, current_price, size_usd, 
                            unrealized_pnl, leverage, opened_at
@@ -1545,7 +1563,7 @@ async def get_bot_decisions(
             raise HTTPException(status_code=404, detail="Configuration not found")
         
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 # Query decisions for this config in the last N hours, ordered by newest first
                 cur.execute("""
                     SELECT 

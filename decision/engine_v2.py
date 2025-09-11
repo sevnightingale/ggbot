@@ -15,7 +15,7 @@ import openai
 from core.common.logger import logger
 from core.config import ConfigRepository, BotConfig, config_repo
 from core.common.db import get_db_connection
-from decision.providers.ccxt_provider import CCXTPriceProvider
+# Removed legacy CCXTPriceProvider - using MarketDataAdapter directly in _get_current_price method
 from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
 from decision.prompts.signal_validation import build_signal_validation_prompt
 from decision.prompts.position_management import build_position_management_prompt
@@ -545,6 +545,8 @@ Take Profit: {take_profit_text}
                         datetime.now(timezone.utc)
                     ))
                     
+                    conn.commit()  # Commit the transaction to save the decision
+                    
                     logger.bind(
                         config_id=self.config_id,
                         decision_id=decision_id,
@@ -1026,7 +1028,7 @@ ORIGINAL MESSAGE:
 
     async def _get_volume_confirmation(self, symbol: str, timeframe: str = '1h') -> str:
         """
-        Get volume confirmation analysis using CCXT provider.
+        Get volume confirmation analysis using existing market data.
         Based on ggShot founder's guidance on volume thresholds.
         
         Args:
@@ -1037,14 +1039,8 @@ ORIGINAL MESSAGE:
             Formatted string with volume analysis and confidence level
         """
         try:
-            # Initialize CCXT provider
-            ccxt_provider = CCXTPriceProvider()
-            
-            # Get dynamic period based on timeframe
-            period = self._get_dynamic_volume_period(timeframe)
-            
-            # Get volume data with dynamic period and signal's native timeframe
-            volume_data = await ccxt_provider.get_current_volume_data(symbol, period=period, timeframe=timeframe)
+            # Get volume data from recent market data extraction
+            volume_data = await self._get_volume_data_from_extraction(symbol, timeframe)
             
             if not volume_data:
                 return "N/A (volume data unavailable from exchanges)"
@@ -1092,6 +1088,65 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                 f"Failed to get volume confirmation for {symbol}: {e}"
             )
             return f"N/A (volume analysis failed: {str(e)})"
+
+    async def _get_volume_data_from_extraction(self, symbol: str, timeframe: str) -> Optional[Dict[str, Any]]:
+        """
+        Get volume data from recent market data extraction.
+        
+        Args:
+            symbol: Trading symbol
+            timeframe: Timeframe for volume analysis
+            
+        Returns:
+            Dictionary with volume analysis data or None if unavailable
+        """
+        try:
+            from core.common.db import get_db_connection
+            
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Get recent market data for this symbol and timeframe
+                    cur.execute("""
+                        SELECT raw_data FROM market_data 
+                        WHERE user_id = %s AND symbol = %s AND timeframe = %s
+                        ORDER BY updated_at DESC LIMIT 1
+                    """, (self.user_id, symbol, timeframe))
+                    
+                    result = cur.fetchone()
+                    if not result:
+                        return None
+                    
+                    raw_data = result[0] if isinstance(result, tuple) else result['raw_data']
+                    if not raw_data or not isinstance(raw_data, list):
+                        return None
+                    
+                    # Extract volume data from OHLCV candles
+                    volumes = [candle.get('volume', 0) for candle in raw_data if 'volume' in candle]
+                    if not volumes or len(volumes) < 2:
+                        return None
+                    
+                    # Get dynamic period for averaging
+                    period = min(self._get_dynamic_volume_period(timeframe), len(volumes) - 1)
+                    
+                    # Calculate volume metrics
+                    current_volume = volumes[-1]  # Latest candle volume
+                    recent_volumes = volumes[-period-1:-1]  # Previous N periods
+                    average_volume = sum(recent_volumes) / len(recent_volumes) if recent_volumes else current_volume
+                    
+                    volume_ratio = current_volume / average_volume if average_volume > 0 else 1.0
+                    
+                    return {
+                        'current_volume': current_volume,
+                        'average_volume': average_volume,
+                        'volume_ratio': volume_ratio,
+                        'period_used': period
+                    }
+                    
+        except Exception as e:
+            logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
+                f"Failed to get volume data from extraction for {symbol}: {e}"
+            )
+            return None
 
     async def _save_position_decision_to_db(
         self, 

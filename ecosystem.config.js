@@ -9,20 +9,25 @@ module.exports = {
       exec_mode: 'fork',
       autorestart: true,
       watch: false,
-      max_memory_restart: '1G',
+      max_memory_restart: '2G',
       env: {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',
         DEVELOPMENT_MODE: 'false',
-        HBOT_USERNAME: 'sev',
-        HBOT_PASSWORD: '7nyhi93cT0Ow2X7S'
+        HBOT_USERNAME: process.env.HBOT_USERNAME,
+        HBOT_PASSWORD: process.env.HBOT_PASSWORD,
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+        OPENAI_API_KEY: process.env.OPENAI_API_KEY,
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY
       },
       error_file: '/home/sev/.pm2/logs/ggbot-error.log',
       out_file: '/home/sev/.pm2/logs/ggbot-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      min_uptime: '10s',
-      max_restarts: 10,
+      min_uptime: '30s',
+      max_restarts: 20,
       restart_delay: 4000
     },
     // Signal processing services (V2 ggShot integration)
@@ -45,8 +50,8 @@ module.exports = {
       out_file: '/home/sev/.pm2/logs/signal-listener-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      min_uptime: '10s',
-      max_restarts: 10,
+      min_uptime: '30s',
+      max_restarts: 20,
       restart_delay: 4000
     },
     {
@@ -68,8 +73,8 @@ module.exports = {
       out_file: '/home/sev/.pm2/logs/signal-publisher-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      min_uptime: '10s',
-      max_restarts: 10,
+      min_uptime: '30s',
+      max_restarts: 20,
       restart_delay: 4000
     }
     // Uncomment when ready to add more services

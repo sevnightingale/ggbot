@@ -84,7 +84,7 @@ class TechnicalAnalysisPreprocessor:
     def preprocess_bollinger_bands(self, upper: pd.Series, middle: pd.Series, lower: pd.Series,
                                   prices: pd.Series, **kwargs) -> Dict[str, Any]:
         """Route Bollinger Bands preprocessing to specialized preprocessor (future implementation)."""
-        preprocessor = get_preprocessor('bollinger_bands')
+        preprocessor = get_preprocessor('bbands')
         if preprocessor:
             return preprocessor.preprocess(upper, middle, lower, prices, **kwargs)
         else:
