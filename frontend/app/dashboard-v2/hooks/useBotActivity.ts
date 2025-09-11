@@ -106,7 +106,7 @@ export function useBotActivity(botId: string | null): UseBotActivityReturn {
       // Polling removed - now handled by WebSocket in botStore
       // Real-time updates via position_update and decisions_update messages every 7 seconds
     } else {
-      setActivity(null)
+      // Clear any existing data when no botId
       setError(null)
       setIsLoading(false)
     }
