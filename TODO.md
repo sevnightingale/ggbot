@@ -1,7 +1,7 @@
 # TODO_V2.md - Focused Implementation Plan
 
 **Status**: Core pipeline operational ✅ - Backend monitoring COMPLETE ✅ - Frontend WebSocket integration COMPLETE ✅  
-**Priority**: Restart frontend server → Test real-time updates → LLM provider system → Scheduler automation
+**Priority**: Fix config fallback masking failures → Frontend config saving investigation → Deploy WebSocket changes → LLM provider system
 
 
 ## CRITICAL - Paper Trading Foundation
@@ -66,15 +66,29 @@
 - [x] Fix missing 'trading' and 'completed' WebSocket messages for complete UI state flow
 - [x] Fix 504 Gateway Timeout errors preventing manual trigger execution
 
-## IMMEDIATE - Complete WebSocket Integration Testing
+## CRITICAL - Config Data Saving Issue  
 
-**Backend broadcasting ALL data ✅ - Frontend handlers implemented ✅ - Testing pending**
+**Fallback masking removed ✅ - Frontend config saving broken - Empty decision data in DB**
 
-### Backend - Decisions Broadcasting COMPLETE ✅
+### Root Cause Analysis
+- **Database shows**: `decision: {}` (empty) for config `18665f58-fb3c-4655-a648-449427be0073`
+- **User updated**: RSI thresholds from 40/60 to 50/50 in frontend  
+- **System used**: Hardcoded fallback template with 40/60 thresholds (now removed)
+- **Issue**: Frontend config save/update not properly writing decision data to database
+
+### Investigation Required
+- [ ] Check frontend config save API calls and payload structure
+- [ ] Verify backend config update endpoints handle decision data correctly
+- [ ] Test complete config save/load cycle from frontend to database
+- [ ] Ensure config validation doesn't strip decision data
+
+### Backend - System Reliability Improvements COMPLETE ✅
 - [x] Add `_get_recent_decisions()` method to monitoring service ✅
-- [x] Include decisions in metrics monitoring loop ✅
+- [x] Include decisions in metrics monitoring loop ✅  
 - [x] Broadcast `decisions_update` messages every 7 seconds ✅
-- [x] Test decisions appear in WebSocket stream ✅
+- [x] Remove dangerous fallback logic from decision engine ✅
+- [x] Disable template fallback files (template_v1.json.DISABLED_FALLBACK) ✅
+- [x] Add explicit error handling for missing config data ✅
 
 ### Frontend - WebSocket Handler Integration COMPLETE ✅ 
 - [x] Update frontend to handle all new WebSocket message types:
@@ -92,13 +106,12 @@
   - [x] updateBotDecisions(configId, decisions) ✅
 - [x] Update hooks to read from store instead of HTTP APIs ✅
 
-### Testing - Frontend Server Restart Required
-- [ ] **RESTART FRONTEND SERVER** - Changes need to take effect
-- [ ] Verify HTTP polling stops (no more `get_bot_decisions` in logs)
-- [ ] Test real-time dashboard updates every 7 seconds
-- [ ] Confirm position P&L updates in real-time
-- [ ] Verify scheduler status updates without polling
-- [ ] Test decisions appear immediately in activity panel
+### Current Priority - Config Data Integrity
+- [ ] **Investigate frontend config save process** - Why is decision data empty in DB?
+- [ ] **Test manual trigger** - Should now fail explicitly with clear error about missing user_prompt
+- [ ] **Fix config data structure** - Ensure decision section saves properly with user strategy
+- [ ] **Deploy frontend WebSocket changes** - Once config saving is fixed
+- [ ] **End-to-end testing** - Complete config save → manual trigger → real-time monitoring flow
 
 ## BACKEND - API & Database
 
@@ -185,6 +198,8 @@
 
 **Frontend WebSocket Integration COMPLETE**: All hooks updated to use store data, HTTP polling removed, WebSocket handlers implemented for all 4 message types. ✅
 
-**Next Focus**: Restart frontend server to activate changes, then test complete real-time dashboard experience.
+**CRITICAL ISSUE FIXED**: Removed dangerous fallback logic that was masking config failures with hardcoded RSI 40/60 thresholds. System now fails explicitly instead of silently using wrong data. ✅
 
-**Expected Result**: Once frontend restarts, `get_bot_decisions` HTTP polling will stop and dashboard will update every 7 seconds via WebSocket instead of 30-second polling.
+**Current Issue**: Config data saving in frontend - database shows empty `decision: {}` instead of user's RSI 50/50 strategy. Need to investigate frontend config update/save process.
+
+**Next Focus**: Fix frontend config saving → Deploy WebSocket changes → Test complete real-time flow
