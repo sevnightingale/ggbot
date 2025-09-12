@@ -72,8 +72,7 @@ All preprocessors follow this consistent structure for LLM clarity:
   "extremes": {                          # Recent highs/lows
     "recent_high": {"value": 85.2, "periods_ago": 3}
   },
-  "summary": "RSI at 73.2, rising strongly",  # Human-readable
-  "raw": [70.1, 71.5, 73.2, ...]        # Recent values for transparency
+  "summary": "RSI at 73.2, rising strongly"  # Human-readable
 }
 ```
 
@@ -244,8 +243,7 @@ class NewIndicatorPreprocessor(BasePreprocessor):
             "levels": {...},
             "patterns": {...},
             "evidence": {...},
-            "summary": "...",
-            "raw": clean.tolist()[-200:]
+            "summary": "..."
         }
 ```
 

@@ -114,8 +114,7 @@ class RSIPreprocessor(BasePreprocessor):
                 }
             },
             "patterns": patterns,
-            "summary": summary,
-            "raw": clean.tolist()
+            "summary": summary
         }
     
     def _detect_rsi_patterns(self, rsi_values: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:

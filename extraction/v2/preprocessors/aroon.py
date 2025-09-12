@@ -84,8 +84,7 @@ class AroonPreprocessor(BasePreprocessor):
             "patterns": pattern_analysis,
             "divergence": divergence,
             "evidence": evidence,
-            "summary": self._generate_aroon_summary(current_up, current_down, trend_analysis, oscillator_analysis),
-            "raw": {"aroon_up": up.tolist()[-200:], "aroon_down": down.tolist()[-200:]},
+            "summary": self._generate_aroon_summary(current_up, current_down, trend_analysis, oscillator_analysis)
         }
     
     def _analyze_aroon_oscillator(self, aroon_up: pd.Series, aroon_down: pd.Series) -> Dict[str, Any]:
