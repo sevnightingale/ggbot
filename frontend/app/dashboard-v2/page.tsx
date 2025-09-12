@@ -315,8 +315,8 @@ export default function DashboardV2Page() {
                     key={bot.config_id}
                     className={`w-3 h-3 rounded-full transition-all duration-200 ${
                       bot.config_id === selectedConfigId
-                        ? 'bg-charcoal-700'
-                        : 'bg-bone-500 hover:bg-bone-300'
+                        ? 'bg-bone-200'
+                        : 'bg-bone-600 hover:bg-bone-400'
                     }`}
                     onClick={() => setSelectedConfigId(bot.config_id)}
                   />
