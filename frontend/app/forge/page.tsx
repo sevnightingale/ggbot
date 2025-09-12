@@ -4,10 +4,20 @@ import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 
 // Clean, focused types for forge
+interface BotConfig {
+  schema_version?: string
+  config_type?: string
+  selected_pair?: string
+  extraction?: Record<string, unknown>
+  decision?: Record<string, unknown>
+  llm_config?: Record<string, unknown>
+  trading?: Record<string, unknown>
+}
+
 interface Bot {
   config_id: string
   config_name: string
-  config_data: any
+  config_data: BotConfig
   state: 'active' | 'inactive'
   created_at: string
   updated_at: string
@@ -64,146 +74,6 @@ export default function ForgePage() {
     getUser()
   }, [])
 
-  // Load or create bot when user is ready
-  useEffect(() => {
-    if (!user) return
-
-    const loadOrCreateBot = async () => {
-      console.log('🔥 Loading bot for user:', user.id)
-      
-      try {
-        // Get user's existing bots
-        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-        const response = await fetch(`${apiUrl}/api/v2/configurations`, {
-          headers: {
-            'Authorization': `Bearer ${await getAuthToken()}`
-          }
-        })
-        
-        if (!response.ok) {
-          throw new Error(`Failed to load bots: ${response.status}`)
-        }
-        
-        const bots = await response.json()
-        console.log('📡 Loaded bots:', bots)
-        
-        if (bots.length > 0) {
-          // Use first existing bot
-          setBot(bots[0])
-        } else {
-          // Create default bot
-          console.log('🔨 No bots found, creating default bot')
-          const newBot = await createDefaultBot()
-          setBot(newBot)
-        }
-        
-      } catch (error) {
-        console.error('❌ Failed to load/create bot:', error)
-      }
-    }
-
-    loadOrCreateBot()
-  }, [user])
-
-  // Real-time SSE connection for status updates
-  useEffect(() => {
-    if (!user || !bot) return
-
-    const connectSSE = async () => {
-      try {
-        const token = await getAuthToken()
-        if (!token) return
-
-        console.log('🔥 Connecting to forge SSE stream...')
-        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-        const stream = new EventSource(`${apiUrl}/api/dashboard-stream?token=${encodeURIComponent(token)}`)
-
-        stream.onopen = () => {
-          console.log('✅ Forge SSE connected')
-        }
-
-        stream.onmessage = (event) => {
-          try {
-            const data = JSON.parse(event.data)
-            console.log('📨 Forge SSE update:', data)
-
-            // Update bot execution status (extraction/decision/trading phases)
-            if (data.bots) {
-              const myBot = data.bots.find((b: any) => b.config_id === bot.config_id)
-              if (myBot?.execution_status) {
-                const phase = myBot.execution_status.phase
-                if (phase === 'extracting') setExecutionStatus('extraction')
-                else if (phase === 'deciding') setExecutionStatus('decision') 
-                else if (phase === 'trading') setExecutionStatus('trading')
-                else setExecutionStatus('idle')
-
-                setStatusMessage(myBot.execution_status.message || '')
-              }
-
-              // Update next run time
-              if (myBot?.next_run) {
-                setNextRun(myBot.next_run)
-              }
-            }
-
-            // Update live positions with P&L
-            if (data.positions) {
-              const myPositions = data.positions.filter((p: any) => p.config_id === bot.config_id)
-              setPositions(myPositions)
-            }
-
-            // Update recent decisions
-            if (data.decisions) {
-              const myDecisions = data.decisions.filter((d: any) => d.config_id === bot.config_id)
-              setDecisions(myDecisions.slice(0, 10)) // Keep last 10
-            }
-
-          } catch (error) {
-            console.error('❌ Failed to parse SSE data:', error)
-          }
-        }
-
-        stream.onerror = (error) => {
-          console.error('❌ SSE connection error:', error)
-        }
-
-        return () => {
-          console.log('🛑 Closing forge SSE connection')
-          stream.close()
-        }
-
-      } catch (error) {
-        console.error('❌ Failed to connect SSE:', error)
-      }
-    }
-
-    connectSSE()
-  }, [user, bot])
-
-  // Countdown timer for next run
-  useEffect(() => {
-    if (!nextRun) return
-
-    const updateCountdown = () => {
-      const now = new Date()
-      const next = new Date(nextRun)
-      const diff = next.getTime() - now.getTime()
-
-      if (diff <= 0) {
-        setCountdown('Running soon...')
-        return
-      }
-
-      const minutes = Math.floor(diff / 60000)
-      const seconds = Math.floor((diff % 60000) / 1000)
-      setCountdown(`Next run: ${minutes}m ${seconds}s`)
-    }
-
-    updateCountdown()
-    const interval = setInterval(updateCountdown, 1000)
-    return () => clearInterval(interval)
-  }, [nextRun])
-
   // Get auth token for API calls
   const getAuthToken = async () => {
     const supabase = createClient()
@@ -211,8 +81,8 @@ export default function ForgePage() {
     return session?.access_token
   }
 
-  // Create default bot with RSI strategy (matches template_v1.json structure)
-  const createDefaultBot = async () => {
+  // Create default bot with RSI strategy
+  const createDefaultBot = async (): Promise<Bot> => {
     const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
     
     const defaultConfig = {
@@ -283,6 +153,146 @@ export default function ForgePage() {
     console.log('🔨 Created default bot:', newBot)
     return newBot
   }
+
+  // Load or create bot when user is ready
+  useEffect(() => {
+    if (!user) return
+
+    const loadOrCreateBot = async () => {
+      console.log('🔥 Loading bot for user:', user.id)
+      
+      try {
+        // Get user's existing bots
+        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+        const response = await fetch(`${apiUrl}/api/v2/configurations`, {
+          headers: {
+            'Authorization': `Bearer ${await getAuthToken()}`
+          }
+        })
+        
+        if (!response.ok) {
+          throw new Error(`Failed to load bots: ${response.status}`)
+        }
+        
+        const bots = await response.json()
+        console.log('📡 Loaded bots:', bots)
+        
+        if (bots.length > 0) {
+          // Use first existing bot
+          setBot(bots[0])
+        } else {
+          // Create default bot
+          console.log('🔨 No bots found, creating default bot')
+          const newBot = await createDefaultBot()
+          setBot(newBot)
+        }
+        
+      } catch (error) {
+        console.error('❌ Failed to load/create bot:', error)
+      }
+    }
+
+    loadOrCreateBot()
+  }, [user])
+
+  // Real-time SSE connection for status updates
+  useEffect(() => {
+    if (!user || !bot) return
+
+    const connectSSE = async () => {
+      try {
+        const token = await getAuthToken()
+        if (!token) return
+
+        console.log('🔥 Connecting to forge SSE stream...')
+        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+        const stream = new EventSource(`${apiUrl}/api/dashboard-stream?token=${encodeURIComponent(token)}`)
+
+        stream.onopen = () => {
+          console.log('✅ Forge SSE connected')
+        }
+
+        stream.onmessage = (event) => {
+          try {
+            const data = JSON.parse(event.data)
+            console.log('📨 Forge SSE update:', data)
+
+            // Update bot execution status (extraction/decision/trading phases)
+            if (data.bots) {
+              const myBot = data.bots.find((b: { config_id: string }) => b.config_id === bot.config_id)
+              if (myBot?.execution_status) {
+                const phase = myBot.execution_status.phase
+                if (phase === 'extracting') setExecutionStatus('extraction')
+                else if (phase === 'deciding') setExecutionStatus('decision') 
+                else if (phase === 'trading') setExecutionStatus('trading')
+                else setExecutionStatus('idle')
+
+                setStatusMessage(myBot.execution_status.message || '')
+              }
+
+              // Update next run time
+              if (myBot?.next_run) {
+                setNextRun(myBot.next_run)
+              }
+            }
+
+            // Update live positions with P&L
+            if (data.positions) {
+              const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === bot.config_id)
+              setPositions(myPositions)
+            }
+
+            // Update recent decisions
+            if (data.decisions) {
+              const myDecisions = data.decisions.filter((d: { config_id: string }) => d.config_id === bot.config_id)
+              setDecisions(myDecisions.slice(0, 10)) // Keep last 10
+            }
+
+          } catch (error) {
+            console.error('❌ Failed to parse SSE data:', error)
+          }
+        }
+
+        stream.onerror = (error) => {
+          console.error('❌ SSE connection error:', error)
+        }
+
+        return () => {
+          console.log('🛑 Closing forge SSE connection')
+          stream.close()
+        }
+
+      } catch (error) {
+        console.error('❌ Failed to connect SSE:', error)
+      }
+    }
+
+    connectSSE()
+  }, [user, bot])
+
+  // Countdown timer for next run
+  useEffect(() => {
+    if (!nextRun) return
+
+    const updateCountdown = () => {
+      const now = new Date()
+      const next = new Date(nextRun)
+      const diff = next.getTime() - now.getTime()
+
+      if (diff <= 0) {
+        setCountdown('Running soon...')
+        return
+      }
+
+      const minutes = Math.floor(diff / 60000)
+      const seconds = Math.floor((diff % 60000) / 1000)
+      setCountdown(`Next run: ${minutes}m ${seconds}s`)
+    }
+
+    updateCountdown()
+    const interval = setInterval(updateCountdown, 1000)
+    return () => clearInterval(interval)
+  }, [nextRun])
 
   // Start bot function
   const startBot = async () => {
