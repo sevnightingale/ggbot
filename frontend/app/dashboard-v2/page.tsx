@@ -258,7 +258,7 @@ export default function DashboardV2Page() {
     <div className="min-h-screen bg-charcoal-700 relative">
       {/* 3-Column Layout with Sharp Dividers (matching old dashboard) */}
       <div className="min-h-screen flex items-center justify-center p-8">
-        <div className="w-full max-w-[1400px] mx-auto grid grid-cols-[1fr_400px_1fr] gap-8 relative">
+        <div className="w-full max-w-[1300px] mx-auto grid grid-cols-[450px_400px_450px] gap-4 relative">
           
           {/* Left Column - Performance Panel */}
           <div className="hidden lg:block">
