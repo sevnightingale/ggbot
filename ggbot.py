@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Request
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_serializer
 import uvicorn
@@ -61,7 +61,7 @@ def is_orchestrator_log(record):
     
     # Only include orchestrator service logs
     if service == "orchestrator":
-        # Exclude WebSocket broadcast spam
+        # Exclude old WebSocket spam (now using SSE)
         if "WebSocket" in message or "broadcast" in function_name:
             return False
         return True
@@ -190,11 +190,11 @@ async def lifespan(app: FastAPI):
         scheduler.start()
         logger.info("✅ APScheduler started")
         
-        # Start monitoring service
+        # Start monitoring service (positions only - no WebSocket spam!)
         from core.monitoring.service import MonitoringService
-        monitoring_service = MonitoringService(websocket_manager)
+        monitoring_service = MonitoringService()
         monitoring_task = asyncio.create_task(monitoring_service.start())
-        logger.info("✅ Monitoring service started (7-second intervals)")
+        logger.info("✅ Monitoring service started (positions only - no WebSocket spam!)")
         
         # Reconcile active bots from database
         await reconcile_active_bots()
@@ -257,8 +257,7 @@ class GGBotOrchestrator:
         user_id: str,
         signal_data: Optional[Dict] = None,
         override_symbol: Optional[str] = None,
-        override_timeframe: Optional[str] = None,
-        websocket_manager = None
+        override_timeframe: Optional[str] = None
     ) -> OrchestrationResult:
         """
         Run a complete trading cycle (autonomous or signal validation).
@@ -287,14 +286,14 @@ class GGBotOrchestrator:
                 if signal_data:
                     # Real signal from external source
                     return await self._run_signal_validation_cycle(
-                        config, signal_data, override_symbol, override_timeframe, websocket_manager
+                        config, signal_data, override_symbol, override_timeframe
                     )
                 else:
                     # Manual trigger - fetch latest real ggShot signal
                     try:
                         latest_signal = await self._fetch_latest_ggshot_signal()
                         return await self._run_signal_validation_cycle(
-                            config, latest_signal, override_symbol, override_timeframe, websocket_manager
+                            config, latest_signal, override_symbol, override_timeframe
                         )
                     except Exception as e:
                         # If fetching real signal fails, fall back to mock for manual testing
@@ -316,10 +315,10 @@ class GGBotOrchestrator:
                             timestamp=datetime.now(timezone.utc)
                         )
                         return await self._run_signal_validation_cycle(
-                            config, mock_signal, override_symbol, override_timeframe, websocket_manager
+                            config, mock_signal, override_symbol, override_timeframe
                         )
             else:
-                return await self._run_autonomous_trading_cycle(config, websocket_manager)
+                return await self._run_autonomous_trading_cycle(config)
             
         except Exception as e:
             end_time = datetime.now(timezone.utc)
@@ -328,7 +327,7 @@ class GGBotOrchestrator:
             self._log.error(f"V2 orchestration failed: {e}")
             raise HTTPException(status_code=500, detail=f"Orchestration failed: {str(e)}")
             
-    async def _run_autonomous_trading_cycle(self, config: BotConfigV2, websocket_manager = None) -> OrchestrationResult:
+    async def _run_autonomous_trading_cycle(self, config: BotConfigV2) -> OrchestrationResult:
         """Run traditional autonomous trading cycle."""
         start_time = datetime.now(timezone.utc)
         user_id = config.user_id
@@ -344,13 +343,9 @@ class GGBotOrchestrator:
             timeframes = self._extract_timeframes_from_config(extraction_config)
             
             # 4. Run V2 extraction for all timeframes
-            if websocket_manager:
-                self._log.info(f"🔌 About to broadcast extracting status to user {user_id}")
-                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="extracting", 
-                    message=f"Extracting {len(requested_indicators)} indicators for {config.selected_pair}..."
-                ))
+            # 🔥 WEBSOCKET DELETED - Now using Redis status for SSE stream!
+            from core.sse import set_execution_phase
+            await set_execution_phase(config_id, "extracting", f"Extracting {len(requested_indicators)} indicators for {config.selected_pair}...")
             
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id, requested_indicators, timeframes
@@ -360,12 +355,8 @@ class GGBotOrchestrator:
             await asyncio.sleep(7)
             
             # 5. Run V2 decision engine
-            if websocket_manager:
-                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="deciding",
-                    message="AI analyzing market conditions and signals..."
-                ))
+            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
+            await set_execution_phase(config_id, "deciding", "AI analyzing market conditions and signals...")
             
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result
@@ -374,19 +365,15 @@ class GGBotOrchestrator:
             # Allow users to see decision phase for 3 seconds (better UX)
             await asyncio.sleep(3)
             
-            # 6. Execute trading (always broadcast status)
-            if websocket_manager:
-                action = decision_result.get('action', 'wait')
-                if action in ['wait', 'no_action', 'hold']:
-                    message = f"Holding position - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
-                else:
-                    message = f"Executing {action} decision..."
-                
-                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="trading",
-                    message=message
-                ))
+            # 6. Execute trading
+            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
+            action = decision_result.get('action', 'wait')
+            if action in ['wait', 'no_action', 'hold']:
+                message = f"Holding position - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
+            else:
+                message = f"Executing {action} decision..."
+            
+            await set_execution_phase(config_id, "trading", message)
             
             trading_result = await self._run_trading_v2(
                 config, user_id, decision_result
@@ -413,12 +400,8 @@ class GGBotOrchestrator:
             )
             
             # 8. Send completion status
-            if websocket_manager:
-                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="completed",
-                    message=f"Cycle completed in {execution_time_ms/1000:.1f}s"
-                ))
+            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
+            await set_execution_phase(config_id, "completed", f"Cycle completed in {execution_time_ms/1000:.1f}s")
             
             self._log.info(f"V2 autonomous cycle completed in {execution_time_ms}ms")
             return result
@@ -443,8 +426,7 @@ class GGBotOrchestrator:
         config: BotConfigV2,
         signal_data: Dict,
         override_symbol: Optional[str] = None,
-        override_timeframe: Optional[str] = None,
-        websocket_manager = None
+        override_timeframe: Optional[str] = None
     ) -> OrchestrationResult:
         """Run signal validation cycle for external signals."""
         start_time = datetime.now(timezone.utc)
@@ -480,19 +462,15 @@ class GGBotOrchestrator:
                 config_id, config, extraction_result, signal_data
             )
             
-            # Execute trading (always broadcast status)
-            if websocket_manager:
-                action = decision_result.get('action', 'wait')
-                if action in ['wait', 'no_action', 'hold']:
-                    message = f"Signal rejected - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
-                else:
-                    message = f"Signal validated - executing {action} decision..."
-                
-                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="trading",
-                    message=message
-                ))
+            # Execute trading
+            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
+            action = decision_result.get('action', 'wait')
+            if action in ['wait', 'no_action', 'hold']:
+                message = f"Signal rejected - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
+            else:
+                message = f"Signal validated - executing {action} decision..."
+            
+            await set_execution_phase(config_id, "trading", message)
             
             trading_result = await self._run_trading_v2(
                 config, user_id, decision_result
@@ -519,12 +497,8 @@ class GGBotOrchestrator:
             )
             
             # Send completion status
-            if websocket_manager:
-                await websocket_manager.broadcast_to_user(user_id, create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="completed",
-                    message=f"Signal validation completed in {execution_time_ms/1000:.1f}s"
-                ))
+            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
+            await set_execution_phase(config_id, "completed", f"Signal validation completed in {execution_time_ms/1000:.1f}s")
             
             self._log.info(f"Signal validation completed in {execution_time_ms}ms")
             return result
@@ -1019,42 +993,20 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
                     "next_fire_at": next_fire
                 }
             )
-            await websocket_manager.broadcast_to_user(user_id, status_message)
+            # 🔥 WEBSOCKET DELETED! Status now via Redis + SSE stream
             
             try:
-                # Run the autonomous cycle with WebSocket updates
-                result = await orchestrator.run_autonomous_cycle(config_id, user_id, websocket_manager=websocket_manager)
+                # Run the autonomous cycle
+                result = await orchestrator.run_autonomous_cycle(config_id, user_id)
                 
-                # Broadcast completion - properly formatted for frontend
-                completion_message = create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="completed",
-                    message=f"Bot cycle completed in {result.execution_time_ms}ms",
-                    context={
-                        "close_ts": close_ts,
-                        "next_fire_at": next_fire,
-                        "execution_time_ms": result.execution_time_ms
-                    }
-                )
-                await websocket_manager.broadcast_to_user(user_id, completion_message)
+                # 🔥 WEBSOCKET DELETED! Completion status handled in orchestrator via Redis + SSE
                 
                 # Mark as completed in Redis
                 await redis_client.set(key, "completed", ex=ttl)
                 logger.info(f"Completed execution for {user_id}:{config_id}:{timeframe}:{close_ts} in {result.execution_time_ms}ms")
                 
             except Exception as e:
-                # Broadcast error - properly formatted for frontend
-                error_message = create_bot_status_message(
-                    config_id=config_id,
-                    execution_phase="error",
-                    message=f"Bot execution failed: {str(e)}",
-                    context={
-                        "error": str(e),
-                        "close_ts": close_ts,
-                        "next_fire_at": next_fire
-                    }
-                )
-                await websocket_manager.broadcast_to_user(user_id, error_message)
+                # 🔥 WEBSOCKET DELETED! Error status would be handled via Redis + SSE if needed
                 
                 logger.error(f"Execution failed for {user_id}:{config_id}:{timeframe}:{close_ts}: {e}")
                 # Leave key as "executing" to prevent retries on same candle
@@ -1392,14 +1344,7 @@ async def update_config(
                 "next_run": next_run
             }
             
-            # Broadcast schedule change via WebSocket
-            await websocket_manager.broadcast_to_user(current_user.user_id, {
-                "type": "bot_schedule_updated",
-                "config_id": config_id,
-                "old_timeframe": old_timeframe,
-                "new_timeframe": new_timeframe,
-                "next_run": next_run
-            })
+            # 🔥 WEBSOCKET DELETED! Schedule changes will show up in SSE stream
     
     response = {
         "status": "success",
@@ -1437,7 +1382,7 @@ async def run_orchestration(
 ) -> OrchestrationResult:
     """Run autonomous trading cycle for a configuration."""
     try:
-        result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id, websocket_manager=websocket_manager)
+        result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id)
         
         if result.status == "error":
             # Extract error details from the result object
@@ -2056,15 +2001,7 @@ async def start_bot(
         job = scheduler.get_job(job_id)
         next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
         
-        # Broadcast bot state change via WebSocket
-        state_message = create_bot_state_message(
-            config_id=config_id,
-            state="active",
-            timeframe=timeframe,
-            next_run=next_run,
-            context={"action": "started", "message": f"Bot activated for {timeframe} trading"}
-        )
-        await websocket_manager.broadcast_to_user(current_user.user_id, state_message)
+        # 🔥 WEBSOCKET DELETED! Bot state changes will show up in SSE stream
         
         return {
             "status": "started",
@@ -2114,15 +2051,7 @@ async def stop_bot(
         if not success:
             logger.warning(f"Job removed but failed to update state for bot {config_id}")
         
-        # Broadcast bot state change via WebSocket
-        state_message = create_bot_state_message(
-            config_id=config_id,
-            state="inactive",
-            timeframe=timeframe,
-            next_run=None,  # No next run when stopped
-            context={"action": "stopped", "message": "Bot stopped successfully", "job_removed": job_removed}
-        )
-        await websocket_manager.broadcast_to_user(current_user.user_id, state_message)
+        # 🔥 WEBSOCKET DELETED! Bot state changes will show up in SSE stream
         
         return {
             "status": "stopped",
@@ -2256,163 +2185,15 @@ async def get_bot_status(
         raise HTTPException(status_code=500, detail=f"Failed to get bot status: {str(e)}")
 
 
-# WebSocket Support for real-time bot status updates
-def create_bot_status_message(
-    config_id: str, 
-    execution_phase: str,
-    message: Optional[str] = None,
-    context: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """
-    Create properly formatted WebSocket status message for frontend consumption.
-    
-    Args:
-        config_id: Bot configuration ID
-        execution_phase: Backend phase (extracting, deciding, trading, completed, idle)
-        message: Optional status message
-        context: Additional context data
-    
-    Returns:
-        Formatted message matching frontend expectations
-    """
-    # Map backend phases to frontend phases
-    phase_mapping = {
-        'extracting': 'extraction',
-        'deciding': 'decision', 
-        'trading': 'trading',
-        'completed': 'idle',
-        'idle': 'idle',
-        'error': 'inactive'
-    }
-    
-    # Map phases to colors
-    color_mapping = {
-        'extraction': 'blue',
-        'decision': 'green',
-        'trading': 'orange', 
-        'idle': 'blue',
-        'inactive': 'gray'
-    }
-    
-    frontend_phase = phase_mapping.get(execution_phase, 'inactive')
-    color = color_mapping.get(frontend_phase, 'gray')
-    
-    # Generate appropriate message if none provided
-    if not message:
-        phase_messages = {
-            'extraction': 'Analyzing market data and indicators...',
-            'decision': 'AI processing signals and validation...',
-            'trading': 'Executing trading decision...',
-            'idle': 'Monitoring market conditions...',
-            'inactive': 'Bot stopped'
-        }
-        message = phase_messages.get(frontend_phase, 'Processing...')
-    
-    return {
-        "type": "bot_status_update",
-        "config_id": config_id,
-        "status": {
-            "phase": frontend_phase,
-            "color": color,
-            "message": message,
-            "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
-            "showSpinner": frontend_phase in ['extraction', 'decision', 'trading'],
-            "context": context or {}
-        }
-    }
+# 🔥 OLD WEBSOCKET SUPPORT DELETED - Now using SSE stream!
+# 🔥 WEBSOCKET STATUS FUNCTIONS DELETED! 
+# Status now via Redis + SSE stream at /api/dashboard-stream
 
 
-def create_bot_state_message(
-    config_id: str,
-    state: str,
-    timeframe: str,
-    next_run: Optional[str] = None,
-    context: Optional[Dict[str, Any]] = None
-) -> Dict[str, Any]:
-    """
-    Create WebSocket message for bot state changes (active/inactive).
-    
-    This is used when bots are started/stopped to notify the frontend
-    of the state change and provide timer information.
-    
-    Args:
-        config_id: Bot configuration ID
-        state: Bot state ('active' or 'inactive')  
-        timeframe: Trading timeframe (5m, 15m, etc)
-        next_run: Next scheduled run time (ISO format)
-        context: Additional context data
-        
-    Returns:
-        Formatted WebSocket message
-    """
-    return {
-        "type": "bot_state_changed",
-        "config_id": config_id,
-        "state": state,
-        "timeframe": timeframe,
-        "next_run": next_run,
-        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
-        "context": context or {}
-    }
+# 🔥 ALL WEBSOCKET MESSAGE FUNCTIONS DELETED!
 
 
-class WebSocketManager:
-    """Simple WebSocket connection manager."""
-    
-    def __init__(self):
-        self.active_connections: Dict[str, WebSocket] = {}
-    
-    async def connect(self, user_id: str, websocket: WebSocket):
-        """Accept WebSocket connection."""
-        await websocket.accept()
-        self.active_connections[user_id] = websocket
-        
-    def disconnect(self, user_id: str):
-        """Remove WebSocket connection."""
-        if user_id in self.active_connections:
-            del self.active_connections[user_id]
-    
-    async def broadcast_to_user(self, user_id: str, data: dict):
-        """Send data to specific user."""
-        logger.info(f"🔌 Attempting WebSocket broadcast to user {user_id}. Active connections: {list(self.active_connections.keys())}")
-        if user_id in self.active_connections:
-            try:
-                message_type = data.get('type', 'bot_status_update')
-                if message_type == 'bot_status_update':
-                    content = data.get('status', {}).get('phase', 'unknown')
-                else:
-                    content = message_type
-                logger.info(f"📡 Sending WebSocket message to {user_id}: {content}")
-                await self.active_connections[user_id].send_text(json.dumps(data, default=str))
-            except Exception as e:
-                logger.error(f"❌ WebSocket send failed for {user_id}: {e}")
-                # Connection closed, remove it
-                self.disconnect(user_id)
-        else:
-            logger.warning(f"⚠️ No active WebSocket connection for user {user_id}")
-
-
-# Global WebSocket manager
-websocket_manager = WebSocketManager()
-
-
-@app.websocket("/ws/bot-status/{user_id}")
-async def websocket_endpoint(websocket: WebSocket, user_id: str):
-    """WebSocket endpoint for real-time bot status updates."""
-    await websocket_manager.connect(user_id, websocket)
-    
-    try:
-        while True:
-            # Keep connection alive and handle incoming messages
-            data = await websocket.receive_text()
-            # Echo heartbeat messages
-            if data == "heartbeat":
-                await websocket.send_text(json.dumps({
-                    "type": "heartbeat_ack", 
-                    "timestamp": datetime.now(timezone.utc).isoformat() + "Z"
-                }))
-    except WebSocketDisconnect:
-        websocket_manager.disconnect(user_id)
+# 🔥 WEBSOCKET CODE DELETED! Now using SSE at /api/dashboard-stream 🔥
 
 
 # Error handlers
