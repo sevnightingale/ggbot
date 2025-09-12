@@ -14,6 +14,7 @@ const config: Config = {
           800: '#1a1a1c',
           700: '#1e1e20',
           600: '#222224',
+          500: '#4a4a50',
         },
         bone: {
           50: '#fafafa',
