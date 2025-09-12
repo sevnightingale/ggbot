@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useBotActivity } from '../hooks/useBotActivity'
+import { useBotStore } from '@/store/botStore'
 
 interface ActivityPanelProps {
   botId: string | null
@@ -22,9 +22,22 @@ interface DecisionHistoryItem {
 }
 
 export default function ActivityPanel({ botId, className = '' }: ActivityPanelProps) {
-  const { activity, isLoading, error } = useBotActivity(botId)
+  // 🔥 NEW: Read data directly from SSE-updated store instead of HTTP calls
+  const bot = useBotStore(state => botId ? state.getBotById(botId) : null)
+  const isLoading = useBotStore(state => state.isLoading)
+  
+  // Build activity object from bot store data (updated via SSE)
+  const activity = bot ? {
+    positions: bot.positions || [],
+    decisions: bot.decisions || [],
+    lastUpdate: bot.lastPositionUpdate || bot.lastDecisionUpdate || new Date().toISOString()
+  } : null
+  
   const [expandedReasoningIds, setExpandedReasoningIds] = React.useState<Set<string>>(new Set())
   const [selectedDecision, setSelectedDecision] = React.useState<DecisionHistoryItem | null>(null)
+  
+  // No more HTTP errors since we're reading from store
+  const error = null
 
   const toggleReasoningExpansion = (tradeId: string) => {
     setExpandedReasoningIds(prev => {
