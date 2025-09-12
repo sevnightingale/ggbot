@@ -191,7 +191,7 @@ export default function DashboardV2Page() {
   // Authentication guard (matching old dashboard)
   if (isLoadingAuth) {
     return (
-      <div className="min-h-screen bg-bone-200 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-charcoal-500 flex items-center justify-center p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-bone-300">Loading...</p>
@@ -208,7 +208,7 @@ export default function DashboardV2Page() {
   // Show loading state while fetching bots
   if (isLoadingBots) {
     return (
-      <div className="min-h-screen bg-bone-200 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-charcoal-500 flex items-center justify-center p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-bone-300">Loading bots...</p>
@@ -220,7 +220,7 @@ export default function DashboardV2Page() {
   // Show empty state if no bots (matching old dashboard)
   if (userBots.length === 0) {
     return (
-      <div className="min-h-screen bg-bone-200 relative">
+      <div className="min-h-screen bg-charcoal-500 relative">
         <div className="flex items-center justify-center p-8 min-h-screen">
           <div className="flex flex-col items-center gap-4 max-w-md text-center">
             <div className="text-6xl mb-4">🤖</div>
@@ -229,7 +229,7 @@ export default function DashboardV2Page() {
             <div className="flex gap-4 flex-col sm:flex-row">
               <button
                 onClick={handleAddBot}
-                className="px-6 py-3 bg-bone-200 text-charcoal-900 rounded-lg hover:bg-bone-300 transition-colors"
+                className="px-6 py-3 bg-charcoal-500 text-charcoal-900 rounded-lg hover:bg-bone-300 transition-colors"
               >
                 Create Your First Bot
               </button>
@@ -255,7 +255,7 @@ export default function DashboardV2Page() {
   }
 
   return (
-    <div className="min-h-screen bg-bone-200 relative">
+    <div className="min-h-screen bg-charcoal-500 relative">
       {/* 3-Column Layout with Sharp Dividers (matching old dashboard) */}
       <div className="min-h-screen flex items-center justify-center p-8">
         <div className="w-full max-w-[1680px] mx-auto grid grid-cols-[1fr_400px_1fr] gap-8 relative">
@@ -315,7 +315,7 @@ export default function DashboardV2Page() {
                     key={bot.config_id}
                     className={`w-3 h-3 rounded-full transition-all duration-200 ${
                       bot.config_id === selectedConfigId
-                        ? 'bg-bone-200'
+                        ? 'bg-charcoal-500'
                         : 'bg-bone-500 hover:bg-bone-300'
                     }`}
                     onClick={() => setSelectedConfigId(bot.config_id)}
