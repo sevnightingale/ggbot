@@ -12,6 +12,16 @@ interface Position {
   currentPrice: number
   unrealizedPnL: number
   timestamp: string
+  
+  // NEW: Enhanced fields for ActivityPanel
+  id?: string
+  timeInTrade?: string
+  confidence?: number
+  reasoning_text?: string
+  signal_timeframe?: string
+  volume_analysis?: string
+  stopLoss?: number | null
+  takeProfit?: number | null
 }
 
 interface Decision {
