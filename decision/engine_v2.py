@@ -348,9 +348,10 @@ class DecisionEngineV2:
         signal_context = self._format_signal_for_llm(signal_data)
         market_context = self._format_market_data_for_llm(market_data)
         # NO FALLBACK - fail explicitly if config is missing required data
-        if not hasattr(self.config.decision, 'user_prompt') or not self.config.decision.user_prompt:
+        user_prompt = self.config.decision.get('user_prompt') if isinstance(self.config.decision, dict) else getattr(self.config.decision, 'user_prompt', None)
+        if not user_prompt:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
-        user_strategy = self.config.decision.user_prompt
+        user_strategy = user_prompt
         
         return build_signal_validation_prompt(
             symbol=symbol,
@@ -369,9 +370,10 @@ class DecisionEngineV2:
         
         market_context = self._format_market_data_for_llm(market_data)
         # NO FALLBACK - fail explicitly if config is missing required data
-        if not hasattr(self.config.decision, 'user_prompt') or not self.config.decision.user_prompt:
+        user_prompt = self.config.decision.get('user_prompt') if isinstance(self.config.decision, dict) else getattr(self.config.decision, 'user_prompt', None)
+        if not user_prompt:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
-        user_strategy = self.config.decision.user_prompt
+        user_strategy = user_prompt
         
         return build_opportunity_analysis_prompt(
             symbol=symbol,
@@ -441,9 +443,10 @@ class DecisionEngineV2:
         position_context = self._format_position_data_for_llm(position_data, current_price)
         market_context = self._format_market_data_for_llm(market_data)
         # NO FALLBACK - fail explicitly if config is missing required data
-        if not hasattr(self.config.decision, 'user_prompt') or not self.config.decision.user_prompt:
+        user_prompt = self.config.decision.get('user_prompt') if isinstance(self.config.decision, dict) else getattr(self.config.decision, 'user_prompt', None)
+        if not user_prompt:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
-        user_strategy = self.config.decision.user_prompt
+        user_strategy = user_prompt
         
         return build_position_management_prompt(
             symbol=symbol,

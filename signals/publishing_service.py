@@ -82,7 +82,14 @@ class AccessControlService:
                         return None
                     
                     config_data = config_result[0]
-                    telegram_config = config_data.get('telegram_integration', {})
+                    
+                    # Handle nested config_data structure like in config_service
+                    if "config_data" in config_data:
+                        inner_config = config_data["config_data"] 
+                        telegram_config = inner_config.get('telegram_integration', {})
+                    else:
+                        telegram_config = config_data.get('telegram_integration', {})
+                        
                     publisher_config = telegram_config.get('publisher', {})
                     
                     if not publisher_config.get('enabled', False):
@@ -278,7 +285,7 @@ class SignalPublishingService:
         ]
         
         # Original signal (if available)
-        raw_message = signal_data.get('raw_message', '')
+        raw_message = getattr(signal_data, 'raw_message', '')
         if raw_message and raw_message != "Manual trigger initiated by user":
             message_parts.extend([
                 raw_message.strip(),
@@ -286,9 +293,9 @@ class SignalPublishingService:
             ])
         else:
             # For manual triggers or missing raw message, create a summary
-            symbol = signal_data.get('symbol', 'Unknown')
-            direction = signal_data.get('direction', 'Unknown')
-            source = signal_data.get('source', 'unknown')
+            symbol = getattr(signal_data, 'symbol', 'Unknown')
+            direction = getattr(signal_data, 'direction', 'Unknown')
+            source = getattr(signal_data, 'source', 'unknown')
             
             if source == 'manual_trigger':
                 signal_summary = f"Manual validation test for {symbol} - {direction} signal analysis"
@@ -394,12 +401,21 @@ async def publish_signal_to_telegram(
                     return False
                 
                 config_data = result[0]
-                telegram_config = config_data.get('telegram_integration', {})
+                
+                # Handle nested config_data structure like in config_service
+                if "config_data" in config_data:
+                    inner_config = config_data["config_data"] 
+                    telegram_config = inner_config.get('telegram_integration', {})
+                else:
+                    telegram_config = config_data.get('telegram_integration', {})
+                
                 publisher_config = telegram_config.get('publisher', {})
                 bot_token = publisher_config.get('bot_token')
                 
                 if not bot_token:
                     logger.warning(f"No bot token configured for config {config_id}")
+                    logger.debug(f"Config structure: telegram_integration keys = {list(telegram_config.keys()) if telegram_config else 'None'}")
+                    logger.debug(f"Publisher config keys = {list(publisher_config.keys()) if publisher_config else 'None'}")
                     return False
         
         # Create a temporary service instance with user's bot token

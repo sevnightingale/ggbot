@@ -115,6 +115,77 @@ class TechnicalAnalysisPreprocessor:
                 "summary": f"BB position: {self._get_bb_position(current_price, current_upper, current_middle, current_lower)}"
             }
     
+    def preprocess_atr(self, atr: pd.Series, prices: pd.Series = None, 
+                      length: int = 14, **kwargs) -> Dict[str, Any]:
+        """Route ATR preprocessing to specialized preprocessor."""
+        preprocessor = get_preprocessor('atr')
+        if preprocessor:
+            return preprocessor.preprocess(atr, prices, length=length, **kwargs)
+        else:
+            # Simple fallback analysis
+            current_atr = float(atr.iloc[-1])
+            return {
+                "indicator": "ATR",
+                "current": {
+                    "value": round(current_atr, 6)
+                },
+                "analysis": {
+                    "volatility": "normal"  # Simplified
+                },
+                "summary": f"ATR: {current_atr:.6f}"
+            }
+    
+    def preprocess_adx(self, adx: pd.Series, plus_di: pd.Series, minus_di: pd.Series,
+                      prices: pd.Series = None, length: int = 14, **kwargs) -> Dict[str, Any]:
+        """Route ADX preprocessing to specialized preprocessor."""
+        preprocessor = get_preprocessor('adx')
+        if preprocessor:
+            return preprocessor.preprocess(adx, plus_di, minus_di, prices, length=length, **kwargs)
+        else:
+            # Simple fallback analysis
+            current_adx = float(adx.iloc[-1])
+            current_plus_di = float(plus_di.iloc[-1])
+            current_minus_di = float(minus_di.iloc[-1])
+            
+            return {
+                "indicator": "ADX",
+                "current": {
+                    "adx": round(current_adx, 2),
+                    "plus_di": round(current_plus_di, 2),
+                    "minus_di": round(current_minus_di, 2)
+                },
+                "analysis": {
+                    "trend_strength": "moderate" if current_adx > 25 else "weak",
+                    "bias": "bullish" if current_plus_di > current_minus_di else "bearish"
+                },
+                "summary": f"ADX: {current_adx:.1f}, {'bullish' if current_plus_di > current_minus_di else 'bearish'} bias"
+            }
+    
+    def preprocess_aroon(self, aroon_up: pd.Series, aroon_down: pd.Series,
+                        prices: pd.Series = None, length: int = 14, **kwargs) -> Dict[str, Any]:
+        """Route Aroon preprocessing to specialized preprocessor."""
+        preprocessor = get_preprocessor('aroon')
+        if preprocessor:
+            return preprocessor.preprocess(aroon_up, aroon_down, prices, length=length, **kwargs)
+        else:
+            # Simple fallback analysis
+            current_up = float(aroon_up.iloc[-1])
+            current_down = float(aroon_down.iloc[-1])
+            
+            return {
+                "indicator": "Aroon",
+                "current": {
+                    "aroon_up": round(current_up, 2),
+                    "aroon_down": round(current_down, 2),
+                    "oscillator": round(current_up - current_down, 2)
+                },
+                "analysis": {
+                    "trend": "uptrend" if current_up > current_down else "downtrend",
+                    "strength": "strong" if abs(current_up - current_down) > 50 else "weak"
+                },
+                "summary": f"Aroon Up: {current_up:.1f}, Down: {current_down:.1f}"
+            }
+    
     def _get_bb_position(self, price: float, upper: float, middle: float, lower: float) -> str:
         """Simple Bollinger Band position analysis."""
         if price > upper:
