@@ -630,39 +630,73 @@ Take Profit: {take_profit_text}
                     
                     # Format rich indicator data from V2 preprocessors
                     if isinstance(indicator_data, dict):
+                        # Current values (always show)
                         if "current" in indicator_data:
-                            formatted.append(f"    Current Value: {indicator_data['current']}")
+                            formatted.append(f"    Current: {indicator_data['current']}")
+                        
+                        # Summary (most important - human readable)
+                        if "summary" in indicator_data:
+                            formatted.append(f"    Summary: {indicator_data['summary']}")
+                        
+                        # Context (trend, momentum, volatility)
+                        if "context" in indicator_data:
+                            context = indicator_data["context"]
+                            if isinstance(context, dict):
+                                for key, value in context.items():
+                                    if isinstance(value, dict):
+                                        # Handle nested context like trend: {direction: rising, strength: 0.68}
+                                        nested_str = ", ".join(f"{k}: {v}" for k, v in value.items())
+                                        formatted.append(f"    {key.title()}: {nested_str}")
+                                    else:
+                                        formatted.append(f"    {key.title()}: {value}")
+                        
+                        # Levels (zones, thresholds, crossovers)
+                        if "levels" in indicator_data:
+                            levels = indicator_data["levels"]
+                            if isinstance(levels, dict):
+                                for key, value in levels.items():
+                                    if key == "current_zone":
+                                        formatted.append(f"    Zone: {value}")
+                                    elif isinstance(value, dict) and "current_zone" in value:
+                                        formatted.append(f"    Zone: {value['current_zone']}")
+                                    elif key not in ["key_levels", "recent_crossovers"]:  # Skip noisy arrays
+                                        formatted.append(f"    {key.replace('_', ' ').title()}: {value}")
+                        
+                        # Patterns (detected formations)
+                        if "patterns" in indicator_data:
+                            patterns = indicator_data["patterns"]
+                            if isinstance(patterns, dict) and patterns:
+                                pattern_names = [k for k, v in patterns.items() if v]
+                                if pattern_names:
+                                    formatted.append(f"    Patterns: {', '.join(pattern_names)}")
+                        
+                        # Evidence (quality metrics)
+                        if "evidence" in indicator_data:
+                            evidence = indicator_data["evidence"]
+                            if isinstance(evidence, dict):
+                                evidence_parts = []
+                                for key, value in evidence.items():
+                                    if isinstance(value, (int, float)):
+                                        evidence_parts.append(f"{key}: {value:.2f}")
+                                    else:
+                                        evidence_parts.append(f"{key}: {value}")
+                                if evidence_parts:
+                                    formatted.append(f"    Quality: {', '.join(evidence_parts)}")
+                        
+                        # Legacy support for old format indicators
                         if "trend" in indicator_data:
                             trend = indicator_data["trend"]
                             if isinstance(trend, dict):
                                 direction = trend.get("direction", "unknown")
-                                formatted.append(f"    Trend: {direction}")
+                                formatted.append(f"    Legacy Trend: {direction}")
                             else:
-                                formatted.append(f"    Trend: {trend}")
-                        if "signals" in indicator_data:
-                            signals = indicator_data["signals"]
-                            if signals:
-                                # Handle both string lists and dict lists
-                                if isinstance(signals, list) and len(signals) > 0:
-                                    if isinstance(signals[0], dict):
-                                        # Convert dict signals to strings
-                                        signal_strings = []
-                                        for signal in signals:
-                                            if isinstance(signal, dict):
-                                                signal_strings.append(str(signal.get('type', signal.get('name', str(signal)))))
-                                            else:
-                                                signal_strings.append(str(signal))
-                                        formatted.append(f"    Signals: {', '.join(signal_strings)}")
-                                    else:
-                                        # Already strings
-                                        formatted.append(f"    Signals: {', '.join(str(s) for s in signals)}")
-                                else:
-                                    formatted.append(f"    Signals: {signals}")
+                                formatted.append(f"    Legacy Trend: {trend}")
+                        
                         if "zones" in indicator_data:
                             zones = indicator_data["zones"]
                             if isinstance(zones, dict):
                                 current_zone = zones.get("current", "unknown")
-                                formatted.append(f"    Zone: {current_zone}")
+                                formatted.append(f"    Legacy Zone: {current_zone}")
                     else:
                         # Simple numeric value
                         formatted.append(f"    Value: {indicator_data}")

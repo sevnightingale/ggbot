@@ -154,6 +154,8 @@ export default function DashboardV2Page() {
   const handleManualTrigger = async (config_id: string) => {
     try {
       console.log('🔥 Manual trigger started for bot:', config_id)
+      console.log('🔌 WebSocket connected:', isWebSocketConnected)
+      console.log('👤 User ID for WebSocket:', userId)
       
       // Use same authentication method as startBot/stopBot
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
@@ -171,6 +173,7 @@ export default function DashboardV2Page() {
       if (response.ok) {
         const result = await response.json()
         console.log('⚡ Manual trigger result:', result)
+        console.log('⚡ Execution time:', result.execution_time_ms, 'ms')
       } else {
         const error = await response.text()
         console.error('❌ Manual trigger failed:', error)
