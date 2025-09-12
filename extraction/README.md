@@ -616,3 +616,4 @@ bbands
 adx
 aroon
 atr
+bbwidth
