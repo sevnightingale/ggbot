@@ -25,13 +25,18 @@ interface Position {
 }
 
 interface Decision {
-  id: string
-  timestamp: string
-  action: 'BUY' | 'SELL' | 'HOLD'
+  decision_id?: string
+  id?: string
+  timestamp?: string
+  created_at?: string
+  action: string
   reasoning: string
   confidence: number
   symbol: string
-  price: number
+  price?: number
+  prompt?: string
+  market_data?: Record<string, unknown>
+  decision_data?: Record<string, unknown>
 }
 
 interface BotActivity {
