@@ -171,20 +171,4 @@ export function useDashboardSSE(userId: string | undefined) {
   }
 }
 
-/**
- * 🔥 DEPRECATED - Legacy WebSocket hook
- * Use useDashboardSSE instead!
- */
-export function useBotWebSocket(userId: string | undefined, _wsUrl?: string, _onDemoMessage?: (data: Record<string, unknown>) => void) {
-  console.warn('🔥 useBotWebSocket is DEPRECATED! Use useDashboardSSE instead.')
-  
-  // Return minimal interface for backward compatibility
-  const { getBotsByUser, isLoading } = useBotStore()
-  const userBots = userId ? getBotsByUser(userId) : []
-  
-  return {
-    isConnected: false, // Always false - WebSocket is dead!
-    userBots,
-    isLoadingBots: isLoading
-  }
-}
+// 🔥 WebSocket hook removed - now using SSE only!

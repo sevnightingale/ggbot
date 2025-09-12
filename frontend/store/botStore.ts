@@ -128,18 +128,12 @@ export interface Bot {
   userId: string           // For multi-user support
 }
 
-export interface WebSocketConnection {
-  ws: WebSocket | null
-  isConnected: boolean
-  reconnectAttempts: number
-  lastError?: string
-}
+// WebSocket interfaces removed - now using SSE
 
 interface BotStore {
   // State
   bots: Map<string, Bot>           // Keyed by config_id
-  connections: Map<string, WebSocketConnection>  // Keyed by userId
-  schedulerStatus: any | null      // Global scheduler status
+  schedulerStatus: any | null      // Global scheduler status (from SSE or fallback)
   isLoading: boolean
   error: string | null
   
@@ -155,17 +149,11 @@ interface BotStore {
   updateBotStatus: (config_id: string, status: BotStatus) => void
   setBotActive: (config_id: string, isActive: boolean) => void
   
-  // Real-time WebSocket Update Actions
+  // Real-time Update Actions (used by both SSE and legacy)
   updateBotPositions: (config_id: string, positions: any[]) => void
   updateBotMetrics: (config_id: string, metrics: any) => void
   updateBotDecisions: (config_id: string, decisions: any[]) => void
   updateSchedulerStatus: (schedulerStatus: any) => void
-  
-  // WebSocket Management Actions (DEPRECATED - use SSE instead)
-  connectWebSocket: (userId: string, wsUrl: string, onDemoMessage?: (data: Record<string, unknown>) => void) => Promise<void>
-  disconnectWebSocket: (userId: string) => void
-  subscribeToBot: (config_id: string) => void
-  isWebSocketConnected: (userId: string) => boolean
   
   // 🔥 NEW SSE Management Actions
   setBotsFromSSE: (botsData: any[], userId: string) => void
@@ -190,7 +178,6 @@ export const useBotStore = create<BotStore>()(
     subscribeWithSelector((set, get) => ({
       // Initial State
       bots: new Map(),
-      connections: new Map(),
       schedulerStatus: null,
       isLoading: false,
       error: null,
@@ -302,223 +289,7 @@ export const useBotStore = create<BotStore>()(
 
       updateSchedulerStatus: (schedulerStatus: any) => set({ schedulerStatus }),
 
-      // WebSocket Management Actions
-      connectWebSocket: async (userId: string, wsUrl: string, onDemoMessage?: (data: Record<string, unknown>) => void) => {
-        const state = get()
-        const existing = state.connections.get(userId)
-        
-        // Don't reconnect if already connected
-        if (existing?.isConnected) return
-
-        try {
-          const ws = new WebSocket(wsUrl)
-          
-          // Set up connection in connecting state
-          const newConnections = new Map(state.connections)
-          newConnections.set(userId, {
-            ws,
-            isConnected: false,
-            reconnectAttempts: existing?.reconnectAttempts || 0
-          })
-          set({ connections: newConnections })
-
-          ws.onopen = () => {
-            console.log(`WebSocket connected for user ${userId}`)
-            set((state) => {
-              const newConnections = new Map(state.connections)
-              const conn = newConnections.get(userId)
-              if (conn) {
-                newConnections.set(userId, { 
-                  ...conn, 
-                  isConnected: true,
-                  reconnectAttempts: 0,
-                  lastError: undefined
-                })
-              }
-              return { connections: newConnections }
-            })
-          }
-
-          ws.onmessage = (event) => {
-            try {
-              const data = JSON.parse(event.data)
-              console.log('📨 WebSocket message received:', data)
-              
-              // Forward demo messages to callback if provided
-              if (onDemoMessage && (data.type === 'demo_position_create' || data.status === 'demo_started')) {
-                onDemoMessage(data)
-              }
-              
-              if (data.type === 'bot_status_update') {
-                console.log('🤖 Bot status update received:', data)
-                console.log('📍 Config ID:', data.config_id || data.bot_id)
-                console.log('📍 Status:', data.status)
-                // Extract config_id from bot_id (format: "ggshot-e249bb49")  
-                const config_id = data.config_id || data.bot_id
-                
-                if (config_id && data.status) {
-                  get().updateBotStatus(config_id, {
-                    phase: data.status.phase,
-                    color: data.status.color,
-                    message: data.status.message,
-                    timestamp: data.status.timestamp,
-                    showSpinner: ['extraction', 'decision', 'trading'].includes(data.status.phase),
-                    context: data.status.context
-                  })
-                }
-              }
-              
-              // NEW: Position updates (real-time P&L)
-              if (data.type === 'position_update') {
-                const config_id = data.config_id
-                if (config_id && data.positions) {
-                  // Transform backend data for frontend (already mostly in correct format from V2 monitoring service)
-                  const transformedPositions = data.positions.map((pos: any) => ({
-                    // Core fields (already in camelCase from V2 monitoring service)
-                    id: pos.id || pos.trade_id,
-                    symbol: pos.symbol,
-                    side: pos.side,
-                    size: pos.size || pos.size_usd,
-                    entryPrice: pos.entryPrice || pos.entry_price || 0,
-                    currentPrice: pos.currentPrice || pos.current_price || 0,
-                    unrealizedPnL: pos.unrealizedPnL || pos.unrealized_pnl || 0,
-                    timestamp: pos.timestamp || pos.opened_at,
-                    
-                    // Enhanced fields for ActivityPanel (V2 monitoring service provides these)
-                    timeInTrade: pos.timeInTrade || '0m',
-                    confidence: pos.confidence || 0,
-                    reasoning_text: pos.reasoning_text || 'Market analysis completed',
-                    signal_timeframe: pos.signal_timeframe || '5m',
-                    volume_analysis: pos.volume_analysis || 'Volume confirmation completed',
-                    stopLoss: pos.stopLoss || pos.stop_loss || null,
-                    takeProfit: pos.takeProfit || pos.take_profit || null,
-                    
-                    // Legacy/backup fields for compatibility
-                    realizedPnL: pos.realized_pnl || 0,
-                    sizeUsd: pos.size_usd || pos.size || 0,
-                    confidenceScore: pos.confidence_score || pos.confidence || 0,
-                    openedAt: pos.opened_at,
-                    closedAt: pos.closed_at
-                  }))
-                  get().updateBotPositions(config_id, transformedPositions)
-                }
-              }
-              
-              // NEW: Metrics updates (account/performance data)
-              if (data.type === 'metrics_update') {
-                const config_id = data.config_id
-                if (config_id && data.metrics) {
-                  get().updateBotMetrics(config_id, data.metrics)
-                }
-              }
-              
-              // NEW: Decisions updates (replaces HTTP polling)
-              if (data.type === 'decisions_update') {
-                const config_id = data.config_id
-                if (config_id && data.decisions) {
-                  get().updateBotDecisions(config_id, data.decisions)
-                }
-              }
-              
-              // NEW: Scheduler updates (replaces HTTP polling)
-              if (data.type === 'scheduler_update') {
-                if (data.scheduler_status) {
-                  get().updateSchedulerStatus(data.scheduler_status)
-                }
-              }
-            } catch (error) {
-              console.error('Failed to parse WebSocket message:', error)
-            }
-          }
-
-          ws.onclose = (event) => {
-            console.log(`WebSocket disconnected for user ${userId}:`, event.code)
-            set((state) => {
-              const newConnections = new Map(state.connections)
-              const conn = newConnections.get(userId)
-              if (conn) {
-                newConnections.set(userId, { 
-                  ...conn, 
-                  isConnected: false,
-                  lastError: `Connection closed: ${event.code}`
-                })
-              }
-              return { connections: newConnections }
-            })
-
-            // Auto-reconnect after delay (exponential backoff)
-            const attempts = existing?.reconnectAttempts || 0
-            if (attempts < 5) {
-              const delay = Math.min(1000 * Math.pow(2, attempts), 30000)
-              setTimeout(() => {
-                get().connectWebSocket(userId, wsUrl)
-              }, delay)
-            }
-          }
-
-          ws.onerror = (error) => {
-            console.error(`WebSocket error for user ${userId}:`, error)
-            set((state) => {
-              const newConnections = new Map(state.connections)
-              const conn = newConnections.get(userId)
-              if (conn) {
-                newConnections.set(userId, { 
-                  ...conn, 
-                  lastError: 'Connection error',
-                  reconnectAttempts: conn.reconnectAttempts + 1
-                })
-              }
-              return { connections: newConnections }
-            })
-          }
-
-        } catch (error) {
-          console.error(`Failed to create WebSocket for user ${userId}:`, error)
-          set((state) => {
-            const newConnections = new Map(state.connections)
-            newConnections.set(userId, {
-              ws: null,
-              isConnected: false,
-              reconnectAttempts: (existing?.reconnectAttempts || 0) + 1,
-              lastError: 'Connection failed'
-            })
-            return { connections: newConnections }
-          })
-        }
-      },
-
-      disconnectWebSocket: (userId: string) => {
-        const state = get()
-        const connection = state.connections.get(userId)
-        
-        if (connection?.ws) {
-          connection.ws.close()
-        }
-
-        const newConnections = new Map(state.connections)
-        newConnections.delete(userId)
-        set({ connections: newConnections })
-      },
-
-      subscribeToBot: (config_id: string) => {
-        // Send subscription message to WebSocket
-        // Implementation depends on your WebSocket protocol
-        const state = get()
-        const bot = state.bots.get(config_id)
-        if (bot) {
-          const connection = state.connections.get(bot.userId)
-          if (connection?.isConnected && connection.ws) {
-            connection.ws.send(JSON.stringify({
-              type: 'subscribe',
-              bot_id: config_id
-            }))
-          }
-        }
-      },
-
-      isWebSocketConnected: (userId: string) => {
-        return get().connections.get(userId)?.isConnected || false
-      },
+      // 🔥 WebSocket methods removed - now using SSE stream!
 
       // API Actions
       loadBots: async (userId: string) => {

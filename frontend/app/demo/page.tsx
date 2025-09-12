@@ -5,7 +5,7 @@ import GGBot from '@/components/GGBot'
 import GGBotConfig from '@/components/GGBotConfig'
 import FloatingActionButtons from '@/components/FloatingActionButtons'
 import { useBotStore, Bot } from '@/store/botStore'
-import { useBotWebSocket } from '@/hooks/useBotWebSocket'
+import { useDashboardSSE } from '@/hooks/useDashboardSSE'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 
 // Production user ID from backend
@@ -101,7 +101,8 @@ export default function DemoPage() {
     stopBot
   } = useBotStore()
   
-  // Function to handle demo messages from WebSocket
+  // Function to handle demo messages from WebSocket (currently unused with SSE)
+  // @ts-ignore - Keeping for future demo functionality
   const handleDemoMessage = React.useCallback((data: { 
     type?: string; 
     config_id?: string; 
@@ -181,8 +182,8 @@ export default function DemoPage() {
     }
   }, [])
   
-  // WebSocket connection for real-time updates with demo message handler
-  const { isLoadingBots } = useBotWebSocket(DEMO_USER_ID, undefined, handleDemoMessage)
+  // 🔥 NEW: SSE connection for real-time updates (replaces WebSocket)
+  const { isLoading: isLoadingBots } = useDashboardSSE(DEMO_USER_ID)
 
   // Cleanup P&L update interval on unmount
   React.useEffect(() => {

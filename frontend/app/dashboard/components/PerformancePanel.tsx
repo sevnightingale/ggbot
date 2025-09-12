@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { useBotMetrics } from '../hooks/useBotMetrics'
+import { useBotStore } from '@/store/botStore'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 
 interface PerformancePanelProps {
@@ -10,7 +10,29 @@ interface PerformancePanelProps {
 }
 
 export default function PerformancePanel({ botId, className = '' }: PerformancePanelProps) {
-  const { metrics, isLoading, error } = useBotMetrics(botId)
+  // 🔥 NEW: Read data directly from SSE-updated store instead of HTTP calls
+  const bot = useBotStore(state => botId ? state.getBotById(botId) : null)
+  const isLoading = useBotStore(state => state.isLoading)
+  
+  // Build metrics object from bot store data (updated via SSE)
+  const metrics = bot ? {
+    balance: parseFloat(bot.balance?.replace(/[$,]/g, '') || '10000'), // Default $10,000 starting balance
+    totalPnL: parseFloat(bot.pnl?.replace(/[\$+,]/g, '') || '0'),
+    winRate: parseFloat(bot.winRate?.replace('%', '') || '0'),
+    totalTrades: 0, // Will be enhanced with account data from SSE
+    winTrades: 0,   // Will be enhanced with account data from SSE
+    lossTrades: 0,  // Will be enhanced with account data from SSE
+    neutralTrades: 0, // Will be enhanced with account data from SSE
+    lossRate: 0,    // Will be enhanced with account data from SSE
+    neutralRate: 0, // Will be enhanced with account data from SSE
+    avgProfitPerTrade: 0, // Will be enhanced with account data from SSE
+    avgLossPerTrade: 0,   // Will be enhanced with account data from SSE
+    avgTradeDuration: '0m', // Will be enhanced with account data from SSE
+    profitLossData: [] as Array<{date: string, profit: number}> // Chart data from SSE
+  } : null
+  
+  // No more HTTP errors since we're reading from store
+  const error = null
 
   if (error) {
     return (

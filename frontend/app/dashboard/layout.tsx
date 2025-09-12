@@ -2,7 +2,7 @@ import React from 'react'
 import { createServerClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
 
-export default async function DashboardLayout({
+export default async function DashboardV2Layout({
   children,
 }: {
   children: React.ReactNode
@@ -17,9 +17,6 @@ export default async function DashboardLayout({
 
   return (
     <div className="min-h-screen bg-charcoal-900">
-      {/* TODO: Add navigation header */}
-      {/* <DashboardNav user={session.user} /> */}
-      
       {children}
     </div>
   )
