@@ -220,12 +220,139 @@ The storage format (`market_data.data_points.indicators`) remains unchanged:
 - ✅ Decision Engine integration unaffected
 - ✅ Database schema unchanged
 
+## Adding New Preprocessors
+
+### Integration Checklist
+
+When adding a new technical indicator preprocessor to the system, follow these steps to ensure complete integration:
+
+#### 1. Create Specialized Preprocessor Class
+```python
+# extraction/v2/preprocessors/new_indicator.py
+class NewIndicatorPreprocessor(BasePreprocessor):
+    def preprocess(self, indicator_data: pd.Series, prices: pd.Series = None, **kwargs):
+        # Clean data first
+        clean = indicator_data.dropna()
+        if len(clean) < 5:
+            return {"error": "Insufficient data"}
+        
+        # Follow analysis-only pattern (NO signals/confidence)
+        return {
+            "indicator": "New_Indicator",
+            "current": {"value": ..., "timestamp": datetime.now(timezone.utc).isoformat()},
+            "context": {...},
+            "levels": {...},
+            "patterns": {...},
+            "evidence": {...},
+            "summary": "...",
+            "raw": clean.tolist()[-200:]
+        }
+```
+
+#### 2. Register in Factory
+```python
+# extraction/v2/preprocessors/__init__.py
+try:
+    from .new_indicator import NewIndicatorPreprocessor
+except ImportError:
+    NewIndicatorPreprocessor = None
+
+# In PreprocessorFactory.__init__()
+if NewIndicatorPreprocessor:
+    self._preprocessors['new_indicator'] = NewIndicatorPreprocessor()
+```
+
+#### 3. Add Calculation Method
+```python
+# extraction/v2/indicators.py
+def calculate_new_indicator(self, df: pd.DataFrame, **params) -> Dict[str, Any]:
+    """Calculate New Indicator using pandas-ta."""
+    # Calculate using pandas-ta
+    indicator_data = ta.new_indicator(df['high'], df['low'], df['close'], **params)
+    
+    if self.use_advanced_preprocessing:
+        return self.preprocessor.preprocess_new_indicator(indicator_data, df['close'], **params)
+    else:
+        # Simple fallback
+        return {"indicator": "New_Indicator", "current": {"value": float(indicator_data.iloc[-1])}}
+```
+
+#### 4. Update calculate_multiple Method
+```python
+# In TechnicalIndicators.calculate_multiple()
+elif indicator.lower() == "new_indicator":
+    params_filtered = {k: v for k, v in params.items() if k.startswith("new_indicator_")}
+    results["new_indicator"] = self.calculate_new_indicator(df, **params_filtered)
+```
+
+#### 5. Add Router Method
+```python
+# extraction/v2/preprocessor.py
+def preprocess_new_indicator(self, indicator_data: pd.Series, prices: pd.Series = None, **kwargs):
+    """Route New Indicator preprocessing to specialized preprocessor."""
+    preprocessor = get_preprocessor('new_indicator')
+    if preprocessor:
+        return preprocessor.preprocess(indicator_data, prices, **kwargs)
+    else:
+        # Simple fallback
+        current_value = float(indicator_data.iloc[-1])
+        return {
+            "indicator": "New_Indicator",
+            "current": {"value": round(current_value, 4)},
+            "summary": f"New Indicator: {current_value:.4f}"
+        }
+```
+
+#### 6. Add to Available Indicators List
+```python
+# In TechnicalIndicators.__init__()
+self.available_indicators = {
+    # ... existing indicators ...
+    "new_indicator": {"param1": default_value, "param2": default_value},
+}
+```
+
+### Critical Requirements
+
+**✅ Must Have:**
+- NaN handling with `.dropna()` 
+- UTC timestamps: `datetime.now(timezone.utc).isoformat()`
+- Zero-division guards: `denom = value if abs(value) > 1e-12 else 1e-12`
+- Analysis-only output (NO signals/confidence)
+- Standardized schema with `context`, `levels`, `patterns`, `evidence`
+- Unit-less prominence factors for peak/trough detection: `prominence=0.5`
+
+**❌ Must NOT Have:**
+- `signals` arrays or trading recommendations
+- `confidence` scores or action suggestions  
+- Hard-coded thresholds (use normalized by std deviation)
+- Non-UTC timestamps
+- Raw pandas tail access without NaN protection
+
+### Testing New Preprocessors
+
+```python
+# Quick validation test
+def test_new_preprocessor():
+    # Create test data
+    test_data = pd.Series([1.0, 1.5, 2.0, 1.8, 2.2])
+    
+    preprocessor = NewIndicatorPreprocessor()
+    result = preprocessor.preprocess(test_data)
+    
+    # Validate structure
+    assert 'signals' not in result, "Should not have signals"
+    assert 'confidence' not in result, "Should not have confidence"  
+    assert 'evidence' in result, "Should have evidence"
+    assert result['current']['timestamp'].endswith('+00:00'), "Should be UTC"
+```
+
 ## Future Enhancements
 
 ### Additional Indicators
 - **Volume indicators**: OBV, VWAP, Volume Profile
-- **Momentum indicators**: Stochastic, Williams %R, CCI, MFI
-- **Volatility indicators**: ATR, Keltner Channels, Donchian Channels
+- **Momentum indicators**: Stochastic, Williams %R, CCI, MFI  
+- **Volatility indicators**: Keltner Channels, Donchian Channels
 
 ### Advanced Features
 - **Multi-timeframe analysis**: Correlation across timeframes

@@ -425,6 +425,142 @@ class TechnicalIndicators:
                 "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
             }
     
+    def calculate_atr(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
+        """
+        Calculate ATR (Average True Range) with advanced preprocessing.
+        
+        Args:
+            df: DataFrame with OHLCV data
+            length: ATR period (default: 14)
+            
+        Returns:
+            Dictionary with ATR values and analysis
+        """
+        if len(df) < length:
+            raise ValueError(f"Need at least {length} periods for ATR calculation, got {len(df)}")
+        
+        # Calculate ATR using pandas-ta
+        atr_series = ta.atr(df['high'], df['low'], df['close'], length=length)
+        
+        if atr_series is None or atr_series.empty:
+            raise ValueError("ATR calculation failed")
+        
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            # Use sophisticated preprocessing
+            prices = df['close'] if 'close' in df.columns else None
+            return self.preprocessor.preprocess_atr(atr_series, prices, length)
+        else:
+            # Simple preprocessing
+            current_atr = float(atr_series.iloc[-1])
+            return {
+                "indicator": "ATR",
+                "period": length,
+                "current": {
+                    "value": round(current_atr, 6)
+                },
+                "values": atr_series.dropna().tolist(),
+                "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
+            }
+    
+    def calculate_adx(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
+        """
+        Calculate ADX (Average Directional Index) with advanced preprocessing.
+        
+        Args:
+            df: DataFrame with OHLCV data
+            length: ADX period (default: 14)
+            
+        Returns:
+            Dictionary with ADX values and analysis
+        """
+        if len(df) < length:
+            raise ValueError(f"Need at least {length} periods for ADX calculation, got {len(df)}")
+        
+        # Calculate ADX using pandas-ta
+        adx_data = ta.adx(df['high'], df['low'], df['close'], length=length)
+        
+        if adx_data is None or adx_data.empty:
+            raise ValueError("ADX calculation failed")
+        
+        # Extract components
+        adx = adx_data[f'ADX_{length}']
+        plus_di = adx_data[f'DMP_{length}']
+        minus_di = adx_data[f'DMN_{length}']
+        
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            # Use sophisticated preprocessing
+            prices = df['close'] if 'close' in df.columns else None
+            return self.preprocessor.preprocess_adx(adx, plus_di, minus_di, prices, length)
+        else:
+            # Simple preprocessing
+            current_adx = float(adx.iloc[-1])
+            current_plus_di = float(plus_di.iloc[-1])
+            current_minus_di = float(minus_di.iloc[-1])
+            
+            return {
+                "indicator": "ADX",
+                "period": length,
+                "current": {
+                    "adx": round(current_adx, 2),
+                    "plus_di": round(current_plus_di, 2),
+                    "minus_di": round(current_minus_di, 2)
+                },
+                "values": {
+                    "adx": adx.dropna().tolist(),
+                    "plus_di": plus_di.dropna().tolist(),
+                    "minus_di": minus_di.dropna().tolist()
+                },
+                "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
+            }
+    
+    def calculate_aroon(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
+        """
+        Calculate Aroon indicator with advanced preprocessing.
+        
+        Args:
+            df: DataFrame with OHLCV data
+            length: Aroon period (default: 14)
+            
+        Returns:
+            Dictionary with Aroon values and analysis
+        """
+        if len(df) < length:
+            raise ValueError(f"Need at least {length} periods for Aroon calculation, got {len(df)}")
+        
+        # Calculate Aroon using pandas-ta
+        aroon_data = ta.aroon(df['high'], df['low'], length=length)
+        
+        if aroon_data is None or aroon_data.empty:
+            raise ValueError("Aroon calculation failed")
+        
+        # Extract components
+        aroon_up = aroon_data[f'AROONU_{length}']
+        aroon_down = aroon_data[f'AROOND_{length}']
+        
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            # Use sophisticated preprocessing
+            prices = df['close'] if 'close' in df.columns else None
+            return self.preprocessor.preprocess_aroon(aroon_up, aroon_down, prices, length)
+        else:
+            # Simple preprocessing
+            current_up = float(aroon_up.iloc[-1])
+            current_down = float(aroon_down.iloc[-1])
+            
+            return {
+                "indicator": "Aroon",
+                "period": length,
+                "current": {
+                    "aroon_up": round(current_up, 2),
+                    "aroon_down": round(current_down, 2),
+                    "oscillator": round(current_up - current_down, 2)
+                },
+                "values": {
+                    "aroon_up": aroon_up.dropna().tolist(),
+                    "aroon_down": aroon_down.dropna().tolist()
+                },
+                "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
+            }
+    
     def calculate_multiple(self, df: pd.DataFrame, indicators: List[str], **params) -> Dict[str, Any]:
         """
         Calculate multiple indicators efficiently.
@@ -472,6 +608,23 @@ class TechnicalIndicators:
                 elif indicator.lower() == "williams_r":
                     length = params.get("williams_r_length", 14)
                     results["williams_r"] = self.calculate_williams_r(df, length)
+                
+                elif indicator.lower() in ["bb", "bollinger_bands"]:
+                    length = params.get("bb_length", 20)
+                    std = params.get("bb_std", 2.0)
+                    results["bollinger_bands"] = self.calculate_bollinger_bands(df, length, std)
+                
+                elif indicator.lower() == "atr":
+                    length = params.get("atr_length", 14)
+                    results["atr"] = self.calculate_atr(df, length)
+                
+                elif indicator.lower() == "adx":
+                    length = params.get("adx_length", 14)
+                    results["adx"] = self.calculate_adx(df, length)
+                
+                elif indicator.lower() == "aroon":
+                    length = params.get("aroon_length", 14)
+                    results["aroon"] = self.calculate_aroon(df, length)
                 
                 else:
                     self._log.warning(f"Indicator '{indicator}' not implemented yet")

@@ -285,26 +285,34 @@ class GGBotOrchestrator:
                         config, signal_data, override_symbol, override_timeframe, websocket_manager
                     )
                 else:
-                    # Manual trigger - create mock signal for testing
-                    from signals.listener_service import SignalData
-                    
-                    mock_signal = SignalData(
-                        source="manual_trigger",
-                        symbol=override_symbol or config.selected_pair,
-                        direction="LONG",  # Default for testing
-                        timeframe="1h",    # Default for testing  
-                        confidence=0.8,    # Default for testing
-                        entry_zone={"low": 0, "high": 0, "mid": 0},  # Will be ignored in manual trigger
-                        stop_loss=0,       # Will be ignored in manual trigger
-                        take_profit=0,     # Will be ignored in manual trigger
-                        reasoning="Manual trigger test - no real signal",
-                        raw_message="Manual trigger initiated by user",
-                        metadata={"manual_trigger": True},
-                        timestamp=datetime.now(timezone.utc)
-                    )
-                    return await self._run_signal_validation_cycle(
-                        config, mock_signal, override_symbol, override_timeframe, websocket_manager
-                    )
+                    # Manual trigger - fetch latest real ggShot signal
+                    try:
+                        latest_signal = await self._fetch_latest_ggshot_signal()
+                        return await self._run_signal_validation_cycle(
+                            config, latest_signal, override_symbol, override_timeframe, websocket_manager
+                        )
+                    except Exception as e:
+                        # If fetching real signal fails, fall back to mock for manual testing
+                        self._log.warning(f"Could not fetch latest ggShot signal, using mock: {e}")
+                        from signals.listener_service import SignalData
+                        
+                        mock_signal = SignalData(
+                            source="manual_trigger",
+                            symbol=override_symbol or config.selected_pair,
+                            direction="LONG",
+                            timeframe="1h",
+                            confidence=0.8,
+                            entry_zone={"low": 0, "high": 0, "mid": 0},
+                            stop_loss=0,
+                            take_profit=0,
+                            reasoning="Manual trigger test - could not fetch real signal",
+                            raw_message="Manual trigger fallback - real signal unavailable",
+                            metadata={"manual_trigger": True, "fallback": True},
+                            timestamp=datetime.now(timezone.utc)
+                        )
+                        return await self._run_signal_validation_cycle(
+                            config, mock_signal, override_symbol, override_timeframe, websocket_manager
+                        )
             else:
                 return await self._run_autonomous_trading_cycle(config, websocket_manager)
             
@@ -437,8 +445,8 @@ class GGBotOrchestrator:
         
         try:
             # Extract symbol and timeframe from signal or override
-            symbol = override_symbol or signal_data.get('symbol') or config.selected_pair
-            timeframe = override_timeframe or signal_data.get('timeframe') or '1h'
+            symbol = override_symbol or signal_data.symbol or config.selected_pair
+            timeframe = override_timeframe or signal_data.timeframe or '1h'
             
             if not symbol:
                 raise ValueError("No symbol specified for signal validation")
@@ -592,6 +600,81 @@ class GGBotOrchestrator:
         self._log.debug(f"Using timeframes: {timeframes}")
         return timeframes
     
+    async def _fetch_latest_ggshot_signal(self):
+        """Fetch the latest real ggShot signal from Telegram for manual testing."""
+        from signals.listener_service import SignalData
+        from telethon import TelegramClient
+        import os
+        import sys
+        from dotenv import load_dotenv
+        
+        try:
+            # Ensure .env is loaded
+            load_dotenv()
+            
+            api_id = int(os.getenv('TG_API_ID'))
+            api_hash = os.getenv('TG_API_HASH')
+            channel_name = os.getenv('GGSHOT_CHANNEL', 'GGShot_Bot')
+            
+            if not api_id or not api_hash:
+                raise ValueError("Missing TG_API_ID or TG_API_HASH environment variables")
+            
+            # Use separate session file for manual trigger to avoid conflicts
+            session_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions')
+            session_path = os.path.join(session_dir, 'manual_trigger_session')
+            
+            client = TelegramClient(session_path, api_id, api_hash)
+            await client.start()
+            
+            try:
+                # Get channel entity
+                channel = await client.get_entity(channel_name)
+                
+                # Fetch latest messages (limit to recent ones)
+                messages = await client.get_messages(channel, limit=10)
+                
+                # Import ggShot parser
+                sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ggshot'))
+                from ggshot_parser import GGShotParser
+                parser = GGShotParser()
+                
+                # Find the most recent valid signal
+                for message in messages:
+                    if message.message:
+                        signal_data = parser.parse_signal(message.message)
+                        if signal_data:
+                            self._log.info(f"Found latest ggShot signal: {signal_data['symbol']} {signal_data['direction']}")
+                            
+                            # Convert to StandardizedSignalData format
+                            return SignalData(
+                                source='ggshot',
+                                symbol=signal_data['symbol'],
+                                direction=signal_data['direction'],
+                                timeframe=signal_data['timeframe'],
+                                confidence=signal_data.get('strategy_accuracy', 80) / 100.0,
+                                entry_zone=signal_data['entry_zone'],
+                                stop_loss=signal_data['stop_loss'],
+                                take_profit=signal_data['target_1'],
+                                reasoning=f"Latest ggShot signal with {signal_data.get('strategy_accuracy', 80)}% accuracy",
+                                raw_message=message.message,
+                                metadata={
+                                    'targets': signal_data['targets'],
+                                    'trend_line': signal_data.get('trend_line'),
+                                    'strategy_accuracy': signal_data.get('strategy_accuracy'),
+                                    'manual_fetch': True
+                                },
+                                timestamp=datetime.now(timezone.utc)
+                            )
+                
+                raise ValueError("No valid ggShot signals found in recent messages")
+                
+            finally:
+                await client.disconnect()
+                
+        except Exception as e:
+            self._log.error(f"Failed to fetch latest ggShot signal: {e}")
+            raise
+
     def _should_publish_signal(self, config: BotConfigV2, decision_result: Dict) -> bool:
         """Check if signal should be published to telegram."""
         telegram_config = config.telegram_integration or {}
@@ -743,7 +826,7 @@ class GGBotOrchestrator:
             decision_engine = await self._get_decision_engine(config_id, config.user_id)
             
             # Get symbol from config or signal data
-            symbol = signal_data.get('symbol') if signal_data else config.selected_pair or "BTC/USDT"
+            symbol = signal_data.symbol if signal_data else config.selected_pair or "BTC/USDT"
             
             # Run decision using V2 engine with full context management
             decision_result = await decision_engine.make_decision(
