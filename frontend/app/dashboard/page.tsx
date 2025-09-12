@@ -17,8 +17,8 @@ import PerformancePanel from './components/PerformancePanel'
 import ActivityPanel from './components/ActivityPanel'
 
 export default function DashboardV2Page() {
-  // Authentication (matching old dashboard)
-  const supabase = createClient()
+  // Authentication (matching old dashboard) - memoize client to prevent loops
+  const supabase = useMemo(() => createClient(), [])
   const router = useRouter()
   const [user, setUser] = useState<User | null>(null)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
@@ -36,13 +36,16 @@ export default function DashboardV2Page() {
 
   // Get current user from Supabase (matching old dashboard)
   useEffect(() => {
-    const getUser = async () => {
+    let cancelled = false
+    ;(async () => {
       const { data: { user } } = await supabase.auth.getUser()
-      setUser(user)
-      setIsLoadingAuth(false)
-    }
-    getUser()
-  }, [supabase.auth])
+      if (!cancelled) {
+        setUser(user)
+        setIsLoadingAuth(false)
+      }
+    })()
+    return () => { cancelled = true }
+  }, [supabase])
 
   // CRITICAL: All hooks must be called BEFORE any conditional returns
   const userId = user?.id
