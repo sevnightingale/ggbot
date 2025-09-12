@@ -257,17 +257,17 @@ export default function ForgePage() {
           console.error('❌ SSE connection error:', error)
         }
 
-        return () => {
-          console.log('🛑 Closing forge SSE connection')
-          stream.close()
-        }
-
       } catch (error) {
         console.error('❌ Failed to connect SSE:', error)
       }
     }
 
     connectSSE()
+
+    // Cleanup function
+    return () => {
+      console.log('🛑 Cleaning up SSE connection')
+    }
   }, [user, bot])
 
   // Countdown timer for next run
