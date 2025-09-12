@@ -78,8 +78,7 @@ class ATRPreprocessor(BasePreprocessor):
                 "stop_loss": stop_loss_analysis
             },
             "evidence": evidence,
-            "summary": self._generate_atr_summary(current_atr, volatility_analysis, atr_trend_analysis),
-            "raw": {"atr": atr_clean.tolist()[-200:]},
+            "summary": self._generate_atr_summary(current_atr, volatility_analysis, atr_trend_analysis)
         }
     
     def _analyze_volatility_levels(self, atr: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:
