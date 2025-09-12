@@ -19,13 +19,12 @@ export function useDashboardSSE(userId: string | undefined) {
   const [lastEventId, setLastEventId] = useState<string | null>(null)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   
-  const { 
-    setBotsFromSSE,
-    updatePositionsFromSSE,
-    updateDecisionsFromSSE,
-    updateAccountsFromSSE,
-    isLoading
-  } = useBotStore()
+  // Use selectors to prevent infinite loops from unstable function refs
+  const setBotsFromSSE = useBotStore(s => s.setBotsFromSSE)
+  const updatePositionsFromSSE = useBotStore(s => s.updatePositionsFromSSE)
+  const updateDecisionsFromSSE = useBotStore(s => s.updateDecisionsFromSSE)
+  const updateAccountsFromSSE = useBotStore(s => s.updateAccountsFromSSE)
+  const isLoading = useBotStore(s => s.isLoading)
 
   useEffect(() => {
     if (!userId) {
