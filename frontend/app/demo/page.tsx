@@ -488,7 +488,7 @@ export default function DemoPage() {
                 name={currentBot.name}
                 status={currentBot.status.phase}
                 message={currentBot.status.message}
-                showSpinner={currentBot.status.showSpinner}
+                showSpinner={'showSpinner' in currentBot.status ? currentBot.status.showSpinner : false}
                 demoMode={currentBot.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' && currentBot.status.phase !== 'inactive'}
                 onClick={() => handleBotClick(currentBot)}
               />

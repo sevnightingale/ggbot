@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useBotStore, Bot } from '@/store/botStore'
-import { useBotWebSocket } from '@/hooks/useBotWebSocket'
+import { useDashboardSSE } from '@/hooks/useDashboardSSE'
 import { useBotStatus } from './hooks/useBotStatus'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
@@ -59,8 +59,8 @@ export default function DashboardV2Page() {
   // Get user's bots directly from store (reactive to store changes)
   const userBots = userId ? getBotsByUser(userId) : []
 
-  // WebSocket connection for real-time updates
-  const { isConnected: isWebSocketConnected, isLoadingBots } = useBotWebSocket(userId)
+  // 🔥 SSE connection for real-time updates (replaces WebSocket!)
+  const { isConnected: isSSEConnected, isLoading: isLoadingBots } = useDashboardSSE(userId)
 
   // Auto-select first bot if none selected and bots exist
   useEffect(() => {
@@ -154,8 +154,8 @@ export default function DashboardV2Page() {
   const handleManualTrigger = async (config_id: string) => {
     try {
       console.log('🔥 Manual trigger started for bot:', config_id)
-      console.log('🔌 WebSocket connected:', isWebSocketConnected)
-      console.log('👤 User ID for WebSocket:', userId)
+      console.log('🔌 SSE connected:', isSSEConnected)
+      console.log('👤 User ID for SSE:', userId)
       
       // Use same authentication method as startBot/stopBot
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
