@@ -23,13 +23,9 @@ export default function DashboardV2Page() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
 
-  // Bot store and state - use selectors to prevent infinite loops
+  // Bot store and state - read actions dynamically to avoid dependency issues
   const getBotsByUser = useBotStore(s => s.getBotsByUser)
   const getBotById = useBotStore(s => s.getBotById)
-  const startBot = useBotStore(s => s.startBot)
-  const stopBot = useBotStore(s => s.stopBot)
-  const deleteBot = useBotStore(s => s.deleteBot)
-  const loadBots = useBotStore(s => s.loadBots)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [selectedBot, setSelectedBot] = useState<Bot | null>(null)
@@ -56,9 +52,10 @@ export default function DashboardV2Page() {
     if (userId && loadedFor.current !== userId) {
       console.log('📡 Dashboard V2 loading bots for userId:', userId)
       loadedFor.current = userId
-      loadBots(userId)
+      // Get loadBots dynamically to avoid dependency issues
+      useBotStore.getState().loadBots(userId)
     }
-  }, [userId, loadBots])
+  }, [userId])
 
   // Get user's bots directly from store (memoized to prevent effect loops)
   const userBots = useMemo(() => {
@@ -135,7 +132,7 @@ export default function DashboardV2Page() {
 
   const handleConfigSaved = (configId: string) => {
     if (userId) {
-      loadBots(userId)
+      useBotStore.getState().loadBots(userId)
     }
     setSelectedConfigId(configId)
   }
@@ -145,6 +142,9 @@ export default function DashboardV2Page() {
       const bot = userBots.find(b => b.config_id === config_id)
       if (!bot) return
 
+      // Get actions dynamically
+      const { startBot, stopBot } = useBotStore.getState()
+      
       if (bot.isActive) {
         await stopBot(config_id)
       } else {
@@ -157,7 +157,8 @@ export default function DashboardV2Page() {
 
   const handleDeleteBot = async (config_id: string) => {
     try {
-      await deleteBot(config_id)
+      // Get deleteBot action dynamically
+      await useBotStore.getState().deleteBot(config_id)
       
       // If we deleted the selected bot, select another one
       if (selectedConfigId === config_id) {
