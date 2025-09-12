@@ -126,13 +126,17 @@ class ConfigUpdateRequest(BaseModel):
 
 
 def serialize_numpy_types(obj):
-    """Recursively convert numpy types to Python native types."""
+    """Recursively convert numpy types and Decimal to Python native types."""
+    from decimal import Decimal
+    
     if isinstance(obj, (np.integer)):
         return int(obj)
     elif isinstance(obj, (np.floating)):
         return float(obj)
     elif isinstance(obj, (np.ndarray)):
         return obj.tolist()
+    elif isinstance(obj, Decimal):
+        return float(obj)
     elif isinstance(obj, dict):
         return {key: serialize_numpy_types(value) for key, value in obj.items()}
     elif isinstance(obj, list):
@@ -365,6 +369,9 @@ class GGBotOrchestrator:
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result
             )
+            
+            # Allow users to see decision phase for 3 seconds (better UX)
+            await asyncio.sleep(3)
             
             # 6. Execute trading (always broadcast status)
             if websocket_manager:
