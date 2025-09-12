@@ -115,9 +115,7 @@ export default function DashboardPage() {
   }, [userId]) // Only depend on userId to prevent infinite re-renders
   
   // Get user's bots directly from store (reactive to store changes)
-  const userBots = React.useMemo(() => {
-    return userId ? getBotsByUser(userId) : []
-  }, [userId, getBotsByUser])
+  const userBots = userId ? getBotsByUser(userId) : []
   
   // Log when bots change for debugging
   React.useEffect(() => {
