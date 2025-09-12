@@ -645,6 +645,14 @@ class MonitoringService:
             
             bot_statuses = []
             
+            # Debug: Log all available scheduler jobs at the start
+            if scheduler:
+                all_jobs = scheduler.get_jobs()
+                logger.info(f"🔍 DEBUG: Found {len(all_jobs)} total scheduler jobs")
+                user_job_ids = [j.id for j in all_jobs if user_id in j.id]
+                if user_job_ids:
+                    logger.info(f"🔍 DEBUG: User {user_id[:8]} has jobs: {user_job_ids}")
+            
             for config in configs:
                 config_id = config['config_id']
                 db_state = config.get('state', 'inactive')
@@ -671,6 +679,14 @@ class MonitoringService:
                 # Check if there's a corresponding scheduler job
                 job_id = f"bot:{user_id}:{config_id}:{timeframe}"
                 job = scheduler.get_job(job_id) if scheduler else None
+                
+                # Debug logging for job lookup
+                if db_state == 'active' and not job:
+                    logger.warning(f"🔍 Active bot {config_id[:8]} has no scheduler job! Looking for job_id: {job_id}")
+                    if scheduler:
+                        all_jobs = scheduler.get_jobs()
+                        user_jobs = [j.id for j in all_jobs if user_id in j.id]
+                        logger.warning(f"🔍 Available jobs for user: {user_jobs}")
                 
                 next_run = None
                 if job and job.next_run_time:
