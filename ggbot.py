@@ -834,7 +834,9 @@ class GGBotOrchestrator:
                 signal_data=signal_data  # Pass signal data for validation mode
             )
             
+            # Log the full decision result
             self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
+            self._log.info(f"🎯 Decision Engine Output: {decision_result}")
             return decision_result
             
         except Exception as e:

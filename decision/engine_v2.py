@@ -726,6 +726,10 @@ ORIGINAL MESSAGE:
     async def _call_gpt5(self, prompt: str) -> str:
         """Call GPT-5 API using the new Responses API."""
         try:
+            # Log the prompt being sent to the LLM
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info("🤖 Prompt sent to Decision LLM")
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info(f"PROMPT:\n{prompt}")
+            
             # Use the new Responses API with high reasoning for trading decisions
             response = await self.openai_client.responses.create(
                 model="gpt-5",
@@ -733,6 +737,10 @@ ORIGINAL MESSAGE:
                 reasoning={"effort": "high"},  # High reasoning for complex trading decisions
                 text={"verbosity": "medium"}   # Medium verbosity for balanced output
             )
+            
+            # Log the response from the LLM
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info("🤖 Response received from Decision LLM")
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info(f"LLM RESPONSE:\n{response.output_text}")
             
             return response.output_text
             
