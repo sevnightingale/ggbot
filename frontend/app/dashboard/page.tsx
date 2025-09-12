@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useDashboardSSE } from '@/hooks/useDashboardSSE'
@@ -57,8 +57,10 @@ export default function DashboardV2Page() {
     }
   }, [userId, loadBots])
 
-  // Get user's bots directly from store (reactive to store changes)  
-  const userBots = userId ? getBotsByUser(userId) : []
+  // Get user's bots directly from store (memoized to prevent effect loops)
+  const userBots = useMemo(() => {
+    return userId ? getBotsByUser(userId) : []
+  }, [userId, getBotsByUser])
 
   // 🔥 SSE connection for real-time updates (replaces WebSocket!)
   const { isConnected: isSSEConnected, isLoading: isLoadingBots } = useDashboardSSE(userId)
