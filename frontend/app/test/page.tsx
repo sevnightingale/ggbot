@@ -149,12 +149,7 @@ export default function TestPage() {
     setSseMessages(['🔌 Connecting to SSE dashboard stream...'])
     
     const eventSource = new EventSource(
-      `${process.env.NEXT_PUBLIC_V2_API_URL}/api/dashboard-stream`,
-      {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      } as EventSourceInit
+      `${process.env.NEXT_PUBLIC_V2_API_URL}/api/dashboard-stream?token=${encodeURIComponent(token)}`
     )
 
     eventSource.onopen = () => {

@@ -1195,7 +1195,8 @@ async def health_check():
 
 @app.get("/api/dashboard-stream")
 async def dashboard_stream(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+    request: Request,
+    token: str = None
 ):
     """
     Server-Sent Events stream for unified dashboard data.
@@ -1207,8 +1208,29 @@ async def dashboard_stream(
     - Account summaries
     
     Updates every 5 seconds with proper SSE headers and heartbeat.
+    
+    Authentication via:
+    - Query parameter: ?token=<jwt_token>
+    - Authorization header: Bearer <jwt_token>
     """
     import time
+    from core.auth.supabase_auth import AuthMiddleware
+    
+    # Get token from query param or Authorization header
+    auth_token = token
+    if not auth_token:
+        auth_header = request.headers.get("authorization")
+        if auth_header and auth_header.startswith("Bearer "):
+            auth_token = auth_header.split(" ", 1)[1]
+    
+    if not auth_token:
+        raise HTTPException(status_code=401, detail="Authentication required: provide token query param or Authorization header")
+    
+    # Authenticate the token
+    try:
+        current_user = await AuthMiddleware.authenticate_request(f"Bearer {auth_token}")
+    except HTTPException as e:
+        raise HTTPException(status_code=403, detail=f"Authentication failed: {e.detail}")
     
     async def generate():
         event_id = 0
