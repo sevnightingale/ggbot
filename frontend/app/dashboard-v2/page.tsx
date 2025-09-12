@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
@@ -57,10 +57,12 @@ export default function DashboardV2Page() {
   }, [userId, loadBots])
 
   // Get user's bots directly from store (reactive to store changes)
-  const userBots = userId ? getBotsByUser(userId) : []
+  const userBots = useMemo(() => {
+    return userId ? getBotsByUser(userId) : []
+  }, [userId, getBotsByUser])
 
   // WebSocket connection for real-time updates
-  const { isConnected: isWebSocketConnected, isLoadingBots } = useBotWebSocket(userId)
+  const { isLoadingBots } = useBotWebSocket(userId)
 
   // Auto-select first bot if none selected and bots exist
   useEffect(() => {
