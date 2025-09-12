@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useBotStore, Bot } from '@/store/botStore'
-import { useDashboardSSE } from '@/hooks/useDashboardSSE'
+import { useDashboardSSE } from './hooks/useDashboardSSE'
 import { useBotStatus } from './hooks/useBotStatus'
 import { useRouter } from 'next/navigation'
 import { apiClient } from '@/lib/api'
