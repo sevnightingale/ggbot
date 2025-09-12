@@ -19,11 +19,7 @@ export function useDashboardSSE(userId: string | undefined) {
   const [lastEventId, setLastEventId] = useState<string | null>(null)
   const [connectionError, setConnectionError] = useState<string | null>(null)
   
-  // Use selectors to prevent infinite loops from unstable function refs
-  const setBotsFromSSE = useBotStore(s => s.setBotsFromSSE)
-  const updatePositionsFromSSE = useBotStore(s => s.updatePositionsFromSSE)
-  const updateDecisionsFromSSE = useBotStore(s => s.updateDecisionsFromSSE)
-  const updateAccountsFromSSE = useBotStore(s => s.updateAccountsFromSSE)
+  // Only read loading state here - actions will be grabbed dynamically
   const isLoading = useBotStore(s => s.isLoading)
 
   useEffect(() => {
@@ -73,6 +69,14 @@ export function useDashboardSSE(userId: string | undefined) {
               setLastEventId(event.lastEventId)
             }
             
+            // Get actions dynamically - no function refs in dependencies
+            const {
+              setBotsFromSSE,
+              updatePositionsFromSSE,
+              updateDecisionsFromSSE,
+              updateAccountsFromSSE,
+            } = useBotStore.getState()
+            
             // Update all dashboard data from unified stream
             if (data.bots) {
               setBotsFromSSE(data.bots, userId)
@@ -98,31 +102,6 @@ export function useDashboardSSE(userId: string | undefined) {
             console.error('❌ Failed to parse SSE dashboard data:', error)
           }
         }
-
-        eventSource.addEventListener('dashboard', (event: MessageEvent) => {
-          if (!isMounted) return
-          
-          try {
-            const data = JSON.parse(event.data)
-            
-            // Handle specific dashboard events (same as onmessage but typed)
-            if (data.bots) {
-              setBotsFromSSE(data.bots, userId)
-            }
-            if (data.positions) {
-              updatePositionsFromSSE(data.positions)
-            }
-            if (data.decisions) {
-              updateDecisionsFromSSE(data.decisions)
-            }
-            if (data.accounts) {
-              updateAccountsFromSSE(data.accounts)
-            }
-            
-          } catch (error) {
-            console.error('❌ Failed to parse SSE dashboard event:', error)
-          }
-        })
 
         eventSource.addEventListener('error', (event) => {
           console.log('❌ SSE error event:', event)
@@ -160,7 +139,7 @@ export function useDashboardSSE(userId: string | undefined) {
       }
       setIsConnected(false)
     }
-  }, [userId, setBotsFromSSE, updatePositionsFromSSE, updateDecisionsFromSSE, updateAccountsFromSSE])
+  }, [userId]) // Only userId - no store action dependencies
 
   return {
     isConnected,
