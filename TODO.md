@@ -68,6 +68,13 @@
   - [ ] Profit factor (gross profit / gross loss)
   - [ ] Win/loss streaks and trade distribution
 
+- [ ] **Light/Dark theme system**
+  - [ ] Add CSS variable swapping for light mode (bone ↔ charcoal inversion)
+  - [ ] Update neumorphic shadows for light theme variants
+  - [ ] Create theme toggle component and context provider
+  - [ ] Test agent colors and corner brackets in light mode
+  - [ ] Update 5 dashboard components with theme-aware classes
+
 ## 🔧 **MEDIUM PRIORITY - LLM Provider System**
 
 **Timeline**: 2-3 days - User flexibility and cost optimization
