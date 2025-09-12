@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useBotWebSocket } from '@/hooks/useBotWebSocket'
@@ -57,12 +57,10 @@ export default function DashboardV2Page() {
   }, [userId, loadBots])
 
   // Get user's bots directly from store (reactive to store changes)
-  const userBots = useMemo(() => {
-    return userId ? getBotsByUser(userId) : []
-  }, [userId, getBotsByUser])
+  const userBots = userId ? getBotsByUser(userId) : []
 
   // WebSocket connection for real-time updates
-  const { isLoadingBots } = useBotWebSocket(userId)
+  const { isConnected: isWebSocketConnected, isLoadingBots } = useBotWebSocket(userId)
 
   // Auto-select first bot if none selected and bots exist
   useEffect(() => {
@@ -190,7 +188,7 @@ export default function DashboardV2Page() {
   // Authentication guard (matching old dashboard)
   if (isLoadingAuth) {
     return (
-      <div className="min-h-screen bg-charcoal-600 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-bone-300">Loading...</p>
@@ -207,7 +205,7 @@ export default function DashboardV2Page() {
   // Show loading state while fetching bots
   if (isLoadingBots) {
     return (
-      <div className="min-h-screen bg-charcoal-600 flex items-center justify-center p-8">
+      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center p-8">
         <div className="flex flex-col items-center gap-4">
           <div className="w-8 h-8 border-2 border-bone-300 border-t-transparent rounded-full animate-spin"></div>
           <p className="text-bone-300">Loading bots...</p>
@@ -219,7 +217,7 @@ export default function DashboardV2Page() {
   // Show empty state if no bots (matching old dashboard)
   if (userBots.length === 0) {
     return (
-      <div className="min-h-screen bg-charcoal-600 relative">
+      <div className="min-h-screen bg-charcoal-700 relative">
         <div className="flex items-center justify-center p-8 min-h-screen">
           <div className="flex flex-col items-center gap-4 max-w-md text-center">
             <div className="text-6xl mb-4">🤖</div>
@@ -254,7 +252,7 @@ export default function DashboardV2Page() {
   }
 
   return (
-    <div className="min-h-screen bg-charcoal-600 relative">
+    <div className="min-h-screen bg-charcoal-700 relative">
       {/* 3-Column Layout with Sharp Dividers (matching old dashboard) */}
       <div className="min-h-screen flex items-center justify-center p-8">
         <div className="w-full max-w-[1680px] mx-auto grid grid-cols-[1fr_400px_1fr] gap-8 relative">
@@ -269,6 +267,17 @@ export default function DashboardV2Page() {
 
           {/* Center Column - Bot Carousel (matching old dashboard layout) */}
           <div className="flex flex-col items-center justify-center">
+            
+            {/* WebSocket & Debug Status */}
+            <div className="mb-4 text-center">
+              <div className={`text-xs ${isWebSocketConnected ? 'text-green-400' : 'text-red-400'}`}>
+                WebSocket: {isWebSocketConnected ? 'Connected' : 'Disconnected'}
+              </div>
+              {/* Debug info */}
+              <div className="text-xs text-gray-500 mt-1">
+                Status: {botStatus.currentState} | Active: {botStatus.isActive ? 'Yes' : 'No'}
+              </div>
+            </div>
 
             {/* GGBot with flanking arrows (matching old dashboard) */}
             <div className="flex items-center gap-10 mb-6 px-4">
