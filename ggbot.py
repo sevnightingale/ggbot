@@ -2233,7 +2233,7 @@ class WebSocketManager:
                 else:
                     content = message_type
                 logger.info(f"📡 Sending WebSocket message to {user_id}: {content}")
-                await self.active_connections[user_id].send_text(json.dumps(data))
+                await self.active_connections[user_id].send_text(json.dumps(data, default=str))
             except Exception as e:
                 logger.error(f"❌ WebSocket send failed for {user_id}: {e}")
                 # Connection closed, remove it

@@ -326,6 +326,7 @@ export const useBotStore = create<BotStore>()(
           ws.onmessage = (event) => {
             try {
               const data = JSON.parse(event.data)
+              console.log('📨 WebSocket message received:', data)
               
               // Forward demo messages to callback if provided
               if (onDemoMessage && (data.type === 'demo_position_create' || data.status === 'demo_started')) {
@@ -333,6 +334,9 @@ export const useBotStore = create<BotStore>()(
               }
               
               if (data.type === 'bot_status_update') {
+                console.log('🤖 Bot status update received:', data)
+                console.log('📍 Config ID:', data.config_id || data.bot_id)
+                console.log('📍 Status:', data.status)
                 // Extract config_id from bot_id (format: "ggshot-e249bb49")  
                 const config_id = data.config_id || data.bot_id
                 
