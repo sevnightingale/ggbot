@@ -5,7 +5,7 @@ import GGBot from '@/components/GGBot'
 import GGBotConfig from '@/components/GGBotConfig'
 import FloatingActionButtons from '@/components/FloatingActionButtons'
 import { useBotStore, Bot } from '@/store/botStore'
-import { useBotWebSocket } from '@/hooks/useBotWebSocket'
+import { useDashboardSSE } from '@/hooks/useDashboardSSE'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 import { createClient } from '@/lib/supabase'
 import type { User } from '@supabase/supabase-js'
@@ -123,8 +123,8 @@ export default function DashboardPage() {
   }, [userBots.length, userId])
   const selectedBotData = selectedConfigId ? getBotById(selectedConfigId) : null
   
-  // WebSocket connection for real-time updates (only when userId is available)
-  const { isLoadingBots } = useBotWebSocket(userId) // Don't pass empty string
+  // 🔥 SSE connection for real-time updates (replaces WebSocket!)
+  const { isLoading: isLoadingBots } = useDashboardSSE(userId)
   
   // Auto-select first bot if none selected and bots exist
   React.useEffect(() => {

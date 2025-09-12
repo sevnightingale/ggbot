@@ -112,8 +112,18 @@ export interface Bot {
   lastMetricsUpdate?: string
   lastDecisionUpdate?: string
   
+  // Scheduler info (from SSE)
+  nextRun?: string | null   // Next scheduled run time
+  timeframe?: string        // Trading timeframe
+  
+  // Display fields (from SSE account data)
+  selectedPair?: string     // Trading pair
+  balance?: string          // Account balance 
+  pnl?: string             // Total P&L
+  winRate?: string         // Win rate percentage
+  
   // Metadata
-  createdAt: Date
+  createdAt: string        // ISO string for consistency 
   lastRun?: Date
   userId: string           // For multi-user support
 }
@@ -151,11 +161,17 @@ interface BotStore {
   updateBotDecisions: (config_id: string, decisions: any[]) => void
   updateSchedulerStatus: (schedulerStatus: any) => void
   
-  // WebSocket Management Actions
+  // WebSocket Management Actions (DEPRECATED - use SSE instead)
   connectWebSocket: (userId: string, wsUrl: string, onDemoMessage?: (data: Record<string, unknown>) => void) => Promise<void>
   disconnectWebSocket: (userId: string) => void
   subscribeToBot: (config_id: string) => void
   isWebSocketConnected: (userId: string) => boolean
+  
+  // 🔥 NEW SSE Management Actions
+  setBotsFromSSE: (botsData: any[], userId: string) => void
+  updatePositionsFromSSE: (positionsData: any[]) => void
+  updateDecisionsFromSSE: (decisionsData: any[]) => void
+  updateAccountsFromSSE: (accountsData: any[]) => void
   
   // API Actions
   loadBots: (userId: string) => Promise<void>
@@ -714,6 +730,122 @@ export const useBotStore = create<BotStore>()(
           set({ error: errorMessage, isLoading: false })
           throw error
         }
+      },
+
+      // 🔥 NEW SSE Management Actions
+      setBotsFromSSE: (botsData: any[], userId: string) => {
+        console.log('🔥 Setting bots from SSE data:', botsData.length, 'bots for user', userId)
+        
+        set((state) => {
+          const newBots = new Map(state.bots)
+          
+          // Process each bot from SSE data
+          botsData.forEach((botData: any) => {
+            try {
+              // Transform SSE bot data to our Bot interface
+              const bot: Bot = {
+                config_id: botData.config_id,
+                instance_name: botData.config_name || `Bot ${botData.config_id.slice(0, 8)}`,
+                config_type: 'production', // Default for SSE data
+                name: botData.config_name || `Bot ${botData.config_id.slice(0, 8)}`,
+                strategy: extractStrategyFromConfig(botData.config_data),
+                crypto: extractCryptoFromPair(botData.config_data?.selected_pair || 'BTC/USDT'),
+                riskLevel: extractRiskLevel(botData.config_data),
+                userId: botData.user_id || userId,
+                isActive: botData.state === 'active',
+                createdAt: botData.created_at || new Date().toISOString(),
+                
+                // Status from runtime data (Redis + scheduler)
+                status: {
+                  phase: botData.execution_status?.phase === 'extracting' ? 'extraction' :
+                         botData.execution_status?.phase === 'deciding' ? 'decision' :
+                         botData.execution_status?.phase === 'trading' ? 'trading' :
+                         botData.execution_status?.phase === 'completed' ? 'idle' :
+                         botData.state === 'active' ? 'idle' : 'inactive',
+                  color: botData.status_color || 
+                         (botData.state === 'active' ? 'blue' : 'gray'),
+                  message: botData.status_message || 
+                          (botData.state === 'active' ? 'Monitoring markets...' : 'Bot inactive'),
+                  timestamp: new Date().toISOString(),
+                  showSpinner: botData.show_spinner || false,
+                  context: botData.execution_status || {}
+                },
+                
+                // Next run info from scheduler
+                nextRun: botData.next_run || null,
+                timeframe: botData.config_data?.timeframe || '1h',
+                
+                // Default values for optional fields
+                selectedPair: botData.config_data?.selected_pair || 'BTC/USDT',
+                balance: '$10,000', // Will be updated from accounts data
+                pnl: '$0.00',
+                winRate: '0%',
+                positions: []
+              }
+              
+              newBots.set(bot.config_id, bot)
+            } catch (error) {
+              console.error('❌ Failed to transform bot data from SSE:', botData, error)
+            }
+          })
+          
+          return { bots: newBots }
+        })
+      },
+      
+      updatePositionsFromSSE: (positionsData: any[]) => {
+        console.log('🔥 Updating positions from SSE data:', positionsData.length, 'positions')
+        
+        // Group positions by config_id and update bot positions
+        const positionsByConfig = positionsData.reduce((acc: any, position: any) => {
+          const configId = position.config_id
+          if (!acc[configId]) acc[configId] = []
+          acc[configId].push(position)
+          return acc
+        }, {})
+        
+        // Update each bot's positions
+        Object.entries(positionsByConfig).forEach(([configId, positions]: [string, any]) => {
+          get().updateBot(configId, { positions })
+        })
+      },
+      
+      updateDecisionsFromSSE: (decisionsData: any[]) => {
+        console.log('🔥 Updating decisions from SSE data:', decisionsData.length, 'decisions')
+        
+        // Group decisions by config_id and update bot decisions  
+        const decisionsByConfig = decisionsData.reduce((acc: any, decision: any) => {
+          const configId = decision.config_id
+          if (!acc[configId]) acc[configId] = []
+          acc[configId].push(decision)
+          return acc
+        }, {})
+        
+        // Update each bot's recent decisions
+        Object.entries(decisionsByConfig).forEach(([configId, decisions]: [string, any]) => {
+          get().updateBotDecisions(configId, decisions)
+        })
+      },
+      
+      updateAccountsFromSSE: (accountsData: any[]) => {
+        console.log('🔥 Updating accounts from SSE data:', accountsData.length, 'accounts')
+        
+        // Update bot balance and metrics from account data
+        accountsData.forEach((account: any) => {
+          const configId = account.config_id
+          if (configId) {
+            const bot = get().getBotById(configId)
+            if (bot) {
+              // Update bot with account information
+              get().updateBot(configId, {
+                balance: `$${parseFloat(account.current_balance || 0).toLocaleString()}`,
+                pnl: `${account.total_pnl >= 0 ? '+' : ''}$${parseFloat(account.total_pnl || 0).toFixed(2)}`,
+                winRate: account.total_trades > 0 ? 
+                         `${Math.round((account.win_trades / account.total_trades) * 100)}%` : '0%'
+              })
+            }
+          }
+        })
       },
 
       // Utility Actions
