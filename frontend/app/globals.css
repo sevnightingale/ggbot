@@ -536,6 +536,9 @@ body {
   /* Base colors */
   --charcoal-900: #161618;
   --charcoal-800: #1a1a1c;
+  --charcoal-700: #2a2a30;
+  --charcoal-600: #3a3a40;
+  --charcoal-500: #4a4a50;
   --bone-200: #e3e5e6;
   --bone-300: #d0d2d3;
   
