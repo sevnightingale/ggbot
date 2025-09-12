@@ -72,7 +72,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
   }
 
   return (
-    <div className={`activity-panel bg-charcoal-800 corner-top-right corner-bottom-left p-6 ${className}`}>
+    <div className={`activity-panel bg-charcoal-800 corner-top-right corner-bottom-left p-6 max-w-full ${className}`}>
       <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
       <div className="gradient-divider mb-4"></div>
       
@@ -85,7 +85,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
           </span>
         </div>
         <div className="overflow-x-auto overflow-y-auto max-h-80">
-          <table className="w-full text-xs">
+          <table className="w-full min-w-0 text-xs">
             <thead className="text-gray-400 border-b border-gray-700">
               <tr>
                 <th className="text-left py-1 pr-2">P&L</th>
