@@ -13,7 +13,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
 
   if (error) {
     return (
-      <div className={`activity-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`activity-panel bg-charcoal-800  p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
         <div className="text-red-400">
           Failed to load activity data
@@ -24,7 +24,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
 
   if (isLoading) {
     return (
-      <div className={`activity-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`activity-panel bg-charcoal-800  p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
         <div className="text-bone-400">
           Loading activity data...
@@ -35,7 +35,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
 
   if (!botId) {
     return (
-      <div className={`activity-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`activity-panel bg-charcoal-800  p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
         <div className="text-bone-400">
           Select a bot to view activity
@@ -45,7 +45,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
   }
 
   return (
-    <div className={`activity-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+    <div className={`activity-panel bg-charcoal-800  p-6 ${className}`}>
       <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
       
       {/* Live Positions */}
