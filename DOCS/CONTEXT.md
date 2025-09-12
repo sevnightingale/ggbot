@@ -46,3 +46,7 @@ asyncio.run(setup_manual_session())
 Once the session is created, try the Manual Trigger button in your frontend.
 
 This will create a separate `manual_trigger_session` file so it won't conflict with your existing `ggshot_session` used by the signal-listener service.
+
+
+I didn't answer your questions yet:
+1) yes that's right. ANd 
