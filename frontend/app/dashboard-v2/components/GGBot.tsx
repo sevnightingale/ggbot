@@ -52,6 +52,16 @@ const GGBot: React.FC<GGBotProps> = ({
               {status === 'idle' ? 'active' : status}
             </span>
           </div>
+          {message && (
+            <div className="ggbot-message-inline">
+              {showSpinner && status !== 'idle' && status !== 'inactive' && (
+                <span className="ggbot-spinner-inline">{spinnerChars[spinnerIndex]}</span>
+              )}
+              <span className="ggbot-message-text-inline">
+                {message.length > 50 ? `${message.substring(0, 50)}...` : message}
+              </span>
+            </div>
+          )}
         </div>
       </button>
       
