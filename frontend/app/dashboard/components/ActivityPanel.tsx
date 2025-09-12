@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
-import { useBotStore } from '@/store/botStore'
+import React, { useCallback } from 'react'
+import { useBotStore, Bot } from '@/store/botStore'
 
 interface ActivityPanelProps {
   botId: string | null
@@ -22,8 +22,12 @@ interface DecisionHistoryItem {
 }
 
 export default function ActivityPanel({ botId, className = '' }: ActivityPanelProps) {
+  // Create stable selector to prevent unnecessary re-renders
+  const botSelector = useCallback((state: { getBotById: (id: string) => Bot | undefined }) => 
+    botId ? state.getBotById(botId) : null, [botId])
+  
   // 🔥 NEW: Read data directly from SSE-updated store instead of HTTP calls
-  const bot = useBotStore(state => botId ? state.getBotById(botId) : null)
+  const bot = useBotStore(botSelector)
   const isLoading = useBotStore(state => state.isLoading)
   
   // Build activity object from bot store data (updated via SSE)

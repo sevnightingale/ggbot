@@ -24,7 +24,6 @@ export default function DashboardV2Page() {
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
 
   // Bot store and state - read actions dynamically to avoid dependency issues
-  const getBotsByUser = useBotStore(s => s.getBotsByUser)
   const getBotById = useBotStore(s => s.getBotById)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
@@ -59,8 +58,8 @@ export default function DashboardV2Page() {
 
   // Get user's bots directly from store (memoized to prevent effect loops)
   const userBots = useMemo(() => {
-    return userId ? getBotsByUser(userId) : []
-  }, [userId, getBotsByUser])
+    return userId ? useBotStore.getState().getBotsByUser(userId) : []
+  }, [userId])
 
   // 🔥 SSE connection for real-time updates (replaces WebSocket!)
   const { isConnected: isSSEConnected, isLoading: isLoadingBots } = useDashboardSSE(userId)

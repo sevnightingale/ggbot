@@ -2,6 +2,29 @@ import { create } from 'zustand'
 import { devtools, subscribeWithSelector } from 'zustand/middleware'
 import { apiClient } from '@/lib/api'
 
+// Deep equality helper for SSE updates
+function deepEqual(a: any, b: any): boolean {
+  if (a === b) return true
+  if (a == null || b == null) return false
+  if (typeof a !== typeof b) return false
+  
+  if (typeof a === 'object') {
+    if (Array.isArray(a) !== Array.isArray(b)) return false
+    if (Array.isArray(a)) {
+      if (a.length !== b.length) return false
+      return a.every((item, index) => deepEqual(item, b[index]))
+    }
+    
+    const keysA = Object.keys(a)
+    const keysB = Object.keys(b)
+    if (keysA.length !== keysB.length) return false
+    
+    return keysA.every(key => deepEqual(a[key], b[key]))
+  }
+  
+  return false
+}
+
 // Helper function to format next run time safely
 function formatNextRunTime(nextRunString: string): string {
   try {
@@ -575,9 +598,12 @@ export const useBotStore = create<BotStore>()(
           return acc
         }, {})
         
-        // Update each bot's positions
+        // Update each bot's positions only if they changed
         Object.entries(positionsByConfig).forEach(([configId, positions]: [string, any]) => {
-          get().updateBot(configId, { positions })
+          const bot = get().getBotById(configId)
+          if (bot && !deepEqual(bot.positions || [], positions)) {
+            get().updateBot(configId, { positions })
+          }
         })
       },
       
@@ -592,9 +618,12 @@ export const useBotStore = create<BotStore>()(
           return acc
         }, {})
         
-        // Update each bot's recent decisions
+        // Update each bot's recent decisions only if they changed
         Object.entries(decisionsByConfig).forEach(([configId, decisions]: [string, any]) => {
-          get().updateBotDecisions(configId, decisions)
+          const bot = get().getBotById(configId)
+          if (bot && !deepEqual(bot.decisions || [], decisions)) {
+            get().updateBotDecisions(configId, decisions)
+          }
         })
       },
       
@@ -607,13 +636,23 @@ export const useBotStore = create<BotStore>()(
           if (configId) {
             const bot = get().getBotById(configId)
             if (bot) {
-              // Update bot with account information
-              get().updateBot(configId, {
+              const newAccountData = {
                 balance: `$${parseFloat(account.current_balance || 0).toLocaleString()}`,
                 pnl: `${account.total_pnl >= 0 ? '+' : ''}$${parseFloat(account.total_pnl || 0).toFixed(2)}`,
                 winRate: account.total_trades > 0 ? 
                          `${Math.round((account.win_trades / account.total_trades) * 100)}%` : '0%'
-              })
+              }
+              
+              const currentAccountData = {
+                balance: bot.balance || '$0',
+                pnl: bot.pnl || '$0.00',
+                winRate: bot.winRate || '0%'
+              }
+              
+              // Only update if account data changed
+              if (!deepEqual(currentAccountData, newAccountData)) {
+                get().updateBot(configId, newAccountData)
+              }
             }
           }
         })

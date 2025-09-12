@@ -62,8 +62,8 @@ export function useCountdownTimer(nextRunISO: string | null): UseCountdownTimerR
     // Update immediately
     updateCountdown()
 
-    // Update every second
-    const interval = setInterval(updateCountdown, 1000)
+    // Update every 5 seconds to reduce render frequency
+    const interval = setInterval(updateCountdown, 5000)
 
     return () => clearInterval(interval)
   }, [nextRunISO])

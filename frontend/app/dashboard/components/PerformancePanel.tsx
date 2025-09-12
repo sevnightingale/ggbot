@@ -1,7 +1,7 @@
 'use client'
 
-import React from 'react'
-import { useBotStore } from '@/store/botStore'
+import React, { useCallback } from 'react'
+import { useBotStore, Bot } from '@/store/botStore'
 import { LineChart, Line, XAxis, YAxis, ResponsiveContainer } from 'recharts'
 
 interface PerformancePanelProps {
@@ -10,8 +10,12 @@ interface PerformancePanelProps {
 }
 
 export default function PerformancePanel({ botId, className = '' }: PerformancePanelProps) {
+  // Create stable selector to prevent unnecessary re-renders
+  const botSelector = useCallback((state: { getBotById: (id: string) => Bot | undefined }) => 
+    botId ? state.getBotById(botId) : null, [botId])
+  
   // 🔥 NEW: Read data directly from SSE-updated store instead of HTTP calls
-  const bot = useBotStore(state => botId ? state.getBotById(botId) : null)
+  const bot = useBotStore(botSelector)
   const isLoading = useBotStore(state => state.isLoading)
   
   // Build metrics object from bot store data (updated via SSE)
