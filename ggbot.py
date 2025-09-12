@@ -12,8 +12,8 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, WebSocket, WebSocketDisconnect, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_serializer
 import uvicorn
 import json
@@ -36,6 +36,7 @@ from core.scheduler import (
 
 # V2 Core Components
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, require_premium_user_v2
+from core.sse import get_unified_dashboard_data
 
 # Development Mock User (TODO: Remove when Phase 5 authentication is complete)
 async def get_mock_user_for_dev():
@@ -1190,6 +1191,72 @@ async def health_check():
         "timestamp": datetime.now(timezone.utc).isoformat(),
         "version": "2.0.0"
     }
+
+
+@app.get("/api/dashboard-stream")
+async def dashboard_stream(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """
+    Server-Sent Events stream for unified dashboard data.
+    
+    Provides real-time updates for:
+    - Bot configurations and status
+    - Open positions and P&L
+    - Recent decisions (5 per bot)
+    - Account summaries
+    
+    Updates every 5 seconds with proper SSE headers and heartbeat.
+    """
+    import time
+    
+    async def generate():
+        event_id = 0
+        heartbeat_counter = 0
+        try:
+            while True:
+                try:
+                    # Get unified dashboard data for authenticated user
+                    data = get_unified_dashboard_data(current_user.user_id)
+                    event_id += 1
+                    heartbeat_counter += 1
+                    
+                    # Send dashboard update event
+                    yield f"id: {event_id}\n"
+                    yield f"event: dashboard\n" 
+                    yield f"data: {json.dumps(data, default=str)}\n\n"
+                    
+                    # Send heartbeat every 10 seconds (2 iterations)
+                    if heartbeat_counter % 2 == 0:
+                        yield f":keepalive {int(time.time())}\n\n"
+                    
+                    await asyncio.sleep(5)  # 5-second update interval
+                    
+                except Exception as e:
+                    logger.error(f"SSE data generation error for user {current_user.user_id}: {e}")
+                    # Send error event
+                    yield f"event: error\n"
+                    yield f"data: {json.dumps({'message': str(e), 'timestamp': datetime.now().isoformat()})}\n\n"
+                    await asyncio.sleep(5)  # Wait before retrying
+                    
+        except asyncio.CancelledError:
+            logger.info(f"SSE stream cancelled for user {current_user.user_id}")
+            return
+        except Exception as e:
+            logger.error(f"SSE stream error for user {current_user.user_id}: {e}")
+            yield f"event: error\n"
+            yield f"data: {json.dumps({'message': 'Stream terminated', 'error': str(e)})}\n\n"
+
+    # Set proper SSE headers
+    headers = {
+        "Cache-Control": "no-cache",
+        "Content-Type": "text/event-stream",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no"  # Prevent nginx buffering
+    }
+    
+    logger.info(f"Starting SSE dashboard stream for user {current_user.user_id}")
+    return StreamingResponse(generate(), headers=headers, media_type="text/event-stream")
 
 
 # Configuration Management Endpoints

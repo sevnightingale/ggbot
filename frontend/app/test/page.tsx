@@ -8,6 +8,9 @@ export default function TestPage() {
   const [token, setToken] = useState<string>('')
   const [results, setResults] = useState<Record<string, { success: boolean; status?: number; data?: unknown; error?: string }>>({})
   const [loading, setLoading] = useState(false)
+  const [sseConnected, setSseConnected] = useState(false)
+  const [sseData, setSseData] = useState<Record<string, unknown> | null>(null)
+  const [sseMessages, setSseMessages] = useState<string[]>([])
 
   const supabase = createClient()
 
@@ -135,6 +138,79 @@ export default function TestPage() {
   const testCreateConfig = () => apiCall('POST', '/api/v2/config', testConfigPayload)
   const testGetUserProfile = () => apiCall('GET', '/api/v2/user/profile')
   const testGetDataSources = () => apiCall('GET', '/api/v2/data-sources-with-points')
+
+  // SSE test functions
+  const startSseTest = () => {
+    if (sseConnected) {
+      alert('SSE already connected!')
+      return
+    }
+
+    setSseMessages(['🔌 Connecting to SSE dashboard stream...'])
+    
+    const eventSource = new EventSource(
+      `${process.env.NEXT_PUBLIC_V2_API_URL}/api/dashboard-stream`,
+      {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      } as EventSourceInit
+    )
+
+    eventSource.onopen = () => {
+      setSseConnected(true)
+      setSseMessages(prev => [...prev, '✅ SSE connection opened'])
+    }
+
+    eventSource.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data)
+        setSseData(data)
+        setSseMessages(prev => [...prev, `📨 Dashboard update received: ${Object.keys(data).join(', ')}`])
+      } catch {
+        setSseMessages(prev => [...prev, `📨 Raw message: ${event.data}`])
+      }
+    }
+
+    eventSource.addEventListener('dashboard', (event: Event) => {
+      const messageEvent = event as MessageEvent
+      try {
+        const data = JSON.parse(messageEvent.data)
+        setSseData(data)
+        setSseMessages(prev => [...prev, `🏠 Dashboard event: ${(data.bots as unknown[])?.length || 0} bots, ${(data.positions as unknown[])?.length || 0} positions`])
+      } catch {
+        setSseMessages(prev => [...prev, `🏠 Dashboard event (raw): ${messageEvent.data}`])
+      }
+    })
+
+    eventSource.addEventListener('error', (event: Event) => {
+      setSseMessages(prev => [...prev, `❌ SSE error event: ${JSON.stringify(event)}`])
+    })
+
+    eventSource.onerror = (error) => {
+      console.error('SSE Error:', error)
+      setSseMessages(prev => [...prev, `❌ SSE connection error occurred`])
+      setSseConnected(false)
+    }
+
+    // Store reference for cleanup
+    ;(window as unknown as Record<string, unknown>).testEventSource = eventSource
+  }
+
+  const stopSseTest = () => {
+    const eventSource = (window as unknown as Record<string, unknown>).testEventSource as EventSource | undefined
+    if (eventSource) {
+      eventSource.close()
+      delete (window as unknown as Record<string, unknown>).testEventSource
+    }
+    setSseConnected(false)
+    setSseMessages(prev => [...prev, '🛑 SSE connection closed'])
+  }
+
+  const clearSseMessages = () => {
+    setSseMessages([])
+    setSseData(null)
+  }
   
   // Advanced tests with config ID (to be used later)
   // const testWithConfigId = async (configId: string) => ({
@@ -238,6 +314,73 @@ export default function TestPage() {
           >
             Get Data Sources
           </button>
+        </div>
+
+        <div className="mb-8">
+          <h3 className="text-xl font-bold mb-4">🔥 SSE Dashboard Stream Test</h3>
+          <div className="space-x-4 mb-4">
+            <button 
+              onClick={startSseTest}
+              className={`px-4 py-2 rounded ${sseConnected ? 'bg-gray-400' : 'bg-orange-500 hover:bg-orange-600'} text-white`}
+              disabled={sseConnected}
+            >
+              {sseConnected ? '🔌 Connected' : '🚀 Start SSE Test'}
+            </button>
+            
+            <button 
+              onClick={stopSseTest}
+              className="bg-red-500 text-white px-4 py-2 rounded hover:bg-red-600"
+              disabled={!sseConnected}
+            >
+              🛑 Stop SSE
+            </button>
+            
+            <button 
+              onClick={clearSseMessages}
+              className="bg-gray-500 text-white px-4 py-2 rounded hover:bg-gray-600"
+            >
+              🧹 Clear Messages
+            </button>
+          </div>
+
+          {sseMessages.length > 0 && (
+            <div className="bg-black text-green-400 p-4 rounded mb-4 max-h-64 overflow-y-auto">
+              <h4 className="font-bold mb-2">SSE Console:</h4>
+              {sseMessages.map((msg, idx) => (
+                <div key={idx} className="text-sm font-mono">{msg}</div>
+              ))}
+            </div>
+          )}
+
+          {sseData && (
+            <div className="bg-blue-50 p-4 rounded">
+              <h4 className="font-bold mb-2">Latest Dashboard Data:</h4>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-blue-600">{(sseData.bots as unknown[])?.length || 0}</div>
+                  <div className="text-sm text-gray-600">Bots</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-green-600">{(sseData.positions as unknown[])?.length || 0}</div>
+                  <div className="text-sm text-gray-600">Positions</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-purple-600">{(sseData.decisions as unknown[])?.length || 0}</div>
+                  <div className="text-sm text-gray-600">Decisions</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-orange-600">{(sseData.accounts as unknown[])?.length || 0}</div>
+                  <div className="text-sm text-gray-600">Accounts</div>
+                </div>
+              </div>
+              <details>
+                <summary className="cursor-pointer font-bold">View Raw Data</summary>
+                <pre className="bg-gray-100 p-2 text-xs overflow-auto mt-2">
+                  {JSON.stringify(sseData, null, 2)}
+                </pre>
+              </details>
+            </div>
+          )}
         </div>
 
         {Object.keys(results).length > 0 && (

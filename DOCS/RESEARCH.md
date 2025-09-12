@@ -1,174 +1,154 @@
-Here’s the straight read, Sev: solid UX and lots of functionality, but there are a few **logic bugs**, **state-mutation risks**, and **DX/security** gaps that will bite you in prod.
+Must-fix risks (highest impact)
 
-# Verdict
+SSE robustness: Add event: types, id: (for resume), retry: and a heartbeat (:keepalive\n\n every 10–15s) so proxies and mobile radios don’t kill the stream. Set headers: Cache-Control: no-cache, Content-Type: text/event-stream, Connection: keep-alive, X-Accel-Buffering: no (Nginx).
 
-Good scaffolding. Needs fixes before you trust it with user configs and API keys.
+Auth/tenancy: Do not trust /{user_id}. Authenticate the request and derive user_id server-side from the session/JWT. Otherwise one tab can read another user’s data.
 
-## Blockers / Bugs
+DB load of “single query every 5s”: For 100+ users this becomes a thumper. Introduce a tiny cache layer (Redis keyed by dashboard:{user_id}) with 5s TTL. SSE reads from cache; background task refreshes it. This gives predictability and shields Postgres.
 
-* **Selection by name (not ID) = incorrect toggles & key collisions.**
-  You store selected data points by **name** and render chips keyed by `dataPointName`. If two sources share a name, removing a chip may toggle the wrong point, and React keys will collide. Store selections as `{source, id}` and render keys as `${source}:${id}`.
-* **Shallow “immutable” update mutates nested objects.**
-  `newConfig = { ...prev }` then mutating `newConfig.extraction.selected_data_sources[category]` mutates nested references from `prev`. It works by chance (top-level object changes) but breaks memoization and can introduce heisenbugs. Use an immutable update (Immer) or deep-clone only the branch you change.
-* **Race/leak on async init.**
-  `initializeComponent()` doesn’t cancel if the sheet closes mid-flight. You also don’t clear the open/close timeouts. Both can set state after unmount.
-* **Default numeric values use `||` instead of `??`.**
-  `value={x || 100}` treats `0` as falsy; 0% is legitimate in some fields. Use `??` + explicit min validation.
-* **Variable shadowing.**
-  In `selectedDataPoints` memo you create `const dataSources = configData.extraction.selected_data_sources`, shadowing the `dataSources` state (array). This is confusing and error-prone; rename to `selectedSources`.
-* **Reset naming inconsistency.**
-  New bot name toggles between **“New ggbot”** and **“New Bot”**. Pick one.
-* **“alert” in 2025 UX.**
-  `alert('Signal Validation requires an upgraded plan')` is a jarring blocking UI; you already have patterns for inline gates.
+APScheduler in multi-instance: If you have >1 worker/pod, use a distributed lock (Redis SET NX EX or APScheduler’s SQL jobstores with misfire_grace_time) so one instance owns each job. Otherwise you’ll double-fire cycles.
 
-## Risky Patterns / Security
+Async DB driver + pooling: Your code is async. Use asyncpg (or SQLAlchemy 2.0 async) with a connection pool and pgbouncer. Don’t block the loop with sync psycopg2.
 
-* **API keys in a shared input state.**
-  One `credentialInput` for all providers = accidental reuse/leak across tabs. Use provider-scoped state or clear on provider change. Never log credential operations.
-* **Console logging sensitive payloads.**
-  You `console.log` API responses and errors broadly; these often include user data. Strip before prod.
+Ephemeral status lifecycle: Set explicit TTLs on Redis phase keys (e.g., 90–120s). Don’t rely on a cleanup task to run; crashes will otherwise leave zombie status.
 
-## Performance
+Backpressure/crash safety in loops: All while True loops need try/except with jittered sleep on failure, and asyncio.CancelledError handling for clean shutdowns.
 
-* **O(n²) chip render lookups.**
-  Each chip does a `.flatMap(...).find(...)`. Build a `Map<data_point_id -> DataPoint>` once via `useMemo`.
-* **Potentially large lists.**
-  Pairs and data points should be **virtualized** (e.g., `react-window`) to keep scroll silky.
+Design tweaks that will pay off
+SSE stream contract (small but important)
 
-## Accessibility & UX
+Send typed events and ids; let the client resume via Last-Event-ID. Emit a heartbeat comment to keep the TCP alive.
 
-* **Modal/bottom sheet should be a real dialog.**
-  Add `role="dialog" aria-modal="true"`, label it, trap focus, close on `Esc`.
-* **Dropdown should be a combobox/listbox.**
-  Current click-out handler is fine, but use a `ref`+containment (not `document.querySelector`/`closest` strings) and add keyboard navigation.
-* **Buttons need aria-labels.**
-  Icon-only buttons (save/reset/exit/chips) should have `aria-label`.
+Send diffs when you can (e.g., new decisions, changed positions) instead of full snapshots every tick. Keep the snapshot path as a fallback.
 
-## High-impact fixes (snippets)
+Server sketch (FastAPI/Starlette):
 
-### 1) Immutable nested updates (Immer)
+from fastapi import Depends, Response
+from starlette.responses import StreamingResponse
 
-```ts
-import { produce } from 'immer';
+@app.get("/api/dashboard-stream")
+async def dashboard_stream(resp: Response, user=Depends(auth)):
+    resp.headers["Cache-Control"] = "no-cache"
+    resp.headers["Content-Type"] = "text/event-stream"
+    resp.headers["Connection"] = "keep-alive"
+    resp.headers["X-Accel-Buffering"] = "no"
 
-const updateConfigData = (updater: (draft: ConfigData) => void) => {
-  setConfigData(prev => produce(prev, draft => { updater(draft) }));
-  setHasChanges(true);
-};
+    async def gen():
+        last_id = 0
+        try:
+            while True:
+                data = await get_cached_dashboard_payload(user.id)  # Redis-backed
+                last_id += 1
+                yield f"id: {last_id}\n"
+                yield "event: dashboard\n"
+                yield f"data: {json.dumps(data, default=str)}\n\n"
+                # Heartbeat
+                yield f":keepalive {int(time.time())}\n\n"
+                await asyncio.sleep(5)
+        except asyncio.CancelledError:
+            return
+        except Exception as e:
+            yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+    return StreamingResponse(gen())
 
-// Example: toggle data point by {source, id}
-updateConfigData(d => {
-  const sel = d.extraction.selected_data_sources;
-  const category = sourceInfo.name as keyof typeof sel;
+Unified query: correctness & performance
 
-  sel[category] ??= { data_points: [], timeframes: ["5m","15m","30m","1h","4h","1d","1w"] };
-  const dpKey = `${category}:${dataPoint.data_point_id}`;
+Your CTE is fine conceptually, but:
 
-  const arr = sel[category]!.data_points as string[]; // now store KEYS, not names
-  const idx = arr.indexOf(dpKey);
-  if (idx >= 0) arr.splice(idx, 1); else arr.push(dpKey);
-});
-```
+Filter by user at the top and keep it through joins to guarantee row-level scoping.
 
-### 2) Store/render by **unique key**, not name
+json_agg returns null on empty sets—COALESCE to [] for client simplicity.
 
-```ts
-// Build a quick index
-const dpIndex = React.useMemo(() => {
-  const map = new Map<string, DataPoint & { source: string }>();
-  for (const s of dataSources)
-    for (const dp of s.data_points)
-      map.set(`${s.name}:${dp.data_point_id}`, { ...dp, source: s.name });
-  return map;
-}, [dataSources]);
+Per-bot decision limits: LIMIT 20 globally may starve some bots. Use a window:
 
-// Selected chip render (unique key + safe removal)
-{selectedDataPoints.map(dpKey => {
-  const dp = dpIndex.get(dpKey);
-  if (!dp) return null;
-  return (
-    <span key={dpKey} /* ... */>
-      {dp.name}
-      <button onClick={() => handleToggleDataPoint(dp.data_point_id, dp.source)} aria-label={`Remove ${dp.name}`}>
-        …
-      </button>
-    </span>
-  );
-})}
-```
+recent_decisions AS (
+  SELECT * FROM (
+    SELECT d.*, ROW_NUMBER() OVER (PARTITION BY d.config_id ORDER BY d.created_at DESC) AS rn
+    FROM decisions d
+    JOIN bot_configs bc ON d.config_id = bc.config_id
+    WHERE d.created_at > NOW() - INTERVAL '2 hours'
+  ) s WHERE s.rn <= 5
+)
 
-### 3) Cancel async init + clear timeouts
 
-```ts
-React.useEffect(() => {
-  if (!isOpen) return;
-  let cancelled = false;
-  const tShow = setTimeout(() => setIsVisible(true), 50);
+Indexes you’ll want:
 
-  (async () => {
-    try {
-      setIsLoading(true); setError(null);
-      const [ds, profile, creds] = await Promise.all([
-        apiClient.getDataSourcesWithPoints(),
-        apiClient.getUserProfile(),
-        apiClient.listCredentials()
-      ]);
-      if (cancelled) return;
-      setDataSources(ds); setUserProfile(profile); setUserCredentials(creds);
-      // ...
-    } catch (e) {
-      if (!cancelled) setError(e instanceof Error ? e.message : 'Failed to load configuration');
-    } finally {
-      if (!cancelled) { setIsLoading(false); setDataSourcesLoading(false); }
-    }
-  })();
+decisions (config_id, created_at DESC)
 
-  return () => { cancelled = true; clearTimeout(tShow); };
-}, [isOpen, bot?.config_id]);
-```
+paper_trades (config_id, status, opened_at DESC)
 
-### 4) Replace `||` with `??` for numeric inputs
+paper_accounts (config_id) (unique)
 
-```tsx
-value={configData.trading.position_sizing.fixed_amount_usd ?? 100}
-```
+configurations (user_id, state, config_id)
 
-### 5) Safer outside-click with ref
+Consider a materialized view (per user) for the dashboard JSON if usage spikes, refreshed by a background task every 5s.
 
-```ts
-const dropdownRef = React.useRef<HTMLDivElement>(null);
-React.useEffect(() => {
-  if (!showPairDropdown) return;
-  const onDown = (e: MouseEvent) => {
-    if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-      setShowPairDropdown(false); setPairSearchTerm('');
-    }
-  };
-  document.addEventListener('mousedown', onDown);
-  return () => document.removeEventListener('mousedown', onDown);
-}, [showPairDropdown]);
-```
+Direct Postgres vs Supabase SDK
 
-### 6) Dialog a11y
+I agree: pick Postgres. But don’t do raw sync psycopg inside async endpoints. Use:
 
-```tsx
-<div role="dialog" aria-modal="true" aria-labelledby="ggbot-config-title" className="fixed inset-0 …">
-  …
-  <h2 id="ggbot-config-title"> {botName} </h2>
-</div>
-```
+asyncpg or SQLAlchemy 2.0 async core for composable SQL + typed results.
 
-### 7) Virtualize long lists
+pgbouncer in transaction mode.
 
-Swap the mapped lists for `react-window` (`FixedSizeList`) to keep memory/paint costs down.
+A read-only DB role for dashboard reads; RLS if you must (and if on Supabase PG).
 
-## Smaller polish
+Background services
 
-* Add `onKeyDown` handlers for Enter/Escape in inputs and menus.
-* Inline “upgrade required” instead of `alert`.
-* Clear `credentialInput` on provider switch; show per-provider controlled inputs.
-* Remove broad `console.log` in production builds.
+position_monitor: If you scale horizontally, gate with a Redis leader lock so only one instance runs it (or partition by user shard).
 
----
+Add jitter (sleep(3 + random.uniform(-0.3, 0.3))) to avoid thundering herd on exact seconds.
 
-If you fix the **ID-vs-name selection**, **immutability**, and **async cleanup**, you’ll eliminate 80% of the risk. Add a11y and virtualization for finish-quality.
+Wrap external calls (paper trading service) with timeouts + retries.
+
+Execution status in Redis
+
+Keys:
+
+bot_execution:{config_id} -> JSON {phase, message, updated_at}, EX=120
+
+Write helpers to atomically set status and publish a small Redis Pub/Sub event. Later you can wire SSE to Pub/Sub for true push, but keep the 5s poll as a baseline.
+
+Frontend
+
+Treat SSE payloads as authoritative; do optimistic UI for POSTs (flip spinners immediately) but reconcile on next SSE tick.
+
+Implement resume via Last-Event-ID and show a “stale” badge if no dashboard event in >10s.
+
+Keep one global EventSource and fan out to stores/components.
+
+Migration & ops
+
+Feature flag the SSE stream; canary to 5–10% of users.
+
+Dual-run for a day: keep WS code dormant but togglable; log parity metrics (counts of bots/positions/decisions).
+
+Load test: simulate 1k concurrent SSE clients, 5s ticks, measure DB QPS and tail latencies.
+
+Observability you’ll want on day 1:
+
+sse_connected_clients, sse_bytes_sent_total, sse_disconnects_total (by reason)
+
+dashboard query latency p50/p95/p99
+
+Redis hit ratio for dashboard:{user_id}
+
+scheduler job runs, dedupe rate, job duration
+
+Small correctness nits in your doc
+
+“~20 SSE requests/sec for 100 users” → It’s ~100 persistent connections with 100 writes every 5s (i.e., 20 writes/sec on average). Clarify this for capacity planning.
+
+Add COALESCE to your JSON aggregates to avoid null:
+
+SELECT json_build_object(
+  'bots', COALESCE((SELECT json_agg(bc.*) FROM bot_configs bc), '[]'::json),
+  'positions', COALESCE((SELECT json_agg(op.*) FROM open_positions op), '[]'::json),
+  'decisions', COALESCE((SELECT json_agg(rd.*) FROM recent_decisions rd), '[]'::json),
+  'accounts', COALESCE((SELECT json_agg(ac.*) FROM account_summaries ac), '[]'::json),
+  'timestamp', NOW()
+);
+
+Verdict
+
+Green-light with edits. The architectural call—SSE + one unified data source + Redis for ephemeral status—is solid and will simplify your life. Shore up SSE reliability, DB load, and multi-instance scheduling, and you’ll get the reliability and UX you want without surprising infra costs.

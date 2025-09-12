@@ -657,30 +657,40 @@ class MonitoringService:
                 config_id = config['config_id']
                 db_state = config.get('state', 'inactive')
                 
-                # Extract timeframe from config data
+                # Extract timeframe from config data - use the same logic as the bot start/stop functions
                 config_data = config.get('config_data', {})
-                extraction_config = config_data.get('extraction', {})
                 
-                # Try to find timeframe in various locations
+                # Use the same timeframe extraction logic from ggbot.py's extract_timeframe_from_config
                 timeframe = None
+                
+                # Try extraction config first
+                extraction_config = config_data.get('extraction', {})
                 if isinstance(extraction_config, dict):
-                    # Look for timeframe in extraction config
-                    for indicator_group in extraction_config.values():
-                        if isinstance(indicator_group, dict) and 'timeframe' in indicator_group:
-                            timeframe = indicator_group['timeframe']
+                    # Look for timeframe in extraction config groups
+                    for group_name, group_config in extraction_config.items():
+                        if isinstance(group_config, dict) and 'timeframe' in group_config:
+                            timeframe = group_config['timeframe']
                             break
-                    
-                    # Fallback to a common timeframe if not found
-                    if not timeframe:
-                        timeframe = '5m'
-                else:
-                    timeframe = '5m'  # Default fallback
+                
+                # Fallback: Import and use the actual function from ggbot.py
+                if not timeframe:
+                    try:
+                        from ggbot import extract_timeframe_from_config
+                        timeframe = extract_timeframe_from_config(config_data)
+                    except Exception as e:
+                        logger.warning(f"🔍 Failed to extract timeframe for {config_id[:8]}: {e}")
+                        timeframe = '5m'  # Final fallback
+                
+                # Ensure we have a valid timeframe
+                if not timeframe:
+                    timeframe = '5m'
                 
                 # Check if there's a corresponding scheduler job
                 job_id = f"bot:{user_id}:{config_id}:{timeframe}"
                 job = scheduler.get_job(job_id) if scheduler else None
                 
                 # Debug logging for job lookup
+                logger.info(f"🔍 Bot {config_id[:8]}: state={db_state}, timeframe={timeframe}, job_id={job_id}, job_exists={job is not None}")
                 if db_state == 'active' and not job:
                     logger.warning(f"🔍 Active bot {config_id[:8]} has no scheduler job! Looking for job_id: {job_id}")
                     if scheduler:
