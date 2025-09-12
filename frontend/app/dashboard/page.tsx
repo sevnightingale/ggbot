@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { useBotStore, Bot } from '@/store/botStore'
 import { useDashboardSSE } from '@/hooks/useDashboardSSE'
@@ -23,15 +23,13 @@ export default function DashboardV2Page() {
   const [user, setUser] = useState<User | null>(null)
   const [isLoadingAuth, setIsLoadingAuth] = useState(true)
 
-  // Bot store and state
-  const { 
-    getBotsByUser,
-    getBotById,
-    startBot,
-    stopBot,
-    deleteBot,
-    loadBots
-  } = useBotStore()
+  // Bot store and state - use selectors to prevent infinite loops
+  const getBotsByUser = useBotStore(s => s.getBotsByUser)
+  const getBotById = useBotStore(s => s.getBotById)
+  const startBot = useBotStore(s => s.startBot)
+  const stopBot = useBotStore(s => s.stopBot)
+  const deleteBot = useBotStore(s => s.deleteBot)
+  const loadBots = useBotStore(s => s.loadBots)
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [isConfigOpen, setIsConfigOpen] = useState(false)
   const [selectedBot, setSelectedBot] = useState<Bot | null>(null)
@@ -49,10 +47,12 @@ export default function DashboardV2Page() {
   // CRITICAL: All hooks must be called BEFORE any conditional returns
   const userId = user?.id
 
-  // Load bots from V2 API on mount (matching old dashboard pattern)
+  // Guard one-time bot load per user to prevent loops
+  const loadedFor = useRef<string | null>(null)
   useEffect(() => {
-    if (userId) {
+    if (userId && loadedFor.current !== userId) {
       console.log('📡 Dashboard V2 loading bots for userId:', userId)
+      loadedFor.current = userId
       loadBots(userId)
     }
   }, [userId, loadBots])
@@ -89,8 +89,7 @@ export default function DashboardV2Page() {
   }
   
   if (!user) {
-    router.push('/login')
-    return null
+    return null  // Layout.tsx handles server redirects
   }
 
   // Logout handler
