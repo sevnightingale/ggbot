@@ -13,7 +13,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
 
   if (error) {
     return (
-      <div className={`activity-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`activity-panel bg-charcoal-800 p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
         <div className="text-red-400">
           Failed to load activity data
@@ -24,7 +24,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
 
   if (isLoading) {
     return (
-      <div className={`activity-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`activity-panel bg-charcoal-800 p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
         <div className="text-bone-400">
           Loading activity data...
@@ -35,7 +35,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
 
   if (!botId) {
     return (
-      <div className={`activity-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`activity-panel bg-charcoal-800 p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Activity</h2>
         <div className="text-bone-400">
           Select a bot to view activity
@@ -54,7 +54,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
         {activity?.positions && activity.positions.length > 0 ? (
           <div className="space-y-2">
             {activity.positions.map((position, index) => (
-              <div key={index} className="bg-charcoal-700 p-3 rounded text-sm">
+              <div key={index} className="bg-charcoal-700 p-3 text-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-bone-300">{position.symbol}</span>
                   <span className={`font-semibold ${
@@ -75,7 +75,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
             ))}
           </div>
         ) : (
-          <div className="bg-charcoal-700 p-3 rounded text-bone-400 text-sm">
+          <div className="bg-charcoal-700 p-3 text-bone-400 text-sm">
             No active positions
           </div>
         )}
@@ -87,7 +87,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
         {activity?.decisions && activity.decisions.length > 0 ? (
           <div className="space-y-2 max-h-64 overflow-y-auto">
             {activity.decisions.map((decision, index) => (
-              <div key={index} className="bg-charcoal-700 p-3 rounded text-sm">
+              <div key={index} className="bg-charcoal-700 p-3 text-sm">
                 <div className="flex justify-between items-center">
                   <span className="text-bone-300">
                     {new Date(decision.timestamp).toLocaleTimeString()}
@@ -111,7 +111,7 @@ export default function ActivityPanel({ botId, className = '' }: ActivityPanelPr
             ))}
           </div>
         ) : (
-          <div className="bg-charcoal-700 p-3 rounded text-bone-400 text-sm">
+          <div className="bg-charcoal-700 p-3 text-bone-400 text-sm">
             No recent decisions
           </div>
         )}
