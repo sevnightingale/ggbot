@@ -75,7 +75,7 @@ export default function DemoPage() {
   const [currentBotIndex, setCurrentBotIndex] = React.useState(0)
   const [isConfigOpen, setIsConfigOpen] = React.useState(false)
   const [selectedBot, setSelectedBot] = React.useState<Bot | null>(null)
-  const [livePositions, setLivePositions] = React.useState<Array<{
+  const [livePositions] = React.useState<Array<{
     id?: string;
     symbol: string;
     direction: string;
@@ -101,86 +101,7 @@ export default function DemoPage() {
     stopBot
   } = useBotStore()
   
-  // Function to handle demo messages from WebSocket (currently unused with SSE)
-  // @ts-ignore - Keeping for future demo functionality
-  const handleDemoMessage = React.useCallback((data: { 
-    type?: string; 
-    config_id?: string; 
-    signal_data?: {
-      symbol: string;
-      signal_direction: string;
-      entry_price: number;
-      confidence_score: number;
-      reasoning_text?: string;
-      volume_analysis?: string;
-      signal_timeframe?: string;
-    };
-  }) => {
-    console.log('🎯 Demo message received:', data)
-    
-    // Check for demo position creation message
-    if (data.type === 'demo_position_create' && 
-        data.config_id === 'e249bb49-0455-4596-9657-09bf9e14ca14' &&
-        data.signal_data) {
-      
-      console.log('🎯 Demo position creation detected!')
-      
-      // Create position directly from signal data
-      const signalData = data.signal_data
-      const newPosition = {
-        id: `demo-${Date.now()}`,
-        symbol: signalData.symbol,
-        direction: signalData.signal_direction,
-        pnl: 0, // Start with 0 P&L
-        positionSize: 1000, // Fixed demo size
-        entryPrice: signalData.entry_price,
-        currentPrice: signalData.entry_price, // Start with entry price
-        timeInTrade: '0m',
-        leverage: 10,
-        confidence: Math.round(signalData.confidence_score * 100),
-        reasoning_text: signalData.reasoning_text,
-        volume_analysis: signalData.volume_analysis,
-        signal_timeframe: signalData.signal_timeframe
-      }
-      
-      setLivePositions([newPosition])
-      
-      // Start updating P&L with live prices
-      const updatePnL = async () => {
-        try {
-          const response = await fetch('/api/live-position-data')
-          const apiData = await response.json()
-          
-          if (apiData.status === 'success' && apiData.positions && apiData.positions.length > 0) {
-            const latestData = apiData.positions[0]
-            
-            setLivePositions(prevPositions => 
-              prevPositions.map(pos => 
-                pos.id === newPosition.id 
-                  ? {
-                      ...pos,
-                      currentPrice: latestData.current_price || pos.entryPrice,
-                      pnl: latestData.pnl || 0,
-                      timeInTrade: latestData.time_in_trade || pos.timeInTrade
-                    }
-                  : pos
-              )
-            )
-          }
-        } catch (error) {
-          console.error('Failed to update P&L:', error)
-        }
-      }
-
-      // Update P&L every 15 seconds
-      const interval = setInterval(updatePnL, 15000)
-      
-      // Store interval for cleanup
-      ;(window as unknown as { pnlUpdateInterval?: NodeJS.Timeout }).pnlUpdateInterval = interval
-      
-      console.log('🎯 Demo position created:', newPosition)
-    }
-  }, [])
+  // Demo message handler removed - SSE now handles all real-time updates
   
   // 🔥 NEW: SSE connection for real-time updates (replaces WebSocket)
   const { isLoading: isLoadingBots } = useDashboardSSE(DEMO_USER_ID)
@@ -270,7 +191,7 @@ export default function DemoPage() {
         riskLevel: "medium",
         userId: DEMO_USER_ID,
         isActive: false,
-        createdAt: new Date(),
+        createdAt: new Date().toISOString(),
         status: {
           phase: "idle" as const,
           color: "gray" as const,

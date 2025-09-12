@@ -329,7 +329,7 @@ export const useBotStore = create<BotStore>()(
               timestamp: new Date().toISOString()
             },
             isActive: false, // Will be updated via bot status endpoint
-            createdAt: configData.created_at ? new Date(configData.created_at) : new Date(),
+            createdAt: configData.created_at || new Date().toISOString(),
             lastRun: configData.updated_at ? new Date(configData.updated_at) : undefined,
             userId: userId // Ensure userId is set correctly
           })) : []
@@ -398,7 +398,7 @@ export const useBotStore = create<BotStore>()(
           const newBot: Bot = {
             ...botData,
             config_id: `bot-${Date.now()}`, // Temporary ID generation
-            createdAt: new Date(),
+            createdAt: new Date().toISOString(),
             status: {
               phase: 'idle',
               color: 'gray', 
