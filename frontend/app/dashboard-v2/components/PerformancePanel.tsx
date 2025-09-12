@@ -13,7 +13,7 @@ export default function PerformancePanel({ botId, className = '' }: PerformanceP
 
   if (error) {
     return (
-      <div className={`performance-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`performance-panel bg-charcoal-800  p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Performance</h2>
         <div className="text-red-400">
           Failed to load performance data
@@ -24,7 +24,7 @@ export default function PerformancePanel({ botId, className = '' }: PerformanceP
 
   if (isLoading) {
     return (
-      <div className={`performance-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`performance-panel bg-charcoal-800  p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Performance</h2>
         <div className="text-bone-400">
           Loading performance data...
@@ -35,7 +35,7 @@ export default function PerformancePanel({ botId, className = '' }: PerformanceP
 
   if (!botId) {
     return (
-      <div className={`performance-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+      <div className={`performance-panel bg-charcoal-800  p-6 ${className}`}>
         <h2 className="text-xl font-semibold text-bone-200 mb-4">Performance</h2>
         <div className="text-bone-400">
           Select a bot to view performance metrics
@@ -45,7 +45,7 @@ export default function PerformancePanel({ botId, className = '' }: PerformanceP
   }
 
   return (
-    <div className={`performance-panel bg-charcoal-800 rounded-lg p-6 ${className}`}>
+    <div className={`performance-panel bg-charcoal-800  p-6 ${className}`}>
       <h2 className="text-xl font-semibold text-bone-200 mb-4">Performance</h2>
       
       {/* Account Summary */}
