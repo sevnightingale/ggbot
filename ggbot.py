@@ -1967,6 +1967,16 @@ async def start_bot(
         job = scheduler.get_job(job_id)
         next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
         
+        # Broadcast bot state change via WebSocket
+        state_message = create_bot_state_message(
+            config_id=config_id,
+            state="active",
+            timeframe=timeframe,
+            next_run=next_run,
+            context={"action": "started", "message": f"Bot activated for {timeframe} trading"}
+        )
+        await websocket_manager.broadcast_to_user(current_user.user_id, state_message)
+        
         return {
             "status": "started",
             "config_id": config_id,
@@ -2014,6 +2024,16 @@ async def stop_bot(
         success = await config_service.set_bot_state(config_id, current_user.user_id, 'inactive')
         if not success:
             logger.warning(f"Job removed but failed to update state for bot {config_id}")
+        
+        # Broadcast bot state change via WebSocket
+        state_message = create_bot_state_message(
+            config_id=config_id,
+            state="inactive",
+            timeframe=timeframe,
+            next_run=None,  # No next run when stopped
+            context={"action": "stopped", "message": "Bot stopped successfully", "job_removed": job_removed}
+        )
+        await websocket_manager.broadcast_to_user(current_user.user_id, state_message)
         
         return {
             "status": "stopped",
@@ -2210,6 +2230,40 @@ def create_bot_status_message(
             "showSpinner": frontend_phase in ['extraction', 'decision', 'trading'],
             "context": context or {}
         }
+    }
+
+
+def create_bot_state_message(
+    config_id: str,
+    state: str,
+    timeframe: str,
+    next_run: Optional[str] = None,
+    context: Optional[Dict[str, Any]] = None
+) -> Dict[str, Any]:
+    """
+    Create WebSocket message for bot state changes (active/inactive).
+    
+    This is used when bots are started/stopped to notify the frontend
+    of the state change and provide timer information.
+    
+    Args:
+        config_id: Bot configuration ID
+        state: Bot state ('active' or 'inactive')  
+        timeframe: Trading timeframe (5m, 15m, etc)
+        next_run: Next scheduled run time (ISO format)
+        context: Additional context data
+        
+    Returns:
+        Formatted WebSocket message
+    """
+    return {
+        "type": "bot_state_changed",
+        "config_id": config_id,
+        "state": state,
+        "timeframe": timeframe,
+        "next_run": next_run,
+        "timestamp": datetime.now(timezone.utc).isoformat() + "Z",
+        "context": context or {}
     }
 
 

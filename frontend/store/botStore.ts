@@ -356,17 +356,31 @@ export const useBotStore = create<BotStore>()(
               if (data.type === 'position_update') {
                 const config_id = data.config_id
                 if (config_id && data.positions) {
-                  // Transform snake_case backend data to camelCase for frontend
+                  // Transform backend data for frontend (already mostly in correct format from V2 monitoring service)
                   const transformedPositions = data.positions.map((pos: any) => ({
-                    ...pos,
-                    unrealizedPnL: pos.unrealized_pnl || 0,  // Convert snake_case to camelCase
+                    // Core fields (already in camelCase from V2 monitoring service)
+                    id: pos.id || pos.trade_id,
+                    symbol: pos.symbol,
+                    side: pos.side,
+                    size: pos.size || pos.size_usd,
+                    entryPrice: pos.entryPrice || pos.entry_price || 0,
+                    currentPrice: pos.currentPrice || pos.current_price || 0,
+                    unrealizedPnL: pos.unrealizedPnL || pos.unrealized_pnl || 0,
+                    timestamp: pos.timestamp || pos.opened_at,
+                    
+                    // Enhanced fields for ActivityPanel (V2 monitoring service provides these)
+                    timeInTrade: pos.timeInTrade || '0m',
+                    confidence: pos.confidence || 0,
+                    reasoning_text: pos.reasoning_text || 'Market analysis completed',
+                    signal_timeframe: pos.signal_timeframe || '5m',
+                    volume_analysis: pos.volume_analysis || 'Volume confirmation completed',
+                    stopLoss: pos.stopLoss || pos.stop_loss || null,
+                    takeProfit: pos.takeProfit || pos.take_profit || null,
+                    
+                    // Legacy/backup fields for compatibility
                     realizedPnL: pos.realized_pnl || 0,
-                    entryPrice: pos.entry_price || 0,
-                    currentPrice: pos.current_price || 0,
-                    sizeUsd: pos.size_usd || 0,
-                    stopLoss: pos.stop_loss || 0,
-                    takeProfit: pos.take_profit || 0,
-                    confidenceScore: pos.confidence_score || 0,
+                    sizeUsd: pos.size_usd || pos.size || 0,
+                    confidenceScore: pos.confidence_score || pos.confidence || 0,
                     openedAt: pos.opened_at,
                     closedAt: pos.closed_at
                   }))
