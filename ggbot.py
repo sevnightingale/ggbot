@@ -287,7 +287,6 @@ class GGBotOrchestrator:
                 else:
                     # Manual trigger - create mock signal for testing
                     from signals.listener_service import SignalData
-                    from datetime import datetime, timezone
                     
                     mock_signal = SignalData(
                         source="manual_trigger",
@@ -1256,12 +1255,31 @@ async def run_orchestration(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> OrchestrationResult:
     """Run autonomous trading cycle for a configuration."""
-    result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id, websocket_manager=websocket_manager)
-    
-    if result.status == "error":
-        raise HTTPException(status_code=500, detail="Orchestration failed")
-    
-    return result
+    try:
+        result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id, websocket_manager=websocket_manager)
+        
+        if result.status == "error":
+            # Extract error details from the result object
+            error_detail = "Unknown orchestration error"
+            if result.extraction_result and isinstance(result.extraction_result, dict):
+                error_detail = result.extraction_result.get('error', error_detail)
+            
+            # Log the full result for debugging
+            logger.error(f"Orchestration failed for config {config_id}: {error_detail}")
+            logger.error(f"Full result object: {result.dict()}")
+            raise HTTPException(status_code=500, detail=f"Orchestration failed: {error_detail}")
+        
+        return result
+        
+    except HTTPException:
+        # Re-raise HTTP exceptions as-is
+        raise
+    except Exception as e:
+        # Log any unexpected exceptions
+        logger.error(f"Unexpected error in orchestration endpoint for config {config_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
 # User Management Endpoints
