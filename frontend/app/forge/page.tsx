@@ -41,12 +41,28 @@ export default function ForgePage() {
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [decisions, setDecisions] = useState<Decision[]>([])
+  const [accounts, setAccounts] = useState<Array<{
+    config_id: string
+    account_id: string
+    current_balance: number
+    total_pnl: number
+    total_trades: number
+    win_trades: number
+    loss_trades: number
+    open_positions: number
+    updated_at: string
+  }>>([])
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
 
   // Get currently selected bot
-  const selectedBot = selectedConfigId 
+  const selectedBot = selectedConfigId
     ? allBots.find(bot => bot.config_id === selectedConfigId) || null
+    : null
+
+  // Get account data for selected bot
+  const selectedAccount = selectedBot
+    ? accounts.find(account => account.config_id === selectedBot.config_id) || null
     : null
   
   // Real-time status tracking
@@ -217,6 +233,11 @@ export default function ForgePage() {
             if (data.decisions) {
               const myDecisions = data.decisions.filter((d: { config_id: string }) => d.config_id === selectedBot.config_id)
               setDecisions(myDecisions.slice(0, 10)) // Keep last 10
+            }
+
+            // Update accounts data
+            if (data.accounts) {
+              setAccounts(data.accounts)
             }
 
           } catch (error) {
@@ -391,6 +412,7 @@ export default function ForgePage() {
                 executionStatus={executionStatus}
                 statusMessage={statusMessage}
                 countdown={countdown}
+                account={selectedAccount}
                 isStarting={isStarting}
                 isStopping={isStopping}
                 onStart={handleStart}
