@@ -29,6 +29,20 @@ The dashboard had accumulated architectural debt that made elegant evolution imp
 - Bot switching clears operational state (positions, decisions) but preserves config data
 - All real-time updates (execution phases, positions, account balances) come via SSE stream
 
+### Progressive Duplication Strategy (Current Implementation Approach)
+The Forge follows a **progressive duplication strategy** rather than attempting to refactor the legacy MonitorContent:
+1. **Build proper components** (ActivationBar, MetricsBar, PositionsTable, DecisionFeed) with clean architecture
+2. **Intentional duplication** - Both new components AND legacy MonitorContent show same data during transition
+3. **Preserve existing functionality** - Legacy system continues working while new components are built
+4. **Complete replacement** - Once all functionality is replicated, delete entire MonitorContent component
+This approach minimizes risk while enabling architectural evolution and maintains a working system throughout development.
+
+### Agent Color System & Design Standards
+- **Agent Colors**: Blue (#38a1c7) extraction, Green (#2cbe77) decision, Orange (#be6a47) trading
+- **Container Design**: All components use `rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]`
+- **Responsive Strategy**: Mobile-first with proper container spacing, not full-width expansion
+- **Real Data Integration**: Components connect to live SSE streams and account data, no hardcoded values
+
 ## CURRENT
 
 ### Overview
@@ -77,11 +91,17 @@ The Forge is a single-page application that replaces the dashboard with an elega
 - SSE reconnects to filter data for newly selected bot
 
 ### Current Status
-- ✅ Multi-bot architecture implemented
-- ✅ API integration working (listConfigs, createConfig, start/stop)
-- ✅ SSE filtering by selected bot
-- ✅ Bot switching UI functional
-- ⏳ Phase 1 data foundation complete, ready for Phase 2
+- ✅ **Phase 1 Complete**: Multi-bot architecture, API integration, SSE filtering, bot switching
+- ✅ **Phase 2B Complete**: Layout shell with responsive design, dark/light theming, mobile nav
+- ✅ **ActivationBar Complete**: Professional status/control bar with real data integration
+  - Real account balance and frequency display from SSE/API data
+  - Agent-specific colors for pipeline stages (blue/green/orange)
+  - Braille spinner with status messages during execution
+  - Responsive 3-group layout (Info, Pipeline, Controls)
+  - Activate/Deactivate terminology (no more Start/Stop)
+  - Proper containerized design with max-width constraints
+- ✅ **BotRail Containerized**: Proper rounded container instead of full-column expansion
+- ⏳ **Ready for Phase 2C**: Core monitor components (MetricsBar, PositionsTable, DecisionFeed)
 
 ## PLANS
 
@@ -181,7 +201,7 @@ The Forge is a single-page application that replaces the dashboard with an elega
     └── Countdown.tsx        # Next run countdown timer
 ```
 
-**Phase 2B: Layout Shell Implementation**
+**Phase 2B: Layout Shell Implementation** ✅ **COMPLETE**
 - [x] Create mobile-first responsive layout shell (header, main, sidebar)
 - [x] Implement dark/light mode theming system with CSS variables and charcoal/bone palette
 - [x] Add sun/moon theme toggle in header with localStorage persistence
@@ -189,13 +209,23 @@ The Forge is a single-page application that replaces the dashboard with an elega
 - [x] Build responsive bot rail component (hidden mobile, visible desktop)
 - [x] Create mobile bottom navigation for bot switching
 - [x] Establish consistent spacing scale and typography system
+- [x] **ActivationBar Implementation**: Professional bot status/control bar above tabs
+  - [x] Real data integration (account balance, frequency, status messages)
+  - [x] Agent-specific color system for pipeline visualization
+  - [x] Braille spinner animation during execution phases
+  - [x] Responsive 3-group layout with proper spacing constraints
+  - [x] Containerized design matching component standards
 
-**Phase 2C: Core Monitor Components**
-- [ ] Build ActivationBar component (sticky, shows bot status and controls)
-- [ ] Create Monitor/Configure tab system replacing current layout
-- [ ] Implement PipelineTicker for extraction→decision→trading visualization
-- [ ] Add responsive breakpoint utilities and mobile-first styling
-- [ ] Create empty state components for all major sections
+**Phase 2C: Core Monitor Components** (IN PROGRESS)
+- [x] Build ActivationBar component (sticky, shows bot status and controls)
+- [x] Create Monitor/Configure tab system replacing current layout
+- [x] Implement PipelineTicker for extraction→decision→trading visualization
+- [x] Add responsive breakpoint utilities and mobile-first styling
+- [x] Create empty state components for all major sections
+- [ ] Build MetricsBar component (KPI cards for balance, P&L, win rate)
+- [ ] Create PositionsTable component (active trades with real-time P&L)
+- [ ] Build DecisionFeed component (list of AI decisions with expandable cards)
+- [ ] Complete progressive duplication of all MonitorContent functionality
 
 **Phase 2D: Enhanced Bot Rail**
 - [ ] Transform current bot selector into persistent left rail
