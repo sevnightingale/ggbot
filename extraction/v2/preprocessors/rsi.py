@@ -2,7 +2,7 @@
 RSI (Relative Strength Index) Preprocessor.
 
 Advanced RSI preprocessing with sophisticated analysis including zone tracking,
-pattern recognition, divergence detection, and professional signal generation.
+pattern recognition, divergence detection, and comprehensive market state description.
 """
 
 import numpy as np
@@ -114,6 +114,14 @@ class RSIPreprocessor(BasePreprocessor):
                 }
             },
             "patterns": patterns,
+            "evidence": {
+                "data_quality": {
+                    "total_periods": len(clean),
+                    "valid_data_percentage": round(len(clean) / len(rsi_values) * 100, 1),
+                    "recent_volatility": round(clean.iloc[-10:].std(), 3) if len(clean) >= 10 else None
+                },
+                "calculation_notes": f"RSI analysis based on {len(clean)} valid data points"
+            },
             "summary": summary
         }
     
@@ -155,10 +163,10 @@ class RSIPreprocessor(BasePreprocessor):
             
             if len(valid_peaks) >= 2:
                 return {
-                    "type": "double_top_reversal",
-                    "confidence": 0.7,
+                    "type": "double_top_pattern",
                     "peak_count": len(valid_peaks),
-                    "description": f"Potential bearish reversal pattern in overbought zone"
+                    "zone": "overbought",
+                    "description": f"Double top pattern detected in overbought zone with {len(valid_peaks)} peaks"
                 }
         
         elif current < 30:  # Oversold zone
@@ -168,10 +176,10 @@ class RSIPreprocessor(BasePreprocessor):
             
             if len(valid_troughs) >= 2:
                 return {
-                    "type": "double_bottom_reversal",
-                    "confidence": 0.7,
+                    "type": "double_bottom_pattern",
                     "trough_count": len(valid_troughs),
-                    "description": f"Potential bullish reversal pattern in oversold zone"
+                    "zone": "oversold",
+                    "description": f"Double bottom pattern detected in oversold zone with {len(valid_troughs)} troughs"
                 }
         
         return None
@@ -191,12 +199,12 @@ class RSIPreprocessor(BasePreprocessor):
         
         if abs(normalized_velocity) > 0.5:  # Normalized momentum threshold (0.5 standard deviations)
             return {
-                "type": f"strong_{'bullish' if velocity > 0 else 'bearish'}_momentum",
+                "type": f"strong_{'rising' if velocity > 0 else 'falling'}_momentum",
                 "velocity": round(velocity, 3),
                 "normalized_velocity": round(normalized_velocity, 3),
                 "acceleration": round(acceleration, 3),
-                "confidence": min(1.0, abs(normalized_velocity) / 1.0),
-                "description": f"Strong {'bullish' if velocity > 0 else 'bearish'} momentum detected"
+                "strength": min(1.0, abs(normalized_velocity) / 1.0),
+                "description": f"Strong {'rising' if velocity > 0 else 'falling'} momentum in RSI"
             }
         
         return None
@@ -226,19 +234,21 @@ class RSIPreprocessor(BasePreprocessor):
         # Check for divergence with normalized thresholds
         if rsi_slope > 0.5 and price_slope < -0.5:  # RSI strengthening, price weakening
             return {
-                "type": "bullish_divergence",
-                "confidence": 0.6,
+                "type": "positive_divergence",
+                "rsi_trend": "strengthening",
+                "price_trend": "weakening",
                 "rsi_slope": round(rsi_slope, 3),
                 "price_slope": round(price_slope, 3),
-                "description": "RSI strengthening while price weakens"
+                "description": "RSI strengthening while price weakens - positive divergence pattern"
             }
         elif rsi_slope < -0.5 and price_slope > 0.5:  # RSI weakening, price strengthening
             return {
-                "type": "bearish_divergence", 
-                "confidence": 0.6,
+                "type": "negative_divergence",
+                "rsi_trend": "weakening",
+                "price_trend": "strengthening",
                 "rsi_slope": round(rsi_slope, 3),
                 "price_slope": round(price_slope, 3),
-                "description": "RSI weakening while price rises"
+                "description": "RSI weakening while price rises - negative divergence pattern"
             }
         
         return None
