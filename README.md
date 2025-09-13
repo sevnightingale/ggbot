@@ -103,11 +103,12 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 ### **[Frontend Platform](frontend/)**
 
 **Professional Next.js application** featuring:
-- **Dashboard V2**: Real-time interface connected to ggbot.py orchestrator
-- **Multi-bot management** with intuitive configuration interfaces  
-- **Real-time performance tracking** with WebSocket updates and countdown timers
-- **Manual testing tools**: Lightning bolt trigger for orchestrator debugging
+- **Forge Architecture**: Clean rebuild with elegant local state patterns (see `FORGE.md`)
+- **Multi-bot management** with `selectedConfigId` switching and intuitive interfaces
+- **Real-time performance tracking** with SSE streams and countdown timers
+- **Direct API integration** using `BotConfiguration` types without transformation layers
 - **Supabase authentication** with JWT token-based API access
+- **Legacy Dashboard V2**: Deprecated due to WebSocket complexity and architectural debt
 
 ## Production Features
 
