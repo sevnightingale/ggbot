@@ -12,8 +12,8 @@ interface BotRailProps {
 
 export function BotRail({ bots, selectedId, onSelect, className = '' }: BotRailProps) {
   return (
-    <aside className={`w-64 border-r border-[var(--border)] bg-[var(--bg-secondary)] ${className}`}>
-      <div className="p-4">
+    <aside className={`w-64 p-4 ${className}`}>
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
             <div className="h-4 w-4">📊</div>
