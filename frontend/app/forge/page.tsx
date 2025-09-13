@@ -3,6 +3,12 @@
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
 import { apiClient, BotConfiguration } from '@/lib/api'
+import { ThemeProvider } from '@/lib/theme'
+import { Header } from './components/layout/Header'
+import { BotRail } from './components/layout/BotRail'
+import { TabNavigation } from './components/layout/TabNavigation'
+import { MobileNav } from './components/layout/MobileNav'
+import { EmptyState } from './components/shared/EmptyState'
 
 interface Position {
   trade_id: string
@@ -47,6 +53,9 @@ export default function ForgePage() {
   const [statusMessage, setStatusMessage] = useState<string>('')
   const [nextRun, setNextRun] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<string>('')
+
+  // Tab navigation state
+  const [activeTab, setActiveTab] = useState<'monitor' | 'configure'>('monitor')
 
   // Real auth check
   useEffect(() => {
@@ -328,165 +337,216 @@ export default function ForgePage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center">
-        <div className="text-bone-300">Loading forge...</div>
-      </div>
+      <ThemeProvider>
+        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+          <div className="text-[var(--text-secondary)]">Loading forge...</div>
+        </div>
+      </ThemeProvider>
     )
   }
 
   if (!user) {
     return (
-      <div className="min-h-screen bg-charcoal-700 flex items-center justify-center">
-        <div className="text-bone-300">Please log in</div>
-      </div>
+      <ThemeProvider>
+        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+          <div className="text-[var(--text-secondary)]">Please log in</div>
+        </div>
+      </ThemeProvider>
     )
   }
 
   return (
-    <div className="min-h-screen bg-charcoal-700 p-8">
-      <div className="max-w-4xl mx-auto">
-        <h1 className="text-3xl font-bold text-bone-200 mb-8">🔥 ggbot Forge</h1>
-        
-        {/* Bot Selector */}
-        {allBots.length > 1 && (
-          <div className="bg-charcoal-800 p-4 rounded-lg mb-6">
-            <h3 className="text-sm text-gray-400 mb-2">Select Bot:</h3>
-            <div className="flex gap-2">
-              {allBots.map((bot) => (
-                <button
-                  key={bot.config_id}
-                  onClick={() => setSelectedConfigId(bot.config_id)}
-                  className={`px-4 py-2 rounded text-sm transition-colors ${
-                    bot.config_id === selectedConfigId
-                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                      : 'bg-charcoal-700 text-bone-300 hover:bg-charcoal-600'
-                  }`}
-                >
-                  {bot.config_name}
-                  {bot.state === 'active' && <span className="ml-1 text-green-400">●</span>}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
-        
-        {selectedBot ? (
-          <div className="space-y-6">
-            
-            {/* Bot Status Card */}
-            <div className="bg-charcoal-800 p-6 rounded-lg">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl text-bone-300">{selectedBot.config_name}</h2>
-                <div className={`px-3 py-1 rounded text-sm ${
-                  executionStatus === 'extraction' ? 'bg-green-500/20 text-green-400' :
-                  executionStatus === 'decision' ? 'bg-orange-500/20 text-orange-400' :
-                  executionStatus === 'trading' ? 'bg-red-500/20 text-red-400' :
-                  selectedBot.state === 'active' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
-                }`}>
-                  {executionStatus !== 'idle' ? executionStatus : (selectedBot.state === 'active' ? 'idle' : 'inactive')}
-                </div>
-              </div>
-              
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div>
-                  <span className="text-gray-400">Trading Pair:</span>
-                  <div className="text-bone-200">{selectedBot.config_data.selected_pair}</div>
-                </div>
-                <div>
-                  <span className="text-gray-400">Status Message:</span>
-                  <div className="text-bone-200">{statusMessage || 'Ready'}</div>
-                </div>
-                <div>
-                  <span className="text-gray-400">Next Run:</span>
-                  <div className="text-bone-200">{countdown || 'Not scheduled'}</div>
-                </div>
-                <div>
-                  <span className="text-gray-400">Positions:</span>
-                  <div className="text-bone-200">{positions.length} open</div>
-                </div>
-              </div>
-              
-              {/* Start/Stop Controls */}
-              <div className="mt-4 flex gap-3">
-                {selectedBot.state === 'active' ? (
-                  <button
-                    onClick={stopBot}
-                    disabled={isStopping}
-                    className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-                  >
-                    {isStopping ? 'Stopping...' : 'Stop Bot'}
-                  </button>
+    <ThemeProvider>
+      <div className="min-h-screen bg-[var(--bg-primary)]">
+        <Header />
+
+        <div className="flex h-[calc(100vh-64px)]">
+          <BotRail
+            bots={allBots}
+            selectedId={selectedConfigId}
+            onSelect={setSelectedConfigId}
+            className="hidden md:block"
+          />
+
+          <main className="flex-1 overflow-y-auto flex flex-col">
+            <TabNavigation
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
+
+            <div className="flex-1 p-4">
+              {selectedBot ? (
+                activeTab === 'monitor' ? (
+                  <MonitorContent
+                    selectedBot={selectedBot}
+                    executionStatus={executionStatus}
+                    statusMessage={statusMessage}
+                    countdown={countdown}
+                    positions={positions}
+                    decisions={decisions}
+                    isStarting={isStarting}
+                    isStopping={isStopping}
+                    onStart={startBot}
+                    onStop={stopBot}
+                  />
                 ) : (
-                  <button
-                    onClick={startBot}
-                    disabled={isStarting}
-                    className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-                  >
-                    {isStarting ? 'Starting...' : 'Start Bot'}
-                  </button>
-                )}
-              </div>
+                  <EmptyState
+                    title="Configuration Editor"
+                    description="Bot configuration interface coming soon"
+                    icon="⚙️"
+                  />
+                )
+              ) : (
+                <EmptyState
+                  title="Setting up your ggbot"
+                  description="Please wait while we create your bot..."
+                  icon="🔧"
+                />
+              )}
             </div>
+          </main>
+        </div>
 
-            {/* Live Positions */}
-            {positions.length > 0 && (
-              <div className="bg-charcoal-800 p-6 rounded-lg">
-                <h3 className="text-lg text-bone-300 mb-4">Live Positions</h3>
-                <div className="space-y-2">
-                  {positions.map(position => (
-                    <div key={position.trade_id} className="flex justify-between items-center p-3 bg-charcoal-700 rounded">
-                      <div>
-                        <span className="text-bone-200">{position.symbol}</span>
-                        <span className={`ml-2 ${position.side === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
-                          {position.side.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="text-right">
-                        <div className={`${position.unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                          {position.unrealized_pnl >= 0 ? '+' : ''}${position.unrealized_pnl?.toFixed(2)}
-                        </div>
-                        <div className="text-xs text-gray-400">${position.size_usd}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Recent Decisions */}
-            {decisions.length > 0 && (
-              <div className="bg-charcoal-800 p-6 rounded-lg">
-                <h3 className="text-lg text-bone-300 mb-4">Recent Decisions</h3>
-                <div className="space-y-2">
-                  {decisions.slice(0, 5).map(decision => (
-                    <div key={decision.decision_id} className="p-3 bg-charcoal-700 rounded">
-                      <div className="flex justify-between items-center mb-2">
-                        <span className={`font-semibold ${
-                          decision.action === 'enter' ? 'text-green-400' :
-                          decision.action === 'exit' ? 'text-red-400' : 'text-gray-400'
-                        }`}>
-                          {decision.action.toUpperCase()} {decision.symbol}
-                        </span>
-                        <span className="text-xs text-gray-400">
-                          {Math.round(decision.confidence * 100)}% confidence
-                        </span>
-                      </div>
-                      <p className="text-sm text-bone-400 line-clamp-2">
-                        {decision.reasoning}
-                      </p>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-          </div>
-        ) : (
-          <div className="bg-charcoal-800 p-6 rounded-lg">
-            <div className="text-bone-400">Creating your ggbot...</div>
-          </div>
-        )}
+        <MobileNav className="md:hidden" />
       </div>
+    </ThemeProvider>
+  )
+}
+
+// Extract the monitor content into a separate component for cleaner code
+interface MonitorContentProps {
+  selectedBot: BotConfiguration
+  executionStatus: 'idle' | 'extraction' | 'decision' | 'trading'
+  statusMessage: string
+  countdown: string
+  positions: Position[]
+  decisions: Decision[]
+  isStarting: boolean
+  isStopping: boolean
+  onStart: () => void
+  onStop: () => void
+}
+
+function MonitorContent({
+  selectedBot,
+  executionStatus,
+  statusMessage,
+  countdown,
+  positions,
+  decisions,
+  isStarting,
+  isStopping,
+  onStart,
+  onStop
+}: MonitorContentProps) {
+  return (
+    <div className="space-y-6">
+      {/* Bot Status Card */}
+      <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
+        <div className="flex justify-between items-center mb-4">
+          <h2 className="text-xl text-[var(--text-primary)]">{selectedBot.config_name}</h2>
+          <div className={`px-3 py-1 rounded text-sm ${
+            executionStatus === 'extraction' ? 'bg-green-500/20 text-green-400' :
+            executionStatus === 'decision' ? 'bg-orange-500/20 text-orange-400' :
+            executionStatus === 'trading' ? 'bg-red-500/20 text-red-400' :
+            selectedBot.state === 'active' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
+          }`}>
+            {executionStatus !== 'idle' ? executionStatus : (selectedBot.state === 'active' ? 'idle' : 'inactive')}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4 text-sm">
+          <div>
+            <span className="text-[var(--text-muted)]">Trading Pair:</span>
+            <div className="text-[var(--text-primary)]">{selectedBot.config_data.selected_pair}</div>
+          </div>
+          <div>
+            <span className="text-[var(--text-muted)]">Status Message:</span>
+            <div className="text-[var(--text-primary)]">{statusMessage || 'Ready'}</div>
+          </div>
+          <div>
+            <span className="text-[var(--text-muted)]">Next Run:</span>
+            <div className="text-[var(--text-primary)]">{countdown || 'Not scheduled'}</div>
+          </div>
+          <div>
+            <span className="text-[var(--text-muted)]">Positions:</span>
+            <div className="text-[var(--text-primary)]">{positions.length} open</div>
+          </div>
+        </div>
+
+        {/* Start/Stop Controls */}
+        <div className="mt-4 flex gap-3">
+          {selectedBot.state === 'active' ? (
+            <button
+              onClick={onStop}
+              disabled={isStopping}
+              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
+            >
+              {isStopping ? 'Stopping...' : 'Stop Bot'}
+            </button>
+          ) : (
+            <button
+              onClick={onStart}
+              disabled={isStarting}
+              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+            >
+              {isStarting ? 'Starting...' : 'Start Bot'}
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Live Positions */}
+      {positions.length > 0 && (
+        <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
+          <h3 className="text-lg text-[var(--text-primary)] mb-4">Live Positions</h3>
+          <div className="space-y-2">
+            {positions.map(position => (
+              <div key={position.trade_id} className="flex justify-between items-center p-3 bg-[var(--bg-tertiary)] rounded">
+                <div>
+                  <span className="text-[var(--text-primary)]">{position.symbol}</span>
+                  <span className={`ml-2 ${position.side === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
+                    {position.side.toUpperCase()}
+                  </span>
+                </div>
+                <div className="text-right">
+                  <div className={`${position.unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                    {position.unrealized_pnl >= 0 ? '+' : ''}${position.unrealized_pnl?.toFixed(2)}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">${position.size_usd}</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Recent Decisions */}
+      {decisions.length > 0 && (
+        <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
+          <h3 className="text-lg text-[var(--text-primary)] mb-4">Recent Decisions</h3>
+          <div className="space-y-2">
+            {decisions.slice(0, 5).map(decision => (
+              <div key={decision.decision_id} className="p-3 bg-[var(--bg-tertiary)] rounded">
+                <div className="flex justify-between items-center mb-2">
+                  <span className={`font-semibold ${
+                    decision.action === 'enter' ? 'text-green-400' :
+                    decision.action === 'exit' ? 'text-red-400' : 'text-gray-400'
+                  }`}>
+                    {decision.action.toUpperCase()} {decision.symbol}
+                  </span>
+                  <span className="text-xs text-[var(--text-muted)]">
+                    {Math.round(decision.confidence * 100)}% confidence
+                  </span>
+                </div>
+                <p className="text-sm text-[var(--text-secondary)] line-clamp-2">
+                  {decision.reasoning}
+                </p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

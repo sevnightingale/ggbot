@@ -532,25 +532,49 @@ body {
   z-index: 1;
 }
 
+/* Theme System - Dark/Light Mode Support */
+[data-theme="dark"] {
+  --bg-primary: #161618;       /* charcoal-900 */
+  --bg-secondary: #1f1f23;     /* charcoal-800 */
+  --bg-tertiary: #2a2a30;      /* charcoal-700 */
+  --text-primary: #e3e5e6;     /* bone-200 */
+  --text-secondary: #d6d8da;   /* bone-300 */
+  --text-muted: #9ca3af;       /* gray-400 */
+  --border: #36363d;           /* charcoal-600 */
+  --border-hover: #4a4a50;     /* charcoal-500 */
+}
+
+[data-theme="light"] {
+  --bg-primary: #f0f2f3;       /* bone-100 */
+  --bg-secondary: white;
+  --bg-tertiary: #e3e5e6;      /* bone-200 */
+  --text-primary: #1f1f23;     /* charcoal-800 */
+  --text-secondary: #2a2a30;   /* charcoal-700 */
+  --text-muted: #6b7280;       /* gray-500 */
+  --border: #d6d8da;           /* bone-300 */
+  --border-hover: #c1c5c7;     /* darker bone for hover */
+}
+
 :root {
-  /* Base colors */
+  /* Base colors (preserved for existing components) */
   --charcoal-900: #161618;
   --charcoal-800: #1a1a1c;
   --charcoal-700: #2a2a30;
   --charcoal-600: #3a3a40;
   --charcoal-500: #4a4a50;
+  --bone-100: #f0f2f3;
   --bone-200: #e3e5e6;
   --bone-300: #d0d2d3;
-  
-  /* Agent colors */
+
+  /* Agent colors (same in both themes) */
   --agent-extraction: #38a1c7;
   --agent-decision: #2cbe77;
   --agent-trading: #be6a47;
-  
-  /* Status colors */
-  --status-success: #2cbe77;
-  --status-warning: #f59e0b;
-  --status-error: #ef4444;
+
+  /* Status colors (same in both themes) */
+  --status-success: #10b981;
+  --status-danger: #ef4444;
+  --status-warning: #f97316;
 }
 
 * {

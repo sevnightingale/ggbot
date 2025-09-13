@@ -136,24 +136,172 @@ The Forge is a single-page application that replaces the dashboard with an elega
 
 ### Implementation Phases
 
-#### Phase 1: Data Foundation
+#### Phase 1: Data Foundation ✅ COMPLETE
 - Verify all API endpoints work correctly
 - Test SSE streams and real-time filtering
 - Implement multi-bot switching with `selectedConfigId`
 - Ensure local state patterns are robust
 - Complete centralized state management architecture
 
-#### Phase 2: Layout & Design System
-- Implement dark/light mode toggle and theming system
-- Design responsive layout structure and component containers
-- Create skeleton/empty state components for all major sections
-- Establish consistent spacing, typography, and color systems
-- Build navigation and bot switching UI shell
-- Focus on UX improvements over existing dashboard
+#### Phase 2: Layout & Design System (IN PROGRESS)
 
-#### Phase 3: Component Integration
-- Import and adapt elegant existing components (GGBot, FloatingActions)
-- Build new separated config components using centralized state
-- Wire components to data foundation progressively
-- Implement component-specific functionality one section at a time
-- Maintain elegance through selective reuse vs rebuild decisions
+**Phase 2A: Component Architecture**
+
+```
+/frontend/app/forge/components/
+├── layout/
+│   ├── Header.tsx           # App branding, theme toggle, user profile
+│   ├── BotRail.tsx          # Left sidebar with bot list
+│   ├── MobileNav.tsx        # Bottom nav for mobile
+│   ├── TabNavigation.tsx    # Monitor/Configure tab switcher
+│   └── UserProfile.tsx      # Profile dropdown (logout, settings, subscription)
+│
+├── monitor/
+│   ├── ActivationBar.tsx    # Bot controls, pipeline ticker, countdown
+│   ├── PipelineTicker.tsx   # Extraction→Decision→Trading visualization
+│   ├── MetricsBar.tsx       # KPI cards (balance, P&L, win rate)
+│   ├── PositionsTable.tsx   # Active trades with real-time P&L
+│   ├── DecisionFeed.tsx     # List of AI decisions
+│   └── DecisionCard.tsx     # Individual decision with expandable reasoning
+│
+├── configure/
+│   ├── SaveConfig.tsx       # Save/Cancel bar with unsaved changes indicator
+│   ├── ConfigTabs.tsx       # Sub-tabs for configuration sections
+│   ├── DecisionEditor.tsx   # Strategy editing with locked sections
+│   ├── MarketDataSelector.tsx # Data source/indicator selection
+│   ├── RiskControls.tsx     # Position sizing, stop loss settings
+│   ├── LLMConfig.tsx        # Provider selection, API keys
+│   └── TradingSetup.tsx     # Exchange config (disabled for MVP)
+│
+└── shared/
+    ├── ThemeToggle.tsx      # Sun/moon theme switcher
+    ├── Toast.tsx            # Notification toasts
+    ├── EmptyState.tsx       # Empty state guidance
+    ├── LoadingSkeleton.tsx  # Loading placeholders
+    └── Countdown.tsx        # Next run countdown timer
+```
+
+**Phase 2B: Layout Shell Implementation**
+- [ ] Create mobile-first responsive layout shell (header, main, sidebar)
+- [ ] Implement dark/light mode theming system with CSS variables and charcoal/bone palette
+- [ ] Add sun/moon theme toggle in header with localStorage persistence
+- [ ] Add user profile dropdown in header (logout, settings, subscription)
+- [ ] Build responsive bot rail component (hidden mobile, visible desktop)
+- [ ] Create mobile bottom navigation for bot switching
+- [ ] Establish consistent spacing scale and typography system
+
+**Phase 2C: Core Monitor Components**
+- [ ] Build ActivationBar component (sticky, shows bot status and controls)
+- [ ] Create Monitor/Configure tab system replacing current layout
+- [ ] Implement PipelineTicker for extraction→decision→trading visualization
+- [ ] Add responsive breakpoint utilities and mobile-first styling
+- [ ] Create empty state components for all major sections
+
+**Phase 2D: Enhanced Bot Rail**
+- [ ] Transform current bot selector into persistent left rail
+- [ ] Add basic P&L display per bot (if feasible with paper trading data)
+- [ ] Implement hover states and quick actions (activate/deactivate)
+- [ ] Add bot creation and management actions
+- [ ] Handle mobile drawer behavior for bot switching
+
+#### Phase 3: Monitor Experience Enhancement
+
+**Phase 3A: Real-Time Dashboard**
+- [ ] Enhance DecisionFeed with expandable reasoning cards
+- [ ] Improve PositionsTable with real-time P&L updates
+- [ ] Add basic performance metrics (balance, unrealized P&L)
+- [ ] Implement countdown timer with next run display
+- [ ] Create health/status indicators for SSE and system state
+
+**Phase 3B: Visual Polish**
+- [ ] Add micro-interactions for pipeline stage animations
+- [ ] Implement toast notifications for bot actions and decisions
+- [ ] Create responsive table→card transformations for mobile
+- [ ] Add loading states and optimistic UI updates
+- [ ] Polish empty states with helpful guidance text
+
+#### Phase 4: Configure Experience
+
+**Phase 4A: Configuration Architecture**
+- [ ] Implement centralized config update system with dirty state tracking
+- [ ] Create save/publish flow with validation
+- [ ] Build configuration tabs (Decision, Market Data, Risk, Trading, LLM)
+- [ ] Add draft mode with auto-save functionality
+- [ ] Implement configuration validation and error handling
+
+**Phase 4B: Configuration Components**
+- [ ] Build DecisionEditor with locked/editable sections
+- [ ] Create MarketDataSelector with hierarchical data source structure
+- [ ] Implement RiskManagement controls with preview
+- [ ] Add LLMConfiguration with provider selection and testing
+- [ ] Build advanced JSON editor for power users
+
+#### Phase 5: Progressive Enhancement
+
+**Phase 5A: Advanced Features**
+- [ ] Add test-run functionality for strategy validation
+- [ ] Implement configuration versioning and diff viewer
+- [ ] Create strategy templates and presets
+- [ ] Add import/export configuration functionality
+- [ ] Build bot duplication and cloning features
+
+**Phase 5B: Performance & Polish**
+- [ ] Optimize for multiple bots with virtualization if needed
+- [ ] Add keyboard shortcuts for power users
+- [ ] Implement search and filtering for decisions and trades
+- [ ] Add comprehensive accessibility features
+- [ ] Create comprehensive error boundaries and fallbacks
+
+### Design System Specifications
+
+#### Responsive Breakpoints
+- **Mobile**: `< 768px` - Single column, bottom nav, drawer for bots
+- **Tablet**: `768px - 1024px` - Two column, side rail visible
+- **Desktop**: `1024px+` - Three column layout with expanded rail
+
+#### Color System (Dark/Light Mode with Charcoal/Bone Palette)
+```css
+/* Dark Mode (Primary) */
+[data-theme="dark"] {
+  --bg-primary: #161618;      /* charcoal-900 */
+  --bg-secondary: #1f1f23;    /* charcoal-800 */
+  --bg-tertiary: #2a2a30;     /* charcoal-700 */
+  --text-primary: #e3e5e6;    /* bone-200 */
+  --text-secondary: #d6d8da;  /* bone-300 */
+  --border: #36363d;          /* charcoal-600 */
+}
+
+/* Light Mode */
+[data-theme="light"] {
+  --bg-primary: #f0f2f3;      /* bone-100 */
+  --bg-secondary: white;
+  --bg-tertiary: #e3e5e6;     /* bone-200 */
+  --text-primary: #1f1f23;    /* charcoal-800 */
+  --text-secondary: #2a2a30;  /* charcoal-700 */
+  --border: #d6d8da;          /* bone-300 */
+}
+
+/* Agent Colors (Same in Both Modes) */
+:root {
+  --agent-extraction: #38a1c7; /* Blue - data extraction */
+  --agent-decision: #2cbe77;   /* Green - AI decision making */
+  --agent-trading: #be6a47;    /* Orange - trade execution */
+  --status-success: #10b981;   /* Profit, success, active */
+  --status-danger: #ef4444;    /* Loss, error, inactive */
+  --status-warning: #f97316;   /* Warning, pending */
+}
+
+/* Theme Toggle Component */
+.theme-toggle {
+  @apply flex h-8 w-8 items-center justify-center rounded-full border
+         border-charcoal-600 bg-charcoal-800 hover:bg-charcoal-700
+         transition-colors;
+}
+```
+
+#### Component Architecture
+- **Local state only** - No global stores, all state in page component
+- **Prop drilling patterns** - Clean component contracts with focused responsibilities
+- **Compound components** - Related components grouped together (e.g., `<BotRail.Item>`)
+- **Mobile-first responsive** - Components adapt to screen size automatically
+- **SSE integration** - Real-time updates flow through existing patterns

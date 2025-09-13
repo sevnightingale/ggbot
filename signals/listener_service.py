@@ -347,30 +347,61 @@ class SignalListenerService:
                 with conn.cursor() as cur:
                     # Query for users with signal_validation configs wanting this signal source
                     # Check if ggshot is in signals_group_chats data_points
+                    # Debug: First check what configs exist at all
+                    cur.execute("""
+                        SELECT c.config_id, c.config_type, c.state, 
+                               up.subscription_tier, up.subscription_status, up.paid_data_points,
+                               c.config_data->'extraction'->'selected_data_sources'->'signals_group_chats'->'data_points' as signal_data_points
+                        FROM configurations c
+                        JOIN user_profiles up ON c.user_id = up.user_id
+                        WHERE c.config_type = 'signal_validation'
+                    """)
+                    
+                    debug_results = cur.fetchall()
+                    self.logger.info(f"🔍 Debug: Found {len(debug_results)} signal_validation configs:")
+                    for row in debug_results:
+                        self.logger.info(f"   Config {row[0]}: type={row[1]}, state={row[2]}, tier={row[3]}, status={row[4]}, paid_points={row[5]}, signal_points={row[6]}")
+                    
+                    # Now run the actual query - handle nested config_data structure
                     cur.execute("""
                         SELECT DISTINCT c.config_id, c.user_id, c.config_data
                         FROM configurations c
                         JOIN user_profiles up ON c.user_id = up.user_id
                         WHERE c.config_type = 'signal_validation'
-                          AND c.config_data->'extraction'->'selected_data_sources' ? 'signals_group_chats'
+                          AND c.state = 'active'
+                          AND (
+                            c.config_data->'extraction'->'selected_data_sources' ? 'signals_group_chats'
+                            OR c.config_data->'config_data'->'extraction'->'selected_data_sources' ? 'signals_group_chats'
+                          )
                           AND %s = ANY(up.paid_data_points)
                           AND up.subscription_tier = 'ggBase'
                           AND up.subscription_status = 'active'
                     """, (signal_source,))
                     
                     results = cur.fetchall()
+                    self.logger.info(f"🔍 Debug: SQL query returned {len(results)} results for signal_source '{signal_source}'")
                     
                     # Filter results to only include configs that actually have this signal in data_points
                     subscribers = []
                     for row in results:
                         config_id, user_id, config_data = row[0], row[1], json.loads(row[2])
-                        extraction_config = config_data.get('extraction', {}).get('selected_data_sources', {})
+                        
+                        # Handle nested config_data structure (same as publishing service)
+                        if "config_data" in config_data:
+                            inner_config = config_data["config_data"] 
+                            extraction_config = inner_config.get('extraction', {}).get('selected_data_sources', {})
+                        else:
+                            extraction_config = config_data.get('extraction', {}).get('selected_data_sources', {})
+                        
                         signals_config = extraction_config.get('signals_group_chats', {})
                         data_points = signals_config.get('data_points', [])
+                        
+                        self.logger.info(f"🔍 Debug: Config {config_id} has signals data_points: {data_points}")
                         
                         # Check if this signal source is in the data points (e.g., "ggshot")
                         if signal_source in data_points:
                             subscribers.append((config_id, user_id))
+                            self.logger.info(f"✅ Config {config_id} subscribed to {signal_source} signals")
                     
                     self.logger.debug(f"Found {len(subscribers)} subscribers for {signal_source} signals")
                     
