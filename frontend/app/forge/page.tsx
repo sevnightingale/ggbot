@@ -12,6 +12,7 @@ import { EmptyState } from './components/shared/EmptyState'
 import { ActivationBar } from './components/monitor/ActivationBar'
 import { MetricsBar } from './components/monitor/MetricsBar'
 import { DecisionFeed } from './components/monitor/DecisionFeed'
+import { PositionsTable } from './components/monitor/PositionsTable'
 
 interface Position {
   trade_id: string
@@ -450,6 +451,11 @@ export default function ForgePage() {
                     {/* DecisionFeed - Decision carousel */}
                     <DecisionFeed
                       decisions={decisions}
+                    />
+
+                    {/* PositionsTable - Active trades */}
+                    <PositionsTable
+                      positions={positions}
                     />
 
                     {/* Legacy MonitorContent - will be replaced progressively */}
