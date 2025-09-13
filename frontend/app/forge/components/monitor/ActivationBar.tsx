@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { Activity, Circle, Clock, Play, PauseCircle, Zap } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 
 interface ActivationBarProps {
@@ -26,67 +27,83 @@ export function ActivationBar({
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
+  const configType = selectedBot.config_data.config_type === 'signal_validation' ? 'Signal validation' : 'Autonomous trading'
+  const frequency = isSignalDriven ? 'Signal driven' : 'Every 5m'
 
   return (
-    <div className="sticky top-[120px] z-30 bg-[var(--bg-secondary)] border-b border-[var(--border)] p-4">
-      <div className="max-w-4xl mx-auto flex items-center justify-between">
-        {/* Left: Bot Info & Pipeline */}
-        <div className="flex items-center gap-6">
-          {/* Bot Status */}
-          <div className="flex items-center gap-3">
-            <div className={`h-3 w-3 rounded-full ${
-              isActive ? 'bg-green-500' : 'bg-gray-500'
-            }`} />
-            <div>
-              <h3 className="font-medium text-[var(--text-primary)]">{selectedBot.config_name}</h3>
-              <p className="text-sm text-[var(--text-muted)]">{selectedBot.config_data.selected_pair}</p>
-            </div>
-          </div>
+    <div className="sticky top-[120px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]/80 backdrop-blur p-4 mx-4 mb-4">
+      {/* Row 1: Info Group (always visible) */}
+      <div className="flex flex-wrap items-center gap-3 mb-3 lg:mb-4">
+        <div className="flex items-center gap-2 text-sm">
+          <span className="text-[var(--text-muted)]">Bot:</span>
+          <span className="font-medium text-[var(--text-primary)]">{selectedBot.config_name}</span>
+        </div>
 
-          {/* Pipeline Ticker */}
+        <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+          {configType}
+        </span>
+
+        <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
+          Paper • $10,000.00
+        </span>
+
+        <span className="text-xs text-[var(--text-muted)]">{frequency}</span>
+      </div>
+
+      {/* Row 2 (Desktop) / Row 2-3 (Mobile): Pipeline + Controls */}
+      <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+        {/* Pipeline Group */}
+        <div className="flex items-center gap-3">
           <PipelineTicker
             executionStatus={executionStatus}
             isActive={isActive}
           />
         </div>
 
-        {/* Right: Controls & Countdown */}
-        <div className="flex items-center gap-4">
-          {/* Status Message */}
-          {statusMessage && (
-            <div className="text-sm">
-              <span className="text-[var(--text-muted)]">Status: </span>
-              <span className="text-[var(--text-primary)]">{statusMessage}</span>
-            </div>
-          )}
-
+        {/* Controls Group */}
+        <div className="flex items-center gap-3 flex-wrap">
           {/* Countdown */}
           {countdown && !isSignalDriven && (
-            <div className="text-sm">
-              <span className="text-[var(--text-muted)]">Next: </span>
-              <span className="text-[var(--text-primary)]">{countdown}</span>
+            <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+              <Clock className="h-4 w-4" />
+              <span>Next in {countdown}</span>
             </div>
           )}
 
-          {/* Start/Stop Controls */}
-          <div className="flex gap-2">
-            {isActive ? (
-              <button
-                onClick={onStop}
-                disabled={isStopping}
-                className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                {isStopping ? 'Stopping...' : 'Stop Bot'}
-              </button>
-            ) : (
-              <button
-                onClick={onStart}
-                disabled={isStarting}
-                className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:opacity-50 text-white rounded-lg text-sm font-medium transition-colors"
-              >
-                {isStarting ? 'Starting...' : 'Start Bot'}
-              </button>
-            )}
+          {/* Action Buttons */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={isActive ? onStop : onStart}
+              disabled={isStarting || isStopping}
+              className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition ${
+                isActive
+                  ? 'bg-rose-600/90 hover:bg-rose-600 ring-rose-500 text-white'
+                  : 'bg-emerald-600/90 hover:bg-emerald-600 ring-emerald-500 text-white'
+              } disabled:opacity-50`}
+            >
+              {isActive ? (
+                <>
+                  <PauseCircle className="h-4 w-4" />
+                  {isStopping ? 'Deactivating...' : 'Deactivate'}
+                </>
+              ) : (
+                <>
+                  <Play className="h-4 w-4" />
+                  {isStarting ? 'Activating...' : 'Activate'}
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => {
+                // TODO: Implement run once functionality
+                console.log('Run once triggered')
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+            >
+              <Zap className="h-4 w-4" />
+              Run once
+            </button>
           </div>
         </div>
       </div>
@@ -101,43 +118,45 @@ interface PipelineTickerProps {
 
 function PipelineTicker({ executionStatus, isActive }: PipelineTickerProps) {
   const stages = [
-    { name: 'Extraction', status: 'extraction', color: 'var(--agent-extraction)' },
-    { name: 'Decision', status: 'decision', color: 'var(--agent-decision)' },
-    { name: 'Trading', status: 'trading', color: 'var(--agent-trading)' }
+    { key: 'extraction', label: 'Extraction' },
+    { key: 'decision', label: 'Decision' },
+    { key: 'trading', label: 'Trading' },
+    { key: 'idle', label: 'Idle' }
   ]
 
-  if (!isActive) {
-    return (
-      <div className="flex items-center gap-2">
-        <span className="text-sm text-[var(--text-muted)]">Pipeline inactive</span>
-      </div>
-    )
-  }
-
   return (
-    <div className="flex items-center gap-1">
+    <div className="flex items-center gap-2 text-xs">
       {stages.map((stage, index) => {
-        const isCurrent = executionStatus === stage.status
-        const isCompleted = executionStatus !== 'idle' && stages.findIndex(s => s.status === executionStatus) > index
+        const isCurrentStage = executionStatus === stage.key || (!isActive && stage.key === 'idle')
 
         return (
-          <React.Fragment key={stage.name}>
-            <div
-              className={`px-2 py-1 rounded text-xs font-medium transition-colors ${
-                isCurrent
-                  ? 'text-white'
-                  : isCompleted
-                    ? 'text-[var(--text-primary)] opacity-60'
-                    : 'text-[var(--text-muted)] opacity-40'
-              }`}
-              style={isCurrent ? { backgroundColor: stage.color } : {}}
-            >
-              {stage.name}
+          <div className="flex items-center" key={stage.key}>
+            <div className={`flex items-center gap-1 rounded-full px-2 py-1 transition-colors ${
+              isCurrentStage
+                ? 'bg-[var(--bg-tertiary)] border border-[var(--border)]'
+                : 'bg-[var(--bg-primary)] border border-[var(--border)] opacity-60'
+            }`}>
+              {isCurrentStage ? (
+                <Activity
+                  className="h-3.5 w-3.5"
+                  style={{
+                    color: stage.key === 'extraction' ? 'var(--agent-extraction)' :
+                           stage.key === 'decision' ? 'var(--agent-decision)' :
+                           stage.key === 'trading' ? 'var(--agent-trading)' :
+                           'var(--agent-extraction)' // default for idle
+                  }}
+                />
+              ) : (
+                <Circle className="h-3.5 w-3.5 text-[var(--text-muted)]" />
+              )}
+              <span className={isCurrentStage ? 'text-[var(--text-primary)]' : 'text-[var(--text-muted)]'}>
+                {stage.label}
+              </span>
             </div>
             {index < stages.length - 1 && (
-              <div className="text-[var(--text-muted)] opacity-40">→</div>
+              <div className="mx-1 h-3.5 w-3.5 text-[var(--text-muted)] opacity-40">→</div>
             )}
-          </React.Fragment>
+          </div>
         )
       })}
     </div>
