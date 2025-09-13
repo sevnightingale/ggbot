@@ -9,6 +9,7 @@ import { BotRail } from './components/layout/BotRail'
 import { TabNavigation } from './components/layout/TabNavigation'
 import { MobileNav } from './components/layout/MobileNav'
 import { EmptyState } from './components/shared/EmptyState'
+import { ActivationBar } from './components/monitor/ActivationBar'
 
 interface Position {
   trade_id: string
@@ -335,6 +336,15 @@ export default function ForgePage() {
     }
   }
 
+  // Handler functions for ActivationBar
+  const handleStart = () => {
+    startBot()
+  }
+
+  const handleStop = () => {
+    stopBot()
+  }
+
   if (loading) {
     return (
       <ThemeProvider>
@@ -374,6 +384,20 @@ export default function ForgePage() {
               onTabChange={setActiveTab}
             />
 
+            {/* ActivationBar for Monitor tab */}
+            {selectedBot && activeTab === 'monitor' && (
+              <ActivationBar
+                selectedBot={selectedBot}
+                executionStatus={executionStatus}
+                statusMessage={statusMessage}
+                countdown={countdown}
+                isStarting={isStarting}
+                isStopping={isStopping}
+                onStart={handleStart}
+                onStop={handleStop}
+              />
+            )}
+
             <div className="flex-1 p-4">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
@@ -386,8 +410,8 @@ export default function ForgePage() {
                     decisions={decisions}
                     isStarting={isStarting}
                     isStopping={isStopping}
-                    onStart={startBot}
-                    onStop={stopBot}
+                    onStart={handleStart}
+                    onStop={handleStop}
                   />
                 ) : (
                   <EmptyState
