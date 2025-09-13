@@ -52,7 +52,7 @@ export function ActivationBar({
   const balanceText = `Paper • $${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
-    <div className="sticky top-[120px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]/80 backdrop-blur p-4 mx-4 mb-4">
+    <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4 max-w-6xl mx-auto">
       {/* Row 1: Info Group (always visible) */}
       <div className="flex flex-wrap items-center gap-3 mb-3 lg:mb-4">
         <div className="flex items-center gap-2 text-sm">

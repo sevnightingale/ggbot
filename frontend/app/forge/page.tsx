@@ -400,12 +400,7 @@ export default function ForgePage() {
           />
 
           <main className="flex-1 overflow-y-auto flex flex-col pb-16 md:pb-0">
-            <TabNavigation
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-            />
-
-            {/* ActivationBar for Monitor tab */}
+            {/* ActivationBar for Monitor tab - above tabs */}
             {selectedBot && activeTab === 'monitor' && (
               <ActivationBar
                 selectedBot={selectedBot}
@@ -419,6 +414,11 @@ export default function ForgePage() {
                 onStop={handleStop}
               />
             )}
+
+            <TabNavigation
+              activeTab={activeTab}
+              onTabChange={setActiveTab}
+            />
 
             <div className="flex-1 p-4">
               {selectedBot ? (
