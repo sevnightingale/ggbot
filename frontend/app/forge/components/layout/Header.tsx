@@ -4,7 +4,7 @@ import React from 'react'
 import { ThemeToggle } from '../shared/ThemeToggle'
 
 interface HeaderProps {
-  // Future props for user profile, notifications, etc.
+  className?: string
 }
 
 export function Header({}: HeaderProps) {

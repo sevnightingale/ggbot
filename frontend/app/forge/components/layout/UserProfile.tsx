@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { User, Settings, LogOut, CreditCard } from 'lucide-react'
 
 interface UserProfileProps {
-  // Future props for user data
+  className?: string
 }
 
 export function UserProfile({}: UserProfileProps) {
