@@ -617,3 +617,4 @@ adx
 aroon
 atr
 bbwidth
+cci
