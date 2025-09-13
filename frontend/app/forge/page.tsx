@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
+import { apiClient } from '@/lib/api'
 
 // Clean, focused types for forge
 interface BotConfig {
@@ -81,77 +82,67 @@ export default function ForgePage() {
     return session?.access_token
   }
 
-  // Create default bot with RSI strategy
+  // Create default bot with RSI strategy using proper API client
   const createDefaultBot = async (): Promise<Bot> => {
-    const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-    
-    const defaultConfig = {
-      config_name: 'Default ggbot',
+    const defaultConfigData = {
+      schema_version: '2.1',
       config_type: 'autonomous_trading',
-      config_data: {
-        schema_version: '2.1',
-        config_type: 'autonomous_trading',
-        selected_pair: 'BTC/USDT',
-        extraction: {
-          selected_data_sources: {
-            technical_analysis: {
-              data_points: ['RSI'],
-              timeframes: ['1h']
-            }
+      selected_pair: 'BTC/USDT',
+      extraction: {
+        selected_data_sources: {
+          technical_analysis: {
+            data_points: ['RSI'],
+            timeframes: ['1h']
           }
+        }
+      },
+      decision: {
+        analysis_frequency: '1h',
+        system_prompt: 'You are an expert cryptocurrency trader. Analyze the provided market data and provide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.',
+        user_prompt: 'if RSI 1hr below 50 enter long, if above enter short'
+      },
+      llm_config: {
+        provider: 'deepseek',
+        model: 'deepseek-r1',
+        use_platform_keys: true,
+        use_own_key: false
+      },
+      trading: {
+        execution_mode: 'paper',
+        leverage: 1,
+        position_sizing: {
+          method: 'fixed_usd',
+          fixed_amount_usd: 100,
+          account_percent: 5.0,
+          max_position_percent: 10.0
         },
-        decision: {
-          analysis_frequency: '1h',
-          system_prompt: 'You are an expert cryptocurrency trader. Analyze the provided market data and provide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.',
-          user_prompt: 'if RSI 1hr below 50 enter long, if above enter short'
+        risk_management: {
+          max_positions: 1,
+          default_stop_loss_percent: 5.0,
+          default_take_profit_percent: 10.0,
+          max_daily_loss_usd: 500
         },
-        llm_config: {
-          provider: 'deepseek',
-          model: 'deepseek-r1',
-          use_platform_keys: true,
-          use_own_key: false
-        },
-        trading: {
-          execution_mode: 'paper',
-          leverage: 1,
-          position_sizing: {
-            method: 'fixed_usd',
-            fixed_amount_usd: 100,
-            account_percent: 5.0,
-            max_position_percent: 10.0
-          },
-          risk_management: {
-            max_positions: 1,
-            default_stop_loss_percent: 5.0,
-            default_take_profit_percent: 10.0,
-            max_daily_loss_usd: 500
-          },
-          exchange_config: {
-            exchange_type: 'cex',
-            selected_exchange: 'binance',
-            api_key: '',
-            secret_key: ''
-          }
+        exchange_config: {
+          exchange_type: 'cex',
+          selected_exchange: 'binance',
+          api_key: '',
+          secret_key: ''
         }
       }
     }
     
-    const response = await fetch(`${apiUrl}/api/v2/configurations`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${await getAuthToken()}`
-      },
-      body: JSON.stringify(defaultConfig)
-    })
+    const newConfig = await apiClient.createConfig('Default ggbot', defaultConfigData)
+    console.log('🔨 Created default bot:', newConfig)
     
-    if (!response.ok) {
-      throw new Error(`Failed to create bot: ${response.status}`)
+    // Transform to Bot interface
+    return {
+      config_id: newConfig.config_id,
+      config_name: newConfig.config_name,
+      config_data: newConfig.config_data,
+      state: newConfig.state === 'active' ? 'active' : 'inactive',
+      created_at: newConfig.created_at,
+      updated_at: newConfig.updated_at
     }
-    
-    const newBot = await response.json()
-    console.log('🔨 Created default bot:', newBot)
-    return newBot
   }
 
   // Load or create bot when user is ready
@@ -162,24 +153,21 @@ export default function ForgePage() {
       console.log('🔥 Loading bot for user:', user.id)
       
       try {
-        // Get user's existing bots
-        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-        const response = await fetch(`${apiUrl}/api/v2/configurations`, {
-          headers: {
-            'Authorization': `Bearer ${await getAuthToken()}`
-          }
-        })
+        // Get user's existing bots using proper API client
+        const configs = await apiClient.listConfigs()
+        console.log('📡 Loaded configs:', configs)
         
-        if (!response.ok) {
-          throw new Error(`Failed to load bots: ${response.status}`)
-        }
-        
-        const bots = await response.json()
-        console.log('📡 Loaded bots:', bots)
-        
-        if (bots.length > 0) {
-          // Use first existing bot
-          setBot(bots[0])
+        if (configs.length > 0) {
+          // Use first existing config - transform to Bot interface  
+          const config = configs[0]
+          setBot({
+            config_id: config.config_id,
+            config_name: config.config_name,
+            config_data: config.config_data,
+            state: config.state === 'active' ? 'active' : 'inactive',
+            created_at: config.created_at,
+            updated_at: config.updated_at
+          })
         } else {
           // Create default bot
           console.log('🔨 No bots found, creating default bot')
@@ -294,18 +282,15 @@ export default function ForgePage() {
     return () => clearInterval(interval)
   }, [nextRun])
 
-  // Start bot function
+  // Start bot function using proper API client
   const startBot = async () => {
     if (!bot) return
     setIsStarting(true)
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-      const response = await fetch(`${apiUrl}/api/v2/bot/${bot.config_id}/start`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await getAuthToken()}`
-        }
+      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${bot.config_id}/start`, {
+        method: 'POST'
       })
 
       if (!response.ok) {
@@ -325,18 +310,15 @@ export default function ForgePage() {
     }
   }
 
-  // Stop bot function
+  // Stop bot function using proper API client
   const stopBot = async () => {
     if (!bot) return
     setIsStopping(true)
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-      const response = await fetch(`${apiUrl}/api/v2/bot/${bot.config_id}/stop`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${await getAuthToken()}`
-        }
+      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${bot.config_id}/stop`, {
+        method: 'POST'
       })
 
       if (!response.ok) {
