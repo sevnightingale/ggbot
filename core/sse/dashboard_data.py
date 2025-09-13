@@ -1,48 +1,55 @@
 """
 Unified Dashboard Data Provider
 
-Provides optimized single-query data fetching for the SSE dashboard stream.
-Combines bot configs, positions, decisions, and accounts in one PostgreSQL query
-with proper per-bot limits and null handling.
+Provides optimized data fetching for the SSE dashboard stream.
+Combines bot configs, positions, decisions, and accounts with enhanced
+portfolio analytics from PositionManager for professional metrics.
 """
 
 import json
+import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from core.common.db import get_db_connection, DecimalEncoder
 from core.common.logger import logger
 from .redis_status import get_execution_phase, get_bot_status_color, get_bot_status_message
+from trading.paper.positions import PositionManager
 
 
 def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
     """
-    Get all dashboard data for a user in a single optimized query.
-    
+    Get all dashboard data for a user with enhanced portfolio analytics.
+
     Combines:
     - Bot configurations (non-archived)
     - Open positions with current P&L
     - Recent decisions (5 per bot, last 2 hours)
-    - Account summaries
-    
+    - Account summaries enhanced with portfolio analytics
+
     Enhanced with runtime data from scheduler and Redis execution status.
-    
+
     Args:
         user_id: User UUID string
-        
+
     Returns:
         Dictionary with 'bots', 'positions', 'decisions', 'accounts', 'timestamp'
     """
     try:
         # Get database data in single query
         db_data = _get_dashboard_data_from_db(user_id)
-        
+
         # Enhance bots with runtime data
         if db_data.get('bots'):
             for bot in db_data['bots']:
                 _enhance_bot_with_runtime_data(bot)
-        
+
+        # Enhance accounts with portfolio analytics (async operation)
+        if db_data.get('accounts'):
+            enhanced_accounts = asyncio.run(_enhance_accounts_with_portfolio_data(db_data['accounts']))
+            db_data['accounts'] = enhanced_accounts
+
         return db_data
-        
+
     except Exception as e:
         logger.error(f"Failed to get unified dashboard data for user {user_id}: {e}")
         # Return empty structure on error
@@ -157,13 +164,68 @@ def _enhance_bot_with_runtime_data(bot: Dict[str, Any]) -> None:
     bot['is_scheduled'] = bot_state == 'active'
 
 
+async def _enhance_accounts_with_portfolio_data(accounts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Enhance account data with comprehensive portfolio analytics.
+
+    Args:
+        accounts: List of account dictionaries from database
+
+    Returns:
+        Enhanced accounts with portfolio analytics fields
+    """
+    if not accounts:
+        return accounts
+
+    enhanced_accounts = []
+    manager = PositionManager()
+
+    for account in accounts:
+        try:
+            config_id = account.get('config_id')
+            if not config_id:
+                enhanced_accounts.append(account)
+                continue
+
+            # Get comprehensive portfolio summary
+            portfolio = await manager.get_portfolio_summary(config_id)
+
+            # Create enhanced account with portfolio analytics
+            enhanced_account = dict(account)  # Copy original data
+
+            # Add portfolio analytics fields
+            enhanced_account.update({
+                'unrealized_pnl': portfolio.unrealized_pnl,
+                'daily_pnl': portfolio.daily_pnl,
+                'portfolio_return_pct': portfolio.portfolio_return_pct,
+                'total_balance': portfolio.total_balance,
+                'available_balance': portfolio.available_balance,
+                'position_value': portfolio.position_value,
+                'win_rate': portfolio.win_rate,
+                'avg_win': portfolio.avg_win,
+                'avg_loss': portfolio.avg_loss,
+                'largest_win': portfolio.largest_win,
+                'largest_loss': portfolio.largest_loss,
+                'sharpe_ratio': portfolio.sharpe_ratio
+            })
+
+            enhanced_accounts.append(enhanced_account)
+
+        except Exception as e:
+            logger.error(f"Failed to enhance account {account.get('config_id', 'unknown')} with portfolio data: {e}")
+            # Return original account data on error
+            enhanced_accounts.append(account)
+
+    return enhanced_accounts
+
+
 def _extract_timeframe_from_config(config_data: Dict[str, Any]) -> str:
     """
     Extract timeframe from bot configuration data.
-    
+
     Args:
         config_data: Bot configuration dictionary
-        
+
     Returns:
         Timeframe string (e.g., '1h', '5m') or '5m' as default
     """

@@ -12,7 +12,7 @@ from decimal import Decimal
 import psycopg2
 from psycopg2.extras import RealDictCursor
 
-from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
+from core.common.db import get_db_connection
 from core.common.logger import logger
 from .market_data import MarketDataAdapter
 
@@ -67,15 +67,8 @@ class PositionManager:
         self.market_data = MarketDataAdapter()
     
     def _get_db_connection(self):
-        """Get database connection"""
-        return psycopg2.connect(
-            host=DB_HOST,
-            port=DB_PORT,
-            database=DB_NAME,
-            user=DB_USER,
-            password=DB_PASS,
-            cursor_factory=RealDictCursor
-        )
+        """Get database connection using unified connection manager"""
+        return get_db_connection()
     
     async def get_position_summary(self, trade_id: str) -> Optional[PositionSummary]:
         """
@@ -89,7 +82,7 @@ class PositionManager:
         """
         try:
             with self._get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("""
                         SELECT * FROM paper_trades 
                         WHERE trade_id = %s AND status = 'open'
@@ -155,7 +148,7 @@ class PositionManager:
         """
         try:
             with self._get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     # Get account info
                     cur.execute("""
                         SELECT * FROM paper_accounts 
@@ -270,7 +263,7 @@ class PositionManager:
             portfolio = await self.get_portfolio_summary(config_id)
             
             with self._get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     # Get open positions
                     cur.execute("""
                         SELECT symbol, side, size_usd, unrealized_pnl, confidence_score
@@ -347,7 +340,7 @@ class PositionManager:
             cutoff_date = datetime.now(timezone.utc) - timedelta(days=days)
             
             with self._get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     # Get closed trades in period
                     cur.execute("""
                         SELECT symbol, side, realized_pnl, confidence_score, 
@@ -451,7 +444,7 @@ class PositionManager:
         try:
             # Get current positions
             with self._get_db_connection() as conn:
-                with conn.cursor() as cur:
+                with conn.cursor(cursor_factory=RealDictCursor) as cur:
                     cur.execute("""
                         SELECT trade_id, symbol, side, size_usd, unrealized_pnl, 
                                confidence_score, opened_at, stop_loss, take_profit
