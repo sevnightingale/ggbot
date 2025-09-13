@@ -16,7 +16,7 @@ from .redis_status import get_execution_phase, get_bot_status_color, get_bot_sta
 from trading.paper.positions import PositionManager
 
 
-def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
+async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
     """
     Get all dashboard data for a user with enhanced portfolio analytics.
 
@@ -45,7 +45,7 @@ def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
 
         # Enhance accounts with portfolio analytics (async operation)
         if db_data.get('accounts'):
-            enhanced_accounts = asyncio.run(_enhance_accounts_with_portfolio_data(db_data['accounts']))
+            enhanced_accounts = await _enhance_accounts_with_portfolio_data(db_data['accounts'])
             db_data['accounts'] = enhanced_accounts
 
         return db_data

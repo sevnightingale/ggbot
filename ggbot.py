@@ -1209,7 +1209,7 @@ async def dashboard_stream(
             while True:
                 try:
                     # Get unified dashboard data for authenticated user
-                    data = get_unified_dashboard_data(current_user.user_id)
+                    data = await get_unified_dashboard_data(current_user.user_id)
                     event_id += 1
                     heartbeat_counter += 1
                     
