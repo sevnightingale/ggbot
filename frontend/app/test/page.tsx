@@ -138,6 +138,16 @@ export default function TestPage() {
   const testCreateConfig = () => apiCall('POST', '/api/v2/config', testConfigPayload)
   const testGetUserProfile = () => apiCall('GET', '/api/v2/user/profile')
   const testGetDataSources = () => apiCall('GET', '/api/v2/data-sources-with-points')
+  
+  // Signal publishing test with config selection
+  const testSignalPublishing = () => {
+    const configId = prompt('Enter Config ID to test signal publishing:')
+    if (!configId) {
+      alert('Config ID is required for signal publishing test')
+      return Promise.reject(new Error('Config ID required'))
+    }
+    return apiCall('POST', `/api/v2/test/signal-publishing/${configId}`)
+  }
 
   // SSE test functions
   const startSseTest = () => {
@@ -308,6 +318,14 @@ export default function TestPage() {
             disabled={loading}
           >
             Get Data Sources
+          </button>
+          
+          <button 
+            onClick={() => runTest('Signal Publishing', testSignalPublishing)}
+            className="bg-pink-500 text-white px-4 py-2 rounded hover:bg-pink-600"
+            disabled={loading}
+          >
+            🔔 Test Signal Publishing
           </button>
         </div>
 

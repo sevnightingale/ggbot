@@ -178,8 +178,25 @@ df -h
 ### 🟡 Production Status (Transition Phase)
 **Autonomous Scheduling** - ✅ Multi-timeframe bots running with zero-drift execution
 **Paper Trading Engine** - ❌ Missing real-time position monitoring (manual testing phase)
-**V2 Dashboard** - ✅ Real-time UI with countdown timers and WebSocket integration
+**V2 Dashboard** - 🟡 Transitioning to Forge architecture (legacy dashboard deprecated)
+
+### 🔄 Frontend Architecture Transition
+
+**Legacy Dashboard Issues**:
+- Complex WebSocket system with infinite loop errors (React #185)
+- 600+ line botStore with data transformation layers
+- Architectural debt preventing elegant evolution
+- Global state management complexity
+
+**New Forge Implementation** (see `FORGE.md`):
+- ✅ Clean local state architecture with direct API types
+- ✅ Simple SSE streams replacing complex WebSocket patterns
+- ✅ Multi-bot switching with `selectedConfigId` pattern
+- ✅ Phase 1 data foundation complete, ready for Phase 2 (design system)
+- **Working Document**: All development guided by `FORGE.md`
+
+**Migration Status**: Legacy dashboard functional but buggy. Forge page under active development as complete replacement using elegant, maintainable patterns.
 
 ---
 
-*Last major update: V2 Architecture complete with autonomous scheduling and signal validation systems operational (2025-01-08)*
+*Last major update: Forge architecture Phase 1 complete - data foundation with multi-bot support and SSE integration (2025-09-13)*
