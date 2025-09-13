@@ -43,9 +43,9 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
             for bot in db_data['bots']:
                 _enhance_bot_with_runtime_data(bot)
 
-        # Ensure all bot configs have paper accounts and enhance with portfolio analytics
-        if db_data.get('bots'):
-            enhanced_accounts = await _ensure_accounts_for_all_bots(db_data['bots'], db_data.get('accounts', []), user_id)
+        # Enhance accounts with portfolio analytics (async operation)
+        if db_data.get('accounts'):
+            enhanced_accounts = await _enhance_accounts_with_portfolio_data(db_data['accounts'])
             db_data['accounts'] = enhanced_accounts
 
         return db_data
@@ -163,76 +163,6 @@ def _enhance_bot_with_runtime_data(bot: Dict[str, Any]) -> None:
     bot['next_run'] = None
     bot['is_scheduled'] = bot_state == 'active'
 
-
-async def _ensure_accounts_for_all_bots(bots: List[Dict[str, Any]], existing_accounts: List[Dict[str, Any]], user_id: str) -> List[Dict[str, Any]]:
-    """
-    Ensure all bot configs have paper accounts, creating them if missing.
-    Then enhance all accounts with portfolio analytics.
-
-    Args:
-        bots: List of bot configuration dictionaries
-        existing_accounts: List of existing account dictionaries from database
-        user_id: User ID for account creation
-
-    Returns:
-        Complete list of accounts with portfolio analytics for all bots
-    """
-    from trading.paper.supabase_service import SupabasePaperTradingService
-
-    # Create a map of existing accounts by config_id
-    existing_accounts_map = {acc.get('config_id'): acc for acc in existing_accounts}
-
-    # Initialize trading service for account creation
-    trading_service = SupabasePaperTradingService()
-
-    all_accounts = []
-
-    for bot in bots:
-        config_id = bot.get('config_id')
-        if not config_id:
-            continue
-
-        # Check if account already exists
-        if config_id in existing_accounts_map:
-            account = existing_accounts_map[config_id]
-        else:
-            # Create missing paper account
-            try:
-                logger.info(f"Creating paper account for bot config {config_id}")
-                domain_account = await trading_service.get_or_create_paper_account(config_id, user_id)
-
-                # Convert domain model to dict format for consistency with database query
-                account = {
-                    'config_id': config_id,
-                    'account_id': str(domain_account.account_id),
-                    'current_balance': float(domain_account.current_balance.amount),
-                    'total_pnl': 0.0,  # New account
-                    'total_trades': 0,
-                    'win_trades': 0,
-                    'loss_trades': 0,
-                    'open_positions': 0,
-                    'updated_at': datetime.now(timezone.utc).isoformat()
-                }
-                logger.info(f"Created paper account {domain_account.account_id} for config {config_id}")
-            except Exception as e:
-                logger.error(f"Failed to create paper account for config {config_id}: {e}")
-                # Create a placeholder account dict so UI doesn't break
-                account = {
-                    'config_id': config_id,
-                    'account_id': 'placeholder',
-                    'current_balance': 10000.0,
-                    'total_pnl': 0.0,
-                    'total_trades': 0,
-                    'win_trades': 0,
-                    'loss_trades': 0,
-                    'open_positions': 0,
-                    'updated_at': datetime.now(timezone.utc).isoformat()
-                }
-
-        all_accounts.append(account)
-
-    # Now enhance all accounts with portfolio analytics
-    return await _enhance_accounts_with_portfolio_data(all_accounts)
 
 
 async def _enhance_accounts_with_portfolio_data(accounts: List[Dict[str, Any]]) -> List[Dict[str, Any]]:

@@ -1257,16 +1257,29 @@ async def create_config(
     request: ConfigCreateRequest,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Create a new bot configuration."""
+    """Create a new bot configuration and corresponding paper trading account."""
     config = await config_service.create_config(
         user_id=current_user.user_id,
         config_name=request.config_name,
         config_data=request.dict(exclude={"config_name"})
     )
-    
+
     if not config:
         raise HTTPException(status_code=400, detail="Failed to create configuration")
-    
+
+    # Create paper trading account for the new config
+    try:
+        from trading.paper.supabase_service import SupabasePaperTradingService
+        trading_service = SupabasePaperTradingService()
+        account = await trading_service.get_or_create_paper_account(
+            config_id=config.config_id,
+            user_id=current_user.user_id
+        )
+        logger.info(f"Created paper account {account.account_id} for new config {config.config_id}")
+    except Exception as e:
+        logger.error(f"Failed to create paper account for config {config.config_id}: {e}")
+        # Don't fail the config creation - account can be created later
+
     return {
         "status": "success",
         "config": config.to_dict()
