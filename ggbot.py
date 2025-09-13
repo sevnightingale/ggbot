@@ -1048,9 +1048,15 @@ def remove_bot_job(user_id: str, config_id: str, timeframe: str):
     """Remove a scheduled job for a bot configuration."""
     job_id = f"bot:{user_id}:{config_id}:{timeframe}"
     try:
-        scheduler.remove_job(job_id)
-        logger.info(f"Removed scheduler job {job_id}")
-        return True
+        # Check if job exists first
+        job = scheduler.get_job(job_id)
+        if job:
+            scheduler.remove_job(job_id)
+            logger.info(f"Removed scheduler job {job_id}")
+            return True
+        else:
+            logger.info(f"Job {job_id} was already removed or never existed")
+            return True  # Consider it successful since the desired state (no job) is achieved
     except Exception as e:
         logger.warning(f"Failed to remove job {job_id}: {e}")
         return False
@@ -1099,22 +1105,34 @@ async def reconcile_active_bots():
 def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
     """
     Extract analysis_frequency (timeframe) from bot config.
-    
+
     Args:
         config: Bot configuration dictionary (may be nested)
-        
+
     Returns:
-        Timeframe string (defaults to "1h")
+        Timeframe string (defaults to "1h"). For signal_driven bots, returns "signal_driven"
     """
     # Handle nested config structure from database
     if "config_data" in config:
         inner_config = config["config_data"]
         decision_config = inner_config.get("decision", {})
+        config_type = inner_config.get("config_type", "autonomous_trading")
     else:
         # Handle flat config structure
         decision_config = config.get("decision", {})
-    
-    return decision_config.get("analysis_frequency", "1h")
+        config_type = config.get("config_type", "autonomous_trading")
+
+    analysis_frequency = decision_config.get("analysis_frequency", "1h")
+
+    # For signal validation bots, respect signal_driven frequency
+    if config_type == "signal_validation" and analysis_frequency == "signal_driven":
+        return "signal_driven"
+
+    # For other bots, default signal_driven to 1h
+    if analysis_frequency == "signal_driven":
+        return "1h"
+
+    return analysis_frequency
 
 
 # API Endpoints
@@ -2033,21 +2051,30 @@ async def start_bot(
         # Extract timeframe from config
         config_dict = config.to_dict()
         timeframe = extract_timeframe_from_config(config_dict)
-        
-        # Schedule the bot job
-        add_bot_job(current_user.user_id, config_id, timeframe)
-        
-        # Update state to active
-        success = await config_service.set_bot_state(config_id, current_user.user_id, 'active')
-        if not success:
-            # Remove the job if state update failed
-            remove_bot_job(current_user.user_id, config_id, timeframe)
-            raise HTTPException(status_code=500, detail="Failed to update bot state")
-        
-        # Get next run time for response
-        job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
-        job = scheduler.get_job(job_id)
-        next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
+
+        # Handle signal_driven bots differently - they don't get scheduled jobs
+        if timeframe == "signal_driven":
+            # Update state to active (but don't schedule)
+            success = await config_service.set_bot_state(config_id, current_user.user_id, 'active')
+            if not success:
+                raise HTTPException(status_code=500, detail="Failed to update bot state")
+
+            next_run = None  # Signal-driven bots don't have scheduled runs
+        else:
+            # Schedule the bot job for time-based bots
+            add_bot_job(current_user.user_id, config_id, timeframe)
+
+            # Update state to active
+            success = await config_service.set_bot_state(config_id, current_user.user_id, 'active')
+            if not success:
+                # Remove the job if state update failed
+                remove_bot_job(current_user.user_id, config_id, timeframe)
+                raise HTTPException(status_code=500, detail="Failed to update bot state")
+
+            # Get next run time for response
+            job_id = f"bot:{current_user.user_id}:{config_id}:{timeframe}"
+            job = scheduler.get_job(job_id)
+            next_run = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
         
         # 🔥 WEBSOCKET DELETED! Bot state changes will show up in SSE stream
         
@@ -2090,10 +2117,14 @@ async def stop_bot(
         # Extract timeframe from config
         config_dict = config.to_dict()
         timeframe = extract_timeframe_from_config(config_dict)
-        
-        # Remove the scheduled job
-        job_removed = remove_bot_job(current_user.user_id, config_id, timeframe)
-        
+
+        # Handle signal_driven bots differently - they don't have scheduled jobs to remove
+        if timeframe == "signal_driven":
+            job_removed = True  # No job to remove, so consider it successful
+        else:
+            # Remove the scheduled job for time-based bots
+            job_removed = remove_bot_job(current_user.user_id, config_id, timeframe)
+
         # Update state to inactive
         success = await config_service.set_bot_state(config_id, current_user.user_id, 'inactive')
         if not success:
