@@ -11,6 +11,7 @@ import { MobileNav } from './components/layout/MobileNav'
 import { EmptyState } from './components/shared/EmptyState'
 import { ActivationBar } from './components/monitor/ActivationBar'
 import { MetricsBar } from './components/monitor/MetricsBar'
+import { DecisionFeed } from './components/monitor/DecisionFeed'
 
 interface Position {
   trade_id: string
@@ -444,6 +445,11 @@ export default function ForgePage() {
                     <MetricsBar
                       account={selectedAccount}
                       positions={positions}
+                    />
+
+                    {/* DecisionFeed - Decision carousel */}
+                    <DecisionFeed
+                      decisions={decisions}
                     />
 
                     {/* Legacy MonitorContent - will be replaced progressively */}
