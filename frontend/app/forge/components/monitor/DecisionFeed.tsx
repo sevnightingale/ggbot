@@ -5,7 +5,7 @@ import { ChevronLeft, ChevronRight, TrendingUp, TrendingDown, Minus } from 'luci
 
 interface Decision {
   decision_id: string
-  config_id: string
+  config_id?: string
   symbol: string
   action: string
   confidence: number
