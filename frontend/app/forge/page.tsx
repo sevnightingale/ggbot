@@ -77,10 +77,6 @@ export default function ForgePage() {
     ? accounts.find(account => account.config_id === selectedBot.config_id) || null
     : null
 
-  // Debug logging
-  console.log('🔍 Debug - selectedBot:', selectedBot?.config_id)
-  console.log('🔍 Debug - accounts:', accounts)
-  console.log('🔍 Debug - selectedAccount:', selectedAccount)
   
   // Real-time status tracking
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'extraction' | 'decision' | 'trading'>('idle')
@@ -254,7 +250,6 @@ export default function ForgePage() {
 
             // Update accounts data
             if (data.accounts) {
-              console.log('📊 SSE accounts data:', data.accounts)
               setAccounts(data.accounts)
             }
 
