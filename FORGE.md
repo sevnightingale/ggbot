@@ -39,9 +39,12 @@ This approach minimizes risk while enabling architectural evolution and maintain
 
 ### Agent Color System & Design Standards
 - **Agent Colors**: Blue (#38a1c7) extraction, Green (#2cbe77) decision, Orange (#be6a47) trading
+- **Financial Colors**: emerald-400 (profit/gains), rose-400 (loss/negative), consistent throughout
 - **Container Design**: All components use `rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]`
+- **Grid Layout Architecture**: 12-column grid system with nested grids for sophisticated layouts
+- **Professional Table Design**: HTML table structure with proper thead/tbody, responsive with `min-w-full`
 - **Responsive Strategy**: Mobile-first with proper container spacing, not full-width expansion
-- **Real Data Integration**: Components connect to live SSE streams and account data, no hardcoded values
+- **Real Data Integration**: Components connect to live SSE streams and account data, **absolutely no mock/simulated/placeholder data**
 
 ## CURRENT
 
@@ -222,9 +225,25 @@ The Forge is a single-page application that replaces the dashboard with an elega
 - [x] Implement PipelineTicker for extraction→decision→trading visualization
 - [x] Add responsive breakpoint utilities and mobile-first styling
 - [x] Create empty state components for all major sections
-- [ ] Build MetricsBar component (KPI cards for balance, P&L, win rate)
-- [ ] Create PositionsTable component (active trades with real-time P&L)
-- [ ] Build DecisionFeed component (list of AI decisions with expandable cards)
+- [ ] **Build MetricsBar component** - Professional KPI grid layout
+  - [ ] 2x2 grid on mobile, 1x4 grid on desktop (`grid-cols-2 md:grid-cols-4`)
+  - [ ] Individual KPI cards with trend indicators (TrendingUp/TrendingDown icons)
+  - [ ] Color-coded values (green=profit, red=loss, consistent throughout)
+  - [ ] Real data integration: balance, unrealized P&L, realized P&L, win rate
+- [ ] **Create PositionsTable component** - Professional table structure
+  - [ ] Proper HTML table with thead/tbody structure (`min-w-full` responsive)
+  - [ ] Real-time P&L updates via SSE (no simulated data)
+  - [ ] Empty state with proper colspan and helpful guidance
+  - [ ] Color-coded P&L columns with +/- indicators
+- [ ] **Build DecisionFeed component** - AI decision history
+  - [ ] List of recent decisions with confidence scores and actions
+  - [ ] Consider expandable interaction pattern for detailed reasoning (TBD - evaluate "Why?" button UX)
+  - [ ] Badge system for action types (ENTER LONG/SHORT, EXIT, WAIT)
+  - [ ] Real decision data only - no mock/placeholder content
+- [ ] **Implement nested grid layout** - Professional dashboard structure
+  - [ ] Main content area: `grid-cols-1 md:grid-cols-3` for 66%/33% split
+  - [ ] Left section (md:col-span-2): Chart placeholder + PositionsTable
+  - [ ] Right section: DecisionFeed + Health indicators
 - [ ] Complete progressive duplication of all MonitorContent functionality
 
 **Phase 2D: Enhanced Bot Rail**
@@ -236,19 +255,35 @@ The Forge is a single-page application that replaces the dashboard with an elega
 
 #### Phase 3: Monitor Experience Enhancement
 
-**Phase 3A: Real-Time Dashboard**
-- [ ] Enhance DecisionFeed with expandable reasoning cards
-- [ ] Improve PositionsTable with real-time P&L updates
-- [ ] Add basic performance metrics (balance, unrealized P&L)
-- [ ] Implement countdown timer with next run display
-- [ ] Create health/status indicators for SSE and system state
+**Phase 3A: Enhanced Interactions**
+- [ ] **Evaluate expandable decision reasoning UX**
+  - [ ] Research "Why?" button interaction pattern vs always-visible reasoning
+  - [ ] Consider toggle states, accordion behavior, or modal alternatives
+  - [ ] Test with real decision data to determine optimal information density
+  - [ ] Implement chosen pattern with smooth transitions (CSS or light animations)
+- [ ] **Chart placeholder component** for future performance visualization
+  - [ ] Simple bordered container matching design system
+  - [ ] Clear labeling for future P&L/equity charts
+  - [ ] No mock data - just container structure
+- [ ] **Enhanced health indicators**
+  - [ ] SSE connection status with clear visual feedback
+  - [ ] Bot execution phase indicators
+  - [ ] System status information panel
 
-**Phase 3B: Visual Polish**
-- [ ] Add micro-interactions for pipeline stage animations
-- [ ] Implement toast notifications for bot actions and decisions
-- [ ] Create responsive table→card transformations for mobile
-- [ ] Add loading states and optimistic UI updates
-- [ ] Polish empty states with helpful guidance text
+**Phase 3B: Visual Polish & Responsiveness**
+- [ ] **Professional color coding system**
+  - [ ] Consistent profit/loss indicators throughout (emerald-400/rose-400)
+  - [ ] Trend arrow icons (TrendingUp/TrendingDown) for all metrics
+  - [ ] Status color consistency (success/warning/danger palette)
+- [ ] **Mobile-responsive enhancements**
+  - [ ] Table→card transformations for narrow screens
+  - [ ] Optimized touch targets and spacing
+  - [ ] Mobile-friendly decision card layouts
+- [ ] **Micro-interactions and feedback**
+  - [ ] Subtle hover states and transitions
+  - [ ] Loading states with skeleton screens
+  - [ ] Toast notifications for bot actions
+  - [ ] Button press feedback and states
 
 #### Phase 4: Configure Experience
 
@@ -316,9 +351,9 @@ The Forge is a single-page application that replaces the dashboard with an elega
   --agent-extraction: #38a1c7; /* Blue - data extraction */
   --agent-decision: #2cbe77;   /* Green - AI decision making */
   --agent-trading: #be6a47;    /* Orange - trade execution */
-  --status-success: #10b981;   /* Profit, success, active */
-  --status-danger: #ef4444;    /* Loss, error, inactive */
-  --status-warning: #f97316;   /* Warning, pending */
+  --success: #10b981;          /* emerald-400 - Profit, success, active */
+  --danger: #f43f5e;           /* rose-400 - Loss, error, inactive */
+  --warning: #f97316;          /* Warning, pending */
 }
 
 /* Theme Toggle Component */
@@ -335,3 +370,13 @@ The Forge is a single-page application that replaces the dashboard with an elega
 - **Compound components** - Related components grouped together (e.g., `<BotRail.Item>`)
 - **Mobile-first responsive** - Components adapt to screen size automatically
 - **SSE integration** - Real-time updates flow through existing patterns
+
+
+
+
+
+example SSE payload:
+
+id: 1
+event: dashboard
+data: {"bots": [{"config_id": "18665f58-fb3c-4655-a648-449427be0073", "user_id": "00000000-0000-0000-0000-000000000000", "config_name": "ggShot-filter", "state": "active", "config_data": {"user_id": "00000000-0000-0000-0000-000000000000", "config_id": "18665f58-fb3c-4655-a648-449427be0073", "created_at": "2025-09-11T19:52:47.207740+00:00", "updated_at": "2025-09-12T00:17:25.217798", "config_data": {"trading": {"leverage": 1, "execution_mode": "paper", "exchange_config": {"api_key": "", "secret_key": "", "exchange_type": "cex", "selected_exchange": "binance"}, "position_sizing": {"method": "fixed_usd", "account_percent": 5, "fixed_amount_usd": 100, "max_position_percent": 10}, "risk_management": {"max_positions": 1, "max_daily_loss_usd": 500, "default_stop_loss_percent": 5, "default_take_profit_percent": 10}}, "decision": {"user_prompt": "## Pillar 0: Market Regime Analysis\nObjective: Filter out choppy/ranging markets where breakout signals frequently fail\n\nIndicators:\n- Aroon (14-period): Trend vs ranging detection\n  - Analysis: When both Aroon Up and Aroon Down are in middle range (30-70), market is consolidating. When one line is high (> 70) while the other is low (< 30), market is trending strongly\n  - Critical Flag: Both Aroon lines between 30-70 indicates HIGH RISK for ggShot signals\n- ADX (14-period): Trend strength confirmation\n  - Analysis: ADX > 25 indicates strong trending conditions, ADX < 20 suggests weak/ranging market\n  - Context: Low ADX combined with middle-range Aroon confirms dangerous ranging conditions\n\nCritical Logic: ggShot signals are designed for breakout/momentum scenarios:\n- Highest Risk: Aroon ranging (both 30-70) AND ADX < 20 (weak trend)\n- High Risk: Either Aroon ranging OR ADX < 20\n- Low Risk: Strong Aroon trend (one >70, other <30) AND ADX > 25\n\n### Pillar 1: Signal Confirmation  \nObjective: Seek confluence of evidence supporting the signal's direction\n\nIndicators:\n- RSI Multi-Timeframe Analysis:\n  - Signal timeframe RSI: Momentum confirmation for entry timing\n  - Analysis: For LONG signals, RSI 40-60 is ideal (not oversold, room to run). For SHORT signals, RSI 40-60 is also ideal\n  - Avoid: RSI extremes (>80 or <20) suggest overextension risk\n- Bollinger Band Position:\n  - Price position relative to bands confirms signal direction\n  - Analysis: For LONG signals, price approaching or touching lower band then bouncing supports upward move. For SHORT signals, price at upper band supports downward move\n  - Context: Signals in middle of bands have less directional conviction\n\n### Pillar 2: Broader Context\nObjective: Ensure trade is well-positioned and has room to run\n\nIndicators:\n- Multi-Timeframe RSI Context:\n  - Compare signal timeframe RSI with higher timeframe (4h) RSI\n  - Analysis: Higher timeframe overbought (RSI > 70) for LONG signals is a significant contradiction. Higher timeframe oversold (RSI < 30) for SHORT signals is a contradiction\n  - Ideal: Both timeframes showing non-extreme RSI (30-70 range)\n- ADX Trend Strength:\n  - Confirms we're in a trending environment suitable for breakouts\n  - Analysis: ADX > 25 provides confidence that trends can sustain. ADX > 30 is very strong trending environment\n\n### Pillar 3: Tactical Caution\nObjective: Identify immediate risks that could stop out an otherwise good setup\n\nIndicators:\n- Bollinger Band Overextension:\n  - Statistical overextension detection\n  - Analysis: Prices far outside bands (beyond +2 sigma) indicate potential overextension with higher mean reversion risk\n  - Caution: Signals when price is already beyond bands carry higher reversal risk\n- ATR Volatility Assessment:\n  - Market volatility/choppiness measurement  \n  - Analysis: Exceptionally high ATR (relative to recent periods) indicates chaotic conditions that may increase stop-loss risk\n  - Context: Very low ATR might indicate upcoming volatility expansion\n\n## Decision Framework:\n- **HIGH CONFIDENCE (0.8-1.0)**: All pillars align - trending market (Aroon + ADX), RSI in good zone, no overextension, normal volatility\n- **MEDIUM CONFIDENCE (0.6-0.8)**: 3 of 4 pillars align, minor contradictions\n- **LOW CONFIDENCE (0.4-0.6)**: 2 of 4 pillars align, significant contradictions present\n- **WAIT (0.0-0.4)**: Major contradictions or ranging market conditions detected", "system_prompt": "You are an expert cryptocurrency trader analyzing {SYMBOL} at current price {CURRENT_PRICE}. Your analysis is based on the following market data:\n\n{MARKET_DATA}\n\nProvide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.", "analysis_frequency": "signal_driven"}, "extraction": {"selected_data_sources": {"influencer_kol": {"timeframes": ["1h"], "data_points": []}, "onchain_analytics": {"timeframes": ["1h"], "data_points": []}, "technical_analysis": {"timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"], "data_points": ["RSI", "Aroon", "ADX", "BB", "ATR"]}, "signals_group_chats": {"timeframes": ["15m"], "data_points": ["ggshot"]}, "fundamental_analysis": {"timeframes": ["1d"], "data_points": []}, "news_and_regulations": {"timeframes": ["1d"], "data_points": []}, "sentiment_and_trends": {"timeframes": ["1h"], "data_points": []}}}, "llm_config": {"model": "deepseek-r1", "provider": "openai", "use_own_key": false, "use_platform_keys": true}, "config_type": "signal_validation", "selected_pair": "BTC/USDT", "schema_version": "2.1", "telegram_integration": {"listener": {"api_id": "", "enabled": false, "api_hash": "", "session_name": "ggbot_session", "source_channels": []}, "publisher": {"enabled": true, "bot_token": "7320956370:AAGMatLFf_myZxmfuN7v7EwToxBter_GHW0", "filter_channel": "-1002507736579", "message_template": "\ud83d\udd25 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}", "include_reasoning": true, "confidence_threshold": 0.7, "include_market_context": true}}}, "config_name": "ggShot-filter"}, "created_at": "2025-09-11T19:52:47.20774+00:00", "updated_at": "2025-09-13T12:53:24.365841+00:00", "execution_status": null, "status_color": "green", "status_message": "Monitoring markets...", "show_spinner": false, "next_run": null, "is_scheduled": true}], "positions": [], "decisions": [], "accounts": [{"config_id": "18665f58-fb3c-4655-a648-449427be0073", "account_id": "707adc89-0aa4-4593-b85c-eb2fdf16d960", "current_balance": 9899.82, "total_pnl": -0.06, "total_trades": 1, "win_trades": 0, "loss_trades": 1, "open_positions": 1, "updated_at": "2025-09-12T04:54:26.816468+00:00"}], "timestamp": "2025-09-13T16:28:30.672502+00:00"}

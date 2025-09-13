@@ -10,6 +10,7 @@ import { TabNavigation } from './components/layout/TabNavigation'
 import { MobileNav } from './components/layout/MobileNav'
 import { EmptyState } from './components/shared/EmptyState'
 import { ActivationBar } from './components/monitor/ActivationBar'
+import { MetricsBar } from './components/monitor/MetricsBar'
 
 interface Position {
   trade_id: string
@@ -51,6 +52,17 @@ export default function ForgePage() {
     loss_trades: number
     open_positions: number
     updated_at: string
+    // Enhanced portfolio analytics from SSE
+    unrealized_pnl?: number
+    daily_pnl?: number
+    portfolio_return_pct?: number
+    total_balance?: number
+    win_rate?: number
+    avg_win?: number
+    avg_loss?: number
+    largest_win?: number
+    largest_loss?: number
+    sharpe_ratio?: number
   }>>([])
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
@@ -403,8 +415,8 @@ export default function ForgePage() {
 
           {/* Main Content */}
           <main className="col-span-12 md:col-span-9 flex flex-col pb-16 md:pb-0">
-            {/* ActivationBar for Monitor tab - above tabs */}
-            {selectedBot && activeTab === 'monitor' && (
+            {/* ActivationBar - persistent across all tabs */}
+            {selectedBot && (
               <ActivationBar
                 selectedBot={selectedBot}
                 executionStatus={executionStatus}
@@ -426,18 +438,27 @@ export default function ForgePage() {
             <div className="flex-1 mt-4">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
-                  <MonitorContent
-                    selectedBot={selectedBot}
-                    executionStatus={executionStatus}
-                    statusMessage={statusMessage}
-                    countdown={countdown}
-                    positions={positions}
-                    decisions={decisions}
-                    isStarting={isStarting}
-                    isStopping={isStopping}
-                    onStart={handleStart}
-                    onStop={handleStop}
-                  />
+                  <div className="space-y-4">
+                    {/* MetricsBar - Professional KPI grid */}
+                    <MetricsBar
+                      account={selectedAccount}
+                      positions={positions}
+                    />
+
+                    {/* Legacy MonitorContent - will be replaced progressively */}
+                    <MonitorContent
+                      selectedBot={selectedBot}
+                      executionStatus={executionStatus}
+                      statusMessage={statusMessage}
+                      countdown={countdown}
+                      positions={positions}
+                      decisions={decisions}
+                      isStarting={isStarting}
+                      isStopping={isStopping}
+                      onStart={handleStart}
+                      onStop={handleStop}
+                    />
+                  </div>
                 ) : (
                   <EmptyState
                     title="Configuration Editor"
