@@ -24,12 +24,13 @@ class BotConfigV2:
         config_name: str,
         selected_pair: str,
         extraction: Dict[str, Any],
-        decision: Dict[str, Any], 
+        decision: Dict[str, Any],
         trading: Dict[str, Any],
         config_type: str = "autonomous_trading",
         schema_version: str = "2.1",
         llm_config: Optional[Dict[str, Any]] = None,
         telegram_integration: Optional[Dict[str, Any]] = None,
+        state: str = "inactive",
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -44,6 +45,7 @@ class BotConfigV2:
         self.schema_version = schema_version
         self.llm_config = llm_config or {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}
         self.telegram_integration = telegram_integration or {}
+        self.state = state
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -53,6 +55,7 @@ class BotConfigV2:
             "config_id": self.config_id,
             "user_id": self.user_id,
             "config_name": self.config_name,
+            "state": self.state,
             "config_data": {
                 "schema_version": self.schema_version,
                 "config_type": self.config_type,
@@ -82,6 +85,7 @@ class BotConfigV2:
             schema_version=data.get("schema_version", "2.1"),
             llm_config=data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
             telegram_integration=data.get("telegram_integration", {}),
+            state=data.get("state", "inactive"),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -282,14 +286,14 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_id, config_name, config_data, created_at, updated_at
+                        SELECT config_id, config_name, config_data, created_at, updated_at, state
                         FROM configurations
                         WHERE user_id = %s
                         ORDER BY created_at DESC
                     """, (user_id,))
                     
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at = row
+                        config_id, config_name, config_data, created_at, updated_at, state = row
                         
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -310,6 +314,7 @@ class ConfigService:
                                 "schema_version": inner_config.get("schema_version", "2.1"),
                                 "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                                 "telegram_integration": inner_config.get("telegram_integration", {}),
+                                "state": state or "inactive",
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -320,6 +325,7 @@ class ConfigService:
                             flattened_config["user_id"] = user_id
                             if config_name and "config_name" not in flattened_config:
                                 flattened_config["config_name"] = config_name
+                            flattened_config["state"] = state or "inactive"
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:

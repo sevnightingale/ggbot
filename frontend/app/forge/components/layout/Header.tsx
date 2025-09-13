@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { ThemeToggle } from '../shared/ThemeToggle'
+import { UserProfile } from './UserProfile'
 
 interface HeaderProps {
   className?: string
@@ -17,7 +18,7 @@ export function Header({}: HeaderProps) {
         </div>
         <div className="flex items-center gap-3">
           <ThemeToggle />
-          {/* Future: UserProfile component will go here */}
+          <UserProfile />
         </div>
       </div>
     </header>
