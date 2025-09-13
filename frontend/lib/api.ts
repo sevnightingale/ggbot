@@ -101,6 +101,7 @@ export interface BotConfiguration {
   config_name: string
   config_type: string
   config_data: ConfigData
+  state: 'active' | 'inactive'
   created_at: string
   updated_at: string
 }
