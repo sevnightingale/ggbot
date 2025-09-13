@@ -2,27 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { apiClient } from '@/lib/api'
-
-// Clean, focused types for forge
-interface BotConfig {
-  schema_version?: string
-  config_type?: string
-  selected_pair?: string
-  extraction?: Record<string, unknown>
-  decision?: Record<string, unknown>
-  llm_config?: Record<string, unknown>
-  trading?: Record<string, unknown>
-}
-
-interface Bot {
-  config_id: string
-  config_name: string
-  config_data: BotConfig
-  state: 'active' | 'inactive'
-  created_at: string
-  updated_at: string
-}
+import { apiClient, BotConfiguration } from '@/lib/api'
 
 interface Position {
   trade_id: string
@@ -50,7 +30,7 @@ export default function ForgePage() {
   const [loading, setLoading] = useState(true)
   
   // Core bot data - all local state
-  const [bot, setBot] = useState<Bot | null>(null)
+  const [bot, setBot] = useState<BotConfiguration | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [isStarting, setIsStarting] = useState(false)
@@ -83,7 +63,7 @@ export default function ForgePage() {
   }
 
   // Create default bot with RSI strategy using proper API client
-  const createDefaultBot = async (): Promise<Bot> => {
+  const createDefaultBot = async (): Promise<BotConfiguration> => {
     const defaultConfigData = {
       schema_version: '2.1',
       config_type: 'autonomous_trading',
@@ -134,15 +114,8 @@ export default function ForgePage() {
     const newConfig = await apiClient.createConfig('Default ggbot', defaultConfigData)
     console.log('🔨 Created default bot:', newConfig)
     
-    // Transform to Bot interface
-    return {
-      config_id: newConfig.config_id,
-      config_name: newConfig.config_name,
-      config_data: newConfig.config_data,
-      state: newConfig.state === 'active' ? 'active' : 'inactive',
-      created_at: newConfig.created_at,
-      updated_at: newConfig.updated_at
-    }
+    // No transformation needed - return directly
+    return newConfig
   }
 
   // Load or create bot when user is ready
@@ -158,16 +131,8 @@ export default function ForgePage() {
         console.log('📡 Loaded configs:', configs)
         
         if (configs.length > 0) {
-          // Use first existing config - transform to Bot interface  
-          const config = configs[0]
-          setBot({
-            config_id: config.config_id,
-            config_name: config.config_name,
-            config_data: config.config_data,
-            state: config.state === 'active' ? 'active' : 'inactive',
-            created_at: config.created_at,
-            updated_at: config.updated_at
-          })
+          // Use first existing config - no transformation needed
+          setBot(configs[0])
         } else {
           // Create default bot
           console.log('🔨 No bots found, creating default bot')
@@ -381,7 +346,7 @@ export default function ForgePage() {
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-400">Trading Pair:</span>
-                  <div className="text-bone-200">{bot.config_data?.selected_pair || 'BTC/USDT'}</div>
+                  <div className="text-bone-200">{bot.config_data.selected_pair}</div>
                 </div>
                 <div>
                   <span className="text-gray-400">Status Message:</span>
