@@ -182,13 +182,13 @@ The Forge is a single-page application that replaces the dashboard with an elega
 ```
 
 **Phase 2B: Layout Shell Implementation**
-- [ ] Create mobile-first responsive layout shell (header, main, sidebar)
-- [ ] Implement dark/light mode theming system with CSS variables and charcoal/bone palette
-- [ ] Add sun/moon theme toggle in header with localStorage persistence
-- [ ] Add user profile dropdown in header (logout, settings, subscription)
-- [ ] Build responsive bot rail component (hidden mobile, visible desktop)
-- [ ] Create mobile bottom navigation for bot switching
-- [ ] Establish consistent spacing scale and typography system
+- [x] Create mobile-first responsive layout shell (header, main, sidebar)
+- [x] Implement dark/light mode theming system with CSS variables and charcoal/bone palette
+- [x] Add sun/moon theme toggle in header with localStorage persistence
+- [x] Add user profile dropdown in header (logout, settings, subscription)
+- [x] Build responsive bot rail component (hidden mobile, visible desktop)
+- [x] Create mobile bottom navigation for bot switching
+- [x] Establish consistent spacing scale and typography system
 
 **Phase 2C: Core Monitor Components**
 - [ ] Build ActivationBar component (sticky, shows bot status and controls)

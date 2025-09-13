@@ -368,7 +368,7 @@ export default function ForgePage() {
             className="hidden md:block"
           />
 
-          <main className="flex-1 overflow-y-auto flex flex-col">
+          <main className="flex-1 overflow-y-auto flex flex-col pb-16 md:pb-0">
             <TabNavigation
               activeTab={activeTab}
               onTabChange={setActiveTab}
@@ -440,7 +440,7 @@ function MonitorContent({
   onStop
 }: MonitorContentProps) {
   return (
-    <div className="space-y-6">
+    <div className="max-w-4xl mx-auto p-6 space-y-6">
       {/* Bot Status Card */}
       <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
         <div className="flex justify-between items-center mb-4">
