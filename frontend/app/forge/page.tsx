@@ -29,12 +29,18 @@ export default function ForgePage() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
   
-  // Core bot data - all local state
-  const [bot, setBot] = useState<BotConfiguration | null>(null)
+  // Core bot data - all local state with multi-bot support
+  const [allBots, setAllBots] = useState<BotConfiguration[]>([])
+  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [decisions, setDecisions] = useState<Decision[]>([])
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+
+  // Get currently selected bot
+  const selectedBot = selectedConfigId 
+    ? allBots.find(bot => bot.config_id === selectedConfigId) || null
+    : null
   
   // Real-time status tracking
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'extraction' | 'decision' | 'trading'>('idle')
@@ -131,13 +137,15 @@ export default function ForgePage() {
         console.log('📡 Loaded configs:', configs)
         
         if (configs.length > 0) {
-          // Use first existing config - no transformation needed
-          setBot(configs[0])
+          // Load all configs and select first one
+          setAllBots(configs)
+          setSelectedConfigId(configs[0].config_id)
         } else {
           // Create default bot
           console.log('🔨 No bots found, creating default bot')
           const newBot = await createDefaultBot()
-          setBot(newBot)
+          setAllBots([newBot])
+          setSelectedConfigId(newBot.config_id)
         }
         
       } catch (error) {
@@ -150,7 +158,7 @@ export default function ForgePage() {
 
   // Real-time SSE connection for status updates
   useEffect(() => {
-    if (!user || !bot) return
+    if (!user || !selectedBot) return
 
     const connectSSE = async () => {
       try {
@@ -172,7 +180,7 @@ export default function ForgePage() {
 
             // Update bot execution status (extraction/decision/trading phases)
             if (data.bots) {
-              const myBot = data.bots.find((b: { config_id: string }) => b.config_id === bot.config_id)
+              const myBot = data.bots.find((b: { config_id: string }) => b.config_id === selectedBot.config_id)
               if (myBot?.execution_status) {
                 const phase = myBot.execution_status.phase
                 if (phase === 'extracting') setExecutionStatus('extraction')
@@ -191,13 +199,13 @@ export default function ForgePage() {
 
             // Update live positions with P&L
             if (data.positions) {
-              const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === bot.config_id)
+              const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === selectedBot.config_id)
               setPositions(myPositions)
             }
 
             // Update recent decisions
             if (data.decisions) {
-              const myDecisions = data.decisions.filter((d: { config_id: string }) => d.config_id === bot.config_id)
+              const myDecisions = data.decisions.filter((d: { config_id: string }) => d.config_id === selectedBot.config_id)
               setDecisions(myDecisions.slice(0, 10)) // Keep last 10
             }
 
@@ -221,7 +229,7 @@ export default function ForgePage() {
     return () => {
       console.log('🛑 Cleaning up SSE connection')
     }
-  }, [user, bot])
+  }, [user, selectedBot])
 
   // Countdown timer for next run
   useEffect(() => {
@@ -249,12 +257,12 @@ export default function ForgePage() {
 
   // Start bot function using proper API client
   const startBot = async () => {
-    if (!bot) return
+    if (!selectedBot) return
     setIsStarting(true)
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${bot.config_id}/start`, {
+      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${selectedBot.config_id}/start`, {
         method: 'POST'
       })
 
@@ -265,8 +273,15 @@ export default function ForgePage() {
       const result = await response.json()
       console.log('✅ Bot started:', result)
       
-      // Update local bot state
-      setBot(prev => prev ? { ...prev, state: 'active' } : null)
+      // Update local bot state and next run from API response
+      setAllBots(prev => prev.map(bot => 
+        bot.config_id === selectedBot.config_id 
+          ? { ...bot, state: 'active' as const }
+          : bot
+      ))
+      if (result.next_run) {
+        setNextRun(result.next_run)
+      }
 
     } catch (error) {
       console.error('❌ Failed to start bot:', error)
@@ -277,12 +292,12 @@ export default function ForgePage() {
 
   // Stop bot function using proper API client
   const stopBot = async () => {
-    if (!bot) return
+    if (!selectedBot) return
     setIsStopping(true)
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${bot.config_id}/stop`, {
+      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${selectedBot.config_id}/stop`, {
         method: 'POST'
       })
 
@@ -293,10 +308,16 @@ export default function ForgePage() {
       const result = await response.json()
       console.log('✅ Bot stopped:', result)
       
-      // Update local bot state
-      setBot(prev => prev ? { ...prev, state: 'inactive' } : null)
+      // Update local bot state and clear scheduling info
+      setAllBots(prev => prev.map(bot => 
+        bot.config_id === selectedBot.config_id 
+          ? { ...bot, state: 'inactive' as const }
+          : bot
+      ))
       setExecutionStatus('idle')
       setStatusMessage('')
+      setNextRun(null)
+      setCountdown('')
 
     } catch (error) {
       console.error('❌ Failed to stop bot:', error)
@@ -326,27 +347,50 @@ export default function ForgePage() {
       <div className="max-w-4xl mx-auto">
         <h1 className="text-3xl font-bold text-bone-200 mb-8">🔥 ggbot Forge</h1>
         
-        {bot ? (
+        {/* Bot Selector */}
+        {allBots.length > 1 && (
+          <div className="bg-charcoal-800 p-4 rounded-lg mb-6">
+            <h3 className="text-sm text-gray-400 mb-2">Select Bot:</h3>
+            <div className="flex gap-2">
+              {allBots.map((bot) => (
+                <button
+                  key={bot.config_id}
+                  onClick={() => setSelectedConfigId(bot.config_id)}
+                  className={`px-4 py-2 rounded text-sm transition-colors ${
+                    bot.config_id === selectedConfigId
+                      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                      : 'bg-charcoal-700 text-bone-300 hover:bg-charcoal-600'
+                  }`}
+                >
+                  {bot.config_name}
+                  {bot.state === 'active' && <span className="ml-1 text-green-400">●</span>}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+        
+        {selectedBot ? (
           <div className="space-y-6">
             
             {/* Bot Status Card */}
             <div className="bg-charcoal-800 p-6 rounded-lg">
               <div className="flex justify-between items-center mb-4">
-                <h2 className="text-xl text-bone-300">{bot.config_name}</h2>
+                <h2 className="text-xl text-bone-300">{selectedBot.config_name}</h2>
                 <div className={`px-3 py-1 rounded text-sm ${
                   executionStatus === 'extraction' ? 'bg-green-500/20 text-green-400' :
                   executionStatus === 'decision' ? 'bg-orange-500/20 text-orange-400' :
                   executionStatus === 'trading' ? 'bg-red-500/20 text-red-400' :
-                  bot.state === 'active' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
+                  selectedBot.state === 'active' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
                 }`}>
-                  {executionStatus !== 'idle' ? executionStatus : (bot.state === 'active' ? 'idle' : 'inactive')}
+                  {executionStatus !== 'idle' ? executionStatus : (selectedBot.state === 'active' ? 'idle' : 'inactive')}
                 </div>
               </div>
               
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div>
                   <span className="text-gray-400">Trading Pair:</span>
-                  <div className="text-bone-200">{bot.config_data.selected_pair}</div>
+                  <div className="text-bone-200">{selectedBot.config_data.selected_pair}</div>
                 </div>
                 <div>
                   <span className="text-gray-400">Status Message:</span>
@@ -364,7 +408,7 @@ export default function ForgePage() {
               
               {/* Start/Stop Controls */}
               <div className="mt-4 flex gap-3">
-                {bot.state === 'active' ? (
+                {selectedBot.state === 'active' ? (
                   <button
                     onClick={stopBot}
                     disabled={isStopping}

@@ -1408,6 +1408,54 @@ async def run_orchestration(
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
 
 
+@app.post("/api/v2/test/signal-publishing/{config_id}")
+async def test_signal_publishing(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Test signal publishing functionality with mock data."""
+    try:
+        from signals.publishing_service import publish_signal_to_telegram
+        
+        # Mock signal data for testing
+        mock_signal_data = {
+            'symbol': 'BTC/USDT',
+            'direction': 'LONG',
+            'source': 'manual_trigger',
+            'raw_message': 'Test signal for Telegram publishing functionality'
+        }
+        
+        # Mock decision result
+        mock_decision_result = {
+            'action': 'VALIDATE',
+            'confidence': 0.85,
+            'reasoning': 'This is a test signal to validate the Telegram publishing functionality. The signal shows strong technical indicators with RSI oversold conditions and bullish MACD crossover.'
+        }
+        
+        # Attempt to publish the test signal
+        success = await publish_signal_to_telegram(
+            config_id=config_id,
+            user_id=current_user.user_id,
+            signal_data=mock_signal_data,
+            decision_result=mock_decision_result
+        )
+        
+        return {
+            "status": "success" if success else "failed",
+            "message": "Test signal published successfully" if success else "Failed to publish test signal",
+            "signal_data": mock_signal_data,
+            "decision_result": mock_decision_result,
+            "config_id": config_id,
+            "user_id": current_user.user_id
+        }
+        
+    except Exception as e:
+        logger.error(f"Signal publishing test failed: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Signal publishing test failed: {str(e)}")
+
+
 # User Management Endpoints
 @app.get("/api/v2/user/profile")
 async def get_user_profile(
