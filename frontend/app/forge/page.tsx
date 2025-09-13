@@ -391,15 +391,18 @@ export default function ForgePage() {
       <div className="min-h-screen bg-[var(--bg-primary)]">
         <Header />
 
-        <div className="flex h-[calc(100vh-64px)]">
+        {/* 12-column grid container */}
+        <div className="mx-auto grid max-w-7xl grid-cols-12 gap-4 px-4 py-4 min-h-[calc(100vh-64px)]">
+          {/* Bot Rail */}
           <BotRail
             bots={allBots}
             selectedId={selectedConfigId}
             onSelect={setSelectedConfigId}
-            className="hidden md:block"
+            className="col-span-12 hidden md:col-span-3 md:block"
           />
 
-          <main className="flex-1 overflow-y-auto flex flex-col pb-16 md:pb-0">
+          {/* Main Content */}
+          <main className="col-span-12 md:col-span-9 flex flex-col pb-16 md:pb-0">
             {/* ActivationBar for Monitor tab - above tabs */}
             {selectedBot && activeTab === 'monitor' && (
               <ActivationBar
@@ -420,7 +423,7 @@ export default function ForgePage() {
               onTabChange={setActiveTab}
             />
 
-            <div className="flex-1 p-4">
+            <div className="flex-1 mt-4">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
                   <MonitorContent
@@ -486,7 +489,7 @@ function MonitorContent({
   onStop
 }: MonitorContentProps) {
   return (
-    <div className="max-w-4xl mx-auto p-6 space-y-6">
+    <div className="space-y-6">
       {/* Bot Status Card */}
       <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
         <div className="flex justify-between items-center mb-4">
