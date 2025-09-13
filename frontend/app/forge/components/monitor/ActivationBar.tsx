@@ -4,11 +4,24 @@ import React from 'react'
 import { Activity, Circle, Clock, Play, PauseCircle, Zap } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 
+interface Account {
+  config_id: string
+  account_id: string
+  current_balance: number
+  total_pnl: number
+  total_trades: number
+  win_trades: number
+  loss_trades: number
+  open_positions: number
+  updated_at: string
+}
+
 interface ActivationBarProps {
   selectedBot: BotConfiguration
   executionStatus: string
   statusMessage: string
   countdown: string | null
+  account?: Account | null
   isStarting: boolean
   isStopping: boolean
   onStart: () => void
@@ -20,6 +33,7 @@ export function ActivationBar({
   executionStatus,
   statusMessage,
   countdown,
+  account,
   isStarting,
   isStopping,
   onStart,
@@ -28,7 +42,14 @@ export function ActivationBar({
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
   const configType = selectedBot.config_data.config_type === 'signal_validation' ? 'Signal validation' : 'Autonomous trading'
-  const frequency = isSignalDriven ? 'Signal driven' : 'Every 5m'
+
+  // Get real frequency from config
+  const analysisFreq = selectedBot.config_data.decision?.analysis_frequency || '1h'
+  const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
+
+  // Get real balance from account data
+  const balance = account?.current_balance ?? 10000
+  const balanceText = `Paper • $${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
     <div className="sticky top-[120px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)]/80 backdrop-blur p-4 mx-4 mb-4">
@@ -44,7 +65,7 @@ export function ActivationBar({
         </span>
 
         <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
-          Paper • $10,000.00
+          {balanceText}
         </span>
 
         <span className="text-xs text-[var(--text-muted)]">{frequency}</span>
@@ -53,11 +74,18 @@ export function ActivationBar({
       {/* Row 2 (Desktop) / Row 2-3 (Mobile): Pipeline + Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         {/* Pipeline Group */}
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col items-center gap-2">
           <PipelineTicker
             executionStatus={executionStatus}
             isActive={isActive}
           />
+          {/* Status Message with Braille Spinner */}
+          {statusMessage && isActive && executionStatus !== 'idle' && (
+            <StatusMessage
+              message={statusMessage}
+              isActive={true}
+            />
+          )}
         </div>
 
         {/* Controls Group */}
@@ -159,6 +187,39 @@ function PipelineTicker({ executionStatus, isActive }: PipelineTickerProps) {
           </div>
         )
       })}
+    </div>
+  )
+}
+
+interface StatusMessageProps {
+  message: string
+  isActive: boolean
+}
+
+function StatusMessage({ message, isActive }: StatusMessageProps) {
+  const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
+  const [spinnerIndex, setSpinnerIndex] = React.useState(0)
+
+  React.useEffect(() => {
+    if (isActive) {
+      const interval = setInterval(() => {
+        setSpinnerIndex((prev) => (prev + 1) % spinnerChars.length)
+      }, 80)
+      return () => clearInterval(interval)
+    }
+    return undefined
+  }, [isActive, spinnerChars.length])
+
+  const truncatedMessage = message.length > 40 ? `${message.substring(0, 40)}...` : message
+
+  return (
+    <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+      {isActive && (
+        <span className="font-mono text-[var(--agent-extraction)]">
+          {spinnerChars[spinnerIndex]}
+        </span>
+      )}
+      <span>{truncatedMessage}</span>
     </div>
   )
 }

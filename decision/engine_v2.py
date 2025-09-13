@@ -10,12 +10,12 @@ import asyncio
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
-import openai
 
 from core.common.logger import logger
 from core.config import ConfigRepository, BotConfig, config_repo
 from core.common.db import get_db_connection
-# Removed legacy CCXTPriceProvider - using MarketDataAdapter directly in _get_current_price method
+from core.services.llm_key_service import LLMKeyService
+from decision.llm_providers import get_llm_provider
 from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
 from decision.prompts.signal_validation import build_signal_validation_prompt
 from decision.prompts.position_management import build_position_management_prompt
@@ -59,10 +59,8 @@ class DecisionEngineV2:
         self.config_id = config_id
         self.user_id = user_id
         self.config: Optional[BotConfig] = None
-        
-        # OpenAI client
-        self.openai_client = openai.AsyncOpenAI()
-        
+        self.llm_provider = None  # Will be initialized dynamically based on config
+
         logger.bind(config_id=config_id).info("DecisionEngineV2 initialized")
     
     async def initialize(self) -> None:
@@ -71,12 +69,50 @@ class DecisionEngineV2:
             self.config = config_repo.get_config(self.config_id, self.user_id)
             if not self.config:
                 raise ConfigurationError(f"Configuration {self.config_id} not found")
+
+            # Initialize LLM provider based on config
+            await self._initialize_llm_provider()
+
             # Use getattr to safely access config_type, default to "autonomous" if not found
             config_type = getattr(self.config, 'config_type', 'autonomous')
-            logger.bind(config_id=self.config_id, mode=config_type).info("Configuration loaded")
+            logger.bind(config_id=self.config_id, mode=config_type).info("Configuration and LLM provider loaded")
         except Exception as e:
             logger.bind(config_id=self.config_id).error(f"Failed to load config: {e}")
             raise ConfigurationError(f"Failed to load config {self.config_id}: {e}")
+
+    async def _initialize_llm_provider(self) -> None:
+        """Initialize LLM provider based on configuration."""
+        try:
+            # Get LLM configuration from decision config
+            decision_config = self.config.decision if hasattr(self.config, 'decision') else {}
+            if isinstance(decision_config, dict):
+                provider_name = decision_config.get('llm_provider', 'deepseek')  # Default to DeepSeek
+                model_name = decision_config.get('llm_model')  # Optional model override
+            else:
+                # Handle legacy format where decision might be a string or other type
+                provider_name = 'deepseek'  # Safe default
+                model_name = None
+
+            # Get API key with user/platform priority
+            api_key = await LLMKeyService.get_api_key(self.user_id, provider_name)
+
+            # Create provider instance
+            self.llm_provider = get_llm_provider(
+                provider_name=provider_name,
+                api_key=api_key,
+                model=model_name  # Uses provider default if None
+            )
+
+            logger.bind(
+                config_id=self.config_id,
+                user_id=self.user_id,
+                provider=provider_name,
+                model=model_name or "default"
+            ).info("LLM provider initialized successfully")
+
+        except Exception as e:
+            logger.bind(config_id=self.config_id, user_id=self.user_id).error(f"Failed to initialize LLM provider: {e}")
+            raise ConfigurationError(f"Failed to initialize LLM provider: {e}")
     
     async def make_decision(self, symbol: Optional[str] = None, 
                           signal_data: Optional[Dict] = None) -> Dict[str, Any]:
@@ -138,8 +174,8 @@ class DecisionEngineV2:
             symbol, signal_data, market_data, current_price, volume_analysis
         )
         
-        # Call GPT-5 for validation
-        llm_response = await self._call_gpt5(prompt)
+        # Call LLM for validation
+        llm_response = await self._call_llm(prompt)
         
         # Parse response
         decision_data = self._parse_llm_response(llm_response)
@@ -210,8 +246,8 @@ class DecisionEngineV2:
         # Step 3: Build prompt from template
         prompt = await self._build_opportunity_analysis_prompt(symbol, market_data, current_price, volume_analysis)
         
-        # Step 4: Call GPT-5
-        llm_response = await self._call_gpt5(prompt)
+        # Step 4: Call LLM
+        llm_response = await self._call_llm(prompt)
         
         # Step 5: Parse response
         decision_data = self._parse_llm_response(llm_response)
@@ -412,8 +448,8 @@ class DecisionEngineV2:
             symbol, position_data, market_data, current_price, volume_analysis
         )
         
-        # Step 4: Call GPT-5
-        llm_response = await self._call_gpt5(prompt)
+        # Step 4: Call LLM
+        llm_response = await self._call_llm(prompt)
         
         # Step 5: Parse response
         decision_data = self._parse_llm_response(llm_response)
@@ -757,30 +793,41 @@ ORIGINAL MESSAGE:
 {signal_data.get('raw_message', 'No original message available')[:500]}...
 """
     
-    async def _call_gpt5(self, prompt: str) -> str:
-        """Call GPT-5 API using the new Responses API."""
+    async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> str:
+        """Call LLM API using configured provider."""
+        if not self.llm_provider:
+            await self.initialize()  # Initialize if not already done
+
         try:
             # Log the prompt being sent to the LLM
             logger.bind(config_id=self.config_id, user_id=self.user_id).info("🤖 Prompt sent to Decision LLM")
             logger.bind(config_id=self.config_id, user_id=self.user_id).info(f"PROMPT:\n{prompt}")
-            
-            # Use the new Responses API with high reasoning for trading decisions
-            response = await self.openai_client.responses.create(
-                model="gpt-5",
-                input=prompt,
-                reasoning={"effort": "high"},  # High reasoning for complex trading decisions
-                text={"verbosity": "medium"}   # Medium verbosity for balanced output
+
+            # Call the configured LLM provider
+            response_text, metadata = await self.llm_provider.generate_response(
+                prompt=prompt,
+                temperature=0.7,  # Could be configurable in future
+                custom_mode=custom_mode
             )
-            
+
             # Log the response from the LLM
             logger.bind(config_id=self.config_id, user_id=self.user_id).info("🤖 Response received from Decision LLM")
-            logger.bind(config_id=self.config_id, user_id=self.user_id).info(f"LLM RESPONSE:\n{response.output_text}")
-            
-            return response.output_text
-            
+            logger.bind(config_id=self.config_id, user_id=self.user_id).info(f"LLM RESPONSE:\n{response_text}")
+
+            # Log metadata for debugging
+            logger.bind(
+                config_id=self.config_id,
+                user_id=self.user_id,
+                model=metadata.get('model'),
+                latency=metadata.get('latency'),
+                tokens=metadata.get('usage', {}).get('total_tokens', 'unknown')
+            ).info("LLM call completed with metadata")
+
+            return response_text
+
         except Exception as e:
-            logger.error(f"GPT-5 API call failed: {e}")
-            raise
+            logger.bind(config_id=self.config_id, user_id=self.user_id).error(f"LLM API call failed: {e}")
+            raise LLMError(f"LLM API call failed: {e}")
     
     def _parse_llm_response(self, response: str) -> Dict[str, Any]:
         """Parse LLM response into structured decision data with standardized format."""
