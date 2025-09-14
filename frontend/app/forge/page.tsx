@@ -220,10 +220,11 @@ export default function ForgePage() {
           console.log('✅ Forge SSE connected')
         }
 
-        stream.onmessage = (event) => {
+        stream.addEventListener('dashboard', (event) => {
+          console.log('📨 Raw SSE message received:', event)
           try {
             const data = JSON.parse(event.data)
-            console.log('📨 Forge SSE update:', data)
+            console.log('📨 Parsed SSE data:', data)
 
             // Update bot execution status (extraction/decision/trading phases)
             if (data.bots) {
@@ -267,7 +268,7 @@ export default function ForgePage() {
           } catch (error) {
             console.error('❌ Failed to parse SSE data:', error)
           }
-        }
+        })
 
         stream.onerror = (error) => {
           console.error('❌ SSE connection error:', error)
