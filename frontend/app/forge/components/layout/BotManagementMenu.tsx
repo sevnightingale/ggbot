@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { BotConfiguration } from '@/lib/api'
 
 interface BotManagementMenuProps {
@@ -25,6 +25,12 @@ export function BotManagementMenu({
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
+  // Cancel rename function
+  const handleRenameCancel = useCallback(() => {
+    setIsRenamingLocal(false)
+    setNewName(bot.config_name)
+  }, [bot.config_name])
+
   // Close menu when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -32,15 +38,14 @@ export function BotManagementMenu({
         setIsOpen(false)
         setShowDeleteConfirm(false)
         if (isRenamingLocal) {
-          setIsRenamingLocal(false)
-          setNewName(bot.config_name)
+          handleRenameCancel() // Automatically discard changes
         }
       }
     }
 
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
-  }, [isRenamingLocal, bot.config_name])
+  }, [isRenamingLocal, handleRenameCancel])
 
   // Focus input when entering rename mode
   useEffect(() => {
@@ -63,11 +68,6 @@ export function BotManagementMenu({
     setIsRenamingLocal(false)
   }
 
-  const handleRenameCancel = () => {
-    setIsRenamingLocal(false)
-    setNewName(bot.config_name)
-  }
-
   const handleDeleteClick = () => {
     setShowDeleteConfirm(true)
     setIsOpen(false)
@@ -80,32 +80,40 @@ export function BotManagementMenu({
 
   if (isRenamingLocal) {
     return (
-      <div className="flex items-center gap-1">
-        <input
-          ref={inputRef}
-          value={newName}
-          onChange={(e) => setNewName(e.target.value)}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') handleRenameSubmit()
-            if (e.key === 'Escape') handleRenameCancel()
-          }}
-          className="flex-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded px-2 py-1 text-xs text-[var(--text-primary)]"
-          disabled={isBotAction}
-        />
-        <button
-          onClick={handleRenameSubmit}
-          disabled={isBotAction}
-          className="text-xs text-emerald-400 hover:text-emerald-300 disabled:opacity-50"
-        >
-          ✓
-        </button>
-        <button
-          onClick={handleRenameCancel}
-          disabled={isBotAction}
-          className="text-xs text-rose-400 hover:text-rose-300 disabled:opacity-50"
-        >
-          ✕
-        </button>
+      <div ref={menuRef} className="fixed inset-0 z-50 flex items-center justify-center bg-black/20">
+        <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg p-4 shadow-lg min-w-64">
+          <div className="text-xs text-[var(--text-primary)] mb-2">
+            Rename Bot
+          </div>
+          <div className="flex items-center gap-2">
+            <input
+              ref={inputRef}
+              value={newName}
+              onChange={(e) => setNewName(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleRenameSubmit()
+                if (e.key === 'Escape') handleRenameCancel()
+              }}
+              className="flex-1 bg-[var(--bg-primary)] border border-[var(--border)] rounded px-3 py-2 text-sm text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-blue-500"
+              disabled={isBotAction}
+              placeholder="Enter bot name"
+            />
+            <button
+              onClick={handleRenameSubmit}
+              disabled={isBotAction}
+              className="px-3 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 text-xs"
+            >
+              Save
+            </button>
+            <button
+              onClick={handleRenameCancel}
+              disabled={isBotAction}
+              className="px-3 py-2 border border-[var(--border)] rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] text-xs"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
       </div>
     )
   }
