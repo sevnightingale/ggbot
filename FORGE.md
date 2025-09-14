@@ -104,7 +104,27 @@ The Forge is a single-page application that replaces the dashboard with an elega
   - Activate/Deactivate terminology (no more Start/Stop)
   - Proper containerized design with max-width constraints
 - ✅ **BotRail Containerized**: Proper rounded container instead of full-column expansion
-- ⏳ **Ready for Phase 2C**: Core monitor components (MetricsBar, PositionsTable, DecisionFeed)
+- ✅ **MetricsBar Complete**: Professional KPI grid with real portfolio analytics
+  - Real-time SSE data integration with portfolio analytics from PositionManager
+  - 2x2 grid layout (optimized for side-by-side placement with DecisionFeed)
+  - Trend indicators with emerald/rose color coding for profit/loss
+  - Loading skeleton states and proper TypeScript integration
+- ✅ **DecisionFeed Complete**: AI decision carousel with auto-advance and expandable reasoning
+  - Carousel navigation with newest-first auto-advance on new decisions
+  - Expandable reasoning text (150 char truncation with show more/less)
+  - Action badges and confidence scoring display
+  - Real decision data integration via SSE stream
+- ✅ **PositionsTable Complete**: Professional trading positions table
+  - HTML table structure with proper thead/tbody and min-w-full responsive
+  - Desktop table with mobile card transformation (no horizontal scroll)
+  - Real-time P&L display with color coding and SL/TP levels
+  - Empty state with helpful guidance when no positions exist
+- ✅ **Nested Grid Layout Complete**: 2-column desktop layout with mobile stacking
+  - DecisionFeed and MetricsBar side-by-side on lg+ breakpoints
+  - PositionsTable full-width below the 2-column section
+  - Left-aligned layout (removed mx-auto) fixes awkward centering on wide screens
+  - Mobile responsive - all components stack vertically on smaller screens
+- ⏳ **Ready for Legacy Cleanup**: All MonitorContent functionality now replicated
 
 ## PLANS
 
@@ -219,32 +239,35 @@ The Forge is a single-page application that replaces the dashboard with an elega
   - [x] Responsive 3-group layout with proper spacing constraints
   - [x] Containerized design matching component standards
 
-**Phase 2C: Core Monitor Components** (IN PROGRESS)
+**Phase 2C: Core Monitor Components** ✅ **COMPLETE**
 - [x] Build ActivationBar component (sticky, shows bot status and controls)
 - [x] Create Monitor/Configure tab system replacing current layout
 - [x] Implement PipelineTicker for extraction→decision→trading visualization
 - [x] Add responsive breakpoint utilities and mobile-first styling
 - [x] Create empty state components for all major sections
-- [ ] **Build MetricsBar component** - Professional KPI grid layout
-  - [ ] 2x2 grid on mobile, 1x4 grid on desktop (`grid-cols-2 md:grid-cols-4`)
-  - [ ] Individual KPI cards with trend indicators (TrendingUp/TrendingDown icons)
-  - [ ] Color-coded values (green=profit, red=loss, consistent throughout)
-  - [ ] Real data integration: balance, unrealized P&L, realized P&L, win rate
-- [ ] **Create PositionsTable component** - Professional table structure
-  - [ ] Proper HTML table with thead/tbody structure (`min-w-full` responsive)
-  - [ ] Real-time P&L updates via SSE (no simulated data)
-  - [ ] Empty state with proper colspan and helpful guidance
-  - [ ] Color-coded P&L columns with +/- indicators
-- [ ] **Build DecisionFeed component** - AI decision history
-  - [ ] List of recent decisions with confidence scores and actions
-  - [ ] Consider expandable interaction pattern for detailed reasoning (TBD - evaluate "Why?" button UX)
-  - [ ] Badge system for action types (ENTER LONG/SHORT, EXIT, WAIT)
-  - [ ] Real decision data only - no mock/placeholder content
-- [ ] **Implement nested grid layout** - Professional dashboard structure
-  - [ ] Main content area: `grid-cols-1 md:grid-cols-3` for 66%/33% split
-  - [ ] Left section (md:col-span-2): Chart placeholder + PositionsTable
-  - [ ] Right section: DecisionFeed + Health indicators
-- [ ] Complete progressive duplication of all MonitorContent functionality
+- [x] **Build MetricsBar component** - Professional KPI grid layout
+  - [x] 2x2 grid layout (optimized for side-by-side placement)
+  - [x] Individual KPI cards with trend indicators (TrendingUp/TrendingDown icons)
+  - [x] Color-coded values (emerald=profit, rose=loss, consistent throughout)
+  - [x] Real data integration: portfolio return, daily P&L, win rate, open positions
+- [x] **Create PositionsTable component** - Professional table structure
+  - [x] Proper HTML table with thead/tbody structure (`min-w-full` responsive)
+  - [x] Real-time P&L updates via SSE (no simulated data)
+  - [x] Empty state with proper colspan and helpful guidance
+  - [x] Color-coded P&L columns with +/- indicators
+  - [x] Mobile card transformation (no horizontal scroll on mobile)
+- [x] **Build DecisionFeed component** - AI decision history
+  - [x] Carousel of recent decisions with confidence scores and actions
+  - [x] Expandable reasoning pattern (150 char truncation with show more/less)
+  - [x] Badge system for action types (ENTER LONG/SHORT, EXIT, WAIT)
+  - [x] Real decision data only - no mock/placeholder content
+  - [x] Auto-advance to newest decision when new decisions arrive
+- [x] **Implement nested grid layout** - Professional dashboard structure
+  - [x] 2-column top section: DecisionFeed + MetricsBar side-by-side on lg+
+  - [x] Full-width sections below: PositionsTable spans complete width
+  - [x] Left-aligned layout removes awkward centering on wide screens
+  - [x] Mobile responsive: all components stack vertically on smaller screens
+- [x] Complete progressive duplication of all MonitorContent functionality
 
 **Phase 2D: Enhanced Bot Rail**
 - [ ] Transform current bot selector into persistent left rail
@@ -382,45 +405,42 @@ data: {"bots": [{"config_id": "18665f58-fb3c-4655-a648-449427be0073", "user_id":
 
 latest updates:
 
-  🎉 MetricsBar Implementation Complete!
+  🎉 Phase 2C Complete - Core Monitor Components & Nested Grid Layout!
 
-  Here's what we've accomplished:
+  ✅ What We've Accomplished:
 
-  ✅ MetricsBar Features:
+  **All Core Monitor Components:**
+  1. **MetricsBar**: Professional 2x2 KPI grid with real portfolio analytics
+  2. **DecisionFeed**: AI decision carousel with auto-advance and expandable reasoning
+  3. **PositionsTable**: Professional HTML table with mobile card transformation
+  4. **Nested Grid Layout**: 2-column desktop layout with mobile stacking
 
-  1. Professional KPI Grid: 2x2 on mobile, 1x4 on desktop
-  2. Real Portfolio Analytics: Powered by enhanced SSE payload
-  3. Trend Indicators: TrendingUp/TrendingDown icons with color coding
-  4. Responsive Design: Matches Forge architecture standards
-  5. Loading States: Skeleton animation when no account data
-  6. Type Safety: Full TypeScript integration
+  **Layout Architecture:**
+  - Left-aligned layout fixes awkward centering on wide screens (removed mx-auto)
+  - DecisionFeed + MetricsBar side-by-side on lg+ breakpoints
+  - PositionsTable spans full width below the 2-column section
+  - Mobile responsive: everything stacks vertically on smaller screens
 
-  📊 KPI Metrics Displayed:
+  **Real Data Integration:**
+  - All components connect to live SSE streams with real account data
+  - Enhanced SSE payload with PositionManager portfolio analytics
+  - Paper trading account creation integrated with config creation
+  - No mock/simulated/placeholder data anywhere
 
-  - Portfolio Return: Overall performance percentage with trend
-  - Daily P&L: Last 24h performance with trend
-  - Win Rate: Trade success rate (neutral, no trend)
-  - Open Positions: Current exposure count
+  **Design System Compliance:**
+  - CSS variables for dark/light theming throughout
+  - Emerald/rose color coding for profit/loss consistency
+  - Professional container design (rounded-2xl border bg-[var(--bg-secondary)])
+  - Trend indicators with TrendingUp/TrendingDown icons
+  - Mobile-first responsive design patterns
 
-  🎨 Design System Compliance:
+  🔄 Progressive Duplication Complete:
+  All MonitorContent functionality now replicated with modern components.
+  Ready for legacy cleanup phase.
 
-  - ✅ Uses CSS variables for theming
-  - ✅ Agent colors (--success/--danger) for trends
-  - ✅ Container design (rounded-2xl border bg-[var(--bg-secondary)])
-  - ✅ Grid layout following forge_example.md patterns
-  - ✅ Professional typography and spacing
+  ✨ Next Phase Ready:
+  - Phase 2D: Enhanced Bot Rail with P&L displays
+  - Legacy MonitorContent removal (clean architectural debt)
+  - Advanced monitor interactions and visual polish
 
-  🔄 Progressive Duplication Strategy:
-
-  The MetricsBar now sits above the legacy MonitorContent, showing the same real data with
-   professional presentation. As we build more components (PositionsTable, DecisionFeed),
-  we'll eventually delete the entire MonitorContent.
-
-  ✨ Next Steps Ready:
-
-  - PositionsTable component (professional table structure)
-  - DecisionFeed component (expandable reasoning cards)
-  - Nested grid layout (2/3 + 1/3 main content split)
-
-  The MetricsBar is now live and ready to display real-time portfolio analytics as soon as
-   the user has trading data! 🚀
+  The Forge now has a complete, professional monitoring experience! 🚀
