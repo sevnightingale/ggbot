@@ -7,10 +7,12 @@ interface BotRailProps {
   bots: BotConfiguration[]
   selectedId: string | null
   onSelect: (configId: string) => void
+  onCreateNew?: () => void
+  isCreatingNew?: boolean
   className?: string
 }
 
-export function BotRail({ bots, selectedId, onSelect, className = '' }: BotRailProps) {
+export function BotRail({ bots, selectedId, onSelect, onCreateNew, isCreatingNew = false, className = '' }: BotRailProps) {
   return (
     <aside className={className}>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
@@ -19,8 +21,12 @@ export function BotRail({ bots, selectedId, onSelect, className = '' }: BotRailP
             <div className="h-4 w-4">📊</div>
             Bots
           </div>
-          <button className="rounded-xl border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]">
-            + New
+          <button
+            onClick={onCreateNew}
+            disabled={isCreatingNew}
+            className="rounded-xl border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isCreatingNew ? '⟳ Creating...' : '+ New'}
           </button>
         </div>
 

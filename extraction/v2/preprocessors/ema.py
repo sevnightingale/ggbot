@@ -8,7 +8,7 @@ and comparison with SMA for enhanced signal quality assessment.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -20,81 +20,112 @@ class EMAPreprocessor(BasePreprocessor):
                   length: int = 20, **kwargs) -> Dict[str, Any]:
         """
         Advanced EMA preprocessing with comprehensive responsiveness analysis.
-        
+
         EMA gives more weight to recent prices, making it more responsive than SMA.
         This responsiveness can provide earlier signals but also more false signals.
-        
+
         Args:
             ema: EMA values
             prices: Price series for position analysis (optional)
             sma: SMA values for comparison (optional)
             length: EMA calculation period
-            
+
         Returns:
             Dictionary with comprehensive EMA analysis
         """
-        if len(ema) < 5:
+        # Clean and align all input series
+        ema_clean = pd.to_numeric(ema, errors='coerce').dropna()
+        if len(ema_clean) < 5:
             return {"error": "Insufficient data for EMA analysis"}
+
+        prices_clean = None if prices is None else pd.to_numeric(prices, errors='coerce').dropna()
+        sma_clean = None if sma is None else pd.to_numeric(sma, errors='coerce').dropna()
+
+        # Align series on common index
+        if prices_clean is not None:
+            prices_clean, ema_clean = prices_clean.align(ema_clean, join='inner')
+        if sma_clean is not None:
+            sma_clean, ema_clean = sma_clean.align(ema_clean, join='inner')
+        if prices_clean is not None and sma_clean is not None:
+            prices_clean, sma_clean = prices_clean.align(sma_clean, join='inner')
+
+        if len(ema_clean) < 5:
+            return {"error": "Insufficient aligned data for EMA analysis"}
+
+        # Generate proper timestamp
+        if hasattr(ema_clean.index, 'tz') or np.issubdtype(ema_clean.index.dtype, np.datetime64):
+            timestamp = ema_clean.index[-1].isoformat() if hasattr(ema_clean.index[-1], 'isoformat') else datetime.now(timezone.utc).isoformat()
+        else:
+            timestamp = datetime.now(timezone.utc).isoformat()
+
+        # Safe current values with div-by-zero guards
+        current_ema = float(ema_clean.iloc[-1])
+        current_price = float(prices_clean.iloc[-1]) if prices_clean is not None and len(prices_clean) > 0 else None
+        ema_denom = current_ema if abs(current_ema) > 1e-12 else 1e-12
         
-        current_ema = float(ema.iloc[-1])
-        current_price = float(prices.iloc[-1]) if prices is not None else None
-        
-        # Trend analysis
-        trend_analysis = self._analyze_ema_trend(ema)
-        
+        # Trend analysis with length-based windows
+        trend_analysis = self._analyze_ema_trend(ema_clean, length)
+
         # Responsiveness analysis
-        responsiveness_analysis = self._analyze_ema_responsiveness(ema)
-        
+        responsiveness_analysis = self._analyze_ema_responsiveness(ema_clean)
+
         # Price-EMA relationship
         price_relationship = {}
-        if prices is not None:
-            price_relationship = self._analyze_price_ema_relationship(prices, ema)
-        
+        if prices_clean is not None:
+            price_relationship = self._analyze_price_ema_relationship(prices_clean, ema_clean)
+
         # EMA-SMA comparison
         ema_sma_comparison = {}
-        if sma is not None:
-            ema_sma_comparison = self._analyze_ema_sma_comparison(ema, sma, prices)
-        
+        if sma_clean is not None:
+            ema_sma_comparison = self._analyze_ema_sma_comparison(ema_clean, sma_clean, prices_clean)
+
         # Crossover analysis
         crossover_analysis = {}
-        if prices is not None:
-            crossover_analysis = self._analyze_price_ema_crossovers(prices, ema)
-        
+        if prices_clean is not None:
+            crossover_analysis = self._analyze_price_ema_crossovers(prices_clean, ema_clean, length)
+
         # Signal quality assessment
-        signal_quality = self._assess_ema_signal_quality(ema, responsiveness_analysis)
-        
+        signal_quality = self._assess_ema_signal_quality(ema_clean, responsiveness_analysis)
+
         # Support/resistance analysis
-        support_resistance = self._analyze_ema_support_resistance(ema, prices)
-        
-        # Signal generation
-        signals = self._generate_ema_signals(current_ema, current_price, trend_analysis, 
-                                           price_relationship, crossover_analysis, signal_quality)
-        
-        # Confidence calculation
-        confidence = self._calculate_ema_confidence(ema, trend_analysis, responsiveness_analysis, signal_quality)
+        support_resistance = self._analyze_ema_support_resistance(ema_clean, prices_clean)
         
         return {
             "indicator": "EMA",
             "current": {
                 "ema_value": round(current_ema, 4),
-                "price": round(current_price, 4) if current_price else None,
-                "price_distance": round(current_price - current_ema, 4) if current_price else None,
-                "price_distance_pct": round(((current_price - current_ema) / current_ema) * 100, 3) if current_price else None,
-                "timestamp": datetime.now().isoformat()
+                "price": round(current_price, 4) if current_price is not None else None,
+                "price_distance": round(current_price - current_ema, 4) if current_price is not None else None,
+                "price_distance_pct": round((current_price - current_ema) / ema_denom * 100, 3) if current_price is not None else None,
+                "timestamp": timestamp
             },
-            "trend": trend_analysis,
-            "responsiveness": responsiveness_analysis,
-            "price_relationship": price_relationship,
-            "ema_sma_comparison": ema_sma_comparison,
-            "crossovers": crossover_analysis,
-            "signal_quality": signal_quality,
-            "support_resistance": support_resistance,
-            "signals": signals,
-            "confidence": confidence,
+            "context": {
+                "length": length,
+                "responsiveness": responsiveness_analysis,
+                "signal_quality": signal_quality
+            },
+            "levels": {
+                "trend": trend_analysis,
+                "price_relationship": price_relationship,
+                "support_resistance": support_resistance
+            },
+            "patterns": {
+                "crossovers": crossover_analysis,
+                "ema_sma_comparison": ema_sma_comparison
+            },
+            "evidence": {
+                "data_quality": {
+                    "total_periods": len(ema_clean),
+                    "valid_data_percentage": round(len(ema_clean) / len(ema) * 100, 1),
+                    "has_price_data": prices_clean is not None,
+                    "has_sma_comparison": sma_clean is not None
+                },
+                "calculation_notes": f"EMA analysis based on {len(ema_clean)} aligned data points with period {length}"
+            },
             "summary": self._generate_ema_summary(current_ema, current_price, trend_analysis, responsiveness_analysis)
         }
     
-    def _analyze_ema_trend(self, ema: pd.Series) -> Dict[str, Any]:
+    def _analyze_ema_trend(self, ema: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze EMA trend characteristics."""
         # Short, medium, long term trends
         short_trend = self._calculate_ema_trend_direction(ema, 2)  # More responsive

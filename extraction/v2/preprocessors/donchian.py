@@ -2,7 +2,7 @@
 Donchian Channels Preprocessor.
 
 Advanced Donchian Channels preprocessing with breakout analysis,
-channel width assessment, and turtle trading signal detection.
+channel width assessment, and comprehensive market structure analysis.
 """
 
 import numpy as np
@@ -14,7 +14,7 @@ from .base import BasePreprocessor
 
 
 class DonchianChannelsPreprocessor(BasePreprocessor):
-    """Advanced Donchian Channels preprocessor with breakout and turtle trading analysis."""
+    """Advanced Donchian Channels preprocessor with breakout and market structure analysis."""
     
     def preprocess(self, upper_channel: pd.Series, middle_channel: pd.Series,
                   lower_channel: pd.Series, prices: pd.Series, length: int = 20, **kwargs) -> Dict[str, Any]:
@@ -99,7 +99,7 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         consolidation_analysis = self._analyze_donchian_consolidation(upper, lower, prices_aligned, length)
 
         # Trend strength analysis
-        trend_analysis = self._analyze_donchian_trend_strength(prices_aligned, upper, lower)
+        trend_analysis = self._analyze_donchian_trend_strength(prices_aligned, upper, lower, length)
         
         return {
             "indicator": "Donchian_Channels",
@@ -317,7 +317,7 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         }
     
     def _analyze_donchian_support_resistance(self, prices: pd.Series, upper: pd.Series,
-                                           middle: pd.Series, lower: pd.Series) -> Dict[str, Any]:
+                                           middle: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze Donchian levels as support/resistance."""
         levels = {
             "upper": {"touches": 0, "bounces": 0, "breaks": 0},
@@ -327,7 +327,9 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         
         touch_threshold = 0.002  # 0.2%
         
-        for i in range(1, len(prices) - 1):
+        # Use length-based lookback for S/R analysis
+        analysis_window = min(length * 2, len(prices) - 1)
+        for i in range(1, analysis_window):
             price = prices.iloc[i]
             prev_price = prices.iloc[i-1]
             next_price = prices.iloc[i+1]
@@ -357,10 +359,11 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
                         if (prev_price < level_val and next_price > price) or (prev_price > level_val and next_price < price):
                             levels[level_name]["bounces"] += 1
                 
-                # Check for breaks
-                if level_name == "upper" and price > level_val:
+                # Check for breaks using cross events (not bar counts)
+                prev_val = prices.iloc[i-1]
+                if level_name == "upper" and prev_val <= level_val and price > level_val:
                     levels[level_name]["breaks"] += 1
-                elif level_name == "lower" and price < level_val:
+                elif level_name == "lower" and prev_val >= level_val and price < level_val:
                     levels[level_name]["breaks"] += 1
         
         # Calculate effectiveness
@@ -373,14 +376,20 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         
         return levels
     
-    def _analyze_donchian_consolidation(self, upper: pd.Series, lower: pd.Series, prices: pd.Series) -> Dict[str, Any]:
+    def _analyze_donchian_consolidation(self, upper: pd.Series, lower: pd.Series, prices: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze consolidation patterns in Donchian Channels."""
         width = upper - lower
         current_width = width.iloc[-1]
         
-        # Consolidation detection (narrow channel)
-        mean_width = width.mean()
-        std_width = width.std()
+        # Consolidation detection using rolling statistics
+        lookback_window = min(length * 2, len(width))
+        if lookback_window >= 5:
+            recent_width = width.iloc[-lookback_window:]
+            mean_width = recent_width.mean()
+            std_width = recent_width.std()
+        else:
+            mean_width = width.mean()
+            std_width = width.std()
         
         is_consolidation = current_width < mean_width - 0.5 * std_width
         
@@ -413,7 +422,7 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
             "breakout_potential": "high" if consolidation_periods >= 10 else "medium" if consolidation_periods >= 5 else "low"
         }
     
-    def _analyze_donchian_trend_strength(self, prices: pd.Series, upper: pd.Series, lower: pd.Series) -> Dict[str, Any]:
+    def _analyze_donchian_trend_strength(self, prices: pd.Series, upper: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze trend strength using Donchian position."""
         current_price = prices.iloc[-1]
         current_upper = upper.iloc[-1]
@@ -425,20 +434,21 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         else:
             position_pct = 50
         
-        # Trend classification
+        # Trend classification using neutral language
         if position_pct >= 80:
-            trend_strength = "strong_bullish"
+            trend_strength = "strong_upward"
         elif position_pct >= 60:
-            trend_strength = "moderate_bullish"
+            trend_strength = "moderate_upward"
         elif position_pct <= 20:
-            trend_strength = "strong_bearish"
+            trend_strength = "strong_downward"
         elif position_pct <= 40:
-            trend_strength = "moderate_bearish"
+            trend_strength = "moderate_downward"
         else:
             trend_strength = "neutral"
         
-        # Channel utilization (how much of channel is being used)
-        recent_prices = prices.iloc[-10:] if len(prices) >= 10 else prices
+        # Channel utilization using length-based window
+        util_window = max(5, length // 2)
+        recent_prices = prices.iloc[-util_window:] if len(prices) >= util_window else prices
         recent_range = recent_prices.max() - recent_prices.min()
         channel_width = current_upper - current_lower
         
@@ -451,128 +461,7 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
             "utilization_rating": "high" if utilization > 0.8 else "medium" if utilization > 0.5 else "low"
         }
     
-    def _generate_donchian_signals(self, price: float, upper: float, middle: float, lower: float,
-                                 breakout_analysis: Dict, turtle_signals: Dict, 
-                                 consolidation_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate Donchian Channels signals."""
-        signals = []
-        
-        # Breakout signals
-        latest_breakout = breakout_analysis.get("latest_breakout")
-        if latest_breakout and latest_breakout["periods_ago"] <= 2:
-            breakout_type = latest_breakout["type"]
-            signal_type = "breakout_buy" if "upper" in breakout_type else "breakout_sell"
-            
-            signals.append({
-                "type": signal_type,
-                "strength": "strong",
-                "reason": f"Recent Donchian {breakout_type.replace('_', ' ')} - new {('high' if 'upper' in breakout_type else 'low')}",
-                "confidence": 0.8
-            })
-        
-        # Turtle trading signals
-        system1 = turtle_signals.get("system1", {})
-        if system1.get("long_entry", False):
-            signals.append({
-                "type": "turtle_long_entry",
-                "strength": "strong", 
-                "reason": f"Turtle System 1: {system1['periods']}-period high breakout",
-                "confidence": 0.85
-            })
-        elif system1.get("short_entry", False):
-            signals.append({
-                "type": "turtle_short_entry",
-                "strength": "strong",
-                "reason": f"Turtle System 1: {system1['periods']}-period low breakout", 
-                "confidence": 0.85
-            })
-        
-        # Exit signals
-        exits = turtle_signals.get("exits", {})
-        if exits.get("long_exit", False):
-            signals.append({
-                "type": "turtle_long_exit",
-                "strength": "medium",
-                "reason": "Turtle exit: 10-period low reached",
-                "confidence": 0.7
-            })
-        elif exits.get("short_exit", False):
-            signals.append({
-                "type": "turtle_short_exit", 
-                "strength": "medium",
-                "reason": "Turtle exit: 10-period high reached",
-                "confidence": 0.7
-            })
-        
-        # Consolidation breakout setup
-        if consolidation_analysis.get("is_consolidation", False):
-            consolidation_periods = consolidation_analysis.get("consolidation_periods", 0)
-            breakout_potential = consolidation_analysis.get("breakout_potential", "low")
-            
-            if breakout_potential in ["high", "medium"]:
-                signals.append({
-                    "type": "consolidation_breakout_setup",
-                    "strength": "medium" if breakout_potential == "high" else "low",
-                    "reason": f"Donchian consolidation for {consolidation_periods} periods - breakout pending",
-                    "confidence": 0.7 if breakout_potential == "high" else 0.5
-                })
-        
-        # Position-based signals
-        position_pct = ((price - lower) / (upper - lower)) * 100 if upper != lower else 50
-        
-        if position_pct > 90:
-            signals.append({
-                "type": "near_resistance",
-                "strength": "low",
-                "reason": f"Price at {position_pct:.1f}% of Donchian range - near resistance",
-                "confidence": 0.4
-            })
-        elif position_pct < 10:
-            signals.append({
-                "type": "near_support",
-                "strength": "low", 
-                "reason": f"Price at {position_pct:.1f}% of Donchian range - near support",
-                "confidence": 0.4
-            })
-        
-        return signals
-    
-    def _calculate_donchian_confidence(self, prices: pd.Series, breakout_analysis: Dict, 
-                                     width_analysis: Dict) -> float:
-        """Calculate Donchian Channels analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor (Donchian needs significant data)
-        data_factor = min(1.0, len(prices) / 40)
-        confidence_factors.append(data_factor)
-        
-        # Breakout clarity factor
-        breakout_frequency = breakout_analysis.get("breakout_frequency", 0)
-        if 0.1 <= breakout_frequency <= 0.3:
-            breakout_factor = 0.8  # Good breakout frequency
-        else:
-            breakout_factor = 0.6
-        confidence_factors.append(breakout_factor)
-        
-        # Width factor (wider channels = clearer signals)
-        width_level = width_analysis.get("width_level", "normal")
-        if width_level in ["very_wide", "wide"]:
-            width_factor = 0.8
-        elif width_level == "narrow":
-            width_factor = 0.6
-        else:
-            width_factor = 0.7
-        confidence_factors.append(width_factor)
-        
-        # Channel utilization factor
-        width_percentile = width_analysis.get("percentile", 50)
-        if width_percentile > 70 or width_percentile < 30:
-            util_factor = 0.8  # Clear width extremes
-        else:
-            util_factor = 0.6
-        confidence_factors.append(util_factor)
-        
-        return round(np.mean(confidence_factors), 3)
+    # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
     
     def _generate_donchian_summary(self, price: float, upper: float, middle: float, lower: float,
                                  breakout_analysis: Dict, consolidation_analysis: Dict) -> str:

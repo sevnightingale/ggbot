@@ -269,29 +269,25 @@ The Forge is a single-page application that replaces the dashboard with an elega
   - [x] Mobile responsive: all components stack vertically on smaller screens
 - [x] Complete progressive duplication of all MonitorContent functionality
 
-**Phase 2D: Enhanced Bot Rail**
-- [ ] Transform current bot selector into persistent left rail
-- [ ] Add basic P&L display per bot (if feasible with paper trading data)
-- [ ] Implement hover states and quick actions (activate/deactivate)
-- [ ] Add bot creation and management actions
-- [ ] Handle mobile drawer behavior for bot switching
+**Phase 2D: Bot Management & Mobile UX** (FOCUSED SCOPE)
+- [ ] **Bot creation and management actions**
+  - [ ] "+" New bot button functionality in BotRail
+  - [ ] Bot deletion/archiving capabilities
+  - [ ] Bot duplication for strategy variations
+  - [ ] Bot renaming interface
+- [ ] **Mobile drawer behavior for bot switching**
+  - [ ] Transform BotRail into mobile drawer on small screens
+  - [ ] Smooth slide-in/out animations
+  - [ ] Overlay background with proper z-index
+  - [ ] Touch-friendly bot selection interface
 
 #### Phase 3: Monitor Experience Enhancement
 
 **Phase 3A: Enhanced Interactions**
-- [ ] **Evaluate expandable decision reasoning UX**
-  - [ ] Research "Why?" button interaction pattern vs always-visible reasoning
-  - [ ] Consider toggle states, accordion behavior, or modal alternatives
-  - [ ] Test with real decision data to determine optimal information density
-  - [ ] Implement chosen pattern with smooth transitions (CSS or light animations)
 - [ ] **Chart placeholder component** for future performance visualization
   - [ ] Simple bordered container matching design system
   - [ ] Clear labeling for future P&L/equity charts
   - [ ] No mock data - just container structure
-- [ ] **Enhanced health indicators**
-  - [ ] SSE connection status with clear visual feedback
-  - [ ] Bot execution phase indicators
-  - [ ] System status information panel
 
 **Phase 3B: Visual Polish & Responsiveness**
 - [ ] **Professional color coding system**
@@ -326,14 +322,30 @@ The Forge is a single-page application that replaces the dashboard with an elega
 
 #### Phase 5: Progressive Enhancement
 
-**Phase 5A: Advanced Features**
+  
+**Phase 5A: Visual Polish & Responsiveness**
+- [ ] **Professional color coding system**
+  - [ ] Consistent profit/loss indicators throughout (emerald-400/rose-400)
+  - [ ] Trend arrow icons (TrendingUp/TrendingDown) for all metrics
+  - [ ] Status color consistency (success/warning/danger palette)
+- [ ] **Mobile-responsive enhancements**
+  - [ ] Table→card transformations for narrow screens
+  - [ ] Optimized touch targets and spacing
+  - [ ] Mobile-friendly decision card layouts
+- [ ] **Micro-interactions and feedback**
+  - [ ] Subtle hover states and transitions
+  - [ ] Loading states with skeleton screens
+  - [ ] Toast notifications for bot actions
+  - [ ] Button press feedback and states
+
+**Phase 5B: Advanced Features**
 - [ ] Add test-run functionality for strategy validation
 - [ ] Implement configuration versioning and diff viewer
 - [ ] Create strategy templates and presets
 - [ ] Add import/export configuration functionality
 - [ ] Build bot duplication and cloning features
 
-**Phase 5B: Performance & Polish**
+**Phase 5C: Performance & Polish**
 - [ ] Optimize for multiple bots with virtualization if needed
 - [ ] Add keyboard shortcuts for power users
 - [ ] Implement search and filtering for decisions and trades
