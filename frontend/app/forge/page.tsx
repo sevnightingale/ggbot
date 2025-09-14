@@ -437,18 +437,21 @@ export default function ForgePage() {
               {selectedBot ? (
                 activeTab === 'monitor' ? (
                   <div className="space-y-4">
-                    {/* MetricsBar - Professional KPI grid */}
-                    <MetricsBar
-                      account={selectedAccount}
-                      positions={positions}
-                    />
+                    {/* Top Row: DecisionFeed + MetricsBar side-by-side */}
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                      {/* DecisionFeed - Decision carousel */}
+                      <DecisionFeed
+                        decisions={decisions}
+                      />
 
-                    {/* DecisionFeed - Decision carousel */}
-                    <DecisionFeed
-                      decisions={decisions}
-                    />
+                      {/* MetricsBar - Professional KPI grid (2x2) */}
+                      <MetricsBar
+                        account={selectedAccount}
+                        positions={positions}
+                      />
+                    </div>
 
-                    {/* PositionsTable - Active trades */}
+                    {/* PositionsTable - Active trades (full width) */}
                     <PositionsTable
                       positions={positions}
                     />
