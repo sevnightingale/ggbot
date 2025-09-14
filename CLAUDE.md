@@ -188,3 +188,4 @@ HUMMINGBOT_API_URL=http://localhost:8888
 ## Documentation References 
 - **Architecture**: `README.md`
 - **Current Status**: `ACTIVE.md`, `TODO.md`
+- We deploy our frontend to vercel by pushing to git. We do not use localhost. You can test builds locally to see if they compile, but when it comes to seeing console logs, you will need to ask the user to share them. The user will access the deployed frontend on vercel. Any changes you make if you want them tested will need to be doen via this method of pushing to git and having the user share the console logs with you.

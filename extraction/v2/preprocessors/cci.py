@@ -347,7 +347,7 @@ class CCIPreprocessor(BasePreprocessor):
         
         return None
     
-    def _detect_cci_divergence(self, cci: pd.Series, prices: pd.Series, length: int) -> Optional[Dict[str, Any]:
+    def _detect_cci_divergence(self, cci: pd.Series, prices: pd.Series, length: int) -> Optional[Dict[str, Any]]:
         """Detect CCI-price divergence patterns."""
         if len(cci) < 15 or len(prices) < 15:
             return None
