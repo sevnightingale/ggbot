@@ -402,7 +402,7 @@ export default function ForgePage() {
         <Header />
 
         {/* 12-column grid container */}
-        <div className="mx-auto grid max-w-7xl grid-cols-12 gap-4 px-4 py-4 min-h-[calc(100vh-64px)]">
+        <div className="grid max-w-7xl grid-cols-12 gap-4 px-4 py-4 min-h-[calc(100vh-64px)]">
           {/* Bot Rail */}
           <BotRail
             bots={allBots}
