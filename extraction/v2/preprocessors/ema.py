@@ -119,8 +119,11 @@ class EMAPreprocessor(BasePreprocessor):
             },
             "evidence": {
                 "data_quality": {
-                    "total_periods": len(ema_clean),
-                    "valid_data_percentage": round(len(ema_clean) / len(ema) * 100, 1),
+                    "original_ema_periods": len(ema),
+                    "aligned_periods": len(df_aligned),
+                    "valid_data_percentage": round(len(df_aligned) / len(ema) * 100, 1),
+                    "had_prices": "prices" in frames,
+                    "had_sma": "sma" in frames,
                     "has_price_data": prices_clean is not None,
                     "has_sma_comparison": sma_clean is not None
                 },
@@ -430,7 +433,7 @@ class EMAPreprocessor(BasePreprocessor):
         return {
             "recent_crossovers": crossovers[:5],
             "latest_crossover": crossovers[0] if crossovers else None,
-            "crossover_frequency": len(crossovers) / lookback if lookback > 0 else 0
+            "crossover_frequency": len(crossovers) / max(1, lookback - 1)
         }
     
     def _assess_ema_signal_quality(self, ema: pd.Series, responsiveness_analysis: Dict) -> Dict[str, Any]:
@@ -488,7 +491,7 @@ class EMAPreprocessor(BasePreprocessor):
             prev_price = prices.iloc[i-1]
 
             # Check for EMA touch with div-by-zero guard
-            ema_denom = ema_val if abs(ema_val) > 1e-12 else 1e12  # Use large number to avoid false positives
+            ema_denom = max(1e-12, abs(ema_val))
             if abs(price - ema_val) / ema_denom <= touch_threshold:
                 touches.append({
                     "index": i,
