@@ -9,6 +9,7 @@ interface BotManagementMenuProps {
   onDuplicate: (configId: string) => void
   onDelete: (configId: string) => void
   isBotAction: boolean
+  hasUnsavedChanges?: boolean
 }
 
 export function BotManagementMenu({
@@ -16,7 +17,8 @@ export function BotManagementMenu({
   onRename,
   onDuplicate,
   onDelete,
-  isBotAction
+  isBotAction,
+  hasUnsavedChanges = false
 }: BotManagementMenuProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [isRenamingLocal, setIsRenamingLocal] = useState(false)
@@ -163,8 +165,9 @@ export function BotManagementMenu({
           <div className="py-1">
             <button
               onClick={handleRename}
-              disabled={isBotAction}
+              disabled={isBotAction || hasUnsavedChanges}
               className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+              title={hasUnsavedChanges ? "Finish editing configuration first" : undefined}
             >
               Rename
             </button>
