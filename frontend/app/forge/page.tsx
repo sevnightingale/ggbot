@@ -69,6 +69,7 @@ export default function ForgePage() {
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
+  const [isBotAction, setIsBotAction] = useState(false)
 
   // Get currently selected bot
   const selectedBot = selectedConfigId
@@ -403,6 +404,65 @@ export default function ForgePage() {
     }
   }
 
+  // Handler function for renaming bot
+  const handleRenameBot = async (configId: string, newName: string) => {
+    setIsBotAction(true)
+
+    try {
+      const updatedBot = await apiClient.updateConfig(configId, {}, newName)
+      setAllBots(prev => prev.map(bot =>
+        bot.config_id === configId ? updatedBot : bot
+      ))
+    } catch (error) {
+      console.error('❌ Failed to rename bot:', error)
+    } finally {
+      setIsBotAction(false)
+    }
+  }
+
+  // Handler function for duplicating bot
+  const handleDuplicateBot = async (configId: string) => {
+    setIsBotAction(true)
+
+    try {
+      const originalBot = allBots.find(bot => bot.config_id === configId)
+      if (!originalBot) return
+
+      const duplicateName = `Copy of ${originalBot.config_name}`
+      const newBot = await apiClient.createConfig(duplicateName, originalBot.config_data)
+
+      setAllBots(prev => [...prev, newBot])
+      setSelectedConfigId(newBot.config_id)
+    } catch (error) {
+      console.error('❌ Failed to duplicate bot:', error)
+    } finally {
+      setIsBotAction(false)
+    }
+  }
+
+  // Handler function for deleting bot
+  const handleDeleteBot = async (configId: string) => {
+    setIsBotAction(true)
+
+    try {
+      await apiClient.deleteConfig(configId)
+
+      setAllBots(prev => {
+        const updatedBots = prev.filter(bot => bot.config_id !== configId)
+
+        if (selectedConfigId === configId) {
+          setSelectedConfigId(updatedBots.length > 0 ? updatedBots[0].config_id : null)
+        }
+
+        return updatedBots
+      })
+    } catch (error) {
+      console.error('❌ Failed to delete bot:', error)
+    } finally {
+      setIsBotAction(false)
+    }
+  }
+
   if (loading) {
     return (
       <ThemeProvider>
@@ -437,6 +497,10 @@ export default function ForgePage() {
             onSelect={setSelectedConfigId}
             onCreateNew={handleCreateNewBot}
             isCreatingNew={isCreatingNew}
+            onRename={handleRenameBot}
+            onDuplicate={handleDuplicateBot}
+            onDelete={handleDeleteBot}
+            isBotAction={isBotAction}
             className="col-span-12 hidden md:col-span-3 md:block"
           />
 
