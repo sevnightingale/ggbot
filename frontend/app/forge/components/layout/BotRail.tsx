@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { BotConfiguration } from '@/lib/api'
+import { BotManagementMenu } from './BotManagementMenu'
 
 interface BotRailProps {
   bots: BotConfiguration[]
@@ -9,10 +10,25 @@ interface BotRailProps {
   onSelect: (configId: string) => void
   onCreateNew?: () => void
   isCreatingNew?: boolean
+  onRename?: (configId: string, newName: string) => void
+  onDuplicate?: (configId: string) => void
+  onDelete?: (configId: string) => void
+  isBotAction?: boolean
   className?: string
 }
 
-export function BotRail({ bots, selectedId, onSelect, onCreateNew, isCreatingNew = false, className = '' }: BotRailProps) {
+export function BotRail({
+  bots,
+  selectedId,
+  onSelect,
+  onCreateNew,
+  isCreatingNew = false,
+  onRename,
+  onDuplicate,
+  onDelete,
+  isBotAction = false,
+  className = ''
+}: BotRailProps) {
   return (
     <aside className={className}>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
@@ -42,6 +58,10 @@ export function BotRail({ bots, selectedId, onSelect, onCreateNew, isCreatingNew
                 bot={bot}
                 isSelected={bot.config_id === selectedId}
                 onClick={() => onSelect(bot.config_id)}
+                onRename={onRename}
+                onDuplicate={onDuplicate}
+                onDelete={onDelete}
+                isBotAction={isBotAction}
               />
             ))
           )}
@@ -55,25 +75,50 @@ interface BotRowProps {
   bot: BotConfiguration
   isSelected: boolean
   onClick: () => void
+  onRename?: (configId: string, newName: string) => void
+  onDuplicate?: (configId: string) => void
+  onDelete?: (configId: string) => void
+  isBotAction: boolean
 }
 
-function BotRow({ bot, isSelected, onClick }: BotRowProps) {
+function BotRow({
+  bot,
+  isSelected,
+  onClick,
+  onRename,
+  onDuplicate,
+  onDelete,
+  isBotAction
+}: BotRowProps) {
   return (
     <div
-      onClick={onClick}
-      className={`flex items-center justify-between rounded-xl px-3 py-2 cursor-pointer transition-colors ${
+      className={`flex items-center justify-between rounded-xl px-3 py-2 transition-colors relative ${
         isSelected ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-primary)]'
       }`}
     >
-      <div className="flex items-center gap-2">
+      <div
+        onClick={onClick}
+        className="flex items-center gap-2 flex-1 cursor-pointer"
+      >
         <div className={`h-4 w-4 ${bot.state === 'active' ? 'text-emerald-400' : 'text-[var(--text-muted)]'}`}>
           {bot.state === 'active' ? '●' : '○'}
         </div>
         <div className="text-sm text-[var(--text-primary)]">{bot.config_name}</div>
       </div>
-      <div className="text-xs text-[var(--text-muted)]">
-        Paper
-        {/* Future: P&L display will go here */}
+      <div className="flex items-center gap-2">
+        <div className="text-xs text-[var(--text-muted)]">
+          Paper
+          {/* Future: P&L display will go here */}
+        </div>
+        {(onRename || onDuplicate || onDelete) && (
+          <BotManagementMenu
+            bot={bot}
+            onRename={onRename || (() => {})}
+            onDuplicate={onDuplicate || (() => {})}
+            onDelete={onDelete || (() => {})}
+            isBotAction={isBotAction}
+          />
+        )}
       </div>
     </div>
   )

@@ -41,13 +41,17 @@ class EMAPreprocessor(BasePreprocessor):
         prices_clean = None if prices is None else pd.to_numeric(prices, errors='coerce').dropna()
         sma_clean = None if sma is None else pd.to_numeric(sma, errors='coerce').dropna()
 
-        # Align series on common index
+        # Single inner-join alignment across all present series
+        frames = {"ema": ema_clean}
         if prices_clean is not None:
-            prices_clean, ema_clean = prices_clean.align(ema_clean, join='inner')
+            frames["prices"] = prices_clean
         if sma_clean is not None:
-            sma_clean, ema_clean = sma_clean.align(ema_clean, join='inner')
-        if prices_clean is not None and sma_clean is not None:
-            prices_clean, sma_clean = prices_clean.align(sma_clean, join='inner')
+            frames["sma"] = sma_clean
+
+        df_aligned = pd.concat(frames, axis=1, join='inner').dropna()
+        ema_clean = df_aligned["ema"]
+        prices_clean = df_aligned["prices"] if "prices" in df_aligned else None
+        sma_clean = df_aligned["sma"] if "sma" in df_aligned else None
 
         if len(ema_clean) < 5:
             return {"error": "Insufficient aligned data for EMA analysis"}
@@ -61,7 +65,7 @@ class EMAPreprocessor(BasePreprocessor):
         # Safe current values with div-by-zero guards
         current_ema = float(ema_clean.iloc[-1])
         current_price = float(prices_clean.iloc[-1]) if prices_clean is not None and len(prices_clean) > 0 else None
-        ema_denom = current_ema if abs(current_ema) > 1e-12 else 1e-12
+        ema_denom = max(1e-12, abs(current_ema))
         
         # Trend analysis with length-based windows
         trend_analysis = self._analyze_ema_trend(ema_clean, length)
@@ -127,31 +131,38 @@ class EMAPreprocessor(BasePreprocessor):
     
     def _analyze_ema_trend(self, ema: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze EMA trend characteristics."""
-        # Short, medium, long term trends
-        short_trend = self._calculate_ema_trend_direction(ema, 2)  # More responsive
-        medium_trend = self._calculate_ema_trend_direction(ema, 5)
-        long_trend = self._calculate_ema_trend_direction(ema, 10) if len(ema) >= 10 else "insufficient_data"
+        # Length-based trend analysis windows
+        short_periods = max(2, length // 10)
+        medium_periods = max(3, length // 4)
+        long_periods = max(5, length // 2)
+
+        short_trend = self._calculate_ema_trend_direction(ema, short_periods)
+        medium_trend = self._calculate_ema_trend_direction(ema, medium_periods)
+        long_trend = self._calculate_ema_trend_direction(ema, long_periods) if len(ema) >= long_periods else "insufficient_data"
         
         # Trend consistency (EMAs should be more volatile)
         trend_consistency = self._calculate_ema_trend_consistency(ema)
         
-        # Trend strength
-        slope = self._calculate_velocity(ema, 3)  # Shorter period for EMA
-        trend_strength = min(1.0, abs(slope) / (ema.std() * 0.15)) if ema.std() > 0 else 0
-        
-        # Acceleration (EMA should show momentum changes faster)
-        acceleration = self._calculate_acceleration(ema, 5)
+        # Trend strength with length-based velocity window
+        velocity_window = max(3, length // 6)
+        slope = self._calculate_velocity(ema, velocity_window)
+        ema_std = ema.std()
+        trend_strength = min(1.0, abs(slope) / max(1e-12, ema_std * 0.15)) if ema_std > 1e-12 else 0
+
+        # Acceleration using length-based window
+        accel_window = max(3, length // 4)
+        acceleration = self._calculate_acceleration(ema, accel_window)
         
         # Overall trend consensus
         trends = [t for t in [short_trend, medium_trend, long_trend] if t not in ["insufficient_data", "sideways"]]
         if trends:
-            bullish_count = sum(1 for t in trends if t == "bullish")
-            bearish_count = sum(1 for t in trends if t == "bearish")
+            rising_count = sum(1 for t in trends if t == "rising")
+            falling_count = sum(1 for t in trends if t == "falling")
             
-            if bullish_count > bearish_count:
-                consensus = "bullish"
-            elif bearish_count > bullish_count:
-                consensus = "bearish"
+            if rising_count > falling_count:
+                consensus = "rising"
+            elif falling_count > rising_count:
+                consensus = "falling"
             else:
                 consensus = "mixed"
         else:
@@ -176,13 +187,14 @@ class EMAPreprocessor(BasePreprocessor):
         start_value = ema.iloc[-(periods + 1)]
         end_value = ema.iloc[-1]
         
-        change_pct = ((end_value - start_value) / start_value) * 100 if start_value != 0 else 0
+        start_denom = max(1e-12, abs(start_value))
+        change_pct = (end_value - start_value) / start_denom * 100
         
         # Lower thresholds for EMA due to higher responsiveness
         if change_pct > 0.1:
-            return "bullish"
+            return "rising"
         elif change_pct < -0.1:
-            return "bearish"
+            return "falling"
         else:
             return "sideways"
     
@@ -215,10 +227,11 @@ class EMAPreprocessor(BasePreprocessor):
         avg_change = ema_changes.abs().mean()
         max_change = ema_changes.abs().max()
         
-        # Volatility of the EMA itself
+        # Volatility of the EMA itself with div-by-zero guard
         ema_volatility = ema.std()
         ema_mean = ema.mean()
-        relative_volatility = ema_volatility / ema_mean if ema_mean > 0 else 0
+        mean_denom = max(1e-12, abs(ema_mean))
+        relative_volatility = ema_volatility / mean_denom
         
         # Direction change frequency
         direction_changes = 0
@@ -271,34 +284,36 @@ class EMAPreprocessor(BasePreprocessor):
         else:
             position = "at_level"
         
-        # Distance analysis
+        # Distance analysis with div-by-zero guards
         distance = current_price - current_ema
-        distance_pct = (distance / current_ema) * 100
-        
-        # Historical position analysis
-        above_periods = sum(1 for i in range(len(prices)) if prices.iloc[i] > ema.iloc[i])
-        below_periods = len(prices) - above_periods
-        total_periods = len(prices)
-        
+        ema_denom = max(1e-12, abs(current_ema))
+        distance_pct = distance / ema_denom * 100
+
+        # Historical position analysis using vectorized operations
+        above_ema_mask = prices > ema
+        above_ema_pct = above_ema_mask.mean() * 100
+        below_ema_pct = 100 - above_ema_pct
+
         # Average distance from EMA
         distances = prices - ema
         avg_distance = distances.mean()
-        avg_distance_pct = (avg_distance / ema.mean()) * 100
+        ema_mean = ema.mean()
+        ema_mean_denom = max(1e-12, abs(ema_mean))
+        avg_distance_pct = avg_distance / ema_mean_denom * 100
         
         return {
             "position": position,
             "distance": round(distance, 4),
             "distance_pct": round(distance_pct, 3),
-            "above_ema_pct": round((above_periods / total_periods) * 100, 1),
-            "below_ema_pct": round((below_periods / total_periods) * 100, 1),
+            "above_ema_pct": round(above_ema_pct, 1),
+            "below_ema_pct": round(below_ema_pct, 1),
             "avg_distance": round(avg_distance, 4),
             "avg_distance_pct": round(avg_distance_pct, 3)
         }
     
     def _analyze_ema_sma_comparison(self, ema: pd.Series, sma: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:
         """Compare EMA vs SMA characteristics."""
-        if len(ema) != len(sma):
-            return {"error": "EMA and SMA series lengths must match"}
+        # Series are already aligned, no length check needed
         
         current_ema = ema.iloc[-1]
         current_sma = sma.iloc[-1]
@@ -338,31 +353,36 @@ class EMAPreprocessor(BasePreprocessor):
     
     def _analyze_ema_sma_signal_timing(self, prices: pd.Series, ema: pd.Series, sma: pd.Series) -> Dict[str, Any]:
         """Analyze timing differences between EMA and SMA signals."""
+        # Ensure all series are aligned for this analysis
+        min_len = min(len(prices), len(ema), len(sma))
+        prices_sync = prices.iloc[:min_len]
+        ema_sync = ema.iloc[:min_len]
+        sma_sync = sma.iloc[:min_len]
+
         # Find crossovers for both
         ema_crossovers = []
         sma_crossovers = []
-        
-        for i in range(1, len(prices)):
+
+        for i in range(1, min_len):
             # EMA crossovers
-            if ((prices.iloc[i-1] <= ema.iloc[i-1] and prices.iloc[i] > ema.iloc[i]) or
-                (prices.iloc[i-1] >= ema.iloc[i-1] and prices.iloc[i] < ema.iloc[i])):
-                cross_type = "bullish" if prices.iloc[i] > ema.iloc[i] else "bearish"
+            if ((prices_sync.iloc[i-1] <= ema_sync.iloc[i-1] and prices_sync.iloc[i] > ema_sync.iloc[i]) or
+                (prices_sync.iloc[i-1] >= ema_sync.iloc[i-1] and prices_sync.iloc[i] < ema_sync.iloc[i])):
+                cross_type = "rising" if prices_sync.iloc[i] > ema_sync.iloc[i] else "falling"
                 ema_crossovers.append({"index": i, "type": cross_type})
-            
-            # SMA crossovers  
-            if ((prices.iloc[i-1] <= sma.iloc[i-1] and prices.iloc[i] > sma.iloc[i]) or
-                (prices.iloc[i-1] >= sma.iloc[i-1] and prices.iloc[i] < sma.iloc[i])):
-                cross_type = "bullish" if prices.iloc[i] > sma.iloc[i] else "bearish"
+
+            # SMA crossovers
+            if ((prices_sync.iloc[i-1] <= sma_sync.iloc[i-1] and prices_sync.iloc[i] > sma_sync.iloc[i]) or
+                (prices_sync.iloc[i-1] >= sma_sync.iloc[i-1] and prices_sync.iloc[i] < sma_sync.iloc[i])):
+                cross_type = "rising" if prices_sync.iloc[i] > sma_sync.iloc[i] else "falling"
                 sma_crossovers.append({"index": i, "type": cross_type})
         
-        # Calculate average timing difference
+        # Calculate average timing difference - filter to same type first
         timing_differences = []
         for ema_cross in ema_crossovers:
             # Find nearest SMA crossover of same type
-            nearest_sma = min(sma_crossovers, 
-                            key=lambda x: abs(x["index"] - ema_cross["index"]) if x["type"] == ema_cross["type"] else float('inf'),
-                            default=None)
-            if nearest_sma:
+            same_type_sma = [x for x in sma_crossovers if x["type"] == ema_cross["type"]]
+            if same_type_sma:
+                nearest_sma = min(same_type_sma, key=lambda x: abs(x["index"] - ema_cross["index"]))
                 timing_diff = ema_cross["index"] - nearest_sma["index"]
                 timing_differences.append(timing_diff)
         
@@ -375,11 +395,13 @@ class EMAPreprocessor(BasePreprocessor):
             "timing_interpretation": "EMA leads" if avg_timing_advantage < -0.5 else "SMA leads" if avg_timing_advantage > 0.5 else "Similar timing"
         }
     
-    def _analyze_price_ema_crossovers(self, prices: pd.Series, ema: pd.Series) -> Dict[str, Any]:
+    def _analyze_price_ema_crossovers(self, prices: pd.Series, ema: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze price crossovers with EMA."""
         crossovers = []
         
-        for i in range(1, min(15, len(prices))):  # Shorter lookback for EMA
+        # Use length-based lookback, limited by available data
+        lookback = min(max(5, length // 2), len(prices), len(ema))
+        for i in range(1, lookback):
             prev_price = prices.iloc[-(i+1)]
             curr_price = prices.iloc[-i]
             prev_ema = ema.iloc[-(i+1)]
@@ -388,27 +410,27 @@ class EMAPreprocessor(BasePreprocessor):
             # Bullish crossover
             if prev_price <= prev_ema and curr_price > curr_ema:
                 crossovers.append({
-                    "type": "bullish_crossover",
+                    "type": "rising_crossover",
                     "periods_ago": i,
                     "price": round(curr_price, 4),
                     "ema_value": round(curr_ema, 4),
-                    "strength": abs(curr_price - curr_ema) / curr_ema
+                    "strength": abs(curr_price - curr_ema) / max(1e-12, abs(curr_ema))
                 })
             
             # Bearish crossover
             elif prev_price >= prev_ema and curr_price < curr_ema:
                 crossovers.append({
-                    "type": "bearish_crossover",
+                    "type": "falling_crossover",
                     "periods_ago": i,
                     "price": round(curr_price, 4),
                     "ema_value": round(curr_ema, 4),
-                    "strength": abs(curr_price - curr_ema) / curr_ema
+                    "strength": abs(curr_price - curr_ema) / max(1e-12, abs(curr_ema))
                 })
         
         return {
             "recent_crossovers": crossovers[:5],
             "latest_crossover": crossovers[0] if crossovers else None,
-            "crossover_frequency": len(crossovers) / min(15, len(prices)) if len(prices) > 0 else 0
+            "crossover_frequency": len(crossovers) / lookback if lookback > 0 else 0
         }
     
     def _assess_ema_signal_quality(self, ema: pd.Series, responsiveness_analysis: Dict) -> Dict[str, Any]:
@@ -464,9 +486,10 @@ class EMAPreprocessor(BasePreprocessor):
             price = prices.iloc[i]
             ema_val = ema.iloc[i]
             prev_price = prices.iloc[i-1]
-            
-            # Check for EMA touch
-            if abs(price - ema_val) / ema_val <= touch_threshold:
+
+            # Check for EMA touch with div-by-zero guard
+            ema_denom = ema_val if abs(ema_val) > 1e-12 else 1e12  # Use large number to avoid false positives
+            if abs(price - ema_val) / ema_denom <= touch_threshold:
                 touches.append({
                     "index": i,
                     "periods_ago": len(prices) - 1 - i,
@@ -508,119 +531,7 @@ class EMAPreprocessor(BasePreprocessor):
             "effectiveness": "high" if success_rate > 0.5 else "medium" if success_rate > 0.25 else "low"
         }
     
-    def _generate_ema_signals(self, ema_value: float, price: Optional[float],
-                             trend_analysis: Dict, price_relationship: Dict,
-                             crossover_analysis: Dict, signal_quality: Dict) -> List[Dict[str, Any]]:
-        """Generate EMA trading signals."""
-        signals = []
-        
-        # Trend-based signals
-        consensus = trend_analysis.get("consensus", "mixed")
-        trend_strength = trend_analysis.get("strength", 0)
-        acceleration = trend_analysis.get("acceleration", 0)
-        
-        if consensus == "bullish" and trend_strength > 0.4:  # Lower threshold for EMA
-            confidence = 0.6 + (trend_strength * 0.2)
-            if acceleration > 0:
-                confidence += 0.1  # Bonus for acceleration
-            
-            signals.append({
-                "type": "ema_trend_buy",
-                "strength": "medium",
-                "reason": f"Bullish EMA trend with {trend_strength:.2f} strength",
-                "confidence": min(0.9, confidence)
-            })
-        
-        elif consensus == "bearish" and trend_strength > 0.4:
-            confidence = 0.6 + (trend_strength * 0.2)
-            if acceleration < 0:
-                confidence += 0.1
-            
-            signals.append({
-                "type": "ema_trend_sell",
-                "strength": "medium",
-                "reason": f"Bearish EMA trend with {trend_strength:.2f} strength",
-                "confidence": min(0.9, confidence)
-            })
-        
-        # Crossover signals (with quality adjustment)
-        if crossover_analysis:
-            latest_crossover = crossover_analysis.get("latest_crossover")
-            if latest_crossover and latest_crossover["periods_ago"] <= 2:  # Very recent for EMA
-                crossover_type = latest_crossover["type"]
-                signal_type = "buy_signal" if "bullish" in crossover_type else "sell_signal"
-                
-                # Adjust confidence based on signal quality
-                base_confidence = 0.7
-                quality = signal_quality.get("signal_quality", "balanced")
-                if quality == "high_frequency_low_reliability":
-                    base_confidence = 0.5  # Lower confidence due to noise
-                elif quality == "low_frequency_high_reliability":
-                    base_confidence = 0.8  # Higher confidence
-                
-                signals.append({
-                    "type": signal_type,
-                    "strength": "medium",
-                    "reason": f"Recent EMA {crossover_type.replace('_', ' ')}",
-                    "confidence": base_confidence
-                })
-        
-        # Responsiveness-based signals
-        if price and price_relationship:
-            distance_pct = abs(price_relationship.get("distance_pct", 0))
-            
-            # EMA signals trigger at smaller distances due to responsiveness
-            if distance_pct > 2:  # Lower threshold than SMA
-                position = price_relationship.get("position")
-                if position == "above":
-                    signals.append({
-                        "type": "ema_pullback_opportunity",
-                        "strength": "low",
-                        "reason": f"Price {distance_pct:.1f}% above responsive EMA",
-                        "confidence": 0.4
-                    })
-                elif position == "below":
-                    signals.append({
-                        "type": "ema_bounce_opportunity",
-                        "strength": "low",
-                        "reason": f"Price {distance_pct:.1f}% below responsive EMA",
-                        "confidence": 0.4
-                    })
-        
-        return signals
-    
-    def _calculate_ema_confidence(self, ema: pd.Series, trend_analysis: Dict, 
-                                 responsiveness_analysis: Dict, signal_quality: Dict) -> float:
-        """Calculate EMA analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor
-        data_factor = min(1.0, len(ema) / 25)  # Shorter requirement for EMA
-        confidence_factors.append(data_factor)
-        
-        # Trend strength factor
-        trend_strength = trend_analysis.get("strength", 0.5)
-        confidence_factors.append(trend_strength)
-        
-        # Signal quality factor
-        quality = signal_quality.get("signal_quality", "balanced")
-        if quality == "low_frequency_high_reliability":
-            quality_factor = 0.8
-        elif quality == "balanced":
-            quality_factor = 0.7
-        else:  # high_frequency_low_reliability
-            quality_factor = 0.5
-        confidence_factors.append(quality_factor)
-        
-        # Responsiveness factor (moderate responsiveness is best)
-        responsiveness = responsiveness_analysis.get("responsiveness_score", 0.5)
-        if 0.3 <= responsiveness <= 0.6:
-            resp_factor = 0.8  # Sweet spot
-        else:
-            resp_factor = 0.6
-        confidence_factors.append(resp_factor)
-        
-        return round(np.mean(confidence_factors), 3)
+    # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
     
     def _generate_ema_summary(self, ema_value: float, price: Optional[float],
                              trend_analysis: Dict, responsiveness_analysis: Dict) -> str:
@@ -636,8 +547,9 @@ class EMAPreprocessor(BasePreprocessor):
         
         summary += f", {responsiveness_rating} responsiveness"
         
-        if price:
-            distance_pct = ((price - ema_value) / ema_value) * 100
+        if price is not None:
+            ema_denom = max(1e-12, abs(ema_value))
+            distance_pct = (price - ema_value) / ema_denom * 100
             summary += f", price {distance_pct:+.1f}%"
         
         return summary
