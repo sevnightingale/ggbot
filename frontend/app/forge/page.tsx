@@ -347,8 +347,8 @@ export default function ForgePage() {
         throw new Error(`Failed to stop bot: ${response.status}`)
       }
 
-      const result = await response.json()
-      
+      await response.json()
+
       // Update local bot state and clear scheduling info
       setAllBots(prev => prev.map(bot => 
         bot.config_id === selectedBot.config_id 
