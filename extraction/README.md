@@ -618,3 +618,4 @@ aroon
 atr
 bbwidth
 cci
+donchian

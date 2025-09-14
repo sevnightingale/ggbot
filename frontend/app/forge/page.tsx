@@ -68,6 +68,7 @@ export default function ForgePage() {
   }>>([])
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+  const [isCreatingNew, setIsCreatingNew] = useState(false)
 
   // Get currently selected bot
   const selectedBot = selectedConfigId
@@ -376,6 +377,32 @@ export default function ForgePage() {
     stopBot()
   }
 
+  // Handler function for creating new bot
+  const handleCreateNewBot = async () => {
+    setIsCreatingNew(true)
+
+    try {
+      // Generate a unique name for the new bot
+      const botCount = allBots.length + 1
+      const newBotName = `ggbot ${botCount}`
+
+      // Create new bot using existing createDefaultBot logic
+      const newBot = await createDefaultBot()
+
+      // Update name to be more descriptive
+      const updatedBot = await apiClient.updateConfig(newBot.config_id, {}, newBotName)
+
+      // Add to local state and select it
+      setAllBots(prev => [...prev, updatedBot])
+      setSelectedConfigId(updatedBot.config_id)
+
+    } catch (error) {
+      console.error('❌ Failed to create new bot:', error)
+    } finally {
+      setIsCreatingNew(false)
+    }
+  }
+
   if (loading) {
     return (
       <ThemeProvider>
@@ -408,6 +435,8 @@ export default function ForgePage() {
             bots={allBots}
             selectedId={selectedConfigId}
             onSelect={setSelectedConfigId}
+            onCreateNew={handleCreateNewBot}
+            isCreatingNew={isCreatingNew}
             className="col-span-12 hidden md:col-span-3 md:block"
           />
 
