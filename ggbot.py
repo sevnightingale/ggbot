@@ -1209,10 +1209,8 @@ async def dashboard_stream(
         try:
             while True:
                 try:
-                    logger.info(f"SSE loop iteration {event_id + 1} for user {current_user.user_id}")
                     # Get unified dashboard data for authenticated user
                     data = await get_unified_dashboard_data(current_user.user_id)
-                    logger.info(f"SSE got dashboard data for user {current_user.user_id}: bots={len(data.get('bots', []))}, accounts={len(data.get('accounts', []))}")
                     event_id += 1
                     heartbeat_counter += 1
 
@@ -1220,12 +1218,10 @@ async def dashboard_stream(
                     yield f"id: {event_id}\n"
                     yield f"event: dashboard\n"
                     yield f"data: {json.dumps(data, default=str)}\n\n"
-                    logger.info(f"SSE sent data event {event_id} for user {current_user.user_id}")
 
                     # Send heartbeat every 10 seconds (2 iterations)
                     if heartbeat_counter % 2 == 0:
                         yield f":keepalive {int(time.time())}\n\n"
-                        logger.info(f"SSE sent heartbeat for user {current_user.user_id}")
 
                     await asyncio.sleep(5)  # 5-second update interval
                     

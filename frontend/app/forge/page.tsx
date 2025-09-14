@@ -79,11 +79,6 @@ export default function ForgePage() {
     ? accounts.find(account => account.config_id === selectedBot.config_id) || null
     : null
 
-  // Debug MetricsBar data
-  console.log('🔍 MetricsBar Debug:')
-  console.log('  selectedBot?.config_id:', selectedBot?.config_id)
-  console.log('  accounts array:', accounts)
-  console.log('  selectedAccount:', selectedAccount)
 
   
   // Real-time status tracking
@@ -176,12 +171,10 @@ export default function ForgePage() {
     if (!user) return
 
     const loadOrCreateBot = async () => {
-      console.log('🔥 Loading bot for user:', user.id)
       
       try {
         // Get user's existing bots using proper API client
         const configs = await apiClient.listConfigs()
-        console.log('📡 Loaded configs:', configs)
         
         if (configs.length > 0) {
           // Load all configs and select first one
@@ -212,19 +205,15 @@ export default function ForgePage() {
         const token = await getAuthToken()
         if (!token) return
 
-        console.log('🔥 Connecting to forge SSE stream...')
         const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
         const stream = new EventSource(`${apiUrl}/api/dashboard-stream?token=${encodeURIComponent(token)}`)
 
         stream.onopen = () => {
-          console.log('✅ Forge SSE connected')
         }
 
         stream.addEventListener('dashboard', (event) => {
-          console.log('📨 Raw SSE message received:', event)
           try {
             const data = JSON.parse(event.data)
-            console.log('📨 Parsed SSE data:', data)
 
             // Update bot execution status (extraction/decision/trading phases)
             if (data.bots) {
@@ -259,10 +248,8 @@ export default function ForgePage() {
 
             // Update accounts data
             if (data.accounts) {
-              console.log('📊 SSE received accounts:', data.accounts)
               setAccounts(data.accounts)
             } else {
-              console.log('📊 SSE: no accounts in data')
             }
 
           } catch (error) {
@@ -327,7 +314,6 @@ export default function ForgePage() {
       }
 
       const result = await response.json()
-      console.log('✅ Bot started:', result)
       
       // Update local bot state and next run from API response
       setAllBots(prev => prev.map(bot => 
@@ -362,7 +348,6 @@ export default function ForgePage() {
       }
 
       const result = await response.json()
-      console.log('✅ Bot stopped:', result)
       
       // Update local bot state and clear scheduling info
       setAllBots(prev => prev.map(bot => 
