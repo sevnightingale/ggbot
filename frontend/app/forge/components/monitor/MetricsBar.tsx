@@ -33,6 +33,12 @@ interface MetricsBarProps {
 }
 
 export function MetricsBar({ account, positions = [], className = '' }: MetricsBarProps) {
+  // Debug: always show what we received
+  if (typeof window !== 'undefined') {
+    console.log('📊 MetricsBar render - account:', account)
+    console.log('📊 MetricsBar render - positions:', positions)
+  }
+
   if (!account) {
     return (
       <div className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${className}`}>

@@ -79,6 +79,12 @@ export default function ForgePage() {
     ? accounts.find(account => account.config_id === selectedBot.config_id) || null
     : null
 
+  // Debug MetricsBar data
+  console.log('🔍 MetricsBar Debug:')
+  console.log('  selectedBot?.config_id:', selectedBot?.config_id)
+  console.log('  accounts array:', accounts)
+  console.log('  selectedAccount:', selectedAccount)
+
   
   // Real-time status tracking
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'extraction' | 'decision' | 'trading'>('idle')
@@ -252,7 +258,10 @@ export default function ForgePage() {
 
             // Update accounts data
             if (data.accounts) {
+              console.log('📊 SSE received accounts:', data.accounts)
               setAccounts(data.accounts)
+            } else {
+              console.log('📊 SSE: no accounts in data')
             }
 
           } catch (error) {
