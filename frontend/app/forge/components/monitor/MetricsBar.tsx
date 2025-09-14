@@ -36,7 +36,7 @@ export function MetricsBar({ account, positions = [], className = '' }: MetricsB
 
   if (!account) {
     return (
-      <div className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${className}`}>
+      <div className={`grid grid-cols-2 gap-3 ${className}`}>
         {/* Loading skeleton */}
         {[1, 2, 3, 4].map((i) => (
           <div key={i} className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
@@ -59,7 +59,7 @@ export function MetricsBar({ account, positions = [], className = '' }: MetricsB
   // const totalPnl = (account.total_pnl || 0) + (account.unrealized_pnl || 0)
 
   return (
-    <div className={`grid grid-cols-2 gap-3 md:grid-cols-4 ${className}`}>
+    <div className={`grid grid-cols-2 gap-3 ${className}`}>
       {/* KPI 1: Portfolio Return */}
       <KPICard
         label="Portfolio Return"
