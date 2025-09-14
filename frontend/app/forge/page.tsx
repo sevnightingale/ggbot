@@ -13,6 +13,7 @@ import { ActivationBar } from './components/monitor/ActivationBar'
 import { MetricsBar } from './components/monitor/MetricsBar'
 import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
+import { ConfigureLayout } from './components/configure/ConfigureLayout'
 
 interface Position {
   trade_id: string
@@ -116,7 +117,6 @@ export default function ForgePage() {
   const createDefaultBot = async (): Promise<BotConfiguration> => {
     const defaultConfigData = {
       schema_version: '2.1',
-      config_type: 'autonomous_trading',
       selected_pair: 'BTC/USDT',
       extraction: {
         selected_data_sources: {
@@ -564,10 +564,34 @@ export default function ForgePage() {
                     />
                   </div>
                 ) : (
-                  <EmptyState
-                    title="Configuration Editor"
-                    description="Bot configuration interface coming soon"
-                    icon="⚙️"
+                  <ConfigureLayout
+                    selectedBot={selectedBot}
+                    isEditingConfig={false}
+                    hasUnsavedChanges={false}
+                    onStartEditing={() => {
+                      // TODO: Implement editing state management
+                      console.log('Start editing config')
+                    }}
+                    onSaveConfig={() => {
+                      // TODO: Implement save functionality
+                      console.log('Save config')
+                    }}
+                    onCancelConfig={() => {
+                      // TODO: Implement cancel functionality
+                      console.log('Cancel config editing')
+                    }}
+                    onResetConfig={() => {
+                      // TODO: Implement reset functionality
+                      console.log('Reset config')
+                    }}
+                    onUpdateConfig={(updates) => {
+                      // TODO: Implement config updates
+                      console.log('Update config:', updates)
+                    }}
+                    onBotTypeChange={(newType) => {
+                      // TODO: Implement bot type changes
+                      console.log('Change bot type to:', newType)
+                    }}
                   />
                 )
               ) : (

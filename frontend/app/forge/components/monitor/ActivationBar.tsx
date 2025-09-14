@@ -41,7 +41,7 @@ export function ActivationBar({
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
-  const configType = selectedBot.config_data.config_type === 'signal_validation' ? 'Signal validation' : 'Autonomous trading'
+  const configType = selectedBot.config_type === 'signal_validation' ? 'Signal validation' : 'Autonomous trading'
 
   // Get real frequency from config
   const analysisFreq = selectedBot.config_data.decision?.analysis_frequency || '1h'

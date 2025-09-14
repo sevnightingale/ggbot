@@ -1,7 +1,5 @@
 {
   "schema_version": "2.1",
-  "config_type": "autonomous_trading",
-  
   "selected_pair": "BTC/USDT",
   
   "extraction": {

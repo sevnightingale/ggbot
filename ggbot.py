@@ -1116,7 +1116,7 @@ def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
     if "config_data" in config:
         inner_config = config["config_data"]
         decision_config = inner_config.get("decision", {})
-        config_type = inner_config.get("config_type", "autonomous_trading")
+        config_type = config.get("config_type", "autonomous_trading")  # Use table field
     else:
         # Handle flat config structure
         decision_config = config.get("decision", {})

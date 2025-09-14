@@ -161,7 +161,6 @@ class ConfigService:
                 extraction=config_data.get("extraction", {}),
                 decision=config_data.get("decision", {}),
                 trading=config_data.get("trading", {}),
-                config_type=config_data.get("config_type", "autonomous_trading"),
                 schema_version=config_data.get("schema_version", "2.1"),
                 llm_config=config_data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                 telegram_integration=config_data.get("telegram_integration", {})
@@ -375,7 +374,6 @@ class ConfigService:
                 extraction=config_data.get("extraction", existing_config.extraction),
                 decision=config_data.get("decision", existing_config.decision),
                 trading=config_data.get("trading", existing_config.trading),
-                config_type=config_data.get("config_type", existing_config.config_type),
                 schema_version=config_data.get("schema_version", existing_config.schema_version),
                 llm_config=config_data.get("llm_config", existing_config.llm_config),
                 telegram_integration=config_data.get("telegram_integration", existing_config.telegram_integration),
