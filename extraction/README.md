@@ -619,3 +619,4 @@ atr
 bbwidth
 cci
 donchian
+ema

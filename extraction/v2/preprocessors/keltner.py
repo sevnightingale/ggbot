@@ -8,7 +8,7 @@ price position assessment, and breakout detection.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -16,26 +16,41 @@ from .base import BasePreprocessor
 class KeltnerChannelsPreprocessor(BasePreprocessor):
     """Advanced Keltner Channels preprocessor with professional-grade channel analysis."""
     
-    def preprocess(self, upper_channel: pd.Series, middle_channel: pd.Series, 
-                  lower_channel: pd.Series, prices: pd.Series, **kwargs) -> Dict[str, Any]:
+    def preprocess(self, upper_channel: pd.Series, middle_channel: pd.Series,
+                  lower_channel: pd.Series, prices: pd.Series, length: int = 20, **kwargs) -> Dict[str, Any]:
         """
         Advanced Keltner Channels preprocessing with comprehensive channel analysis.
-        
+
         Keltner Channels use ATR-based volatility bands around an EMA centerline,
         providing dynamic support/resistance levels and trend analysis.
-        
+
         Args:
             upper_channel: Upper Keltner Channel values
             middle_channel: Middle Keltner Channel (EMA) values
             lower_channel: Lower Keltner Channel values
             prices: Price series for position analysis (required)
-            
+            length: Keltner calculation period for configurable windows
+
         Returns:
             Dictionary with comprehensive Keltner Channels analysis
         """
-        if len(upper_channel) < 5 or len(prices) < 5:
-            return {"error": "Insufficient data for Keltner Channels analysis"}
-        
+        # Clean and align all input series
+        df_aligned = self._clean_and_align_series(prices, upper_channel, middle_channel, lower_channel)
+        if len(df_aligned) < 5:
+            return {"error": "Insufficient aligned data for Keltner Channels analysis"}
+
+        prices = df_aligned["prices"]
+        upper_channel = df_aligned["upper"]
+        middle_channel = df_aligned["middle"]
+        lower_channel = df_aligned["lower"]
+
+        # Generate proper timestamp
+        if hasattr(prices.index, 'tz') or np.issubdtype(prices.index.dtype, np.datetime64):
+            timestamp = prices.index[-1].isoformat() if hasattr(prices.index[-1], 'isoformat') else datetime.now(timezone.utc).isoformat()
+        else:
+            timestamp = datetime.now(timezone.utc).isoformat()
+
+        # Safe current values
         current_price = float(prices.iloc[-1])
         current_upper = float(upper_channel.iloc[-1])
         current_middle = float(middle_channel.iloc[-1])
@@ -43,28 +58,21 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         
         # Position analysis
         position_analysis = self._analyze_price_position(prices, upper_channel, middle_channel, lower_channel)
-        
+
         # Channel width analysis
-        width_analysis = self._analyze_channel_width(upper_channel, middle_channel, lower_channel)
-        
+        width_analysis = self._analyze_channel_width(upper_channel, middle_channel, lower_channel, length)
+
         # Trend analysis
-        trend_analysis = self._analyze_keltner_trend(middle_channel, prices)
-        
+        trend_analysis = self._analyze_keltner_trend(middle_channel, prices, length)
+
         # Breakout analysis
-        breakout_analysis = self._analyze_keltner_breakouts(prices, upper_channel, lower_channel)
-        
+        breakout_analysis = self._analyze_keltner_breakouts(prices, upper_channel, lower_channel, length)
+
         # Support/resistance analysis
-        support_resistance = self._analyze_channel_support_resistance(prices, upper_channel, middle_channel, lower_channel)
-        
+        support_resistance = self._analyze_channel_support_resistance(prices, upper_channel, middle_channel, lower_channel, length)
+
         # Squeeze analysis
-        squeeze_analysis = self._analyze_keltner_squeeze(upper_channel, lower_channel, middle_channel)
-        
-        # Signal generation
-        signals = self._generate_keltner_signals(current_price, current_upper, current_middle, current_lower,
-                                               position_analysis, breakout_analysis, squeeze_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_keltner_confidence(prices, position_analysis, width_analysis)
+        squeeze_analysis = self._analyze_keltner_squeeze(upper_channel, lower_channel, middle_channel, length)
         
         return {
             "indicator": "Keltner_Channels",
@@ -73,23 +81,57 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
                 "upper_channel": round(current_upper, 4),
                 "middle_channel": round(current_middle, 4),
                 "lower_channel": round(current_lower, 4),
-                "channel_width": round((current_upper - current_lower) / current_middle * 100, 2),
-                "price_position_pct": round(((current_price - current_lower) / (current_upper - current_lower)) * 100, 1),
-                "timestamp": datetime.now().isoformat()
+                "channel_width": round((current_upper - current_lower) / self._safe_denom(current_middle) * 100, 2),
+                "price_position_pct": position_analysis["position_pct"],  # Reuse guarded value
+                "timestamp": timestamp
             },
-            "position": position_analysis,
-            "width": width_analysis,
-            "trend": trend_analysis,
-            "breakouts": breakout_analysis,
-            "support_resistance": support_resistance,
-            "squeeze": squeeze_analysis,
-            "signals": signals,
-            "confidence": confidence,
-            "summary": self._generate_keltner_summary(current_price, current_upper, current_middle, 
+            "context": {
+                "length": length,
+                "trend": trend_analysis,
+                "squeeze": squeeze_analysis
+            },
+            "levels": {
+                "position": position_analysis,
+                "support_resistance": support_resistance
+            },
+            "patterns": {
+                "breakouts": breakout_analysis,
+                "width_analysis": width_analysis
+            },
+            "evidence": {
+                "data_quality": {
+                    "original_periods": len(prices) + len(upper_channel) + len(middle_channel) + len(lower_channel),  # Approximate
+                    "aligned_periods": len(df_aligned),
+                    "valid_data_percentage": round(len(df_aligned) / max(len(prices), len(upper_channel)) * 100, 1)
+                },
+                "calculation_notes": f"Keltner analysis based on {len(df_aligned)} aligned data points with period {length}"
+            },
+            "summary": self._generate_keltner_summary(current_price, current_upper, current_middle,
                                                     current_lower, position_analysis, squeeze_analysis)
         }
     
-    def _analyze_price_position(self, prices: pd.Series, upper: pd.Series, 
+    def _clean_and_align_series(self, prices: pd.Series, upper: pd.Series, middle: pd.Series, lower: pd.Series) -> pd.DataFrame:
+        """Clean and align all input series."""
+        df = pd.concat({
+            "prices": pd.to_numeric(prices, errors='coerce'),
+            "upper": pd.to_numeric(upper, errors='coerce'),
+            "middle": pd.to_numeric(middle, errors='coerce'),
+            "lower": pd.to_numeric(lower, errors='coerce')
+        }, axis=1, join='inner').dropna()
+
+        # Ensure upper >= lower; if not, swap those rows
+        swapped = df["upper"] < df["lower"]
+        if swapped.any():
+            u, l = df.loc[swapped, "upper"].copy(), df.loc[swapped, "lower"].copy()
+            df.loc[swapped, "upper"], df.loc[swapped, "lower"] = l, u
+
+        return df
+
+    def _safe_denom(self, x: float) -> float:
+        """Safe denominator to prevent division by zero."""
+        return max(1e-12, abs(float(x)))
+
+    def _analyze_price_position(self, prices: pd.Series, upper: pd.Series,
                                middle: pd.Series, lower: pd.Series) -> Dict[str, Any]:
         """Analyze price position within Keltner Channels."""
         current_price = prices.iloc[-1]
@@ -97,9 +139,10 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         current_middle = middle.iloc[-1]
         current_lower = lower.iloc[-1]
         
-        # Position calculation (0-100 scale)
-        if current_upper != current_lower:
-            position_pct = ((current_price - current_lower) / (current_upper - current_lower)) * 100
+        # Position calculation (0-100 scale) with div-by-zero guard
+        width = current_upper - current_lower
+        if abs(width) > 1e-12:
+            position_pct = (current_price - current_lower) / width * 100
         else:
             position_pct = 50
         
@@ -119,9 +162,9 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         else:
             position = "below_lower"
         
-        # Distance from middle
+        # Distance from middle with div-by-zero guard
         distance_from_middle = current_price - current_middle
-        distance_pct = (distance_from_middle / current_middle) * 100
+        distance_pct = distance_from_middle / self._safe_denom(current_middle) * 100
         
         # Historical position analysis
         position_history = self._analyze_position_history(prices, upper, middle, lower)
@@ -147,8 +190,9 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             middle_val = middle.iloc[i]
             lower_val = lower.iloc[i]
             
-            if upper_val != lower_val:
-                pos_pct = ((price - lower_val) / (upper_val - lower_val)) * 100
+            width = upper_val - lower_val
+            if abs(width) > 1e-12:
+                pos_pct = (price - lower_val) / width * 100
             else:
                 pos_pct = 50
                 
@@ -173,9 +217,10 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             "position_volatility": round(positions.std(), 1)
         }
     
-    def _analyze_channel_width(self, upper: pd.Series, middle: pd.Series, lower: pd.Series) -> Dict[str, Any]:
+    def _analyze_channel_width(self, upper: pd.Series, middle: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze Keltner Channel width characteristics."""
-        width = (upper - lower) / middle * 100
+        # Safe width calculation with guarded denominators
+        width = (upper - lower).clip(lower=0) / middle.abs().clip(lower=1e-12) * 100
         current_width = width.iloc[-1]
         
         # Width statistics
@@ -184,8 +229,9 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         max_width = width.max()
         min_width = width.min()
         
-        # Width percentile
-        width_percentile = self._calculate_position_rank(width, lookback=len(width))
+        # Width percentile with length-based lookback
+        lookback = min(length * 2, len(width))
+        width_percentile = self._calculate_position_rank(width, lookback=lookback)
         
         # Width classification
         if current_width > mean_width + std_width:
@@ -197,8 +243,9 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         else:
             width_level = "below_average"
         
-        # Width trend
-        width_velocity = self._calculate_velocity(width, 3)
+        # Width trend with configurable window
+        velocity_window = max(3, length // 6)
+        width_velocity = self._calculate_velocity(width, velocity_window)
         width_trend = "expanding" if width_velocity > 0.1 else "contracting" if width_velocity < -0.1 else "stable"
         
         return {
@@ -215,13 +262,14 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             }
         }
     
-    def _analyze_keltner_trend(self, middle: pd.Series, prices: pd.Series) -> Dict[str, Any]:
+    def _analyze_keltner_trend(self, middle: pd.Series, prices: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze trend using Keltner middle line."""
         current_middle = middle.iloc[-1]
         current_price = prices.iloc[-1]
         
-        # Middle line trend
-        middle_slope = self._calculate_velocity(middle, 5)
+        # Middle line trend with configurable window
+        slope_window = max(3, length // 4)
+        middle_slope = self._calculate_velocity(middle, slope_window)
         
         if middle_slope > 0.001:
             middle_trend = "rising"
@@ -233,8 +281,9 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         # Price vs middle
         price_vs_middle = "above" if current_price > current_middle else "below"
         
-        # Trend strength
-        trend_strength = min(1.0, abs(middle_slope) / (middle.std() * 0.1)) if middle.std() > 0 else 0
+        # Trend strength with div-by-zero guard
+        middle_std = middle.std()
+        trend_strength = min(1.0, abs(middle_slope) / self._safe_denom(middle_std * 0.1))
         
         return {
             "middle_trend": middle_trend,
@@ -243,11 +292,13 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             "trend_strength": round(trend_strength, 3)
         }
     
-    def _analyze_keltner_breakouts(self, prices: pd.Series, upper: pd.Series, lower: pd.Series) -> Dict[str, Any]:
+    def _analyze_keltner_breakouts(self, prices: pd.Series, upper: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze breakouts from Keltner Channels."""
         breakouts = []
         
-        for i in range(1, min(15, len(prices))):
+        # Use length-based lookback
+        lookback = min(max(5, length), len(prices))
+        for i in range(1, lookback):
             prev_price = prices.iloc[-(i+1)]
             curr_price = prices.iloc[-i]
             prev_upper = upper.iloc[-(i+1)]
@@ -262,7 +313,7 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
                     "periods_ago": i,
                     "price": round(curr_price, 4),
                     "channel_level": round(curr_upper, 4),
-                    "strength": (curr_price - curr_upper) / curr_upper
+                    "strength": (curr_price - curr_upper) / self._safe_denom(curr_upper)
                 })
             
             # Downward breakout
@@ -272,17 +323,17 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
                     "periods_ago": i,
                     "price": round(curr_price, 4),
                     "channel_level": round(curr_lower, 4),
-                    "strength": (curr_lower - curr_price) / curr_lower
+                    "strength": (curr_lower - curr_price) / self._safe_denom(curr_lower)
                 })
         
         return {
             "recent_breakouts": breakouts[:5],
             "latest_breakout": breakouts[0] if breakouts else None,
-            "breakout_frequency": len(breakouts) / min(15, len(prices)) if len(prices) > 0 else 0
+            "breakout_frequency": len(breakouts) / max(1, lookback - 1)
         }
     
-    def _analyze_channel_support_resistance(self, prices: pd.Series, upper: pd.Series, 
-                                          middle: pd.Series, lower: pd.Series) -> Dict[str, Any]:
+    def _analyze_channel_support_resistance(self, prices: pd.Series, upper: pd.Series,
+                                          middle: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze channels as support/resistance."""
         touches = {"upper": [], "middle": [], "lower": []}
         bounces = {"upper": [], "middle": [], "lower": []}
@@ -290,7 +341,9 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         # Touch threshold
         touch_threshold = 0.005  # 0.5%
         
-        for i in range(1, len(prices)):
+        # Use length-based analysis window
+        analysis_window = min(length * 2, len(prices))
+        for i in range(1, analysis_window):
             price = prices.iloc[i]
             prev_price = prices.iloc[i-1]
             
@@ -306,7 +359,8 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             ]
             
             for level_name, level_val in levels:
-                if abs(price - level_val) / level_val <= touch_threshold:
+                denom = self._safe_denom(level_val)
+                if abs(price - level_val) / denom <= touch_threshold:
                     touches[level_name].append({
                         "index": i,
                         "periods_ago": len(prices) - 1 - i,
@@ -322,14 +376,14 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
                             bounces[level_name].append({
                                 "type": "support_bounce",
                                 "periods_ago": len(prices) - 1 - i,
-                                "strength": abs(next_price - price) / price
+                                "strength": abs(next_price - price) / self._safe_denom(price)
                             })
                         # Resistance bounce
                         elif prev_price < level_val and next_price < price:
                             bounces[level_name].append({
                                 "type": "resistance_bounce",
                                 "periods_ago": len(prices) - 1 - i,
-                                "strength": abs(price - next_price) / price
+                                "strength": abs(price - next_price) / self._safe_denom(price)
                             })
         
         # Calculate effectiveness for each level
@@ -382,117 +436,14 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             "squeeze_intensity": round((squeeze_threshold - current_width) / squeeze_threshold * 100, 2) if is_squeeze else 0
         }
     
-    def _generate_keltner_signals(self, price: float, upper: float, middle: float, lower: float,
-                                position_analysis: Dict, breakout_analysis: Dict, 
-                                squeeze_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate Keltner Channels signals."""
-        signals = []
-        
-        # Position-based signals
-        position = position_analysis.get("position", "middle_channel")
-        position_pct = position_analysis.get("position_pct", 50)
-        
-        if position == "above_upper":
-            signals.append({
-                "type": "upward_breakout_signal",
-                "strength": "strong",
-                "reason": f"Price above upper Keltner Channel ({position_pct:.1f}%)",
-                "confidence": 0.8
-            })
-        elif position == "below_lower":
-            signals.append({
-                "type": "downward_breakout_signal",
-                "strength": "strong",
-                "reason": f"Price below lower Keltner Channel ({position_pct:.1f}%)",
-                "confidence": 0.8
-            })
-        
-        # Breakout signals
-        latest_breakout = breakout_analysis.get("latest_breakout")
-        if latest_breakout and latest_breakout["periods_ago"] <= 2:
-            breakout_type = latest_breakout["type"]
-            signal_type = "breakout_buy" if "upward" in breakout_type else "breakout_sell"
-            
-            signals.append({
-                "type": signal_type,
-                "strength": "medium",
-                "reason": f"Recent {breakout_type.replace('_', ' ')} from Keltner Channel",
-                "confidence": 0.7
-            })
-        
-        # Squeeze signals
-        if squeeze_analysis.get("is_squeeze", False):
-            squeeze_periods = squeeze_analysis.get("squeeze_periods", 0)
-            
-            signals.append({
-                "type": "squeeze_setup",
-                "strength": "medium",
-                "reason": f"Keltner squeeze for {squeeze_periods} periods - breakout pending",
-                "confidence": 0.6
-            })
-        
-        # Mean reversion signals
-        if position in ["near_upper", "near_lower"]:
-            if position == "near_upper":
-                signals.append({
-                    "type": "mean_reversion_sell",
-                    "strength": "low",
-                    "reason": "Price near upper Keltner Channel - potential pullback",
-                    "confidence": 0.5
-                })
-            else:
-                signals.append({
-                    "type": "mean_reversion_buy",
-                    "strength": "low",
-                    "reason": "Price near lower Keltner Channel - potential bounce",
-                    "confidence": 0.5
-                })
-        
-        return signals
-    
-    def _calculate_keltner_confidence(self, prices: pd.Series, position_analysis: Dict, 
-                                    width_analysis: Dict) -> float:
-        """Calculate Keltner Channels analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor
-        data_factor = min(1.0, len(prices) / 30)
-        confidence_factors.append(data_factor)
-        
-        # Position clarity factor
-        position_pct = position_analysis.get("position_pct", 50)
-        if position_pct > 90 or position_pct < 10:
-            position_factor = 0.9  # Very clear position
-        elif position_pct > 80 or position_pct < 20:
-            position_factor = 0.7
-        else:
-            position_factor = 0.6
-        confidence_factors.append(position_factor)
-        
-        # Channel width factor
-        width_level = width_analysis.get("width_level", "average")
-        if width_level in ["wide", "narrow"]:
-            width_factor = 0.8  # Clear width signals
-        else:
-            width_factor = 0.6
-        confidence_factors.append(width_factor)
-        
-        # Historical data factor
-        history = position_analysis.get("history", {})
-        if not history.get("insufficient_data", False):
-            history_factor = 0.8
-        else:
-            history_factor = 0.6
-        confidence_factors.append(history_factor)
-        
-        return round(np.mean(confidence_factors), 3)
+    # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
     
     def _generate_keltner_summary(self, price: float, upper: float, middle: float, lower: float,
                                 position_analysis: Dict, squeeze_analysis: Dict) -> str:
         """Generate human-readable Keltner Channels summary."""
         position = position_analysis.get("position", "middle").replace("_", " ")
         position_pct = position_analysis.get("position_pct", 50)
-        width = (upper - lower) / middle * 100
+        width = (upper - lower) / self._safe_denom(middle) * 100
         
         summary = f"Keltner: Price {price:.4f} ({position}, {position_pct:.1f}%)"
         summary += f", Width {width:.2f}%"
