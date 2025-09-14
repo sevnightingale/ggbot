@@ -8,7 +8,7 @@ channel width assessment, and turtle trading signal detection.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -20,55 +20,86 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
                   lower_channel: pd.Series, prices: pd.Series, length: int = 20, **kwargs) -> Dict[str, Any]:
         """
         Advanced Donchian Channels preprocessing with comprehensive breakout analysis.
-        
+
         Donchian Channels are formed by the highest high and lowest low over N periods,
         creating natural support/resistance levels and breakout signals.
-        
+
         Args:
             upper_channel: Upper Donchian Channel (highest high over N periods)
             middle_channel: Middle Donchian Channel (average of upper and lower)
             lower_channel: Lower Donchian Channel (lowest low over N periods)
             prices: Price series for analysis (required)
             length: Donchian calculation period
-            
+
         Returns:
             Dictionary with comprehensive Donchian Channels analysis
         """
-        if len(upper_channel) < 5 or len(prices) < 5:
+        # Sanitize and align all input series
+        upper_clean = pd.to_numeric(upper_channel, errors='coerce').dropna()
+        middle_clean = pd.to_numeric(middle_channel, errors='coerce').dropna()
+        lower_clean = pd.to_numeric(lower_channel, errors='coerce').dropna()
+        prices_clean = pd.to_numeric(prices, errors='coerce').dropna()
+
+        if len(upper_clean) < 5 or len(prices_clean) < 5:
             return {"error": "Insufficient data for Donchian Channels analysis"}
-        
-        current_price = float(prices.iloc[-1])
-        current_upper = float(upper_channel.iloc[-1])
-        current_middle = float(middle_channel.iloc[-1])
-        current_lower = float(lower_channel.iloc[-1])
+
+        # Align all series on common index
+        aligned_data = pd.DataFrame({
+            'upper': upper_clean,
+            'middle': middle_clean,
+            'lower': lower_clean,
+            'prices': prices_clean
+        }).dropna()
+
+        if len(aligned_data) < 5:
+            return {"error": "Insufficient aligned data for Donchian Channels analysis"}
+
+        # Extract aligned series
+        upper = aligned_data['upper']
+        middle = aligned_data['middle']
+        lower = aligned_data['lower']
+        prices_aligned = aligned_data['prices']
+
+        # Enforce width correctness (upper >= lower)
+        width_check = upper >= lower
+        if not width_check.all():
+            # Fix inverted channels by swapping where needed
+            mask = ~width_check
+            upper_temp = upper.copy()
+            upper.loc[mask] = lower.loc[mask]
+            lower.loc[mask] = upper_temp.loc[mask]
+
+        current_price = float(prices_aligned.iloc[-1])
+        current_upper = float(upper.iloc[-1])
+        current_middle = float(middle.iloc[-1])
+        current_lower = float(lower.iloc[-1])
+
+        # Generate proper timestamp
+        if hasattr(prices_aligned.index, 'tz') or np.issubdtype(prices_aligned.index.dtype, np.datetime64):
+            timestamp = prices_aligned.index[-1].isoformat() if hasattr(prices_aligned.index[-1], 'isoformat') else datetime.now(timezone.utc).isoformat()
+        else:
+            timestamp = datetime.now(timezone.utc).isoformat()
         
         # Position analysis
-        position_analysis = self._analyze_price_position_donchian(prices, upper_channel, middle_channel, lower_channel)
-        
+        position_analysis = self._analyze_price_position_donchian(prices_aligned, upper, middle, lower)
+
         # Breakout analysis
-        breakout_analysis = self._analyze_donchian_breakouts(prices, upper_channel, lower_channel)
-        
+        breakout_analysis = self._analyze_donchian_breakouts(prices_aligned, upper, lower, length)
+
         # Channel width analysis
-        width_analysis = self._analyze_donchian_width(upper_channel, lower_channel, middle_channel)
-        
-        # Turtle trading signals
-        turtle_signals = self._analyze_turtle_signals(prices, upper_channel, lower_channel, length)
-        
+        width_analysis = self._analyze_donchian_width(upper, lower, middle, length)
+
+        # Turtle trading analysis (remove signals, keep analysis)
+        turtle_analysis = self._analyze_turtle_patterns(prices_aligned, upper, lower, length)
+
         # Support/resistance analysis
-        support_resistance = self._analyze_donchian_support_resistance(prices, upper_channel, middle_channel, lower_channel)
-        
+        support_resistance = self._analyze_donchian_support_resistance(prices_aligned, upper, middle, lower, length)
+
         # Consolidation analysis
-        consolidation_analysis = self._analyze_donchian_consolidation(upper_channel, lower_channel, prices)
-        
+        consolidation_analysis = self._analyze_donchian_consolidation(upper, lower, prices_aligned, length)
+
         # Trend strength analysis
-        trend_analysis = self._analyze_donchian_trend_strength(prices, upper_channel, lower_channel)
-        
-        # Signal generation
-        signals = self._generate_donchian_signals(current_price, current_upper, current_middle, current_lower,
-                                                breakout_analysis, turtle_signals, consolidation_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_donchian_confidence(prices, breakout_analysis, width_analysis)
+        trend_analysis = self._analyze_donchian_trend_strength(prices_aligned, upper, lower)
         
         return {
             "indicator": "Donchian_Channels",
@@ -77,20 +108,33 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
                 "upper_channel": round(current_upper, 4),
                 "middle_channel": round(current_middle, 4),
                 "lower_channel": round(current_lower, 4),
-                "channel_width": round(current_upper - current_lower, 4),
-                "price_position_pct": round(((current_price - current_lower) / (current_upper - current_lower)) * 100, 1) if current_upper != current_lower else 50,
-                "timestamp": datetime.now().isoformat()
+                "channel_width": round(max(0, current_upper - current_lower), 4),
+                "price_position_pct": round(((current_price - current_lower) / max(1e-12, current_upper - current_lower)) * 100, 1),
+                "timestamp": timestamp
             },
-            "position": position_analysis,
-            "breakouts": breakout_analysis,
-            "width": width_analysis,
-            "turtle_signals": turtle_signals,
-            "support_resistance": support_resistance,
-            "consolidation": consolidation_analysis,
-            "trend": trend_analysis,
-            "signals": signals,
-            "confidence": confidence,
-            "summary": self._generate_donchian_summary(current_price, current_upper, current_middle, 
+            "context": {
+                "length": length,
+                "trend": trend_analysis,
+                "consolidation": consolidation_analysis
+            },
+            "levels": {
+                "position": position_analysis,
+                "support_resistance": support_resistance
+            },
+            "patterns": {
+                "breakouts": breakout_analysis,
+                "turtle_patterns": turtle_analysis,
+                "width_analysis": width_analysis
+            },
+            "evidence": {
+                "data_quality": {
+                    "total_periods": len(aligned_data),
+                    "valid_data_percentage": round(len(aligned_data) / len(prices) * 100, 1),
+                    "width_corrections": int((~width_check).sum()) if 'width_check' in locals() else 0
+                },
+                "calculation_notes": f"Donchian analysis based on {len(aligned_data)} aligned data points with period {length}"
+            },
+            "summary": self._generate_donchian_summary(current_price, current_upper, current_middle,
                                                      current_lower, breakout_analysis, consolidation_analysis)
         }
     
@@ -136,11 +180,11 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
             "distance_to_middle": round(abs(current_price - current_middle), 4)
         }
     
-    def _analyze_donchian_breakouts(self, prices: pd.Series, upper: pd.Series, lower: pd.Series) -> Dict[str, Any]:
+    def _analyze_donchian_breakouts(self, prices: pd.Series, upper: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze breakouts from Donchian Channels."""
         breakouts = []
         
-        for i in range(1, min(10, len(prices))):
+        for i in range(1, min(length, len(prices))):
             curr_price = prices.iloc[-i]
             prev_price = prices.iloc[-(i+1)]
             curr_upper = upper.iloc[-i]
@@ -175,10 +219,10 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
             "latest_breakout": breakouts[0] if breakouts else None,
             "latest_upper_breakout": latest_upper,
             "latest_lower_breakout": latest_lower,
-            "breakout_frequency": len(breakouts) / min(10, len(prices)) if len(prices) > 0 else 0
+            "breakout_frequency": len(breakouts) / min(length, len(prices)) if len(prices) > 0 else 0
         }
     
-    def _analyze_donchian_width(self, upper: pd.Series, lower: pd.Series, middle: pd.Series) -> Dict[str, Any]:
+    def _analyze_donchian_width(self, upper: pd.Series, lower: pd.Series, middle: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze Donchian Channel width characteristics."""
         width = upper - lower
         current_width = width.iloc[-1]
@@ -189,8 +233,8 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         max_width = width.max()
         min_width = width.min()
         
-        # Width percentile
-        width_percentile = self._calculate_position_rank(width, lookback=len(width))
+        # Width percentile using length-based lookback
+        width_percentile = self._calculate_position_rank(width, lookback=min(length * 2, len(width)))
         
         # Width classification
         if current_width > mean_width + std_width:
@@ -202,8 +246,9 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
         else:
             width_level = "normal"
         
-        # Width trend
-        width_velocity = self._calculate_velocity(width, 3)
+        # Width trend using length-based window
+        velocity_window = max(3, length // 6)
+        width_velocity = self._calculate_velocity(width, velocity_window)
         
         return {
             "current_width": round(current_width, 4),
@@ -218,54 +263,56 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
             }
         }
     
-    def _analyze_turtle_signals(self, prices: pd.Series, upper: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
+    def _analyze_turtle_patterns(self, prices: pd.Series, upper: pd.Series, lower: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze turtle trading signals based on Donchian breakouts."""
         current_price = prices.iloc[-1]
         current_upper = upper.iloc[-1]
         current_lower = lower.iloc[-1]
         
-        # Turtle entry signals
-        turtle_long = current_price >= current_upper  # System 1: 20-day high
-        turtle_short = current_price <= current_lower  # System 1: 20-day low
+        # Turtle pattern analysis (no signals)
+        at_upper_channel = current_price >= current_upper  # At N-period high
+        at_lower_channel = current_price <= current_lower  # At N-period low
         
-        # Additional turtle criteria
+        # Extended period analysis
         if len(prices) >= length * 2:
-            # System 2: 55-day breakout (simulate with available data)
-            extended_high = prices.iloc[-length*2:].max()
-            extended_low = prices.iloc[-length*2:].min()
-            
-            turtle_long_s2 = current_price >= extended_high
-            turtle_short_s2 = current_price <= extended_low
+            extended_lookback = length * 2
+            extended_high = prices.iloc[-extended_lookback:].max()
+            extended_low = prices.iloc[-extended_lookback:].min()
+
+            at_extended_high = current_price >= extended_high
+            at_extended_low = current_price <= extended_low
         else:
-            turtle_long_s2 = False
-            turtle_short_s2 = False
+            extended_lookback = None
+            at_extended_high = False
+            at_extended_low = False
         
-        # Turtle exit signals (10-day)
-        if len(prices) >= 10:
-            exit_high = prices.iloc[-10:].max()
-            exit_low = prices.iloc[-10:].min()
-            
-            turtle_exit_long = current_price <= exit_low
-            turtle_exit_short = current_price >= exit_high
+        # Short-term reversal analysis
+        exit_lookback = max(5, length // 4)
+        if len(prices) >= exit_lookback:
+            recent_high = prices.iloc[-exit_lookback:].max()
+            recent_low = prices.iloc[-exit_lookback:].min()
+
+            at_recent_low = current_price <= recent_low
+            at_recent_high = current_price >= recent_high
         else:
-            turtle_exit_long = False
-            turtle_exit_short = False
+            recent_high = recent_low = None
+            at_recent_low = at_recent_high = False
         
         return {
-            "system1": {
-                "long_entry": turtle_long,
-                "short_entry": turtle_short,
-                "periods": length
+            "primary_period": {
+                "at_upper_channel": at_upper_channel,
+                "at_lower_channel": at_lower_channel,
+                "lookback_periods": length
             },
-            "system2": {
-                "long_entry": turtle_long_s2,
-                "short_entry": turtle_short_s2,
-                "periods": length * 2
+            "extended_period": {
+                "at_extended_high": at_extended_high,
+                "at_extended_low": at_extended_low,
+                "lookback_periods": extended_lookback
             },
-            "exits": {
-                "long_exit": turtle_exit_long,
-                "short_exit": turtle_exit_short,
-                "exit_periods": 10
+            "recent_extremes": {
+                "at_recent_low": at_recent_low,
+                "at_recent_high": at_recent_high,
+                "lookback_periods": exit_lookback
             }
         }
     
