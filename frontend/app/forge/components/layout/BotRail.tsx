@@ -14,6 +14,7 @@ interface BotRailProps {
   onDuplicate?: (configId: string) => void
   onDelete?: (configId: string) => void
   isBotAction?: boolean
+  hasUnsavedChanges?: boolean
   className?: string
 }
 
@@ -27,6 +28,7 @@ export function BotRail({
   onDuplicate,
   onDelete,
   isBotAction = false,
+  hasUnsavedChanges = false,
   className = ''
 }: BotRailProps) {
   return (
@@ -117,6 +119,7 @@ function BotRow({
             onDuplicate={onDuplicate || (() => {})}
             onDelete={onDelete || (() => {})}
             isBotAction={isBotAction}
+            hasUnsavedChanges={hasUnsavedChanges}
           />
         )}
       </div>

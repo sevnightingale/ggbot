@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { apiClient, BotConfiguration } from '@/lib/api'
+import { apiClient, BotConfiguration, ConfigData } from '@/lib/api'
 import { ThemeProvider } from '@/lib/theme'
 import { Header } from './components/layout/Header'
 import { BotRail } from './components/layout/BotRail'
@@ -92,6 +92,16 @@ export default function ForgePage() {
 
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<'monitor' | 'configure'>('monitor')
+
+  // Configuration editing state - sandboxed from operational display
+  const [isEditingConfig, setIsEditingConfig] = useState(false)
+  const [editingConfigData, setEditingConfigData] = useState<ConfigData | null>(null)
+  const [editingTableFields, setEditingTableFields] = useState<{
+    config_name?: string
+    config_type?: string
+  } | null>(null)
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+  const [originalConfig, setOriginalConfig] = useState<BotConfiguration | null>(null)
 
   // Real auth check
   useEffect(() => {
@@ -378,6 +388,132 @@ export default function ForgePage() {
     stopBot()
   }
 
+  // Configuration editing handlers
+  const startEditingConfig = () => {
+    if (!selectedBot) return
+
+    // Deep clone the selected bot config to avoid reference issues
+    const clonedConfigData = JSON.parse(JSON.stringify(selectedBot.config_data))
+    const clonedTableFields = {
+      config_name: selectedBot.config_name,
+      config_type: selectedBot.config_type
+    }
+
+    // Store original config for comparison and reset
+    setOriginalConfig(selectedBot)
+
+    // Load into editing state
+    setEditingConfigData(clonedConfigData)
+    setEditingTableFields(clonedTableFields)
+    setIsEditingConfig(true)
+    setHasUnsavedChanges(false) // Start with no changes
+  }
+
+  // Unified config update function with deep merging
+  const updateEditingConfig = (updates: {
+    configData?: Partial<ConfigData>
+    tableFields?: { config_name?: string; config_type?: string }
+  }) => {
+    if (!isEditingConfig) return
+
+    // Update JSONB config_data if provided
+    if (updates.configData) {
+      setEditingConfigData(prev => {
+        if (!prev) return null
+
+        // Deep merge the updates into existing config
+        const deepMerge = (target: any, source: any): any => {
+          const result = { ...target }
+          for (const key in source) {
+            if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
+              result[key] = deepMerge(target[key] || {}, source[key])
+            } else {
+              result[key] = source[key]
+            }
+          }
+          return result
+        }
+
+        return deepMerge(prev, updates.configData!)
+      })
+    }
+
+    // Update table fields if provided
+    if (updates.tableFields) {
+      setEditingTableFields(prev => ({
+        ...prev,
+        ...updates.tableFields
+      }))
+    }
+
+    // Mark as having changes
+    setHasUnsavedChanges(true)
+  }
+
+  // Save configuration changes
+  const saveConfigurationChanges = async () => {
+    if (!selectedBot || !editingConfigData || !editingTableFields || !hasUnsavedChanges) return
+
+    try {
+      // Call API with both JSONB config_data and table fields
+      const updatedBot = await apiClient.updateConfig(
+        selectedBot.config_id,
+        editingConfigData,                     // JSONB config_data
+        editingTableFields.config_name,        // Table field
+        editingTableFields.config_type         // Table field
+      )
+
+      // Update the selected bot in allBots array
+      setAllBots(prev => prev.map(bot =>
+        bot.config_id === selectedBot.config_id ? updatedBot : bot
+      ))
+
+      // Clear editing state
+      setIsEditingConfig(false)
+      setEditingConfigData(null)
+      setEditingTableFields(null)
+      setHasUnsavedChanges(false)
+      setOriginalConfig(null)
+
+    } catch (error) {
+      console.error('❌ Failed to save configuration:', error)
+      // TODO: Show error toast/notification
+    }
+  }
+
+  // Cancel configuration editing
+  const cancelConfigurationEditing = () => {
+    // Discard all editing state
+    setIsEditingConfig(false)
+    setEditingConfigData(null)
+    setEditingTableFields(null)
+    setHasUnsavedChanges(false)
+    setOriginalConfig(null)
+  }
+
+  // Reset configuration to original values
+  const resetConfigurationChanges = () => {
+    if (!originalConfig) return
+
+    // Reload original config into editing state
+    setEditingConfigData(JSON.parse(JSON.stringify(originalConfig.config_data)))
+    setEditingTableFields({
+      config_name: originalConfig.config_name,
+      config_type: originalConfig.config_type
+    })
+    setHasUnsavedChanges(false)
+  }
+
+  // Handle bot type changes with warning
+  const handleBotTypeChange = (newType: 'autonomous_trading' | 'signal_validation') => {
+    if (!isEditingConfig) return
+
+    // TODO: Show warning about field resets when changing bot type
+    updateEditingConfig({
+      tableFields: { config_type: newType }
+    })
+  }
+
   // Handler function for creating new bot
   const handleCreateNewBot = async () => {
     setIsCreatingNew(true)
@@ -406,6 +542,12 @@ export default function ForgePage() {
 
   // Handler function for renaming bot
   const handleRenameBot = async (configId: string, newName: string) => {
+    // Prevent renaming if there are unsaved configuration changes
+    if (hasUnsavedChanges) {
+      console.warn('Cannot rename bot while configuration changes are unsaved')
+      return
+    }
+
     setIsBotAction(true)
 
     try {
@@ -501,6 +643,7 @@ export default function ForgePage() {
             onDuplicate={handleDuplicateBot}
             onDelete={handleDeleteBot}
             isBotAction={isBotAction}
+            hasUnsavedChanges={hasUnsavedChanges}
             className="col-span-12 hidden md:col-span-3 md:block"
           />
 
@@ -566,32 +709,17 @@ export default function ForgePage() {
                 ) : (
                   <ConfigureLayout
                     selectedBot={selectedBot}
-                    isEditingConfig={false}
-                    hasUnsavedChanges={false}
-                    onStartEditing={() => {
-                      // TODO: Implement editing state management
-                      console.log('Start editing config')
-                    }}
-                    onSaveConfig={() => {
-                      // TODO: Implement save functionality
-                      console.log('Save config')
-                    }}
-                    onCancelConfig={() => {
-                      // TODO: Implement cancel functionality
-                      console.log('Cancel config editing')
-                    }}
-                    onResetConfig={() => {
-                      // TODO: Implement reset functionality
-                      console.log('Reset config')
-                    }}
+                    isEditingConfig={isEditingConfig}
+                    editingConfigData={editingConfigData}
+                    hasUnsavedChanges={hasUnsavedChanges}
+                    onStartEditing={startEditingConfig}
+                    onSaveConfig={saveConfigurationChanges}
+                    onCancelConfig={cancelConfigurationEditing}
+                    onResetConfig={resetConfigurationChanges}
                     onUpdateConfig={(updates) => {
-                      // TODO: Implement config updates
-                      console.log('Update config:', updates)
+                      updateEditingConfig({ configData: updates })
                     }}
-                    onBotTypeChange={(newType) => {
-                      // TODO: Implement bot type changes
-                      console.log('Change bot type to:', newType)
-                    }}
+                    onBotTypeChange={handleBotTypeChange}
                   />
                 )
               ) : (

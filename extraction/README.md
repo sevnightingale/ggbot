@@ -620,3 +620,5 @@ bbwidth
 cci
 donchian
 ema
+keltner
+
