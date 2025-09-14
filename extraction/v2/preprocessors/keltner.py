@@ -34,6 +34,14 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive Keltner Channels analysis
         """
+        # Capture original lengths before alignment
+        orig_lengths = {
+            "prices": len(prices),
+            "upper": len(upper_channel),
+            "middle": len(middle_channel),
+            "lower": len(lower_channel)
+        }
+
         # Clean and align all input series
         df_aligned = self._clean_and_align_series(prices, upper_channel, middle_channel, lower_channel)
         if len(df_aligned) < 5:
@@ -100,9 +108,9 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             },
             "evidence": {
                 "data_quality": {
-                    "original_periods": len(prices) + len(upper_channel) + len(middle_channel) + len(lower_channel),  # Approximate
+                    "original_periods": orig_lengths,
                     "aligned_periods": len(df_aligned),
-                    "valid_data_percentage": round(len(df_aligned) / max(len(prices), len(upper_channel)) * 100, 1)
+                    "valid_data_percentage": round(len(df_aligned) / max(orig_lengths.values()) * 100, 1)
                 },
                 "calculation_notes": f"Keltner analysis based on {len(df_aligned)} aligned data points with period {length}"
             },
@@ -341,9 +349,10 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         # Touch threshold
         touch_threshold = 0.005  # 0.5%
         
-        # Use length-based analysis window
+        # Use length-based analysis window for recent bars
         analysis_window = min(length * 2, len(prices))
-        for i in range(1, analysis_window):
+        start = max(1, len(prices) - analysis_window + 1)
+        for i in range(start, len(prices)):
             price = prices.iloc[i]
             prev_price = prices.iloc[i-1]
             
@@ -403,23 +412,25 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
         
         return effectiveness
     
-    def _analyze_keltner_squeeze(self, upper: pd.Series, lower: pd.Series, middle: pd.Series) -> Dict[str, Any]:
+    def _analyze_keltner_squeeze(self, upper: pd.Series, lower: pd.Series, middle: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze Keltner Channel squeeze conditions."""
-        width = (upper - lower) / middle * 100
+        # Safe width calculation with guarded denominator
+        width = (upper - lower).clip(lower=0) / middle.abs().clip(lower=1e-12) * 100
         current_width = width.iloc[-1]
-        
-        # Squeeze threshold (20-period low width)
-        if len(width) >= 20:
-            squeeze_threshold = width.rolling(20).min().iloc[-1]
+
+        # Squeeze threshold with configurable lookback
+        lookback = min(max(20, length), len(width))
+        if len(width) >= lookback:
+            squeeze_threshold = width.rolling(lookback).min().iloc[-1]
         else:
             mean_width = width.mean()
             std_width = width.std()
             squeeze_threshold = mean_width - std_width
-        
+
         # Squeeze detection
         is_squeeze = current_width <= squeeze_threshold * 1.05
-        
-        # Squeeze duration
+
+        # Squeeze duration with guarded condition
         squeeze_periods = 0
         if is_squeeze:
             for i in range(len(width) - 1, -1, -1):
@@ -427,13 +438,17 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
                     squeeze_periods += 1
                 else:
                     break
-        
+
+        # Safe intensity calculation
+        squeeze_threshold_denom = max(1e-12, abs(squeeze_threshold))
+        intensity = ((squeeze_threshold - current_width) / squeeze_threshold_denom * 100) if is_squeeze else 0.0
+
         return {
             "is_squeeze": is_squeeze,
             "squeeze_periods": squeeze_periods,
             "squeeze_threshold": round(squeeze_threshold, 2),
             "current_width": round(current_width, 2),
-            "squeeze_intensity": round((squeeze_threshold - current_width) / squeeze_threshold * 100, 2) if is_squeeze else 0
+            "squeeze_intensity": round(intensity, 2)
         }
     
     # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy

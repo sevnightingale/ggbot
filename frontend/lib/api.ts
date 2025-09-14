@@ -199,10 +199,13 @@ export class ApiClient {
     return result.config
   }
 
-  async updateConfig(configId: string, configData: Partial<ConfigData>, configName?: string): Promise<BotConfiguration> {
+  async updateConfig(configId: string, configData: Partial<ConfigData>, configName?: string, configType?: string): Promise<BotConfiguration> {
     const updateData: Record<string, unknown> = { ...configData }
     if (configName) {
       updateData.config_name = configName
+    }
+    if (configType) {
+      updateData.config_type = configType
     }
 
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/config/${configId}`, {

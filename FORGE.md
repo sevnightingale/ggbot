@@ -130,52 +130,212 @@ The Forge is a single-page application that replaces the dashboard with an elega
 
 ### Elegant Config State Architecture
 
+#### Sandboxed Editing Approach
+The configuration system uses **separate editing state** inspired by the legacy GGBotConfig patterns, adapted to the Forge architecture:
+
+- **Monitor Tab**: Displays live bot data with real-time SSE updates (positions, decisions, status)
+- **Configure Tab**: Loads selected bot into isolated editing state, separate from operational display
+- **Clear Separation**: Configuration editing never interferes with real-time operational data
+- **Explicit Save/Cancel**: Changes only take effect when user explicitly saves, can always cancel/reset
+
 #### Centralized State Management
-- Forge page maintains single source of truth for all `BotConfiguration` objects
-- `selectedConfigId` state determines which bot is currently active
-- Generic update function handles all configuration changes for selected bot
-- Dirty state tracking to detect unsaved changes
-- Single save operation overwrites entire configuration for selected bot
+- **Forge page**: Maintains single source of truth for all `BotConfiguration` objects in `allBots[]`
+- **selectedConfigId**: Determines which bot is currently active across all tabs
+- **Multi-bot native**: Load all user configurations, seamless switching between bots
+- **Editing isolation**: When Configure tab is active, selected bot config is loaded into separate `editingConfigState`
+- **Change detection**: `hasUnsavedChanges` flag tracks when editing state differs from original
+- **Original preservation**: Selected bot in `allBots[]` remains unchanged until save operation
+
+#### Two-Level Configuration Structure
+Based on database schema analysis, configuration data exists at two levels:
+
+**Database Table Fields** (`configurations` table):
+```sql
+config_id        UUID PRIMARY KEY
+user_id         UUID
+config_type     VARCHAR(50)     -- autonomous_trading | signal_validation
+config_name     VARCHAR(100)    -- User-defined bot name
+state           TEXT            -- active | inactive (for scheduler)
+config_data     JSONB           -- The configuration settings blob
+created_at      TIMESTAMPTZ
+updated_at      TIMESTAMPTZ
+```
+
+**JSONB Configuration Data** (`config_data` field):
+```json
+{
+  "schema_version": "2.1",
+  "selected_pair": "BTC/USDT",
+  "extraction": {
+    "selected_data_sources": { ... }
+  },
+  "decision": {
+    "analysis_frequency": "1h",
+    "user_prompt": "...",
+    "system_prompt": "..."
+  },
+  "llm_config": {
+    "provider": "deepseek",
+    "model": "deepseek-r1",
+    "use_platform_keys": true
+  },
+  "trading": {
+    "position_sizing": { ... },
+    "risk_management": { ... },
+    "exchange_config": { ... }
+  },
+  "telegram_integration": { ... }
+}
+```
+
+**Note**: JSONB `config_type` field is redundant and should be removed - table field is source of truth.
+
+#### Configure Tab Workflow
+1. **Tab Activation**: When user switches to Configure tab, load selected bot config into editing state
+2. **Isolated Editing**: All configuration changes happen in `editingConfigState`, never touch original bot
+3. **Real-time Safety**: SSE updates continue flowing to Monitor tab without conflicts
+4. **Change Detection**: Compare editing state to original config to detect unsaved changes
+5. **Save Operation**: Commit editing state back to selected bot and database
+6. **Cancel/Reset**: Discard editing state and reload from original bot config
+
+#### Component Architecture
+```
+├── configure/
+│   ├── SaveConfigBar.tsx      # Bot type selector + unsaved indicator + save/cancel/reset
+│   ├── ConfigTabs.tsx         # Sub-tabs: Market Data | Strategy | Trade Settings
+│   ├── MarketDataSelector.tsx # extraction.selected_data_sources management
+│   ├── DecisionEditor.tsx     # decision.user_prompt + analysis_frequency editing
+│   ├── RiskControls.tsx       # trading.risk_management + position_sizing
+│   ├── LLMConfig.tsx          # llm_config provider selection and API keys
+│   └── TelegramConfig.tsx     # telegram_integration publishing settings
+```
+
+#### SaveConfigBar Layout
+```
+[Bot Type Toggle] [Unsaved Changes Indicator] [Reset] [Cancel] [Save]
+```
+
+**Bot Type Toggle**: Switch between `autonomous_trading` and `signal_validation` with warning about field resets
+**Unsaved Indicator**: Shows when `editingConfigState` differs from original
+**Action Buttons**: Reset (reload original), Cancel (exit editing), Save (commit changes)
 
 #### Multi-Bot Switching Support
-- Load all user configurations, display selected one
-- `selectedConfigId` drives all page content (config editing, operational data, controls)
-- SSE stream filters data by currently selected `config_id`
-- Switching bots clears operational state (positions, decisions, execution status)
-- Config editing always targets currently selected bot
-- Bot selector component for navigation between multiple bots
+- **selectedConfigId** drives all page content (Monitor operational data, Configure editing)
+- **SSE stream filtering** by currently selected `config_id` for real-time updates
+- **Bot switching behavior**:
+  - Monitor tab: Immediately switches to new bot's operational data
+  - Configure tab: Warns about unsaved changes before switching, can cancel switch
+- **Editing state isolation**: Each bot gets independent editing session when Configure tab is active
 
-#### Component Separation Strategy
-- **Market Data Component**: Manages data sources and technical indicators
-- **Decision Component**: Handles strategy prompts and analysis frequency  
-- **Risk Management Component**: Controls position sizing and risk parameters
-- **LLM Configuration Component**: Manages AI provider and model settings
-- **Bot State Component**: Handles active/inactive state and naming
+#### Configuration Sub-Tabs
+**Market Data Tab**:
+- Data source selection (technical_analysis, signals_group_chats, etc.)
+- Data point selection with premium feature gating
+- Timeframe configuration for each data source
+- Search and filtering for large data source lists
+
+**Strategy Tab**:
+- Bot type selection (autonomous vs signal validation)
+- Analysis frequency settings
+- Decision engine prompt editing (locked system prompt + editable user prompt)
+- LLM provider and model selection
+
+**Trade Settings Tab**:
+- Position sizing configuration (fixed USD, account percentage, max position percentage)
+- Risk management (stop loss, take profit, max daily loss, max positions)
+- LLM configuration (API keys, provider selection, platform vs own keys)
+- Telegram integration (publishing channels, message templates, confidence thresholds)
+
+#### Component Data Flow Pattern
+```typescript
+interface ConfigComponentProps {
+  editingConfig: ConfigData
+  onUpdate: (updates: Partial<ConfigData>) => void
+  originalConfig: ConfigData  // For comparison/reset
+  hasUnsavedChanges: boolean
+}
+
+// Usage pattern
+<DecisionEditor
+  editingConfig={editingConfigState}
+  onUpdate={(updates) => updateEditingConfig(updates)}
+  originalConfig={selectedBot.config_data}
+  hasUnsavedChanges={hasUnsavedChanges}
+/>
+```
 
 #### Update Flow Pattern
-- Each component receives focused update function for its domain
-- Components update specific sections of configuration via callbacks
-- All changes flow through central update function
-- Immediate local state updates with dirty tracking
-- Batch save overwrites database configuration
+- **Component isolation**: Each component manages its specific config section
+- **Centralized updates**: All changes flow through `updateEditingConfig()` function
+- **Immediate local updates**: Changes appear instantly in editing state
+- **Deep merging**: Handle nested JSONB updates safely without losing other sections
+- **Change detection**: Automatically compare editing state to original on each update
 
 #### Multi-Field Support
-- Handle JSONB `config_data` field updates (nested object changes)
-- Handle top-level configuration fields (`state`, `config_name`, etc.)
-- Unified update pattern for both types of changes
+- **Table field updates**: Handle `config_name`, `config_type` changes in editing state
+- **JSONB field updates**: Deep merge changes into `config_data` sections
+- **Unified save operation**: Single API call handles both table and JSONB updates
+- **Atomic updates**: Either all changes save successfully or none do
 
 #### Save Strategy
-- Single save button triggers complete configuration overwrite
-- API call to `apiClient.updateConfig()` with entire modified configuration
-- Reset dirty state on successful save
-- Handle save conflicts and validation errors gracefully
+```typescript
+const saveConfiguration = async () => {
+  if (!selectedBot || !hasUnsavedChanges) return
 
-#### Benefits
-- Component isolation with shared state
-- Simple coordination without state duplication
-- Handles complex nested configuration updates
-- Maintains real-time operational data separately from configuration edits
-- Clean separation between configuration (user settings) and operational data (SSE updates)
+  try {
+    // Single API call with both table fields and JSONB data
+    const updatedBot = await apiClient.updateConfig(
+      selectedBot.config_id,
+      editingConfigState,                    // JSONB config_data
+      editingTableFields?.config_name,       // Table field
+      editingTableFields?.config_type        // Table field
+    )
+
+    // Update selected bot in allBots array
+    setAllBots(prev => prev.map(bot =>
+      bot.config_id === selectedBot.config_id ? updatedBot : bot
+    ))
+
+    // Clear editing state
+    clearEditingState()
+    setHasUnsavedChanges(false)
+
+  } catch (error) {
+    // Handle validation errors, conflicts, etc.
+  }
+}
+```
+
+#### Bot Naming Conflict Resolution
+**Problem**: Bot name can be edited in two places:
+1. BotRail rename (anytime)
+2. Configure tab editing state (when active)
+
+**Solution**: Disable BotRail rename when Configure tab has unsaved changes
+- Show tooltip: "Finish editing configuration first"
+- Prevents conflicts between editing state and direct bot updates
+- Maintains data integrity and user expectations
+
+#### Validation and Error Handling
+- **Real-time validation**: Show field-level errors immediately in editing state
+- **Save validation**: Server-side validation on save with detailed error messages
+- **Conflict resolution**: Handle cases where selected bot was updated by another session
+- **Graceful degradation**: If save fails, preserve editing state for retry
+
+#### Benefits of Sandboxed Approach
+- **Robust user experience**: Can always cancel/reset changes, no accidental data loss
+- **Real-time data safety**: SSE updates never conflict with user edits
+- **Clear mental model**: "Viewing bot" vs "editing bot settings" are distinct modes
+- **Validation isolation**: Invalid edits don't corrupt operational display
+- **Multi-component coordination**: All config components share same editing state cleanly
+- **Undo/reset capability**: Always can return to last saved state
+- **Change awareness**: User always knows exactly what's been modified
+
+#### Technical Implementation Notes
+- **API extension needed**: `updateConfig()` must accept `config_type` parameter
+- **JSONB cleanup required**: Remove redundant `config_type` from JSONB data
+- **Template updates**: Remove `config_type` from configuration templates
+- **Validation updates**: Ensure all validation logic uses table field not JSONB field
 
 ### Implementation Phases
 
@@ -270,11 +430,11 @@ The Forge is a single-page application that replaces the dashboard with an elega
 - [x] Complete progressive duplication of all MonitorContent functionality
 
 **Phase 2D: Bot Management & Mobile UX** (FOCUSED SCOPE)
-- [ ] **Bot creation and management actions**
-  - [ ] "+" New bot button functionality in BotRail
-  - [ ] Bot deletion/archiving capabilities
-  - [ ] Bot duplication for strategy variations
-  - [ ] Bot renaming interface
+- [x] **Bot creation and management actions**
+  - [x] "+" New bot button functionality in BotRail
+  - [x] Bot deletion/archiving capabilities
+  - [x] Bot duplication for strategy variations
+  - [x] Bot renaming interface
 - [ ] **Mobile drawer behavior for bot switching**
   - [ ] Transform BotRail into mobile drawer on small screens
   - [ ] Smooth slide-in/out animations
@@ -306,19 +466,30 @@ The Forge is a single-page application that replaces the dashboard with an elega
 
 #### Phase 4: Configure Experience
 
-**Phase 4A: Configuration Architecture**
-- [ ] Implement centralized config update system with dirty state tracking
-- [ ] Create save/publish flow with validation
-- [ ] Build configuration tabs (Decision, Market Data, Risk, Trading, LLM)
-- [ ] Add draft mode with auto-save functionality
-- [ ] Implement configuration validation and error handling
+**Phase 4A: Configuration Foundation** ✅ **COMPLETE**
+- [x] **JSONB config_type cleanup**: Removed redundant config_type from JSONB data across codebase
+- [x] **API client extension**: Updated `updateConfig()` to accept configType parameter
+- [x] **Elegant architecture design**: Complete sandboxed editing approach documented in FORGE.md
+- [x] **Two-level data structure mapping**: Table fields vs JSONB config_data clarified
+- [x] **Component architecture planning**: SaveConfigBar + 3 sub-tabs (Market Data | Strategy | Trade Settings)
 
-**Phase 4B: Configuration Components**
-- [ ] Build DecisionEditor with locked/editable sections
-- [ ] Create MarketDataSelector with hierarchical data source structure
-- [ ] Implement RiskManagement controls with preview
-- [ ] Add LLMConfiguration with provider selection and testing
-- [ ] Build advanced JSON editor for power users
+**Phase 4B: Configure Tab Implementation**
+- [ ] **SaveConfigBar component**: Bot type toggle + unsaved indicator + save/cancel/reset actions
+- [ ] **Configure tab activation**: Load selected bot into isolated editing state when tab becomes active
+- [ ] **Change detection system**: Compare editing state to original config, track hasUnsavedChanges flag
+- [ ] **Bot switching protection**: Disable BotRail rename when Configure tab has unsaved changes
+
+**Phase 4C: Configuration Sub-Tabs**
+- [ ] **ConfigTabs component**: Sub-tab navigation (Market Data | Strategy | Trade Settings)
+- [ ] **Market Data tab**: MarketDataSelector for extraction.selected_data_sources with premium gating
+- [ ] **Strategy tab**: DecisionEditor for user prompts + bot type selection + LLM provider config
+- [ ] **Trade Settings tab**: RiskControls + LLMConfig + TelegramConfig components
+
+**Phase 4D: Save/Cancel Flow**
+- [ ] **Centralized state management**: editingConfigState + editingTableFields with unified update function
+- [ ] **Save operation**: Atomic update of both table fields and JSONB config_data via API
+- [ ] **Cancel/Reset functionality**: Discard editing state and reload from original bot config
+- [ ] **Validation and error handling**: Field-level + save-time validation with graceful error states
 
 #### Phase 5: Progressive Enhancement
 
