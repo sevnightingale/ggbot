@@ -8,7 +8,7 @@ histogram analysis, zero line behavior, and divergence pattern recognition.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -30,29 +30,56 @@ class MACDPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive MACD analysis
         """
-        if len(macd_line) < 5:
-            return {"error": "Insufficient data for MACD analysis"}
+        # Capture original lengths before alignment
+        orig_lengths = {
+            "macd": len(macd_line),
+            "signal": len(signal_line),
+            "histogram": len(histogram)
+        }
+        if prices is not None:
+            orig_lengths["prices"] = len(prices)
+
+        # Clean and align all input series
+        macd = pd.to_numeric(macd_line, errors="coerce")
+        sig = pd.to_numeric(signal_line, errors="coerce")
+        hist = pd.to_numeric(histogram, errors="coerce")
+        frames = {"macd": macd, "signal": sig, "hist": hist}
+        if prices is not None:
+            frames["price"] = pd.to_numeric(prices, errors="coerce")
+
+        df = pd.concat(frames, axis=1, join="inner").dropna()
+        if len(df) < 5:
+            return {"error": "Insufficient aligned data for MACD analysis"}
+
+        macd, sig, hist = df["macd"], df["signal"], df["hist"]
+        px = df["price"] if "price" in df else None
+
+        current_macd = float(macd.iloc[-1])
+        current_signal = float(sig.iloc[-1])
+        current_histogram = float(hist.iloc[-1])
         
-        current_macd = float(macd_line.iloc[-1])
-        current_signal = float(signal_line.iloc[-1])
-        current_histogram = float(histogram.iloc[-1])
-        
+        # Generate proper timestamp
+        if np.issubdtype(macd.index.dtype, np.datetime64):
+            timestamp = macd.index[-1].isoformat() if hasattr(macd.index[-1], 'isoformat') else datetime.now(timezone.utc).isoformat()
+        else:
+            timestamp = datetime.now(timezone.utc).isoformat()
+
         # Crossover analysis
-        crossover_analysis = self._analyze_macd_crossovers(macd_line, signal_line)
-        
+        crossover_analysis = self._analyze_macd_crossovers(macd, sig)
+
         # Histogram analysis
-        histogram_analysis = self._analyze_histogram(histogram)
-        
+        histogram_analysis = self._analyze_histogram(hist)
+
         # Divergence analysis
         divergence = None
-        if prices is not None:
-            divergence = self._detect_macd_price_divergence(macd_line, prices)
-        
+        if px is not None:
+            divergence = self._detect_macd_price_divergence(macd, px)
+
         # Trend strength
-        trend_strength = self._analyze_macd_trend_strength(macd_line, signal_line, histogram)
-        
+        trend_strength = self._analyze_macd_trend_strength(macd, sig, hist)
+
         # Zero line analysis
-        zero_line_analysis = self._analyze_zero_line_behavior(macd_line)
+        zero_line_analysis = self._analyze_zero_line_behavior(macd)
         
         return {
             "indicator": "MACD",
@@ -60,7 +87,7 @@ class MACDPreprocessor(BasePreprocessor):
                 "macd": round(current_macd, 4),
                 "signal": round(current_signal, 4),
                 "histogram": round(current_histogram, 4),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": timestamp
             },
             "trend": {
                 "direction": "bullish" if current_macd > current_signal else "bearish",
@@ -68,14 +95,24 @@ class MACDPreprocessor(BasePreprocessor):
                 "momentum": histogram_analysis["momentum_direction"],
                 "acceleration": histogram_analysis["acceleration"]
             },
-            "crossovers": crossover_analysis,
-            "histogram": histogram_analysis,
-            "zero_line": zero_line_analysis,
-            "divergence": divergence,
-            "signals": self._generate_macd_signals(current_macd, current_signal, current_histogram, crossover_analysis),
-            "confidence": trend_strength["confidence"],
+            "patterns": {
+                "crossovers": crossover_analysis,
+                "divergence": divergence
+            },
+            "levels": {
+                "zero_line": zero_line_analysis,
+                "histogram": histogram_analysis
+            },
+            "evidence": {
+                "data_quality": {
+                    "original_periods": orig_lengths,
+                    "aligned_periods": len(df),
+                    "valid_data_percentage": round(len(df) / max(orig_lengths.values()) * 100, 1)
+                },
+                "calculation_notes": f"MACD analysis based on {len(df)} aligned data points"
+            },
             "summary": self._generate_macd_summary(
-                current_macd, current_signal, current_histogram, 
+                current_macd, current_signal, current_histogram,
                 crossover_analysis, trend_strength
             )
         }
@@ -84,25 +121,34 @@ class MACDPreprocessor(BasePreprocessor):
         """Analyze MACD crossovers."""
         crossovers = []
         
-        for i in range(1, min(20, len(macd_line))):
+        # Calculate volatility for realistic strength scaling
+        lookback = min(50, len(macd_line))
+        vol = float(macd_line.tail(lookback).std() + signal_line.tail(lookback).std()) or 1e-6
+
+        for i in range(1, min(20, len(macd_line), len(signal_line))):
             prev_macd = macd_line.iloc[-(i+1)]
             curr_macd = macd_line.iloc[-i]
             prev_signal = signal_line.iloc[-(i+1)]
             curr_signal = signal_line.iloc[-i]
-            
+
+            # Calculate volatility-scaled strength
+            strength = abs(curr_macd - curr_signal) / vol
+
             # Bullish crossover
             if prev_macd <= prev_signal and curr_macd > curr_signal:
                 crossovers.append({
                     "type": "bullish_crossover",
                     "periods_ago": i,
-                    "strength": abs(curr_macd - curr_signal)
+                    "strength": round(strength, 3),
+                    "strength_level": "high" if strength > 1.5 else ("medium" if strength > 0.7 else "low")
                 })
-            # Bearish crossover  
+            # Bearish crossover
             elif prev_macd >= prev_signal and curr_macd < curr_signal:
                 crossovers.append({
                     "type": "bearish_crossover",
                     "periods_ago": i,
-                    "strength": abs(curr_macd - curr_signal)
+                    "strength": round(strength, 3),
+                    "strength_level": "high" if strength > 1.5 else ("medium" if strength > 0.7 else "low")
                 })
         
         return {
@@ -113,7 +159,12 @@ class MACDPreprocessor(BasePreprocessor):
     def _analyze_histogram(self, histogram: pd.Series) -> Dict[str, Any]:
         """Analyze MACD histogram for momentum insights."""
         if len(histogram) < 3:
-            return {}
+            return {
+                "momentum_direction": "flat",
+                "acceleration": 0.0,
+                "zero_crossings_recent": 0,
+                "histogram_strength": float(histogram.iloc[-1]) if len(histogram) else 0.0
+            }
         
         current = histogram.iloc[-1]
         previous = histogram.iloc[-2]
@@ -139,16 +190,19 @@ class MACDPreprocessor(BasePreprocessor):
         """Analyze MACD behavior around zero line."""
         current = macd_line.iloc[-1]
         
-        # Time above/below zero
-        above_zero = sum(1 for v in macd_line if v > 0)
-        below_zero = sum(1 for v in macd_line if v < 0)
-        total = len(macd_line)
-        
+        # Use finite values and handle zero case
+        finite = macd_line.dropna()
+        above_pct = (finite > 0).mean() * 100
+        below_pct = (finite < 0).mean() * 100
+
+        # Position classification
+        position = "above" if current > 0 else ("below" if current < 0 else "at_zero")
+
         return {
-            "current_position": "above" if current > 0 else "below",
+            "current_position": position,
             "distance_from_zero": round(abs(current), 4),
-            "time_above_zero_pct": round((above_zero / total) * 100, 1),
-            "time_below_zero_pct": round((below_zero / total) * 100, 1)
+            "time_above_zero_pct": round(above_pct, 1),
+            "time_below_zero_pct": round(below_pct, 1)
         }
     
     def _analyze_macd_trend_strength(self, macd: pd.Series, signal: pd.Series, histogram: pd.Series) -> Dict[str, Any]:
@@ -157,37 +211,34 @@ class MACDPreprocessor(BasePreprocessor):
         current_signal = signal.iloc[-1]
         current_histogram = histogram.iloc[-1]
         
-        # Basic strength calculation
-        strength = 0.5  # Default moderate strength
-        
-        # Enhance strength based on histogram
-        if abs(current_histogram) > np.std(histogram.dropna()):
-            strength = 0.7
-        
-        # Confidence based on signal clarity
-        confidence = min(1.0, abs(current_macd - current_signal) / (np.std(macd.dropna()) + 0.001))
-        confidence = max(0.3, min(0.8, confidence))
-        
+        # Relative histogram strength calculation
+        lookback = min(50, len(histogram))
+        hvol = max(1e-6, histogram.tail(lookback).std())
+        strength = min(1.0, abs(current_histogram) / (2 * hvol))
+
         return {
-            "strength": strength,
-            "confidence": confidence
+            "strength": round(strength, 3)
         }
     
     def _detect_macd_price_divergence(self, macd: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
         """Detect MACD-price divergence."""
-        if len(macd) < 15 or len(prices) < 15:
+        if len(macd) < 15:
             return None
-        
-        # Look for divergence patterns
-        recent_periods = 10
-        macd_recent = macd.iloc[-recent_periods:]
-        price_recent = prices.iloc[-recent_periods:]
-        
-        # Find peaks and troughs
-        macd_peaks = self._find_peaks(macd_recent, prominence=5)
-        macd_troughs = self._find_troughs(macd_recent, prominence=5)
-        price_peaks = self._find_peaks(price_recent)
-        price_troughs = self._find_troughs(price_recent)
+
+        # Look for divergence patterns using aligned data
+        win = 10
+        m_recent = macd.tail(win)
+        p_recent = prices.tail(win)
+
+        # Calculate relative prominence thresholds
+        prom_m = max(1e-6, m_recent.std() * 0.8)
+        prom_p = max(1e-6, p_recent.std() * 0.8)
+
+        # Find peaks and troughs with scaled prominence
+        macd_peaks = self._find_peaks(m_recent, prominence=prom_m)
+        macd_troughs = self._find_troughs(m_recent, prominence=prom_m)
+        price_peaks = self._find_peaks(p_recent, prominence=prom_p)
+        price_troughs = self._find_troughs(p_recent, prominence=prom_p)
         
         # Bearish divergence: price higher highs, MACD lower highs
         if len(macd_peaks) >= 2 and len(price_peaks) >= 2:
@@ -199,8 +250,7 @@ class MACDPreprocessor(BasePreprocessor):
             if (latest_price_peak["value"] > prev_price_peak["value"] and
                 latest_macd_peak["value"] < prev_macd_peak["value"]):
                 return {
-                    "type": "bearish_divergence",
-                    "confidence": 0.7,
+                    "type": "negative_divergence",
                     "description": "Price making higher highs while MACD making lower highs"
                 }
         
@@ -214,46 +264,18 @@ class MACDPreprocessor(BasePreprocessor):
             if (latest_price_trough["value"] < prev_price_trough["value"] and
                 latest_macd_trough["value"] > prev_macd_trough["value"]):
                 return {
-                    "type": "bullish_divergence",
-                    "confidence": 0.7,
+                    "type": "positive_divergence",
                     "description": "Price making lower lows while MACD making higher lows"
                 }
         
         return None
     
-    def _generate_macd_signals(self, macd: float, signal: float, histogram: float, 
-                              crossovers: Dict) -> List[Dict[str, Any]]:
-        """Generate MACD signals."""
-        signals = []
-        
-        # Crossover signals
-        if crossovers["latest_crossover"]:
-            crossover = crossovers["latest_crossover"]
-            if crossover["periods_ago"] <= 2:  # Recent crossover
-                signals.append({
-                    "type": f"{crossover['type']}_signal",
-                    "strength": "high" if crossover["strength"] > 100 else "medium",
-                    "reason": f"Recent MACD {crossover['type']} {crossover['periods_ago']} periods ago",
-                    "confidence": min(1.0, crossover["strength"] / 200)
-                })
-        
-        # Histogram momentum signals
-        if histogram > 0 and macd > signal:
-            signals.append({
-                "type": "momentum_continuation",
-                "strength": "medium",
-                "reason": "MACD above signal with positive histogram momentum",
-                "confidence": 0.6
-            })
-        
-        return signals
-    
     def _generate_macd_summary(self, macd: float, signal: float, histogram: float,
                               crossovers: Dict, trend_strength: Dict) -> str:
         """Generate MACD summary."""
-        trend = "bullish" if macd > signal else "bearish"
+        trend = "rising" if macd > signal else "falling"
         momentum = "increasing" if histogram > 0 else "decreasing"
-        
+
         summary = f"MACD {trend} trend with {momentum} momentum"
         
         if crossovers["latest_crossover"] and crossovers["latest_crossover"]["periods_ago"] <= 5:

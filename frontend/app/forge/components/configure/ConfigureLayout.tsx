@@ -5,6 +5,7 @@ import { BotConfiguration, ConfigData } from '@/lib/api'
 import { SaveConfigBar } from './SaveConfigBar'
 import { ConfigTabs, ConfigTabType } from './ConfigTabs'
 import { MarketDataSelector } from './MarketDataSelector'
+import { SignalsConfiguration } from './SignalsConfiguration'
 import { StrategyEditor } from './StrategyEditor'
 import { TradeSettings } from './TradeSettings'
 import { EmptyState } from '../shared/EmptyState'
@@ -79,6 +80,13 @@ export function ConfigureLayout({
           <div className="min-h-[400px]">
             {activeConfigTab === 'market-data' && (
               <MarketDataSelector
+                configData={configData}
+                onUpdate={onUpdateConfig}
+              />
+            )}
+
+            {activeConfigTab === 'signals' && (
+              <SignalsConfiguration
                 configData={configData}
                 onUpdate={onUpdateConfig}
               />

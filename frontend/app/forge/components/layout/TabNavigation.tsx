@@ -17,7 +17,7 @@ export function TabNavigation({ activeTab, onTabChange, className = '' }: TabNav
   ]
 
   return (
-    <div className={`border-b border-[var(--border)] bg-[var(--bg-primary)] ${className}`}>
+    <div className={`bg-[var(--bg-primary)] ${className}`}>
       <div className="flex items-center gap-2 py-2">
         {tabs.map((tab) => (
           <button

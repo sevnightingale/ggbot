@@ -30,8 +30,8 @@ export default function Pricing() {
         "Live trading execution",
         "Priority support"
       ],
-      cta: "Sign up",
-      href: "https://app.ggbots.ai/signup",
+      cta: "Coming Soon",
+      href: "#",
       popular: true
     },
     {
@@ -46,8 +46,8 @@ export default function Pricing() {
         "Portfolio management",
         "White-glove setup"
       ],
-      cta: "Sign up", 
-      href: "https://app.ggbots.ai/signup",
+      cta: "Coming Soon",
+      href: "#",
       popular: false
     }
   ]
@@ -114,16 +114,18 @@ export default function Pricing() {
               </ul>
 
               {/* CTA Button */}
-              <a
-                href={plan.href}
-                className={`block w-full text-center py-3 px-6 rounded-sm font-medium transition-all duration-200 ${
-                  plan.popular
-                    ? 'bg-agents-decision hover:bg-agents-decision/90 text-bone-200 shadow-[0_0_15px_rgba(44,190,119,0.3)] hover:shadow-[0_0_25px_rgba(44,190,119,0.4)]'
-                    : 'bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 border border-bone-200/20 hover:border-bone-200/40'
-                }`}
-              >
-                {plan.cta}
-              </a>
+              {plan.cta === "Coming Soon" ? (
+                <div className="block w-full text-center py-3 px-6 rounded-sm font-medium bg-charcoal-700 text-bone-200/60 border border-bone-200/20 cursor-not-allowed">
+                  {plan.cta}
+                </div>
+              ) : (
+                <a
+                  href={plan.href}
+                  className="block w-full text-center py-3 px-6 rounded-sm font-medium transition-all duration-200 bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 border border-bone-200/20 hover:border-bone-200/40"
+                >
+                  {plan.cta}
+                </a>
+              )}
 
               {/* Placeholder Note */}
               {index === 1 && (

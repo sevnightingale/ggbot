@@ -1,7 +1,8 @@
 'use client'
 
-import React from 'react'
-import { ConfigData } from '@/lib/api'
+import React, { useState } from 'react'
+import { ChevronDown, ChevronUp, Lock } from 'lucide-react'
+import { ConfigData, createDefaultConfigData } from '@/lib/api'
 
 interface TradeSettingsProps {
   configData?: ConfigData
@@ -14,9 +15,31 @@ export function TradeSettings({
   onUpdate,
   className = ''
 }: TradeSettingsProps) {
-  const trading = configData?.trading || {}
-  const positionSizing = trading.position_sizing || {}
-  const riskManagement = trading.risk_management || {}
+  const [showMessageTemplate, setShowMessageTemplate] = useState(false)
+
+  const defaultConfig = createDefaultConfigData()
+  const trading = configData?.trading || defaultConfig.trading
+  const positionSizing = trading.position_sizing || defaultConfig.trading.position_sizing
+  const riskManagement = trading.risk_management || defaultConfig.trading.risk_management
+  const telegramConfig = configData?.telegram_integration || defaultConfig.telegram_integration
+  const publisher = telegramConfig.publisher || defaultConfig.telegram_integration.publisher
+
+  const updateConfig = (updates: Partial<ConfigData>) => {
+    if (onUpdate) {
+      onUpdate(updates)
+    }
+  }
+
+  // Helper to update trading config with proper type handling
+  const updateTradingConfig = (tradingUpdates: Partial<ConfigData['trading']>) => {
+    updateConfig({
+      trading: {
+        ...defaultConfig.trading,
+        ...trading,
+        ...tradingUpdates
+      }
+    })
+  }
 
   return (
     <div className={`space-y-6 ${className}`}>
@@ -32,13 +55,17 @@ export function TradeSettings({
             <label className="block text-sm font-medium text-[var(--text-muted)] mb-3">
               Sizing Method
             </label>
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 gap-3">
               {[
                 { id: 'fixed_usd', name: 'Fixed USD Amount', desc: 'Use same dollar amount per trade' },
-                { id: 'account_percent', name: 'Account Percentage', desc: 'Use percentage of total balance' }
+                { id: 'account_percentage', name: 'Account Percentage', desc: 'Use percentage of total balance' },
+                { id: 'confidence_based', name: 'Confidence-Based', desc: 'Scale position size based on AI confidence (recommended)' }
               ].map((method) => (
                 <button
                   key={method.id}
+                  onClick={() => updateTradingConfig({
+                    position_sizing: { ...positionSizing, method: method.id }
+                  })}
                   className={`p-4 rounded-xl border text-left transition-colors ${
                     positionSizing.method === method.id
                       ? 'bg-[var(--agent-trading)]/20 border-[var(--agent-trading)] text-[var(--text-primary)]'
@@ -53,14 +80,19 @@ export function TradeSettings({
           </div>
 
           {/* Size Inputs */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
                 Fixed Amount (USD)
               </label>
               <input
                 type="number"
-                value={positionSizing.fixed_amount_usd || 100}
+                value={(positionSizing.fixed_amount_usd as number) || 100}
+                onChange={(e) => updateTradingConfig({
+                    position_sizing: { ...positionSizing, fixed_amount_usd: Number(e.target.value) }
+                })}
+                min="10"
+                max="10000"
                 className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
                 placeholder="100"
               />
@@ -71,12 +103,32 @@ export function TradeSettings({
               </label>
               <input
                 type="number"
-                value={positionSizing.account_percent || 5}
+                value={(positionSizing.account_percent as number) || 5}
+                onChange={(e) => updateTradingConfig({
+                    position_sizing: { ...positionSizing, account_percent: Number(e.target.value) }
+                })}
                 min="0.1"
-                max="100"
+                max="50"
                 step="0.1"
                 className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
                 placeholder="5"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Max Position % (when confidence=100%)
+              </label>
+              <input
+                type="number"
+                value={(positionSizing.max_position_percent as number) || 10}
+                onChange={(e) => updateTradingConfig({
+                    position_sizing: { ...positionSizing, max_position_percent: Number(e.target.value) }
+                })}
+                min="1"
+                max="25"
+                step="0.5"
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                placeholder="10"
               />
             </div>
           </div>
@@ -89,59 +141,94 @@ export function TradeSettings({
           Risk Management
         </h3>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-              Stop Loss (%)
-            </label>
-            <input
-              type="number"
-              value={riskManagement.default_stop_loss_percent || 5}
-              min="0.1"
-              max="50"
-              step="0.1"
-              className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
-              placeholder="5"
-            />
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Stop Loss (%)
+              </label>
+              <input
+                type="number"
+                value={(riskManagement.default_stop_loss_percent as number) || 5}
+                onChange={(e) => updateTradingConfig({
+                    risk_management: { ...riskManagement, default_stop_loss_percent: Number(e.target.value) }
+                })}
+                min="0.1"
+                max="50"
+                step="0.1"
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
+                placeholder="5"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Take Profit (%)
+              </label>
+              <input
+                type="number"
+                value={(riskManagement.default_take_profit_percent as number) || 10}
+                onChange={(e) => updateTradingConfig({
+                    risk_management: { ...riskManagement, default_take_profit_percent: Number(e.target.value) }
+                })}
+                min="0.1"
+                max="100"
+                step="0.1"
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                placeholder="10"
+              />
+            </div>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-              Take Profit (%)
-            </label>
-            <input
-              type="number"
-              value={riskManagement.default_take_profit_percent || 10}
-              min="0.1"
-              max="100"
-              step="0.1"
-              className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
-              placeholder="10"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-              Max Positions
-            </label>
-            <input
-              type="number"
-              value={riskManagement.max_positions || 1}
-              min="1"
-              max="10"
-              className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
-              placeholder="1"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-              Daily Loss Limit (USD)
-            </label>
-            <input
-              type="number"
-              value={riskManagement.max_daily_loss_usd || 500}
-              min="10"
-              className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
-              placeholder="500"
-            />
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Leverage
+              </label>
+              <input
+                type="number"
+                value={(trading.leverage as number) || 1}
+                onChange={(e) => updateTradingConfig({
+                    leverage: Number(e.target.value)
+                })}
+                min="1"
+                max="100"
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                placeholder="1"
+              />
+              <div className="text-xs text-[var(--text-muted)] mt-1">1x = spot trading, higher = leveraged</div>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Max Positions
+              </label>
+              <input
+                type="number"
+                value={(riskManagement.max_positions as number) || 5}
+                onChange={(e) => updateTradingConfig({
+                    risk_management: { ...riskManagement, max_positions: Number(e.target.value) }
+                })}
+                min="1"
+                max="20"
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                placeholder="5"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Daily Loss Limit (USD)
+              </label>
+              <input
+                type="number"
+                value={(riskManagement.max_daily_loss_usd as number) || ''}
+                onChange={(e) => updateTradingConfig({
+                    risk_management: { ...riskManagement, max_daily_loss_usd: e.target.value ? Number(e.target.value) : undefined }
+                })}
+                min="50"
+                max="5000"
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
+                placeholder="Optional limit"
+              />
+            </div>
           </div>
         </div>
       </div>
@@ -160,45 +247,200 @@ export function TradeSettings({
               <div className="text-sm text-[var(--text-muted)]">Send trading decisions to Telegram channel</div>
             </div>
             <button
+              onClick={() => updateConfig({
+                telegram_integration: {
+                  ...telegramConfig,
+                  publisher: { ...publisher, enabled: !publisher.enabled }
+                }
+              })}
               className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                configData?.telegram_integration?.publisher?.enabled
+                publisher.enabled
                   ? 'bg-emerald-500'
                   : 'bg-[var(--border)]'
               }`}
             >
               <span
                 className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  configData?.telegram_integration?.publisher?.enabled ? 'translate-x-6' : 'translate-x-1'
+                  publisher.enabled ? 'translate-x-6' : 'translate-x-1'
                 }`}
               />
             </button>
           </div>
 
           {/* Channel Settings (when enabled) */}
-          {configData?.telegram_integration?.publisher?.enabled && (
-            <div className="space-y-3">
-              <div>
-                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                  Bot Token
-                </label>
-                <input
-                  type="password"
-                  placeholder="Your Telegram bot token"
-                  className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
-                />
+          {publisher.enabled && (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                    Bot Token
+                  </label>
+                  <input
+                    type="password"
+                    value={(publisher.bot_token as string) || ''}
+                    onChange={(e) => updateConfig({
+                      telegram_integration: {
+                        ...telegramConfig,
+                        publisher: { ...publisher, bot_token: e.target.value }
+                      }
+                    })}
+                    placeholder="Your Telegram bot token"
+                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                    Channel ID
+                  </label>
+                  <input
+                    type="text"
+                    value={(publisher.filter_channel as string) || ''}
+                    onChange={(e) => updateConfig({
+                      telegram_integration: {
+                        ...telegramConfig,
+                        publisher: { ...publisher, filter_channel: e.target.value }
+                      }
+                    })}
+                    placeholder="-1001234567890"
+                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
+                  />
+                </div>
               </div>
+
               <div>
                 <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                  Channel ID
+                  Confidence Threshold (%)
                 </label>
                 <input
-                  type="text"
-                  placeholder="-1001234567890"
+                  type="number"
+                  value={((publisher.confidence_threshold as number) || 0.7) * 100}
+                  onChange={(e) => updateConfig({
+                    telegram_integration: {
+                      ...telegramConfig,
+                      publisher: { ...publisher, confidence_threshold: Number(e.target.value) / 100 }
+                    }
+                  })}
+                  min="0"
+                  max="100"
+                  step="1"
                   className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
+                  placeholder="70"
                 />
+                <div className="text-xs text-[var(--text-muted)] mt-1">Only publish signals above this confidence level</div>
+              </div>
+
+              {/* Collapsible Message Template */}
+              <div>
+                <button
+                  onClick={() => setShowMessageTemplate(!showMessageTemplate)}
+                  className="flex items-center justify-between w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-left hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  <span className="font-medium text-[var(--text-primary)]">Message Template</span>
+                  {showMessageTemplate ? (
+                    <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" />
+                  ) : (
+                    <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
+                  )}
+                </button>
+
+                {showMessageTemplate && (
+                  <div className="mt-3">
+                    <textarea
+                      value={(publisher.message_template as string) || '🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}'}
+                      onChange={(e) => updateConfig({
+                        telegram_integration: {
+                          ...telegramConfig,
+                          publisher: { ...publisher, message_template: e.target.value }
+                        }
+                      })}
+                      rows={4}
+                      className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
+                      placeholder="🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}
+{REASONING}"
+                    />
+                    <div className="text-xs text-[var(--text-muted)] mt-1">
+                      Use {'{ACTION}'}, {'{SYMBOL}'}, {'{CONFIDENCE}'}, {'{REASONING}'} as placeholders
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           )}
+        </div>
+      </div>
+
+      {/* Exchange Connection (Locked for MVP) */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 opacity-60">
+        <div className="flex items-center gap-3 mb-4">
+          <Lock className="h-5 w-5 text-[var(--text-muted)]" />
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+            Exchange Connection
+          </h3>
+          <span className="px-2 py-1 rounded-full bg-[var(--agent-trading)]/20 text-xs text-[var(--agent-trading)] border border-[var(--agent-trading)]/30">
+            Live Trading - Coming Soon
+          </span>
+        </div>
+
+        <div className="space-y-4">
+          <div className="p-4 rounded-xl bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30">
+            <div className="flex items-center gap-2 mb-2">
+              <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
+              <span className="font-medium text-[var(--text-primary)]">Paper Trading Active</span>
+            </div>
+            <div className="text-sm text-[var(--text-muted)]">
+              Your bot is currently trading with $10,000 in simulated funds. Live trading with real exchanges will be available soon.
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Exchange
+              </label>
+              <select
+                disabled
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
+              >
+                <option>Binance (Coming Soon)</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                Trading Pair
+              </label>
+              <input
+                type="text"
+                value={configData?.selected_pair || 'BTC/USDT'}
+                disabled
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                API Key
+              </label>
+              <input
+                type="password"
+                placeholder="Your exchange API key"
+                disabled
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                API Secret
+              </label>
+              <input
+                type="password"
+                placeholder="Your exchange API secret"
+                disabled
+                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
+              />
+            </div>
+          </div>
         </div>
       </div>
     </div>

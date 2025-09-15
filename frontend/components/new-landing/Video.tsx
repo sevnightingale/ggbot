@@ -8,9 +8,6 @@ export default function Video() {
           <h2 className="text-3xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
             See the complete walkthrough
           </h2>
-          <p className="text-lg text-bone-200/70 max-w-2xl mx-auto">
-            Watch how real traders are using ggbots to automate their strategies and achieve consistent results in volatile markets.
-          </p>
         </div>
 
         {/* Video Container - YouTube Ready */}
@@ -62,21 +59,6 @@ export default function Video() {
           </div>
         </div>
 
-        {/* Key Takeaways */}
-        <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <div className="text-center p-4 bg-charcoal-900 border border-bone-200/20 rounded-sm">
-            <h4 className="font-medium text-bone-200 mb-2">The Problem</h4>
-            <p className="text-sm text-bone-200/70">Why traditional bots fail in dynamic markets</p>
-          </div>
-          <div className="text-center p-4 bg-charcoal-900 border border-bone-200/20 rounded-sm">
-            <h4 className="font-medium text-bone-200 mb-2">The Solution</h4>
-            <p className="text-sm text-bone-200/70">How AI agents think and adapt like humans</p>
-          </div>
-          <div className="text-center p-4 bg-charcoal-900 border border-bone-200/20 rounded-sm">
-            <h4 className="font-medium text-bone-200 mb-2">The Results</h4>
-            <p className="text-sm text-bone-200/70">Real performance data and user success stories</p>
-          </div>
-        </div>
 
         {/* CTA */}
         <div className="text-center">
@@ -87,7 +69,7 @@ export default function Video() {
             href="https://app.ggbots.ai"
             className="inline-flex items-center gap-2 bg-agents-trading hover:bg-agents-trading/90 text-bone-200 px-8 py-4 rounded-sm font-medium transition-all duration-200 shadow-[0_0_25px_rgba(190,106,71,0.3)] hover:shadow-[0_0_35px_rgba(190,106,71,0.4)]"
           >
-            Create your AI trading agent now
+            Try free today
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 8l4 4m0 0l-4 4m4-4H3" />
             </svg>
