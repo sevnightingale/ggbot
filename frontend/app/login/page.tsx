@@ -13,7 +13,7 @@ export default function LoginPage() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        router.push('/dashboard')
+        router.push('/forge')
       }
     })
 
@@ -25,7 +25,7 @@ export default function LoginPage() {
       <div className="max-w-md w-full">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-bone-200 mb-2">Welcome to ggbots</h1>
-          <p className="text-gray-400">Sign in to access your autonomous trading dashboard</p>
+          <p className="text-gray-400">Sign in to access your AI trading forge</p>
         </div>
         
         <div className="bg-charcoal-800 p-8 rounded-lg border border-gray-700">
@@ -96,7 +96,7 @@ export default function LoginPage() {
             providers={[]} // Start with just email, add social providers when you set them up
             view="sign_in"
             showLinks={true}
-            redirectTo={`https://app.ggbots.ai/auth/callback`}
+            // No redirectTo needed for OTP flow - verification happens in-app
           />
         </div>
         

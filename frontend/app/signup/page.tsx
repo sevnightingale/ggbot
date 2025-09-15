@@ -13,7 +13,7 @@ export default function SignupPage() {
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (event === 'SIGNED_IN' && session) {
-        router.push('/dashboard')
+        router.push('/forge')
       }
     })
 
@@ -96,7 +96,7 @@ export default function SignupPage() {
             providers={[]} // Start with just email, add social providers when you set them up
             view="sign_up"
             showLinks={true}
-            redirectTo={`https://app.ggbots.ai/auth/callback`}
+            // No redirectTo needed for OTP flow - verification happens in-app
           />
         </div>
         

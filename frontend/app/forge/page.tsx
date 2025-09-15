@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect } from 'react'
 import { createClient } from '@/lib/supabase'
-import { apiClient, BotConfiguration, ConfigData } from '@/lib/api'
+import { apiClient, BotConfiguration, ConfigData, DataSource } from '@/lib/api'
 import { ThemeProvider } from '@/lib/theme'
 import { Header } from './components/layout/Header'
 import { BotRail } from './components/layout/BotRail'
@@ -36,6 +36,7 @@ interface Decision {
   created_at: string
 }
 
+
 export default function ForgePage() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -45,6 +46,7 @@ export default function ForgePage() {
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [decisions, setDecisions] = useState<Decision[]>([])
+  const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [accounts, setAccounts] = useState<Array<{
     config_id: string
     account_id: string
@@ -187,7 +189,7 @@ export default function ForgePage() {
       try {
         // Get user's existing bots using proper API client
         const configs = await apiClient.listConfigs()
-        
+
         if (configs.length > 0) {
           // Load all configs and select first one
           setAllBots(configs)
@@ -198,6 +200,15 @@ export default function ForgePage() {
           const newBot = await createDefaultBot()
           setAllBots([newBot])
           setSelectedConfigId(newBot.config_id)
+        }
+
+        // Fetch available data sources for configuration
+        try {
+          const dataSourcesResponse = await apiClient.getDataSourcesWithPoints()
+          setDataSources(dataSourcesResponse)
+        } catch (dataSourceError) {
+          console.error('Failed to fetch data sources:', dataSourceError)
+          // Continue without data sources - MarketDataSelector will show empty state
         }
         
       } catch (error) {
@@ -388,26 +399,7 @@ export default function ForgePage() {
     stopBot()
   }
 
-  // Configuration editing handlers
-  const startEditingConfig = () => {
-    if (!selectedBot) return
-
-    // Deep clone the selected bot config to avoid reference issues
-    const clonedConfigData = JSON.parse(JSON.stringify(selectedBot.config_data))
-    const clonedTableFields = {
-      config_name: selectedBot.config_name,
-      config_type: selectedBot.config_type
-    }
-
-    // Store original config for comparison and reset
-    setOriginalConfig(selectedBot)
-
-    // Load into editing state
-    setEditingConfigData(clonedConfigData)
-    setEditingTableFields(clonedTableFields)
-    setIsEditingConfig(true)
-    setHasUnsavedChanges(false) // Start with no changes
-  }
+  // Configuration editing handlers - removed startEditingConfig as we now always start in editing mode
 
   // Unified config update function with deep merging
   const updateEditingConfig = (updates: {
@@ -719,6 +711,7 @@ export default function ForgePage() {
                     selectedBot={selectedBot}
                     editingConfigData={editingConfigData}
                     hasUnsavedChanges={hasUnsavedChanges}
+                    dataSources={dataSources}
                     onSaveConfig={saveConfigurationChanges}
                     onCancelConfig={cancelConfigurationEditing}
                     onResetConfig={resetConfigurationChanges}
