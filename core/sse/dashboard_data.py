@@ -157,11 +157,16 @@ def _enhance_bot_with_runtime_data(bot: Dict[str, Any]) -> None:
     bot['status_message'] = get_bot_status_message(bot_state, execution_status)
     bot['show_spinner'] = execution_status.get('phase') in ['extracting', 'deciding', 'trading'] if execution_status else False
     
-    # TODO: Add scheduler info when we integrate APScheduler
-    # bot['next_run'] = get_next_run_from_scheduler(config_id)
-    # bot['is_scheduled'] = has_scheduler_job(config_id)
-    bot['next_run'] = None
-    bot['is_scheduled'] = bot_state == 'active'
+    # Get scheduler info from APScheduler
+    from ggbot import get_next_run_from_scheduler, has_scheduler_job
+
+    user_id = bot.get('user_id')
+    if user_id and config_id:
+        bot['next_run'] = get_next_run_from_scheduler(user_id, config_id)
+        bot['is_scheduled'] = has_scheduler_job(user_id, config_id)
+    else:
+        bot['next_run'] = None
+        bot['is_scheduled'] = bot_state == 'active'
 
 
 
