@@ -39,7 +39,7 @@ def get_llm_provider(
     if provider_name == 'deepseek':
         return DeepSeekProvider(
             api_key=api_key,
-            model=model or 'deepseek-r1',
+            model=model or 'deepseek-reasoner',
             **kwargs
         )
 
