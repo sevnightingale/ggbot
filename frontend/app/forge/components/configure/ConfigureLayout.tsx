@@ -12,10 +12,8 @@ import { EmptyState } from '../shared/EmptyState'
 
 interface ConfigureLayoutProps {
   selectedBot?: BotConfiguration | null
-  isEditingConfig?: boolean
   editingConfigData?: ConfigData | null
   hasUnsavedChanges?: boolean
-  onStartEditing?: () => void
   onSaveConfig?: () => void
   onCancelConfig?: () => void
   onResetConfig?: () => void
@@ -26,10 +24,8 @@ interface ConfigureLayoutProps {
 
 export function ConfigureLayout({
   selectedBot,
-  isEditingConfig = false,
   editingConfigData,
   hasUnsavedChanges = false,
-  onStartEditing,
   onSaveConfig,
   onCancelConfig,
   onResetConfig,
@@ -67,7 +63,7 @@ export function ConfigureLayout({
         onBotTypeChange={onBotTypeChange}
       />
 
-      {isEditingConfig ? (
+      {selectedBot ? (
         <>
           {/* Configuration Tabs */}
           <ConfigTabs
@@ -82,6 +78,42 @@ export function ConfigureLayout({
               <MarketDataSelector
                 configData={configData}
                 onUpdate={onUpdateConfig}
+                dataSources={[
+                  {
+                    source_id: 'technical_analysis',
+                    name: 'technical_analysis',
+                    display_name: 'Technical Analysis',
+                    description: 'Technical indicators and chart analysis',
+                    enabled: true,
+                    requires_premium: false,
+                    data_points: [
+                      { data_point_id: 'rsi', name: 'RSI', display_name: 'RSI (14)', description: 'Relative Strength Index', requires_premium: false, enabled: true, sort_order: 1 },
+                      { data_point_id: 'macd', name: 'MACD', display_name: 'MACD (12,26,9)', description: 'Moving Average Convergence Divergence', requires_premium: false, enabled: true, sort_order: 2 },
+                      { data_point_id: 'bb', name: 'BB', display_name: 'Bollinger Bands', description: 'Bollinger Bands (20)', requires_premium: false, enabled: true, sort_order: 3 },
+                      { data_point_id: 'adx', name: 'ADX', display_name: 'ADX (14)', description: 'Average Directional Index', requires_premium: false, enabled: true, sort_order: 4 },
+                      { data_point_id: 'atr', name: 'ATR', display_name: 'ATR (14)', description: 'Average True Range', requires_premium: false, enabled: true, sort_order: 5 },
+                      { data_point_id: 'aroon', name: 'Aroon', display_name: 'Aroon (14)', description: 'Aroon Oscillator', requires_premium: false, enabled: true, sort_order: 6 }
+                    ]
+                  },
+                  {
+                    source_id: 'fundamental_analysis',
+                    name: 'fundamental_analysis',
+                    display_name: 'Fundamental Analysis',
+                    description: 'Financial metrics and company fundamentals',
+                    enabled: false,
+                    requires_premium: true,
+                    data_points: []
+                  },
+                  {
+                    source_id: 'sentiment_and_trends',
+                    name: 'sentiment_and_trends',
+                    display_name: 'Sentiment & Trends',
+                    description: 'Social media sentiment and trending topics',
+                    enabled: false,
+                    requires_premium: true,
+                    data_points: []
+                  }
+                ]}
               />
             )}
 
@@ -107,76 +139,6 @@ export function ConfigureLayout({
             )}
           </div>
         </>
-      ) : (
-        /* Configuration Overview (when not editing) */
-        <div className="space-y-6">
-          {/* Bot Summary */}
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-              {selectedBot.config_name} Configuration
-            </h3>
-
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-                <div className="text-sm text-[var(--text-muted)]">Bot Type</div>
-                <div className="font-medium text-[var(--text-primary)] capitalize">
-                  {selectedBot.config_type?.replace('_', ' ') || 'Autonomous Trading'}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-                <div className="text-sm text-[var(--text-muted)]">Analysis Frequency</div>
-                <div className="font-medium text-[var(--text-primary)]">
-                  Every {configData?.decision?.analysis_frequency || '1h'}
-                </div>
-              </div>
-
-              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-                <div className="text-sm text-[var(--text-muted)]">Trading Pair</div>
-                <div className="font-medium text-[var(--text-primary)]">
-                  {configData?.selected_pair || 'BTC/USDT'}
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-4 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-              <div className="text-sm text-[var(--text-muted)] mb-2">Current Strategy</div>
-              <div className="text-sm text-[var(--text-secondary)] leading-relaxed">
-                {configData?.decision?.user_prompt || 'No strategy configured'}
-              </div>
-            </div>
-          </div>
-
-          {/* Quick Actions */}
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-            <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-              Quick Actions
-            </h3>
-
-            <div className="flex flex-wrap gap-3">
-              <button
-                onClick={onStartEditing}
-                className="inline-flex items-center gap-2 rounded-xl bg-[var(--agent-extraction)] px-4 py-2 text-sm font-medium text-white shadow-sm hover:opacity-90"
-              >
-                ⚙️ Configure Settings
-              </button>
-
-              <button
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-                disabled
-              >
-                📊 View Performance
-              </button>
-
-              <button
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]"
-                disabled
-              >
-                📋 Export Config
-              </button>
-            </div>
-          </div>
-        </div>
       )}
     </div>
   )

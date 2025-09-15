@@ -15,7 +15,7 @@ export function Header({}: HeaderProps) {
       <div className="flex items-center justify-between px-4 py-3">
         <div className="h-6 w-6 flex items-center justify-center">
           <Image
-            src="/ggbots_logo.png"
+            src="/ggbots_logo.svg"
             alt="ggbots logo"
             width={20}
             height={20}

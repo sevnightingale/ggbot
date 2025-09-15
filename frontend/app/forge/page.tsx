@@ -717,10 +717,8 @@ export default function ForgePage() {
                 ) : (
                   <ConfigureLayout
                     selectedBot={selectedBot}
-                    isEditingConfig={isEditingConfig}
                     editingConfigData={editingConfigData}
                     hasUnsavedChanges={hasUnsavedChanges}
-                    onStartEditing={startEditingConfig}
                     onSaveConfig={saveConfigurationChanges}
                     onCancelConfig={cancelConfigurationEditing}
                     onResetConfig={resetConfigurationChanges}

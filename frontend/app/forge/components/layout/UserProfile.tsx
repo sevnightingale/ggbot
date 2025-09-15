@@ -2,6 +2,8 @@
 
 import React, { useState } from 'react'
 import { User, Settings, LogOut, CreditCard } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
+import { useRouter } from 'next/navigation'
 
 interface UserProfileProps {
   className?: string
@@ -9,6 +11,18 @@ interface UserProfileProps {
 
 export function UserProfile({}: UserProfileProps) {
   const [isOpen, setIsOpen] = useState(false)
+  const router = useRouter()
+  const supabase = createClient()
+
+  // Logout handler
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut()
+      router.push('/login')
+    } catch (error) {
+      console.error('Error logging out:', error)
+    }
+  }
 
   return (
     <div className="relative">
@@ -38,7 +52,7 @@ export function UserProfile({}: UserProfileProps) {
             <div className="space-y-1">
               <MenuButton icon={Settings} label="Settings" />
               <MenuButton icon={CreditCard} label="Subscription" />
-              <MenuButton icon={LogOut} label="Log out" />
+              <MenuButton icon={LogOut} label="Log out" onClick={handleLogout} />
             </div>
           </div>
         </>
