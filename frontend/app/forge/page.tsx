@@ -108,6 +108,9 @@ export default function ForgePage() {
   // Start editing mode when configure tab is activated
   useEffect(() => {
     if (activeTab === 'configure' && selectedBot && !isEditingConfig) {
+      console.log('🔧 Starting edit mode for bot:', selectedBot.config_id)
+      console.log('🔧 Bot data being loaded into editing state:', JSON.stringify(selectedBot, null, 2))
+
       // Enter editing mode - load selected bot config into editing state
       setIsEditingConfig(true)
       setEditingConfigData(JSON.parse(JSON.stringify(selectedBot.config_data)))
@@ -190,7 +193,9 @@ export default function ForgePage() {
     
     const newConfig = await apiClient.createConfig('Default ggbot', defaultConfigData)
     console.log('🔨 Created default bot:', newConfig)
-    
+    console.log('🔨 Bot config_id:', newConfig.config_id)
+    console.log('🔨 Bot structure:', JSON.stringify(newConfig, null, 2))
+
     // No transformation needed - return directly
     return newConfig
   }
@@ -213,8 +218,24 @@ export default function ForgePage() {
           // Create default bot
           console.log('🔨 No bots found, creating default bot')
           const newBot = await createDefaultBot()
-          setAllBots([newBot])
-          setSelectedConfigId(newBot.config_id)
+
+          // Verify the bot was actually created by fetching it back
+          try {
+            const verifyBot = await apiClient.getConfig(newBot.config_id)
+            console.log('✅ Bot creation verified:', verifyBot.config_id)
+            setAllBots([newBot])
+            setSelectedConfigId(newBot.config_id)
+          } catch (verifyError) {
+            console.error('❌ Bot creation verification failed:', verifyError)
+            // Try to refresh the list in case there's a timing issue
+            const refreshedConfigs = await apiClient.listConfigs()
+            if (refreshedConfigs.length > 0) {
+              setAllBots(refreshedConfigs)
+              setSelectedConfigId(refreshedConfigs[0].config_id)
+            } else {
+              console.error('❌ No bots found after creation attempt')
+            }
+          }
         }
 
         // Fetch available data sources for configuration
@@ -491,6 +512,11 @@ export default function ForgePage() {
   const saveConfigurationChanges = async () => {
     if (!selectedBot || !editingConfigData || !editingTableFields || !hasUnsavedChanges) return
 
+    console.log('💾 Attempting to save config for bot:', selectedBot.config_id)
+    console.log('💾 Selected bot structure:', JSON.stringify(selectedBot, null, 2))
+    console.log('💾 Editing config data:', JSON.stringify(editingConfigData, null, 2))
+    console.log('💾 Table fields:', editingTableFields)
+
     try {
       // Call API with both JSONB config_data and table fields
       const updatedBot = await apiClient.updateConfig(
@@ -514,7 +540,14 @@ export default function ForgePage() {
 
     } catch (error) {
       console.error('❌ Failed to save configuration:', error)
-      // TODO: Show error toast/notification
+
+      // If 404 error, the bot was likely deleted - refresh bot list
+      if (error instanceof Error && error.message.includes('404')) {
+        console.warn('⚠️ Bot not found (404) - refreshing bot list from server')
+        await refreshBotList()
+      }
+
+      // TODO: Show error toast/notification to user
     }
   }
 
@@ -631,6 +664,12 @@ export default function ForgePage() {
 
         if (selectedConfigId === configId) {
           setSelectedConfigId(updatedBots.length > 0 ? updatedBots[0].config_id : null)
+          // Clear editing state if deleting currently editing bot
+          setIsEditingConfig(false)
+          setEditingConfigData(null)
+          setEditingTableFields(null)
+          setHasUnsavedChanges(false)
+          setOriginalConfig(null)
         }
 
         return updatedBots
@@ -639,6 +678,33 @@ export default function ForgePage() {
       console.error('❌ Failed to delete bot:', error)
     } finally {
       setIsBotAction(false)
+    }
+  }
+
+  // Helper function to refresh bot list from server (for error recovery)
+  const refreshBotList = async () => {
+    try {
+      const refreshedBots = await apiClient.listConfigs()
+      setAllBots(refreshedBots)
+
+      // Check if currently selected bot still exists
+      if (selectedConfigId) {
+        const stillExists = refreshedBots.find(bot => bot.config_id === selectedConfigId)
+        if (!stillExists) {
+          setSelectedConfigId(refreshedBots.length > 0 ? refreshedBots[0].config_id : null)
+          // Clear editing state since selected bot no longer exists
+          setIsEditingConfig(false)
+          setEditingConfigData(null)
+          setEditingTableFields(null)
+          setHasUnsavedChanges(false)
+          setOriginalConfig(null)
+        }
+      }
+
+      return refreshedBots
+    } catch (error) {
+      console.error('❌ Failed to refresh bot list:', error)
+      throw error
     }
   }
 
