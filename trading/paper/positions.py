@@ -98,9 +98,10 @@ class PositionManager:
                     
                     # Calculate metrics
                     entry_price = float(trade["entry_price"])
-                    size_contracts = float(trade["size_contracts"])
                     size_usd = float(trade["size_usd"])
-                    
+                    # Calculate size in contracts from USD size
+                    size_contracts = size_usd / entry_price
+
                     if trade["side"] == "long":
                         unrealized_pnl = (current_price - entry_price) * size_contracts
                     else:  # short
@@ -180,13 +181,15 @@ class PositionManager:
                             if pos["symbol"] in prices:
                                 current_price = prices[pos["symbol"]].mid
                                 entry_price = float(pos["entry_price"])
-                                size_contracts = float(pos["size_contracts"])
-                                
+                                size_usd = float(pos["size_usd"])
+                                # Calculate size in contracts from USD size
+                                size_contracts = size_usd / entry_price
+
                                 if pos["side"] == "long":
                                     pnl = (current_price - entry_price) * size_contracts
                                 else:
                                     pnl = (entry_price - current_price) * size_contracts
-                                
+
                                 total_unrealized_pnl += pnl
                                 total_position_value += current_price * size_contracts
                     
