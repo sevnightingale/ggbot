@@ -9,6 +9,6 @@ export async function GET(request: NextRequest) {
     // Just redirect to dashboard and let the auth state update
   }
 
-  // Redirect to dashboard after successful authentication
-  return NextResponse.redirect(new URL('/dashboard', request.url))
+  // Redirect to forge after successful authentication
+  return NextResponse.redirect(new URL('/forge', request.url))
 }
