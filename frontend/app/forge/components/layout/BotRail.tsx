@@ -4,17 +4,29 @@ import React from 'react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
 
+interface Account {
+  config_id: string
+  account_id: string
+  current_balance: number
+  total_pnl: number
+  total_trades: number
+  win_trades: number
+  loss_trades: number
+  open_positions: number
+  updated_at: string
+}
+
 interface BotRailProps {
   bots: BotConfiguration[]
   selectedId: string | null
   onSelect: (configId: string) => void
+  accounts?: Account[]
   onCreateNew?: () => void
   isCreatingNew?: boolean
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
   onDelete?: (configId: string) => void
   isBotAction?: boolean
-  hasUnsavedChanges?: boolean
   className?: string
 }
 
@@ -22,13 +34,13 @@ export function BotRail({
   bots,
   selectedId,
   onSelect,
+  accounts = [],
   onCreateNew,
   isCreatingNew = false,
   onRename,
   onDuplicate,
   onDelete,
   isBotAction = false,
-  hasUnsavedChanges = false,
   className = ''
 }: BotRailProps) {
   return (
@@ -58,6 +70,7 @@ export function BotRail({
               <BotRow
                 key={bot.config_id}
                 bot={bot}
+                account={accounts.find(acc => acc.config_id === bot.config_id)}
                 isSelected={bot.config_id === selectedId}
                 onClick={() => onSelect(bot.config_id)}
                 onRename={onRename}
@@ -75,6 +88,7 @@ export function BotRail({
 
 interface BotRowProps {
   bot: BotConfiguration
+  account?: Account
   isSelected: boolean
   onClick: () => void
   onRename?: (configId: string, newName: string) => void
@@ -85,6 +99,7 @@ interface BotRowProps {
 
 function BotRow({
   bot,
+  account,
   isSelected,
   onClick,
   onRename,
@@ -92,36 +107,54 @@ function BotRow({
   onDelete,
   isBotAction
 }: BotRowProps) {
+  // Get bot metadata
+  const isSignalDriven = bot.config_data.decision?.analysis_frequency === 'signal_driven'
+  const configType = bot.config_type === 'signal_validation' ? 'Signal validation' : 'Autonomous trading'
+  const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
+  const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
+  const balance = account?.current_balance ?? 10000
+  const balanceText = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+
   return (
     <div
-      className={`flex items-center justify-between rounded-xl px-3 py-2 transition-colors relative ${
+      className={`rounded-xl px-3 py-3 transition-colors relative ${
         isSelected ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-primary)]'
       }`}
     >
       <div
         onClick={onClick}
-        className="flex items-center gap-2 flex-1 cursor-pointer"
+        className="cursor-pointer mb-2"
       >
-        <div className={`h-4 w-4 ${bot.state === 'active' ? 'text-emerald-400' : 'text-[var(--text-muted)]'}`}>
-          {bot.state === 'active' ? '●' : '○'}
+        <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <div className={`h-3 w-3 ${bot.state === 'active' ? 'text-emerald-400' : 'text-[var(--text-muted)]'}`}>
+              {bot.state === 'active' ? '●' : '○'}
+            </div>
+            <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
+          </div>
+          {(onRename || onDuplicate || onDelete) && (
+            <BotManagementMenu
+              bot={bot}
+              onRename={onRename || (() => {})}
+              onDuplicate={onDuplicate || (() => {})}
+              onDelete={onDelete || (() => {})}
+              isBotAction={isBotAction}
+            />
+          )}
         </div>
-        <div className="text-sm text-[var(--text-primary)]">{bot.config_name}</div>
-      </div>
-      <div className="flex items-center gap-2">
-        <div className="text-xs text-[var(--text-muted)]">
-          Paper
-          {/* Future: P&L display will go here */}
+
+        {/* Metadata badges */}
+        <div className="flex flex-wrap gap-1 mb-2">
+          <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
+            {configType === 'Signal validation' ? 'Signal' : 'Auto'}
+          </span>
+          <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
+            {balanceText}
+          </span>
         </div>
-        {(onRename || onDuplicate || onDelete) && (
-          <BotManagementMenu
-            bot={bot}
-            onRename={onRename || (() => {})}
-            onDuplicate={onDuplicate || (() => {})}
-            onDelete={onDelete || (() => {})}
-            isBotAction={isBotAction}
-            hasUnsavedChanges={hasUnsavedChanges}
-          />
-        )}
+
+        {/* Frequency */}
+        <div className="text-xs text-[var(--text-muted)]">{frequency}</div>
       </div>
     </div>
   )

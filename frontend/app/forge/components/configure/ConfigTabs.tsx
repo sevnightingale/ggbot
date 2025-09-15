@@ -2,7 +2,7 @@
 
 import React from 'react'
 
-export type ConfigTabType = 'market-data' | 'strategy' | 'trade-settings'
+export type ConfigTabType = 'market-data' | 'signals' | 'strategy' | 'trade-settings'
 
 interface ConfigTabsProps {
   activeTab?: ConfigTabType
@@ -17,6 +17,7 @@ export function ConfigTabs({
 }: ConfigTabsProps) {
   const tabs = [
     { id: 'market-data' as ConfigTabType, label: 'Market Data', icon: '📊' },
+    { id: 'signals' as ConfigTabType, label: 'Signals', icon: '📡' },
     { id: 'strategy' as ConfigTabType, label: 'Strategy', icon: '🧠' },
     { id: 'trade-settings' as ConfigTabType, label: 'Trade Settings', icon: '⚙️' },
   ]

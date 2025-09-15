@@ -96,35 +96,45 @@ The Forge is a single-page application that replaces the dashboard with an elega
 ### Current Status
 - ✅ **Phase 1 Complete**: Multi-bot architecture, API integration, SSE filtering, bot switching
 - ✅ **Phase 2B Complete**: Layout shell with responsive design, dark/light theming, mobile nav
-- ✅ **ActivationBar Complete**: Professional status/control bar with real data integration
-  - Real account balance and frequency display from SSE/API data
-  - Agent-specific colors for pipeline stages (blue/green/orange)
-  - Braille spinner with status messages during execution
-  - Responsive 3-group layout (Info, Pipeline, Controls)
-  - Activate/Deactivate terminology (no more Start/Stop)
-  - Proper containerized design with max-width constraints
-- ✅ **BotRail Containerized**: Proper rounded container instead of full-column expansion
-- ✅ **MetricsBar Complete**: Professional KPI grid with real portfolio analytics
-  - Real-time SSE data integration with portfolio analytics from PositionManager
-  - 2x2 grid layout (optimized for side-by-side placement with DecisionFeed)
-  - Trend indicators with emerald/rose color coding for profit/loss
-  - Loading skeleton states and proper TypeScript integration
-- ✅ **DecisionFeed Complete**: AI decision carousel with auto-advance and expandable reasoning
-  - Carousel navigation with newest-first auto-advance on new decisions
-  - Expandable reasoning text (150 char truncation with show more/less)
-  - Action badges and confidence scoring display
-  - Real decision data integration via SSE stream
-- ✅ **PositionsTable Complete**: Professional trading positions table
-  - HTML table structure with proper thead/tbody and min-w-full responsive
-  - Desktop table with mobile card transformation (no horizontal scroll)
-  - Real-time P&L display with color coding and SL/TP levels
-  - Empty state with helpful guidance when no positions exist
-- ✅ **Nested Grid Layout Complete**: 2-column desktop layout with mobile stacking
-  - DecisionFeed and MetricsBar side-by-side on lg+ breakpoints
-  - PositionsTable full-width below the 2-column section
-  - Left-aligned layout (removed mx-auto) fixes awkward centering on wide screens
-  - Mobile responsive - all components stack vertically on smaller screens
-- ⏳ **Ready for Legacy Cleanup**: All MonitorContent functionality now replicated
+- ✅ **Phase 2C Complete**: All Monitor tab components with real-time data integration
+  - ActivationBar: Professional status/control bar with agent colors and braille spinner
+  - MetricsBar: 2x2 KPI grid with portfolio analytics and trend indicators
+  - DecisionFeed: AI decision carousel with expandable reasoning and confidence scoring
+  - PositionsTable: Professional table with mobile card transformation and real-time P&L
+  - Nested Grid Layout: Side-by-side desktop layout with mobile stacking
+- ✅ **Phase 2D Complete**: Bot Management & Enhanced UX
+  - Bot creation, duplication, renaming, and deletion functionality
+  - Enhanced BotRail with account balances and metadata display
+  - Multi-bot switching with proper state isolation
+- ✅ **Phase 4A Complete**: Configuration Foundation
+  - JSONB config_type cleanup across codebase
+  - API client extension for table field updates
+  - Sandboxed editing architecture design
+- ✅ **Phase 4B Complete**: Configure Tab Implementation
+  - Complete sandboxed editing state management system
+  - SaveConfigBar with bot type toggle and unsaved changes tracking
+  - ConfigTabs sub-navigation system
+  - Unified config update function with deep merging
+  - Bot switching protection during editing
+- ✅ **Phase 4C Complete**: Configuration Sub-Tabs
+  - ✅ MarketDataSelector: Elegant stateless component with tab system and data point selection
+  - ✅ SignalsConfiguration: Separated signals (ggShot) from market data with proper gatekeeping
+    - External service subscription status and modal flow
+    - Configuration options for subscribed users (confidence threshold, processing mode)
+    - Clean separation from internal indicators (RSI, MACD) that go in prompts
+    - Future signal sources (Discord, Twitter, Custom APIs) planned
+  - ✅ StrategyEditor: Complete prompt template integration with collapsible context display
+    - Analysis frequency selection (5m default for immediate satisfaction)
+    - Large strategy text area with decision-green prominence (user's main control)
+    - Collapsible "Complete Prompt Template" showing all 5 sections of decision engine
+    - User's strategy highlighted in context with live preview
+    - LLM provider selection (DeepSeek R1 recommended, OpenAI GPT-4 premium)
+    - Perfect onboarding: user sees default strategy works, understands what they control
+  - ✅ TradeSettings: Complete trading configuration with reality-aligned features
+    - Position sizing with all three methods (fixed USD, account %, confidence-based)
+    - Risk management controls (stop loss, take profit, leverage, max positions, daily loss limit)
+    - Telegram integration with collapsible message template
+    - Exchange section (grayed out "Live Trading - Coming Soon")
 
 ## PLANS
 
@@ -473,27 +483,44 @@ const saveConfiguration = async () => {
 - [x] **Two-level data structure mapping**: Table fields vs JSONB config_data clarified
 - [x] **Component architecture planning**: SaveConfigBar + 3 sub-tabs (Market Data | Strategy | Trade Settings)
 
-**Phase 4B: Configure Tab Implementation**
-- [ ] **SaveConfigBar component**: Bot type toggle + unsaved indicator + save/cancel/reset actions
-- [ ] **Configure tab activation**: Load selected bot into isolated editing state when tab becomes active
-- [ ] **Change detection system**: Compare editing state to original config, track hasUnsavedChanges flag
-- [ ] **Bot switching protection**: Disable BotRail rename when Configure tab has unsaved changes
+**Phase 4B: Configure Tab Implementation** ✅ **COMPLETE**
+- [x] **SaveConfigBar component**: Bot type toggle + unsaved indicator + save/cancel/reset actions
+- [x] **Configure tab activation**: Load selected bot into isolated editing state when tab becomes active
+- [x] **Change detection system**: Compare editing state to original config, track hasUnsavedChanges flag
+- [x] **Bot switching protection**: Disable BotRail rename when Configure tab has unsaved changes
+- [x] **Unified config update function**: Deep merging for nested JSONB updates with proper change detection
+- [x] **Sandboxed editing architecture**: Complete isolation between operational display and configuration editing
 
-**Phase 4C: Configuration Sub-Tabs**
-- [ ] **ConfigTabs component**: Sub-tab navigation (Market Data | Strategy | Trade Settings)
-- [ ] **Market Data tab**: MarketDataSelector for extraction.selected_data_sources with premium gating
-- [ ] **Strategy tab**: DecisionEditor for user prompts + bot type selection + LLM provider config
-- [ ] **Trade Settings tab**: RiskControls + LLMConfig + TelegramConfig components
+**Phase 4C: Configuration Sub-Tabs** ✅ **COMPLETE**
+- [x] **ConfigTabs component**: Sub-tab navigation (Market Data | Signals | Strategy | Trade Settings)
+- [x] **MarketDataSelector component**: Elegant stateless component for extraction.selected_data_sources
+  - [x] Tab system for all data sources (Technical Analysis, Fundamental, etc.)
+  - [x] Data point selection with checkbox UI and premium indicators
+  - [x] Automatic timeframe population (all 7 timeframes when selecting indicators)
+  - [x] Search functionality and "Coming Soon" states for future data sources
+  - [x] Smart category management (auto-create/delete based on selections)
+  - [x] Integrates with parent's updateEditingConfig() system
+- [x] **SignalsConfiguration component**: Separated external signal sources from market data
+  - [x] ggShot subscription status detection and modal flow
+  - [x] Configuration options for subscribed users (confidence threshold, processing modes)
+  - [x] Future signal sources section (Discord, Twitter, Custom APIs)
+  - [x] Clean architectural separation: signals ≠ market data indicators
+- [x] **StrategyEditor component**: decision.user_prompt editing + analysis_frequency + LLM provider config
+- [x] **TradeSettings component**: Complete trading configuration aligned with paper trading reality
+  - [x] Position sizing with all three methods (fixed USD, account percentage, confidence-based)
+  - [x] Risk management controls (stop loss, take profit, leverage, max positions, daily loss limit)
+  - [x] Telegram integration with collapsible message template
+  - [x] Exchange connection section (disabled for MVP with "Live Trading - Coming Soon")
 
-**Phase 4D: Save/Cancel Flow**
-- [ ] **Centralized state management**: editingConfigState + editingTableFields with unified update function
-- [ ] **Save operation**: Atomic update of both table fields and JSONB config_data via API
-- [ ] **Cancel/Reset functionality**: Discard editing state and reload from original bot config
-- [ ] **Validation and error handling**: Field-level + save-time validation with graceful error states
+**Phase 4D: Save/Cancel Flow** ✅ **COMPLETE**
+- [x] **Centralized state management**: editingConfigState + editingTableFields with unified update function
+- [x] **Save operation**: Atomic update of both table fields and JSONB config_data via API
+- [x] **Cancel/Reset functionality**: Discard editing state and reload from original bot config
+- [x] **Validation and error handling**: Field-level + save-time validation with graceful error states
 
 #### Phase 5: Progressive Enhancement
 
-  
+
 **Phase 5A: Visual Polish & Responsiveness**
 - [ ] **Professional color coding system**
   - [ ] Consistent profit/loss indicators throughout (emerald-400/rose-400)
@@ -522,6 +549,30 @@ const saveConfiguration = async () => {
 - [ ] Implement search and filtering for decisions and trades
 - [ ] Add comprehensive accessibility features
 - [ ] Create comprehensive error boundaries and fallbacks
+
+#### Phase 6: Code Quality & Architecture Cleanup
+
+**High-Priority Type Consolidation:**
+- [ ] **Extract shared interfaces**: Move Account, Position, Decision interfaces to shared types file
+- [ ] **TypeScript strict compliance**: Add proper typing and remove any/unknown usage
+- [ ] **Component props consistency**: Standardize required vs optional prop patterns across components
+
+**SSE & Real-Time Data Improvements:**
+- [ ] **SSE connection management**: Add proper cleanup/reconnection logic with connection state tracking
+- [ ] **Edge case handling**: Handle bot deletion while selected, stale data validation
+- [ ] **Error boundaries**: Add boundaries around SSE connections and real-time components
+- [ ] **Performance optimizations**: Add memoization for computed values, optimize SSE data filtering
+
+**Code Cleanup & Maintenance:**
+- [ ] **Remove unused code**: Clean up empty else blocks, unused variables, whitespace artifacts
+- [ ] **Countdown formatting**: Standardize countdown display format and timing logic
+- [ ] **Error handling**: Add graceful API failure handling and loading states
+- [ ] **Component interface cleanup**: Remove interface duplication across MetricsBar, BotRail, ActivationBar
+
+**Architecture Validation:**
+- [ ] **Data flow audit**: Verify all real-time data paths and filtering logic
+- [ ] **Performance monitoring**: Add interval cleanup checks and memory leak prevention
+- [ ] **Component separation**: Ensure clean boundaries between operational and configuration state
 
 ### Design System Specifications
 

@@ -44,9 +44,6 @@ export default function FAQ() {
           <h2 className="text-3xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
             Frequently asked questions
           </h2>
-          <p className="text-lg text-bone-200/70 max-w-2xl mx-auto">
-            Common questions about how ggbots work and what makes them different from traditional trading automation.
-          </p>
         </div>
 
         <div className="space-y-4">
@@ -96,26 +93,15 @@ export default function FAQ() {
 
         {/* Still have questions CTA */}
         <div className="text-center mt-12 p-8 bg-charcoal-800 border border-bone-200/20 rounded-sm">
-          <h3 className="text-xl font-medium text-bone-200 mb-4">
-            Still have questions?
-          </h3>
           <p className="text-bone-200/70 mb-6">
-            Join our community of traders and get direct access to the team building ggbots.
+            Still have questions? Reach out to me through email. Your feedback is quintessential to the future of ggbots.
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <a
-              href="#"
-              className="text-agents-extraction hover:text-agents-extraction/80 transition-colors font-medium"
-            >
-              Join our Discord →
-            </a>
-            <a
-              href="#"
-              className="text-agents-decision hover:text-agents-decision/80 transition-colors font-medium"
-            >
-              Email support →
-            </a>
-          </div>
+          <a
+            href="mailto:sev@ggbots.ai"
+            className="text-agents-extraction hover:text-agents-extraction/80 transition-colors font-medium"
+          >
+            Contact sev →
+          </a>
         </div>
       </div>
     </section>

@@ -4,24 +4,11 @@ import React from 'react'
 import { Activity, Circle, Clock, Play, PauseCircle, Zap } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 
-interface Account {
-  config_id: string
-  account_id: string
-  current_balance: number
-  total_pnl: number
-  total_trades: number
-  win_trades: number
-  loss_trades: number
-  open_positions: number
-  updated_at: string
-}
-
 interface ActivationBarProps {
   selectedBot: BotConfiguration
   executionStatus: string
   statusMessage: string
   countdown: string | null
-  account?: Account | null
   isStarting: boolean
   isStopping: boolean
   onStart: () => void
@@ -33,7 +20,6 @@ export function ActivationBar({
   executionStatus,
   statusMessage,
   countdown,
-  account,
   isStarting,
   isStopping,
   onStart,
@@ -41,40 +27,13 @@ export function ActivationBar({
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
-  const configType = selectedBot.config_type === 'signal_validation' ? 'Signal validation' : 'Autonomous trading'
-
-  // Get real frequency from config
-  const analysisFreq = selectedBot.config_data.decision?.analysis_frequency || '1h'
-  const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
-
-  // Get real balance from account data
-  const balance = account?.current_balance ?? 10000
-  const balanceText = `Paper • $${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
 
   return (
     <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">
-      {/* Row 1: Info Group (always visible) */}
-      <div className="flex flex-wrap items-center gap-3 mb-3 lg:mb-4">
-        <div className="flex items-center gap-2 text-sm">
-          <span className="text-[var(--text-muted)]">Bot:</span>
-          <span className="font-medium text-[var(--text-primary)]">{selectedBot.config_name}</span>
-        </div>
-
-        <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-          {configType}
-        </span>
-
-        <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
-          {balanceText}
-        </span>
-
-        <span className="text-xs text-[var(--text-muted)]">{frequency}</span>
-      </div>
-
-      {/* Row 2 (Desktop) / Row 2-3 (Mobile): Pipeline + Controls */}
+      {/* Single Row: Pipeline + Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         {/* Pipeline Group */}
-        <div className="flex flex-col items-center gap-2">
+        <div className="flex flex-col items-center lg:items-start gap-2">
           <PipelineTicker
             executionStatus={executionStatus}
             isActive={isActive}
@@ -89,17 +48,28 @@ export function ActivationBar({
         </div>
 
         {/* Controls Group */}
-        <div className="flex items-center gap-3 flex-wrap">
+        <div className="flex items-center justify-center lg:justify-end gap-3 flex-wrap">
           {/* Countdown */}
           {countdown && !isSignalDriven && (
             <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
               <Clock className="h-4 w-4" />
-              <span>Next in {countdown}</span>
+              <span>{countdown}</span>
             </div>
           )}
 
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => {
+                // TODO: Implement run once functionality
+                console.log('Run once triggered')
+              }}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+            >
+              <Zap className="h-4 w-4" />
+              Run once
+            </button>
+
             <button
               onClick={isActive ? onStop : onStart}
               disabled={isStarting || isStopping}
@@ -120,17 +90,6 @@ export function ActivationBar({
                   {isStarting ? 'Activating...' : 'Activate'}
                 </>
               )}
-            </button>
-
-            <button
-              onClick={() => {
-                // TODO: Implement run once functionality
-                console.log('Run once triggered')
-              }}
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
-            >
-              <Zap className="h-4 w-4" />
-              Run once
             </button>
           </div>
         </div>

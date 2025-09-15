@@ -621,4 +621,5 @@ cci
 donchian
 ema
 keltner
-
+macd
+mfi

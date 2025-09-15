@@ -422,19 +422,42 @@ export default function ForgePage() {
         if (!prev) return null
 
         // Deep merge the updates into existing config
-        const deepMerge = (target: any, source: any): any => {
-          const result = { ...target }
-          for (const key in source) {
-            if (source[key] && typeof source[key] === 'object' && !Array.isArray(source[key])) {
-              result[key] = deepMerge(target[key] || {}, source[key])
-            } else {
-              result[key] = source[key]
+        const configUpdates = updates.configData!
+        return {
+          ...prev,
+          ...configUpdates,
+          // Handle nested objects specifically
+          ...(configUpdates.extraction && {
+            extraction: {
+              ...prev.extraction,
+              ...configUpdates.extraction
             }
-          }
-          return result
-        }
-
-        return deepMerge(prev, updates.configData!)
+          }),
+          ...(configUpdates.decision && {
+            decision: {
+              ...prev.decision,
+              ...configUpdates.decision
+            }
+          }),
+          ...(configUpdates.trading && {
+            trading: {
+              ...prev.trading,
+              ...configUpdates.trading
+            }
+          }),
+          ...(configUpdates.llm_config && {
+            llm_config: {
+              ...prev.llm_config,
+              ...configUpdates.llm_config
+            }
+          }),
+          ...(configUpdates.telegram_integration && {
+            telegram_integration: {
+              ...prev.telegram_integration,
+              ...configUpdates.telegram_integration
+            }
+          })
+        } as ConfigData
       })
     }
 
@@ -637,13 +660,13 @@ export default function ForgePage() {
             bots={allBots}
             selectedId={selectedConfigId}
             onSelect={setSelectedConfigId}
+            accounts={accounts}
             onCreateNew={handleCreateNewBot}
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
             onDelete={handleDeleteBot}
             isBotAction={isBotAction}
-            hasUnsavedChanges={hasUnsavedChanges}
             className="col-span-12 hidden md:col-span-3 md:block"
           />
 
@@ -656,7 +679,6 @@ export default function ForgePage() {
                 executionStatus={executionStatus}
                 statusMessage={statusMessage}
                 countdown={countdown}
-                account={selectedAccount}
                 isStarting={isStarting}
                 isStopping={isStopping}
                 onStart={handleStart}
@@ -691,20 +713,6 @@ export default function ForgePage() {
                     <PositionsTable
                       positions={positions}
                     />
-
-                    {/* Legacy MonitorContent - will be replaced progressively */}
-                    <MonitorContent
-                      selectedBot={selectedBot}
-                      executionStatus={executionStatus}
-                      statusMessage={statusMessage}
-                      countdown={countdown}
-                      positions={positions}
-                      decisions={decisions}
-                      isStarting={isStarting}
-                      isStopping={isStopping}
-                      onStart={handleStart}
-                      onStop={handleStop}
-                    />
                   </div>
                 ) : (
                   <ConfigureLayout
@@ -736,143 +744,5 @@ export default function ForgePage() {
         <MobileNav className="md:hidden" />
       </div>
     </ThemeProvider>
-  )
-}
-
-// Extract the monitor content into a separate component for cleaner code
-interface MonitorContentProps {
-  selectedBot: BotConfiguration
-  executionStatus: 'idle' | 'extraction' | 'decision' | 'trading'
-  statusMessage: string
-  countdown: string
-  positions: Position[]
-  decisions: Decision[]
-  isStarting: boolean
-  isStopping: boolean
-  onStart: () => void
-  onStop: () => void
-}
-
-function MonitorContent({
-  selectedBot,
-  executionStatus,
-  statusMessage,
-  countdown,
-  positions,
-  decisions,
-  isStarting,
-  isStopping,
-  onStart,
-  onStop
-}: MonitorContentProps) {
-  return (
-    <div className="space-y-6">
-      {/* Bot Status Card */}
-      <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
-        <div className="flex justify-between items-center mb-4">
-          <h2 className="text-xl text-[var(--text-primary)]">{selectedBot.config_name}</h2>
-          <div className={`px-3 py-1 rounded text-sm ${
-            executionStatus === 'extraction' ? 'bg-green-500/20 text-green-400' :
-            executionStatus === 'decision' ? 'bg-orange-500/20 text-orange-400' :
-            executionStatus === 'trading' ? 'bg-red-500/20 text-red-400' :
-            selectedBot.state === 'active' ? 'bg-blue-500/20 text-blue-400' : 'bg-gray-500/20 text-gray-400'
-          }`}>
-            {executionStatus !== 'idle' ? executionStatus : (selectedBot.state === 'active' ? 'idle' : 'inactive')}
-          </div>
-        </div>
-
-        <div className="grid grid-cols-2 gap-4 text-sm">
-          <div>
-            <span className="text-[var(--text-muted)]">Trading Pair:</span>
-            <div className="text-[var(--text-primary)]">{selectedBot.config_data.selected_pair}</div>
-          </div>
-          <div>
-            <span className="text-[var(--text-muted)]">Status Message:</span>
-            <div className="text-[var(--text-primary)]">{statusMessage || 'Ready'}</div>
-          </div>
-          <div>
-            <span className="text-[var(--text-muted)]">Next Run:</span>
-            <div className="text-[var(--text-primary)]">{countdown || 'Not scheduled'}</div>
-          </div>
-          <div>
-            <span className="text-[var(--text-muted)]">Positions:</span>
-            <div className="text-[var(--text-primary)]">{positions.length} open</div>
-          </div>
-        </div>
-
-        {/* Start/Stop Controls */}
-        <div className="mt-4 flex gap-3">
-          {selectedBot.state === 'active' ? (
-            <button
-              onClick={onStop}
-              disabled={isStopping}
-              className="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 disabled:opacity-50"
-            >
-              {isStopping ? 'Stopping...' : 'Stop Bot'}
-            </button>
-          ) : (
-            <button
-              onClick={onStart}
-              disabled={isStarting}
-              className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
-            >
-              {isStarting ? 'Starting...' : 'Start Bot'}
-            </button>
-          )}
-        </div>
-      </div>
-
-      {/* Live Positions */}
-      {positions.length > 0 && (
-        <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
-          <h3 className="text-lg text-[var(--text-primary)] mb-4">Live Positions</h3>
-          <div className="space-y-2">
-            {positions.map(position => (
-              <div key={position.trade_id} className="flex justify-between items-center p-3 bg-[var(--bg-tertiary)] rounded">
-                <div>
-                  <span className="text-[var(--text-primary)]">{position.symbol}</span>
-                  <span className={`ml-2 ${position.side === 'buy' ? 'text-green-400' : 'text-red-400'}`}>
-                    {position.side.toUpperCase()}
-                  </span>
-                </div>
-                <div className="text-right">
-                  <div className={`${position.unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                    {position.unrealized_pnl >= 0 ? '+' : ''}${position.unrealized_pnl?.toFixed(2)}
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">${position.size_usd}</div>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Recent Decisions */}
-      {decisions.length > 0 && (
-        <div className="bg-[var(--bg-secondary)] p-6 rounded-lg border border-[var(--border)]">
-          <h3 className="text-lg text-[var(--text-primary)] mb-4">Recent Decisions</h3>
-          <div className="space-y-2">
-            {decisions.slice(0, 5).map(decision => (
-              <div key={decision.decision_id} className="p-3 bg-[var(--bg-tertiary)] rounded">
-                <div className="flex justify-between items-center mb-2">
-                  <span className={`font-semibold ${
-                    decision.action === 'enter' ? 'text-green-400' :
-                    decision.action === 'exit' ? 'text-red-400' : 'text-gray-400'
-                  }`}>
-                    {decision.action.toUpperCase()} {decision.symbol}
-                  </span>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    {Math.round(decision.confidence * 100)}% confidence
-                  </span>
-                </div>
-                <p className="text-sm text-[var(--text-secondary)] line-clamp-2">
-                  {decision.reasoning}
-                </p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-    </div>
   )
 }

@@ -40,32 +40,15 @@ export default function Hero() {
           </p>
 
           {/* Primary CTA */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
+          <div className="flex justify-center">
             <a
               href="https://app.ggbots.ai"
               className="bg-agents-extraction hover:bg-agents-extraction/90 text-bone-200 px-8 py-4 rounded-sm font-medium transition-all duration-200 text-lg shadow-[0_0_25px_rgba(56,161,199,0.3)] hover:shadow-[0_0_35px_rgba(56,161,199,0.4)]"
             >
               Create a ggbot now
             </a>
-            <button
-              onClick={() => document.getElementById('demo')?.scrollIntoView({ behavior: 'smooth' })}
-              className="text-bone-200/80 hover:text-bone-200 px-8 py-4 rounded-sm font-medium transition-colors text-lg border border-bone-200/20 hover:border-bone-200/40"
-            >
-              See how it works
-            </button>
           </div>
 
-          {/* Trust Indicators */}
-          <div className="mt-16 text-center">
-            <p className="text-sm text-bone-200/60 mb-4">
-              Built by active traders, powered by advanced AI
-            </p>
-            <div className="flex justify-center items-center space-x-8 text-xs text-bone-200/50">
-              <span>• Real market testing</span>
-              <span>• Adaptive strategies</span>
-              <span>• 24/7 execution</span>
-            </div>
-          </div>
         </div>
       </div>
     </section>

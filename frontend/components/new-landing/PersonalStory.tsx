@@ -10,35 +10,33 @@ export default function PersonalStory() {
           {/* Letter styling container */}
           <div className="bg-charcoal-900 border border-bone-200/20 rounded-sm p-8 md:p-12 shadow-[8px_8px_16px_rgba(0,0,0,0.9),-8px_-8px_16px_rgba(255,255,255,0.08)]">
             
-            {/* Profile section */}
-            <div className="flex flex-col md:flex-row items-start gap-6 mb-8">
-              {/* Profile photo placeholder */}
-              <div className="flex-shrink-0">
+            {/* Letter header with photo on right */}
+            <div className="flex flex-col md:flex-row items-start gap-8 mb-8">
+              {/* Letter greeting */}
+              <div className="flex-grow">
+                <h3 className="text-2xl font-bold text-bone-200 font-display mb-2">
+                  Dear trader,
+                </h3>
+                <p className="text-lg text-bone-200/80">
+                  I&apos;m sev
+                </p>
+              </div>
+
+              {/* Profile photo on right */}
+              <div className="flex-shrink-0 flex flex-col items-center">
                 <div className="w-24 h-24 bg-bone-200/10 rounded-full border-2 border-bone-200/20 flex items-center justify-center">
                   <div className="w-16 h-16 bg-bone-200/20 rounded-full"></div>
                 </div>
                 <p className="text-xs text-bone-200/50 text-center mt-2">
                   [Sev&apos;s photo placeholder]
                 </p>
-              </div>
-
-              {/* Intro with social */}
-              <div className="flex-grow">
-                <div className="flex items-center gap-4 mb-4">
-                  <h3 className="text-2xl font-bold text-bone-200 font-display">
-                    Dear trader,
-                  </h3>
-                  <a 
-                    href="#" 
-                    className="text-bone-200/60 hover:text-bone-200 transition-colors"
-                    title="Follow Sev on Twitter"
-                  >
-                    <Twitter size={20} />
-                  </a>
-                </div>
-                <p className="text-lg text-bone-200/80 mb-6">
-                  I&apos;m sev
-                </p>
+                <a
+                  href="#"
+                  className="text-bone-200/60 hover:text-bone-200 transition-colors mt-2"
+                  title="Follow Sev on Twitter"
+                >
+                  <Twitter size={18} />
+                </a>
               </div>
             </div>
 
