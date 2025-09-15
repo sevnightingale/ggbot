@@ -164,7 +164,7 @@ export default function ForgePage() {
       },
       llm_config: {
         provider: 'deepseek',
-        model: 'deepseek-r1',
+        model: 'deepseek-reasoner',
         use_platform_keys: true,
         use_own_key: false
       },

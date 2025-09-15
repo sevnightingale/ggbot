@@ -500,7 +500,7 @@ export function createDefaultConfigData(): ConfigData {
     },
     llm_config: {
       provider: "deepseek",
-      model: "deepseek-r1", // Free default model
+      model: "deepseek-reasoner", // Optimized for trading with reasoning capabilities
       use_platform_keys: true, // Use platform-managed keys by default
       use_own_key: false
     },

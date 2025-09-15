@@ -1135,6 +1135,56 @@ def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
     return analysis_frequency
 
 
+def get_next_run_from_scheduler(user_id: str, config_id: str) -> Optional[str]:
+    """
+    Get next run time for a specific bot from APScheduler.
+
+    Args:
+        user_id: User ID
+        config_id: Bot configuration ID
+
+    Returns:
+        Next run time as ISO string or None if no job exists
+    """
+    try:
+        # Get all jobs for this user
+        user_jobs = [
+            job for job in scheduler.get_jobs()
+            if job.id.startswith(f"bot:{user_id}:{config_id}:")
+        ]
+
+        if user_jobs:
+            job = user_jobs[0]  # Should only be one job per config
+            return job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job.next_run_time else None
+
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to get next run for {user_id}:{config_id}: {e}")
+        return None
+
+
+def has_scheduler_job(user_id: str, config_id: str) -> bool:
+    """
+    Check if a bot has an active scheduler job.
+
+    Args:
+        user_id: User ID
+        config_id: Bot configuration ID
+
+    Returns:
+        True if job exists, False otherwise
+    """
+    try:
+        user_jobs = [
+            job for job in scheduler.get_jobs()
+            if job.id.startswith(f"bot:{user_id}:{config_id}:")
+        ]
+        return len(user_jobs) > 0
+    except Exception as e:
+        logger.warning(f"Failed to check scheduler job for {user_id}:{config_id}: {e}")
+        return False
+
+
 # API Endpoints
 @app.get("/")
 async def root():
