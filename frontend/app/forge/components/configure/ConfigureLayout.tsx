@@ -56,7 +56,7 @@ export function ConfigureLayout({
       <SaveConfigBar
         selectedBot={selectedBot}
         hasUnsavedChanges={hasUnsavedChanges}
-        isEditingConfig={isEditingConfig}
+        isEditingConfig={true}
         onSave={onSaveConfig}
         onCancel={onCancelConfig}
         onReset={onResetConfig}
