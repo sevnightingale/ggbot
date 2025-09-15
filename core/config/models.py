@@ -80,8 +80,10 @@ class LLMProvider(str, Enum):
 
 class LLMConfig(BaseModel):
     """LLM configuration for decision making."""
-    provider: LLMProvider = Field(default=LLMProvider.OPENAI, description="LLM provider selection")
-    use_platform_keys: bool = Field(default=False, description="Use platform-managed API keys vs user's own keys")
+    provider: LLMProvider = Field(default=LLMProvider.DEEPSEEK, description="LLM provider selection")
+    model: Optional[str] = Field(default="deepseek-reasoner", description="Specific model to use for the provider")
+    use_platform_keys: bool = Field(default=True, description="Use platform-managed API keys vs user's own keys")
+    use_own_key: bool = Field(default=False, description="Use user's own API keys instead of platform keys")
     openai_api_key: Optional[str] = Field(None, description="User's OpenAI API key (encrypted in vault)")
     deepseek_api_key: Optional[str] = Field(None, description="User's DeepSeek API key (encrypted in vault)")
     anthropic_api_key: Optional[str] = Field(None, description="User's Anthropic API key (encrypted in vault)")

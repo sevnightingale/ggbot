@@ -31,13 +31,13 @@ class DeepSeekProvider(LLMProvider):
     strong reasoning capabilities.
     """
     
-    def __init__(self, api_key: str, model: str = "deepseek-r1", **kwargs):
+    def __init__(self, api_key: str, model: str = "deepseek-reasoner", **kwargs):
         """
         Initialize the DeepSeek provider.
         
         Args:
             api_key (str): DeepSeek API key
-            model (str): Model to use (default: 'deepseek-r1')
+            model (str): Model to use (default: 'deepseek-reasoner')
             **kwargs: Additional settings like base_url, timeout, etc.
         """
         super().__init__(api_key, model, **kwargs)

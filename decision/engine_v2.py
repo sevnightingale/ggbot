@@ -83,15 +83,22 @@ class DecisionEngineV2:
     async def _initialize_llm_provider(self) -> None:
         """Initialize LLM provider based on configuration."""
         try:
-            # Get LLM configuration from decision config
-            decision_config = self.config.decision if hasattr(self.config, 'decision') else {}
-            if isinstance(decision_config, dict):
-                provider_name = decision_config.get('llm_provider', 'deepseek')  # Default to DeepSeek
-                model_name = decision_config.get('llm_model')  # Optional model override
+            # Get LLM configuration from llm_config section (V2 format)
+            llm_config = self.config.llm_config if hasattr(self.config, 'llm_config') else {}
+
+            if isinstance(llm_config, dict) and llm_config:
+                provider_name = llm_config.get('provider', 'deepseek')
+                model_name = llm_config.get('model', 'deepseek-reasoner')  # Use optimized trading model
             else:
-                # Handle legacy format where decision might be a string or other type
-                provider_name = 'deepseek'  # Safe default
-                model_name = None
+                # Fallback to legacy decision config
+                decision_config = self.config.decision if hasattr(self.config, 'decision') else {}
+                if isinstance(decision_config, dict):
+                    provider_name = decision_config.get('llm_provider', 'deepseek')  # Default to DeepSeek
+                    model_name = decision_config.get('llm_model', 'deepseek-reasoner')  # Updated default model
+                else:
+                    # Handle legacy format where decision might be a string or other type
+                    provider_name = 'deepseek'  # Safe default
+                    model_name = 'deepseek-reasoner'  # Updated default model
 
             # Get API key with user/platform priority
             api_key = await LLMKeyService.get_api_key(self.user_id, provider_name)
