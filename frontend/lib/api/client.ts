@@ -178,6 +178,12 @@ class ApiClient {
     return this.request(`/api/v2/bot/${configId}/status`)
   }
 
+  async triggerBotManually(configId: string): Promise<ApiResponse<{ status: string, config_id: string, execution_id?: string }>> {
+    return this.request(`/api/v2/bot/${configId}/trigger`, {
+      method: 'POST',
+    })
+  }
+
   async getSchedulerStatus(): Promise<SchedulerStatus> {
     return this.request('/api/v2/scheduler/status')
   }
