@@ -269,6 +269,10 @@ export default function ForgePage() {
               // Update next run time
               if (myBot?.next_run) {
                 setNextRun(myBot.next_run)
+              } else if (myBot?.is_scheduled) {
+                // Bot is scheduled but next_run is null - show waiting state
+                setNextRun(null)
+                setCountdown('Waiting for next run...')
               }
             }
 
@@ -314,7 +318,10 @@ export default function ForgePage() {
 
   // Countdown timer for next run
   useEffect(() => {
-    if (!nextRun) return
+    if (!nextRun) {
+      // If no next_run but countdown was manually set (e.g., "Waiting for next run..."), keep it
+      return
+    }
 
     const updateCountdown = () => {
       const now = new Date()
