@@ -105,6 +105,21 @@ export default function ForgePage() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [originalConfig, setOriginalConfig] = useState<BotConfiguration | null>(null)
 
+  // Start editing mode when configure tab is activated
+  useEffect(() => {
+    if (activeTab === 'configure' && selectedBot && !isEditingConfig) {
+      // Enter editing mode - load selected bot config into editing state
+      setIsEditingConfig(true)
+      setEditingConfigData(JSON.parse(JSON.stringify(selectedBot.config_data)))
+      setEditingTableFields({
+        config_name: selectedBot.config_name,
+        config_type: selectedBot.config_type
+      })
+      setOriginalConfig(selectedBot)
+      setHasUnsavedChanges(false)
+    }
+  }, [activeTab, selectedBot, isEditingConfig])
+
   // Real auth check
   useEffect(() => {
     const getUser = async () => {
@@ -683,7 +698,7 @@ export default function ForgePage() {
               onTabChange={setActiveTab}
             />
 
-            <div className="flex-1 mt-4">
+            <div className="flex-1 mt-4 pb-32">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
                   <div className="space-y-4">
