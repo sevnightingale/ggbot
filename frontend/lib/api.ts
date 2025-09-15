@@ -335,10 +335,10 @@ export class ApiClient {
   }
 
   async triggerBotManually(configId: string): Promise<{ status: string, config_id: string, execution_id?: string }> {
-    console.log('🔥 API Call: triggerBotManually to', `${this.baseUrl}/api/v2/bot/${configId}/trigger`)
+    console.log('🔥 API Call: triggerBotManually to', `${this.baseUrl}/api/v2/orchestrate/${configId}`)
 
     try {
-      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/bot/${configId}/trigger`, {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/orchestrate/${configId}`, {
         method: 'POST'
       })
       console.log('📡 Response status:', response.status, response.statusText)
@@ -346,7 +346,7 @@ export class ApiClient {
       if (!response.ok) {
         const error = await response.text()
         console.error('❌ API Error:', error)
-        throw new Error(`Failed to trigger bot manually: ${error}`)
+        throw new Error(`Failed to trigger bot orchestration: ${error}`)
       }
 
       const result = await response.json()
