@@ -334,6 +334,30 @@ export class ApiClient {
     }
   }
 
+  async triggerBotManually(configId: string): Promise<{ status: string, config_id: string, execution_id?: string }> {
+    console.log('🔥 API Call: triggerBotManually to', `${this.baseUrl}/api/v2/bot/${configId}/trigger`)
+
+    try {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/bot/${configId}/trigger`, {
+        method: 'POST'
+      })
+      console.log('📡 Response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ API Error:', error)
+        throw new Error(`Failed to trigger bot manually: ${error}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ Manual trigger result:', result)
+      return result
+    } catch (err) {
+      console.error('💥 Network error:', err)
+      throw err
+    }
+  }
+
   // LLM Credential Management
   async storeCredential(provider: string, apiKey: string): Promise<void> {
     const credentialName = `${provider}_production`
