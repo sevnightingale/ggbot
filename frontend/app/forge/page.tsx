@@ -650,6 +650,14 @@ export default function ForgePage() {
 
     } catch (error) {
       console.error('❌ Failed to create new bot:', error)
+
+      // Check if it's a unique constraint violation
+      if (error instanceof Error && error.message.includes('unique constraint')) {
+        console.warn('⚠️ Cannot create multiple bots of the same type - database constraint limitation')
+        // TODO: Show user-friendly message about single bot limitation
+        // TODO: Remove this once database constraint is fixed
+      }
+
       // On creation failure, don't modify state - let user try again
     } finally {
       setIsCreatingNew(false)
