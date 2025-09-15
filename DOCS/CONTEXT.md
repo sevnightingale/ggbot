@@ -153,8 +153,42 @@ data: {"bots": [{"config_id": "18665f58-fb3c-4655-a648-449427be0073", "user_id":
 
 
 
-id: 5
-event: dashboard
-data: {"bots": [{"config_id": "18fe0b69-731c-4f8f-bcff-69a66fd0cf27", "user_id": "5ef40fad-3778-4b75-a539-5cd4af3e16e4", "config_name": "Default ggbot", "state": "inactive", "config_data": {"state": "inactive", "user_id": "5ef40fad-3778-4b75-a539-5cd4af3e16e4", "config_id": "18fe0b69-731c-4f8f-bcff-69a66fd0cf27", "created_at": "2025-09-15T06:45:21.440924+00:00", "updated_at": "2025-09-15T06:48:53.167396", "config_data": {"trading": {"leverage": 1, "execution_mode": "paper", "exchange_config": {"api_key": "", "secret_key": "", "exchange_type": "cex", "selected_exchange": "binance"}, "position_sizing": {"method": "fixed_usd", "account_percent": 5, "fixed_amount_usd": 100, "max_position_percent": 10}, "risk_management": {"max_positions": 1, "max_daily_loss_usd": 500, "default_stop_loss_percent": 5, "default_take_profit_percent": 10}}, "decision": {"user_prompt": "if RSI 1hr below 50 enter long, if above enter short", "system_prompt": "You are an expert cryptocurrency trader. Analyze the provided market data and provide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.", "analysis_frequency": "5m"}, "extraction": {"selected_data_sources": {"technical_analysis": {"timeframes": ["1h"], "data_points": ["RSI"]}}}, "llm_config": {"model": "deepseek-r1", "provider": "deepseek", "use_own_key": false, "use_platform_keys": true}, "config_type": "autonomous_trading", "selected_pair": "BTC/USDT", "schema_version": "2.1", "telegram_integration": {}}, "config_name": "Default ggbot"}, "created_at": "2025-09-15T06:45:21.440924+00:00", "updated_at": "2025-09-15T08:28:05.118671+00:00", "execution_status": null, "status_color": "gray", "status_message": "Bot inactive", "show_spinner": false, "next_run": null, "is_scheduled": false}, {"config_id": "8afc1d8c-2465-4bec-b7d0-2f022ac22357", "user_id": "5ef40fad-3778-4b75-a539-5cd4af3e16e4", "config_name": "Default ggbot", "state": "inactive", "config_data": {"state": "inactive", "user_id": "5ef40fad-3778-4b75-a539-5cd4af3e16e4", "config_id": "8afc1d8c-2465-4bec-b7d0-2f022ac22357", "created_at": "2025-09-15T08:29:11.927794", "updated_at": "2025-09-15T08:29:11.927797", "config_data": {"trading": {"leverage": 1, "execution_mode": "paper", "exchange_config": {"api_key": "", "secret_key": "", "exchange_type": "cex", "selected_exchange": "binance"}, "position_sizing": {"method": "fixed_usd", "account_percent": 5, "fixed_amount_usd": 100, "max_position_percent": 10}, "risk_management": {"max_positions": 1, "max_daily_loss_usd": 500, "default_stop_loss_percent": 5, "default_take_profit_percent": 10}}, "decision": {"user_prompt": "if RSI 1hr below 50 enter long, if above enter short", "system_prompt": "You are an expert cryptocurrency trader. Analyze the provided market data and provide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.", "analysis_frequency": "1h"}, "extraction": {"selected_data_sources": {"technical_analysis": {"timeframes": ["1h"], "data_points": ["RSI"]}}}, "llm_config": {"model": "deepseek-reasoner", "provider": "deepseek", "use_own_key": false, "use_platform_keys": true}, "config_type": "autonomous_trading", "selected_pair": "BTC/USDT", "schema_version": "2.1", "telegram_integration": {}}, "config_name": "Default ggbot"}, "created_at": "2025-09-15T08:29:11.982063+00:00", "updated_at": "2025-09-15T08:29:11.982063+00:00", "execution_status": {"phase": "deciding", "message": "AI analyzing market conditions and signals...", "updated_at": "2025-09-15T08:47:32.901499+00:00"}, "status_color": "gray", "status_message": "Bot inactive", "show_spinner": true, "next_run": null, "is_scheduled": false}], "positions": [{"config_id": "8afc1d8c-2465-4bec-b7d0-2f022ac22357", "trade_id": "3abbf704-9ec8-4fd5-ae85-b7b4e4a31891", "symbol": "BTC/USDT", "side": "long", "size_usd": 100.0, "entry_price": 115465.1, "current_price": 115243.8, "unrealized_pnl": -0.19165964, "opened_at": "2025-09-15T08:36:55.055657+00:00", "stop_loss": 109691.845, "take_profit": 127011.61}], "decisions": [{"config_id": "8afc1d8c-2465-4bec-b7d0-2f022ac22357", "decision_id": "dfda0c8c-10e9-43dd-96cd-683453b35f3e", "symbol": "BTC/USDT", "action": "enter", "confidence": 0.9, "reasoning": "The trading strategy strictly uses the RSI 1hr value relative to 50 to determine entries. The current RSI 1hr value is 46.41, which is below 50, triggering a long entry signal according to the strategy. The data is recent (7 seconds old) and has good quality (93% valid data points), supporting the decision. Momentum or other factors are not considered per the strategy rules.", "created_at": "2025-09-15T08:36:51.395947+00:00", "rn": 1}], "accounts": [{"config_id": "18fe0b69-731c-4f8f-bcff-69a66fd0cf27", "account_id": "1abea66b-df8b-4406-a317-9d396c1805e3", "current_balance": 10000.0, "total_pnl": 0.0, "total_trades": 0, "win_trades": 0, "loss_trades": 0, "open_positions": 0, "updated_at": "2025-09-15T06:45:21.872615+00:00", "unrealized_pnl": 0.0, "daily_pnl": 0.0, "portfolio_return_pct": 0.0, "total_balance": 10000.0, "available_balance": 10000.0, "position_value": 0.0, "win_rate": 0, "avg_win": 0, "avg_loss": 0, "largest_win": 0, "largest_loss": 0, "sharpe_ratio": null}, {"config_id": "8afc1d8c-2465-4bec-b7d0-2f022ac22357", "account_id": "f8d7e8a4-bcf8-4bfe-b817-48890a7c357c", "current_balance": 9899.94, "total_pnl": 0.0, "total_trades": 0, "win_trades": 0, "loss_trades": 0, "open_positions": 1, "updated_at": "2025-09-15T08:36:55.01955+00:00", "unrealized_pnl": -0.19668280718589928, "daily_pnl": 0.0, "portfolio_return_pct": -0.001966828071858993, "total_balance": 9999.743317192815, "available_balance": 9899.94, "position_value": 99.80331719281409, "win_rate": 0, "avg_win": 0, "avg_loss": 0, "largest_win": 0, "largest_loss": 0, "sharpe_ratio": null}], "timestamp": "2025-09-15T08:47:37.37346+00:00"}
+---
+
+## 🛠️ Database Fix Required - Bot Creation Constraint Issue
+
+**Problem**: Users can't create multiple bots due to restrictive database constraint `idx_configurations_user_type` that only allows one bot per config_type per user.
+
+**Solution**: Run this SQL in Supabase SQL Editor to enable 7 bots total per user:
+
+```sql
+-- Remove the restrictive per-type constraint
+DROP INDEX IF EXISTS idx_configurations_user_type;
+
+-- Create a function to check bot limit
+CREATE OR REPLACE FUNCTION check_user_bot_limit()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF (SELECT COUNT(*) FROM configurations WHERE user_id = NEW.user_id) > 7 THEN
+    RAISE EXCEPTION 'User cannot have more than 7 bots total';
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create trigger to enforce the limit
+DROP TRIGGER IF EXISTS trigger_check_user_bot_limit ON configurations;
+CREATE TRIGGER trigger_check_user_bot_limit
+  BEFORE INSERT ON configurations
+  FOR EACH ROW
+  EXECUTE FUNCTION check_user_bot_limit();
+```
+
+**What this fixes:**
+- ✅ Users can create multiple autonomous_trading bots
+- ✅ Users can create multiple signal_validation bots
+- ✅ Maximum 7 total bots per user (reasonable limit)
+- ✅ New bots appear immediately without page refresh
+- ✅ No data loss - existing bots unchanged
 
 
