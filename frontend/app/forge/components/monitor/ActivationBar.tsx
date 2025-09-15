@@ -11,8 +11,10 @@ interface ActivationBarProps {
   countdown: string | null
   isStarting: boolean
   isStopping: boolean
+  isManualTriggering: boolean
   onStart: () => void
   onStop: () => void
+  onManualTrigger: () => void
 }
 
 export function ActivationBar({
@@ -22,8 +24,10 @@ export function ActivationBar({
   countdown,
   isStarting,
   isStopping,
+  isManualTriggering,
   onStart,
-  onStop
+  onStop,
+  onManualTrigger
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
@@ -60,14 +64,12 @@ export function ActivationBar({
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             <button
-              onClick={() => {
-                // TODO: Implement run once functionality
-                console.log('Run once triggered')
-              }}
-              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+              onClick={onManualTrigger}
+              disabled={isManualTriggering || isStarting || isStopping}
+              className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Zap className="h-4 w-4" />
-              Run once
+              {isManualTriggering ? 'Triggering...' : 'Run once'}
             </button>
 
             <button

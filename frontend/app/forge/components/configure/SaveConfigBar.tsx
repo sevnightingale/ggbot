@@ -6,6 +6,7 @@ import { BotConfiguration } from '@/lib/api'
 
 interface SaveConfigBarProps {
   selectedBot?: BotConfiguration | null
+  editingTableFields?: { config_name?: string; config_type?: string } | null
   hasUnsavedChanges?: boolean
   isEditingConfig?: boolean
   onSave?: () => void
@@ -16,6 +17,7 @@ interface SaveConfigBarProps {
 
 export function SaveConfigBar({
   selectedBot,
+  editingTableFields,
   hasUnsavedChanges = false,
   isEditingConfig = false,
   onSave,
@@ -23,7 +25,8 @@ export function SaveConfigBar({
   onReset,
   onBotTypeChange
 }: SaveConfigBarProps) {
-  const currentBotType = selectedBot?.config_type || 'autonomous_trading'
+  // Use editing config type if available, otherwise fall back to selected bot config type
+  const currentBotType = editingTableFields?.config_type || selectedBot?.config_type || 'autonomous_trading'
 
   return (
     <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">

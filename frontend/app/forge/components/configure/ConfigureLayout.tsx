@@ -14,6 +14,7 @@ import { EmptyState } from '../shared/EmptyState'
 interface ConfigureLayoutProps {
   selectedBot?: BotConfiguration | null
   editingConfigData?: ConfigData | null
+  editingTableFields?: { config_name?: string; config_type?: string } | null
   hasUnsavedChanges?: boolean
   dataSources?: DataSource[]
   onSaveConfig?: () => void
@@ -27,6 +28,7 @@ interface ConfigureLayoutProps {
 export function ConfigureLayout({
   selectedBot,
   editingConfigData,
+  editingTableFields,
   hasUnsavedChanges = false,
   dataSources = [],
   onSaveConfig,
@@ -58,6 +60,7 @@ export function ConfigureLayout({
       {/* Save Config Bar - Always visible */}
       <SaveConfigBar
         selectedBot={selectedBot}
+        editingTableFields={editingTableFields}
         hasUnsavedChanges={hasUnsavedChanges}
         isEditingConfig={true}
         onSave={onSaveConfig}

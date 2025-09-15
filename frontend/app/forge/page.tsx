@@ -71,6 +71,7 @@ export default function ForgePage() {
   }>>([])
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
+  const [isManualTriggering, setIsManualTriggering] = useState(false)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
 
@@ -433,6 +434,27 @@ export default function ForgePage() {
     }
   }
 
+  // Manual trigger function using proper API client
+  const triggerBotManually = async () => {
+    if (!selectedBot) return
+    setIsManualTriggering(true)
+
+    try {
+      console.log('🔥 Manual trigger started for bot:', selectedBot.config_id)
+      const result = await apiClient.triggerBotManually(selectedBot.config_id)
+      console.log('✅ Manual trigger result:', result)
+
+      // Set execution status to show it's running
+      setExecutionStatus('extraction')
+      setStatusMessage('Manual execution started...')
+
+    } catch (error) {
+      console.error('❌ Failed to trigger bot manually:', error)
+    } finally {
+      setIsManualTriggering(false)
+    }
+  }
+
   // Handler functions for ActivationBar
   const handleStart = () => {
     startBot()
@@ -440,6 +462,10 @@ export default function ForgePage() {
 
   const handleStop = () => {
     stopBot()
+  }
+
+  const handleManualTrigger = () => {
+    triggerBotManually()
   }
 
   // Configuration editing handlers - removed startEditingConfig as we now always start in editing mode
@@ -761,8 +787,10 @@ export default function ForgePage() {
                 countdown={countdown}
                 isStarting={isStarting}
                 isStopping={isStopping}
+                isManualTriggering={isManualTriggering}
                 onStart={handleStart}
                 onStop={handleStop}
+                onManualTrigger={handleManualTrigger}
               />
             )}
 
@@ -798,6 +826,7 @@ export default function ForgePage() {
                   <ConfigureLayout
                     selectedBot={selectedBot}
                     editingConfigData={editingConfigData}
+                    editingTableFields={editingTableFields}
                     hasUnsavedChanges={hasUnsavedChanges}
                     dataSources={dataSources}
                     onSaveConfig={saveConfigurationChanges}
