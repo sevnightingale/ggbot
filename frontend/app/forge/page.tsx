@@ -625,12 +625,32 @@ export default function ForgePage() {
       // Update name to be more descriptive
       const updatedBot = await apiClient.updateConfig(newBot.config_id, {}, newBotName)
 
-      // Add to local state and select it
-      setAllBots(prev => [...prev, updatedBot])
-      setSelectedConfigId(updatedBot.config_id)
+      // Verify bot was created successfully by fetching it back
+      try {
+        const verifyBot = await apiClient.getConfig(updatedBot.config_id)
+        console.log('✅ New bot creation verified:', verifyBot.config_id, verifyBot.config_name)
+
+        // Add to local state and select it
+        setAllBots(prev => [...prev, verifyBot])
+        setSelectedConfigId(verifyBot.config_id)
+      } catch (verifyError) {
+        console.error('❌ New bot verification failed, refreshing bot list:', verifyError)
+        // If verification fails, refresh from server to ensure we have latest data
+        const refreshedBots = await apiClient.listConfigs()
+        setAllBots(refreshedBots)
+
+        // Try to select the newly created bot if it exists in the refreshed list
+        const createdBot = refreshedBots.find(bot => bot.config_id === updatedBot.config_id)
+        if (createdBot) {
+          setSelectedConfigId(createdBot.config_id)
+        } else {
+          setSelectedConfigId(refreshedBots.length > 0 ? refreshedBots[0].config_id : null)
+        }
+      }
 
     } catch (error) {
       console.error('❌ Failed to create new bot:', error)
+      // On creation failure, don't modify state - let user try again
     } finally {
       setIsCreatingNew(false)
     }
