@@ -42,8 +42,8 @@ export function ActivationBar({
             executionStatus={executionStatus}
             isActive={isActive}
           />
-          {/* Status Message with Braille Spinner */}
-          {statusMessage && isActive && executionStatus !== 'idle' && (
+          {/* Status Message with Braille Spinner - show during execution even if bot inactive */}
+          {statusMessage && executionStatus !== 'idle' && (
             <StatusMessage
               message={statusMessage}
               isActive={true}
