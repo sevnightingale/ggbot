@@ -50,11 +50,12 @@ class BotConfigV2:
         self.updated_at = updated_at or datetime.now()
     
     def to_dict(self) -> Dict[str, Any]:
-        """Convert to dictionary for API response - returns raw config_data JSONB structure."""
+        """Convert to dictionary for API response - returns complete BotConfiguration structure."""
         return {
             "config_id": self.config_id,
             "user_id": self.user_id,
             "config_name": self.config_name,
+            "config_type": self.config_type,
             "state": self.state,
             "config_data": {
                 "schema_version": self.schema_version,
@@ -68,6 +69,19 @@ class BotConfigV2:
             },
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
+        }
+
+    def to_jsonb(self) -> Dict[str, Any]:
+        """Convert to dictionary for database storage - returns raw config_data JSONB structure."""
+        return {
+            "schema_version": self.schema_version,
+            "config_type": self.config_type,
+            "selected_pair": self.selected_pair,
+            "extraction": self.extraction,
+            "decision": self.decision,
+            "trading": self.trading,
+            "llm_config": self.llm_config,
+            "telegram_integration": self.telegram_integration,
         }
     
     @classmethod
@@ -188,7 +202,7 @@ class ConfigService:
                         user_id,
                         unique_config_type,
                         config_name,
-                        json.dumps(config.to_dict())
+                        json.dumps(config.to_jsonb())
                     ))
                 conn.commit()
             
@@ -396,7 +410,7 @@ class ConfigService:
                         WHERE config_id = %s AND user_id = %s
                     """, (
                         updated_config.config_name,
-                        json.dumps(updated_config.to_dict()),
+                        json.dumps(updated_config.to_jsonb()),
                         updated_config.config_type,
                         config_id,
                         user_id

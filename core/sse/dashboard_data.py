@@ -105,7 +105,18 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         INNER JOIN bot_configs bc ON pa.config_id = bc.config_id
     )
     SELECT json_build_object(
-        'bots', COALESCE((SELECT json_agg(bc.*) FROM bot_configs bc), '[]'::json),
+        'bots', COALESCE((SELECT json_agg(
+            json_build_object(
+                'config_id', bc.config_id,
+                'user_id', bc.user_id,
+                'config_name', bc.config_name,
+                'config_type', 'autonomous_trading',
+                'state', bc.state,
+                'config_data', bc.config_data,
+                'created_at', bc.created_at,
+                'updated_at', bc.updated_at
+            )
+        ) FROM bot_configs bc), '[]'::json),
         'positions', COALESCE((SELECT json_agg(op.*) FROM open_positions op), '[]'::json),
         'decisions', COALESCE((SELECT json_agg(rd.*) FROM recent_decisions rd), '[]'::json),
         'accounts', COALESCE((SELECT json_agg(ac.*) FROM account_summaries ac), '[]'::json),
