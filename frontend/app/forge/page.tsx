@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { apiClient, BotConfiguration, ConfigData, DataSource } from '@/lib/api'
 import { ThemeProvider } from '@/lib/theme'
@@ -75,6 +75,10 @@ export default function ForgePage() {
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
 
+  // Use ref to track selectedConfigId for SSE filtering without causing reconnections
+  const selectedConfigIdRef = useRef(selectedConfigId)
+  selectedConfigIdRef.current = selectedConfigId
+
   // Get currently selected bot
   const selectedBot = selectedConfigId
     ? allBots.find(bot => bot.config_id === selectedConfigId) || null
@@ -123,6 +127,21 @@ export default function ForgePage() {
       setHasUnsavedChanges(false)
     }
   }, [activeTab, selectedBot, isEditingConfig])
+
+  // Clear component data immediately when switching bots for instant UI update
+  useEffect(() => {
+    if (selectedConfigId && selectedBot) {
+      // Clear operational data that should be bot-specific
+      setPositions([])
+      setDecisions([])
+      setExecutionStatus('idle')
+      setStatusMessage('')
+      setCountdown('')
+      setNextRun(null)
+
+      console.log('🔄 Switched to bot:', selectedBot.config_id, selectedBot.config_name)
+    }
+  }, [selectedConfigId, selectedBot]) // Clear data when switching bots
 
   // Real auth check
   useEffect(() => {
@@ -258,7 +277,7 @@ export default function ForgePage() {
 
   // Real-time SSE connection for status updates
   useEffect(() => {
-    if (!user || !selectedBot) return
+    if (!user) return
 
     const connectSSE = async () => {
       try {
@@ -275,13 +294,17 @@ export default function ForgePage() {
           try {
             const data = JSON.parse(event.data)
 
+            // Only process data if we have a selected bot
+            const currentSelectedId = selectedConfigIdRef.current
+            if (!currentSelectedId) return
+
             // Update bot execution status (extraction/decision/trading phases)
             if (data.bots) {
-              const myBot = data.bots.find((b: { config_id: string }) => b.config_id === selectedBot.config_id)
+              const myBot = data.bots.find((b: { config_id: string }) => b.config_id === currentSelectedId)
               if (myBot?.execution_status) {
                 const phase = myBot.execution_status.phase
                 if (phase === 'extracting') setExecutionStatus('extraction')
-                else if (phase === 'deciding') setExecutionStatus('decision') 
+                else if (phase === 'deciding') setExecutionStatus('decision')
                 else if (phase === 'trading') setExecutionStatus('trading')
                 else setExecutionStatus('idle')
 
@@ -300,13 +323,13 @@ export default function ForgePage() {
 
             // Update live positions with P&L
             if (data.positions) {
-              const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === selectedBot.config_id)
+              const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === currentSelectedId)
               setPositions(myPositions)
             }
 
             // Update recent decisions
             if (data.decisions) {
-              const myDecisions = data.decisions.filter((d: { config_id: string }) => d.config_id === selectedBot.config_id)
+              const myDecisions = data.decisions.filter((d: { config_id: string }) => d.config_id === currentSelectedId)
               setDecisions(myDecisions.slice(0, 10)) // Keep last 10
             }
 
@@ -336,7 +359,7 @@ export default function ForgePage() {
     return () => {
       console.log('🛑 Cleaning up SSE connection')
     }
-  }, [user, selectedBot])
+  }, [user]) // Only reconnect when user changes, not when switching bots
 
   // Countdown timer for next run
   useEffect(() => {
