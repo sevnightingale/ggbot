@@ -373,7 +373,7 @@ class SignalListenerService:
                             OR c.config_data->'config_data'->'extraction'->'selected_data_sources' ? 'signals_group_chats'
                           )
                           AND %s = ANY(up.paid_data_points)
-                          AND up.subscription_tier = 'ggBase'
+                          AND up.subscription_tier = 'ggbase'
                           AND up.subscription_status = 'active'
                     """, (signal_source,))
                     

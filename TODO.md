@@ -1,36 +1,20 @@
 # TODO.md - ggbots Implementation Plan
 
-**Status**: ✅ **Core V2 pipeline fully operational!** - Scheduler working, APScheduler executing trades, SSE streaming, dashboard functional. Ready for production polish and ggShot integration.
+**Status**: ✅ **Core V2 pipeline operational with ggShot integration!** - Scheduler working, signal flow fixed, multi-timeframe extraction working. Focus now on testing and polish.
 
-## 🚨 **HIGHEST PRIORITY - ggShot Signal Integration**
+## 🚨 **HIGHEST PRIORITY - ggShot Signal Polish**
 
-**Timeline**: 1-2 days - Critical for production revenue stream
+**Timeline**: 1 day - Fix remaining signal integration issues
 
-- [ ] **Re-integrate ggShot filter service**
-  - [ ] Restore `signals/listener_service.py` and `signals/publishing_service.py`
-  - [ ] Update PM2 configuration to start signal services
-  - [ ] Test signal filtering pipeline with live ggShot data
-  - [ ] Verify premium user gating through subscription system
-
-- [ ] **Enable signal validation mode**
-  - [ ] Test signal_validation vs autonomous_trading config modes
-  - [ ] Verify V2 orchestrator processes ggShot signals correctly
-  - [ ] Test decision engine with signal validation prompts
-  - [ ] Confirm Telegram publishing integration works
+- [ ] **Fix manual trigger signal context**
+  - [ ] Fix "Run Once" button to include signal context in decision prompts
+  - [ ] Test manual signal validation with proper ggShot signal data
 
 - [ ] **Production signal pipeline testing**
   - [ ] Test end-to-end: ggShot signal → filter → decision → Telegram publish
   - [ ] Verify multi-user signal isolation and premium access
   - [ ] Test signal processing performance under load
   - [ ] Monitor signal latency and accuracy
-
-## 🔧 **REMAINING ggbot.py Issues**
-
-**Timeline**: Low priority - Nice to have improvements
-
-- [ ] **Fix Telethon session coupling**
-  - [ ] Point session files to env-driven writable directory
-  - [ ] Validate `TG_API_ID/HASH` on boot and degrade gracefully
 
 ## 🔧 **HIGH PRIORITY - Frontend Decision Display**
 
@@ -130,6 +114,24 @@
   - [ ] Create comprehensive end-to-end test suite
   - [ ] Validate performance under load (multiple bots)
   - [ ] Cross-browser compatibility testing
+
+## 🧪 **COMPREHENSIVE TESTING SUITES**
+
+**Timeline**: 1-2 weeks - Validate system reliability and coverage
+
+- [ ] **Symbol Coverage Testing**
+  - [ ] Test all 140+ crypto symbols for KuCoin data availability
+  - [ ] Identify symbols missing on KuCoin exchange
+  - [ ] Document symbol mapping issues and fallback strategies
+  - [ ] Test symbol extraction success rates across all timeframes
+  - [ ] Create symbol blacklist for unsupported pairs
+
+- [ ] **Technical Analysis Testing**
+  - [ ] Test all 21 indicator preprocessors individually
+  - [ ] Validate indicator calculations against reference implementations
+  - [ ] Test multi-timeframe indicator consistency
+  - [ ] Performance benchmarking for indicator calculations
+  - [ ] Edge case testing (low volume, missing data, extreme values)
 
 - [ ] **Deployment readiness**
   - [ ] Update documentation to reflect current implementation

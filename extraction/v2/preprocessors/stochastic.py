@@ -8,7 +8,8 @@ overbought/oversold zone tracking, and divergence pattern recognition.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
+from pandas.api.types import is_datetime64_any_dtype
 
 from .base import BasePreprocessor
 
@@ -16,82 +17,142 @@ from .base import BasePreprocessor
 class StochasticPreprocessor(BasePreprocessor):
     """Advanced Stochastic preprocessor with professional-grade analysis."""
     
-    def preprocess(self, k_percent: pd.Series, d_percent: pd.Series, 
-                  prices: pd.Series = None, **kwargs) -> Dict[str, Any]:
+    def preprocess(self, k_percent: pd.Series, d_percent: pd.Series,
+                  prices: pd.Series = None, period: int = 14, **kwargs) -> Dict[str, Any]:
         """
-        Advanced Stochastic Oscillator preprocessing with professional analysis.
-        
-        Based on RESEARCH.md requirements:
-        - %K, %D and their spread
-        - Latest cross direction & bars since
-        - Overbought/oversold streak length
-        - Divergence flag with price
-        - %K position rank within last N bars
-        
+        Advanced Stochastic Oscillator preprocessing with sophisticated analysis.
+
+        Provides rich market state description following analysis-only pattern.
+        No signals or confidence - pure market context for Decision LLM.
+
         Args:
             k_percent: %K values (fast stochastic)
             d_percent: %D values (slow stochastic, signal line)
             prices: Price series for divergence analysis (optional)
-            
+            period: Stochastic period for window calculations
+
         Returns:
             Dictionary with comprehensive Stochastic analysis
         """
-        if len(k_percent) < 5 or len(d_percent) < 5:
+        # Clean and align data
+        k = pd.to_numeric(k_percent, errors="coerce").dropna()
+        d = pd.to_numeric(d_percent, errors="coerce").dropna()
+        kd = pd.concat({"k": k, "d": d}, axis=1, join="inner").dropna()
+
+        if len(kd) < 5:
             return {"error": "Insufficient data for Stochastic analysis"}
-        
-        current_k = float(k_percent.iloc[-1])
-        current_d = float(d_percent.iloc[-1])
+
+        k, d = kd["k"], kd["d"]
+
+        # Price alignment for divergence (optional)
+        px = None if prices is None else pd.to_numeric(prices, errors="coerce").dropna()
+        kdpx = None if px is None else pd.concat({"k": k, "px": px}, axis=1, join="inner").dropna()
+
+        # Get timestamp from series index
+        ts = (k.index[-1].isoformat()
+              if is_datetime64_any_dtype(k.index)
+              else datetime.now(timezone.utc).isoformat())
+
+        # Clamp values to [0,100] range
+        current_k = np.clip(float(k.iloc[-1]), 0, 100)
+        current_d = np.clip(float(d.iloc[-1]), 0, 100)
         spread = current_k - current_d
         
         # Cross analysis
-        cross_analysis = self._analyze_stoch_crossovers(k_percent, d_percent)
-        
+        cross_analysis = self._analyze_stoch_crossovers(k, d, period)
+
         # Zone analysis (80/20 levels for Stochastic)
-        zone_analysis = self._analyze_stoch_zones(k_percent, d_percent)
-        
+        zone_analysis = self._analyze_stoch_zones(k, d, period)
+
         # Position rank analysis
-        position_rank = self._calculate_position_rank(k_percent, lookback=20)
-        
+        position_rank = self._calculate_position_rank(k, lookback=max(10, period))
+
         # Momentum analysis
-        momentum_analysis = self._analyze_stoch_momentum(k_percent, d_percent)
-        
-        # Divergence analysis
+        momentum_analysis = self._analyze_stoch_momentum(k, d, period)
+
+        # Divergence analysis (if prices available)
         divergence = None
-        if prices is not None:
-            divergence = self._detect_stoch_divergence(k_percent, prices)
-        
-        # Signal generation
-        signals = self._generate_stoch_signals(current_k, current_d, cross_analysis, zone_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_stoch_confidence(k_percent, d_percent, cross_analysis, zone_analysis)
+        if kdpx is not None:
+            divergence = self._detect_stoch_divergence(kdpx["k"], kdpx["px"], period)
+
+        # Level analysis
+        level_analysis = self._analyze_key_levels(k, [20, 50, 80])
+
+        # Recent extremes
+        extremes = self._find_recent_extremes(k, max(20, period))
+
+        # Pattern detection
+        patterns = self._detect_stoch_patterns(k, d, kdpx, period)
+
+        # Include divergence in patterns if detected
+        if divergence is not None:
+            patterns["divergence"] = divergence
+
+        # Generate summary
+        summary = self._generate_stoch_summary(
+            current_k, current_d, cross_analysis, zone_analysis, position_rank
+        )
         
         return {
             "indicator": "Stochastic",
+            "period": period,
             "current": {
                 "k_percent": round(current_k, 2),
-                "d_percent": round(current_d, 2), 
+                "d_percent": round(current_d, 2),
                 "spread": round(spread, 2),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": ts
             },
-            "crossovers": cross_analysis,
-            "zones": zone_analysis,
-            "position_rank": {
-                "k_percentile": round(position_rank, 1),
-                "interpretation": self._interpret_position_rank(position_rank)
+            "context": {
+                "trend": {
+                    "k_direction": "rising" if momentum_analysis.get("k_velocity", 0) > 0 else ("falling" if momentum_analysis.get("k_velocity", 0) < 0 else "sideways"),
+                    "momentum": momentum_analysis.get("momentum_interpretation", "neutral"),
+                    "velocity": round(momentum_analysis.get("k_velocity", 0), 3),
+                    "acceleration": round(momentum_analysis.get("k_acceleration", 0), 3)
+                },
+                "spread_momentum": round(momentum_analysis.get("spread_momentum", 0), 3),
+                "volatility": round(k.std(), 3)
             },
-            "momentum": momentum_analysis,
-            "divergence": divergence,
-            "signals": signals,
-            "confidence": confidence,
-            "summary": self._generate_stoch_summary(current_k, current_d, cross_analysis, zone_analysis, position_rank)
+            "levels": {
+                "overbought": zone_analysis["overbought"],
+                "oversold": zone_analysis["oversold"],
+                "neutral": {
+                    "level": 50,
+                    "bias": zone_analysis["neutral_bias"],
+                    "distance_from_50": round(current_k - 50, 2)
+                },
+                "key_levels": [20, 50, 80],
+                "recent_crossovers": cross_analysis.get("recent_crossovers", [])
+            },
+            "extremes": {
+                "recent_high": {
+                    "value": round(extremes["high_value"], 2),
+                    "periods_ago": extremes["high_periods_ago"],
+                    "significance": extremes["high_significance"]
+                },
+                "recent_low": {
+                    "value": round(extremes["low_value"], 2),
+                    "periods_ago": extremes["low_periods_ago"],
+                    "significance": extremes["low_significance"]
+                }
+            },
+            "patterns": patterns,
+            "evidence": {
+                "data_quality": {
+                    "aligned_periods": len(k),
+                    "period_used": period,
+                    "had_prices": kdpx is not None,
+                    "valid_data_percentage": round(len(k) / len(k_percent) * 100, 1) if len(k_percent) > 0 else 0
+                },
+                "calculation_notes": f"Stochastic analysis based on {len(k)} aligned K/D periods"
+            },
+            "summary": summary
         }
     
-    def _analyze_stoch_crossovers(self, k_percent: pd.Series, d_percent: pd.Series) -> Dict[str, Any]:
+    def _analyze_stoch_crossovers(self, k_percent: pd.Series, d_percent: pd.Series, period: int = 14) -> Dict[str, Any]:
         """Analyze Stochastic crossovers (%K crossing %D)."""
         crossovers = []
         
-        for i in range(1, min(15, len(k_percent))):
+        for i in range(1, min(max(10, period), len(k_percent), len(d_percent))):
             prev_k = k_percent.iloc[-(i+1)]
             curr_k = k_percent.iloc[-i]
             prev_d = d_percent.iloc[-(i+1)]
@@ -102,15 +163,15 @@ class StochasticPreprocessor(BasePreprocessor):
                 crossovers.append({
                     "type": "bullish_crossover",
                     "periods_ago": i,
-                    "strength": abs(curr_k - curr_d),
+                    "strength": round(abs(curr_k - curr_d), 2),
                     "location": self._get_stoch_zone(curr_k)
                 })
             # Bearish crossover (%K crosses below %D)
             elif prev_k >= prev_d and curr_k < curr_d:
                 crossovers.append({
-                    "type": "bearish_crossover", 
+                    "type": "bearish_crossover",
                     "periods_ago": i,
-                    "strength": abs(curr_k - curr_d),
+                    "strength": round(abs(curr_k - curr_d), 2),
                     "location": self._get_stoch_zone(curr_k)
                 })
         
@@ -120,7 +181,7 @@ class StochasticPreprocessor(BasePreprocessor):
             "bars_since_cross": crossovers[0]["periods_ago"] if crossovers else None
         }
     
-    def _analyze_stoch_zones(self, k_percent: pd.Series, d_percent: pd.Series) -> Dict[str, Any]:
+    def _analyze_stoch_zones(self, k_percent: pd.Series, d_percent: pd.Series, period: int = 14) -> Dict[str, Any]:
         """Analyze Stochastic overbought/oversold zones (80/20 levels)."""
         current_k = k_percent.iloc[-1]
         
@@ -136,10 +197,10 @@ class StochasticPreprocessor(BasePreprocessor):
         ob_streak = self._calculate_zone_streak(k_percent, 80, "above")
         os_streak = self._calculate_zone_streak(k_percent, 20, "below")
         
-        # Time percentage analysis
+        # Time percentage analysis (vectorized)
         total_periods = len(k_percent)
-        ob_periods = sum(1 for v in k_percent if v >= 80)
-        os_periods = sum(1 for v in k_percent if v <= 20)
+        ob_periods = (k_percent >= 80).sum()
+        os_periods = (k_percent <= 20).sum()
         
         # Exit analysis
         ob_exit = self._analyze_zone_exits(k_percent, 80, "above")
@@ -161,7 +222,7 @@ class StochasticPreprocessor(BasePreprocessor):
                 "time_percentage": round((os_periods / total_periods) * 100, 1),
                 "exit_analysis": os_exit
             },
-            "neutral_bias": "bullish" if current_k > 50 else "bearish"
+            "neutral_bias": "bullish" if current_k > 50 else ("bearish" if current_k < 50 else "neutral")
         }
     
     def _calculate_zone_streak(self, values: pd.Series, threshold: float, direction: str) -> int:
@@ -189,14 +250,14 @@ class StochasticPreprocessor(BasePreprocessor):
                     exits.append({
                         "periods_ago": i,
                         "exit_level": curr_val,
-                        "strength": threshold - curr_val
+                        "strength": min(1.0, (threshold - curr_val) / 20)
                     })
             else:  # below
                 if prev_val <= threshold and curr_val > threshold:
                     exits.append({
                         "periods_ago": i,
                         "exit_level": curr_val,
-                        "strength": curr_val - threshold
+                        "strength": min(1.0, (curr_val - threshold) / 20)
                     })
         
         return {
@@ -204,14 +265,16 @@ class StochasticPreprocessor(BasePreprocessor):
             "latest_exit": exits[0] if exits else None
         }
     
-    def _analyze_stoch_momentum(self, k_percent: pd.Series, d_percent: pd.Series) -> Dict[str, Any]:
+    def _analyze_stoch_momentum(self, k_percent: pd.Series, d_percent: pd.Series, period: int = 14) -> Dict[str, Any]:
         """Analyze Stochastic momentum characteristics."""
         if len(k_percent) < 5:
             return {}
         
-        # %K velocity and acceleration
-        k_velocity = self._calculate_velocity(k_percent, 3)
-        k_acceleration = self._calculate_acceleration(k_percent, 6)
+        # %K velocity and acceleration (period-driven windows)
+        vel_win = max(2, period // 5)
+        acc_win = max(3, period // 3)
+        k_velocity = self._calculate_velocity(k_percent, vel_win)
+        k_acceleration = self._calculate_acceleration(k_percent, acc_win)
         
         # %D smoothing effect
         spread_current = k_percent.iloc[-1] - d_percent.iloc[-1]
@@ -240,21 +303,25 @@ class StochasticPreprocessor(BasePreprocessor):
         else:
             return f"{'bullish' if velocity > 0 else 'bearish'}_momentum"
     
-    def _detect_stoch_divergence(self, k_percent: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
+    def _detect_stoch_divergence(self, k_percent: pd.Series, prices: pd.Series, period: int = 14) -> Optional[Dict[str, Any]]:
         """Detect Stochastic-price divergence patterns."""
         if len(k_percent) < 15 or len(prices) < 15:
             return None
         
-        # Analyze recent swing highs/lows
-        recent_periods = 10
-        k_recent = k_percent.iloc[-recent_periods:]
-        price_recent = prices.iloc[-recent_periods:]
-        
+        # Period-driven analysis window
+        win = min(max(10, period), len(k_percent), len(prices))
+        k_recent = k_percent.tail(win)
+        price_recent = prices.tail(win)
+
+        # Scaled prominence for peak/trough detection
+        prom_k = max(1e-6, k_recent.std() * 0.6)
+        prom_p = max(1e-6, price_recent.std() * 0.6)
+
         # Find recent peaks and troughs
-        k_peaks = self._find_peaks(k_recent, prominence=5)
-        k_troughs = self._find_troughs(k_recent, prominence=5)
-        price_peaks = self._find_peaks(price_recent)
-        price_troughs = self._find_troughs(price_recent)
+        k_peaks = self._find_peaks(k_recent, prominence=prom_k)
+        k_troughs = self._find_troughs(k_recent, prominence=prom_k)
+        price_peaks = self._find_peaks(price_recent, prominence=prom_p)
+        price_troughs = self._find_troughs(price_recent, prominence=prom_p)
         
         # Check for divergence patterns
         if len(k_peaks) >= 2 and len(price_peaks) >= 2:
@@ -268,8 +335,11 @@ class StochasticPreprocessor(BasePreprocessor):
                 latest_k_peak["value"] < prev_k_peak["value"]):
                 return {
                     "type": "bearish_divergence",
-                    "confidence": 0.7,
-                    "description": "Price making higher highs while Stochastic making lower highs"
+                    "description": "Price making higher highs while Stochastic making lower highs",
+                    "peak_comparison": {
+                        "price_change": round(latest_price_peak["value"] - prev_price_peak["value"], 4),
+                        "stoch_change": round(latest_k_peak["value"] - prev_k_peak["value"], 2)
+                    }
                 }
         
         if len(k_troughs) >= 2 and len(price_troughs) >= 2:
@@ -283,8 +353,11 @@ class StochasticPreprocessor(BasePreprocessor):
                 latest_k_trough["value"] > prev_k_trough["value"]):
                 return {
                     "type": "bullish_divergence",
-                    "confidence": 0.7,
-                    "description": "Price making lower lows while Stochastic making higher lows"
+                    "description": "Price making lower lows while Stochastic making higher lows",
+                    "trough_comparison": {
+                        "price_change": round(latest_price_trough["value"] - prev_price_trough["value"], 4),
+                        "stoch_change": round(latest_k_trough["value"] - prev_k_trough["value"], 2)
+                    }
                 }
         
         return None
@@ -298,56 +371,36 @@ class StochasticPreprocessor(BasePreprocessor):
         else:
             return "neutral"
     
-    def _generate_stoch_signals(self, k_value: float, d_value: float, 
-                               cross_analysis: Dict, zone_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate actionable Stochastic signals."""
-        signals = []
-        
-        # Crossover signals
-        latest_cross = cross_analysis.get("latest_crossover")
-        if latest_cross and latest_cross["periods_ago"] <= 3:
-            if latest_cross["type"] == "bullish_crossover":
-                strength = "strong" if latest_cross["location"] == "oversold" else "medium"
-                signals.append({
-                    "type": "buy_signal",
-                    "strength": strength,
-                    "reason": f"Bullish %K/%D crossover in {latest_cross['location']} zone",
-                    "confidence": 0.8 if strength == "strong" else 0.6
-                })
-            else:  # bearish crossover
-                strength = "strong" if latest_cross["location"] == "overbought" else "medium"
-                signals.append({
-                    "type": "sell_signal",
-                    "strength": strength,
-                    "reason": f"Bearish %K/%D crossover in {latest_cross['location']} zone", 
-                    "confidence": 0.8 if strength == "strong" else 0.6
-                })
-        
-        return signals
-    
-    def _calculate_stoch_confidence(self, k_percent: pd.Series, d_percent: pd.Series,
-                                   cross_analysis: Dict, zone_analysis: Dict) -> float:
-        """Calculate Stochastic analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor
-        data_factor = min(1.0, len(k_percent) / 30)
-        confidence_factors.append(data_factor)
-        
-        # Signal clarity factor
-        latest_cross = cross_analysis.get("latest_crossover")
-        if latest_cross:
-            cross_strength = min(1.0, latest_cross["strength"] / 20)
-            confidence_factors.append(cross_strength)
-        
-        # Zone consistency factor
-        current_k = k_percent.iloc[-1]
-        if current_k >= 80 or current_k <= 20:
-            confidence_factors.append(0.8)  # High confidence in extreme zones
-        else:
-            confidence_factors.append(0.6)  # Medium confidence in neutral zone
-        
-        return round(np.mean(confidence_factors), 3)
+    def _detect_stoch_patterns(self, k: pd.Series, d: pd.Series,
+                              kdpx: Optional[pd.DataFrame], period: int = 14) -> Dict[str, Any]:
+        """Detect Stochastic patterns and formations."""
+        patterns = {}
+
+        # Crossover momentum patterns (period-driven velocity window)
+        if len(k) >= 10:
+            vel_win = max(2, period // 5)
+            velocity = self._calculate_velocity(k, vel_win)
+            if abs(velocity) > 2.0:
+                patterns["momentum"] = {
+                    "type": f"strong_{'rising' if velocity > 0 else 'falling'}_momentum",
+                    "velocity": round(velocity, 3),
+                    "window": vel_win,
+                    "description": f"Strong {'rising' if velocity > 0 else 'falling'} momentum in %K"
+                }
+
+        # Squeeze patterns (low volatility)
+        if len(k) >= period:
+            k_volatility = k.tail(period).std()
+            overall_volatility = k.std()
+            if k_volatility < overall_volatility * 0.5:
+                patterns["squeeze"] = {
+                    "type": "low_volatility_squeeze",
+                    "current_volatility": round(k_volatility, 3),
+                    "baseline_volatility": round(overall_volatility, 3),
+                    "description": "Stochastic showing reduced volatility - potential breakout setup"
+                }
+
+        return patterns
     
     def _generate_stoch_summary(self, k_value: float, d_value: float, cross_analysis: Dict,
                                zone_analysis: Dict, position_rank: float) -> str:
@@ -369,3 +422,28 @@ class StochasticPreprocessor(BasePreprocessor):
             summary += f". {latest_cross['type'].replace('_', ' ').title()} {latest_cross['periods_ago']}p ago"
         
         return summary
+
+    def _calculate_stoch_confidence(self, k: pd.Series, d: pd.Series,
+                                   cross_analysis: Dict, zone_analysis: Dict, period: int = 14) -> float:
+        """Calculate Stochastic analysis confidence with spread volatility scaling."""
+        confidence_factors = []
+
+        # Data quantity factor
+        data_factor = min(1.0, len(k) / max(20, period))
+        confidence_factors.append(data_factor)
+
+        # Signal clarity factor (scaled to spread volatility)
+        latest_cross = cross_analysis.get("latest_crossover")
+        if latest_cross:
+            spread_std = float((k - d).tail(max(20, period)).std() or 1e-6)
+            cross_strength = min(1.0, abs(latest_cross["strength"]) / (2 * spread_std))
+            confidence_factors.append(cross_strength)
+
+        # Zone consistency factor
+        current_k = k.iloc[-1]
+        if current_k >= 80 or current_k <= 20:
+            confidence_factors.append(0.8)  # High confidence in extreme zones
+        else:
+            confidence_factors.append(0.6)  # Medium confidence in neutral zone
+
+        return round(np.mean(confidence_factors), 3)
