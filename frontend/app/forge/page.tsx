@@ -411,7 +411,7 @@ function ForgeApp() {
         setHasUnsavedChanges(false)
       }
     }
-  }, [selectedConfigId, selectedBot, isEditingConfig])
+  }, [selectedConfigId, selectedBot, isEditingConfig, editingConfigData, originalConfig])
 
   // Start bot function using proper API client
   const startBot = async () => {

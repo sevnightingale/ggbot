@@ -108,9 +108,8 @@ function KPICard({ label, value, delta, isPercentage }: KPICardProps) {
 
   // Determine if this metric should be colored based on value
   const shouldColorValue = label === 'Portfolio Return' || label === 'Daily P&L'
-  const isPositive = shouldColorValue && (delta ?? 0) >= 0
+  const isPositive = shouldColorValue && (delta ?? 0) > 0
   const isNegative = shouldColorValue && (delta ?? 0) < 0
-  const isZero = shouldColorValue && (delta ?? 0) === 0
 
   // Color for the main value
   const valueColorClass = shouldColorValue
