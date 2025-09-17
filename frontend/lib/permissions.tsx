@@ -27,7 +27,14 @@ const PermissionContext = createContext<PermissionContextType | undefined>(undef
 export function usePermissions() {
   const context = useContext(PermissionContext)
   if (context === undefined) {
-    throw new Error('usePermissions must be used within a PermissionProvider')
+    // Return safe defaults instead of throwing during hydration/SSR
+    return {
+      userProfile: null,
+      loading: true,
+      canAccess: () => false,
+      hasSubscription: () => false,
+      hasPaidDataPoint: () => false,
+    }
   }
   return context
 }
