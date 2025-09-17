@@ -28,8 +28,6 @@ export default function Demo() {
           </div>
         </div>
 
-        </div>
-
         {/* Call to Action */}
         <div className="text-center mt-12">
           <a
