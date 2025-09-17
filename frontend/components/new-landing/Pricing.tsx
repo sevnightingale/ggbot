@@ -87,7 +87,7 @@ export default function Pricing() {
                   {plan.name}
                 </h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-bone-200 blur-sm">
+                  <span className={`text-3xl font-bold text-bone-200 ${plan.price !== "Free" ? "blur-sm" : ""}`}>
                     {plan.price}
                   </span>
                   {plan.price !== "Free" && (
