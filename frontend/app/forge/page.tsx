@@ -41,7 +41,7 @@ interface Decision {
 function ForgeApp() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
-  const { userProfile, loading: permissionsLoading } = usePermissions()
+  const { loading: permissionsLoading } = usePermissions()
   
   // Core bot data - all local state with multi-bot support
   const [allBots, setAllBots] = useState<BotConfiguration[]>([])
