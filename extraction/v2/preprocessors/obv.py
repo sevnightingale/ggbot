@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
+from pandas.api.types import is_datetime64_any_dtype
 
 from .base import BasePreprocessor
 
@@ -49,7 +50,10 @@ class OBVPreprocessor(BasePreprocessor):
 
         # Generate proper timestamp
         def _ts_from(s: pd.Series):
-            return s.index[-1].isoformat() if hasattr(s.index[-1], 'isoformat') and np.issubdtype(s.index.dtype, np.datetime64) else datetime.now(timezone.utc).isoformat()
+            idx = s.index
+            return (idx[-1].isoformat()
+                    if is_datetime64_any_dtype(idx)
+                    else datetime.now(timezone.utc).isoformat())
 
         timestamp = _ts_from(obv)
         
@@ -102,10 +106,14 @@ class OBVPreprocessor(BasePreprocessor):
         """Analyze OBV trend characteristics."""
         current_obv = obv.iloc[-1]
         
-        # Short and long term trends
-        short_trend = self._calculate_trend_direction(obv, 5)
-        medium_trend = self._calculate_trend_direction(obv, 10)
-        long_trend = self._calculate_trend_direction(obv, 20) if len(obv) >= 20 else "insufficient_data"
+        # Length-driven trend windows
+        short = max(3, length // 4)
+        medium = max(5, length // 2)
+        long = max(10, length)
+
+        short_trend = self._calculate_trend_direction(obv, short)
+        medium_trend = self._calculate_trend_direction(obv, medium)
+        long_trend = self._calculate_trend_direction(obv, long) if len(obv) >= long else "insufficient_data"
         
         # Overall trend consensus
         trends = [t for t in [short_trend, medium_trend, long_trend] if t != "insufficient_data"]
@@ -285,9 +293,9 @@ class OBVPreprocessor(BasePreprocessor):
         if len(obv) < 5:
             return {}
         
-        # Velocity and acceleration
-        velocity = self._calculate_velocity(obv, 3)
-        acceleration = self._calculate_acceleration(obv, 5)
+        # Length-driven velocity and acceleration windows
+        velocity = self._calculate_velocity(obv, max(2, length // 5))
+        acceleration = self._calculate_acceleration(obv, max(3, length // 3))
         
         # Momentum classification
         if velocity > 0 and acceleration > 0:
@@ -480,9 +488,10 @@ class OBVPreprocessor(BasePreprocessor):
             "min_obv": round(min_obv, 2)
         }
     
-    def _generate_obv_signals(self, current_obv: float, trend_analysis: Dict, 
-                             accumulation_analysis: Dict, divergence: Optional[Dict]) -> List[Dict[str, Any]]:
-        """Generate OBV trading signals."""
+    # Signal generation and confidence methods removed to comply with analysis-only philosophy
+
+    def _generate_obv_summary(self, current_obv: float, trend_analysis: Dict, accumulation_analysis: Dict) -> str:
+        """Generate human-readable OBV summary."""
         signals = []
         
         # Trend-based signals

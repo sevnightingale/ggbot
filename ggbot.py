@@ -22,6 +22,7 @@ import numpy as np
 
 # APScheduler imports
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.base import STATE_RUNNING
 from apscheduler.triggers.cron import CronTrigger
 import redis.asyncio as redis
 
@@ -78,8 +79,16 @@ def is_orchestrator_log(record):
     
     return False
 
+# Configure log directory and ensure it exists
+LOG_DIR = os.getenv("GGBOT_LOG_DIR", "/home/sev/ggbot/logs")
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_PATH = os.path.join(LOG_DIR, "orchestrator.log")
+
+# Demo mode configuration for artificial delays
+DEMO_MODE = os.getenv("GGBOT_DEMO_MODE", "false").lower() == "true"
+
 base_logger.add(
-    "/home/sev/ggbot/logs/orchestrator.log",
+    LOG_PATH,
     filter=is_orchestrator_log,
     format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}",
     rotation="50 MB",      # Larger rotation for important logs
@@ -222,7 +231,7 @@ async def lifespan(app: FastAPI):
         logger.info("✅ Monitoring service stopped")
     
     # Shutdown scheduler
-    if scheduler.running:
+    if scheduler.state == STATE_RUNNING:
         scheduler.shutdown(wait=False)
         logger.info("✅ APScheduler shutdown")
 
@@ -351,8 +360,9 @@ class GGBotOrchestrator:
                 extraction_engine, config, user_id, requested_indicators, timeframes
             )
             
-            # Allow users to see extraction phase for 7 seconds (better UX)
-            await asyncio.sleep(7)
+            # Allow users to see extraction phase for 7 seconds (better UX) - only in demo mode
+            if DEMO_MODE:
+                await asyncio.sleep(7)
             
             # 5. Run V2 decision engine
             # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
@@ -362,8 +372,9 @@ class GGBotOrchestrator:
                 config_id, config, extraction_result
             )
             
-            # Allow users to see decision phase for 3 seconds (better UX)
-            await asyncio.sleep(3)
+            # Allow users to see decision phase for 3 seconds (better UX) - only in demo mode
+            if DEMO_MODE:
+                await asyncio.sleep(3)
             
             # 6. Execute trading
             # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
@@ -449,14 +460,21 @@ class GGBotOrchestrator:
             
             # Get or create extraction engine
             extraction_engine = await self._get_extraction_engine(user_id)
-            
+
+            # Add extracting phase for UI consistency
+            from core.sse import set_execution_phase
+            await set_execution_phase(config_id, "extracting", f"Extracting indicators for {symbol} ({timeframe})...")
+
             # Run extraction for signal's symbol/timeframe
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id, 
                 signal_indicators, [timeframe],
                 override_symbol=symbol
             )
-            
+
+            # Add deciding phase for UI consistency
+            await set_execution_phase(config_id, "deciding", "AI decision engine analyzing signal context...")
+
             # Run decision with signal context
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result, signal_data
@@ -894,6 +912,7 @@ class GGBotOrchestrator:
                 # First, get any open positions for this symbol and config
                 try:
                     # Check if there are open positions for this config and symbol
+                    from core.common.db import get_db_connection
                     open_positions = []
                     with get_db_connection() as conn:
                         with conn.cursor() as cur:
@@ -1913,13 +1932,13 @@ async def get_bot_trades(
     """Get trade history for a bot configuration."""
     try:
         from core.common.db import get_db_connection
-        
+
         with get_db_connection() as conn:
-            with conn.cursor() as cur:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
                 cur.execute("""
                     SELECT trade_id, symbol, side, entry_price, size_usd, realized_pnl,
                            opened_at, closed_at, confidence_score, status
-                    FROM paper_trades 
+                    FROM paper_trades
                     WHERE config_id = %s AND user_id = %s
                     ORDER BY opened_at DESC
                     LIMIT %s
@@ -2046,7 +2065,7 @@ async def get_bot_decisions(
                     FROM decisions 
                     WHERE config_id = %s 
                         AND user_id = %s
-                        AND created_at >= NOW() - INTERVAL '%s hours'
+                        AND created_at >= NOW() - make_interval(hours => %s)
                     ORDER BY created_at DESC
                     LIMIT %s
                 """, (config_id, current_user.user_id, hours_back, limit))
@@ -2241,7 +2260,7 @@ async def get_scheduler_status(
         
         return {
             "status": "success",
-            "scheduler_running": scheduler.running,
+            "scheduler_running": scheduler.state == STATE_RUNNING,
             "active_jobs": jobs_info,
             "job_count": len(user_jobs),
             "total_jobs_in_scheduler": len(scheduler.get_jobs())
@@ -2258,7 +2277,7 @@ async def manual_reconcile(
 ) -> Dict[str, Any]:
     """Manually trigger scheduler reconciliation (admin function)."""
     try:
-        if not scheduler.running:
+        if not scheduler.state == STATE_RUNNING:
             raise HTTPException(status_code=503, detail="Scheduler is not running")
         
         # Store counts before reconciliation

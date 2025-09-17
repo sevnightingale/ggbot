@@ -623,3 +623,4 @@ ema
 keltner
 macd
 mfi
+obv
