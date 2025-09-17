@@ -127,6 +127,8 @@ class VWAPPreprocessor(BasePreprocessor):
                     "distance_pct": round(fair_value_analysis["distance_from_fair_value_pct"], 3),
                     "reversion_tendency": fair_value_analysis["mean_reversion"]["reversion_strength"]
                 },
+                "anchored": anchored_analysis,
+                "volume_profile": volume_profile,
                 "volatility": round((prices - vwap).std(), 4)
             },
             "levels": {

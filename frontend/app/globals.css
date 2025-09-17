@@ -575,6 +575,11 @@ body {
   --status-success: #10b981;
   --status-danger: #ef4444;
   --status-warning: #f97316;
+
+  /* Financial data colors (matches Activate/Deactivate button colors) */
+  --profit-color: #10b981;      /* emerald-600 - same as Activate button */
+  --loss-color: #e11d48;        /* rose-600 - same as Deactivate button */
+  --neutral-color: #9ca3af;     /* gray-400 - for zero/neutral values */
 }
 
 * {
