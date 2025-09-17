@@ -24,6 +24,15 @@
   - [ ] Test signal processing performance under load
   - [ ] Monitor signal latency and accuracy
 
+## ✅ **COMPLETED - Signal Validation System**
+
+**Status**: DONE - Signal validation toggle and config_type duplication fixed
+
+- [x] **Fix signal validation button not updating config_type** - Frontend and backend now properly handle mode switching
+- [x] **Fix config_type duplication in table and JSONB** - Eliminated duplication at creation and update time
+- [x] **Signal validation mode switching** - Automatically sets analysis_frequency to 'signal_driven'
+- [x] **Clean config_type storage** - Only stored in table field, removed from JSONB data
+
 ## 🚨 **CRITICAL BUGS - ggbot.py Production Blockers**
 
 **Timeline**: IMMEDIATE - These will crash production usage

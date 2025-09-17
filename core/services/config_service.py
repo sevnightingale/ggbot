@@ -72,10 +72,12 @@ class BotConfigV2:
         }
 
     def to_jsonb(self) -> Dict[str, Any]:
-        """Convert to dictionary for database storage - returns raw config_data JSONB structure."""
+        """Convert to dictionary for database storage - returns raw config_data JSONB structure.
+
+        Note: config_type is stored in the table field, not in JSONB to avoid duplication.
+        """
         return {
             "schema_version": self.schema_version,
-            "config_type": self.config_type,
             "selected_pair": self.selected_pair,
             "extraction": self.extraction,
             "decision": self.decision,
@@ -171,6 +173,7 @@ class ConfigService:
                 config_id=config_id,
                 user_id=user_id,
                 config_name=config_name,
+                config_type=config_data.get("config_type", "autonomous_trading"),
                 selected_pair=config_data.get("selected_pair", "BTC/USDT"),
                 extraction=config_data.get("extraction", {}),
                 decision=config_data.get("decision", {}),
@@ -189,18 +192,14 @@ class ConfigService:
             # Store in database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Generate unique config_type by appending timestamp for multiple configs per user
-                    import time
-                    unique_config_type = f"autonomous_trading_{int(time.time())}"
-                    
                     cur.execute("""
-                        INSERT INTO configurations 
+                        INSERT INTO configurations
                         (config_id, user_id, config_type, config_name, config_data, created_at, updated_at)
                         VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
                     """, (
                         config_id,
                         user_id,
-                        unique_config_type,
+                        config.config_type,  # Use actual config_type from BotConfigV2
                         config_name,
                         json.dumps(config.to_jsonb())
                     ))
@@ -384,6 +383,7 @@ class ConfigService:
                 config_id=config_id,
                 user_id=user_id,
                 config_name=config_name or existing_config.config_name,
+                config_type=config_data.get("config_type", existing_config.config_type),
                 selected_pair=config_data.get("selected_pair", existing_config.selected_pair),
                 extraction=config_data.get("extraction", existing_config.extraction),
                 decision=config_data.get("decision", existing_config.decision),

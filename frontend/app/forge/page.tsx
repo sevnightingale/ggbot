@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase'
 import { apiClient, BotConfiguration, ConfigData, DataSource } from '@/lib/api'
 import { ThemeProvider } from '@/lib/theme'
+import { PermissionProvider, usePermissions } from '@/lib/permissions'
 import { Header } from './components/layout/Header'
 import { BotRail } from './components/layout/BotRail'
 import { TabNavigation } from './components/layout/TabNavigation'
@@ -37,9 +38,10 @@ interface Decision {
 }
 
 
-export default function ForgePage() {
+function ForgeApp() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const { userProfile, loading: permissionsLoading } = usePermissions()
   
   // Core bot data - all local state with multi-bot support
   const [allBots, setAllBots] = useState<BotConfiguration[]>([])
@@ -675,7 +677,15 @@ export default function ForgePage() {
 
     // TODO: Show warning about field resets when changing bot type
     updateEditingConfig({
-      tableFields: { config_type: newType }
+      tableFields: { config_type: newType },
+      configData: {
+        config_type: newType,
+        // Update analysis_frequency based on type
+        decision: {
+          ...editingConfigData?.decision,
+          analysis_frequency: newType === 'signal_validation' ? 'signal_driven' : '1h'
+        }
+      }
     })
   }
 
@@ -843,18 +853,23 @@ export default function ForgePage() {
 
   if (!user) {
     return (
-      <ThemeProvider>
-        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-          <div className="text-[var(--text-secondary)]">Please log in</div>
-        </div>
-      </ThemeProvider>
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="text-[var(--text-secondary)]">Please log in</div>
+      </div>
+    )
+  }
+
+  if (permissionsLoading) {
+    return (
+      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
+        <div className="text-[var(--text-secondary)]">Loading permissions...</div>
+      </div>
     )
   }
 
   return (
-    <ThemeProvider>
-      <div className="min-h-screen bg-[var(--bg-primary)]">
-        <Header />
+    <div className="min-h-screen bg-[var(--bg-primary)]">
+      <Header />
 
         {/* 12-column grid container */}
         <div className="grid max-w-7xl grid-cols-12 gap-4 px-4 py-4 min-h-[calc(100vh-64px)]">
@@ -946,8 +961,17 @@ export default function ForgePage() {
           </main>
         </div>
 
-        <MobileNav className="md:hidden" />
-      </div>
+      <MobileNav className="md:hidden" />
+    </div>
+  )
+}
+
+export default function ForgePage() {
+  return (
+    <ThemeProvider>
+      <PermissionProvider>
+        <ForgeApp />
+      </PermissionProvider>
     </ThemeProvider>
   )
 }

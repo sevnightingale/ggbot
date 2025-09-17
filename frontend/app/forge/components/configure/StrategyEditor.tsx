@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { usePermissions } from '@/lib/permissions'
 import { ConfigData } from '@/lib/api'
 
 interface StrategyEditorProps {
@@ -14,6 +15,7 @@ export function StrategyEditor({
   onUpdate,
   className = ''
 }: StrategyEditorProps) {
+  const { canAccess } = usePermissions()
   const currentStrategy = configData?.decision?.user_prompt || 'if RSI 1h below 50 enter long, if above 50 enter short'
   const analysisFrequency = configData?.decision?.analysis_frequency || '5m'
   const llmProvider = configData?.llm_config?.provider || 'deepseek'
@@ -45,6 +47,12 @@ export function StrategyEditor({
 
   // Handle LLM provider change
   const handleProviderChange = (provider: string) => {
+    // Check if user has access to premium LLMs
+    if (provider === 'openai' && !canAccess('premium_llms')) {
+      alert('Premium AI models require a ggbase subscription. Upgrade to access OpenAI GPT-4!')
+      return
+    }
+
     onUpdate?.({
       llm_config: {
         ...configData?.llm_config,
@@ -230,15 +238,23 @@ export function StrategyEditor({
                 description: 'Reliable and well-tested for trading analysis',
                 premium: true
               }
-            ].map((provider) => (
-              <button
-                key={provider.id}
-                onClick={() => handleProviderChange(provider.id)}
-                className={`p-4 rounded-xl border text-left transition-colors ${
-                  llmProvider === provider.id
-                    ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                    : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                }`}
+            ].map((provider) => {
+              const isPremium = provider.premium
+              const hasAccess = !isPremium || canAccess('premium_llms')
+              const isLocked = isPremium && !hasAccess
+
+              return (
+                <button
+                  key={provider.id}
+                  onClick={() => handleProviderChange(provider.id)}
+                  disabled={isLocked}
+                  className={`p-4 rounded-xl border text-left transition-colors relative ${
+                    llmProvider === provider.id
+                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                      : isLocked
+                        ? 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 cursor-not-allowed'
+                        : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="font-medium">{provider.name}</div>
@@ -247,17 +263,29 @@ export function StrategyEditor({
                       Recommended
                     </span>
                   )}
-                  {provider.premium && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-500">
-                      Premium
-                    </span>
+                  {isPremium && (
+                    <div className="flex items-center gap-1">
+                      {isLocked && (
+                        <svg className="h-3 w-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 0h12m-6 0V9a6 6 0 012.121-4.586M12 15v2m-6 0h12m-6 0V9a6 6 0 00-2.121-4.586" />
+                        </svg>
+                      )}
+                      <span className={`text-xs px-2 py-1 rounded-full ${
+                        isLocked
+                          ? 'bg-amber-500/20 text-amber-500/70'
+                          : 'bg-amber-500/20 text-amber-500'
+                      }`}>
+                        Premium
+                      </span>
+                    </div>
                   )}
                 </div>
                 <div className="text-xs text-[var(--text-muted)]">
                   {provider.description}
                 </div>
               </button>
-            ))}
+              )
+            })}
           </div>
 
           <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
