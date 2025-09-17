@@ -2,19 +2,11 @@
 
 export default function Demo() {
   return (
-    <section id="demo" className="py-20 bg-charcoal-800">
+    <section id="demo" className="py-12 bg-charcoal-800">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-12">
-          <h2 className="text-3xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
-            Interactive Demo
-          </h2>
-          <p className="text-lg text-bone-200/70 max-w-2xl mx-auto">
-            See ggbots in action
-          </p>
-        </div>
 
         {/* Demo Container - Arcade Embed */}
-        <div className="relative overflow-hidden bg-charcoal-900 border-2 border-bone-200/20 rounded-sm">
+        <div className="relative overflow-hidden">
           <div style={{position: 'relative', paddingBottom: 'calc(51.71875% + 41px)', height: 0, width: '100%'}}>
             <iframe
               src="https://demo.arcade.software/q0l4MM1QqmUJLDwDTJin?embed&embed_mobile=tab&embed_desktop=inline&show_copy_link=true"
