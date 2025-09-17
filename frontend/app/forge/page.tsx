@@ -681,7 +681,6 @@ function ForgeApp() {
     updateEditingConfig({
       tableFields: { config_type: newType },
       configData: {
-        config_type: newType,
         // Update analysis_frequency based on type
         decision: {
           ...editingConfigData?.decision,
