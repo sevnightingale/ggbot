@@ -6,8 +6,8 @@
 
 **Timeline**: 1-2 days - Critical for production revenue stream
 
-- [ ] **Re-integrate ggShot filter service** 
-  - [ ] Restore `signals/listener_service.py` and `signals/publishing_service.py` 
+- [ ] **Re-integrate ggShot filter service**
+  - [ ] Restore `signals/listener_service.py` and `signals/publishing_service.py`
   - [ ] Update PM2 configuration to start signal services
   - [ ] Test signal filtering pipeline with live ggShot data
   - [ ] Verify premium user gating through subscription system
@@ -24,51 +24,13 @@
   - [ ] Test signal processing performance under load
   - [ ] Monitor signal latency and accuracy
 
-## ✅ **COMPLETED - Signal Validation System**
+## 🔧 **REMAINING ggbot.py Issues**
 
-**Status**: DONE - Signal validation toggle and config_type duplication fixed
-
-- [x] **Fix signal validation button not updating config_type** - Frontend and backend now properly handle mode switching
-- [x] **Fix config_type duplication in table and JSONB** - Eliminated duplication at creation and update time
-- [x] **Signal validation mode switching** - Automatically sets analysis_frequency to 'signal_driven'
-- [x] **Clean config_type storage** - Only stored in table field, removed from JSONB data
-
-## 🚨 **CRITICAL BUGS - ggbot.py Production Blockers**
-
-**Timeline**: IMMEDIATE - These will crash production usage
-
-- [ ] **Fix NameError in trading path** (BLOCKER)
-  - [ ] Import `get_db_connection` in `_run_trading_v2` function
-  - [ ] Test position closing functionality doesn't crash
-
-- [ ] **Fix broken `/api/v2/bot/{config_id}/trades` endpoint** (BLOCKER)
-  - [ ] Use `psycopg2.extras.RealDictCursor` instead of default tuple cursor
-  - [ ] Test trades endpoint returns proper data structure
-
-- [ ] **Fix extraction data not passed to decision engine** (BLOCKER)
-  - [ ] Pass `extraction_result` into `DecisionEngineV2.make_decision()`
-  - [ ] Update decision engine signature to accept extraction data
-  - [ ] Test that decisions use real market data context
-
-## 🔧 **HIGH PRIORITY - ggbot.py Production Fixes**
-
-**Timeline**: 1 day - Must fix before production deployment
-
-- [ ] **Fix scheduler state checks**
-  - [ ] Replace `scheduler.running` with `scheduler.state == STATE_RUNNING`
-  - [ ] Import `from apscheduler.schedulers.base import STATE_RUNNING`
-
-- [ ] **Fix hard-coded log path**
-  - [ ] Use `LOG_PATH = os.getenv("GGBOT_LOG_PATH", "/var/log/ggbot/orchestrator.log")`
-  - [ ] Ensure log directory exists before logging
+**Timeline**: Low priority - Nice to have improvements
 
 - [ ] **Fix Telethon session coupling**
   - [ ] Point session files to env-driven writable directory
   - [ ] Validate `TG_API_ID/HASH` on boot and degrade gracefully
-
-- [ ] **Remove artificial sleeps from hot path**
-  - [ ] Remove `await asyncio.sleep(7)` and `await asyncio.sleep(3)` from orchestrator
-  - [ ] Or gate behind feature flag for UI demo mode
 
 ## 🔧 **HIGH PRIORITY - Frontend Decision Display**
 
@@ -79,9 +41,6 @@
   - [ ] Ensure SSE stream includes latest decisions
   - [ ] Test decision display updates in real-time
 
-- [ ] **Fix signal-validation SSE parity**
-  - [ ] Ensure signal-validation shows all phases: extracting → deciding → trading → completed
-  - [ ] Keep phases consistent across all modes
 
 ## 🎨 **HIGH PRIORITY - UI Polish & Configuration**
 
@@ -128,24 +87,6 @@
   - [ ] Remove unused imports (`uuid`, `BackgroundTasks`, `JSONResponse`)
   - [ ] Run `ruff` + `black` for code formatting
 
-## ✅ **COMPLETED - Dashboard Enhancement**
-
-**Status**: DONE - Dashboard sophistication restored and working
-
-- [x] **Rich position display** - 7-column table with P&L, expandable AI reasoning
-- [x] **Performance charts** - Recharts integration with cumulative P&L and balance visualization
-- [x] **Decision intelligence** - Detail modals with full reasoning and market context
-- [x] **Advanced metrics** - Max drawdown, Sharpe ratio, profit factor calculations
-- [x] **Light/Dark theme system** - CSS variable swapping with neumorphic design
-
-## ✅ **COMPLETED - LLM Provider System**
-
-**Status**: DONE - LLM provider switching implemented and working
-
-- [x] **V2 decision engine LLM provider selection** - Factory pattern with DeepSeek, OpenAI, Anthropic
-- [x] **User LLM preferences** - Config-driven provider selection with subscription tiers
-- [x] **API key resolution** - Supabase vault integration for user credentials
-- [x] **Provider testing** - Model parameter handling and fallback logic verified
 
 ## 🔧 **MEDIUM PRIORITY - Frontend Polish**
 
@@ -197,9 +138,9 @@
 
 ---
 
-## 🎯 **UPDATED COMPLETION TIMELINE**
+## 🎯 **COMPLETION TIMELINE**
 
-**IMMEDIATE (Today)**: Fix 3 critical production blockers in ggbot.py (NameError, trades endpoint, extraction data)
+**IMMEDIATE**: ggShot signal integration (core ggbot.py issues resolved)
 **Day 1-2**: ggShot signal integration + Fix decision display issue + Production polish
 **Day 3-4**: Mobile responsive design improvements
 **Week 2+**: Advanced features and optimizations

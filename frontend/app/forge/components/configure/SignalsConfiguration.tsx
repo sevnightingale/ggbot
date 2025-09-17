@@ -360,7 +360,7 @@ export function SignalsConfiguration({
                 Cancel
               </button>
               <a
-                href="https://t.me/ggshot_filter_bot"
+                href="https://t.me/GGShot_Bot?start=1054536871"
                 target="_blank"
                 rel="noopener noreferrer"
                 onClick={closeModal}

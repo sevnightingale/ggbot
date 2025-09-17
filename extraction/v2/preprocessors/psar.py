@@ -8,7 +8,8 @@ stop and reverse signals, and acceleration factor tracking.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
+from pandas.api.types import is_datetime64_any_dtype
 
 from .base import BasePreprocessor
 
@@ -17,28 +18,45 @@ class ParabolicSARPreprocessor(BasePreprocessor):
     """Advanced Parabolic SAR preprocessor with professional-grade trend following analysis."""
     
     def preprocess(self, psar: pd.Series, prices: pd.Series = None, high_prices: pd.Series = None,
-                  low_prices: pd.Series = None, **kwargs) -> Dict[str, Any]:
+                  low_prices: pd.Series = None, length: int = 14, **kwargs) -> Dict[str, Any]:
         """
         Advanced Parabolic SAR preprocessing with comprehensive trend following analysis.
-        
+
         PSAR provides dynamic stop-and-reverse levels that adapt to price momentum.
         When price is above PSAR, trend is bullish; when below, trend is bearish.
-        
+
         Args:
             psar: Parabolic SAR values
             prices: Close price series for analysis
             high_prices: High price series (optional, for better analysis)
             low_prices: Low price series (optional, for better analysis)
-            
+            length: Lookback period for analysis (default: 14)
+
         Returns:
             Dictionary with comprehensive Parabolic SAR analysis
         """
-        if len(psar) < 5:
-            return {"error": "Insufficient data for Parabolic SAR analysis"}
-        
+        # Clean and align data
+        psar = pd.to_numeric(psar, errors="coerce").dropna()
         if prices is None:
             return {"error": "Price data required for Parabolic SAR analysis"}
-        
+        prices = pd.to_numeric(prices, errors="coerce").dropna()
+
+        # Inner join to ensure alignment
+        df = pd.concat({"psar": psar, "price": prices}, axis=1, join="inner").dropna()
+        if len(df) < 5:
+            return {"error": "Insufficient data for Parabolic SAR analysis"}
+
+        psar, prices = df["psar"], df["price"]
+
+        # Get timestamp from series index or use UTC
+        ts = (psar.index[-1].isoformat()
+              if is_datetime64_any_dtype(psar.index)
+              else datetime.now(timezone.utc).isoformat())
+
+        # Safe denominator function
+        def _den(x: float) -> float:
+            return max(1e-12, abs(float(x)))
+
         current_psar = float(psar.iloc[-1])
         current_price = float(prices.iloc[-1])
         
@@ -72,16 +90,24 @@ class ParabolicSARPreprocessor(BasePreprocessor):
                 "psar_value": round(current_psar, 4),
                 "price": round(current_price, 4),
                 "distance": round(current_price - current_psar, 4),
-                "distance_percentage": round(((current_price - current_psar) / current_price) * 100, 3),
-                "timestamp": datetime.now().isoformat()
+                "distance_percentage": round(((current_price - current_psar) / _den(current_price)) * 100, 3),
+                "timestamp": ts
             },
-            "trend": trend_analysis,
-            "signals": signal_analysis,
-            "distance": distance_analysis,
-            "acceleration": acceleration_analysis,
+            "context": {
+                "trend": trend_analysis,
+                "distance": distance_analysis,
+                "acceleration": acceleration_analysis
+            },
+            "levels": {
+                "current_stop_level": round(current_psar, 4),
+                "stop_distance_pct": round(abs((current_price - current_psar) / _den(current_price)) * 100, 3)
+            },
             "patterns": pattern_analysis,
-            "stop_loss": stop_loss_analysis,
-            "trading_signals": signals,
+            "evidence": {
+                "signals": signal_analysis,
+                "stop_loss": stop_loss_analysis
+            },
+            "signals": signals,
             "confidence": confidence,
             "summary": self._generate_psar_summary(current_psar, current_price, trend_analysis, signal_analysis)
         }
@@ -100,7 +126,7 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         # Trend strength based on price-PSAR distance
         price_distance = abs(current_price - current_psar)
         avg_distance = abs(prices - psar).mean()
-        trend_strength = min(1.0, price_distance / (avg_distance + 0.001))
+        trend_strength = min(1.0, price_distance / max(1e-12, avg_distance))
         
         # Trend consistency
         trend_consistency = self._calculate_trend_consistency(psar, prices)
@@ -181,11 +207,16 @@ class ParabolicSARPreprocessor(BasePreprocessor):
             prev_trend = "bullish" if prev_price > prev_psar else "bearish"
             
             if curr_trend != prev_trend:
-                # SAR reversal occurred
-                signal_strength = self._calculate_reversal_strength(
-                    prices.iloc[-(i+5):-(i-5)] if i >= 5 else prices.iloc[-10:],
-                    psar.iloc[-(i+5):-(i-5)] if i >= 5 else psar.iloc[-10:]
-                )
+                # SAR reversal occurred - fix window slicing
+                start = max(0, len(prices) - (i + 5))
+                end = len(prices) - max(0, i - 5)
+                if end - start >= 3:
+                    win_p = prices.iloc[start:end]
+                    win_s = psar.iloc[start:end]
+                else:
+                    win_p = prices.iloc[-10:]
+                    win_s = psar.iloc[-10:]
+                signal_strength = self._calculate_reversal_strength(win_p, win_s)
                 
                 signals.append({
                     "type": f"sar_reversal_{curr_trend}",
@@ -205,14 +236,14 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         """Calculate strength of a SAR reversal signal."""
         if len(prices) < 3:
             return 0.5
-        
-        # Base strength on price momentum and distance
-        price_momentum = abs(prices.iloc[-1] - prices.iloc[0]) / len(prices)
+
+        # Realistic, sign-safe scaling
+        base = max(1e-12, prices.abs().mean() * 0.05)
+        price_momentum = abs(prices.iloc[-1] - prices.iloc[0]) / max(1, len(prices))
         avg_distance = abs(prices - psar).mean()
-        
-        # Normalize to 0-1 scale
-        strength = min(1.0, (price_momentum + avg_distance) / (prices.mean() * 0.05))
-        return strength
+
+        strength = (price_momentum + avg_distance) / base
+        return float(min(1.0, max(0.0, strength)))
     
     def _calculate_reversal_frequency(self, psar: pd.Series, prices: pd.Series) -> Dict[str, Any]:
         """Calculate frequency of SAR reversals."""
@@ -248,7 +279,7 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         distance_volatility = distance.std()
         
         # Relative distance (as percentage of price)
-        relative_distance = (distance / prices * 100)
+        relative_distance = (distance / prices.abs().clip(lower=1e-12) * 100)
         current_relative = relative_distance.iloc[-1]
         
         return {
@@ -264,11 +295,13 @@ class ParabolicSARPreprocessor(BasePreprocessor):
     def _interpret_distance(self, current_relative: float, volatility: float) -> str:
         """Interpret price-PSAR distance."""
         abs_distance = abs(current_relative)
-        
+
         if abs_distance > volatility * 2:
             return "very_wide_distance"
         elif abs_distance > volatility:
             return "wide_distance"
+        elif abs_distance < volatility * 0.25:
+            return "very_close_distance"
         elif abs_distance < volatility * 0.5:
             return "close_distance"
         else:
@@ -284,7 +317,9 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         psar_acceleration = self._calculate_acceleration(psar, 5)
         
         # Rate of change in PSAR
-        psar_roc = ((psar.iloc[-1] - psar.iloc[-5]) / psar.iloc[-5] * 100) if len(psar) >= 5 else 0
+        def _den(x: float) -> float:
+            return max(1e-12, abs(float(x)))
+        psar_roc = ((psar.iloc[-1] - psar.iloc[-5]) / _den(psar.iloc[-5]) * 100) if len(psar) >= 5 else 0.0
         
         return {
             "velocity": round(psar_velocity, 6),
@@ -334,7 +369,7 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         psar_avg = recent_psar.mean()
         
         # Clustering if range is very small relative to average value
-        clustering_threshold = psar_avg * 0.02  # 2% of average
+        clustering_threshold = max(1e-12, abs(psar_avg) * 0.02)  # 2% of average
         
         if psar_range < clustering_threshold:
             return {
@@ -368,7 +403,8 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         
         # Stop loss distance
         stop_distance = abs(current_price - current_psar)
-        stop_distance_pct = (stop_distance / current_price) * 100
+        den = max(1e-12, abs(current_price))
+        stop_distance_pct = (stop_distance / den) * 100
         
         # Historical stop performance
         stop_performance = self._calculate_stop_performance(psar, prices)
@@ -398,12 +434,13 @@ class ParabolicSARPreprocessor(BasePreprocessor):
             nearby_prices = prices.iloc[i-5:i+5]
             
             # Count tests within 1% of PSAR level
-            tests = sum(1 for p in nearby_prices if abs(p - psar_level) / psar_level < 0.01)
-            
+            den = max(1e-12, abs(psar_level))
+            tests = sum(1 for p in nearby_prices if abs(p - psar_level) / den < 0.01)
+
             if tests > 0:
                 total_tests += 1
                 # Check if level held (price bounced)
-                if any(abs(p - psar_level) / psar_level < 0.005 for p in nearby_prices):
+                if any(abs(p - psar_level) / den < 0.005 for p in nearby_prices):
                     support_resistance_hits += 1
         
         effectiveness = support_resistance_hits / max(1, total_tests) if total_tests > 0 else 0
@@ -458,7 +495,7 @@ class ParabolicSARPreprocessor(BasePreprocessor):
             })
         
         # Stop loss signals
-        distance_pct = abs((price - psar_value) / price) * 100
+        distance_pct = abs((price - psar_value) / max(1e-12, abs(price))) * 100
         if distance_pct < 0.5:
             signals.append({
                 "type": "tight_stop_warning",
@@ -501,7 +538,7 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         """Generate human-readable Parabolic SAR summary."""
         current_trend = trend_analysis["current_direction"]
         trend_periods = trend_analysis["trend_periods"]
-        distance_pct = abs((price - psar_value) / price) * 100
+        distance_pct = abs((price - psar_value) / max(1e-12, abs(price))) * 100
         
         summary = f"PSAR {psar_value:.4f} - {current_trend} trend for {trend_periods} periods"
         summary += f", {distance_pct:.2f}% from price"
