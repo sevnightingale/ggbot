@@ -1385,7 +1385,7 @@ async def update_config(
     
     # Get old config to compare timeframes
     old_config = await config_service.get_config(config_id, current_user.user_id)
-    old_timeframe = extract_timeframe_from_config(old_config.config_data) if old_config else None
+    old_timeframe = extract_timeframe_from_config(old_config.to_jsonb()) if old_config else None
     
     config = await config_service.update_config(
         config_id=config_id,
@@ -1400,7 +1400,7 @@ async def update_config(
     # If bot was active, check if timeframe changed and reschedule if needed
     reschedule_info = None
     if was_active and scheduler.running:
-        new_timeframe = extract_timeframe_from_config(config.config_data)
+        new_timeframe = extract_timeframe_from_config(config.to_jsonb())
         
         if old_timeframe != new_timeframe:
             logger.info(f"Timeframe changed from {old_timeframe} to {new_timeframe} for active bot {config_id}")
@@ -2113,7 +2113,7 @@ async def start_bot(
             }
         
         # Extract timeframe from config
-        config_dict = config.config_data
+        config_dict = config.to_jsonb()
         timeframe = extract_timeframe_from_config(config_dict)
 
         # Handle signal_driven bots differently - they don't get scheduled jobs
@@ -2179,7 +2179,7 @@ async def stop_bot(
             }
         
         # Extract timeframe from config
-        config_dict = config.config_data
+        config_dict = config.to_jsonb()
         timeframe = extract_timeframe_from_config(config_dict)
 
         # Handle signal_driven bots differently - they don't have scheduled jobs to remove
@@ -2305,7 +2305,7 @@ async def get_bot_status(
             raise HTTPException(status_code=404, detail="Configuration not found")
             
         # Extract timeframe from config
-        config_dict = config.config_data
+        config_dict = config.to_jsonb()
         timeframe = extract_timeframe_from_config(config_dict)
         
         # Check if job exists in scheduler
