@@ -59,7 +59,6 @@ class BotConfigV2:
             "state": self.state,
             "config_data": {
                 "schema_version": self.schema_version,
-                "config_type": self.config_type,
                 "selected_pair": self.selected_pair,
                 "extraction": self.extraction,
                 "decision": self.decision,
@@ -298,14 +297,14 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_id, config_name, config_data, created_at, updated_at, state
+                        SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type
                         FROM configurations
                         WHERE user_id = %s
                         ORDER BY created_at DESC
                     """, (user_id,))
                     
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state = row
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type = row
                         
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -322,7 +321,7 @@ class ConfigService:
                                 "extraction": inner_config.get("extraction", {}),
                                 "decision": inner_config.get("decision", {}),
                                 "trading": inner_config.get("trading", {}),
-                                "config_type": inner_config.get("config_type", "autonomous_trading"),
+                                "config_type": db_config_type or "autonomous_trading",
                                 "schema_version": inner_config.get("schema_version", "2.1"),
                                 "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                                 "telegram_integration": inner_config.get("telegram_integration", {}),
@@ -338,6 +337,7 @@ class ConfigService:
                             if config_name and "config_name" not in flattened_config:
                                 flattened_config["config_name"] = config_name
                             flattened_config["state"] = state or "inactive"
+                            flattened_config["config_type"] = db_config_type or "autonomous_trading"
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:
@@ -357,7 +357,8 @@ class ConfigService:
         config_id: str,
         user_id: str,
         config_data: Dict[str, Any],
-        config_name: Optional[str] = None
+        config_name: Optional[str] = None,
+        config_type: Optional[str] = None
     ) -> Optional[BotConfigV2]:
         """
         Update bot configuration with user access validation.
@@ -383,7 +384,7 @@ class ConfigService:
                 config_id=config_id,
                 user_id=user_id,
                 config_name=config_name or existing_config.config_name,
-                config_type=config_data.get("config_type", existing_config.config_type),
+                config_type=config_type or existing_config.config_type,
                 selected_pair=config_data.get("selected_pair", existing_config.selected_pair),
                 extraction=config_data.get("extraction", existing_config.extraction),
                 decision=config_data.get("decision", existing_config.decision),

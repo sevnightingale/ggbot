@@ -1375,6 +1375,7 @@ async def update_config(
     # Filter out None values
     update_data = {k: v for k, v in request.dict().items() if v is not None}
     config_name = update_data.pop("config_name", None)
+    config_type = update_data.pop("config_type", None)
     
     # Check if this is an active bot before update
     current_state = await config_service.get_bot_state(config_id, current_user.user_id)
@@ -1388,7 +1389,8 @@ async def update_config(
         config_id=config_id,
         user_id=current_user.user_id,
         config_data=update_data,
-        config_name=config_name
+        config_name=config_name,
+        config_type=config_type
     )
     
     if not config:
