@@ -2,7 +2,25 @@
 
 **Status**: ✅ **Core V2 pipeline operational with ggShot integration!** - Scheduler working, signal flow fixed, multi-timeframe extraction working. Focus now on testing and polish.
 
-## 🚨 **HIGHEST PRIORITY - ggShot Signal Polish**
+## 🚨 **HIGHEST PRIORITY - Frontend Polish & Landing Page**
+
+**Timeline**: 2 days - Complete frontend modernization
+
+- [ ] **Polish and deploy new landing page**
+  - [ ] Complete /new-landing page polish and final touches
+  - [ ] Archive existing /landing page to /legacy-landing
+  - [ ] Rename /new-landing to /landing for main ggbots.ai URL
+  - [ ] Update routing and middleware for new landing page
+  - [ ] Test deployment on Vercel with new routing
+
+- [ ] **Remove legacy dashboard and clean up frontend directory**
+  - [ ] Archive /dashboard directory (legacy WebSocket-based dashboard)
+  - [ ] Remove botStore.ts and related WebSocket complexity
+  - [ ] Clean up unused components and dependencies
+  - [ ] Update navigation and routing to use /forge as primary app
+  - [ ] Simplify directory structure to focus on /landing and /forge
+
+## 🔧 **HIGH PRIORITY - ggShot Signal Polish**
 
 **Timeline**: 1 day - Fix remaining signal integration issues
 
@@ -50,6 +68,14 @@
   - [ ] Change 'next run...' to 'waiting for next candle close...' in frontend
   - [ ] Make it clear why bot doesn't trigger immediately after activation
   - [ ] Update status messages to be more user-friendly
+
+- [ ] **Review decimal precision for crypto pricing**
+  - [ ] Audit all price display components across frontend (Forge positions table, metrics, etc.)
+  - [ ] Ensure backend API returns appropriate decimal precision for small-cap cryptos
+  - [ ] Update price formatting to handle micro-prices (e.g., $0.000001234 for meme coins)
+  - [ ] Verify extraction/decision/trading systems handle high-precision decimals correctly
+  - [ ] Test with various crypto price ranges (BTC ~$100k vs SHIB ~$0.000024)
+  - [ ] Implement dynamic decimal places based on price magnitude
 
 ## 🔧 **MEDIUM PRIORITY - Backend Polish**
 

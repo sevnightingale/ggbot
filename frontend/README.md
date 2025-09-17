@@ -1,559 +1,178 @@
-# GGBot Frontend - Authentication & Dashboard
+# ggbots Frontend - Forge Architecture
 
-**Next.js 15 + TypeScript + Tailwind CSS + Supabase Authentication**
+**Next.js 15 + TypeScript + Tailwind CSS + Supabase + Real-time SSE**
 
 ---
 
-## 🚀 Current Status: PRODUCTION READY
+## 🚀 Current Status: PRODUCTION READY - FORGE ARCHITECTURE
 
-### **✅ COMPLETE AUTHENTICATION SYSTEM**
-- **Full User Flow**: Signup → Email verification → Login → Dashboard
-- **Domain Architecture**: 
-  - `ggbots.ai` → Landing page
-  - `app.ggbots.ai` → Authenticated dashboard application
-- **Supabase Integration**: Email/password auth with custom theming
-- **Auth Guards**: Server-side session protection with redirect handling
-- **Email Verification**: Complete callback flow with proper URL handling
-- **Logout System**: Session clearing with redirect to login
+### **✅ FORGE - COMPLETE AUTONOMOUS TRADING PLATFORM**
+- **Architecture**: Clean local-state design with SSE real-time updates
+- **Multi-Bot Management**: Native support for unlimited trading agents per user
+- **Configuration System**: Complete sandboxed editing with premium feature gating
+- **Authentication**: Full Supabase integration with permission-based access control
+- **Real-time Data**: Live positions, decisions, and account tracking via Server-Sent Events
+- **Permission System**: Comprehensive premium feature gatekeeping for monetization
 
-### **✅ DASHBOARD IMPLEMENTATION**
-- **Clean Architecture**: selectedConfigId state pattern implemented
-- **Authentication Protected**: Route guards on all dashboard pages
-- **User Experience**: Loading states, error handling, empty states
-- **Bot Management**: Ready for V2 backend integration
-- **Real-time Ready**: Structured for live data subscriptions
+### **✅ AUTHENTICATION & LANDING SYSTEM**
+- **Landing Pages**: Modern marketing site with new-landing ready for deployment
+- **Auth Flow**: Email/password signup → verification → dashboard access
+- **Protected Routes**: Server-side session guards with automatic redirects
+- **Permission Gates**: Subscription tier-based feature access control
 
 ---
 
 ## 🏗 Architecture Overview
 
-### **Authentication Flow**
+### **Current Page Structure**
 ```
-1. User visits app.ggbots.ai
-   ↓
-2. Middleware redirects to /dashboard  
-   ↓
-3. Dashboard layout checks auth session
-   ↓
-4. If not authenticated → redirect to /login
-   ↓  
-5. User signs up/logs in with Supabase Auth UI
-   ↓
-6. Email verification → /auth/callback → /dashboard
-   ↓
-7. Authenticated dashboard access granted
+Production Pages:
+├── /forge                    # Main application (Forge architecture)
+├── /new-landing             # Modern landing page (ready to replace /landing)
+├── /login                   # Supabase authentication (login)
+├── /signup                  # Supabase authentication (signup)
+└── /auth/callback           # Email verification handler
+
+Legacy/Archive (Moved to /archive/):
+├── frontend-dashboard       # Deprecated WebSocket-based dashboard
+├── frontend-landing-components # Old landing page components
+└── frontend-store          # Archived Zustand botStore complexity
 ```
 
-### **Domain Structure**
+### **Forge Architecture (Production)**
 ```
-ggbots.ai/                    # Landing page (marketing)
-├── /landing                  # Landing content
-
-app.ggbots.ai/                # Authenticated application  
-├── /                         # → redirects to /dashboard
-├── /dashboard                # Main dashboard (auth required)
-├── /login                    # Supabase Auth UI (login)
-├── /signup                   # Supabase Auth UI (signup)
-└── /auth/callback            # Email verification handler
-```
-
-### **Page Structure**
-```
-app/
-├── page.tsx                  # Root → middleware handles routing
-├── middleware.ts             # Domain-based routing logic
-├── landing/
-│   ├── layout.tsx            # Landing page layout
-│   └── page.tsx              # Landing page content
-├── dashboard/
-│   ├── layout.tsx            # Auth-protected layout
-│   └── page.tsx              # Dashboard with bot management
-├── login/
-│   └── page.tsx              # Supabase Auth UI (login)
-├── signup/
-│   └── page.tsx              # Supabase Auth UI (signup)
-└── auth/callback/
-    └── route.ts              # Email verification callback
+/forge/components/
+├── layout/                  # Application shell
+│   ├── Header.tsx          # Branding, theme toggle, user profile
+│   ├── BotRail.tsx         # Multi-bot sidebar with management
+│   ├── TabNavigation.tsx   # Monitor/Configure tab switching
+│   ├── MobileNav.tsx       # Mobile responsive navigation
+│   └── UserProfile.tsx     # Profile dropdown with subscription status
+│
+├── monitor/                 # Real-time operational dashboard
+│   ├── ActivationBar.tsx   # Bot status/control with agent pipeline visualization
+│   ├── MetricsBar.tsx      # Portfolio KPIs (balance, P&L, win rate, positions)
+│   ├── DecisionFeed.tsx    # AI decision carousel with reasoning expansion
+│   └── PositionsTable.tsx  # Live trading positions with real-time P&L
+│
+├── configure/               # Bot configuration system
+│   ├── SaveConfigBar.tsx   # Bot type toggle + save/cancel with change tracking
+│   ├── ConfigTabs.tsx      # Sub-navigation (Market Data | Signals | Strategy | Trade Settings)
+│   ├── MarketDataSelector.tsx # Technical indicator selection with premium gates
+│   ├── SignalsConfiguration.tsx # External signal sources (ggShot, Discord, etc.)
+│   ├── StrategyEditor.tsx  # AI prompt editing with LLM provider selection
+│   └── TradeSettings.tsx   # Position sizing, risk management, Telegram integration
+│
+└── shared/                  # Reusable components
+    ├── ThemeToggle.tsx     # Dark/light mode switching
+    ├── EmptyState.tsx      # Guidance for empty states
+    └── LoadingSkeleton.tsx # Loading placeholders
 ```
 
 ---
 
-## 🔐 Authentication Implementation
+## 🎯 Forge Architecture Highlights
 
-### **Supabase Configuration**
+### **Local State Design**
+- **No Global Store**: Direct API types, no transformation layers
+- **Multi-Bot Native**: `selectedConfigId` pattern with seamless switching
+- **SSE Real-time**: Server-Sent Events replace complex WebSocket patterns
+- **Sandboxed Editing**: Configuration changes isolated from operational display
+
+### **Real-time Data Flow**
 ```typescript
-// Environment Variables Required
-NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+// SSE connection with filtered data streams
+const eventSource = new EventSource(`${apiUrl}/api/v2/dashboard/stream?user_id=${userId}`)
 
-// Supabase Dashboard Settings:
-// - Site URL: https://app.ggbots.ai
-// - Redirect URLs: https://app.ggbots.ai/auth/callback
-```
+eventSource.onmessage = (event) => {
+  const data = JSON.parse(event.data)
 
-### **Auth Components**
-```typescript
-// Client-side auth
-/lib/supabase.ts              # Client component auth client
-/lib/supabase-server.ts       # Server component auth client
-
-// Auth UI with custom theming
-/app/login/page.tsx           # Branded login form
-/app/signup/page.tsx          # Branded signup form
-```
-
-### **Authentication Guards**
-```typescript
-// Server-side protection in dashboard layout
-export default async function DashboardLayout({ children }) {
-  const supabase = createServerClient()
-  const { data: { session } } = await supabase.auth.getSession()
-  
-  // Redirect to login if not authenticated
-  if (!session) {
-    redirect('/login')
+  // Filter for currently selected bot
+  if (data.config_id === selectedConfigIdRef.current) {
+    setPositions(data.positions)
+    setDecisions(data.decisions)
+    setAccounts(data.accounts)
+    setExecutionStatus(data.execution_status)
   }
-
-  return <div>{children}</div>
 }
 ```
 
-### **Custom Auth Theming**
-- **Brand Colors**: Agent-trading orange (`#be6a47`) with charcoal backgrounds
-- **Brutalist Design**: Matches existing dashboard design system
-- **Form Styling**: Custom Supabase Auth UI theme variables
-- **Message Backgrounds**: Fixed white background issues on verification states
+### **Configuration Architecture**
+```typescript
+// Sandboxed editing pattern
+const [allBots, setAllBots] = useState<BotConfiguration[]>([])
+const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
+const [editingConfig, setEditingConfig] = useState<ConfigData | null>(null)
+const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
+
+// Centralized config updates with deep merging
+const updateEditingConfig = (updates: Partial<ConfigData>) => {
+  setEditingConfig(prev => ({
+    ...prev,
+    ...updates,
+    // Deep merge for nested JSONB fields
+    extraction: { ...prev?.extraction, ...updates.extraction },
+    decision: { ...prev?.decision, ...updates.decision },
+    trading: { ...prev?.trading, ...updates.trading }
+  }))
+  setHasUnsavedChanges(true)
+}
+```
 
 ---
 
-## 🎯 User Experience Flow
+## 🔐 Permission System
 
-### **New User Journey**
-1. **Visit** `app.ggbots.ai` → Redirected to login (not authenticated)
-2. **Click "Sign up"** → Branded signup form
-3. **Enter email/password** → "Check your email" message (dark themed)
-4. **Click email link** → `app.ggbots.ai/auth/callback` → Dashboard
-5. **Dashboard loads** → Empty state with "Create Your First Bot" + Logout button
+### **Subscription Tier Architecture**
+```typescript
+// /lib/permissions.tsx - Complete permission context
+interface PermissionContextType {
+  userProfile: UserProfile | null
+  loading: boolean
+  canAccess: (feature: string) => boolean
+  hasSubscription: (tier: 'ggbase') => boolean
+  hasPaidDataPoint: (dataPoint: string) => boolean
+}
 
-### **Returning User Journey**
-1. **Visit** `app.ggbots.ai` → Direct access to dashboard (authenticated)
-2. **Dashboard loads** → Last state preserved
-3. **Logout available** → Red logout button clears session
+// Permission gates in components
+const { canAccess } = usePermissions()
 
-### **Domain Routing**
-- **Landing Traffic**: `ggbots.ai` serves marketing content
-- **App Traffic**: `app.ggbots.ai` serves authenticated dashboard
-- **Middleware**: Handles domain-based routing automatically
-- **SSL**: Vercel provides automatic HTTPS for both domains
+// Premium LLM models
+const isLocked = !canAccess('premium_llms')
+<button disabled={isLocked} className={isLocked ? 'opacity-60 cursor-not-allowed' : ''}>
+  {isLocked && <LockIcon />} OpenAI GPT-4
+</button>
+
+// ggShot signals
+const canUseSignals = canAccess('ggshot')
+<Toggle enabled={canUseSignals && isGgShotEnabled} />
+```
+
+### **Feature Gatekeeping**
+- **OpenAI GPT-4**: Requires `premium_llms` access
+- **ggShot Signals**: Requires `ggshot` subscription
+- **Telegram Publishing**: Requires `telegram_publishing` access
+- **Platform LLM Keys**: Requires `platform_llm_keys` access
 
 ---
 
-## 💻 Development Setup
+## 💻 Development & Deployment
 
-### **Environment Configuration**
+### **Environment Setup**
 ```bash
-# Clone and setup
-git clone [repo]
-cd frontend/
-
-# Install dependencies
+# Development
+cd /home/sev/ggbot/frontend
 npm install
-
-# Environment variables (.env.local)
-NEXT_PUBLIC_SUPABASE_URL=your-supabase-url
-NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
-
-# Development server
 npm run dev          # http://localhost:3000
 
-# Production build
-npm run build        # Test deployment readiness
+# Production Build
+npm run build        # Test compilation
+npm run lint         # Code quality check
 ```
 
-### **Local Testing**
+### **Environment Variables**
 ```bash
-# Test routes locally
-http://localhost:3000/landing    # Landing page
-http://localhost:3000/dashboard  # Dashboard (auth required)  
-http://localhost:3000/login      # Login form
-http://localhost:3000/signup     # Signup form
-
-# Note: Subdomain routing only works in production
-# Local development uses path-based routing
-```
-
-### **Deployment**
-```bash
-# Automatic deployment via GitHub + Vercel
-git push origin main
-
-# Vercel Configuration Required:
-# 1. Add environment variables to Vercel dashboard
-# 2. Add domain: app.ggbots.ai
-# 3. DNS CNAME: app → cname.vercel-dns.com
-```
-
----
-
-## 🔧 Technical Implementation
-
-### **Middleware-Based Routing**
-```typescript
-// middleware.ts - Modern Next.js 13+ pattern
-export function middleware(request: NextRequest) {
-  const hostname = request.headers.get('host') || ''
-  
-  if (hostname.startsWith('app.')) {
-    // App subdomain routing
-    if (pathname === '/') {
-      return NextResponse.rewrite(new URL('/dashboard', request.url))
-    }
-  } else {
-    // Main domain routing  
-    if (pathname === '/') {
-      return NextResponse.rewrite(new URL('/landing', request.url))
-    }
-  }
-}
-```
-
-### **Session Management**
-```typescript
-// Server-side session check
-const supabase = createServerClient()
-const { data: { session } } = await supabase.auth.getSession()
-
-// Client-side logout
-const handleLogout = async () => {
-  await supabase.auth.signOut()
-  router.push('/login')
-}
-```
-
-### **Email Verification Callback**
-```typescript
-// /app/auth/callback/route.ts
-export async function GET(request: NextRequest) {
-  const code = request.searchParams.get('code')
-  
-  if (code) {
-    // Supabase handles session creation
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-  
-  return NextResponse.redirect(new URL('/login', request.url))
-}
-```
-
----
-
-## 📋 Ready for Integration
-
-### **V2 Backend Connection Points**
-```typescript
-// Dashboard ready for real API integration
-const fetchBotData = async (configId: string) => {
-  const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-  
-  const [metricsResponse, tradesResponse, positionsResponse] = await Promise.all([
-    fetch(`${baseUrl}/api/v2/bot/${configId}/metrics`),
-    fetch(`${baseUrl}/api/v2/bot/${configId}/trades`), 
-    fetch(`${baseUrl}/api/v2/bot/${configId}/positions`)
-  ])
-  
-  // Update dashboard state with real data
-}
-```
-
-### **Real-time Subscriptions Ready**
-```typescript
-// Structure prepared for Supabase real-time
-useEffect(() => {
-  if (selectedConfigId) {
-    // TODO: Implement real-time bot data subscriptions
-    // const subscription = supabase
-    //   .channel(`bot:${selectedConfigId}`)
-    //   .on('postgres_changes', { event: '*' }, handleUpdate)
-    //   .subscribe()
-  }
-}, [selectedConfigId])
-```
-
----
-
-## 🎨 Design System
-
-### **Authentication UI Theme**
-```typescript
-// Custom Supabase Auth UI theme
-const authTheme = {
-  colors: {
-    brand: '#be6a47',                    // Agent-trading orange
-    brandAccent: '#a85a3f',             // Darker orange
-    inputBackground: '#161618',          // Charcoal-900
-    inputBorder: '#36363d',              // Charcoal-600  
-    inputText: '#e3e5e6',               // Bone-200
-    messageBackground: '#1f1f23',        // Charcoal-800
-    // ... matches brutalist design system
-  }
-}
-```
-
-### **Component Consistency**
-- **Colors**: Matches existing dashboard (charcoal + bone palette)
-- **Typography**: Consistent font sizes and weights
-- **Interactions**: Hover states and transitions align
-- **Error States**: Branded error messages and backgrounds
-
----
-
-## ✅ Production Checklist
-
-### **Authentication System**
-- [x] Email/password signup and login
-- [x] Email verification with callback handling  
-- [x] Session-based route protection
-- [x] Logout functionality with session clearing
-- [x] Custom UI theming matching brand
-- [x] Error handling and user feedback
-- [x] Subdomain-based app separation
-
-### **Dashboard Application**  
-- [x] Protected dashboard routes
-- [x] Empty state with create/logout options
-- [x] Bot management UI structure
-- [x] Real-time data subscription framework
-- [x] Loading and error states
-- [x] Responsive design
-
-### **Infrastructure**
-- [x] Domain routing (app.ggbots.ai)
-- [x] SSL certificates (automatic via Vercel)
-- [x] Environment variable configuration
-- [x] Production build optimization
-- [x] Git-based deployment workflow
-
----
-
-## 🚀 Next Steps
-
-### **Immediate Priorities**
-1. **Social Authentication**: Add Google/GitHub OAuth providers
-2. **Bot Configuration**: Implement GGBotConfig component with V2 API
-3. **Real-time Data**: Connect dashboard to live trading data
-4. **User Profile**: Settings page with account management
-
-### **Future Enhancements**
-1. **Mobile App**: React Native version with shared auth
-2. **Advanced Charts**: TradingView integration
-3. **Notifications**: Email/SMS alerts for bot events
-4. **Analytics**: User behavior tracking and optimization
-
----
-
----
-
-## 🤖 **Configuration System - PRODUCTION READY**
-
-### **✅ COMPLETE V2 BACKEND INTEGRATION**
-
-The GGBot configuration system has been completely overhauled with full API integration:
-
-#### **Real-Time Configuration Management**
-- **Single State Object**: Replaced 60+ individual state variables with unified `configData` structure
-- **API Integration**: All save/load operations use authenticated V2 backend endpoints  
-- **Dynamic Data Loading**: Indicators and data sources loaded from database with premium gating
-- **Supabase Authentication**: Session-based auth with JWT tokens for all API calls
-
-#### **LLM API Key Management** 🔐
-- **Encrypted Storage**: User API keys encrypted via Supabase Vault before database storage
-- **Tier-Based Access**: Free users provide own keys, paid users can use platform-managed keys
-- **Provider Selection**: OpenAI GPT-4, DeepSeek R1, and Anthropic Claude support
-- **Security First**: API keys never stored in plaintext, complete vault integration
-
-#### **Premium Feature Gating** 💎
-- **Subscription Tiers**: Free, Base (Signals), and Full (Autonomous) tier structure
-- **Dynamic Access Control**: Database-driven premium feature visibility
-- **Real-Time Validation**: Backend determines user access via `paid_data_points` array
-- **Upgrade Prompts**: Locked features show clear upgrade paths and benefits
-
-#### **Multi-Agent Configuration**
-1. **Extraction Agent**: 21 technical indicators + 7 data source categories with timeframe selection
-2. **LLM Configuration**: Provider selection, API key management, platform vs user keys
-3. **Decision Agent**: Analysis frequency, custom strategy prompts, confidence-based sizing
-4. **Trading Agent**: Paper trading, position sizing, risk management, tier-restricted features
-
-### **📋 Configuration Architecture**
-
-#### **Backend API Endpoints (All Implemented)**
-```typescript
-// Configuration Management
-POST   /api/v2/config              // Create new configuration
-GET    /api/v2/config/{config_id}  // Load specific configuration  
-PUT    /api/v2/config/{config_id}  // Update configuration
-DELETE /api/v2/config/{config_id}  // Delete configuration
-GET    /api/v2/config              // List user configurations
-
-// LLM Credential Management (NEW)
-POST   /api/v2/user/llm-credentials                    // Store encrypted API key
-GET    /api/v2/user/llm-credentials                    // List user credentials
-GET    /api/v2/user/llm-credentials/{credential_name}  // Get specific credential
-DELETE /api/v2/user/llm-credentials/{credential_name}  // Delete credential
-
-// Data Sources & Premium Features  
-GET    /api/v2/data-sources-with-points  // Get available indicators with access control
-GET    /api/v2/user/profile              // Get user subscription tier and permissions
-```
-
-#### **Database Schema Integration**
-```sql
--- All tables exist and are fully integrated
-user_profiles              -- Subscription tiers and paid_data_points
-user_llm_credentials       -- Encrypted API keys via Supabase Vault
-configurations             -- Bot configurations with config_data JSONB
-data_sources + data_points -- Dynamic indicator management with premium gating
-```
-
-#### **Configuration Data Flow (V2.1 Multi-Timeframe)**
-```typescript
-// Frontend saves structured config with multi-timeframe support
-configData = {
-  schema_version: "2.1",
-  selected_pair: "BTC/USDT",
-  extraction: {
-    selected_data_sources: {                    // NEW STRUCTURE
-      technical_analysis: {
-        data_points: ["RSI", "MACD", "BB", "EMA", "SMA"],
-        timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
-      },
-      signals_group_chats: {
-        data_points: ["ggShot"],
-        timeframes: ["1h"]
-      }
-    }
-  },
-  decision: {
-    analysis_frequency: "1h",
-    system_prompt: "You are an expert trader analyzing {SYMBOL}...",
-    user_prompt: "Look at 15m RSI and 1h MACD for confluence..."
-  },
-  llm_config: {                    
-    provider: "openai",
-    use_platform_keys: false,
-    openai_api_key: "sk-...",      // Encrypted in Vault
-  },
-  trading: {
-    execution_mode: "paper",        // Only paper for now
-    position_sizing: { method: "confidence_based", ... },
-    risk_management: { max_positions: 5, ... }
-  },
-  telegram_integration: {          // Tier-restricted
-    publisher: { enabled: true, bot_token: "...", ... }
-  }
-}
-
-// Backend orchestrator extracts data for ALL 7 timeframes
-// Decision engine gets rich multi-timeframe context for LLM
-// LLM keys encrypted separately in Supabase Vault
-```
-
-### **🎯 Tier Structure Implementation**
-
-#### **Free Tier** (Current Default)
-- ✅ **Paper Trading Only**: Full paper trading with $10k virtual accounts
-- ❌ **Own LLM Keys Required**: Must provide OpenAI/DeepSeek API keys  
-- ❌ **No Telegram Publishing**: Shows locked overlay with upgrade prompts
-- ❌ **No Exchange Connection**: Coming soon section (grayed out with overlay)
-- ✅ **All Technical Indicators**: Access to 21 technical analysis indicators
-
-#### **Base/Signals Tier** (Premium)
-- ✅ **Everything from Free**: Paper trading and technical indicators
-- ✅ **Platform LLM Keys**: Option to use managed API keys (cost-efficient)
-- ✅ **Telegram Publishing**: Publish bot decisions to custom channels
-- ✅ **ggShot Premium Signals**: Access to filtered trading signals
-- ❌ **No Exchange Connection**: Still coming soon
-
-#### **Full/Autonomous Tier** (Future)
-- ✅ **Everything from Base**: All previous features included
-- ✅ **Exchange API Integration**: Connect Binance, Coinbase, etc.
-- ✅ **Fully Autonomous Trading**: Real money execution with risk controls
-- ✅ **Advanced Analytics**: Performance tracking and optimization
-
-### **🔒 Security Implementation**
-
-#### **API Key Encryption (Supabase Vault)**
-```typescript
-// Frontend → API → Vault → Database flow
-const storeCredential = async (provider: string, apiKey: string) => {
-  // API encrypts key in Vault, stores vault_secret_id in database
-  const response = await apiClient.authenticatedFetch('/api/v2/user/llm-credentials', {
-    method: 'POST',
-    body: JSON.stringify({
-      credential_name: `${provider}_production`,
-      provider: provider,
-      api_key: apiKey  // Encrypted by Supabase Vault
-    })
-  })
-}
-```
-
-#### **Row Level Security (RLS)**
-- **User Isolation**: All config data isolated by `auth.uid()` policies
-- **Premium Validation**: `paid_data_points` array determines feature access
-- **Credential Security**: LLM credentials only accessible by owning user
-
-### **📊 Real-Time Data Integration**
-
-#### **Dynamic Indicator Loading**
-```typescript
-// Loads from database instead of hardcoded arrays
-const [dataSources, setDataSources] = useState<DataSource[]>([])
-const [userProfile, setUserProfile] = useState<UserProfile | null>(null)
-
-useEffect(() => {
-  // Loads available indicators with premium access control
-  const [dataSourcesResponse, userProfileResponse] = await Promise.all([
-    apiClient.getDataSourcesWithPoints(),  // 21 indicators + premium ggShot
-    apiClient.getUserProfile()              // Subscription tier + paid_data_points
-  ])
-  
-  setDataSources(dataSourcesResponse)  // Shows locked state for premium indicators
-  setUserProfile(userProfileResponse)   // Determines UI access levels
-}, [])
-```
-
-#### **Premium Feature Gating**
-```typescript
-// Backend determines access, frontend shows appropriate UI
-const canAccessDataPoint = (dataPoint: DataPoint): boolean => {
-  return dataPoint.has_access  // Calculated by backend based on subscription
-}
-
-// UI shows locked indicators with upgrade prompts
-{dataPoint.is_locked && (
-  <div className="absolute inset-0 bg-charcoal-900/50">
-    <div className="text-orange-400 text-xs font-medium">Upgrade Required</div>
-  </div>
-)}
-```
-
-### **⚡ Performance Features**
-
-#### **Optimistic Updates**
-- **Instant UI Response**: Changes reflected immediately in UI
-- **Background Sync**: API calls happen asynchronously  
-- **Error Recovery**: Rollback on API failures with user notification
-
-#### **Smart Caching**
-- **Session-Based Auth**: Supabase session automatically refreshed
-- **Config State Persistence**: Maintains state during session
-- **Selective Loading**: Only loads changed data sources
-
-### **🚀 Production Deployment**
-
-#### **Environment Variables**
-```bash
-# Supabase Integration (Production Ready)
+# Supabase Authentication
 NEXT_PUBLIC_SUPABASE_URL=https://ciinauxtnkweyebyhucl.supabase.co
 NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
@@ -561,55 +180,158 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 NEXT_PUBLIC_V2_API_URL=https://ggbots-api.nightingale.business
 
 # Domain Configuration
-# ggbots.ai       → Landing page
-# app.ggbots.ai   → Authenticated dashboard
+# ggbots.ai → Landing page
+# app.ggbots.ai → Forge application
 ```
 
-#### **Build & Deploy**
+### **Deployment**
 ```bash
-# Production build with all features
-npm run build    # Compiles successfully with full API integration
-npm run lint     # Passes all linting checks
+# Automatic deployment via Vercel + GitHub
+git push origin main
 
-# Automatic deployment via Vercel GitHub integration
-git push origin main  # Triggers deployment to https://app.ggbots.ai
+# Vercel automatically deploys:
+# - Frontend: https://ggbot-app.vercel.app
+# - Production: https://app.ggbots.ai
 ```
 
-### **📈 Multi-Timeframe Trading Benefits**
+---
 
-**Enhanced Decision Context (V2.1 - 2025-09-07)**:
-- ✅ **7-Timeframe Analysis**: Users configure once, get analysis across 5m → 1w timeframes
-- ✅ **Natural Language Prompts**: "Look at 15m RSI and 4h MACD for trend confirmation"  
-- ✅ **Rich LLM Context**: Decision engine receives comprehensive market view
-- ✅ **Timeframe Convergence**: Identify alignment between short/medium/long-term trends
-- ✅ **Intuitive Configuration**: Select "RSI" → automatically gets RSI across all 7 timeframes
+## 🗂 Legacy Components (Archived)
 
-### **📈 Usage Analytics**
+### **Moved to Main Archive** (`/archive/`)
+- **`frontend-dashboard/`** - WebSocket-based dashboard with Zustand complexity
+- **`frontend-store/`** - Global botStore with 600+ lines and transformation layers
+- **`frontend-landing-components/`** - Original landing page components
 
-The configuration system now tracks:
-- **Config Creation/Updates**: Full audit trail in database
-- **Premium Feature Attempts**: Usage metrics for conversion optimization  
-- **API Key Management**: Security event logging
-- **Subscription Tier Analytics**: User behavior by tier
-- **Multi-Timeframe Usage**: Analytics on timeframe combinations and performance
+### **Unused Directories** (Consider for cleanup)
+```
+/components/
+├── /ui/                     # Generic UI components (potentially useful)
+├── /auth/                   # Authentication components (check if used)
+├── /trades/                 # Trading-specific components (may overlap with Forge)
+├── /charts/                 # Chart components (future integration)
+└── /bot/                    # Bot-specific components (likely superseded by Forge)
+
+/emails/                     # Email templates (keep for notifications)
+/types/                      # TypeScript definitions (may have useful types)
+/hooks/                      # Custom hooks (check for Forge overlap)
+```
+
+### **Cleanup Recommendations**
+1. **Audit `/components/ui/`** - May contain reusable components for Forge
+2. **Review `/components/auth/`** - Check if used by login/signup pages
+3. **Evaluate `/components/trades/` and `/components/charts/`** - Potential future integration
+4. **Check `/hooks/`** - May contain useful hooks not implemented in Forge
+5. **Review `/types/`** - Consolidate with Forge type definitions
 
 ---
 
-## 🎉 **CONFIGURATION SYSTEM COMPLETE**
+## 🎨 Design System
 
-**The GGBot configuration system is now production-ready with:**
+### **Theme Architecture**
+```typescript
+// /lib/theme.tsx - Complete dark/light mode system
+const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 
-✅ **Full V2 Backend Integration** - Real API calls, authentication, data persistence  
-✅ **Supabase Vault Encryption** - Secure API key storage with enterprise-grade encryption  
-✅ **Tier-Based Premium Features** - Dynamic access control with upgrade paths  
-✅ **21 Technical Indicators** - Professional-grade technical analysis tools  
-✅ **Multi-Agent Architecture** - Extraction, LLM, Decision, and Trading configuration  
-✅ **Paper Trading Ready** - Complete virtual trading environment  
-✅ **Telegram Integration** - Signal publishing for premium users  
-✅ **Mobile Responsive** - Works perfectly on all devices  
+// CSS Variables (charcoal/bone palette)
+[data-theme="dark"] {
+  --bg-primary: #161618;      /* charcoal-900 */
+  --bg-secondary: #1f1f23;    /* charcoal-800 */
+  --text-primary: #e3e5e6;    /* bone-200 */
+  --border: #36363d;          /* charcoal-600 */
+}
 
-**Ready for user onboarding, subscription management, and autonomous trading deployment!** 🚀
+[data-theme="light"] {
+  --bg-primary: #f0f2f3;      /* bone-100 */
+  --bg-secondary: white;
+  --text-primary: #1f1f23;    /* charcoal-800 */
+  --border: #d6d8da;          /* bone-300 */
+}
+```
+
+### **Agent Color System**
+```css
+:root {
+  --agent-extraction: #38a1c7;  /* Blue - data extraction */
+  --agent-decision: #2cbe77;    /* Green - AI decision making */
+  --agent-trading: #be6a47;     /* Orange - trade execution */
+  --success: #10b981;           /* emerald-400 - Profit/success */
+  --danger: #f43f5e;            /* rose-400 - Loss/error */
+}
+```
 
 ---
 
-**The authentication system and dashboard provide a solid foundation for the GGBot trading platform, ready for V2 backend integration and user onboarding.** 🚀
+## 🚀 Production Features
+
+### **Multi-Bot Management**
+- **Unlimited Bots**: Create, duplicate, rename, delete trading agents
+- **Bot Switching**: Seamless switching with isolated operational data
+- **Real-time Status**: Live execution status with agent pipeline visualization
+- **Account Isolation**: $10k paper trading accounts per bot configuration
+
+### **Configuration System**
+- **Market Data**: 21+ technical indicators with premium feature gating
+- **Signal Sources**: ggShot integration with subscription gatekeeping
+- **Strategy Editor**: AI prompt templates with LLM provider selection
+- **Trading Settings**: Position sizing, risk management, Telegram integration
+
+### **Real-time Monitoring**
+- **Live Positions**: Real-time P&L updates with color-coded performance
+- **AI Decisions**: Decision carousel with expandable reasoning and confidence scores
+- **Portfolio Metrics**: Balance, daily P&L, win rate, and position tracking
+- **Execution Pipeline**: Visual extraction → decision → trading status tracking
+
+---
+
+## ✅ Production Readiness Checklist
+
+### **Core Architecture**
+- [x] Forge architecture with local state design
+- [x] Multi-bot management with seamless switching
+- [x] Real-time SSE data streams with proper filtering
+- [x] Sandboxed configuration editing with change detection
+- [x] Permission system with subscription tier gatekeeping
+
+### **Authentication & Security**
+- [x] Supabase authentication with email verification
+- [x] Protected routes with server-side session guards
+- [x] Permission-based feature access control
+- [x] API client with JWT token authentication
+
+### **User Experience**
+- [x] Responsive design with mobile navigation
+- [x] Dark/light theme system with localStorage persistence
+- [x] Loading states, empty states, and error boundaries
+- [x] Professional design system with agent color scheme
+
+### **Integration & Deployment**
+- [x] V2 backend API integration with real-time data
+- [x] Vercel deployment with custom domain routing
+- [x] Environment variable configuration
+- [x] Production build optimization
+
+---
+
+## 🎯 Next Steps
+
+### **Landing Page Deployment**
+1. **Polish new-landing page** - Complete final touches and content
+2. **Replace landing routing** - Archive current landing, promote new-landing
+3. **Update domain routing** - Ensure ggbots.ai routes to new landing page
+
+### **Frontend Optimization**
+1. **Component Audit** - Review unused components in `/components/`
+2. **Type Consolidation** - Merge useful types from `/types/` into Forge
+3. **Hook Evaluation** - Extract useful hooks from `/hooks/` for Forge use
+4. **Dependency Cleanup** - Remove unused dependencies from package.json
+
+### **Feature Enhancements**
+1. **Mobile UX Polish** - Complete mobile drawer behavior for bot switching
+2. **Advanced Charts** - Integrate TradingView or custom chart components
+3. **Notification System** - Email/SMS alerts for bot events and performance
+4. **Analytics Integration** - User behavior tracking and conversion optimization
+
+---
+
+**The Forge architecture represents a complete, production-ready autonomous trading platform with elegant local state management, comprehensive real-time features, and sophisticated permission-based monetization capabilities.** 🚀
