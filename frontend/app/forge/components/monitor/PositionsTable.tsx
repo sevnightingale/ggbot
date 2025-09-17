@@ -56,7 +56,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
   }
 
   const getSideColor = (side: string) => {
-    return side.toLowerCase() === 'long' ? 'text-[var(--success)]' : 'text-[var(--danger)]'
+    return side.toLowerCase() === 'long' ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
   }
 
   const getSideIcon = (side: string) => {
@@ -68,7 +68,9 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
   }
 
   const getPnLColor = (pnl: number) => {
-    return pnl >= 0 ? 'text-[var(--success)]' : 'text-[var(--danger)]'
+    if (pnl > 0) return 'text-[var(--profit-color)]'
+    if (pnl < 0) return 'text-[var(--loss-color)]'
+    return 'text-[var(--neutral-color)]'
   }
 
   const getTimeAgo = (timestamp: string) => {
