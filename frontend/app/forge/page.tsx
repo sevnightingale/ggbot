@@ -41,8 +41,10 @@ interface Decision {
 function ForgeApp() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
+
+  // Permission loading - always call hook, but only use when user exists
   const { loading: permissionsLoading } = usePermissions()
-  
+
   // Core bot data - all local state with multi-bot support
   const [allBots, setAllBots] = useState<BotConfiguration[]>([])
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
@@ -859,7 +861,7 @@ function ForgeApp() {
     )
   }
 
-  if (permissionsLoading) {
+  if (user && permissionsLoading) {
     return (
       <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
         <div className="text-[var(--text-secondary)]">Loading permissions...</div>
