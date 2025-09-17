@@ -153,11 +153,12 @@
 **Timeline**: 1-2 weeks - Validate system reliability and coverage
 
 - [ ] **Symbol Coverage Testing**
-  - [ ] Test all 140+ crypto symbols for KuCoin data availability
-  - [ ] Identify symbols missing on KuCoin exchange
-  - [ ] Document symbol mapping issues and fallback strategies
-  - [ ] Test symbol extraction success rates across all timeframes
+  - [ ] Test all 140+ crypto symbols for KuCoin data availability with new extraction system
+  - [ ] Verify Hummingbot KuCoin data integration works correctly for all supported pairs
+  - [ ] Identify symbols missing on KuCoin exchange and document alternatives
+  - [ ] Test symbol extraction success rates across all timeframes (5m-1w)
   - [ ] Create symbol blacklist for unsupported pairs
+  - [ ] Full end-to-end testing: Hummingbot → extraction → decision → trading pipeline
 
 - [ ] **Technical Analysis Testing**
   - [ ] Test all 21 indicator preprocessors individually
