@@ -456,10 +456,11 @@ class GGBotOrchestrator:
             
             self._log.info(f"Running signal validation for {symbol}")
             
-            # Get indicators from user's config (same as autonomous trading)
+            # Get indicators and timeframes from user's config (same as autonomous trading)
             extraction_config = config.extraction or {}
             signal_indicators = self._extract_indicators_from_config(extraction_config)
-            
+            timeframes = self._extract_timeframes_from_config(extraction_config)
+
             # Get or create extraction engine
             extraction_engine = await self._get_extraction_engine(user_id)
 
@@ -467,10 +468,10 @@ class GGBotOrchestrator:
             from core.sse import set_execution_phase
             await set_execution_phase(config_id, "extracting", f"Extracting indicators for {symbol}...")
 
-            # Run extraction for signal's symbol/timeframe
+            # Run extraction for all configured timeframes
             extraction_result = await self._run_extraction_v2(
-                extraction_engine, config, user_id, 
-                signal_indicators, [timeframe],
+                extraction_engine, config, user_id,
+                signal_indicators, timeframes,
                 override_symbol=symbol
             )
 

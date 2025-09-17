@@ -8,7 +8,8 @@ and multi-timeframe moving average relationships.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
+from pandas.api.types import is_datetime64_any_dtype
 
 from .base import BasePreprocessor
 
@@ -32,69 +33,114 @@ class SMAPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive SMA analysis
         """
+        # Clean and align data
+        sma = pd.to_numeric(sma, errors="coerce").dropna()
+        prices_clean = None if prices is None else pd.to_numeric(prices, errors="coerce").dropna()
+
         if len(sma) < 5:
             return {"error": "Insufficient data for SMA analysis"}
-        
-        current_sma = float(sma.iloc[-1])
-        current_price = float(prices.iloc[-1]) if prices is not None else None
+
+        # Align data if prices provided
+        if prices_clean is not None:
+            df = pd.concat({"sma": sma, "price": prices_clean}, axis=1, join="inner").dropna()
+            sma_c = df["sma"]
+            px_c = df["price"] if "price" in df and len(df["price"]) > 0 else None
+        else:
+            sma_c = sma
+            px_c = None
+
+        # Get timestamp from series index or use UTC
+        ts = (sma_c.index[-1].isoformat()
+              if is_datetime64_any_dtype(sma_c.index)
+              else datetime.now(timezone.utc).isoformat())
+
+        # Safe denominator function
+        def _den(x: float) -> float:
+            return max(1e-12, abs(float(x)))
+
+        # Length-driven windows
+        short_win = max(3, length // 6)
+        medium_win = max(5, length // 3)
+        long_win = max(10, length)
+        slope_short = max(2, length // 6)
+        slope_medium = max(3, length // 4)
+        slope_long = max(5, length // 2)
+        crossover_win = min(length, 20)
+        support_win = min(length, len(px_c) if px_c is not None else len(sma_c))
+
+        cur_sma = float(sma_c.iloc[-1])
+        cur_px = float(px_c.iloc[-1]) if px_c is not None and len(px_c) > 0 else None
         
         # Trend analysis
-        trend_analysis = self._analyze_sma_trend(sma)
-        
+        trend_analysis = self._analyze_sma_trend(sma_c, short_win, medium_win, long_win)
+
         # Price-SMA relationship
         price_relationship = {}
-        if prices is not None:
-            price_relationship = self._analyze_price_sma_relationship(prices, sma)
-        
+        if px_c is not None:
+            price_relationship = self._analyze_price_sma_relationship(px_c, sma_c, _den)
+
         # Support/Resistance analysis
-        support_resistance = self._analyze_support_resistance(sma, prices)
-        
+        support_resistance = self._analyze_support_resistance(sma_c, px_c, support_win, _den)
+
         # Slope analysis
-        slope_analysis = self._analyze_sma_slope(sma)
-        
+        slope_analysis = self._analyze_sma_slope(sma_c, slope_short, slope_medium, slope_long)
+
         # Crossover analysis
         crossover_analysis = {}
-        if prices is not None:
-            crossover_analysis = self._analyze_price_sma_crossovers(prices, sma)
-        
+        if px_c is not None:
+            crossover_analysis = self._analyze_price_sma_crossovers(px_c, sma_c, crossover_win, _den)
+
         # Moving average quality
-        quality_analysis = self._analyze_ma_quality(sma)
+        quality_analysis = self._analyze_ma_quality(sma_c, _den)
         
         # Signal generation
-        signals = self._generate_sma_signals(current_sma, current_price, trend_analysis, 
+        signals = self._generate_sma_signals(cur_sma, cur_px, trend_analysis,
                                            price_relationship, crossover_analysis)
-        
+
         # Confidence calculation
-        confidence = self._calculate_sma_confidence(sma, trend_analysis, quality_analysis)
+        confidence = self._calculate_sma_confidence(sma_c, trend_analysis, quality_analysis)
         
         return {
             "indicator": "SMA",
             "current": {
-                "sma_value": round(current_sma, 4),
-                "price": round(current_price, 4) if current_price else None,
-                "price_distance": round(current_price - current_sma, 4) if current_price else None,
-                "price_distance_pct": round(((current_price - current_sma) / current_sma) * 100, 3) if current_price else None,
-                "timestamp": datetime.now().isoformat()
+                "sma_value": round(cur_sma, 4),
+                "price": round(cur_px, 4) if cur_px is not None else None,
+                "price_distance": round(cur_px - cur_sma, 4) if cur_px is not None else None,
+                "price_distance_pct": round(((cur_px - cur_sma) / _den(cur_sma)) * 100, 3) if cur_px is not None else None,
+                "timestamp": ts
             },
-            "trend": trend_analysis,
-            "price_relationship": price_relationship,
-            "support_resistance": support_resistance,
-            "slope": slope_analysis,
-            "crossovers": crossover_analysis,
-            "quality": quality_analysis,
+            "context": {
+                "trend": trend_analysis,
+                "slope": slope_analysis,
+                "quality": quality_analysis
+            },
+            "levels": {
+                "price_relationship": price_relationship,
+                "support_resistance": support_resistance
+            },
+            "patterns": {
+                "crossovers": crossover_analysis
+            },
+            "evidence": {
+                "signals": signals
+            },
             "signals": signals,
             "confidence": confidence,
-            "summary": self._generate_sma_summary(current_sma, current_price, trend_analysis, price_relationship)
+            "summary": self._generate_sma_summary(cur_sma, cur_px, trend_analysis, price_relationship)
         }
     
-    def _analyze_sma_trend(self, sma: pd.Series) -> Dict[str, Any]:
+    def _analyze_sma_trend(self, sma: pd.Series, short_win: int = 3, medium_win: int = 8, long_win: int = 15) -> Dict[str, Any]:
         """Analyze SMA trend characteristics."""
         current_sma = sma.iloc[-1]
         
+        # Define safe denominator function for this method
+        def _den(x: float) -> float:
+            return max(1e-12, abs(float(x)))
+
         # Short, medium, long term trends
-        short_trend = self._calculate_ma_trend_direction(sma, 3)
-        medium_trend = self._calculate_ma_trend_direction(sma, 8)
-        long_trend = self._calculate_ma_trend_direction(sma, 15) if len(sma) >= 15 else "insufficient_data"
+        short_trend = self._calculate_ma_trend_direction(sma, short_win, _den)
+        medium_trend = self._calculate_ma_trend_direction(sma, medium_win, _den)
+        long_trend = self._calculate_ma_trend_direction(sma, long_win, _den) if len(sma) >= long_win else "insufficient_data"
         
         # Trend consistency
         trend_consistency = self._calculate_ma_trend_consistency(sma)
@@ -128,7 +174,7 @@ class SMAPreprocessor(BasePreprocessor):
             "slope": round(slope, 6)
         }
     
-    def _calculate_ma_trend_direction(self, ma: pd.Series, periods: int) -> str:
+    def _calculate_ma_trend_direction(self, ma: pd.Series, periods: int, _den) -> str:
         """Calculate trend direction over specified periods."""
         if len(ma) < periods + 1:
             return "insufficient_data"
@@ -136,7 +182,7 @@ class SMAPreprocessor(BasePreprocessor):
         start_value = ma.iloc[-(periods + 1)]
         end_value = ma.iloc[-1]
         
-        change_pct = ((end_value - start_value) / start_value) * 100 if start_value != 0 else 0
+        change_pct = ((end_value - start_value) / _den(start_value)) * 100
         
         if change_pct > 0.2:
             return "bullish"
@@ -165,7 +211,7 @@ class SMAPreprocessor(BasePreprocessor):
         max_directional = max(positive_changes, negative_changes)
         return max_directional / total_changes if total_changes > 0 else 0.5
     
-    def _analyze_price_sma_relationship(self, prices: pd.Series, sma: pd.Series) -> Dict[str, Any]:
+    def _analyze_price_sma_relationship(self, prices: pd.Series, sma: pd.Series, _den) -> Dict[str, Any]:
         """Analyze price position relative to SMA."""
         current_price = prices.iloc[-1]
         current_sma = sma.iloc[-1]
@@ -180,22 +226,16 @@ class SMAPreprocessor(BasePreprocessor):
         
         # Distance analysis
         distance = current_price - current_sma
-        distance_pct = (distance / current_sma) * 100
+        distance_pct = (distance / _den(current_sma)) * 100
         
-        # Historical position analysis
-        above_periods = sum(1 for i in range(len(prices)) if prices.iloc[i] > sma.iloc[i])
+        # Vectorized position analysis
+        mask_above = (prices > sma)
+        above_periods = mask_above.sum()
         below_periods = len(prices) - above_periods
         total_periods = len(prices)
-        
-        # Recent position changes
-        position_changes = 0
-        prev_position = "above" if prices.iloc[0] > sma.iloc[0] else "below"
-        
-        for i in range(1, len(prices)):
-            curr_position = "above" if prices.iloc[i] > sma.iloc[i] else "below"
-            if curr_position != prev_position:
-                position_changes += 1
-            prev_position = curr_position
+
+        # Position changes using vectorized operations (exclude first NaN comparison)
+        position_changes = mask_above.ne(mask_above.shift(1)).iloc[1:].sum()
         
         return {
             "position": position,
@@ -204,10 +244,10 @@ class SMAPreprocessor(BasePreprocessor):
             "above_sma_pct": round((above_periods / total_periods) * 100, 1),
             "below_sma_pct": round((below_periods / total_periods) * 100, 1),
             "position_changes": position_changes,
-            "position_stability": round(1 - (position_changes / total_periods), 3)
+            "position_stability": round(1 - position_changes / max(1, len(mask_above) - 1), 3)
         }
     
-    def _analyze_support_resistance(self, sma: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:
+    def _analyze_support_resistance(self, sma: pd.Series, prices: pd.Series = None, support_win: int = 20, _den=None) -> Dict[str, Any]:
         """Analyze SMA as dynamic support/resistance."""
         if prices is None:
             return {"no_price_data": True}
@@ -225,7 +265,7 @@ class SMAPreprocessor(BasePreprocessor):
             prev_price = prices.iloc[i-1]
             
             # Check if price touched SMA
-            if abs(price - sma_val) / sma_val <= touch_threshold:
+            if abs(price - sma_val) / _den(sma_val) <= touch_threshold:
                 touches.append({
                     "index": i,
                     "periods_ago": len(prices) - 1 - i,
@@ -243,7 +283,7 @@ class SMAPreprocessor(BasePreprocessor):
                             "type": "support_bounce",
                             "index": i,
                             "periods_ago": len(prices) - 1 - i,
-                            "strength": abs(next_price - price) / price
+                            "strength": abs(next_price - price) / _den(price)
                         })
                     
                     # Resistance bounce (price was above, touched, then moved down)
@@ -252,7 +292,7 @@ class SMAPreprocessor(BasePreprocessor):
                             "type": "resistance_bounce",
                             "index": i,
                             "periods_ago": len(prices) - 1 - i,
-                            "strength": abs(price - next_price) / price
+                            "strength": abs(price - next_price) / _den(price)
                         })
         
         # Calculate success rate
@@ -269,15 +309,15 @@ class SMAPreprocessor(BasePreprocessor):
             "effectiveness": "high" if success_rate > 0.6 else "medium" if success_rate > 0.3 else "low"
         }
     
-    def _analyze_sma_slope(self, sma: pd.Series) -> Dict[str, Any]:
+    def _analyze_sma_slope(self, sma: pd.Series, slope_short: int = 3, slope_medium: int = 5, slope_long: int = 10) -> Dict[str, Any]:
         """Analyze SMA slope characteristics."""
         if len(sma) < 5:
             return {}
         
         # Calculate slope over different periods
-        slope_3 = self._calculate_velocity(sma, 3)
-        slope_5 = self._calculate_velocity(sma, 5)
-        slope_10 = self._calculate_velocity(sma, 10) if len(sma) >= 10 else None
+        slope_3 = self._calculate_velocity(sma, slope_short)
+        slope_5 = self._calculate_velocity(sma, slope_medium)
+        slope_10 = self._calculate_velocity(sma, slope_long) if len(sma) >= slope_long else None
         
         # Acceleration
         acceleration = self._calculate_acceleration(sma, 5)
@@ -291,22 +331,22 @@ class SMAPreprocessor(BasePreprocessor):
             slope_direction = "flat"
         
         # Slope consistency (are short and long term slopes aligned?)
-        slope_alignment = "aligned" if slope_10 and (slope_5 * slope_10 > 0) else "mixed"
+        slope_alignment = "aligned" if (slope_10 is not None) and (slope_5 * slope_10 > 0) else "mixed"
         
         return {
             "short_term_slope": round(slope_3, 6),
             "medium_term_slope": round(slope_5, 6),
-            "long_term_slope": round(slope_10, 6) if slope_10 else None,
+            "long_term_slope": (None if slope_10 is None else round(slope_10, 6)),
             "acceleration": round(acceleration, 6),
             "direction": slope_direction,
             "alignment": slope_alignment
         }
     
-    def _analyze_price_sma_crossovers(self, prices: pd.Series, sma: pd.Series) -> Dict[str, Any]:
+    def _analyze_price_sma_crossovers(self, prices: pd.Series, sma: pd.Series, crossover_win: int = 20, _den=None) -> Dict[str, Any]:
         """Analyze price crossovers with SMA."""
         crossovers = []
         
-        for i in range(1, min(20, len(prices))):
+        for i in range(1, min(crossover_win, len(prices))):
             prev_price = prices.iloc[-(i+1)]
             curr_price = prices.iloc[-i]
             prev_sma = sma.iloc[-(i+1)]
@@ -319,7 +359,7 @@ class SMAPreprocessor(BasePreprocessor):
                     "periods_ago": i,
                     "price": round(curr_price, 4),
                     "sma_value": round(curr_sma, 4),
-                    "strength": abs(curr_price - curr_sma) / curr_sma
+                    "strength": round(abs(curr_price - curr_sma) / _den(curr_sma), 3)
                 })
             
             # Bearish crossover (price crosses below SMA)
@@ -329,40 +369,34 @@ class SMAPreprocessor(BasePreprocessor):
                     "periods_ago": i,
                     "price": round(curr_price, 4),
                     "sma_value": round(curr_sma, 4),
-                    "strength": abs(curr_price - curr_sma) / curr_sma
+                    "strength": round(abs(curr_price - curr_sma) / _den(curr_sma), 3)
                 })
         
         return {
             "recent_crossovers": crossovers[:5],
             "latest_crossover": crossovers[0] if crossovers else None,
-            "crossover_frequency": len(crossovers) / min(20, len(prices)) if len(prices) > 0 else 0
+            "crossover_frequency": len(crossovers) / max(1, min(crossover_win, len(prices)) - 1)
         }
     
-    def _analyze_ma_quality(self, sma: pd.Series) -> Dict[str, Any]:
+    def _analyze_ma_quality(self, sma: pd.Series, _den) -> Dict[str, Any]:
         """Analyze quality characteristics of the moving average."""
         if len(sma) < 10:
             return {}
         
         # Smoothness (lower volatility = smoother)
-        sma_volatility = sma.std()
-        sma_mean = sma.mean()
-        smoothness = 1 - (sma_volatility / sma_mean) if sma_mean > 0 else 0
+        sma_mean = float(sma.mean())
+        base = _den(sma_mean)
+        smoothness = float(np.clip(1 - (sma.std() / base), 0, 1))
         
         # Responsiveness (how quickly it changes)
-        recent_changes = sma.diff().dropna().abs().mean()
-        responsiveness = min(1.0, recent_changes / (sma_mean * 0.01)) if sma_mean > 0 else 0
+        changes = sma.diff().dropna()
+        responsiveness = float(np.clip(changes.abs().mean() / (base * 0.01), 0, 1))
         
         # Trend clarity (consistent direction)
-        direction_changes = 0
-        prev_direction = None
-        
-        for change in sma.diff().dropna():
-            current_direction = "up" if change > 0 else "down" if change < 0 else "flat"
-            if prev_direction and current_direction != prev_direction and current_direction != "flat":
-                direction_changes += 1
-            prev_direction = current_direction
-        
-        trend_clarity = 1 - (direction_changes / len(sma)) if len(sma) > 0 else 0
+        direction_changes = sum(
+            (np.sign(changes).shift(-1).fillna(0) != np.sign(changes)) & (np.sign(changes) != 0)
+        )
+        trend_clarity = float(np.clip(1 - direction_changes / max(1, len(changes)), 0, 1))
         
         return {
             "smoothness": round(smoothness, 3),
@@ -397,7 +431,7 @@ class SMAPreprocessor(BasePreprocessor):
             })
         
         # Price position signals
-        if price and price_relationship:
+        if (price is not None) and price_relationship:
             position = price_relationship.get("position")
             distance_pct = abs(price_relationship.get("distance_pct", 0))
             
@@ -468,7 +502,7 @@ class SMAPreprocessor(BasePreprocessor):
         if trend_strength > 0.6:
             summary += f" (strong)"
         
-        if price and price_relationship:
+        if (price is not None) and price_relationship:
             position = price_relationship.get("position", "unknown")
             distance_pct = price_relationship.get("distance_pct", 0)
             

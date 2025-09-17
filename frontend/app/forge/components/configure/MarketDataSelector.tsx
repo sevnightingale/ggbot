@@ -80,6 +80,9 @@ export function MarketDataSelector({
       timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
     }
 
+    // Always use all 7 timeframes for technical analysis
+    const allTimeframes = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+
     const isSelected = categoryData.data_points.includes(dataPoint.name)
 
     let updatedDataPoints: string[]
@@ -99,7 +102,7 @@ export function MarketDataSelector({
           ...currentConfig,
           [category]: updatedDataPoints.length > 0 ? {
             data_points: updatedDataPoints,
-            timeframes: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+            timeframes: allTimeframes
           } : undefined
         }
       }

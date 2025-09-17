@@ -347,7 +347,7 @@ def test_new_preprocessor():
 
 ## Current Implementation Status
 
-### Refined Preprocessors (15 Complete) ✅
+### Refined Preprocessors (16 Complete) ✅
 **Following standardized schema with analysis-only pattern:**
 - `rsi` - Relative Strength Index with zone analysis and divergence detection
 - `bbands` - Bollinger Bands with squeeze detection and band positioning
@@ -364,10 +364,10 @@ def test_new_preprocessor():
 - `obv` - On-Balance Volume with accumulation/distribution patterns
 - `psar` - Parabolic SAR with dynamic stop-loss and trend reversal analysis
 - `roc` - Rate of Change with momentum persistence and zero-line analysis
+- `sma` - Simple Moving Average with trend following and support/resistance analysis
 
-### Remaining for Refinement (8 Preprocessors) 🔄
+### Remaining for Refinement (7 Preprocessors) 🔄
 **Legacy implementations requiring standardization:**
-- `sma` - Simple Moving Average (trend)
 - `stochastic` - Stochastic Oscillator (momentum)
 - `trix` - TRIX (trend/momentum)
 - `vortex` - Vortex Indicator (trend)
@@ -375,7 +375,7 @@ def test_new_preprocessor():
 - `williams_r` - Williams %R (momentum)
 
 ### Migration Progress
-**15 of 23 preprocessors (65%) completed** - All refined preprocessors follow the new standards:
+**16 of 23 preprocessors (70%) completed** - All refined preprocessors follow the new standards:
 - ✅ Analysis-only pattern (no signals/confidence)
 - ✅ UTC timestamps with timezone awareness
 - ✅ NaN protection and data validation
