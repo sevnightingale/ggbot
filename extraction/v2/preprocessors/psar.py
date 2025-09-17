@@ -78,12 +78,6 @@ class ParabolicSARPreprocessor(BasePreprocessor):
         # Stop loss analysis
         stop_loss_analysis = self._analyze_stop_loss_levels(psar, prices)
         
-        # Signal generation
-        signals = self._generate_psar_signals(current_psar, current_price, trend_analysis, signal_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_psar_confidence(psar, prices, trend_analysis, distance_analysis)
-        
         return {
             "indicator": "Parabolic_SAR",
             "current": {
@@ -96,19 +90,28 @@ class ParabolicSARPreprocessor(BasePreprocessor):
             "context": {
                 "trend": trend_analysis,
                 "distance": distance_analysis,
-                "acceleration": acceleration_analysis
+                "acceleration": acceleration_analysis,
+                "length": length,
+                "calculation_periods": len(psar)
             },
             "levels": {
                 "current_stop_level": round(current_psar, 4),
-                "stop_distance_pct": round(abs((current_price - current_psar) / _den(current_price)) * 100, 3)
+                "stop_distance_pct": round(abs((current_price - current_psar) / _den(current_price)) * 100, 3),
+                "trend_direction": trend_analysis.get("current_trend", "unknown")
             },
-            "patterns": pattern_analysis,
+            "patterns": {
+                **pattern_analysis,
+                "signal_analysis": signal_analysis
+            },
             "evidence": {
-                "signals": signal_analysis,
-                "stop_loss": stop_loss_analysis
+                "data_quality": {
+                    "aligned_periods": len(psar),
+                    "had_high_low_data": high_prices is not None and low_prices is not None,
+                    "calculation_periods": length
+                },
+                "stop_loss": stop_loss_analysis,
+                "calculation_notes": f"Parabolic SAR analysis based on {len(psar)} aligned periods"
             },
-            "signals": signals,
-            "confidence": confidence,
             "summary": self._generate_psar_summary(current_psar, current_price, trend_analysis, signal_analysis)
         }
     
@@ -491,7 +494,7 @@ class ParabolicSARPreprocessor(BasePreprocessor):
                 "type": f"trend_continuation_{current_trend}",
                 "strength": "medium",
                 "reason": f"Strong {current_trend} trend continuation (PSAR {trend_analysis['trend_periods']} periods)",
-                "confidence": 0.6 + (trend_strength * 0.2)
+                "strength_score": round(0.6 + (trend_strength * 0.2), 2)
             })
         
         # Stop loss signals
@@ -501,7 +504,7 @@ class ParabolicSARPreprocessor(BasePreprocessor):
                 "type": "tight_stop_warning",
                 "strength": "low",
                 "reason": f"Price very close to PSAR stop level ({distance_pct:.2f}%)",
-                "confidence": 0.7
+                "strength_score": 0.7
             })
         
         return signals

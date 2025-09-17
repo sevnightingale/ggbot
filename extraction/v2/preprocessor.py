@@ -71,7 +71,7 @@ class TechnicalAnalysisPreprocessor:
         else:
             return {"error": "CCI preprocessor not available"}
     
-    def preprocess_mfi(self, mfi: pd.Series, prices: pd.Series = None, 
+    def preprocess_mfi(self, mfi: pd.Series, prices: pd.Series = None,
                       length: int = 14, **kwargs) -> Dict[str, Any]:
         """Route MFI preprocessing to specialized MFI preprocessor."""
         preprocessor = get_preprocessor('mfi')
@@ -79,7 +79,106 @@ class TechnicalAnalysisPreprocessor:
             return preprocessor.preprocess(mfi, prices, length, **kwargs)
         else:
             return {"error": "MFI preprocessor not available"}
-    
+
+    def preprocess_sma(self, sma: pd.Series, prices: pd.Series = None,
+                      length: int = 20, **kwargs) -> Dict[str, Any]:
+        """Route SMA preprocessing to specialized SMA preprocessor."""
+        preprocessor = get_preprocessor('sma')
+        if preprocessor:
+            return preprocessor.preprocess(sma, prices, length=length, **kwargs)
+        else:
+            return {"error": "SMA preprocessor not available"}
+
+    def preprocess_ema(self, ema: pd.Series, prices: pd.Series = None,
+                      length: int = 20, **kwargs) -> Dict[str, Any]:
+        """Route EMA preprocessing to specialized EMA preprocessor."""
+        preprocessor = get_preprocessor('ema')
+        if preprocessor:
+            return preprocessor.preprocess(ema, prices, length=length, **kwargs)
+        else:
+            return {"error": "EMA preprocessor not available"}
+
+    def preprocess_roc(self, roc: pd.Series, prices: pd.Series = None,
+                      length: int = 10, **kwargs) -> Dict[str, Any]:
+        """Route ROC preprocessing to specialized ROC preprocessor."""
+        preprocessor = get_preprocessor('roc')
+        if preprocessor:
+            return preprocessor.preprocess(roc, prices, length=length, **kwargs)
+        else:
+            return {"error": "ROC preprocessor not available"}
+
+    def preprocess_psar(self, psar: pd.Series, prices: pd.Series = None,
+                       high_prices: pd.Series = None, low_prices: pd.Series = None, **kwargs) -> Dict[str, Any]:
+        """Route PSAR preprocessing to specialized PSAR preprocessor."""
+        preprocessor = get_preprocessor('psar')
+        if preprocessor:
+            return preprocessor.preprocess(psar, prices, high_prices, low_prices, **kwargs)
+        else:
+            return {"error": "PSAR preprocessor not available"}
+
+    def preprocess_obv(self, obv: pd.Series, prices: pd.Series = None,
+                      volumes: pd.Series = None, **kwargs) -> Dict[str, Any]:
+        """Route OBV preprocessing to specialized OBV preprocessor."""
+        preprocessor = get_preprocessor('obv')
+        if preprocessor:
+            return preprocessor.preprocess(obv, prices, volumes, **kwargs)
+        else:
+            return {"error": "OBV preprocessor not available"}
+
+    def preprocess_bbwidth(self, bbwidth: pd.Series, prices: pd.Series = None,
+                          length: int = 20, std: float = 2.0, **kwargs) -> Dict[str, Any]:
+        """Route Bollinger Band Width preprocessing to specialized preprocessor."""
+        preprocessor = get_preprocessor('bbwidth')
+        if preprocessor:
+            return preprocessor.preprocess(bbwidth, prices, length=length, std=std, **kwargs)
+        else:
+            return {"error": "BBWidth preprocessor not available"}
+
+    def preprocess_donchian(self, upper: pd.Series, middle: pd.Series, lower: pd.Series,
+                           prices: pd.Series = None, length: int = 20, **kwargs) -> Dict[str, Any]:
+        """Route Donchian Channels preprocessing to specialized preprocessor."""
+        preprocessor = get_preprocessor('donchian')
+        if preprocessor:
+            return preprocessor.preprocess(upper, middle, lower, prices, length=length, **kwargs)
+        else:
+            return {"error": "Donchian preprocessor not available"}
+
+    def preprocess_keltner(self, upper: pd.Series, middle: pd.Series, lower: pd.Series,
+                          prices: pd.Series = None, length: int = 20, multiplier: float = 2.0, **kwargs) -> Dict[str, Any]:
+        """Route Keltner Channels preprocessing to specialized preprocessor."""
+        preprocessor = get_preprocessor('keltner')
+        if preprocessor:
+            return preprocessor.preprocess(upper, middle, lower, prices, length=length, multiplier=multiplier, **kwargs)
+        else:
+            return {"error": "Keltner preprocessor not available"}
+
+    def preprocess_trix(self, trix: pd.Series, prices: pd.Series = None,
+                       length: int = 14, **kwargs) -> Dict[str, Any]:
+        """Route TRIX preprocessing to specialized TRIX preprocessor."""
+        preprocessor = get_preprocessor('trix')
+        if preprocessor:
+            return preprocessor.preprocess(trix, prices, length=length, **kwargs)
+        else:
+            return {"error": "TRIX preprocessor not available"}
+
+    def preprocess_vortex(self, vi_plus: pd.Series, vi_minus: pd.Series, prices: pd.Series = None,
+                         length: int = 14, **kwargs) -> Dict[str, Any]:
+        """Route Vortex preprocessing to specialized Vortex preprocessor."""
+        preprocessor = get_preprocessor('vortex')
+        if preprocessor:
+            return preprocessor.preprocess(vi_plus, vi_minus, prices, length=length, **kwargs)
+        else:
+            return {"error": "Vortex preprocessor not available"}
+
+    def preprocess_vwap(self, vwap: pd.Series, prices: pd.Series = None,
+                       volumes: pd.Series = None, anchor: str = "D", **kwargs) -> Dict[str, Any]:
+        """Route VWAP preprocessing to specialized VWAP preprocessor."""
+        preprocessor = get_preprocessor('vwap')
+        if preprocessor:
+            return preprocessor.preprocess(vwap, prices, volumes, anchor=anchor, **kwargs)
+        else:
+            return {"error": "VWAP preprocessor not available"}
+
     # Bollinger Bands preprocessing - placeholder for future implementation
     def preprocess_bollinger_bands(self, upper: pd.Series, middle: pd.Series, lower: pd.Series,
                                   prices: pd.Series, **kwargs) -> Dict[str, Any]:

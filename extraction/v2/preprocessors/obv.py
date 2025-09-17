@@ -503,14 +503,14 @@ class OBVPreprocessor(BasePreprocessor):
                 "type": "volume_accumulation",
                 "strength": "medium",
                 "reason": f"Strong bullish OBV trend with {trend_strength:.2f} strength",
-                "confidence": 0.7
+                "strength_score": 0.7
             })
         elif consensus == "bearish" and trend_strength > 0.6:
             signals.append({
                 "type": "volume_distribution",
                 "strength": "medium",
                 "reason": f"Strong bearish OBV trend with {trend_strength:.2f} strength",
-                "confidence": 0.7
+                "strength_score": 0.7
             })
         
         # Accumulation/Distribution signals
@@ -523,14 +523,14 @@ class OBVPreprocessor(BasePreprocessor):
                     "type": "strong_accumulation_signal",
                     "strength": "strong",
                     "reason": "Strong accumulation detected across multiple timeframes",
-                    "confidence": 0.8
+                    "strength_score": 0.8
                 })
             elif overall_phase == "distribution_phase" and phase_strength == "strong":
                 signals.append({
                     "type": "strong_distribution_signal",
                     "strength": "strong",
                     "reason": "Strong distribution detected across multiple timeframes",
-                    "confidence": 0.8
+                    "strength_score": 0.8
                 })
         
         # Divergence signals
@@ -540,7 +540,7 @@ class OBVPreprocessor(BasePreprocessor):
                 "type": f"obv_{div_type}",
                 "strength": "strong",
                 "reason": divergence["description"],
-                "confidence": divergence["confidence"]
+                "strength_score": divergence.get("strength_score", 0.7)
             })
         
         return signals

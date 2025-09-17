@@ -75,12 +75,6 @@ class ROCPreprocessor(BasePreprocessor):
         # Pattern analysis
         pattern_analysis = self._analyze_roc_patterns(roc, length)
         
-        # Signal generation
-        signals = self._generate_roc_signals(current_roc, momentum_analysis, overbought_oversold, trend_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_roc_confidence(roc, momentum_analysis, trend_analysis)
-        
         return {
             "indicator": "ROC",
             "current": {
@@ -91,19 +85,28 @@ class ROCPreprocessor(BasePreprocessor):
             "context": {
                 "momentum": momentum_analysis,
                 "trend": trend_analysis,
-                "velocity": velocity_analysis
+                "velocity": velocity_analysis,
+                "length": length,
+                "calculation_periods": len(roc)
             },
             "levels": {
                 "zero_line": zero_line_analysis,
                 "extremes": overbought_oversold
             },
-            "patterns": pattern_analysis,
-            "evidence": {
-                "divergence": divergence,
-                "signals": signals
+            "patterns": {
+                **pattern_analysis,
+                "divergence": divergence
             },
-            "signals": signals,
-            "confidence": confidence,
+            "evidence": {
+                "data_quality": {
+                    "original_periods": len(roc),
+                    "clean_periods": len(roc),
+                    "valid_data_percentage": 100.0,
+                    "had_prices": prices is not None,
+                    "calculation_periods": length
+                },
+                "calculation_notes": f"ROC analysis based on {len(roc)} periods with length={length}"
+            },
             "summary": self._generate_roc_summary(current_roc, momentum_analysis, overbought_oversold)
         }
     
@@ -424,8 +427,8 @@ class ROCPreprocessor(BasePreprocessor):
                 latest_roc_trough["value"] > prev_roc_trough["value"]):
                 return {
                     "type": "bullish_divergence",
-                    "confidence": 0.7,
-                    "description": "Price making lower lows while ROC making higher lows - momentum improving"
+                    "description": "Price making lower lows while ROC making higher lows - momentum improving",
+                    "strength": "medium"
                 }
         
         # Bearish divergence: price higher highs, ROC lower highs
@@ -439,8 +442,8 @@ class ROCPreprocessor(BasePreprocessor):
                 latest_roc_peak["value"] < prev_roc_peak["value"]):
                 return {
                     "type": "bearish_divergence",
-                    "confidence": 0.7,
-                    "description": "Price making higher highs while ROC making lower highs - momentum weakening"
+                    "description": "Price making higher highs while ROC making lower highs - momentum weakening",
+                    "strength": "medium"
                 }
         
         return None

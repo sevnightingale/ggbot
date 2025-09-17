@@ -141,10 +141,19 @@ class DecisionEngineV2:
         try:
             # Route based on config type and signal data presence
             config_type = getattr(self.config, 'config_type', 'autonomous_trading')
-            
+
             if config_type == "signal_validation" and signal_data:
+                # Signal validation mode: Always evaluate signals independently
+                # Bypasses position management to allow multiple concurrent positions
+                logger.bind(config_id=self.config_id, symbol=symbol).info(
+                    "Signal validation mode: Evaluating signal independently (bypassing position management)"
+                )
                 return await self._handle_signal_validation(symbol, signal_data)
             else:
+                # Autonomous trading mode: Check for existing positions first
+                logger.bind(config_id=self.config_id, symbol=symbol).info(
+                    "Autonomous trading mode: Checking for existing positions"
+                )
                 return await self._handle_autonomous_trading(symbol)
                 
         except (DecisionError, MarketDataError, ConfigurationError, LLMError):
@@ -1225,11 +1234,15 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                         return None
                     
                     raw_data = result[0] if isinstance(result, tuple) else result['raw_data']
-                    if not raw_data or not isinstance(raw_data, list):
+                    if not raw_data or not isinstance(raw_data, dict):
                         return None
-                    
-                    # Extract volume data from OHLCV candles
-                    volumes = [candle.get('volume', 0) for candle in raw_data if 'volume' in candle]
+
+                    # Extract volume data from OHLCV candles (V2 structure)
+                    candles = raw_data.get('candles', [])
+                    if not candles or not isinstance(candles, list):
+                        return None
+
+                    volumes = [candle.get('volume', 0) for candle in candles if isinstance(candle, dict) and 'volume' in candle]
                     if not volumes or len(volumes) < 2:
                         return None
                     
