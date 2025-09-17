@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { usePermissions } from '@/lib/permissions'
 import { ExternalLink, Lock, CheckCircle, AlertCircle } from 'lucide-react'
 import { ConfigData } from '@/lib/api'
 
@@ -25,7 +26,8 @@ export function SignalsConfiguration({
 
   // For now, we'll simulate the subscription status
   // In real implementation, this would come from user profile or API
-  const isGgShotSubscribed = false // TODO: Get from user profile API
+  const { canAccess } = usePermissions()
+  const isGgShotSubscribed = canAccess('ggshot')
 
   const handleSubscribeClick = () => {
     setShowGgShotModal(true)
@@ -44,6 +46,11 @@ export function SignalsConfiguration({
 
   // Toggle ggShot enabled/disabled
   const toggleGgShot = (enabled: boolean) => {
+    // Check permission before enabling
+    if (enabled && !isGgShotSubscribed) {
+      alert('ggShot signals require a ggbase subscription. Upgrade to access external signal sources!')
+      return
+    }
     const currentConfig = configData?.extraction?.selected_data_sources || {}
     const currentSignalsConfig = currentConfig.signals_group_chats || {
       data_points: [],
@@ -124,10 +131,13 @@ export function SignalsConfiguration({
               </div>
               <button
                 onClick={() => toggleGgShot(!isGgShotEnabled)}
+                disabled={!isGgShotSubscribed && !isGgShotEnabled}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   isGgShotEnabled
                     ? 'bg-emerald-500'
-                    : 'bg-[var(--border)]'
+                    : !isGgShotSubscribed
+                      ? 'bg-[var(--border)] opacity-50 cursor-not-allowed'
+                      : 'bg-[var(--border)]'
                 }`}
               >
                 <span
@@ -233,10 +243,13 @@ export function SignalsConfiguration({
               </div>
               <button
                 onClick={() => toggleGgShot(!isGgShotEnabled)}
+                disabled={!isGgShotSubscribed && !isGgShotEnabled}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   isGgShotEnabled
                     ? 'bg-emerald-500'
-                    : 'bg-[var(--border)]'
+                    : !isGgShotSubscribed
+                      ? 'bg-[var(--border)] opacity-50 cursor-not-allowed'
+                      : 'bg-[var(--border)]'
                 }`}
               >
                 <span

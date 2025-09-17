@@ -1299,10 +1299,17 @@ async def create_config(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """Create a new bot configuration and corresponding paper trading account."""
+    # Extract config_type separately for table field, exclude from JSONB data
+    request_data = request.dict(exclude={"config_name"})
+    config_type = request_data.pop("config_type", "autonomous_trading")
+
+    # Add config_type back to config_data for BotConfigV2 constructor
+    request_data["config_type"] = config_type
+
     config = await config_service.create_config(
         user_id=current_user.user_id,
         config_name=request.config_name,
-        config_data=request.dict(exclude={"config_name"})
+        config_data=request_data
     )
 
     if not config:
