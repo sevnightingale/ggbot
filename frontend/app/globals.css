@@ -542,6 +542,7 @@ body {
   --text-muted: #9ca3af;       /* gray-400 */
   --border: #36363d;           /* charcoal-600 */
   --border-hover: #4a4a50;     /* charcoal-500 */
+  --logo-invert: 89%;          /* Light logo for dark theme */
 }
 
 [data-theme="light"] {
@@ -553,6 +554,7 @@ body {
   --text-muted: #6b7280;       /* gray-500 */
   --border: #d6d8da;           /* bone-300 */
   --border-hover: #c1c5c7;     /* darker bone for hover */
+  --logo-invert: 12%;          /* Dark logo for light theme */
 }
 
 :root {
