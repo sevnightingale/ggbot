@@ -160,7 +160,7 @@ def get_bot_status_message(bot_state: str, execution_status: Optional[Dict[str, 
         return 'Bot inactive'
     
     if not execution_status:
-        return 'Monitoring markets...'
+        return 'Monitoring markets and waiting for next analysis...'
     
     # Use the message from Redis if available
     message = execution_status.get('message')
@@ -170,9 +170,9 @@ def get_bot_status_message(bot_state: str, execution_status: Optional[Dict[str, 
     # Fallback based on phase
     phase = execution_status.get('phase', '')
     phase_messages = {
-        'extracting': 'Analyzing market data...',
-        'deciding': 'AI processing signals...',
-        'trading': 'Executing decision...',
+        'extracting': 'Gathering technical indicators and market data...',
+        'deciding': 'AI decision engine evaluating trading opportunities...',
+        'trading': 'Processing trade execution and risk management...',
         'completed': 'Cycle completed',
         'error': 'Error occurred'
     }

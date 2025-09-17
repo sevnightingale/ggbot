@@ -8,7 +8,7 @@ and accumulation/distribution pattern recognition.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 from .base import BasePreprocessor
 
@@ -16,8 +16,8 @@ from .base import BasePreprocessor
 class OBVPreprocessor(BasePreprocessor):
     """Advanced OBV preprocessor with professional-grade volume analysis."""
     
-    def preprocess(self, obv: pd.Series, prices: pd.Series = None, volumes: pd.Series = None, 
-                  **kwargs) -> Dict[str, Any]:
+    def preprocess(self, obv: pd.Series, prices: pd.Series = None, volumes: pd.Series = None,
+                  length: int = 14, **kwargs) -> Dict[str, Any]:
         """
         Advanced OBV preprocessing with comprehensive volume flow analysis.
         
@@ -32,59 +32,73 @@ class OBVPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive OBV analysis
         """
+        # Capture original lengths
+        orig_obv_len = len(obv)
+        orig_prices_len = len(prices) if prices is not None else 0
+        orig_volumes_len = len(volumes) if volumes is not None else 0
+
+        # Clean data
+        obv = pd.to_numeric(obv, errors="coerce").dropna()
+        prices = None if prices is None else pd.to_numeric(prices, errors="coerce").dropna()
+        volumes = None if volumes is None else pd.to_numeric(volumes, errors="coerce").dropna()
+
         if len(obv) < 5:
             return {"error": "Insufficient data for OBV analysis"}
-        
+
         current_obv = float(obv.iloc[-1])
+
+        # Generate proper timestamp
+        def _ts_from(s: pd.Series):
+            return s.index[-1].isoformat() if hasattr(s.index[-1], 'isoformat') and np.issubdtype(s.index.dtype, np.datetime64) else datetime.now(timezone.utc).isoformat()
+
+        timestamp = _ts_from(obv)
         
-        # Trend analysis
-        trend_analysis = self._analyze_obv_trend(obv)
-        
-        # Volume flow analysis
+        # Analysis using length parameter
+        trend_analysis = self._analyze_obv_trend(obv, length)
         flow_analysis = self._analyze_volume_flow(obv, volumes) if volumes is not None else {}
-        
-        # Accumulation/Distribution analysis
-        accumulation_analysis = self._analyze_accumulation_distribution(obv)
-        
-        # Momentum analysis
-        momentum_analysis = self._analyze_obv_momentum(obv)
-        
-        # Divergence analysis
-        divergence = None
-        if prices is not None:
-            divergence = self._detect_obv_price_divergence(obv, prices)
-        
-        # Pattern analysis
-        pattern_analysis = self._analyze_obv_patterns(obv)
-        
-        # Relative analysis
+        accumulation_analysis = self._analyze_accumulation_distribution(obv, length)
+        momentum_analysis = self._analyze_obv_momentum(obv, length)
+        divergence = self._detect_obv_price_divergence(obv, prices, length) if prices is not None else None
+        pattern_analysis = self._analyze_obv_patterns(obv, length)
         relative_analysis = self._analyze_relative_obv(obv)
-        
-        # Signal generation
-        signals = self._generate_obv_signals(current_obv, trend_analysis, accumulation_analysis, divergence)
-        
-        # Confidence calculation
-        confidence = self._calculate_obv_confidence(obv, trend_analysis, flow_analysis)
         
         return {
             "indicator": "OBV",
             "current": {
                 "value": round(current_obv, 2),
-                "timestamp": datetime.now().isoformat()
+                "timestamp": timestamp
             },
-            "trend": trend_analysis,
-            "flow": flow_analysis,
-            "accumulation": accumulation_analysis,
-            "momentum": momentum_analysis,
-            "divergence": divergence,
-            "patterns": pattern_analysis,
-            "relative": relative_analysis,
-            "signals": signals,
-            "confidence": confidence,
+            "context": {
+                "length": length,
+                "relative": relative_analysis
+            },
+            "levels": {
+                "trend": trend_analysis,
+                "accumulation": accumulation_analysis
+            },
+            "patterns": {
+                "momentum": momentum_analysis,
+                "formations": pattern_analysis,
+                "divergence": divergence,
+                "flow": flow_analysis
+            },
+            "evidence": {
+                "data_quality": {
+                    "original_periods": {
+                        "obv": orig_obv_len,
+                        "prices": orig_prices_len,
+                        "volumes": orig_volumes_len
+                    },
+                    "cleaned_periods": len(obv),
+                    "had_prices": prices is not None,
+                    "had_volumes": volumes is not None
+                },
+                "calculation_notes": f"OBV analysis based on {len(obv)} periods with length {length}"
+            },
             "summary": self._generate_obv_summary(current_obv, trend_analysis, accumulation_analysis)
         }
     
-    def _analyze_obv_trend(self, obv: pd.Series) -> Dict[str, Any]:
+    def _analyze_obv_trend(self, obv: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze OBV trend characteristics."""
         current_obv = obv.iloc[-1]
         
@@ -109,9 +123,11 @@ class OBVPreprocessor(BasePreprocessor):
         else:
             consensus = "insufficient_data"
         
-        # Trend strength
+        # Trend strength with safe denominator
         velocity = self._calculate_velocity(obv, 5)
-        trend_strength = min(1.0, abs(velocity) / (obv.std() * 0.1)) if obv.std() > 0 else 0
+        obv_std = float(obv.std())
+        base = max(1e-12, obv_std * 0.1)
+        trend_strength = min(1.0, abs(velocity) / base)
         
         # Trend consistency
         consistency = self._calculate_obv_trend_consistency(obv)
@@ -165,16 +181,19 @@ class OBVPreprocessor(BasePreprocessor):
     
     def _analyze_volume_flow(self, obv: pd.Series, volumes: pd.Series) -> Dict[str, Any]:
         """Analyze volume flow characteristics."""
-        if len(obv) < 5 or len(volumes) < 5:
+        if len(obv) < 5 or volumes is None or len(volumes) < 5:
             return {}
-        
-        # Recent volume flow
-        recent_obv_change = obv.iloc[-1] - obv.iloc[-5]
-        recent_volume_sum = volumes.iloc[-5:].sum()
-        
-        # Flow efficiency (how much OBV change per unit volume)
-        flow_efficiency = abs(recent_obv_change) / recent_volume_sum if recent_volume_sum > 0 else 0
-        
+
+        # Align OBV and volumes with inner join
+        obv_v = pd.concat({"obv": obv, "vol": volumes}, axis=1, join="inner").dropna()
+        if len(obv_v) < 5:
+            return {}
+
+        # Recent volume flow using aligned data
+        recent_obv_change = float(obv_v["obv"].iloc[-1] - obv_v["obv"].iloc[-5])
+        recent_volume_sum = float(obv_v["vol"].iloc[-5:].sum())
+        flow_efficiency = abs(recent_obv_change) / recent_volume_sum if recent_volume_sum > 0 else 0.0
+
         # Volume-weighted trend
         if recent_obv_change > 0:
             volume_trend = "accumulation"
@@ -182,25 +201,22 @@ class OBVPreprocessor(BasePreprocessor):
             volume_trend = "distribution"
         else:
             volume_trend = "neutral"
-        
-        # Average volume during up/down moves
-        obv_changes = obv.diff().dropna()
-        up_periods = [i for i, change in enumerate(obv_changes) if change > 0]
-        down_periods = [i for i, change in enumerate(obv_changes) if change < 0]
-        
-        avg_up_volume = volumes.iloc[up_periods].mean() if up_periods else 0
-        avg_down_volume = volumes.iloc[down_periods].mean() if down_periods else 0
+
+        # Average volume during up/down moves using aligned data
+        chg = obv_v["obv"].diff()
+        avg_up_volume = float(obv_v["vol"][chg > 0].mean()) if (chg > 0).any() else 0.0
+        avg_down_volume = float(obv_v["vol"][chg < 0].mean()) if (chg < 0).any() else 0.0
         
         return {
             "recent_flow": volume_trend,
             "flow_efficiency": round(flow_efficiency, 6),
             "avg_up_volume": round(avg_up_volume, 2),
             "avg_down_volume": round(avg_down_volume, 2),
-            "volume_bias": "up_days" if avg_up_volume > avg_down_volume else "down_days",
+            "volume_bias": "up_days" if avg_up_volume > avg_down_volume else ("down_days" if avg_down_volume > avg_up_volume else "balanced"),
             "volume_ratio": round(avg_up_volume / avg_down_volume, 2) if avg_down_volume > 0 else None
         }
     
-    def _analyze_accumulation_distribution(self, obv: pd.Series) -> Dict[str, Any]:
+    def _analyze_accumulation_distribution(self, obv: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze accumulation/distribution patterns."""
         if len(obv) < 10:
             return {}
@@ -264,7 +280,7 @@ class OBVPreprocessor(BasePreprocessor):
         else:
             return "weak"
     
-    def _analyze_obv_momentum(self, obv: pd.Series) -> Dict[str, Any]:
+    def _analyze_obv_momentum(self, obv: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze OBV momentum characteristics."""
         if len(obv) < 5:
             return {}
@@ -300,20 +316,29 @@ class OBVPreprocessor(BasePreprocessor):
             "roc_10p": round(roc_10, 2)
         }
     
-    def _detect_obv_price_divergence(self, obv: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
+    def _detect_obv_price_divergence(self, obv: pd.Series, prices: pd.Series, length: int) -> Optional[Dict[str, Any]]:
         """Detect OBV-price divergence patterns."""
-        if len(obv) < 15 or len(prices) < 15:
+        if obv is None or prices is None or len(obv) < 15 or len(prices) < 15:
             return None
-        
-        recent_periods = 10
-        obv_recent = obv.iloc[-recent_periods:]
-        price_recent = prices.iloc[-recent_periods:]
-        
-        # Find peaks and troughs
-        obv_peaks = self._find_peaks(obv_recent, prominence=obv_recent.std() * 0.5)
-        obv_troughs = self._find_troughs(obv_recent, prominence=obv_recent.std() * 0.5)
-        price_peaks = self._find_peaks(price_recent)
-        price_troughs = self._find_troughs(price_recent)
+
+        # Align OBV and prices
+        df = pd.concat({"obv": obv, "px": prices}, axis=1, join="inner").dropna()
+        if len(df) < 15:
+            return None
+
+        win = min(max(10, length), len(df))
+        m_recent = df["obv"].tail(win)
+        p_recent = df["px"].tail(win)
+
+        # Calculate relative prominence thresholds
+        prom_m = max(1e-6, m_recent.std() * 0.6)
+        prom_p = max(1e-6, p_recent.std() * 0.6)
+
+        # Find peaks and troughs with scaled prominence
+        obv_peaks = self._find_peaks(m_recent, prominence=prom_m)
+        obv_troughs = self._find_troughs(m_recent, prominence=prom_m)
+        price_peaks = self._find_peaks(p_recent, prominence=prom_p)
+        price_troughs = self._find_troughs(p_recent, prominence=prom_p)
         
         # Bullish divergence: price lower lows, OBV higher lows
         if len(obv_troughs) >= 2 and len(price_troughs) >= 2:
@@ -325,8 +350,7 @@ class OBVPreprocessor(BasePreprocessor):
             if (latest_price_trough["value"] < prev_price_trough["value"] and
                 latest_obv_trough["value"] > prev_obv_trough["value"]):
                 return {
-                    "type": "bullish_divergence",
-                    "confidence": 0.8,  # Higher confidence for volume indicators
+                    "type": "positive_divergence",
                     "description": "Price making lower lows while OBV making higher lows - accumulation"
                 }
         
@@ -340,14 +364,13 @@ class OBVPreprocessor(BasePreprocessor):
             if (latest_price_peak["value"] > prev_price_peak["value"] and 
                 latest_obv_peak["value"] < prev_obv_peak["value"]):
                 return {
-                    "type": "bearish_divergence",
-                    "confidence": 0.8,  # Higher confidence for volume indicators
+                    "type": "negative_divergence",
                     "description": "Price making higher highs while OBV making lower highs - distribution"
                 }
         
         return None
     
-    def _analyze_obv_patterns(self, obv: pd.Series) -> Dict[str, Any]:
+    def _analyze_obv_patterns(self, obv: pd.Series, length: int) -> Dict[str, Any]:
         """Analyze OBV patterns and formations."""
         patterns = {}
         
@@ -369,30 +392,29 @@ class OBVPreprocessor(BasePreprocessor):
         if len(obv) < 20:
             return None
         
-        # Look for breakout from recent range
-        recent_obv = obv.iloc[-10:]
-        prior_obv = obv.iloc[-20:-10]
-        
-        recent_high = recent_obv.max()
-        recent_low = recent_obv.min()
-        prior_high = prior_obv.max()
-        prior_low = prior_obv.min()
-        
-        current_obv = obv.iloc[-1]
-        
+        # Look for breakout from recent range with safe math
+        recent = obv.iloc[-10:]
+        prior = obv.iloc[-20:-10]
+        prior_high, prior_low = float(prior.max()), float(prior.min())
+        curr = float(obv.iloc[-1])
+
+        # Safe denominators to prevent div-by-zero and sign issues
+        den_hi = max(1e-12, abs(prior_high))
+        den_lo = max(1e-12, abs(prior_low))
+
         # Upward breakout
-        if current_obv > prior_high and current_obv > recent_high * 0.95:
+        if curr > max(prior_high, recent.max()):
             return {
                 "type": "upward_breakout",
-                "strength": round((current_obv - prior_high) / prior_high * 100, 2),
+                "strength": round((curr - prior_high) / den_hi * 100, 2),
                 "description": "OBV breaking above recent resistance"
             }
-        
+
         # Downward breakout
-        elif current_obv < prior_low and current_obv < recent_low * 1.05:
+        elif curr < min(prior_low, recent.min()):
             return {
-                "type": "downward_breakout", 
-                "strength": round((prior_low - current_obv) / prior_low * 100, 2),
+                "type": "downward_breakout",
+                "strength": round((prior_low - curr) / den_lo * 100, 2),
                 "description": "OBV breaking below recent support"
             }
         
@@ -403,19 +425,19 @@ class OBVPreprocessor(BasePreprocessor):
         if len(obv) < 10:
             return None
         
-        # Check if OBV is making new highs/lows
-        recent_obv = obv.iloc[-5:]
+        # Check if OBV is making new highs/lows with tolerance
         current_obv = obv.iloc[-1]
-        
+        tol = max(1e-12, obv.std() * 0.05)
+
         # New high confirmation
-        if current_obv == obv.max():
+        if abs(current_obv - obv.max()) <= tol:
             return {
                 "type": "new_high_confirmation",
                 "description": "OBV making new highs, strong accumulation"
             }
-        
+
         # New low confirmation
-        elif current_obv == obv.min():
+        elif abs(current_obv - obv.min()) <= tol:
             return {
                 "type": "new_low_confirmation",
                 "description": "OBV making new lows, strong distribution"

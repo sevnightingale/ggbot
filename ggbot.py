@@ -356,7 +356,7 @@ class GGBotOrchestrator:
             
             # 5. Run V2 decision engine
             # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
-            await set_execution_phase(config_id, "deciding", "AI analyzing market conditions and signals...")
+            await set_execution_phase(config_id, "deciding", "AI decision engine analyzing market data across multiple timeframes...")
             
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result
@@ -983,17 +983,7 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
             job = scheduler.get_job(job_id)
             next_fire = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
             
-            # Broadcast running status - now properly formatted for frontend
-            status_message = create_bot_status_message(
-                config_id=config_id,
-                execution_phase="extracting",
-                message="Starting bot execution...",
-                context={
-                    "close_ts": close_ts,
-                    "next_fire_at": next_fire
-                }
-            )
-            # 🔥 WEBSOCKET DELETED! Status now via Redis + SSE stream
+            # Status is handled inside orchestrator via set_execution_phase() calls
             
             try:
                 # Run the autonomous cycle
