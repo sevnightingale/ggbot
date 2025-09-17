@@ -112,7 +112,16 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                 'config_name', bc.config_name,
                 'config_type', 'autonomous_trading',
                 'state', bc.state,
-                'config_data', bc.config_data,
+                'config_data', json_build_object(
+                    'schema_version', bc.config_data->>'schema_version',
+                    'config_type', bc.config_data->>'config_type',
+                    'selected_pair', bc.config_data->>'selected_pair',
+                    'extraction', bc.config_data->'extraction',
+                    'decision', bc.config_data->'decision',
+                    'trading', bc.config_data->'trading',
+                    'llm_config', bc.config_data->'llm_config',
+                    'telegram_integration', bc.config_data->'telegram_integration'
+                ),
                 'created_at', bc.created_at,
                 'updated_at', bc.updated_at
             )

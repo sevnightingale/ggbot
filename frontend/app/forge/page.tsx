@@ -388,6 +388,27 @@ export default function ForgePage() {
     return () => clearInterval(interval)
   }, [nextRun])
 
+  // Handle selectedConfigId changes while in editing mode (programmatic bot switches)
+  useEffect(() => {
+    if (isEditingConfig && selectedBot && editingConfigData) {
+      // If the selected bot changed while editing, we need to update the editing state
+      const isEditingDifferentBot = originalConfig?.config_id !== selectedBot.config_id
+
+      if (isEditingDifferentBot) {
+        console.log('🔄 Bot changed while editing - switching editing state to new bot')
+
+        // Load the new bot's config into editing state
+        setEditingConfigData(JSON.parse(JSON.stringify(selectedBot.config_data)))
+        setEditingTableFields({
+          config_name: selectedBot.config_name,
+          config_type: selectedBot.config_type
+        })
+        setOriginalConfig(selectedBot)
+        setHasUnsavedChanges(false)
+      }
+    }
+  }, [selectedConfigId, selectedBot, isEditingConfig])
+
   // Start bot function using proper API client
   const startBot = async () => {
     if (!selectedBot) return
@@ -557,6 +578,27 @@ export default function ForgePage() {
     setHasUnsavedChanges(true)
   }
 
+  // Handle bot switching with clean state reset
+  const handleBotSelection = (configId: string) => {
+    // If currently editing and has unsaved changes, show warning
+    if (isEditingConfig && hasUnsavedChanges) {
+      console.warn('⚠️ Switching bots - discarding unsaved changes')
+    }
+
+    // Always reset to monitor tab when switching bots
+    setActiveTab('monitor')
+
+    // Clear any editing state
+    setIsEditingConfig(false)
+    setEditingConfigData(null)
+    setEditingTableFields(null)
+    setHasUnsavedChanges(false)
+    setOriginalConfig(null)
+
+    // Switch to the new bot
+    setSelectedConfigId(configId)
+  }
+
   // Save configuration changes
   const saveConfigurationChanges = async () => {
     if (!selectedBot || !editingConfigData || !editingTableFields || !hasUnsavedChanges) return
@@ -587,6 +629,9 @@ export default function ForgePage() {
       setHasUnsavedChanges(false)
       setOriginalConfig(null)
 
+      // Show save confirmation
+      alert('✅ Configuration saved successfully!')
+
     } catch (error) {
       console.error('❌ Failed to save configuration:', error)
 
@@ -596,7 +641,8 @@ export default function ForgePage() {
         await refreshBotList()
       }
 
-      // TODO: Show error toast/notification to user
+      // Show error alert
+      alert('❌ Failed to save configuration. Please try again.')
     }
   }
 
@@ -816,7 +862,7 @@ export default function ForgePage() {
           <BotRail
             bots={allBots}
             selectedId={selectedConfigId}
-            onSelect={setSelectedConfigId}
+            onSelect={handleBotSelection}
             accounts={accounts}
             onCreateNew={handleCreateNewBot}
             isCreatingNew={isCreatingNew}
