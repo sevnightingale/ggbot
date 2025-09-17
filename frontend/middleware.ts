@@ -11,9 +11,9 @@ export function middleware(request: NextRequest) {
       return NextResponse.next()
     }
     
-    // Handle root app subdomain -> dashboard
+    // Handle root app subdomain -> forge
     if (pathname === '/') {
-      return NextResponse.rewrite(new URL('/dashboard', request.url))
+      return NextResponse.rewrite(new URL('/forge', request.url))
     }
     
     // All other app subdomain routes go through normally
