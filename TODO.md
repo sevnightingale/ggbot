@@ -68,6 +68,7 @@
   - [ ] Change 'next run...' to 'waiting for next candle close...' in frontend
   - [ ] Make it clear why bot doesn't trigger immediately after activation
   - [ ] Update status messages to be more user-friendly
+  - [ ] Add pop-up notification explaining 'your bot will run on the next candle close'
 
 - [ ] **Review decimal precision for crypto pricing**
   - [ ] Audit all price display components across frontend (Forge positions table, metrics, etc.)
@@ -76,6 +77,12 @@
   - [ ] Verify extraction/decision/trading systems handle high-precision decimals correctly
   - [ ] Test with various crypto price ranges (BTC ~$100k vs SHIB ~$0.000024)
   - [ ] Implement dynamic decimal places based on price magnitude
+
+- [ ] **Fix market data extraction issues**
+  - [ ] Debug volume analysis broken in technical indicators
+  - [ ] Investigate market data not showing up properly in Forge interface
+  - [ ] Verify some indicators not working correctly with new extraction system
+  - [ ] Test indicator calculations against reference implementations
 
 ## 🔧 **MEDIUM PRIORITY - Backend Polish**
 
