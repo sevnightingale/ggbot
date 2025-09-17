@@ -25,8 +25,6 @@ export default function Pricing() {
       features: [
         "No API LLM costs",
         "Telegram Signals",
-        "Cornix integration", 
-        "Bot filter system (like ggshot)",
         "Live trading execution",
         "Priority support"
       ],
@@ -89,11 +87,11 @@ export default function Pricing() {
                   {plan.name}
                 </h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-bone-200">
+                  <span className="text-3xl font-bold text-bone-200 blur-sm">
                     {plan.price}
                   </span>
                   {plan.price !== "Free" && (
-                    <span className="text-bone-200/60 ml-1">/month</span>
+                    <span className="text-bone-200/60 ml-1 blur-sm">/month</span>
                   )}
                 </div>
                 <p className="text-sm text-bone-200/70">
@@ -127,14 +125,6 @@ export default function Pricing() {
                 </a>
               )}
 
-              {/* Placeholder Note */}
-              {index === 1 && (
-                <div className="mt-4 text-center">
-                  <p className="text-xs text-bone-200/50">
-                    [Stripe integration pending]
-                  </p>
-                </div>
-              )}
             </div>
           ))}
         </div>

@@ -97,7 +97,7 @@ export default function FAQ() {
             Still have questions? Reach out to me through email. Your feedback is quintessential to the future of ggbots.
           </p>
           <a
-            href="mailto:sev@ggbots.ai"
+            href="mailto:sevnightingale@gmail.com"
             className="text-agents-extraction hover:text-agents-extraction/80 transition-colors font-medium"
           >
             Contact sev →
