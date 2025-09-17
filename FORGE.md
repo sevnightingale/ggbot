@@ -136,6 +136,151 @@ The Forge is a single-page application that replaces the dashboard with an elega
     - Telegram integration with collapsible message template
     - Exchange section (grayed out "Live Trading - Coming Soon")
 
+## PERMISSION SYSTEM ARCHITECTURE
+
+### **Implementation Status: ✅ COMPLETE**
+
+The Forge implements a comprehensive permission-based gatekeeping system to control access to premium features based on user subscription tiers and paid data points.
+
+#### **Core Architecture Pattern**
+
+**Follows Existing Patterns**: The permission system mirrors the `ThemeProvider` pattern exactly, maintaining consistency with the codebase architecture.
+
+```typescript
+// Permission Context - mirrors ThemeProvider
+<ThemeProvider>
+  <PermissionProvider>
+    <ForgeApp />
+  </PermissionProvider>
+</ThemeProvider>
+
+// Usage in components - mirrors useTheme()
+const { canAccess, userProfile, hasSubscription } = usePermissions()
+```
+
+#### **Permission Flow**
+
+1. **Authentication Check**: Standard Supabase auth check for user login
+2. **Permission Loading**: `PermissionProvider` loads user profile via `apiClient.getUserProfile()`
+3. **Access Control**: Components use `canAccess(feature)` for gatekeeping decisions
+4. **Graceful Fallback**: API failures default to free tier permissions
+
+#### **Feature Gatekeeping Implementation**
+
+**Premium LLM Models (`StrategyEditor.tsx`)**:
+- **OpenAI GPT-4**: Requires `canAccess('premium_llms')`
+- **Visual Feedback**: Disabled state with lock icon for non-subscribers
+- **User Interaction**: Alert with upgrade prompt when attempting access
+- **Button State**: `disabled={isLocked}` with opacity styling
+
+**ggShot Signals (`SignalsConfiguration.tsx`)**:
+- **Signal Access**: Requires `canAccess('ggshot')`
+- **Toggle Control**: Disabled for free users, enabled for subscribers
+- **Real-time Check**: Replaces hardcoded `isGgShotSubscribed = false`
+- **Permission Validation**: Blocks enabling without subscription
+
+**Telegram Publishing (`TradeSettings.tsx`)**:
+- **Publishing Access**: Requires `canAccess('telegram_publishing')`
+- **Configuration UI**: Hidden/disabled for non-subscribers
+- **Business Logic**: Prevents unauthorized signal publishing
+
+#### **Permission Context API**
+
+```typescript
+interface PermissionContextType {
+  userProfile: UserProfile | null
+  loading: boolean
+  canAccess: (feature: string) => boolean
+  hasSubscription: (tier: 'ggbase') => boolean
+  hasPaidDataPoint: (dataPoint: string) => boolean
+}
+
+// Supported features for canAccess()
+'signals' | 'ggshot' | 'telegram_publishing' | 'premium_llms' |
+'openai_gpt4' | 'platform_llm_keys' | 'signal_validation_mode'
+```
+
+#### **Visual Design Patterns**
+
+**Locked Feature States**:
+- **Disabled Buttons**: `opacity-60 cursor-not-allowed` styling
+- **Lock Icons**: SVG lock icons for premium features
+- **Premium Badges**: Amber-colored badges with conditional opacity
+- **Upgrade Prompts**: Alert-based upgrade messaging (upgradeable to modals)
+
+**User Feedback**:
+- **Loading State**: "Loading permissions..." during profile fetch
+- **Access Denied**: Clear messaging about subscription requirements
+- **Visual Hierarchy**: Locked features visually de-emphasized
+
+#### **Error Handling & Resilience**
+
+**API Failure Handling**:
+- **Graceful Degradation**: Falls back to free tier on getUserProfile() failure
+- **No Blocking**: Never blocks app loading due to permission issues
+- **Consistent UX**: Free tier experience remains fully functional
+
+**Edge Cases**:
+- **No User Profile**: Defaults to restrictive permissions
+- **Network Issues**: Cached permissions with refresh capability
+- **Subscription Changes**: Real-time permission updates via profile refresh
+
+#### **Security Implementation**
+
+**Frontend Gatekeeping**:
+- **UI Restrictions**: Premium features disabled/hidden for non-subscribers
+- **User Experience**: Clear upgrade paths and messaging
+- **Visual Feedback**: Obvious distinction between free and premium features
+
+**Backend Enforcement** (Required):
+- **API Validation**: Backend must validate permissions for all premium operations
+- **Data Persistence**: Subscription status stored securely in user profile table
+- **Business Logic**: Server-side enforcement prevents unauthorized access
+
+#### **Files Modified/Created**
+
+**New Files**:
+- `/frontend/lib/permissions.tsx` - Permission context provider and hooks
+- `/frontend/lib/permission-gate.tsx` - Reusable permission gate component
+
+**Modified Components**:
+- `/frontend/app/forge/page.tsx` - Integrated PermissionProvider wrapper
+- `/frontend/app/forge/components/configure/StrategyEditor.tsx` - LLM gatekeeping
+- `/frontend/app/forge/components/configure/SignalsConfiguration.tsx` - ggShot gatekeeping
+
+#### **Future Expansion**
+
+The permission system is designed for easy expansion:
+
+**Additional Features**:
+```typescript
+// Easy to add new permission checks
+const showAdvancedTA = canAccess('advanced_technical_analysis')
+const allowCustomIndicators = canAccess('custom_indicators')
+const enableAPITrading = canAccess('live_trading')
+```
+
+**Permission Gates**:
+```typescript
+// Declarative permission wrapping for complex UI sections
+<PermissionGate feature="advanced_analytics" fallback={<UpgradePrompt />}>
+  <AdvancedAnalyticsPanel />
+</PermissionGate>
+```
+
+**Data Point Restrictions**:
+```typescript
+// Granular data point access control
+const showPremiumIndicator = hasPaidDataPoint('fibonacci_retracements')
+```
+
+### **Integration Notes**
+
+- **No Breaking Changes**: Existing functionality remains unchanged for users with access
+- **Backward Compatible**: Free tier users maintain full access to basic features
+- **Performance Impact**: Minimal - single API call on app load with local caching
+- **Development Workflow**: Permission checks add minimal complexity to component development
+
 ## PLANS
 
 ### Elegant Config State Architecture

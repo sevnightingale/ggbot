@@ -16,7 +16,7 @@ export function PermissionGate({
   fallback,
   showUpgrade = true
 }: PermissionGateProps) {
-  const { canAccess, userProfile } = usePermissions()
+  const { canAccess } = usePermissions()
 
   // If user has access, render children
   if (canAccess(feature)) {
