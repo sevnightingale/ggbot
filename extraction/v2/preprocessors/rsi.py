@@ -9,6 +9,7 @@ import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timezone
+from pandas.api.types import is_datetime64_any_dtype
 
 from .base import BasePreprocessor
 
@@ -31,12 +32,24 @@ class RSIPreprocessor(BasePreprocessor):
         Returns:
             Dictionary with comprehensive RSI analysis
         """
-        # Use clean data to avoid NaN issues
-        clean = rsi_values.dropna()
+        # Numeric hygiene - convert to numeric and clean
+        clean = pd.to_numeric(rsi_values, errors="coerce").dropna()
+        prices = None if prices is None else pd.to_numeric(prices, errors="coerce").dropna()
+
         if len(clean) < 5:
             return {"error": "Insufficient data for RSI analysis"}
-        
+
+        # Get timestamp from series index or use UTC
+        ts = (clean.index[-1].isoformat()
+              if is_datetime64_any_dtype(clean.index)
+              else datetime.now(timezone.utc).isoformat())
+
         current = float(clean.iloc[-1])
+
+        # Period-driven windows
+        win = min(len(clean), max(20, period))
+        recent = max(10, period)
+        prom = max(1e-6, clean.tail(win).std() * 0.6)
         
         # Advanced trend analysis using clean data
         trend_analysis = self._analyze_trend(clean)
@@ -49,13 +62,13 @@ class RSIPreprocessor(BasePreprocessor):
         zone_analysis = self._analyze_zones(clean, 70, 30)
         
         # Pattern recognition
-        patterns = self._detect_rsi_patterns(clean, prices)
-        
+        patterns = self._detect_rsi_patterns(clean, prices, win, prom, recent)
+
         # Level analysis
         level_analysis = self._analyze_key_levels(clean, [30, 50, 70])
-        
+
         # Recent extremes
-        extremes = self._find_recent_extremes(clean)
+        extremes = self._find_recent_extremes(clean, win)
         
         # Generate sophisticated summary
         summary = self._generate_rsi_summary(
@@ -67,7 +80,7 @@ class RSIPreprocessor(BasePreprocessor):
             "period": period,
             "current": {
                 "value": round(current, 2),
-                "timestamp": datetime.now(timezone.utc).isoformat()
+                "timestamp": ts
             },
             "context": {
                 "trend": {
@@ -95,7 +108,7 @@ class RSIPreprocessor(BasePreprocessor):
                 },
                 "neutral": {
                     "level": 50,
-                    "status": "above" if current > 50 else "below",
+                    "status": "above" if current > 50 else ("below" if current < 50 else "at_level"),
                     "distance": round(current - 50, 2)
                 },
                 "key_levels": [30, 50, 70],
@@ -125,29 +138,30 @@ class RSIPreprocessor(BasePreprocessor):
             "summary": summary
         }
     
-    def _detect_rsi_patterns(self, rsi_values: pd.Series, prices: pd.Series = None) -> Dict[str, Any]:
+    def _detect_rsi_patterns(self, rsi_values: pd.Series, prices: pd.Series = None,
+                            win: int = 20, prom: float = 1.0, recent: int = 10) -> Dict[str, Any]:
         """Detect RSI patterns and formations."""
         patterns = {}
         
         # Reversal patterns
-        reversal = self._detect_reversal_pattern(rsi_values)
+        reversal = self._detect_reversal_pattern(rsi_values, win, prom)
         if reversal:
             patterns["reversal"] = reversal
-        
+
         # Momentum patterns
-        momentum = self._detect_momentum_pattern(rsi_values)
+        momentum = self._detect_momentum_pattern(rsi_values, win)
         if momentum:
             patterns["momentum"] = momentum
-        
-        # Divergence patterns (if prices provided) - remove strict length check
+
+        # Divergence patterns (if prices provided)
         if prices is not None:
-            divergence = self._detect_rsi_divergence(rsi_values, prices)
+            divergence = self._detect_rsi_divergence(rsi_values, prices, recent)
             if divergence:
                 patterns["divergence"] = divergence
         
         return patterns
     
-    def _detect_reversal_pattern(self, values: pd.Series) -> Optional[Dict[str, Any]]:
+    def _detect_reversal_pattern(self, values: pd.Series, win: int = 20, prom: float = 1.0) -> Optional[Dict[str, Any]]:
         """Detect potential reversal patterns using volatility-scaled peak/trough detection."""
         clean = values.dropna()
         if len(clean) < 5:
@@ -157,7 +171,7 @@ class RSIPreprocessor(BasePreprocessor):
         
         # Use base class volatility-scaled peak/trough finders
         if current > 70:  # Overbought zone
-            peaks = self._find_peaks(clean.iloc[-20:], prominence=1)  # Look back 20 periods
+            peaks = self._find_peaks(clean.tail(win), prominence=prom)
             # Require at least 2 peaks with minimum separation
             valid_peaks = [p for p in peaks if p["periods_ago"] >= 2]
             
@@ -170,7 +184,7 @@ class RSIPreprocessor(BasePreprocessor):
                 }
         
         elif current < 30:  # Oversold zone
-            troughs = self._find_troughs(clean.iloc[-20:], prominence=1)  # Look back 20 periods
+            troughs = self._find_troughs(clean.tail(win), prominence=prom)
             # Require at least 2 troughs with minimum separation
             valid_troughs = [t for t in troughs if t["periods_ago"] >= 2]
             
@@ -184,7 +198,7 @@ class RSIPreprocessor(BasePreprocessor):
         
         return None
     
-    def _detect_momentum_pattern(self, values: pd.Series) -> Optional[Dict[str, Any]]:
+    def _detect_momentum_pattern(self, values: pd.Series, win: int = 20) -> Optional[Dict[str, Any]]:
         """Detect momentum patterns with scale-independent thresholds."""
         clean = values.dropna()
         if len(clean) < 10:
@@ -209,19 +223,17 @@ class RSIPreprocessor(BasePreprocessor):
         
         return None
     
-    def _detect_rsi_divergence(self, rsi_values: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
+    def _detect_rsi_divergence(self, rsi_values: pd.Series, prices: pd.Series, recent: int = 10) -> Optional[Dict[str, Any]]:
         """Detect RSI-price divergence with robust NaN handling and scale normalization."""
         if prices is None:
             return None
-        
-        recent = 10
         
         # Align data and handle NaN/mismatched indices
         df = pd.DataFrame({"rsi": rsi_values, "price": prices}).dropna()
         if len(df) < recent:
             return None
-        
-        df = df.iloc[-recent:]
+
+        df = df.tail(recent)
         x = np.arange(len(df))
         
         # Calculate normalized slopes to handle scale differences

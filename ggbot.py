@@ -105,6 +105,7 @@ logger = base_logger.bind(service="orchestrator")
 from extraction.v2.extraction_engine import ExtractionEngineV2
 from decision.engine_v2 import DecisionEngineV2
 from trading.paper.supabase_service import SupabasePaperTradingService
+from signals.publishing_service import publish_signal_to_telegram
 
 # Domain Models  
 from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
@@ -133,6 +134,11 @@ class ConfigUpdateRequest(BaseModel):
     trading: Optional[Dict[str, Any]] = None
     llm_config: Optional[Dict[str, Any]] = None
     telegram_integration: Optional[Dict[str, Any]] = None
+
+
+class SignalOrchestrationRequest(BaseModel):
+    signal_data: Optional[Dict[str, Any]] = None
+    override_symbol: Optional[str] = None
 
 
 def serialize_numpy_types(obj):
@@ -265,8 +271,7 @@ class GGBotOrchestrator:
         config_id: str,
         user_id: str,
         signal_data: Optional[Dict] = None,
-        override_symbol: Optional[str] = None,
-        override_timeframe: Optional[str] = None
+        override_symbol: Optional[str] = None
     ) -> OrchestrationResult:
         """
         Run a complete trading cycle (autonomous or signal validation).
@@ -276,7 +281,6 @@ class GGBotOrchestrator:
             user_id: User ID for access validation
             signal_data: Signal data for validation mode
             override_symbol: Dynamic symbol override for signals
-            override_timeframe: Dynamic timeframe override for signals
             
         Returns:
             OrchestrationResult with execution details
@@ -295,14 +299,14 @@ class GGBotOrchestrator:
                 if signal_data:
                     # Real signal from external source
                     return await self._run_signal_validation_cycle(
-                        config, signal_data, override_symbol, override_timeframe
+                        config, signal_data, override_symbol
                     )
                 else:
                     # Manual trigger - fetch latest real ggShot signal
                     try:
                         latest_signal = await self._fetch_latest_ggshot_signal()
                         return await self._run_signal_validation_cycle(
-                            config, latest_signal, override_symbol, override_timeframe
+                            config, latest_signal, override_symbol
                         )
                     except Exception as e:
                         # If fetching real signal fails, fall back to mock for manual testing
@@ -324,7 +328,7 @@ class GGBotOrchestrator:
                             timestamp=datetime.now(timezone.utc)
                         )
                         return await self._run_signal_validation_cycle(
-                            config, mock_signal, override_symbol, override_timeframe
+                            config, mock_signal, override_symbol
                         )
             else:
                 return await self._run_autonomous_trading_cycle(config)
@@ -436,8 +440,7 @@ class GGBotOrchestrator:
         self,
         config: BotConfigV2,
         signal_data: Dict,
-        override_symbol: Optional[str] = None,
-        override_timeframe: Optional[str] = None
+        override_symbol: Optional[str] = None
     ) -> OrchestrationResult:
         """Run signal validation cycle for external signals."""
         start_time = datetime.now(timezone.utc)
@@ -445,14 +448,13 @@ class GGBotOrchestrator:
         config_id = config.config_id
         
         try:
-            # Extract symbol and timeframe from signal or override
+            # Extract symbol from signal or override
             symbol = override_symbol or signal_data.symbol or config.selected_pair
-            timeframe = override_timeframe or signal_data.timeframe or '1h'
             
             if not symbol:
                 raise ValueError("No symbol specified for signal validation")
             
-            self._log.info(f"Running signal validation for {symbol} ({timeframe})")
+            self._log.info(f"Running signal validation for {symbol}")
             
             # Get indicators from user's config (same as autonomous trading)
             extraction_config = config.extraction or {}
@@ -463,7 +465,7 @@ class GGBotOrchestrator:
 
             # Add extracting phase for UI consistency
             from core.sse import set_execution_phase
-            await set_execution_phase(config_id, "extracting", f"Extracting indicators for {symbol} ({timeframe})...")
+            await set_execution_phase(config_id, "extracting", f"Extracting indicators for {symbol}...")
 
             # Run extraction for signal's symbol/timeframe
             extraction_result = await self._run_extraction_v2(
@@ -679,14 +681,42 @@ class GGBotOrchestrator:
         """Check if signal should be published to telegram."""
         telegram_config = config.telegram_integration or {}
         publisher_config = telegram_config.get('publisher', {})
-        
+
+        # Check if telegram publishing is enabled
         if not publisher_config.get('enabled', False):
             return False
-            
+
+        # Check if user has ggbase subscription (required for signal publishing)
+        try:
+            from core.common.db import get_db_connection
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT subscription_tier, subscription_status
+                        FROM user_profiles
+                        WHERE user_id = %s
+                    """, (config.user_id,))
+
+                    result = cur.fetchone()
+                    if not result:
+                        self._log.warning(f"No user profile found for {config.user_id}")
+                        return False
+
+                    tier, status = result
+
+                    # Must be ggbase tier with active subscription
+                    if tier != 'ggbase' or status != 'active':
+                        self._log.info(f"User {config.user_id} requires ggbase subscription for signal publishing")
+                        return False
+
+        except Exception as e:
+            self._log.error(f"Failed to check subscription for signal publishing: {e}")
+            return False
+
         # Check confidence threshold
         confidence_threshold = publisher_config.get('confidence_threshold', 0.6)
         signal_confidence = decision_result.get('confidence', 0.0)
-        
+
         return signal_confidence >= confidence_threshold
     
     async def _trigger_signal_publishing(
@@ -1478,11 +1508,17 @@ async def delete_config(
 @app.post("/api/v2/orchestrate/{config_id}")
 async def run_orchestration(
     config_id: str,
+    request: SignalOrchestrationRequest = SignalOrchestrationRequest(),
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> OrchestrationResult:
-    """Run autonomous trading cycle for a configuration."""
+    """Run autonomous trading cycle or signal validation for a configuration."""
     try:
-        result = await orchestrator.run_autonomous_cycle(config_id, current_user.user_id)
+        result = await orchestrator.run_autonomous_cycle(
+            config_id,
+            current_user.user_id,
+            signal_data=request.signal_data,
+            override_symbol=request.override_symbol
+        )
         
         if result.status == "error":
             # Extract error details from the result object

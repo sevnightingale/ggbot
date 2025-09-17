@@ -8,7 +8,8 @@ and velocity-based trend strength assessment.
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
+from pandas.api.types import is_datetime64_any_dtype
 
 from .base import BasePreprocessor
 
@@ -16,49 +17,63 @@ from .base import BasePreprocessor
 class ROCPreprocessor(BasePreprocessor):
     """Advanced ROC preprocessor with professional-grade momentum analysis."""
     
-    def preprocess(self, roc: pd.Series, prices: pd.Series = None, 
+    def preprocess(self, roc: pd.Series, prices: pd.Series = None,
                   length: int = 10, **kwargs) -> Dict[str, Any]:
         """
         Advanced ROC preprocessing with comprehensive momentum analysis.
-        
+
         ROC measures the percentage change in price over a specified period.
         Positive values indicate upward momentum, negative values indicate downward momentum.
-        
+
         Args:
             roc: ROC values (percentage change)
             prices: Price series for additional analysis (optional)
             length: ROC calculation period
-            
+
         Returns:
             Dictionary with comprehensive ROC analysis
         """
+        # Clean and align data
+        roc = pd.to_numeric(roc, errors="coerce").dropna()
+        prices = None if prices is None else pd.to_numeric(prices, errors="coerce").dropna()
+
         if len(roc) < 5:
             return {"error": "Insufficient data for ROC analysis"}
-        
+
+        # Get timestamp from series index or use UTC
+        ts = (roc.index[-1].isoformat()
+              if is_datetime64_any_dtype(roc.index)
+              else datetime.now(timezone.utc).isoformat())
+
         current_roc = float(roc.iloc[-1])
+
+        # Length-driven windows
+        vel_win = max(3, length // 3)
+        acc_win = max(5, length // 2)
+        rank_win = max(10, length)
         
         # Momentum analysis
-        momentum_analysis = self._analyze_roc_momentum(roc)
-        
+        momentum_analysis = self._analyze_roc_momentum(roc, length)
+
         # Overbought/oversold analysis
-        overbought_oversold = self._analyze_roc_extremes(roc)
-        
+        overbought_oversold = self._analyze_roc_extremes(roc, length)
+
         # Trend analysis
-        trend_analysis = self._analyze_roc_trend(roc)
-        
+        trend_analysis = self._analyze_roc_trend(roc, vel_win)
+
         # Velocity analysis (rate of change of ROC)
-        velocity_analysis = self._analyze_roc_velocity(roc)
-        
+        velocity_analysis = self._analyze_roc_velocity(roc, vel_win, acc_win)
+
         # Zero line analysis
-        zero_line_analysis = self._analyze_roc_zero_line(roc)
-        
+        zero_line_analysis = self._analyze_roc_zero_line(roc, rank_win)
+
         # Divergence analysis
         divergence = None
         if prices is not None:
-            divergence = self._detect_roc_price_divergence(roc, prices)
-        
+            divergence = self._detect_roc_price_divergence(roc, prices, length)
+
         # Pattern analysis
-        pattern_analysis = self._analyze_roc_patterns(roc)
+        pattern_analysis = self._analyze_roc_patterns(roc, length)
         
         # Signal generation
         signals = self._generate_roc_signals(current_roc, momentum_analysis, overbought_oversold, trend_analysis)
@@ -71,21 +86,28 @@ class ROCPreprocessor(BasePreprocessor):
             "current": {
                 "value": round(current_roc, 3),
                 "value_pct": f"{current_roc:+.2f}%",
-                "timestamp": datetime.now().isoformat()
+                "timestamp": ts
             },
-            "momentum": momentum_analysis,
-            "overbought_oversold": overbought_oversold,
-            "trend": trend_analysis,
-            "velocity": velocity_analysis,
-            "zero_line": zero_line_analysis,
-            "divergence": divergence,
+            "context": {
+                "momentum": momentum_analysis,
+                "trend": trend_analysis,
+                "velocity": velocity_analysis
+            },
+            "levels": {
+                "zero_line": zero_line_analysis,
+                "extremes": overbought_oversold
+            },
             "patterns": pattern_analysis,
+            "evidence": {
+                "divergence": divergence,
+                "signals": signals
+            },
             "signals": signals,
             "confidence": confidence,
             "summary": self._generate_roc_summary(current_roc, momentum_analysis, overbought_oversold)
         }
     
-    def _analyze_roc_momentum(self, roc: pd.Series) -> Dict[str, Any]:
+    def _analyze_roc_momentum(self, roc: pd.Series, length: int = 10) -> Dict[str, Any]:
         """Analyze ROC momentum characteristics."""
         current_roc = roc.iloc[-1]
         
@@ -113,9 +135,10 @@ class ROCPreprocessor(BasePreprocessor):
             strength_level = "very_weak"
         
         # Recent momentum evolution
-        if len(roc) >= 5:
-            recent_avg = roc.iloc[-5:].mean()
-            prior_avg = roc.iloc[-10:-5].mean() if len(roc) >= 10 else roc.iloc[:-5].mean()
+        lookback = max(5, length // 2)
+        if len(roc) >= lookback:
+            recent_avg = roc.iloc[-lookback:].mean()
+            prior_avg = roc.iloc[-2*lookback:-lookback].mean() if len(roc) >= 2*lookback else roc.iloc[:-lookback].mean()
             momentum_change = recent_avg - prior_avg
             
             if momentum_change > 0.5:
@@ -128,7 +151,7 @@ class ROCPreprocessor(BasePreprocessor):
             momentum_evolution = "insufficient_data"
         
         # Momentum persistence
-        persistence = self._calculate_momentum_persistence(roc)
+        persistence = self._calculate_momentum_persistence(roc, lookback)
         
         return {
             "direction": momentum_direction,
@@ -138,37 +161,57 @@ class ROCPreprocessor(BasePreprocessor):
             "persistence": round(persistence, 3)
         }
     
-    def _calculate_momentum_persistence(self, roc: pd.Series) -> float:
+    def _calculate_momentum_persistence(self, roc: pd.Series, lookback: int = 5) -> float:
         """Calculate how persistent the momentum direction is."""
-        if len(roc) < 5:
+        if len(roc) < lookback:
             return 0.5
-        
+
         # Look at recent periods
-        recent_roc = roc.iloc[-5:]
-        current_direction = "positive" if roc.iloc[-1] > 0 else "negative"
-        
+        recent = roc.dropna().iloc[-lookback:]
+        if not len(recent):
+            return 0.5
+
+        current_val = recent.iloc[-1]
+        if current_val > 0:
+            cur = "pos"
+        elif current_val < 0:
+            cur = "neg"
+        else:
+            return 0.5  # Treat zero as neutral
+
         # Count periods with same direction
-        same_direction = sum(1 for val in recent_roc if 
-                           (val > 0 and current_direction == "positive") or 
-                           (val < 0 and current_direction == "negative"))
-        
-        return same_direction / len(recent_roc)
+        same = sum((v > 0 and cur == "pos") or (v < 0 and cur == "neg") for v in recent)
+        return same / len(recent)
     
-    def _analyze_roc_extremes(self, roc: pd.Series) -> Dict[str, Any]:
+    def _analyze_roc_extremes(self, roc: pd.Series, length: int = 10) -> Dict[str, Any]:
         """Analyze ROC overbought/oversold conditions."""
         current_roc = roc.iloc[-1]
         
         # Statistical analysis
         mean_roc = roc.mean()
         std_roc = roc.std()
-        
-        # Dynamic thresholds based on historical data
-        overbought_threshold = mean_roc + 1.5 * std_roc
-        oversold_threshold = mean_roc - 1.5 * std_roc
-        
+
+        # Guard against zero std (flat series)
+        if std_roc == 0.0:
+            return {
+                "condition": "neutral",
+                "overbought_threshold": 0.0,
+                "oversold_threshold": 0.0,
+                "extreme_overbought_threshold": 0.0,
+                "extreme_oversold_threshold": 0.0,
+                "overbought_time_pct": 0.0,
+                "oversold_time_pct": 0.0,
+                "current_streak": 0
+            }
+
+        # Dynamic thresholds based on historical data (scale with length)
+        sigma_mult = 1.5 * (length / 10)  # Adjust sigma multiplier based on length
+        overbought_threshold = mean_roc + sigma_mult * std_roc
+        oversold_threshold = mean_roc - sigma_mult * std_roc
+
         # Extreme thresholds
-        extreme_overbought = mean_roc + 2.5 * std_roc
-        extreme_oversold = mean_roc - 2.5 * std_roc
+        extreme_overbought = mean_roc + 2.5 * sigma_mult * std_roc
+        extreme_oversold = mean_roc - 2.5 * sigma_mult * std_roc
         
         # Current condition
         if current_roc >= extreme_overbought:
@@ -188,7 +231,11 @@ class ROCPreprocessor(BasePreprocessor):
         total_periods = len(roc)
         
         # Current streak
-        current_streak = self._calculate_extreme_streak(roc, condition)
+        current_streak = self._calculate_extreme_streak(
+            roc, condition,
+            overbought_threshold, oversold_threshold,
+            extreme_overbought, extreme_oversold
+        )
         
         return {
             "condition": condition,
@@ -201,40 +248,34 @@ class ROCPreprocessor(BasePreprocessor):
             "current_streak": current_streak
         }
     
-    def _calculate_extreme_streak(self, roc: pd.Series, condition: str) -> int:
+    def _calculate_extreme_streak(
+        self, roc: pd.Series, condition: str,
+        overbought_threshold: float, oversold_threshold: float,
+        extreme_overbought_threshold: float, extreme_oversold_threshold: float
+    ) -> int:
         """Calculate consecutive periods in current extreme condition."""
         if condition == "neutral":
             return 0
-        
+
         streak = 0
-        mean_roc = roc.mean()
-        std_roc = roc.std()
-        
-        overbought_threshold = mean_roc + 1.5 * std_roc
-        oversold_threshold = mean_roc - 1.5 * std_roc
-        extreme_overbought = mean_roc + 2.5 * std_roc
-        extreme_oversold = mean_roc - 2.5 * std_roc
-        
         for i in range(len(roc) - 1, -1, -1):
-            val = roc.iloc[i]
-            
-            if condition == "extreme_overbought" and val >= extreme_overbought:
+            v = roc.iloc[i]
+            if condition == "extreme_overbought" and v >= extreme_overbought_threshold:
                 streak += 1
-            elif condition == "overbought" and val >= overbought_threshold:
+            elif condition == "overbought" and v >= overbought_threshold:
                 streak += 1
-            elif condition == "extreme_oversold" and val <= extreme_oversold:
+            elif condition == "extreme_oversold" and v <= extreme_oversold_threshold:
                 streak += 1
-            elif condition == "oversold" and val <= oversold_threshold:
+            elif condition == "oversold" and v <= oversold_threshold:
                 streak += 1
             else:
                 break
-        
         return streak
     
-    def _analyze_roc_trend(self, roc: pd.Series) -> Dict[str, Any]:
+    def _analyze_roc_trend(self, roc: pd.Series, vel_win: int = 3) -> Dict[str, Any]:
         """Analyze ROC trend characteristics."""
         # ROC trend (trend of the momentum)
-        roc_slope = self._calculate_velocity(roc, 3)
+        roc_slope = self._calculate_velocity(roc, vel_win)
         
         if roc_slope > 0.2:
             roc_trend = "rising"
@@ -274,16 +315,16 @@ class ROCPreprocessor(BasePreprocessor):
         max_directional = max(positive_changes, negative_changes)
         return max_directional / total_changes if total_changes > 0 else 0.5
     
-    def _analyze_roc_velocity(self, roc: pd.Series) -> Dict[str, Any]:
+    def _analyze_roc_velocity(self, roc: pd.Series, vel_win: int = 3, acc_win: int = 5) -> Dict[str, Any]:
         """Analyze velocity of ROC (acceleration/deceleration)."""
         if len(roc) < 5:
             return {}
         
         # First derivative (velocity of momentum)
-        velocity = self._calculate_velocity(roc, 3)
-        
+        velocity = self._calculate_velocity(roc, vel_win)
+
         # Second derivative (acceleration of momentum)
-        acceleration = self._calculate_acceleration(roc, 5)
+        acceleration = self._calculate_acceleration(roc, acc_win)
         
         # Velocity interpretation
         if velocity > 0.5:
@@ -299,40 +340,43 @@ class ROCPreprocessor(BasePreprocessor):
             "interpretation": velocity_interpretation
         }
     
-    def _analyze_roc_zero_line(self, roc: pd.Series) -> Dict[str, Any]:
+    def _analyze_roc_zero_line(self, roc: pd.Series, rank_win: int = 10) -> Dict[str, Any]:
         """Analyze ROC behavior around zero line."""
         current_roc = roc.iloc[-1]
         
-        # Position relative to zero
-        if current_roc > 0:
+        # Position relative to zero with tolerance
+        eps = 1e-6
+        if current_roc > eps:
             position = "above_zero"
-        elif current_roc < 0:
+        elif current_roc < -eps:
             position = "below_zero"
         else:
             position = "at_zero"
+
+        # Time above/below zero using finite values
+        finite = roc.dropna()
+        above_zero = (finite > 0).sum()
+        below_zero = (finite < 0).sum()
+        total = len(finite)
+        above_zero_pct = (above_zero / max(1, total)) * 100
+        below_zero_pct = (below_zero / max(1, total)) * 100
         
-        # Time above/below zero
-        above_zero = sum(1 for val in roc if val > 0)
-        below_zero = sum(1 for val in roc if val < 0)
-        at_zero = sum(1 for val in roc if val == 0)
-        total = len(roc)
-        
-        # Zero line crossings
+        # Zero line crossings with epsilon tolerance
         crossings = 0
         for i in range(1, len(roc)):
-            if (roc.iloc[i] > 0 and roc.iloc[i-1] <= 0) or (roc.iloc[i] < 0 and roc.iloc[i-1] >= 0):
+            if (roc.iloc[i] > eps and roc.iloc[i-1] <= -eps) or (roc.iloc[i] < -eps and roc.iloc[i-1] >= eps):
                 crossings += 1
         
-        # Recent zero line crosses
+        # Recent zero line crosses with epsilon tolerance
         recent_crosses = []
-        for i in range(1, min(10, len(roc))):
-            if (roc.iloc[-i] > 0 and roc.iloc[-(i+1)] <= 0):
+        for i in range(1, min(rank_win, len(roc))):
+            if (roc.iloc[-i] > eps and roc.iloc[-(i+1)] <= -eps):
                 recent_crosses.append({
                     "type": "bullish_zero_cross",
                     "periods_ago": i,
                     "value": round(roc.iloc[-i], 3)
                 })
-            elif (roc.iloc[-i] < 0 and roc.iloc[-(i+1)] >= 0):
+            elif (roc.iloc[-i] < -eps and roc.iloc[-(i+1)] >= eps):
                 recent_crosses.append({
                     "type": "bearish_zero_cross",
                     "periods_ago": i,
@@ -341,27 +385,33 @@ class ROCPreprocessor(BasePreprocessor):
         
         return {
             "position": position,
-            "above_zero_pct": round((above_zero / total) * 100, 1),
-            "below_zero_pct": round((below_zero / total) * 100, 1),
+            "above_zero_pct": round(above_zero_pct, 1),
+            "below_zero_pct": round(below_zero_pct, 1),
             "total_crossings": crossings,
             "recent_crosses": recent_crosses[:3],
-            "crossing_frequency": round(crossings / total, 3)
+            "crossing_frequency": round(crossings / max(1, len(finite)), 3)
         }
     
-    def _detect_roc_price_divergence(self, roc: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
+    def _detect_roc_price_divergence(self, roc: pd.Series, prices: pd.Series, length: int = 10) -> Optional[Dict[str, Any]]:
         """Detect ROC-price divergence patterns."""
-        if len(roc) < 15 or len(prices) < 15:
+        # Align data properly
+        df = pd.concat({"roc": roc, "px": prices}, axis=1, join="inner").dropna()
+        if len(df) < max(15, length):
             return None
-        
-        recent_periods = 10
-        roc_recent = roc.iloc[-recent_periods:]
-        price_recent = prices.iloc[-recent_periods:]
-        
-        # Find peaks and troughs
-        roc_peaks = self._find_peaks(roc_recent, prominence=1)
-        roc_troughs = self._find_troughs(roc_recent, prominence=1)
-        price_peaks = self._find_peaks(price_recent)
-        price_troughs = self._find_troughs(price_recent)
+
+        # Use length-driven window
+        win = min(max(10, length), len(df))
+        r, p = df["roc"].tail(win), df["px"].tail(win)
+
+        # Scale prominence to recent std
+        prom_r = max(1e-6, r.std() * 0.6)
+        prom_p = max(1e-6, p.std() * 0.6)
+
+        # Find peaks and troughs with scaled prominence
+        roc_peaks = self._find_peaks(r, prominence=prom_r)
+        roc_troughs = self._find_troughs(r, prominence=prom_r)
+        price_peaks = self._find_peaks(p, prominence=prom_p)
+        price_troughs = self._find_troughs(p, prominence=prom_p)
         
         # Bullish divergence: price lower lows, ROC higher lows
         if len(roc_troughs) >= 2 and len(price_troughs) >= 2:
@@ -395,7 +445,7 @@ class ROCPreprocessor(BasePreprocessor):
         
         return None
     
-    def _analyze_roc_patterns(self, roc: pd.Series) -> Dict[str, Any]:
+    def _analyze_roc_patterns(self, roc: pd.Series, length: int = 10) -> Dict[str, Any]:
         """Analyze ROC patterns and formations."""
         patterns = {}
         

@@ -29,6 +29,10 @@ class TelegramChannel:
     chat_id: str
     channel_name: Optional[str] = None
     enabled: bool = True
+    message_template: Optional[str] = None
+    include_reasoning: bool = True
+    include_market_context: bool = False
+    confidence_threshold: float = 0.6
 
 
 class AccessControlService:
@@ -54,11 +58,10 @@ class AccessControlService:
                     
                     tier, status, paid_points = result
                     
-                    # Must be ggBase tier with active subscription
+                    # Must be ggbase tier with active subscription
                     return (
-                        tier == 'ggBase' and 
-                        status == 'active' and 
-                        paid_points and 'ggshot' in paid_points
+                        tier == 'ggbase' and
+                        status == 'active'
                     )
                     
         except Exception as e:
@@ -103,7 +106,11 @@ class AccessControlService:
                     return TelegramChannel(
                         chat_id=user_channel_id,
                         channel_name=publisher_config.get('channel_name'),
-                        enabled=True
+                        enabled=True,
+                        message_template=publisher_config.get('message_template'),
+                        include_reasoning=publisher_config.get('include_reasoning', True),
+                        include_market_context=publisher_config.get('include_market_context', True),
+                        confidence_threshold=publisher_config.get('confidence_threshold', 0.6)
                     )
                     
         except Exception as e:
@@ -239,7 +246,7 @@ class SignalPublishingService:
                 return False
             
             # 3. Format message with validation results
-            message = self._format_signal_message(signal_data, decision_result)
+            message = self._format_signal_message(signal_data, decision_result, channel_config)
             
             # 4. Send to user's channel
             success = await self.telegram_bot.send_message(
@@ -263,66 +270,56 @@ class SignalPublishingService:
     def _format_signal_message(
         self,
         signal_data: Dict,
-        decision_result: Dict
+        decision_result: Dict,
+        channel_config: TelegramChannel
     ) -> str:
-        """Format validated signal for telegram publishing - matches old ggShot format."""
-        
-        action = decision_result.get('action', 'unknown').upper()
+        """Format validated signal using user's custom message template."""
+
+        # Extract data for template variables
+        action = decision_result.get('action', 'UNKNOWN').upper()
         confidence = decision_result.get('confidence', 0.0)
-        
-        # Determine status and emoji (matching old ggShot format)
-        is_validated = action in ['VALIDATE', 'LONG', 'SHORT', 'ENTER']
-        status_emoji = "✅" if is_validated else "❌"
-        status_text = "APPROVED" if is_validated else "REJECTED"
-        
-        # Get confidence threshold from config or use default
-        confidence_threshold = 0.65  # Default ggShot threshold
-        
-        # Build message parts (matching old ggShot structure)
-        message_parts = [
-            f"{status_emoji} Filter: {status_text} - Confidence: {confidence:.1%}",
-            ""
-        ]
-        
-        # Original signal (if available)
-        raw_message = getattr(signal_data, 'raw_message', '')
-        if raw_message and raw_message != "Manual trigger initiated by user":
-            message_parts.extend([
-                raw_message.strip(),
-                ""
-            ])
+        reasoning = decision_result.get('reasoning', 'No reasoning provided')
+
+        # Get symbol from signal_data (handle both dict and object formats)
+        if hasattr(signal_data, 'symbol'):
+            symbol = signal_data.symbol
         else:
-            # For manual triggers or missing raw message, create a summary
-            symbol = getattr(signal_data, 'symbol', 'Unknown')
-            direction = getattr(signal_data, 'direction', 'Unknown')
-            source = getattr(signal_data, 'source', 'unknown')
-            
-            if source == 'manual_trigger':
-                signal_summary = f"Manual validation test for {symbol} - {direction} signal analysis"
-            else:
-                signal_summary = f"{source.upper()} signal for {symbol} - {direction} direction"
-            
-            message_parts.extend([
-                signal_summary,
-                ""
-            ])
-        
-        # Reasoning (matching old format)
-        reasoning = decision_result.get('reasoning', 'No analysis provided')
-        message_parts.extend([
-            "Reasoning:",
-            reasoning.strip(),
-            ""
-        ])
-        
-        # Summary details (matching old ggShot format)
-        message_parts.extend([
-            "Summary:",
-            f"• Confidence Score: {confidence:.3f}",
-            f"• Threshold: {confidence_threshold}",
-            f"• Status: {status_text}"
-        ])
-        
+            symbol = signal_data.get('symbol', 'UNKNOWN')
+
+        # Use user's custom message template if provided
+        if channel_config.message_template:
+            try:
+                # Format the message using user's template
+                message = channel_config.message_template.format(
+                    ACTION=action,
+                    SYMBOL=symbol,
+                    CONFIDENCE=f"{confidence:.1%}",
+                    REASONING=reasoning if channel_config.include_reasoning else ""
+                )
+
+                # Add market context if requested
+                if channel_config.include_market_context:
+                    raw_message = getattr(signal_data, 'raw_message', '') or signal_data.get('raw_message', '')
+                    if raw_message and raw_message.strip() and raw_message != "Manual trigger initiated by user":
+                        message += f"\n\nOriginal Signal:\n{raw_message}"
+
+                return message.strip()
+
+            except KeyError as e:
+                # Template variable missing, fall back to simple format
+                self.logger.warning(f"Invalid template variable {e}, using fallback format")
+            except Exception as e:
+                # Template formatting failed, fall back to simple format
+                self.logger.error(f"Template formatting failed: {e}, using fallback format")
+
+        # Fallback to simple format if no template or formatting failed
+        message_parts = [
+            f"🔥 {action} {symbol} - Confidence: {confidence:.1%}"
+        ]
+
+        if channel_config.include_reasoning and reasoning:
+            message_parts.append(f"\n{reasoning}")
+
         return "\n".join(message_parts)
     
     async def _update_signal_metrics(self, user_id: str, decision_result: Dict) -> None:

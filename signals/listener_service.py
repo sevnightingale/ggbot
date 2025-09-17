@@ -211,8 +211,7 @@ class OrchestratorClient:
                     'metadata': signal_data.metadata,
                     'timestamp': signal_data.timestamp.isoformat()
                 },
-                'override_symbol': signal_data.symbol,
-                'override_timeframe': signal_data.timeframe
+                'override_symbol': signal_data.symbol
             }
             
             # For now, use the regular orchestration endpoint
