@@ -171,8 +171,6 @@ function StatusMessage({ message, isActive }: StatusMessageProps) {
     return undefined
   }, [isActive, spinnerChars.length])
 
-  const truncatedMessage = message.length > 40 ? `${message.substring(0, 40)}...` : message
-
   return (
     <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
       {isActive && (
@@ -180,7 +178,7 @@ function StatusMessage({ message, isActive }: StatusMessageProps) {
           {spinnerChars[spinnerIndex]}
         </span>
       )}
-      <span>{truncatedMessage}</span>
+      <span>{message}</span>
     </div>
   )
 }
