@@ -2,105 +2,176 @@
 TRIX Preprocessor.
 
 Advanced TRIX preprocessing with triple exponential smoothing analysis,
-momentum turning points detection, and signal line crossover analysis.
+momentum turning points detection, and comprehensive market state description.
 """
 
 import numpy as np
 import pandas as pd
 from typing import Dict, List, Optional, Any
-from datetime import datetime
+from datetime import datetime, timezone
+from pandas.api.types import is_datetime64_any_dtype
 
 from .base import BasePreprocessor
 
 
 class TRIXPreprocessor(BasePreprocessor):
     """Advanced TRIX preprocessor with professional-grade momentum analysis."""
-    
-    def preprocess(self, trix: pd.Series, trix_signal: pd.Series = None, 
+
+    def preprocess(self, trix: pd.Series, trix_signal: pd.Series = None,
                   prices: pd.Series = None, length: int = 14, **kwargs) -> Dict[str, Any]:
         """
-        Advanced TRIX preprocessing with comprehensive momentum analysis.
-        
-        TRIX is a momentum oscillator that uses triple exponential smoothing
-        to filter out short-term price movements and identify longer-term trends.
-        
+        Advanced TRIX preprocessing with sophisticated momentum analysis.
+
+        Provides rich market state description following analysis-only pattern.
+        No signals or confidence - pure market context for Decision LLM.
+
         Args:
             trix: TRIX line values (percentage rate of change of triple EMA)
             trix_signal: TRIX signal line (optional, EMA of TRIX)
             prices: Price series for divergence analysis (optional)
             length: TRIX calculation period
-            
+
         Returns:
             Dictionary with comprehensive TRIX analysis
         """
-        if len(trix) < 5:
+        # Clean and align data
+        trix = pd.to_numeric(trix, errors="coerce").dropna()
+        sig = None if trix_signal is None else pd.to_numeric(trix_signal, errors="coerce").dropna()
+        px = None if prices is None else pd.to_numeric(prices, errors="coerce").dropna()
+
+        # Align TRIX & signal for all TRIX-only analytics
+        cols = {"trix": trix}
+        if sig is not None:
+            cols["signal"] = sig
+        df = pd.concat(cols, axis=1, join="inner").dropna()
+
+        if len(df) < 5:
             return {"error": "Insufficient data for TRIX analysis"}
-        
+
+        trix, sig = df["trix"], (df["signal"] if "signal" in df else None)
+
+        # Get timestamp from series index
+        ts = (trix.index[-1].isoformat()
+              if is_datetime64_any_dtype(trix.index)
+              else datetime.now(timezone.utc).isoformat())
+
+        # Period-driven windows
+        vel_win = max(2, length // 5)
+        acc_win = max(3, length // 3)
+        tp_win = max(10, length)
+        div_win = max(10, length)
+
         current_trix = float(trix.iloc[-1])
-        current_signal = float(trix_signal.iloc[-1]) if trix_signal is not None else None
-        
-        # Momentum analysis
-        momentum_analysis = self._analyze_trix_momentum(trix)
-        
+        current_signal = float(sig.iloc[-1]) if sig is not None else None
+
+        # Momentum analysis (period-driven)
+        momentum_analysis = self._analyze_trix_momentum(trix, vel_win, acc_win)
+
         # Zero line analysis
         zero_line_analysis = self._analyze_trix_zero_line(trix)
-        
-        # Signal line analysis
+
+        # Signal line analysis (if available)
         signal_line_analysis = {}
-        if trix_signal is not None:
-            signal_line_analysis = self._analyze_trix_signal_crossovers(trix, trix_signal)
-        
-        # Turning points analysis
-        turning_points = self._analyze_trix_turning_points(trix)
-        
-        # Smoothness analysis (TRIX should be smooth due to triple smoothing)
-        smoothness_analysis = self._analyze_trix_smoothness(trix)
-        
-        # Trend strength analysis
-        trend_analysis = self._analyze_trix_trend_strength(trix)
-        
-        # Divergence analysis
+        if sig is not None:
+            signal_line_analysis = self._analyze_trix_signal_crossovers(trix, sig)
+
+        # Turning points analysis (period-driven)
+        turning_points = self._analyze_trix_turning_points(trix, tp_win)
+
+        # Trend analysis
+        trend_analysis = self._analyze_trend(trix)
+
+        # Divergence analysis (if prices available)
         divergence = None
-        if prices is not None:
-            divergence = self._detect_trix_price_divergence(trix, prices)
-        
-        # Histogram analysis (if signal line available)
-        histogram_analysis = {}
-        if trix_signal is not None:
-            histogram_analysis = self._analyze_trix_histogram(trix, trix_signal)
-        
-        # Signal generation
-        signals = self._generate_trix_signals(current_trix, current_signal, momentum_analysis, 
-                                            zero_line_analysis, signal_line_analysis)
-        
-        # Confidence calculation
-        confidence = self._calculate_trix_confidence(trix, momentum_analysis, smoothness_analysis)
-        
+        if px is not None:
+            divergence = self._detect_trix_price_divergence(trix, px, div_win)
+
+        # Pattern detection
+        patterns = self._detect_trix_patterns(trix, sig, length)
+
+        # Include divergence in patterns if detected
+        if divergence is not None:
+            patterns["divergence"] = divergence
+
+        # Level analysis
+        level_analysis = self._analyze_key_levels(trix, [0])
+
+        # Recent extremes
+        extremes = self._find_recent_extremes(trix, max(20, length))
+
+        # Generate summary
+        summary = self._generate_trix_summary(
+            current_trix, current_signal, momentum_analysis, zero_line_analysis
+        )
+
         return {
             "indicator": "TRIX",
+            "length": length,
             "current": {
                 "trix": round(current_trix, 6),
                 "signal": round(current_signal, 6) if current_signal is not None else None,
                 "histogram": round(current_trix - current_signal, 6) if current_signal is not None else None,
-                "timestamp": datetime.now().isoformat()
+                "timestamp": ts
             },
-            "momentum": momentum_analysis,
-            "zero_line": zero_line_analysis,
-            "signal_line": signal_line_analysis,
-            "turning_points": turning_points,
-            "smoothness": smoothness_analysis,
-            "trend": trend_analysis,
-            "divergence": divergence,
-            "histogram": histogram_analysis,
-            "signals": signals,
-            "confidence": confidence,
-            "summary": self._generate_trix_summary(current_trix, current_signal, momentum_analysis, zero_line_analysis)
+            "context": {
+                "trend": {
+                    "direction": trend_analysis["direction"],
+                    "strength": round(trend_analysis["strength"], 3),
+                    "velocity": round(momentum_analysis["velocity"], 6),
+                    "acceleration": round(momentum_analysis["acceleration"], 6)
+                },
+                "momentum": {
+                    "direction": momentum_analysis["direction"],
+                    "strength_level": momentum_analysis["strength_level"],
+                    "persistence": round(momentum_analysis["persistence"], 3)
+                },
+                "volatility": round(trix.std(), 6)
+            },
+            "levels": {
+                "zero_line": {
+                    "position": zero_line_analysis["position"],
+                    "above_zero_pct": zero_line_analysis["above_zero_pct"],
+                    "below_zero_pct": zero_line_analysis["below_zero_pct"],
+                    "recent_crossings": zero_line_analysis.get("recent_crossings", [])
+                },
+                "signal_line": signal_line_analysis,
+                "key_levels": [0],
+                "recent_crossovers": level_analysis.get("recent_crossovers", [])
+            },
+            "extremes": {
+                "recent_high": {
+                    "value": round(extremes["high_value"], 6),
+                    "periods_ago": extremes["high_periods_ago"],
+                    "significance": extremes["high_significance"]
+                },
+                "recent_low": {
+                    "value": round(extremes["low_value"], 6),
+                    "periods_ago": extremes["low_periods_ago"],
+                    "significance": extremes["low_significance"]
+                }
+            },
+            "patterns": patterns,
+            "evidence": {
+                "data_quality": {
+                    "aligned_periods": len(trix),
+                    "had_signal": sig is not None,
+                    "had_prices": px is not None,
+                    "windows_used": {
+                        "velocity": vel_win,
+                        "acceleration": acc_win,
+                        "turning_points": tp_win,
+                        "divergence": div_win
+                    }
+                },
+                "calculation_notes": f"TRIX analysis based on {len(trix)} aligned periods with length={length}"
+            },
+            "summary": summary
         }
-    
-    def _analyze_trix_momentum(self, trix: pd.Series) -> Dict[str, Any]:
+
+    def _analyze_trix_momentum(self, trix: pd.Series, vel_win: int = 3, acc_win: int = 5) -> Dict[str, Any]:
         """Analyze TRIX momentum characteristics."""
         current_trix = trix.iloc[-1]
-        
+
         # Momentum direction
         if current_trix > 0:
             momentum_direction = "bullish"
@@ -108,10 +179,10 @@ class TRIXPreprocessor(BasePreprocessor):
             momentum_direction = "bearish"
         else:
             momentum_direction = "neutral"
-        
+
         # Momentum strength (TRIX values are typically small due to triple smoothing)
         momentum_strength = abs(current_trix)
-        
+
         # Momentum strength classification
         trix_std = trix.std()
         if momentum_strength > trix_std * 2:
@@ -122,14 +193,14 @@ class TRIXPreprocessor(BasePreprocessor):
             strength_level = "moderate"
         else:
             strength_level = "weak"
-        
-        # Momentum acceleration
-        trix_velocity = self._calculate_velocity(trix, 3)
-        trix_acceleration = self._calculate_acceleration(trix, 5)
-        
+
+        # Momentum acceleration (period-driven windows)
+        trix_velocity = self._calculate_velocity(trix, vel_win)
+        trix_acceleration = self._calculate_acceleration(trix, acc_win)
+
         # Momentum persistence
         persistence = self._calculate_trix_momentum_persistence(trix)
-        
+
         return {
             "direction": momentum_direction,
             "strength": round(momentum_strength, 6),
@@ -138,44 +209,41 @@ class TRIXPreprocessor(BasePreprocessor):
             "acceleration": round(trix_acceleration, 6),
             "persistence": round(persistence, 3)
         }
-    
+
     def _calculate_trix_momentum_persistence(self, trix: pd.Series) -> float:
         """Calculate persistence of TRIX momentum direction."""
         if len(trix) < 5:
             return 0.5
-        
+
         recent_trix = trix.iloc[-5:]
         current_direction = "positive" if trix.iloc[-1] > 0 else "negative"
-        
-        same_direction = sum(1 for val in recent_trix if 
-                           (val > 0 and current_direction == "positive") or 
+
+        same_direction = sum(1 for val in recent_trix if
+                           (val > 0 and current_direction == "positive") or
                            (val < 0 and current_direction == "negative"))
-        
+
         return same_direction / len(recent_trix)
-    
+
     def _analyze_trix_zero_line(self, trix: pd.Series) -> Dict[str, Any]:
         """Analyze TRIX behavior around zero line."""
-        current_trix = trix.iloc[-1]
-        
-        # Position relative to zero
-        if current_trix > 0:
-            position = "above_zero"
-        elif current_trix < 0:
-            position = "below_zero"
-        else:
-            position = "at_zero"
-        
-        # Time above/below zero
-        above_zero = sum(1 for val in trix if val > 0)
-        below_zero = sum(1 for val in trix if val < 0)
-        total = len(trix)
-        
+        # Position relative to zero with epsilon tolerance
+        finite = trix.dropna()
+        eps = max(1e-8, finite.std() * 0.02)
+        current_trix = float(finite.iloc[-1])
+
+        position = "above_zero" if current_trix > eps else ("below_zero" if current_trix < -eps else "at_zero")
+
+        # Time above/below zero (vectorized)
+        above_zero = (finite > eps).sum()
+        below_zero = (finite < -eps).sum()
+        total = len(finite)
+
         # Zero line crossings
         crossings = []
         for i in range(1, min(15, len(trix))):
             prev_trix = trix.iloc[-(i+1)]
             curr_trix = trix.iloc[-i]
-            
+
             # Bullish zero crossing
             if prev_trix <= 0 and curr_trix > 0:
                 crossings.append({
@@ -190,7 +258,7 @@ class TRIXPreprocessor(BasePreprocessor):
                     "periods_ago": i,
                     "value": round(curr_trix, 6)
                 })
-        
+
         return {
             "position": position,
             "above_zero_pct": round((above_zero / total) * 100, 1),
@@ -198,17 +266,22 @@ class TRIXPreprocessor(BasePreprocessor):
             "recent_crossings": crossings[:5],
             "latest_crossing": crossings[0] if crossings else None
         }
-    
+
     def _analyze_trix_signal_crossovers(self, trix: pd.Series, trix_signal: pd.Series) -> Dict[str, Any]:
-        """Analyze TRIX signal line crossovers."""
+        """Analyze TRIX signal line crossovers with safe indexing."""
+        n = min(15, len(trix), len(trix_signal))
         crossovers = []
-        
-        for i in range(1, min(15, len(trix))):
+
+        # Calculate spread scaling for strength normalization
+        spread = (trix - trix_signal).tail(max(20, n))
+        scale = float(spread.std() or 1e-6)
+
+        for i in range(1, n):
             prev_trix = trix.iloc[-(i+1)]
             curr_trix = trix.iloc[-i]
             prev_signal = trix_signal.iloc[-(i+1)]
             curr_signal = trix_signal.iloc[-i]
-            
+
             # Bullish crossover (TRIX crosses above signal)
             if prev_trix <= prev_signal and curr_trix > curr_signal:
                 crossovers.append({
@@ -216,7 +289,7 @@ class TRIXPreprocessor(BasePreprocessor):
                     "periods_ago": i,
                     "trix_value": round(curr_trix, 6),
                     "signal_value": round(curr_signal, 6),
-                    "strength": abs(curr_trix - curr_signal)
+                    "strength": round(abs(curr_trix - curr_signal) / scale, 3)
                 })
             # Bearish crossover (TRIX crosses below signal)
             elif prev_trix >= prev_signal and curr_trix < curr_signal:
@@ -225,51 +298,52 @@ class TRIXPreprocessor(BasePreprocessor):
                     "periods_ago": i,
                     "trix_value": round(curr_trix, 6),
                     "signal_value": round(curr_signal, 6),
-                    "strength": abs(curr_trix - curr_signal)
+                    "strength": round(abs(curr_trix - curr_signal) / scale, 3)
                 })
-        
+
         return {
             "recent_crossovers": crossovers[:5],
             "latest_crossover": crossovers[0] if crossovers else None,
-            "crossover_frequency": len(crossovers) / min(15, len(trix)) if len(trix) > 0 else 0
+            "crossover_frequency": len(crossovers) / max(1, n - 1)
         }
-    
-    def _analyze_trix_turning_points(self, trix: pd.Series) -> Dict[str, Any]:
+
+    def _analyze_trix_turning_points(self, trix: pd.Series, tp_win: int = 20) -> Dict[str, Any]:
         """Analyze TRIX turning points (peaks and troughs)."""
         if len(trix) < 10:
             return {}
-        
-        # Find peaks and troughs with appropriate prominence for TRIX
-        trix_std = trix.std()
-        prominence = max(trix_std * 0.1, 0.000001)  # Very small prominence for TRIX
-        
-        peaks = self._find_peaks(trix, prominence=prominence)
-        troughs = self._find_troughs(trix, prominence=prominence)
-        
+
+        # Scale prominence on recent window, not whole series
+        win = min(tp_win, len(trix))
+        seg = trix.tail(win)
+        prominence = max(seg.std() * 0.6, 1e-6)
+
+        peaks = self._find_peaks(seg, prominence=prominence)
+        troughs = self._find_troughs(seg, prominence=prominence)
+
         # Recent turning points
-        recent_peaks = [p for p in peaks if len(trix) - 1 - p["index"] <= 10]
-        recent_troughs = [t for t in troughs if len(trix) - 1 - t["index"] <= 10]
-        
+        recent_peaks = [p for p in peaks if p["periods_ago"] <= 10]
+        recent_troughs = [t for t in troughs if t["periods_ago"] <= 10]
+
         # Latest turning point
         latest_peak = peaks[-1] if peaks else None
         latest_trough = troughs[-1] if troughs else None
-        
+
         if latest_peak and latest_trough:
-            if latest_peak["index"] > latest_trough["index"]:
+            if latest_peak["periods_ago"] < latest_trough["periods_ago"]:
                 latest_turning_point = {
                     "type": "peak",
                     "value": round(latest_peak["value"], 6),
-                    "periods_ago": len(trix) - 1 - latest_peak["index"]
+                    "periods_ago": latest_peak["periods_ago"]
                 }
             else:
                 latest_turning_point = {
-                    "type": "trough", 
+                    "type": "trough",
                     "value": round(latest_trough["value"], 6),
-                    "periods_ago": len(trix) - 1 - latest_trough["index"]
+                    "periods_ago": latest_trough["periods_ago"]
                 }
         else:
             latest_turning_point = None
-        
+
         return {
             "total_peaks": len(peaks),
             "total_troughs": len(troughs),
@@ -277,296 +351,110 @@ class TRIXPreprocessor(BasePreprocessor):
             "recent_troughs": recent_troughs,
             "latest_turning_point": latest_turning_point
         }
-    
-    def _analyze_trix_smoothness(self, trix: pd.Series) -> Dict[str, Any]:
-        """Analyze TRIX smoothness characteristics."""
-        if len(trix) < 5:
-            return {}
-        
-        # TRIX should be very smooth due to triple exponential smoothing
-        trix_changes = trix.diff().dropna()
-        
-        # Smoothness metrics
-        avg_change = trix_changes.abs().mean()
-        max_change = trix_changes.abs().max()
-        volatility = trix.std()
-        mean_trix = abs(trix.mean())
-        
-        # Relative smoothness
-        relative_volatility = volatility / mean_trix if mean_trix > 0 else 0
-        
-        # Direction changes (should be infrequent for smooth indicator)
-        direction_changes = 0
-        prev_direction = None
-        
-        for change in trix_changes:
-            current_direction = "up" if change > 0 else "down" if change < 0 else "flat"
-            if prev_direction and current_direction != prev_direction and current_direction != "flat":
-                direction_changes += 1
-            prev_direction = current_direction
-        
-        change_frequency = direction_changes / len(trix_changes) if len(trix_changes) > 0 else 0
-        
-        # Smoothness score (lower is smoother)
-        smoothness_score = 1 - min(1.0, change_frequency + relative_volatility)
-        
-        return {
-            "avg_change": round(avg_change, 8),
-            "max_change": round(max_change, 8),
-            "relative_volatility": round(relative_volatility, 6),
-            "direction_changes": direction_changes,
-            "change_frequency": round(change_frequency, 3),
-            "smoothness_score": round(smoothness_score, 3),
-            "smoothness_rating": self._rate_smoothness(smoothness_score)
-        }
-    
-    def _rate_smoothness(self, score: float) -> str:
-        """Rate TRIX smoothness level."""
-        if score > 0.8:
-            return "very_smooth"
-        elif score > 0.6:
-            return "smooth"
-        elif score > 0.4:
-            return "moderately_smooth"
-        elif score > 0.2:
-            return "choppy"
-        else:
-            return "very_choppy"
-    
-    def _analyze_trix_trend_strength(self, trix: pd.Series) -> Dict[str, Any]:
-        """Analyze TRIX trend strength."""
-        current_trix = trix.iloc[-1]
-        
-        # Trend direction based on TRIX
-        if current_trix > 0:
-            trend_direction = "bullish"
-        elif current_trix < 0:
-            trend_direction = "bearish"
-        else:
-            trend_direction = "neutral"
-        
-        # Trend strength based on TRIX magnitude
-        trix_std = trix.std()
-        normalized_strength = abs(current_trix) / trix_std if trix_std > 0 else 0
-        trend_strength = min(1.0, normalized_strength)
-        
-        # Trend consistency
-        trend_consistency = self._calculate_trix_trend_consistency(trix)
-        
-        return {
-            "direction": trend_direction,
-            "strength": round(trend_strength, 3),
-            "consistency": round(trend_consistency, 3),
-            "quality": self._assess_trend_quality(trend_strength, trend_consistency)
-        }
-    
-    def _calculate_trix_trend_consistency(self, trix: pd.Series) -> float:
-        """Calculate TRIX trend consistency."""
-        if len(trix) < 5:
-            return 0.5
-        
-        # Look at recent TRIX values
-        recent_trix = trix.iloc[-5:]
-        current_direction = "positive" if trix.iloc[-1] > 0 else "negative"
-        
-        consistent_periods = sum(1 for val in recent_trix if
-                               (val > 0 and current_direction == "positive") or
-                               (val < 0 and current_direction == "negative"))
-        
-        return consistent_periods / len(recent_trix)
-    
-    def _assess_trend_quality(self, strength: float, consistency: float) -> str:
-        """Assess overall trend quality."""
-        if strength > 0.7 and consistency > 0.8:
-            return "excellent"
-        elif strength > 0.5 and consistency > 0.6:
-            return "good"
-        elif strength > 0.3 and consistency > 0.4:
-            return "fair"
-        else:
-            return "poor"
-    
-    def _detect_trix_price_divergence(self, trix: pd.Series, prices: pd.Series) -> Optional[Dict[str, Any]]:
+
+    def _detect_trix_price_divergence(self, trix: pd.Series, prices: pd.Series, div_win: int = 15) -> Optional[Dict[str, Any]]:
         """Detect TRIX-price divergence patterns."""
-        if len(trix) < 15 or len(prices) < 15:
+        # Align TRIX and price data
+        df = pd.concat({"trix": trix, "px": prices}, axis=1, join="inner").dropna()
+        if len(df) < max(15, div_win):
             return None
-        
-        recent_periods = 10
-        trix_recent = trix.iloc[-recent_periods:]
-        price_recent = prices.iloc[-recent_periods:]
-        
-        # Find peaks and troughs
-        trix_std = trix.std()
-        prominence = max(trix_std * 0.1, 0.000001)
-        
-        trix_peaks = self._find_peaks(trix_recent, prominence=prominence)
-        trix_troughs = self._find_troughs(trix_recent, prominence=prominence)
-        price_peaks = self._find_peaks(price_recent)
-        price_troughs = self._find_troughs(price_recent)
-        
+
+        # Use recent window for analysis
+        r = df.tail(min(div_win, len(df)))
+
+        # Scaled prominence for both series
+        prom_t = max(r["trix"].std() * 0.6, 1e-6)
+        prom_p = max(r["px"].std() * 0.6, 1e-6)
+
+        trix_peaks = self._find_peaks(r["trix"], prominence=prom_t)
+        trix_troughs = self._find_troughs(r["trix"], prominence=prom_t)
+        price_peaks = self._find_peaks(r["px"], prominence=prom_p)
+        price_troughs = self._find_troughs(r["px"], prominence=prom_p)
+
         # Bullish divergence: price lower lows, TRIX higher lows
         if len(trix_troughs) >= 2 and len(price_troughs) >= 2:
             latest_trix_trough = trix_troughs[-1]
             prev_trix_trough = trix_troughs[-2]
             latest_price_trough = price_troughs[-1]
             prev_price_trough = price_troughs[-2]
-            
+
             if (latest_price_trough["value"] < prev_price_trough["value"] and
                 latest_trix_trough["value"] > prev_trix_trough["value"]):
                 return {
                     "type": "bullish_divergence",
-                    "confidence": 0.8,  # Higher confidence for TRIX due to smoothing
-                    "description": "Price making lower lows while TRIX making higher lows - strong reversal signal"
+                    "description": "Price making lower lows while TRIX making higher lows",
+                    "trough_comparison": {
+                        "price_change": round(latest_price_trough["value"] - prev_price_trough["value"], 4),
+                        "trix_change": round(latest_trix_trough["value"] - prev_trix_trough["value"], 6)
+                    }
                 }
-        
+
         # Bearish divergence: price higher highs, TRIX lower highs
         if len(trix_peaks) >= 2 and len(price_peaks) >= 2:
             latest_trix_peak = trix_peaks[-1]
             prev_trix_peak = trix_peaks[-2]
             latest_price_peak = price_peaks[-1]
             prev_price_peak = price_peaks[-2]
-            
-            if (latest_price_peak["value"] > prev_price_peak["value"] and 
+
+            if (latest_price_peak["value"] > prev_price_peak["value"] and
                 latest_trix_peak["value"] < prev_trix_peak["value"]):
                 return {
                     "type": "bearish_divergence",
-                    "confidence": 0.8,  # Higher confidence for TRIX due to smoothing
-                    "description": "Price making higher highs while TRIX making lower highs - strong reversal signal"
+                    "description": "Price making higher highs while TRIX making lower highs",
+                    "peak_comparison": {
+                        "price_change": round(latest_price_peak["value"] - prev_price_peak["value"], 4),
+                        "trix_change": round(latest_trix_peak["value"] - prev_trix_peak["value"], 6)
+                    }
                 }
-        
+
         return None
-    
-    def _analyze_trix_histogram(self, trix: pd.Series, trix_signal: pd.Series) -> Dict[str, Any]:
-        """Analyze TRIX histogram (TRIX - Signal)."""
-        histogram = trix - trix_signal
-        current_histogram = histogram.iloc[-1]
-        
-        # Histogram direction
-        histogram_direction = "positive" if current_histogram > 0 else "negative"
-        
-        # Histogram momentum
-        hist_velocity = self._calculate_velocity(histogram, 3)
-        
-        # Zero line crossings
-        zero_crossings = 0
-        for i in range(1, len(histogram)):
-            if ((histogram.iloc[i] > 0 and histogram.iloc[i-1] <= 0) or 
-                (histogram.iloc[i] < 0 and histogram.iloc[i-1] >= 0)):
-                zero_crossings += 1
-        
-        return {
-            "current_value": round(current_histogram, 6),
-            "direction": histogram_direction,
-            "momentum": round(hist_velocity, 6),
-            "zero_crossings": zero_crossings,
-            "momentum_interpretation": self._interpret_histogram_momentum(hist_velocity)
-        }
-    
-    def _interpret_histogram_momentum(self, velocity: float) -> str:
-        """Interpret TRIX histogram momentum."""
-        if velocity > 0.00001:
-            return "expanding"
-        elif velocity < -0.00001:
-            return "contracting"
-        else:
-            return "stable"
-    
-    def _generate_trix_signals(self, current_trix: float, current_signal: Optional[float],
-                              momentum_analysis: Dict, zero_line_analysis: Dict,
-                              signal_line_analysis: Dict) -> List[Dict[str, Any]]:
-        """Generate TRIX trading signals."""
-        signals = []
-        
-        # Zero line signals
-        position = zero_line_analysis.get("position", "at_zero")
-        latest_crossing = zero_line_analysis.get("latest_crossing")
-        
-        if latest_crossing and latest_crossing["periods_ago"] <= 3:
-            crossing_type = latest_crossing["type"]
-            signal_type = "buy_signal" if "bullish" in crossing_type else "sell_signal"
-            
-            signals.append({
-                "type": signal_type,
-                "strength": "strong",
-                "reason": f"Recent TRIX {crossing_type.replace('_', ' ')} {latest_crossing['periods_ago']} periods ago",
-                "confidence": 0.8  # High confidence for TRIX due to smoothing
-            })
-        
-        # Signal line crossover signals
-        if signal_line_analysis and current_signal is not None:
-            latest_crossover = signal_line_analysis.get("latest_crossover")
-            if latest_crossover and latest_crossover["periods_ago"] <= 2:
-                crossover_type = latest_crossover["type"]
-                signal_type = "buy_signal" if "bullish" in crossover_type else "sell_signal"
-                
-                signals.append({
-                    "type": signal_type,
-                    "strength": "medium",
-                    "reason": f"TRIX {crossover_type.replace('_', ' ')} signal line",
-                    "confidence": 0.7
-                })
-        
-        # Momentum-based signals
-        momentum_direction = momentum_analysis.get("direction", "neutral")
-        strength_level = momentum_analysis.get("strength_level", "weak")
-        persistence = momentum_analysis.get("persistence", 0.5)
-        
-        if momentum_direction != "neutral" and strength_level in ["strong", "very_strong"] and persistence > 0.7:
-            signal_type = "momentum_buy" if momentum_direction == "bullish" else "momentum_sell"
-            
-            signals.append({
-                "type": signal_type,
-                "strength": "medium",
-                "reason": f"Strong {momentum_direction} TRIX momentum with high persistence",
-                "confidence": 0.6
-            })
-        
-        return signals
-    
-    def _calculate_trix_confidence(self, trix: pd.Series, momentum_analysis: Dict, 
-                                  smoothness_analysis: Dict) -> float:
-        """Calculate TRIX analysis confidence."""
-        confidence_factors = []
-        
-        # Data quantity factor
-        data_factor = min(1.0, len(trix) / 25)  # TRIX needs less data due to smoothing
-        confidence_factors.append(data_factor)
-        
-        # Momentum persistence factor
-        persistence = momentum_analysis.get("persistence", 0.5)
-        confidence_factors.append(persistence)
-        
-        # Smoothness factor (smoother = more reliable for TRIX)
-        if smoothness_analysis:
-            smoothness_score = smoothness_analysis.get("smoothness_score", 0.5)
-            confidence_factors.append(smoothness_score)
-        else:
-            confidence_factors.append(0.7)  # TRIX is inherently smooth
-        
-        # Signal clarity factor
-        current_trix = abs(trix.iloc[-1])
-        trix_std = trix.std()
-        if current_trix > trix_std:
-            clarity_factor = 0.8  # Clear signal
-        else:
-            clarity_factor = 0.6  # Weaker signal
-        confidence_factors.append(clarity_factor)
-        
-        return round(np.mean(confidence_factors), 3)
-    
+
+    def _detect_trix_patterns(self, trix: pd.Series, sig: Optional[pd.Series], length: int = 14) -> Dict[str, Any]:
+        """Detect TRIX patterns and formations."""
+        patterns = {}
+
+        # Zero-line momentum patterns
+        if len(trix) >= 10:
+            vel_win = max(2, length // 5)
+            velocity = self._calculate_velocity(trix, vel_win)
+            current = float(trix.iloc[-1])
+
+            # Strong momentum around zero line
+            if abs(velocity) > trix.std() * 0.5:
+                patterns["momentum"] = {
+                    "type": f"strong_{'rising' if velocity > 0 else 'falling'}_momentum",
+                    "velocity": round(velocity, 6),
+                    "near_zero": abs(current) < trix.std() * 0.1,
+                    "description": f"Strong {'rising' if velocity > 0 else 'falling'} TRIX momentum"
+                }
+
+        # Signal line convergence/divergence patterns
+        if sig is not None and len(trix) >= length:
+            histogram = trix - sig
+            hist_velocity = self._calculate_velocity(histogram, max(2, length // 5))
+
+            if abs(hist_velocity) > histogram.std() * 0.3:
+                patterns["histogram_momentum"] = {
+                    "type": f"histogram_{'expanding' if hist_velocity > 0 else 'contracting'}",
+                    "velocity": round(hist_velocity, 6),
+                    "description": f"TRIX histogram {'expanding' if hist_velocity > 0 else 'contracting'}"
+                }
+
+        return patterns
+
     def _generate_trix_summary(self, current_trix: float, current_signal: Optional[float],
                               momentum_analysis: Dict, zero_line_analysis: Dict) -> str:
         """Generate human-readable TRIX summary."""
         momentum_direction = momentum_analysis.get("direction", "neutral")
         strength_level = momentum_analysis.get("strength_level", "weak")
         position = zero_line_analysis.get("position", "at_zero")
-        
+
         summary = f"TRIX {current_trix:.6f} - {strength_level} {momentum_direction} momentum"
-        
+
         if current_signal is not None:
             histogram = current_trix - current_signal
             summary += f", histogram {histogram:+.6f}"
-        
+
         summary += f" ({position.replace('_', ' ')})"
-        
+
         return summary

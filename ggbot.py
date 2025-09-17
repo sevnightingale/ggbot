@@ -907,7 +907,15 @@ class GGBotOrchestrator:
             
             # Get trading config from config
             trading_config = config.trading or {}
-            symbol = decision_result.get("symbol") or config.selected_pair or "BTC/USDT"
+            symbol = decision_result.get("symbol") or config.selected_pair
+
+            if not symbol:
+                self._log.error("No symbol available for trading - decision result and config both missing symbol")
+                return {
+                    "status": "error",
+                    "error": "No symbol specified for trading",
+                    "action": action
+                }
             
             # Map decision actions to trading actions
             if action in ["enter", "long"]:
