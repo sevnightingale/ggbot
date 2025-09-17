@@ -4,7 +4,6 @@ import Demo from '@/components/new-landing/Demo'
 import Process from '@/components/new-landing/Process'
 import PersonalStory from '@/components/new-landing/PersonalStory'
 import Features from '@/components/new-landing/Features'
-import Video from '@/components/new-landing/Video'
 import FAQ from '@/components/new-landing/FAQ'
 import Pricing from '@/components/new-landing/Pricing'
 
@@ -17,7 +16,6 @@ export default function NewLandingPage() {
       <Process />
       <PersonalStory />
       <Features />
-      <Video />
       <FAQ />
       <Pricing />
     </main>

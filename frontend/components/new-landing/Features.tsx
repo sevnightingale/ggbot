@@ -80,23 +80,9 @@ export default function Features() {
                 <h3 className="text-xl font-bold text-bone-200 mb-4 font-display">
                   {feature.title}
                 </h3>
-                <p className="text-bone-200/70 mb-6 leading-relaxed">
+                <p className="text-bone-200/70 leading-relaxed">
                   {feature.description}
                 </p>
-
-                {/* Video walkthrough placeholder */}
-                <div className="bg-charcoal-900 border border-bone-200/20 rounded-sm aspect-video flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-3 bg-bone-200/10 rounded-full flex items-center justify-center">
-                      <svg className="w-6 h-6 text-bone-200/60" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M8 5v14l11-7z"/>
-                      </svg>
-                    </div>
-                    <p className="text-sm text-bone-200/60">
-                      Video walkthrough of {feature.title.toLowerCase()}
-                    </p>
-                  </div>
-                </div>
 
                 {/* Decorative corner bracket */}
                 <div className="absolute top-0 left-0 w-6 h-6">
