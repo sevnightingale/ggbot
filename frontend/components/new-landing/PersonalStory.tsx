@@ -24,12 +24,13 @@ export default function PersonalStory() {
 
               {/* Profile photo on right */}
               <div className="flex-shrink-0 flex flex-col items-center">
-                <div className="w-24 h-24 bg-bone-200/10 rounded-full border-2 border-bone-200/20 flex items-center justify-center">
-                  <div className="w-16 h-16 bg-bone-200/20 rounded-full"></div>
+                <div className="w-24 h-24 rounded-full border-2 border-bone-200/20 overflow-hidden">
+                  <img
+                    src="/pfp.jpg"
+                    alt="Sev - Founder of ggbots"
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <p className="text-xs text-bone-200/50 text-center mt-2">
-                  [Sev&apos;s photo placeholder]
-                </p>
                 <a
                   href="#"
                   className="text-bone-200/60 hover:text-bone-200 transition-colors mt-2"

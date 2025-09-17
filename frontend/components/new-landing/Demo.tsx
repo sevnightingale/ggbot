@@ -23,8 +23,6 @@ export default function Demo() {
                 title="Set Up and Configure Automated Trading Bots"
                 frameBorder="0"
                 loading="lazy"
-                webkitallowfullscreen="true"
-                mozallowfullscreen="true"
                 allowFullScreen={true}
                 allow="clipboard-write"
                 style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', colorScheme: 'light'}}
