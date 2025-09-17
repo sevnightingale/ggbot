@@ -19,7 +19,10 @@ export function Header({}: HeaderProps) {
             alt="ggbots logo"
             width={20}
             height={20}
-            className="h-5 w-auto [filter:brightness(0)_saturate(100%)_invert(12%)_sepia(12%)_saturate(584%)_hue-rotate(200deg)_brightness(95%)_contrast(89%)] dark:[filter:brightness(0)_saturate(100%)_invert(89%)_sepia(13%)_saturate(282%)_hue-rotate(165deg)_brightness(106%)_contrast(90%)]"
+            className="h-5 w-auto text-[var(--text-primary)]"
+            style={{
+              filter: 'brightness(0) saturate(100%) invert(var(--logo-invert, 12%)) sepia(12%) saturate(584%) hue-rotate(200deg) brightness(95%) contrast(89%)'
+            }}
           />
         </div>
         <div className="flex items-center gap-3">

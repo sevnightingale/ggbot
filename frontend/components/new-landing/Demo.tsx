@@ -13,19 +13,22 @@ export default function Demo() {
           </p>
         </div>
 
-        {/* Demo Container - Ready for Arcade Embed */}
+        {/* Demo Container - Arcade Embed */}
         <div className="relative">
-          {/* Placeholder for Arcade Demo */}
-          <div className="bg-charcoal-900 border-2 border-bone-200/20 rounded-sm aspect-video flex items-center justify-center">
-            <div className="text-center">
-              <div className="w-24 h-24 mx-auto mb-6 bg-bone-200/10 rounded-full flex items-center justify-center">
-                <div className="w-8 h-8 bg-agents-extraction rounded-full animate-pulse"></div>
-              </div>
-              <h3 className="text-xl font-medium text-bone-200 mb-2">Interactive Demo Space</h3>
-              <p className="text-bone-200/60">
-                Arcade demo will be embedded here showing:<br/>
-                Bot creation → Configuration → Dashboard → Live trades
-              </p>
+          {/* Arcade Demo Embed */}
+          <div className="bg-charcoal-900 border-2 border-bone-200/20 rounded-sm overflow-hidden">
+            <div style={{position: 'relative', paddingBottom: 'calc(51.71875% + 41px)', height: 0, width: '100%'}}>
+              <iframe
+                src="https://demo.arcade.software/q0l4MM1QqmUJLDwDTJin?embed&embed_mobile=tab&embed_desktop=inline&show_copy_link=true"
+                title="Set Up and Configure Automated Trading Bots"
+                frameBorder="0"
+                loading="lazy"
+                webkitallowfullscreen="true"
+                mozallowfullscreen="true"
+                allowFullScreen={true}
+                allow="clipboard-write"
+                style={{position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', colorScheme: 'light'}}
+              />
             </div>
           </div>
 
