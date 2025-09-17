@@ -60,7 +60,7 @@ class BasePreprocessor:
         # Drop NaN values first
         clean_values = values.dropna()
         if len(clean_values) < max(periods):
-            return {"direction": "unknown", "strength": 0, "confidence": 0}
+            return {"direction": "unknown", "strength": 0, "reliability": 0}
         
         trends = {}
         data_std = clean_values.std()
@@ -83,18 +83,18 @@ class BasePreprocessor:
             direction = "rising" if weighted_trend > 0.1 else "falling" if weighted_trend < -0.1 else "sideways"
             strength = min(abs(weighted_trend), 1.0)
             
-            # Confidence based on trend consistency
+            # Reliability based on trend consistency
             trend_consistency = 1 - np.std(list(trends.values())) / (np.mean(np.abs(list(trends.values()))) + 0.001)
-            confidence = max(0, min(1, trend_consistency))
-            
+            reliability = max(0, min(1, trend_consistency))
+
             return {
                 "direction": direction,
                 "strength": strength,
-                "confidence": confidence,
+                "reliability": reliability,
                 "trends_by_period": trends
             }
-        
-        return {"direction": "unknown", "strength": 0, "confidence": 0}
+
+        return {"direction": "unknown", "strength": 0, "reliability": 0}
     
     # ==================================================================================
     # PATTERN DETECTION UTILITIES

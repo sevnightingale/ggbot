@@ -1,6 +1,6 @@
 'use client'
 
-import { Twitter } from 'lucide-react'
+import { X } from 'lucide-react'
 
 export default function PersonalStory() {
   return (
@@ -32,11 +32,13 @@ export default function PersonalStory() {
                   />
                 </div>
                 <a
-                  href="#"
+                  href="https://x.com/SevNightingale"
                   className="text-bone-200/60 hover:text-bone-200 transition-colors mt-2"
-                  title="Follow Sev on Twitter"
+                  title="Follow Sev on X"
+                  target="_blank"
+                  rel="noopener noreferrer"
                 >
-                  <Twitter size={18} />
+                  <X size={18} />
                 </a>
               </div>
             </div>

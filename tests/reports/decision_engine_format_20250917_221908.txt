@@ -1,0 +1,703 @@
+DECISION ENGINE LLM PROMPT FORMAT
+================================================================================
+
+This is exactly how market data appears in GPT-5 prompts for trading decisions.
+
+MARKET ANALYSIS FOR BTC/USDT
+Current Price: $116,264.00
+Timeframes Available: 5m, 15m, 30m, 1h, 4h, 1d
+
+=== 5M TIMEFRAME ===
+  rsi:
+    Current: {'value': 65.0, 'timestamp': '2025-09-17T22:19:07.421624+00:00'}
+    Summary: RSI at 65.0, rising (recent high: 65.0 0p ago)
+    Trend: direction: rising, strength: 0.139, velocity: 0.301, acceleration: -1.205
+    Ma5: 62.98
+    Ma10: 60.05
+    Volatility: 8.275
+    Overbought: {'level': 70, 'status': 'below', 'periods_in_zone': 0, 'time_percentage': 0.0}
+    Oversold: {'level': 30, 'status': 'far_above', 'periods_in_zone': 0, 'time_percentage': 0.0}
+    Neutral: {'level': 50, 'status': 'above', 'distance': 15.0}
+    Quality: data_quality: {'total_periods': 86, 'valid_data_percentage': 86.0, 'recent_volatility': 4.21}, calculation_notes: RSI analysis based on 86 valid data points
+
+  macd:
+    Current: {'macd': 136.6751, 'signal': 89.6501, 'histogram': 47.025, 'timestamp': '2025-09-17T22:19:07.430592+00:00'}
+    Summary: MACD rising trend with increasing momentum
+    Zero Line: {'current_position': 'above', 'distance_from_zero': 136.6751, 'time_above_zero_pct': 58.2, 'time_below_zero_pct': 41.8}
+    Histogram: {'momentum_direction': 'increasing', 'acceleration': 0.0177, 'zero_crossings_recent': 0, 'histogram_strength': 47.024979331249256}
+    Patterns: crossovers
+    Quality: data_quality: {'original_periods': {'macd': 100, 'signal': 100, 'histogram': 100, 'prices': 100}, 'aligned_periods': 67, 'valid_data_percentage': 67.0}, calculation_notes: MACD analysis based on 67 aligned data points
+    Legacy Trend: bullish
+
+  sma:
+    Current: {'sma_value': 115851.605, 'price': 116264.0, 'price_distance': 412.395, 'price_distance_pct': 0.356, 'timestamp': '2025-09-17T22:19:07.435006+00:00'}
+    Summary: SMA 115851.6050 - sideways trend (strong), price above (+0.4%)
+    Trend: short_term: sideways, medium_term: sideways, long_term: sideways, consensus: sideways, strength: 1.0, consistency: 0.889, slope: 16.749
+    Slope: short_term_slope: 20.605, medium_term_slope: 16.749, long_term_slope: 10.4855, acceleration: 23.6925, direction: upward, alignment: aligned
+    Quality: smoothness: 0.999, responsiveness: 0.011, trend_clarity: 0.675, overall_quality: 0.837
+    Length: 20
+    Smoothing_Factor: 0.0952
+    Price Relationship: {'position': 'above', 'distance': 412.395, 'distance_pct': 0.356, 'above_sma_pct': 60.5, 'below_sma_pct': 39.5, 'position_changes': 14, 'position_stability': 0.825}
+    Support Resistance: {'total_touches': 78, 'successful_bounces': 42, 'success_rate': 0.538, 'recent_touches': [{'index': 76, 'periods_ago': 4, 'price': 116037.3, 'sma_value': 115772.725}, {'index': 77, 'periods_ago': 3, 'price': 116189.3, 'sma_value': 115789.79000000001}, {'index': 78, 'periods_ago': 2, 'price': 116128.6, 'sma_value': 115805.80500000001}, {'index': 79, 'periods_ago': 1, 'price': 116253.7, 'sma_value': 115823.63}, {'index': 80, 'periods_ago': 0, 'price': 116264.0, 'sma_value': 115851.60500000001}], 'recent_bounces': [{'type': 'support_bounce', 'index': 72, 'periods_ago': 8, 'strength': 0.0007966648828738879}, {'type': 'resistance_bounce', 'index': 74, 'periods_ago': 6, 'strength': 0.0005669183336047555}, {'type': 'resistance_bounce', 'index': 77, 'periods_ago': 3, 'strength': 0.0005224233212524483}], 'effectiveness': 'medium'}
+    Current Level: 115851.605
+    Trend Direction: sideways
+    Patterns: crossovers, trend_alignment, slope_direction
+    Quality: data_quality: {'original_periods': 81, 'aligned_periods': 81, 'valid_data_percentage': 100.0, 'had_prices': True, 'calculation_periods': 20}, calculation_notes: SMA analysis based on 81 periods with length=20
+
+  ema:
+    Current: {'ema_value': 115949.0056, 'price': 116264.0, 'price_distance': 314.9944, 'price_distance_pct': 0.272, 'timestamp': '2025-09-17T22:19:07.440924+00:00'}
+    Summary: EMA 115949.0056 - rising trend (strength: 1.00), low responsiveness, price +0.3%
+    Length: 20
+    Responsiveness: avg_change: 17.538895, max_change: 73.503968, relative_volatility: 0.000808, direction_changes: 18, change_frequency: 0.225, responsiveness_score: 0.117, responsiveness_rating: low
+    Signal_Quality: signal_quality: low_frequency_high_reliability, noise_level: low, recommended_use: Reliable for position trading, slower signals
+    Trend: {'short_term': 'sideways', 'medium_term': 'rising', 'long_term': 'rising', 'consensus': 'rising', 'strength': 1.0, 'consistency': 1.0, 'slope': 31.619691, 'acceleration': 8.246115}
+    Price Relationship: {'position': 'above', 'distance': 314.9944, 'distance_pct': 0.272, 'above_ema_pct': 61.7, 'below_ema_pct': 38.3, 'avg_distance': 21.8165, 'avg_distance_pct': 0.019}
+    Support Resistance: {'total_touches': 73, 'successful_bounces': 38, 'success_rate': 0.521, 'recent_touches': [{'index': 76, 'periods_ago': 4, 'price': 116037.3, 'ema_value': 115818.86719987642}, {'index': 77, 'periods_ago': 3, 'price': 116189.3, 'ema_value': 115854.1465141739}, {'index': 78, 'periods_ago': 2, 'price': 116128.6, 'ema_value': 115880.28494139544}, {'index': 79, 'periods_ago': 1, 'price': 116253.7, 'ema_value': 115915.84828031017}, {'index': 80, 'periods_ago': 0, 'price': 116264.0, 'ema_value': 115949.0055869473}], 'recent_bounces': [{'type': 'resistance_bounce', 'index': 70, 'periods_ago': 10, 'strength': 0.00042140495375342206}, {'type': 'resistance_bounce', 'index': 74, 'periods_ago': 6, 'strength': 0.0005669183336047555}, {'type': 'resistance_bounce', 'index': 77, 'periods_ago': 3, 'strength': 0.0005224233212524483}], 'effectiveness': 'high'}
+    Patterns: crossovers
+    Quality: data_quality: {'original_ema_periods': 100, 'aligned_periods': 81, 'valid_data_percentage': 81.0, 'had_prices': True, 'had_sma': False, 'has_price_data': True, 'has_sma_comparison': False}, calculation_notes: EMA analysis based on 81 aligned data points with period 20
+
+  bbands:
+    Current: {'lower': 115353.0018, 'middle': 115851.605, 'upper': 116350.2082, 'bandwidth': 0.8608, 'percent_b': 0.9136}
+
+  adx:
+    Current: {'adx': 20.53, 'plus_di': 37.22, 'minus_di': 14.86, 'timestamp': '2025-09-17T22:19:07.451829+00:00'}
+    Summary: ADX 20.5 - Developing trend with bullish bias (22.4), trend strengthening
+    Trend_Strength: developing
+    Strength_Value: 20.53
+    Description: Developing trend
+    Trend_Evolution: strengthening
+    Directional_Bias: bullish
+    Directional_Strength: 22.36
+    Current Strength: developing
+    Weak Threshold: 20
+    Strong Threshold: 25
+    Very Strong Threshold: 40
+    Extreme Threshold: 60
+    Patterns: di_patterns
+
+  aroon:
+    Current: {'aroon_up': 100.0, 'aroon_down': 0.0, 'oscillator': 100.0, 'timestamp': '2025-09-17T22:19:07.466609+00:00'}
+    Summary: Aroon Up: 100.0, Down: 0.0 - strong_uptrend for 9 periods (strong bullish)
+    Trend: current_trend: strong_uptrend, trend_strength: 1.0, trend_consistency: 0.9, trend_duration: 9, separation: 100.0, trend_quality: excellent
+    Strength: aroon_up_strength: very_strong, aroon_down_strength: very_weak, combined_strength: very_strong, up_momentum: 0.0, down_momentum: -7.14, up_evolution: rising, down_evolution: falling, dominant_indicator: aroon_up
+    Parallel_Movement: correlation: -0.326, movement_type: moderate_negative_correlation, interpretation: Some opposition in indicator movement
+    Oscillator: {'current_value': 100.0, 'zone': 'strong_bullish', 'velocity': 7.14, 'acceleration': 3.57, 'zero_crossings': 7, 'time_above_zero_pct': 46.5, 'time_below_zero_pct': 51.2, 'oscillator_interpretation': 'strong_bullish_momentum'}
+    Crossovers: {'recent_crossovers': [{'type': 'bullish_crossover', 'periods_ago': 9, 'up_value': 85.71, 'down_value': 57.14, 'strength': 28.571428571428584, 'location': 'high_levels'}], 'latest_crossover': {'type': 'bullish_crossover', 'periods_ago': 9, 'up_value': 85.71, 'down_value': 57.14, 'strength': 28.571428571428584, 'location': 'high_levels'}, 'crossover_frequency': 'low'}
+    Patterns: extreme_readings
+    Quality: clarity: 1.00, consistency: 0.90, data_quality: 0.43
+
+  atr:
+    Current: {'value': 157.721151, 'timestamp': '2025-09-17T22:19:07.476031+00:00'}
+    Summary: ATR 157.721151 - below average volatility (41th percentile)
+    Trend: direction: falling, velocity: -1.149572, acceleration: 5.309759, strength: 0.012, consistency: 0.5, interpretation: volatility_stable
+    Relative: comparisons: {'5p_avg': -0.12, '10p_avg': -4.14, '20p_avg': -14.52, '50p_avg': -39.78}, regime: suppressed_volatility, regime_ratio: 0.602
+    Breakout: squeeze_detected: False, squeeze_periods: 0, expansion_potential: 0.0, recent_volatility_change_pct: -1.83, breakout_setup: False
+    Volatility: {'current_level': 'below_average', 'percentile_rank': 40.7, 'relative_to_mean': -21.75, 'relative_to_price_pct': 0.136, 'statistical': {'mean': 201.556835, 'std': 92.755337, 'max': 371.942974, 'min': 97.220474}}
+    Cycles: {'cycle_detected': False}
+    Stop Loss: {'current_price': 116264.0, 'stop_levels': {'1.0x_atr': {'long_stop': 116106.278849, 'short_stop': 116421.721151, 'distance': 157.721151, 'distance_pct': 0.136}, '1.5x_atr': {'long_stop': 116027.418273, 'short_stop': 116500.581727, 'distance': 236.581727, 'distance_pct': 0.203}, '2.0x_atr': {'long_stop': 115948.557697, 'short_stop': 116579.442303, 'distance': 315.442303, 'distance_pct': 0.271}, '2.5x_atr': {'long_stop': 115869.697122, 'short_stop': 116658.302878, 'distance': 394.302878, 'distance_pct': 0.339}, '3.0x_atr': {'long_stop': 115790.836546, 'short_stop': 116737.163454, 'distance': 473.163454, 'distance_pct': 0.407}}, 'recommended_multiplier': 2.0, 'recommended_stop': {'long_stop': 115948.557697, 'short_stop': 116579.442303, 'distance': 315.442303, 'distance_pct': 0.271}}
+    Quality: clarity: 0.47, consistency: 0.01, data_quality: 0.43
+
+  stochastic:
+    Current: {'k_percent': 93.07, 'd_percent': 94.14, 'spread': -1.07, 'timestamp': '2025-09-17T22:19:07.485111+00:00'}
+    Summary: Stochastic %K: 93.1, %D: 94.1 (overbought for 9 periods). Bearish Crossover 1p ago
+    Trend: k_direction: falling, momentum: sideways_momentum, velocity: -0.07, acceleration: 2.81
+    Spread_Momentum: -3.68
+    Volatility: 27.335
+    Overbought: {'level': 80, 'status': 'in_zone', 'streak_length': 9, 'time_percentage': 22.9, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': 20, 'status': 'above', 'streak_length': 0, 'time_percentage': 15.7, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': 50, 'bias': 'bullish', 'distance_from_50': 43.07}
+    Quality: data_quality: {'aligned_periods': 83, 'period_used': 14, 'had_prices': True, 'valid_data_percentage': 95.4}, calculation_notes: Stochastic analysis based on 83 aligned K/D periods
+
+  williams_r:
+    Current: {'value': -10.99, 'timestamp': '2025-09-17T22:19:07.489843+00:00'}
+    Summary: Williams %R at -11.0 (overbought for 9 periods)
+    Trend: direction: sideways, strength: 0.031, velocity: -1.181, acceleration: 2.876
+    Momentum: interpretation: downward_momentum, recent_range: 25.01, volatility: 30.67
+    Volatility: 30.665
+    Overbought: {'level': -20, 'status': 'in_zone', 'streak_length': 9, 'time_percentage': 25.3, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': -80, 'status': 'above', 'streak_length': 0, 'time_percentage': 18.4, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': -50, 'bias': 'bullish', 'distance_from_50': 39.01}
+    Patterns: failure_swing
+    Quality: data_quality: {'aligned_periods': 87, 'had_prices': True, 'period_used': 14, 'windows_used': {'velocity': 2, 'acceleration': 4, 'position_rank': 14, 'divergence': 14}}, calculation_notes: Williams %R analysis based on 87 periods with length=14
+
+  vwap:
+
+=== 15M TIMEFRAME ===
+  rsi:
+    Current: {'value': 58.92, 'timestamp': '2025-09-17T22:19:07.530388+00:00'}
+    Summary: RSI at 58.9, rising (recent high: 58.9 0p ago)
+    Trend: direction: rising, strength: 0.144, velocity: 1.815, acceleration: 3.471
+    Ma5: 55.4
+    Ma10: 52.85
+    Volatility: 11.014
+    Overbought: {'level': 70, 'status': 'far_below', 'periods_in_zone': 0, 'time_percentage': 0.0}
+    Oversold: {'level': 30, 'status': 'far_above', 'periods_in_zone': 0, 'time_percentage': 5.8}
+    Neutral: {'level': 50, 'status': 'above', 'distance': 8.92}
+    Quality: data_quality: {'total_periods': 86, 'valid_data_percentage': 86.0, 'recent_volatility': 3.967}, calculation_notes: RSI analysis based on 86 valid data points
+
+  macd:
+    Current: {'macd': 68.9587, 'signal': -18.4168, 'histogram': 87.3755, 'timestamp': '2025-09-17T22:19:07.538519+00:00'}
+    Summary: MACD rising trend with increasing momentum
+    Zero Line: {'current_position': 'above', 'distance_from_zero': 68.9587, 'time_above_zero_pct': 26.9, 'time_below_zero_pct': 73.1}
+    Histogram: {'momentum_direction': 'increasing', 'acceleration': 7.0403, 'zero_crossings_recent': 0, 'histogram_strength': 87.37550781164882}
+    Patterns: crossovers
+    Quality: data_quality: {'original_periods': {'macd': 100, 'signal': 100, 'histogram': 100, 'prices': 100}, 'aligned_periods': 67, 'valid_data_percentage': 67.0}, calculation_notes: MACD analysis based on 67 aligned data points
+    Legacy Trend: bullish
+
+  sma:
+    Current: {'sma_value': 115750.655, 'price': 116264.0, 'price_distance': 513.345, 'price_distance_pct': 0.443, 'timestamp': '2025-09-17T22:19:07.543474+00:00'}
+    Summary: SMA 115750.6550 - sideways trend, price above (+0.4%)
+    Trend: short_term: sideways, medium_term: sideways, long_term: sideways, consensus: sideways, strength: 0.466, consistency: 0.778, slope: 21.465
+    Slope: short_term_slope: 25.925, medium_term_slope: 21.465, long_term_slope: 12.003, acceleration: 30.6225, direction: upward, alignment: aligned
+    Quality: smoothness: 0.996, responsiveness: 0.022, trend_clarity: 0.912, overall_quality: 0.954
+    Length: 20
+    Smoothing_Factor: 0.0952
+    Price Relationship: {'position': 'above', 'distance': 513.345, 'distance_pct': 0.443, 'above_sma_pct': 35.8, 'below_sma_pct': 64.2, 'position_changes': 12, 'position_stability': 0.85}
+    Support Resistance: {'total_touches': 77, 'successful_bounces': 39, 'success_rate': 0.506, 'recent_touches': [{'index': 76, 'periods_ago': 4, 'price': 115803.1, 'sma_value': 115649.525}, {'index': 77, 'periods_ago': 3, 'price': 115950.3, 'sma_value': 115672.87999999998}, {'index': 78, 'periods_ago': 2, 'price': 116037.3, 'sma_value': 115692.7}, {'index': 79, 'periods_ago': 1, 'price': 116253.7, 'sma_value': 115721.48999999999}, {'index': 80, 'periods_ago': 0, 'price': 116264.0, 'sma_value': 115750.65499999998}], 'recent_bounces': [{'type': 'resistance_bounce', 'index': 72, 'periods_ago': 8, 'strength': 0.0009343026363395118}, {'type': 'resistance_bounce', 'index': 73, 'periods_ago': 7, 'strength': 0.0006923070939437893}, {'type': 'support_bounce', 'index': 75, 'periods_ago': 5, 'strength': 0.00030664883784409453}], 'effectiveness': 'medium'}
+    Current Level: 115750.655
+    Trend Direction: sideways
+    Patterns: crossovers, trend_alignment, slope_direction
+    Quality: data_quality: {'original_periods': 81, 'aligned_periods': 81, 'valid_data_percentage': 100.0, 'had_prices': True, 'calculation_periods': 20}, calculation_notes: SMA analysis based on 81 periods with length=20
+
+  ema:
+    Current: {'ema_value': 115860.4037, 'price': 116264.0, 'price_distance': 403.5963, 'price_distance_pct': 0.348, 'timestamp': '2025-09-17T22:19:07.549854+00:00'}
+    Summary: EMA 115860.4037 - rising trend (strength: 0.59), very_low responsiveness, price +0.3%
+    Length: 20
+    Responsiveness: avg_change: 26.819641, max_change: 85.914256, relative_volatility: 0.003769, direction_changes: 12, change_frequency: 0.15, responsiveness_score: 0.094, responsiveness_rating: very_low
+    Signal_Quality: signal_quality: low_frequency_high_reliability, noise_level: low, recommended_use: Reliable for position trading, slower signals
+    Trend: {'short_term': 'sideways', 'medium_term': 'rising', 'long_term': 'rising', 'consensus': 'rising', 'strength': 0.589, 'consistency': 0.857, 'slope': 38.758883, 'acceleration': 45.999589}
+    Price Relationship: {'position': 'above', 'distance': 403.5963, 'distance_pct': 0.348, 'above_ema_pct': 33.3, 'below_ema_pct': 66.7, 'avg_distance': -101.4585, 'avg_distance_pct': -0.087}
+    Support Resistance: {'total_touches': 62, 'successful_bounces': 28, 'success_rate': 0.452, 'recent_touches': [{'index': 74, 'periods_ago': 6, 'price': 115620.0, 'ema_value': 115708.28326147597}, {'index': 75, 'periods_ago': 5, 'price': 115767.6, 'ema_value': 115713.93247466872}, {'index': 76, 'periods_ago': 4, 'price': 115803.1, 'ema_value': 115722.42461993836}, {'index': 77, 'periods_ago': 3, 'price': 115950.3, 'ema_value': 115744.12703708709}, {'index': 78, 'periods_ago': 2, 'price': 116037.3, 'ema_value': 115772.04827165023}], 'recent_bounces': [{'type': 'resistance_bounce', 'index': 73, 'periods_ago': 7, 'strength': 0.0006923070939437893}, {'type': 'support_bounce', 'index': 74, 'periods_ago': 6, 'strength': 0.0012765957446809013}, {'type': 'support_bounce', 'index': 75, 'periods_ago': 5, 'strength': 0.00030664883784409453}], 'effectiveness': 'medium'}
+    Patterns: crossovers
+    Quality: data_quality: {'original_ema_periods': 100, 'aligned_periods': 81, 'valid_data_percentage': 81.0, 'had_prices': True, 'had_sma': False, 'has_price_data': True, 'has_sma_comparison': False}, calculation_notes: EMA analysis based on 81 aligned data points with period 20
+
+  bbands:
+    Current: {'lower': 115111.1735, 'middle': 115750.655, 'upper': 116390.1365, 'bandwidth': 1.1049, 'percent_b': 0.9014}
+
+  adx:
+    Current: {'adx': 19.37, 'plus_di': 24.03, 'minus_di': 14.58, 'timestamp': '2025-09-17T22:19:07.567182+00:00'}
+    Summary: ADX 19.4 - Weak or no trend with bullish bias (9.4)
+    Trend_Strength: weak
+    Strength_Value: 19.37
+    Description: Weak or no trend
+    Trend_Evolution: stable
+    Directional_Bias: bullish
+    Directional_Strength: 9.44
+    Current Strength: weak
+    Weak Threshold: 20
+    Strong Threshold: 25
+    Very Strong Threshold: 40
+    Extreme Threshold: 60
+    Patterns: di_patterns
+
+  aroon:
+    Current: {'aroon_up': 100.0, 'aroon_down': 0.0, 'oscillator': 100.0, 'timestamp': '2025-09-17T22:19:07.576067+00:00'}
+    Summary: Aroon Up: 100.0, Down: 0.0 - strong_uptrend for 3 periods (strong bullish)
+    Trend: current_trend: strong_uptrend, trend_strength: 1.0, trend_consistency: 0.3, trend_duration: 3, separation: 100.0, trend_quality: poor
+    Strength: aroon_up_strength: very_strong, aroon_down_strength: very_weak, combined_strength: very_strong, up_momentum: 33.33, down_momentum: -7.14, up_evolution: rising, down_evolution: falling, dominant_indicator: aroon_up
+    Parallel_Movement: correlation: -0.274, movement_type: independent_movement, interpretation: Indicators moving independently
+    Oscillator: {'current_value': 100.0, 'zone': 'strong_bullish', 'velocity': 40.48, 'acceleration': 32.14, 'zero_crossings': 7, 'time_above_zero_pct': 27.9, 'time_below_zero_pct': 72.1, 'oscillator_interpretation': 'strong_bullish_momentum'}
+    Crossovers: {'recent_crossovers': [{'type': 'bullish_crossover', 'periods_ago': 3, 'up_value': 50.0, 'down_value': 14.29, 'strength': 35.71428571428571, 'location': 'mid_levels'}], 'latest_crossover': {'type': 'bullish_crossover', 'periods_ago': 3, 'up_value': 50.0, 'down_value': 14.29, 'strength': 35.71428571428571, 'location': 'mid_levels'}, 'crossover_frequency': 'low'}
+    Patterns: extreme_readings
+    Quality: clarity: 1.00, consistency: 0.30, data_quality: 0.43
+
+  atr:
+    Current: {'value': 345.436499, 'timestamp': '2025-09-17T22:19:07.590729+00:00'}
+    Summary: ATR 345.436499 - high volatility (80th percentile)
+    Trend: direction: falling, velocity: -10.969165, acceleration: 2.289522, strength: 0.109, consistency: 1.0, interpretation: volatility_stable
+    Relative: comparisons: {'5p_avg': -6.08, '10p_avg': -12.19, '20p_avg': -10.87, '50p_avg': 33.09}, regime: elevated_volatility, regime_ratio: 1.331
+    Breakout: squeeze_detected: False, squeeze_periods: 0, expansion_potential: 0.0, recent_volatility_change_pct: -11.96, breakout_setup: False
+    Volatility: {'current_level': 'high', 'percentile_rank': 80.2, 'relative_to_mean': 58.04, 'relative_to_price_pct': 0.297, 'statistical': {'mean': 218.576404, 'std': 100.892072, 'max': 464.402842, 'min': 126.353351}}
+    Cycles: {'cycle_detected': False}
+    Stop Loss: {'current_price': 116264.0, 'stop_levels': {'1.0x_atr': {'long_stop': 115918.563501, 'short_stop': 116609.436499, 'distance': 345.436499, 'distance_pct': 0.297}, '1.5x_atr': {'long_stop': 115745.845252, 'short_stop': 116782.154748, 'distance': 518.154748, 'distance_pct': 0.446}, '2.0x_atr': {'long_stop': 115573.127003, 'short_stop': 116954.872997, 'distance': 690.872997, 'distance_pct': 0.594}, '2.5x_atr': {'long_stop': 115400.408754, 'short_stop': 117127.591246, 'distance': 863.591246, 'distance_pct': 0.743}, '3.0x_atr': {'long_stop': 115227.690504, 'short_stop': 117300.309496, 'distance': 1036.309496, 'distance_pct': 0.891}}, 'recommended_multiplier': 2.5, 'recommended_stop': {'long_stop': 115400.408754, 'short_stop': 117127.591246, 'distance': 863.591246, 'distance_pct': 0.743}}
+    Quality: clarity: 1.00, consistency: 0.11, data_quality: 0.43
+
+  stochastic:
+    Current: {'k_percent': 94.63, 'd_percent': 89.9, 'spread': 4.73, 'timestamp': '2025-09-17T22:19:07.595131+00:00'}
+    Summary: Stochastic %K: 94.6, %D: 89.9 (overbought for 3 periods). Bullish Crossover 5p ago
+    Trend: k_direction: rising, momentum: strong_bullish_acceleration, velocity: 6.19, acceleration: 5.53
+    Spread_Momentum: -5.35
+    Volatility: 28.931
+    Overbought: {'level': 80, 'status': 'in_zone', 'streak_length': 3, 'time_percentage': 13.3, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': 20, 'status': 'above', 'streak_length': 0, 'time_percentage': 32.5, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': 50, 'bias': 'bullish', 'distance_from_50': 44.63}
+    Patterns: momentum
+    Quality: data_quality: {'aligned_periods': 83, 'period_used': 14, 'had_prices': True, 'valid_data_percentage': 95.4}, calculation_notes: Stochastic analysis based on 83 aligned K/D periods
+
+  williams_r:
+    Current: {'value': -8.06, 'timestamp': '2025-09-17T22:19:07.600218+00:00'}
+    Summary: Williams %R at -8.1 (overbought for 4 periods)
+    Trend: direction: rising, strength: 0.156, velocity: -0.375, acceleration: -6.168
+    Momentum: interpretation: sideways_momentum, recent_range: 43.27, volatility: 31.7
+    Volatility: 31.701
+    Overbought: {'level': -20, 'status': 'in_zone', 'streak_length': 4, 'time_percentage': 17.2, 'exit_analysis': {'recent_exits': [{'periods_ago': 9, 'exit_level': -32.08, 'strength': 0.6041257988989404}], 'latest_exit': {'periods_ago': 9, 'exit_level': -32.08, 'strength': 0.6041257988989404}}}
+    Oversold: {'level': -80, 'status': 'above', 'streak_length': 0, 'time_percentage': 39.1, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': -50, 'bias': 'bullish', 'distance_from_50': 41.94}
+    Quality: data_quality: {'aligned_periods': 87, 'had_prices': True, 'period_used': 14, 'windows_used': {'velocity': 2, 'acceleration': 4, 'position_rank': 14, 'divergence': 14}}, calculation_notes: Williams %R analysis based on 87 periods with length=14
+
+  vwap:
+
+=== 30M TIMEFRAME ===
+  rsi:
+    Current: {'value': 55.34, 'timestamp': '2025-09-17T22:19:07.643132+00:00'}
+    Summary: RSI at 55.3, rising (recent high: 55.3 0p ago)
+    Trend: direction: rising, strength: 0.191, velocity: 3.918, acceleration: 4.596
+    Ma5: 48.88
+    Ma10: 44.52
+    Volatility: 11.07
+    Overbought: {'level': 70, 'status': 'far_below', 'periods_in_zone': 0, 'time_percentage': 1.2}
+    Oversold: {'level': 30, 'status': 'far_above', 'periods_in_zone': 0, 'time_percentage': 3.5}
+    Neutral: {'level': 50, 'status': 'above', 'distance': 5.34}
+    Quality: data_quality: {'total_periods': 86, 'valid_data_percentage': 86.0, 'recent_volatility': 7.055}, calculation_notes: RSI analysis based on 86 valid data points
+
+  macd:
+    Current: {'macd': -104.7767, 'signal': -183.9647, 'histogram': 79.1881, 'timestamp': '2025-09-17T22:19:07.652024+00:00'}
+    Summary: MACD rising trend with increasing momentum. Recent bullish_crossover 5p ago
+    Zero Line: {'current_position': 'below', 'distance_from_zero': 104.7767, 'time_above_zero_pct': 62.7, 'time_below_zero_pct': 37.3}
+    Histogram: {'momentum_direction': 'increasing', 'acceleration': 29.3207, 'zero_crossings_recent': 1, 'histogram_strength': 79.18806950205754}
+    Patterns: crossovers
+    Quality: data_quality: {'original_periods': {'macd': 100, 'signal': 100, 'histogram': 100, 'prices': 100}, 'aligned_periods': 67, 'valid_data_percentage': 67.0}, calculation_notes: MACD analysis based on 67 aligned data points
+    Legacy Trend: bullish
+
+  sma:
+    Current: {'sma_value': 115799.755, 'price': 116264.0, 'price_distance': 464.245, 'price_distance_pct': 0.401, 'timestamp': '2025-09-17T22:19:07.655045+00:00'}
+    Summary: SMA 115799.7550 - bearish trend, price above (+0.4%)
+    Trend: short_term: sideways, medium_term: sideways, long_term: bearish, consensus: bearish, strength: 0.43, consistency: 1.0, slope: -21.713
+    Slope: short_term_slope: -14.085, medium_term_slope: -21.713, long_term_slope: -41.517, acceleration: 39.5725, direction: downward, alignment: aligned
+    Quality: smoothness: 0.996, responsiveness: 0.028, trend_clarity: 0.9, overall_quality: 0.948
+    Length: 20
+    Smoothing_Factor: 0.0952
+    Price Relationship: {'position': 'above', 'distance': 464.245, 'distance_pct': 0.401, 'above_sma_pct': 50.6, 'below_sma_pct': 49.4, 'position_changes': 6, 'position_stability': 0.925}
+    Support Resistance: {'total_touches': 61, 'successful_bounces': 28, 'success_rate': 0.459, 'recent_touches': [{'index': 76, 'periods_ago': 4, 'price': 115808.3, 'sma_value': 115878.925}, {'index': 77, 'periods_ago': 3, 'price': 115620.0, 'sma_value': 115842.01000000001}, {'index': 78, 'periods_ago': 2, 'price': 115803.1, 'sma_value': 115816.5}, {'index': 79, 'periods_ago': 1, 'price': 116037.3, 'sma_value': 115805.30500000001}, {'index': 80, 'periods_ago': 0, 'price': 116264.0, 'sma_value': 115799.755}], 'recent_bounces': [{'type': 'support_bounce', 'index': 75, 'periods_ago': 5, 'strength': 0.0014129460097246722}, {'type': 'support_bounce', 'index': 77, 'periods_ago': 3, 'strength': 0.0015836360491264991}, {'type': 'support_bounce', 'index': 78, 'periods_ago': 2, 'strength': 0.0020223983641197607}], 'effectiveness': 'medium'}
+    Current Level: 115799.755
+    Trend Direction: bearish
+    Patterns: crossovers, trend_alignment, slope_direction
+    Quality: data_quality: {'original_periods': 81, 'aligned_periods': 81, 'valid_data_percentage': 100.0, 'had_prices': True, 'calculation_periods': 20}, calculation_notes: SMA analysis based on 81 periods with length=20
+
+  ema:
+    Current: {'ema_value': 115914.788, 'price': 116264.0, 'price_distance': 349.212, 'price_distance_pct': 0.301, 'timestamp': '2025-09-17T22:19:07.662438+00:00'}
+    Summary: EMA 115914.7880 - falling trend, very_low responsiveness, price +0.3%
+    Length: 20
+    Responsiveness: avg_change: 35.63047, max_change: 119.351671, relative_volatility: 0.004063, direction_changes: 8, change_frequency: 0.1, responsiveness_score: 0.07, responsiveness_rating: very_low
+    Signal_Quality: signal_quality: low_frequency_high_reliability, noise_level: low, recommended_use: Reliable for position trading, slower signals
+    Trend: {'short_term': 'sideways', 'medium_term': 'sideways', 'long_term': 'falling', 'consensus': 'falling', 'strength': 0.223, 'consistency': 0.714, 'slope': 15.800695, 'acceleration': 49.655869}
+    Price Relationship: {'position': 'above', 'distance': 349.212, 'distance_pct': 0.301, 'above_ema_pct': 50.6, 'below_ema_pct': 49.4, 'avg_distance': 68.4263, 'avg_distance_pct': 0.059}
+    Support Resistance: {'total_touches': 42, 'successful_bounces': 23, 'success_rate': 0.548, 'recent_touches': [{'index': 75, 'periods_ago': 5, 'price': 115644.9, 'ema_value': 115902.38718685036}, {'index': 76, 'periods_ago': 4, 'price': 115808.3, 'ema_value': 115893.42650238842}, {'index': 77, 'periods_ago': 3, 'price': 115620.0, 'ema_value': 115867.38588311333}, {'index': 78, 'periods_ago': 2, 'price': 115803.1, 'ema_value': 115861.26341805492}, {'index': 79, 'periods_ago': 1, 'price': 116037.3, 'ema_value': 115878.02880681159}], 'recent_bounces': [{'type': 'support_bounce', 'index': 75, 'periods_ago': 5, 'strength': 0.0014129460097246722}, {'type': 'support_bounce', 'index': 77, 'periods_ago': 3, 'strength': 0.0015836360491264991}, {'type': 'support_bounce', 'index': 78, 'periods_ago': 2, 'strength': 0.0020223983641197607}], 'effectiveness': 'high'}
+    Patterns: crossovers
+    Quality: data_quality: {'original_ema_periods': 100, 'aligned_periods': 81, 'valid_data_percentage': 81.0, 'had_prices': True, 'had_sma': False, 'has_price_data': True, 'has_sma_comparison': False}, calculation_notes: EMA analysis based on 81 aligned data points with period 20
+
+  bbands:
+    Current: {'lower': 115278.9904, 'middle': 115799.755, 'upper': 116320.5196, 'bandwidth': 0.8994, 'percent_b': 0.9457}
+
+  adx:
+    Current: {'adx': 20.77, 'plus_di': 19.21, 'minus_di': 19.12, 'timestamp': '2025-09-17T22:19:07.688848+00:00'}
+    Summary: ADX 20.8 - Developing trend with bullish bias (0.1)
+    Trend_Strength: developing
+    Strength_Value: 20.77
+    Description: Developing trend
+    Trend_Evolution: stable
+    Directional_Bias: bullish
+    Directional_Strength: 0.09
+    Current Strength: developing
+    Weak Threshold: 20
+    Strong Threshold: 25
+    Very Strong Threshold: 40
+    Extreme Threshold: 60
+    Patterns: di_patterns
+
+  aroon:
+    Current: {'aroon_up': 100.0, 'aroon_down': 50.0, 'oscillator': 50.0, 'timestamp': '2025-09-17T22:19:07.697510+00:00'}
+    Summary: Aroon Up: 100.0, Down: 50.0 - uptrend for 1 periods (bullish)
+    Trend: current_trend: uptrend, trend_strength: 0.5, trend_consistency: 0.1, trend_duration: 1, separation: 50.0, trend_quality: poor
+    Strength: aroon_up_strength: very_strong, aroon_down_strength: moderate, combined_strength: very_strong, up_momentum: 11.9, down_momentum: -7.14, up_evolution: rising, down_evolution: falling, dominant_indicator: aroon_up
+    Parallel_Movement: correlation: 0.347, movement_type: moderate_positive_correlation, interpretation: Some coordination in indicator movement
+    Oscillator: {'current_value': 50.0, 'zone': 'bullish', 'velocity': 19.05, 'acceleration': 28.57, 'zero_crossings': 7, 'time_above_zero_pct': 58.1, 'time_below_zero_pct': 41.9, 'oscillator_interpretation': 'bullish_strengthening'}
+    Crossovers: {'recent_crossovers': [{'type': 'bullish_crossover', 'periods_ago': 1, 'up_value': 100.0, 'down_value': 50.0, 'strength': 50.0, 'location': 'high_levels'}], 'latest_crossover': {'type': 'bullish_crossover', 'periods_ago': 1, 'up_value': 100.0, 'down_value': 50.0, 'strength': 50.0, 'location': 'high_levels'}, 'crossover_frequency': 'low'}
+    Quality: clarity: 0.50, consistency: 0.10, data_quality: 0.43
+
+  atr:
+    Current: {'value': 451.948874, 'timestamp': '2025-09-17T22:19:07.703719+00:00'}
+    Summary: ATR 451.948874 - extremely high volatility (92th percentile)
+    Trend: direction: falling, velocity: -2.74065, acceleration: -55.1867, strength: 0.042, consistency: 0.75, interpretation: volatility_stable
+    Relative: comparisons: {'5p_avg': -2.06, '10p_avg': 3.14, '20p_avg': 28.74, '50p_avg': 51.06}, regime: high_volatility, regime_ratio: 1.511
+    Breakout: squeeze_detected: False, squeeze_periods: 0, expansion_potential: 0.0, recent_volatility_change_pct: -2.82, breakout_setup: False
+    Volatility: {'current_level': 'extremely_high', 'percentile_rank': 91.9, 'relative_to_mean': 54.29, 'relative_to_price_pct': 0.389, 'statistical': {'mean': 292.925284, 'std': 65.174788, 'max': 476.832602, 'min': 208.230785}}
+    Cycles: {'cycle_detected': True, 'avg_contraction_cycle': 52.0, 'recent_peaks': 1, 'recent_troughs': 2, 'cycle_position': 'post_peak_contraction'}
+    Stop Loss: {'current_price': 116264.0, 'stop_levels': {'1.0x_atr': {'long_stop': 115812.051126, 'short_stop': 116715.948874, 'distance': 451.948874, 'distance_pct': 0.389}, '1.5x_atr': {'long_stop': 115586.07669, 'short_stop': 116941.92331, 'distance': 677.92331, 'distance_pct': 0.583}, '2.0x_atr': {'long_stop': 115360.102253, 'short_stop': 117167.897747, 'distance': 903.897747, 'distance_pct': 0.777}, '2.5x_atr': {'long_stop': 115134.127816, 'short_stop': 117393.872184, 'distance': 1129.872184, 'distance_pct': 0.972}, '3.0x_atr': {'long_stop': 114908.153379, 'short_stop': 117619.846621, 'distance': 1355.846621, 'distance_pct': 1.166}}, 'recommended_multiplier': 2.5, 'recommended_stop': {'long_stop': 115134.127816, 'short_stop': 117393.872184, 'distance': 1129.872184, 'distance_pct': 0.972}}
+    Quality: clarity: 1.00, consistency: 0.04, data_quality: 0.43
+
+  stochastic:
+    Current: {'k_percent': 81.21, 'd_percent': 71.24, 'spread': 9.97, 'timestamp': '2025-09-17T22:19:07.707454+00:00'}
+    Summary: Stochastic %K: 81.2, %D: 71.2 (overbought for 1 periods)
+    Trend: k_direction: rising, momentum: strong_bullish_acceleration, velocity: 8.69, acceleration: 3.11
+    Spread_Momentum: 5.59
+    Volatility: 30.088
+    Overbought: {'level': 80, 'status': 'in_zone', 'streak_length': 1, 'time_percentage': 30.1, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': 20, 'status': 'above', 'streak_length': 0, 'time_percentage': 19.3, 'exit_analysis': {'recent_exits': [{'periods_ago': 9, 'exit_level': 34.15780315417124, 'strength': 0.707890157708562}], 'latest_exit': {'periods_ago': 9, 'exit_level': 34.15780315417124, 'strength': 0.707890157708562}}}
+    Neutral: {'level': 50, 'bias': 'bullish', 'distance_from_50': 31.21}
+    Patterns: momentum
+    Quality: data_quality: {'aligned_periods': 83, 'period_used': 14, 'had_prices': True, 'valid_data_percentage': 95.4}, calculation_notes: Stochastic analysis based on 83 aligned K/D periods
+
+  williams_r:
+    Current: {'value': -6.37, 'timestamp': '2025-09-17T22:19:07.715755+00:00'}
+    Summary: Williams %R at -6.4 (overbought for 2 periods), strong upward acceleration
+    Trend: direction: rising, strength: 0.219, velocity: 13.021, acceleration: 7.566
+    Momentum: interpretation: strong_upward_acceleration, recent_range: 80.94, volatility: 31.59
+    Volatility: 31.586
+    Overbought: {'level': -20, 'status': 'in_zone', 'streak_length': 2, 'time_percentage': 32.2, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': -80, 'status': 'above', 'streak_length': 0, 'time_percentage': 21.8, 'exit_analysis': {'recent_exits': [{'periods_ago': 9, 'exit_level': -36.07, 'strength': 1.0}], 'latest_exit': {'periods_ago': 9, 'exit_level': -36.07, 'strength': 1.0}}}
+    Neutral: {'level': -50, 'bias': 'bullish', 'distance_from_50': 43.63}
+    Patterns: failure_swing
+    Quality: data_quality: {'aligned_periods': 87, 'had_prices': True, 'period_used': 14, 'windows_used': {'velocity': 2, 'acceleration': 4, 'position_rank': 14, 'divergence': 14}}, calculation_notes: Williams %R analysis based on 87 periods with length=14
+
+  vwap:
+
+=== 1H TIMEFRAME ===
+  rsi:
+    Current: {'value': 53.51, 'timestamp': '2025-09-17T22:19:07.766995+00:00'}
+    Summary: RSI at 53.5, rising
+    Trend: direction: rising, strength: 0.271, velocity: 3.591, acceleration: 4.408
+    Ma5: 44.53
+    Ma10: 42.5
+    Volatility: 10.205
+    Overbought: {'level': 70, 'status': 'far_below', 'periods_in_zone': 0, 'time_percentage': 1.2}
+    Oversold: {'level': 30, 'status': 'far_above', 'periods_in_zone': 0, 'time_percentage': 1.2}
+    Neutral: {'level': 50, 'status': 'above', 'distance': 3.51}
+    Quality: data_quality: {'total_periods': 86, 'valid_data_percentage': 86.0, 'recent_volatility': 5.888}, calculation_notes: RSI analysis based on 86 valid data points
+
+  macd:
+    Current: {'macd': -113.6922, 'signal': -79.4757, 'histogram': -34.2165, 'timestamp': '2025-09-17T22:19:07.775811+00:00'}
+    Summary: MACD falling trend with decreasing momentum
+    Zero Line: {'current_position': 'below', 'distance_from_zero': 113.6922, 'time_above_zero_pct': 55.2, 'time_below_zero_pct': 44.8}
+    Histogram: {'momentum_direction': 'increasing', 'acceleration': 50.3972, 'zero_crossings_recent': 0, 'histogram_strength': 34.21649968374882}
+    Patterns: crossovers
+    Quality: data_quality: {'original_periods': {'macd': 100, 'signal': 100, 'histogram': 100, 'prices': 100}, 'aligned_periods': 67, 'valid_data_percentage': 67.0}, calculation_notes: MACD analysis based on 67 aligned data points
+    Legacy Trend: bearish
+
+  sma:
+    Current: {'sma_value': 116200.895, 'price': 116264.0, 'price_distance': 63.105, 'price_distance_pct': 0.054, 'timestamp': '2025-09-17T22:19:07.780857+00:00'}
+    Summary: SMA 116200.8950 - bearish trend (strong), price above (+0.1%)
+    Trend: short_term: sideways, medium_term: bearish, long_term: sideways, consensus: bearish, strength: 1.0, consistency: 1.0, slope: -47.489
+    Slope: short_term_slope: -33.12, medium_term_slope: -47.489, long_term_slope: -46.434, acceleration: 35.545, direction: downward, alignment: aligned
+    Quality: smoothness: 0.996, responsiveness: 0.033, trend_clarity: 0.863, overall_quality: 0.929
+    Length: 20
+    Smoothing_Factor: 0.0952
+    Price Relationship: {'position': 'above', 'distance': 63.105, 'distance_pct': 0.054, 'above_sma_pct': 50.6, 'below_sma_pct': 49.4, 'position_changes': 13, 'position_stability': 0.838}
+    Support Resistance: {'total_touches': 49, 'successful_bounces': 30, 'success_rate': 0.612, 'recent_touches': [{'index': 69, 'periods_ago': 11, 'price': 116261.2, 'sma_value': 116657.76000000001}, {'index': 70, 'periods_ago': 10, 'price': 116205.5, 'sma_value': 116665.23500000002}, {'index': 71, 'periods_ago': 9, 'price': 116109.9, 'sma_value': 116647.61000000002}, {'index': 79, 'periods_ago': 1, 'price': 116037.3, 'sma_value': 116222.18999999999}, {'index': 80, 'periods_ago': 0, 'price': 116264.0, 'sma_value': 116200.89499999999}], 'recent_bounces': [{'type': 'resistance_bounce', 'index': 61, 'periods_ago': 19, 'strength': 0.0004966728077651817}, {'type': 'resistance_bounce', 'index': 66, 'periods_ago': 14, 'strength': 0.002575608220040799}, {'type': 'resistance_bounce', 'index': 67, 'periods_ago': 13, 'strength': 0.0017698340662602788}], 'effectiveness': 'high'}
+    Current Level: 116200.895
+    Trend Direction: bearish
+    Patterns: crossovers, trend_alignment, slope_direction
+    Quality: data_quality: {'original_periods': 81, 'aligned_periods': 81, 'valid_data_percentage': 100.0, 'had_prices': True, 'calculation_periods': 20}, calculation_notes: SMA analysis based on 81 periods with length=20
+
+  ema:
+    Current: {'ema_value': 116033.0568, 'price': 116264.0, 'price_distance': 230.9432, 'price_distance_pct': 0.199, 'timestamp': '2025-09-17T22:19:07.787607+00:00'}
+    Summary: EMA 116033.0568 - falling trend, very_low responsiveness, price +0.2%
+    Length: 20
+    Responsiveness: avg_change: 41.141438, max_change: 107.885646, relative_volatility: 0.003631, direction_changes: 13, change_frequency: 0.163, responsiveness_score: 0.099, responsiveness_rating: very_low
+    Signal_Quality: signal_quality: low_frequency_high_reliability, noise_level: low, recommended_use: Reliable for position trading, slower signals
+    Trend: {'short_term': 'sideways', 'medium_term': 'falling', 'long_term': 'falling', 'consensus': 'falling', 'strength': 0.07, 'consistency': 0.714, 'slope': -4.42966, 'acceleration': 79.638424}
+    Price Relationship: {'position': 'above', 'distance': 230.9432, 'distance_pct': 0.199, 'above_ema_pct': 51.9, 'below_ema_pct': 48.1, 'avg_distance': 20.9657, 'avg_distance_pct': 0.018}
+    Support Resistance: {'total_touches': 39, 'successful_bounces': 25, 'success_rate': 0.641, 'recent_touches': [{'index': 69, 'periods_ago': 11, 'price': 116261.2, 'ema_value': 116497.44814707617}, {'index': 70, 'periods_ago': 10, 'price': 116205.5, 'ema_value': 116469.64356164035}, {'index': 71, 'periods_ago': 9, 'price': 116109.9, 'ema_value': 116435.38227005555}, {'index': 79, 'periods_ago': 1, 'price': 116037.3, 'ema_value': 116008.74702732054}, {'index': 80, 'periods_ago': 0, 'price': 116264.0, 'ema_value': 116033.0568342424}], 'recent_bounces': [{'type': 'resistance_bounce', 'index': 66, 'periods_ago': 14, 'strength': 0.002575608220040799}, {'type': 'resistance_bounce', 'index': 67, 'periods_ago': 13, 'strength': 0.0017698340662602788}, {'type': 'resistance_bounce', 'index': 68, 'periods_ago': 12, 'strength': 0.0008344913942538334}], 'effectiveness': 'high'}
+    Patterns: crossovers
+    Quality: data_quality: {'original_ema_periods': 100, 'aligned_periods': 81, 'valid_data_percentage': 81.0, 'had_prices': True, 'had_sma': False, 'has_price_data': True, 'has_sma_comparison': False}, calculation_notes: EMA analysis based on 81 aligned data points with period 20
+
+  bbands:
+    Current: {'lower': 115077.1894, 'middle': 116200.895, 'upper': 117324.6006, 'bandwidth': 1.9341, 'percent_b': 0.5281}
+
+  adx:
+    Current: {'adx': 19.39, 'plus_di': 16.99, 'minus_di': 23.42, 'timestamp': '2025-09-17T22:19:07.799393+00:00'}
+    Summary: ADX 19.4 - Weak or no trend with bearish bias (6.4)
+    Trend_Strength: weak
+    Strength_Value: 19.39
+    Description: Weak or no trend
+    Trend_Evolution: stable
+    Directional_Bias: bearish
+    Directional_Strength: 6.43
+    Current Strength: weak
+    Weak Threshold: 20
+    Strong Threshold: 25
+    Very Strong Threshold: 40
+    Extreme Threshold: 60
+    Patterns: di_patterns
+
+  aroon:
+    Current: {'aroon_up': 0.0, 'aroon_down': 71.43, 'oscillator': -71.43, 'timestamp': '2025-09-17T22:19:07.808256+00:00'}
+    Summary: Aroon Up: 0.0, Down: 71.4 - strong_downtrend for 11 periods (strong bearish)
+    Trend: current_trend: strong_downtrend, trend_strength: 0.714, trend_consistency: 1.0, trend_duration: 11, separation: 71.43, trend_quality: excellent
+    Strength: aroon_up_strength: very_weak, aroon_down_strength: strong, combined_strength: strong, up_momentum: -2.38, down_momentum: -7.14, up_evolution: falling, down_evolution: falling, dominant_indicator: aroon_down
+    Parallel_Movement: correlation: -0.4, movement_type: moderate_negative_correlation, interpretation: Some opposition in indicator movement
+    Oscillator: {'current_value': -71.43, 'zone': 'strong_bearish', 'velocity': 4.76, 'acceleration': 14.29, 'zero_crossings': 7, 'time_above_zero_pct': 48.8, 'time_below_zero_pct': 51.2, 'oscillator_interpretation': 'strong_bearish_slowing'}
+    Crossovers: {'recent_crossovers': [{'type': 'bearish_crossover', 'periods_ago': 11, 'up_value': 57.14, 'down_value': 100.0, 'strength': 42.85714285714286, 'location': 'high_levels'}], 'latest_crossover': {'type': 'bearish_crossover', 'periods_ago': 11, 'up_value': 57.14, 'down_value': 100.0, 'strength': 42.85714285714286, 'location': 'high_levels'}, 'crossover_frequency': 'low'}
+    Quality: clarity: 0.71, consistency: 1.00, data_quality: 0.43
+
+  atr:
+    Current: {'value': 552.400905, 'timestamp': '2025-09-17T22:19:07.822514+00:00'}
+    Summary: ATR 552.400905 - high volatility (98th percentile)
+    Trend: direction: rising, velocity: 2.441449, acceleration: -0.606019, strength: 0.031, consistency: 0.75, interpretation: volatility_stable
+    Relative: comparisons: {'5p_avg': 0.94, '10p_avg': 15.7, '20p_avg': 26.17, '50p_avg': 28.95}, regime: elevated_volatility, regime_ratio: 1.289
+    Breakout: squeeze_detected: False, squeeze_periods: 0, expansion_potential: 0.0, recent_volatility_change_pct: 6.74, breakout_setup: False
+    Volatility: {'current_level': 'high', 'percentile_rank': 97.7, 'relative_to_mean': 38.33, 'relative_to_price_pct': 0.475, 'statistical': {'mean': 399.339227, 'std': 79.862997, 'max': 569.46679, 'min': 205.844571}}
+    Cycles: {'cycle_detected': False}
+    Stop Loss: {'current_price': 116264.0, 'stop_levels': {'1.0x_atr': {'long_stop': 115711.599095, 'short_stop': 116816.400905, 'distance': 552.400905, 'distance_pct': 0.475}, '1.5x_atr': {'long_stop': 115435.398642, 'short_stop': 117092.601358, 'distance': 828.601358, 'distance_pct': 0.713}, '2.0x_atr': {'long_stop': 115159.198189, 'short_stop': 117368.801811, 'distance': 1104.801811, 'distance_pct': 0.95}, '2.5x_atr': {'long_stop': 114882.997736, 'short_stop': 117645.002264, 'distance': 1381.002264, 'distance_pct': 1.188}, '3.0x_atr': {'long_stop': 114606.797284, 'short_stop': 117921.202716, 'distance': 1657.202716, 'distance_pct': 1.425}}, 'recommended_multiplier': 2.5, 'recommended_stop': {'long_stop': 114882.997736, 'short_stop': 117645.002264, 'distance': 1381.002264, 'distance_pct': 1.188}}
+    Quality: clarity: 1.00, consistency: 0.03, data_quality: 0.43
+
+  stochastic:
+    Current: {'k_percent': 53.25, 'd_percent': 41.5, 'spread': 11.75, 'timestamp': '2025-09-17T22:19:07.826462+00:00'}
+    Summary: Stochastic %K: 53.3, %D: 41.5. Bullish Crossover 4p ago
+    Trend: k_direction: rising, momentum: strong_bullish_acceleration, velocity: 11.63, acceleration: 12.5
+    Spread_Momentum: 1.22
+    Volatility: 28.664
+    Overbought: {'level': 80, 'status': 'below', 'streak_length': 0, 'time_percentage': 21.7, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': 20, 'status': 'above', 'streak_length': 0, 'time_percentage': 19.3, 'exit_analysis': {'recent_exits': [{'periods_ago': 4, 'exit_level': 20.909841672560137, 'strength': 0.04549208362800687}], 'latest_exit': {'periods_ago': 4, 'exit_level': 20.909841672560137, 'strength': 0.04549208362800687}}}
+    Neutral: {'level': 50, 'bias': 'bullish', 'distance_from_50': 3.25}
+    Patterns: momentum
+    Quality: data_quality: {'aligned_periods': 83, 'period_used': 14, 'had_prices': True, 'valid_data_percentage': 95.4}, calculation_notes: Stochastic analysis based on 83 aligned K/D periods
+
+  williams_r:
+    Current: {'value': -28.24, 'timestamp': '2025-09-17T22:19:07.835222+00:00'}
+    Summary: Williams %R at -28.2, strong upward acceleration
+    Trend: direction: rising, strength: 0.267, velocity: 18.456, acceleration: 15.444
+    Momentum: interpretation: strong_upward_acceleration, recent_range: 64.17, volatility: 31.08
+    Volatility: 31.076
+    Overbought: {'level': -20, 'status': 'below', 'streak_length': 0, 'time_percentage': 28.7, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': -80, 'status': 'above', 'streak_length': 0, 'time_percentage': 21.8, 'exit_analysis': {'recent_exits': [{'periods_ago': 4, 'exit_level': -64.23, 'strength': 0.7882551786486225}, {'periods_ago': 8, 'exit_level': -76.55, 'strength': 0.17266069086140234}], 'latest_exit': {'periods_ago': 4, 'exit_level': -64.23, 'strength': 0.7882551786486225}}}
+    Neutral: {'level': -50, 'bias': 'bullish', 'distance_from_50': 21.76}
+    Patterns: momentum
+    Quality: data_quality: {'aligned_periods': 87, 'had_prices': True, 'period_used': 14, 'windows_used': {'velocity': 2, 'acceleration': 4, 'position_rank': 14, 'divergence': 14}}, calculation_notes: Williams %R analysis based on 87 periods with length=14
+
+  vwap:
+
+=== 4H TIMEFRAME ===
+  rsi:
+    Current: {'value': 54.93, 'timestamp': '2025-09-17T22:19:07.881189+00:00'}
+    Summary: RSI at 54.9, falling (recent high: 64.9 4p ago)
+    Trend: direction: falling, strength: 0.218, velocity: -0.145, acceleration: -1.843
+    Ma5: 55.38
+    Ma10: 57.39
+    Volatility: 7.454
+    Overbought: {'level': 70, 'status': 'far_below', 'periods_in_zone': 0, 'time_percentage': 4.7}
+    Oversold: {'level': 30, 'status': 'far_above', 'periods_in_zone': 0, 'time_percentage': 0.0}
+    Neutral: {'level': 50, 'status': 'above', 'distance': 4.93}
+    Quality: data_quality: {'total_periods': 86, 'valid_data_percentage': 86.0, 'recent_volatility': 5.621}, calculation_notes: RSI analysis based on 86 valid data points
+
+  macd:
+    Current: {'macd': 334.003, 'signal': 382.5869, 'histogram': -48.5839, 'timestamp': '2025-09-17T22:19:07.894651+00:00'}
+    Summary: MACD falling trend with decreasing momentum. Recent bearish_crossover 3p ago
+    Zero Line: {'current_position': 'above', 'distance_from_zero': 334.003, 'time_above_zero_pct': 100.0, 'time_below_zero_pct': 0.0}
+    Histogram: {'momentum_direction': 'increasing', 'acceleration': 5.2403, 'zero_crossings_recent': 2, 'histogram_strength': 48.58388116687985}
+    Patterns: crossovers
+    Quality: data_quality: {'original_periods': {'macd': 100, 'signal': 100, 'histogram': 100, 'prices': 100}, 'aligned_periods': 67, 'valid_data_percentage': 67.0}, calculation_notes: MACD analysis based on 67 aligned data points
+    Legacy Trend: bearish
+
+  sma:
+    Current: {'sma_value': 115811.355, 'price': 116264.0, 'price_distance': 452.645, 'price_distance_pct': 0.391, 'timestamp': '2025-09-17T22:19:07.900163+00:00'}
+    Summary: SMA 115811.3550 - bullish trend, price above (+0.4%)
+    Trend: short_term: sideways, medium_term: sideways, long_term: bullish, consensus: bullish, strength: 0.14, consistency: 0.889, slope: 27.996
+    Slope: short_term_slope: 16.055, medium_term_slope: 27.996, long_term_slope: 23.3255, acceleration: -18.11, direction: upward, alignment: aligned
+    Quality: smoothness: 0.982, responsiveness: 0.07, trend_clarity: 0.838, overall_quality: 0.91
+    Length: 20
+    Smoothing_Factor: 0.0952
+    Price Relationship: {'position': 'above', 'distance': 452.645, 'distance_pct': 0.391, 'above_sma_pct': 69.1, 'below_sma_pct': 30.9, 'position_changes': 19, 'position_stability': 0.762}
+    Support Resistance: {'total_touches': 40, 'successful_bounces': 20, 'success_rate': 0.5, 'recent_touches': [{'index': 72, 'periods_ago': 8, 'price': 115899.6, 'sma_value': 115549.68499999998}, {'index': 77, 'periods_ago': 3, 'price': 116261.2, 'sma_value': 115763.19000000002}, {'index': 78, 'periods_ago': 2, 'price': 115878.6, 'sma_value': 115766.785}, {'index': 79, 'periods_ago': 1, 'price': 115644.9, 'sma_value': 115759.44000000002}, {'index': 80, 'periods_ago': 0, 'price': 116264.0, 'sma_value': 115811.35500000001}], 'recent_bounces': [{'type': 'support_bounce', 'index': 72, 'periods_ago': 8, 'strength': 0.007721338123686312}, {'type': 'resistance_bounce', 'index': 77, 'periods_ago': 3, 'strength': 0.003290865740246886}, {'type': 'resistance_bounce', 'index': 78, 'periods_ago': 2, 'strength': 0.00201676582216226}], 'effectiveness': 'medium'}
+    Current Level: 115811.355
+    Trend Direction: bullish
+    Patterns: crossovers, trend_alignment, slope_direction
+    Quality: data_quality: {'original_periods': 81, 'aligned_periods': 81, 'valid_data_percentage': 100.0, 'had_prices': True, 'calculation_periods': 20}, calculation_notes: SMA analysis based on 81 periods with length=20
+
+  ema:
+    Current: {'ema_value': 115897.3474, 'price': 116264.0, 'price_distance': 366.6526, 'price_distance_pct': 0.316, 'timestamp': '2025-09-17T22:19:07.908978+00:00'}
+    Summary: EMA 115897.3474 - rising trend, low responsiveness, price +0.3%
+    Length: 20
+    Responsiveness: avg_change: 80.626789, max_change: 266.133758, relative_volatility: 0.01746, direction_changes: 15, change_frequency: 0.188, responsiveness_score: 0.181, responsiveness_rating: low
+    Signal_Quality: signal_quality: low_frequency_high_reliability, noise_level: low, recommended_use: Reliable for position trading, slower signals
+    Trend: {'short_term': 'sideways', 'medium_term': 'rising', 'long_term': 'rising', 'consensus': 'rising', 'strength': 0.018, 'consistency': 0.714, 'slope': 5.267965, 'acceleration': -88.214434}
+    Price Relationship: {'position': 'above', 'distance': 366.6526, 'distance_pct': 0.316, 'above_ema_pct': 77.8, 'below_ema_pct': 22.2, 'avg_distance': 615.8978, 'avg_distance_pct': 0.545}
+    Support Resistance: {'total_touches': 25, 'successful_bounces': 12, 'success_rate': 0.48, 'recent_touches': [{'index': 68, 'periods_ago': 12, 'price': 115356.3, 'ema_value': 115265.98214505169}, {'index': 69, 'periods_ago': 11, 'price': 115307.3, 'ema_value': 115269.9171788563}, {'index': 71, 'periods_ago': 9, 'price': 115288.0, 'ema_value': 115319.67642078713}, {'index': 78, 'periods_ago': 2, 'price': 115878.6, 'ema_value': 115881.26318475525}, {'index': 79, 'periods_ago': 1, 'price': 115644.9, 'ema_value': 115858.75240525475}], 'recent_bounces': [{'type': 'support_bounce', 'index': 67, 'periods_ago': 13, 'strength': 0.0005282084107432624}, {'type': 'resistance_bounce', 'index': 68, 'periods_ago': 12, 'strength': 0.0004247709054468633}, {'type': 'resistance_bounce', 'index': 78, 'periods_ago': 2, 'strength': 0.00201676582216226}], 'effectiveness': 'medium'}
+    Patterns: crossovers
+    Quality: data_quality: {'original_ema_periods': 100, 'aligned_periods': 81, 'valid_data_percentage': 81.0, 'had_prices': True, 'had_sma': False, 'has_price_data': True, 'has_sma_comparison': False}, calculation_notes: EMA analysis based on 81 aligned data points with period 20
+
+  bbands:
+    Current: {'lower': 114594.1329, 'middle': 115811.355, 'upper': 117028.5771, 'bandwidth': 2.1021, 'percent_b': 0.6859}
+
+  adx:
+    Current: {'adx': 21.66, 'plus_di': 18.53, 'minus_di': 21.93, 'timestamp': '2025-09-17T22:19:07.936032+00:00'}
+    Summary: ADX 21.7 - Developing trend with bearish bias (3.4)
+    Trend_Strength: developing
+    Strength_Value: 21.66
+    Description: Developing trend
+    Trend_Evolution: stable
+    Directional_Bias: bearish
+    Directional_Strength: 3.4
+    Current Strength: developing
+    Weak Threshold: 20
+    Strong Threshold: 25
+    Very Strong Threshold: 40
+    Extreme Threshold: 60
+
+  aroon:
+    Current: {'aroon_up': 71.43, 'aroon_down': 0.0, 'oscillator': 71.43, 'timestamp': '2025-09-17T22:19:07.945600+00:00'}
+    Summary: Aroon Up: 71.4, Down: 0.0 - strong_uptrend for 8 periods (strong bullish)
+    Trend: current_trend: strong_uptrend, trend_strength: 0.714, trend_consistency: 0.8, trend_duration: 8, separation: 71.43, trend_quality: good
+    Strength: aroon_up_strength: strong, aroon_down_strength: very_weak, combined_strength: strong, up_momentum: -7.14, down_momentum: -7.14, up_evolution: falling, down_evolution: falling, dominant_indicator: aroon_up
+    Parallel_Movement: correlation: -0.103, movement_type: independent_movement, interpretation: Indicators moving independently
+    Oscillator: {'current_value': 71.43, 'zone': 'strong_bullish', 'velocity': 0.0, 'acceleration': -7.14, 'zero_crossings': 8, 'time_above_zero_pct': 81.4, 'time_below_zero_pct': 18.6, 'oscillator_interpretation': 'strong_bullish_slowing'}
+    Crossovers: {'recent_crossovers': [{'type': 'bullish_crossover', 'periods_ago': 8, 'up_value': 100.0, 'down_value': 50.0, 'strength': 50.0, 'location': 'high_levels'}], 'latest_crossover': {'type': 'bullish_crossover', 'periods_ago': 8, 'up_value': 100.0, 'down_value': 50.0, 'strength': 50.0, 'location': 'high_levels'}, 'crossover_frequency': 'low'}
+    Quality: clarity: 0.71, consistency: 0.80, data_quality: 0.43
+
+  atr:
+    Current: {'value': 898.652319, 'timestamp': '2025-09-17T22:19:07.953700+00:00'}
+    Summary: ATR 898.652319 - below average volatility (58th percentile)
+    Trend: direction: rising, velocity: 27.72956, acceleration: 32.976067, strength: 0.162, consistency: 1.0, interpretation: volatility_stable
+    Relative: comparisons: {'5p_avg': 5.93, '10p_avg': 9.71, '20p_avg': 15.7, '50p_avg': 8.73}, regime: normal_volatility, regime_ratio: 1.087
+    Breakout: squeeze_detected: False, squeeze_periods: 0, expansion_potential: 0.0, recent_volatility_change_pct: 11.37, breakout_setup: False
+    Volatility: {'current_level': 'below_average', 'percentile_rank': 58.1, 'relative_to_mean': -1.77, 'relative_to_price_pct': 0.773, 'statistical': {'mean': 914.855037, 'std': 171.069926, 'max': 1366.217638, 'min': 667.176766}}
+    Cycles: {'cycle_detected': True, 'avg_contraction_cycle': 24.0, 'recent_peaks': 1, 'recent_troughs': 2, 'cycle_position': 'post_peak_contraction'}
+    Stop Loss: {'current_price': 116264.0, 'stop_levels': {'1.0x_atr': {'long_stop': 115365.347681, 'short_stop': 117162.652319, 'distance': 898.652319, 'distance_pct': 0.773}, '1.5x_atr': {'long_stop': 114916.021522, 'short_stop': 117611.978478, 'distance': 1347.978478, 'distance_pct': 1.159}, '2.0x_atr': {'long_stop': 114466.695362, 'short_stop': 118061.304638, 'distance': 1797.304638, 'distance_pct': 1.546}, '2.5x_atr': {'long_stop': 114017.369203, 'short_stop': 118510.630797, 'distance': 2246.630797, 'distance_pct': 1.932}, '3.0x_atr': {'long_stop': 113568.043043, 'short_stop': 118959.956957, 'distance': 2695.956957, 'distance_pct': 2.319}}, 'recommended_multiplier': 2.0, 'recommended_stop': {'long_stop': 114466.695362, 'short_stop': 118061.304638, 'distance': 1797.304638, 'distance_pct': 1.546}}
+    Quality: clarity: 0.10, consistency: 0.16, data_quality: 0.43
+
+  stochastic:
+    Current: {'k_percent': 52.33, 'd_percent': 58.75, 'spread': -6.42, 'timestamp': '2025-09-17T22:19:07.957124+00:00'}
+    Summary: Stochastic %K: 52.3, %D: 58.8. Bearish Crossover 4p ago
+    Trend: k_direction: falling, momentum: strong_bearish_acceleration, velocity: -9.2, acceleration: -10.63
+    Spread_Momentum: 7.75
+    Volatility: 22.021
+    Overbought: {'level': 80, 'status': 'below', 'streak_length': 0, 'time_percentage': 21.7, 'exit_analysis': {'recent_exits': [{'periods_ago': 4, 'exit_level': 78.23590820609611, 'strength': 0.08820458969519436}], 'latest_exit': {'periods_ago': 4, 'exit_level': 78.23590820609611, 'strength': 0.08820458969519436}}}
+    Oversold: {'level': 20, 'status': 'above', 'streak_length': 0, 'time_percentage': 0.0, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': 50, 'bias': 'bullish', 'distance_from_50': 2.33}
+    Patterns: momentum
+    Quality: data_quality: {'aligned_periods': 83, 'period_used': 14, 'had_prices': True, 'valid_data_percentage': 95.4}, calculation_notes: Stochastic analysis based on 83 aligned K/D periods
+
+  williams_r:
+    Current: {'value': -37.9, 'timestamp': '2025-09-17T22:19:07.967043+00:00'}
+    Summary: Williams %R at -37.9, strong upward acceleration
+    Trend: direction: falling, strength: 0.204, velocity: 5.305, acceleration: 4.319
+    Momentum: interpretation: strong_upward_acceleration, recent_range: 59.48, volatility: 25.05
+    Volatility: 25.053
+    Overbought: {'level': -20, 'status': 'below', 'streak_length': 0, 'time_percentage': 24.1, 'exit_analysis': {'recent_exits': [{'periods_ago': 4, 'exit_level': -35.26, 'strength': 0.7628416057635803}, {'periods_ago': 6, 'exit_level': -25.97, 'strength': 0.29845395473897957}], 'latest_exit': {'periods_ago': 4, 'exit_level': -35.26, 'strength': 0.7628416057635803}}}
+    Oversold: {'level': -80, 'status': 'above', 'streak_length': 0, 'time_percentage': 3.4, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': -50, 'bias': 'bullish', 'distance_from_50': 12.1}
+    Quality: data_quality: {'aligned_periods': 87, 'had_prices': True, 'period_used': 14, 'windows_used': {'velocity': 2, 'acceleration': 4, 'position_rank': 14, 'divergence': 14}}, calculation_notes: Williams %R analysis based on 87 periods with length=14
+
+  vwap:
+
+=== 1D TIMEFRAME ===
+  rsi:
+    Current: {'value': 58.69, 'timestamp': '2025-09-17T22:19:08.076256+00:00'}
+    Summary: RSI at 58.7 (recent high: 60.8 1p ago)
+    Trend: direction: sideways, strength: 0.074, velocity: 0.688, acceleration: -4.337
+    Ma5: 58.38
+    Ma10: 56.01
+    Volatility: 9.759
+    Overbought: {'level': 70, 'status': 'far_below', 'periods_in_zone': 0, 'time_percentage': 7.0}
+    Oversold: {'level': 30, 'status': 'far_above', 'periods_in_zone': 0, 'time_percentage': 0.0}
+    Neutral: {'level': 50, 'status': 'above', 'distance': 8.69}
+    Quality: data_quality: {'total_periods': 86, 'valid_data_percentage': 86.0, 'recent_volatility': 4.46}, calculation_notes: RSI analysis based on 86 valid data points
+
+  macd:
+    Current: {'macd': 759.8688, 'signal': 86.5853, 'histogram': 673.2835, 'timestamp': '2025-09-17T22:19:08.187322+00:00'}
+    Summary: MACD rising trend with increasing momentum
+    Zero Line: {'current_position': 'above', 'distance_from_zero': 759.8688, 'time_above_zero_pct': 64.2, 'time_below_zero_pct': 35.8}
+    Histogram: {'momentum_direction': 'decreasing', 'acceleration': -61.4308, 'zero_crossings_recent': 0, 'histogram_strength': 673.2835000305544}
+    Patterns: crossovers
+    Quality: data_quality: {'original_periods': {'macd': 100, 'signal': 100, 'histogram': 100, 'prices': 100}, 'aligned_periods': 67, 'valid_data_percentage': 67.0}, calculation_notes: MACD analysis based on 67 aligned data points
+    Legacy Trend: bullish
+
+  sma:
+    Current: {'sma_value': 112446.435, 'price': 116264.0, 'price_distance': 3817.565, 'price_distance_pct': 3.395, 'timestamp': '2025-09-17T22:19:08.195477+00:00'}
+    Summary: SMA 112446.4350 - bullish trend, price above (+3.4%)
+    Trend: short_term: bullish, medium_term: bullish, long_term: bearish, consensus: bullish, strength: 0.526, consistency: 0.778, slope: 204.259
+    Slope: short_term_slope: 213.546667, medium_term_slope: 204.259, long_term_slope: 87.54, acceleration: 251.5325, direction: upward, alignment: aligned
+    Quality: smoothness: 0.966, responsiveness: 0.248, trend_clarity: 0.85, overall_quality: 0.908
+    Length: 20
+    Smoothing_Factor: 0.0952
+    Price Relationship: {'position': 'above', 'distance': 3817.565, 'distance_pct': 3.395, 'above_sma_pct': 61.7, 'below_sma_pct': 38.3, 'position_changes': 8, 'position_stability': 0.9}
+    Support Resistance: {'total_touches': 13, 'successful_bounces': 5, 'success_rate': 0.385, 'recent_touches': [{'index': 49, 'periods_ago': 31, 'price': 117404.3, 'sma_value': 116907.92000000001}, {'index': 54, 'periods_ago': 26, 'price': 116921.6, 'sma_value': 116677.58}, {'index': 70, 'periods_ago': 10, 'price': 111137.9, 'sma_value': 111571.035}, {'index': 71, 'periods_ago': 9, 'price': 112069.4, 'sma_value': 111530.505}, {'index': 72, 'periods_ago': 8, 'price': 111531.4, 'sma_value': 111394.23000000001}], 'recent_bounces': [{'type': 'support_bounce', 'index': 41, 'periods_ago': 39, 'strength': 0.024271836323951936}, {'type': 'resistance_bounce', 'index': 49, 'periods_ago': 31, 'strength': 0.010015817137873218}, {'type': 'support_bounce', 'index': 70, 'periods_ago': 10, 'strength': 0.008381479225358767}], 'effectiveness': 'medium'}
+    Current Level: 112446.435
+    Trend Direction: bullish
+    Patterns: crossovers, trend_alignment, slope_direction
+    Quality: data_quality: {'original_periods': 81, 'aligned_periods': 81, 'valid_data_percentage': 100.0, 'had_prices': True, 'calculation_periods': 20}, calculation_notes: SMA analysis based on 81 periods with length=20
+
+  ema:
+    Current: {'ema_value': 113986.5676, 'price': 116264.0, 'price_distance': 2277.4324, 'price_distance_pct': 1.998, 'timestamp': '2025-09-17T22:19:08.238732+00:00'}
+    Summary: EMA 113986.5676 - rising trend, low responsiveness, price +2.0%
+    Length: 20
+    Responsiveness: avg_change: 279.787182, max_change: 859.293884, relative_volatility: 0.029966, direction_changes: 10, change_frequency: 0.125, responsiveness_score: 0.212, responsiveness_rating: low
+    Signal_Quality: signal_quality: low_frequency_high_reliability, noise_level: low, recommended_use: Reliable for position trading, slower signals
+    Trend: {'short_term': 'rising', 'medium_term': 'rising', 'long_term': 'rising', 'consensus': 'rising', 'strength': 0.499, 'consistency': 1.0, 'slope': 254.360854, 'acceleration': -59.07243}
+    Price Relationship: {'position': 'above', 'distance': 2277.4324, 'distance_pct': 1.998, 'above_ema_pct': 60.5, 'below_ema_pct': 39.5, 'avg_distance': 982.6977, 'avg_distance_pct': 0.866}
+    Support Resistance: {'total_touches': 6, 'successful_bounces': 1, 'success_rate': 0.167, 'recent_touches': [{'index': 47, 'periods_ago': 33, 'price': 117336.0, 'ema_value': 117507.14713403865}, {'index': 48, 'periods_ago': 32, 'price': 117383.0, 'ema_value': 117495.32359746353}, {'index': 49, 'periods_ago': 31, 'price': 117404.3, 'ema_value': 117486.65468341939}, {'index': 71, 'periods_ago': 9, 'price': 112069.4, 'ema_value': 111850.45579101534}, {'index': 72, 'periods_ago': 8, 'price': 111531.4, 'ema_value': 111820.06952520435}], 'recent_bounces': [{'type': 'support_bounce', 'index': 48, 'periods_ago': 32, 'strength': 0.00018145728086693056}], 'effectiveness': 'low'}
+    Patterns: crossovers
+    Quality: data_quality: {'original_ema_periods': 100, 'aligned_periods': 81, 'valid_data_percentage': 81.0, 'had_prices': True, 'had_sma': False, 'has_price_data': True, 'has_sma_comparison': False}, calculation_notes: EMA analysis based on 81 aligned data points with period 20
+
+  bbands:
+    Current: {'lower': 106788.8042, 'middle': 112446.435, 'upper': 118104.0658, 'bandwidth': 10.0628, 'percent_b': 0.8374}
+
+  adx:
+    Current: {'adx': 17.4, 'plus_di': 20.23, 'minus_di': 13.19, 'timestamp': '2025-09-17T22:19:08.330679+00:00'}
+    Summary: ADX 17.4 - Weak or no trend with bullish bias (7.0)
+    Trend_Strength: weak
+    Strength_Value: 17.4
+    Description: Weak or no trend
+    Trend_Evolution: stable
+    Directional_Bias: bullish
+    Directional_Strength: 7.04
+    Current Strength: weak
+    Weak Threshold: 20
+    Strong Threshold: 25
+    Very Strong Threshold: 40
+    Extreme Threshold: 60
+
+  aroon:
+    Current: {'aroon_up': 100.0, 'aroon_down': 7.14, 'oscillator': 92.86, 'timestamp': '2025-09-17T22:19:08.460299+00:00'}
+    Summary: Aroon Up: 100.0, Down: 7.1 - strong_uptrend for 8 periods (strong bullish)
+    Trend: current_trend: strong_uptrend, trend_strength: 0.929, trend_consistency: 0.8, trend_duration: 8, separation: 92.86, trend_quality: good
+    Strength: aroon_up_strength: very_strong, aroon_down_strength: very_weak, combined_strength: very_strong, up_momentum: 4.76, down_momentum: 0.0, up_evolution: rising, down_evolution: falling, dominant_indicator: aroon_up
+    Parallel_Movement: correlation: 0.0, movement_type: independent_movement, interpretation: Indicators moving independently
+    Oscillator: {'current_value': 92.86, 'zone': 'strong_bullish', 'velocity': 4.76, 'acceleration': -10.71, 'zero_crossings': 5, 'time_above_zero_pct': 47.7, 'time_below_zero_pct': 52.3, 'oscillator_interpretation': 'strong_bullish_momentum'}
+    Crossovers: {'recent_crossovers': [{'type': 'bullish_crossover', 'periods_ago': 8, 'up_value': 100.0, 'down_value': 35.71, 'strength': 64.28571428571429, 'location': 'mid_levels'}], 'latest_crossover': {'type': 'bullish_crossover', 'periods_ago': 8, 'up_value': 100.0, 'down_value': 35.71, 'strength': 64.28571428571429, 'location': 'mid_levels'}, 'crossover_frequency': 'low'}
+    Patterns: extreme_readings
+    Quality: clarity: 0.93, consistency: 0.80, data_quality: 0.43
+
+  atr:
+    Current: {'value': 2426.186785, 'timestamp': '2025-09-17T22:19:08.508802+00:00'}
+    Summary: ATR 2426.186785 - low volatility (5th percentile)
+    Trend: direction: falling, velocity: -3.763563, acceleration: -0.092258, strength: 0.016, consistency: 0.75, interpretation: volatility_stable
+    Relative: comparisons: {'5p_avg': -1.04, '10p_avg': -5.97, '20p_avg': -13.28, '50p_avg': -14.56}, regime: normal_volatility, regime_ratio: 0.854
+    Breakout: squeeze_detected: True, squeeze_periods: 6, expansion_potential: 0.6, recent_volatility_change_pct: -4.72, breakout_setup: True
+    Volatility: {'current_level': 'low', 'percentile_rank': 4.7, 'relative_to_mean': -13.99, 'relative_to_price_pct': 2.087, 'statistical': {'mean': 2820.814101, 'std': 235.540125, 'max': 3350.454673, 'min': 2337.420167}}
+    Cycles: {'cycle_detected': True, 'avg_expansion_cycle': 8.1, 'avg_contraction_cycle': 11.6, 'recent_peaks': 9, 'recent_troughs': 6, 'cycle_position': 'post_peak_contraction'}
+    Stop Loss: {'current_price': 116264.0, 'stop_levels': {'1.0x_atr': {'long_stop': 113837.813215, 'short_stop': 118690.186785, 'distance': 2426.186785, 'distance_pct': 2.087}, '1.5x_atr': {'long_stop': 112624.719822, 'short_stop': 119903.280178, 'distance': 3639.280178, 'distance_pct': 3.13}, '2.0x_atr': {'long_stop': 111411.62643, 'short_stop': 121116.37357, 'distance': 4852.37357, 'distance_pct': 4.174}, '2.5x_atr': {'long_stop': 110198.533037, 'short_stop': 122329.466963, 'distance': 6065.466963, 'distance_pct': 5.217}, '3.0x_atr': {'long_stop': 108985.439645, 'short_stop': 123542.560355, 'distance': 7278.560355, 'distance_pct': 6.26}}, 'recommended_multiplier': 1.5, 'recommended_stop': {'long_stop': 112624.719822, 'short_stop': 119903.280178, 'distance': 3639.280178, 'distance_pct': 3.13}}
+    Quality: clarity: 1.00, consistency: 0.02, data_quality: 0.43
+
+  stochastic:
+    Current: {'k_percent': 89.51, 'd_percent': 88.42, 'spread': 1.09, 'timestamp': '2025-09-17T22:19:08.530903+00:00'}
+    Summary: Stochastic %K: 89.5, %D: 88.4 (overbought for 8 periods). Bullish Crossover 2p ago
+    Trend: k_direction: rising, momentum: bullish_momentum, velocity: 1.31, acceleration: -2.19
+    Spread_Momentum: 0.87
+    Volatility: 27.065
+    Overbought: {'level': 80, 'status': 'in_zone', 'streak_length': 8, 'time_percentage': 30.1, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': 20, 'status': 'above', 'streak_length': 0, 'time_percentage': 12.0, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': 50, 'bias': 'bullish', 'distance_from_50': 39.51}
+    Quality: data_quality: {'aligned_periods': 83, 'period_used': 14, 'had_prices': True, 'valid_data_percentage': 95.4}, calculation_notes: Stochastic analysis based on 83 aligned K/D periods
+
+  williams_r:
+    Current: {'value': -12.77, 'timestamp': '2025-09-17T22:19:08.623734+00:00'}
+    Summary: Williams %R at -12.8 (overbought for 8 periods)
+    Trend: direction: sideways, strength: 0.043, velocity: 1.959, acceleration: 5.945
+    Momentum: interpretation: upward_momentum, recent_range: 31.18, volatility: 28.51
+    Volatility: 28.505
+    Overbought: {'level': -20, 'status': 'in_zone', 'streak_length': 8, 'time_percentage': 29.9, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Oversold: {'level': -80, 'status': 'above', 'streak_length': 0, 'time_percentage': 14.9, 'exit_analysis': {'recent_exits': [], 'latest_exit': None}}
+    Neutral: {'level': -50, 'bias': 'bullish', 'distance_from_50': 37.23}
+    Patterns: failure_swing
+    Quality: data_quality: {'aligned_periods': 87, 'had_prices': True, 'period_used': 14, 'windows_used': {'velocity': 2, 'acceleration': 4, 'position_rank': 14, 'divergence': 14}}, calculation_notes: Williams %R analysis based on 87 periods with length=14
+
+  vwap:
+
+Data Age: 30 seconds
+
+================================================================================
+Generated: 2025-09-17T22:19:08.755771+00:00
+Symbol: BTC/USDT
+Timeframes: 5m, 15m, 30m, 1h, 4h, 1d
+Indicators: rsi, macd, sma, ema, bbands, adx, aroon, atr, stochastic, williams_r, vwap

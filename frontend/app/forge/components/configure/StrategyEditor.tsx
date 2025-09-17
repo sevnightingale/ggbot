@@ -36,6 +36,11 @@ export function StrategyEditor({
 
   // Handle strategy text change
   const handleStrategyChange = (value: string) => {
+    // Limit to 10,000 characters
+    if (value.length > 10000) {
+      value = value.substring(0, 10000)
+    }
+
     onUpdate?.({
       decision: {
         analysis_frequency: configData?.decision?.analysis_frequency ?? null,
@@ -43,6 +48,14 @@ export function StrategyEditor({
         user_prompt: value
       }
     })
+  }
+
+  // Auto-resize textarea
+  const handleTextareaResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const textarea = e.target
+    textarea.style.height = 'auto'
+    textarea.style.height = `${textarea.scrollHeight}px`
+    handleStrategyChange(textarea.value)
   }
 
   // Handle LLM provider change
@@ -114,13 +127,20 @@ export function StrategyEditor({
             </label>
             <textarea
               value={currentStrategy}
-              onChange={(e) => handleStrategyChange(e.target.value)}
+              onChange={handleTextareaResize}
               rows={6}
-              className="w-full p-4 rounded-xl bg-[var(--bg-primary)] border-2 border-[var(--agent-decision)]/30 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-[var(--agent-decision)] resize-none"
+              maxLength={10000}
+              className="w-full p-4 rounded-xl bg-[var(--bg-primary)] border-2 border-[var(--agent-decision)]/30 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-[var(--agent-decision)] resize-none overflow-hidden"
               placeholder="Example: if RSI 1h below 30 and volume > 1.5x average enter long, if RSI 1h above 70 exit position"
+              style={{minHeight: '6rem'}}
             />
-            <div className="mt-2 text-xs text-[var(--text-muted)]">
-              Write clear conditions for when to enter long/short positions, when to exit, and any risk rules.
+            <div className="mt-2 flex justify-between items-center">
+              <div className="text-xs text-[var(--text-muted)]">
+                Write clear conditions for when to enter long/short positions, when to exit, and any risk rules.
+              </div>
+              <div className="text-xs text-[var(--text-muted)]">
+                {currentStrategy.length}/10,000
+              </div>
             </div>
           </div>
 

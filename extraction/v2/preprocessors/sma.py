@@ -93,13 +93,6 @@ class SMAPreprocessor(BasePreprocessor):
         # Moving average quality
         quality_analysis = self._analyze_ma_quality(sma_c, _den)
         
-        # Signal generation
-        signals = self._generate_sma_signals(cur_sma, cur_px, trend_analysis,
-                                           price_relationship, crossover_analysis)
-
-        # Confidence calculation
-        confidence = self._calculate_sma_confidence(sma_c, trend_analysis, quality_analysis)
-        
         return {
             "indicator": "SMA",
             "current": {
@@ -112,20 +105,31 @@ class SMAPreprocessor(BasePreprocessor):
             "context": {
                 "trend": trend_analysis,
                 "slope": slope_analysis,
-                "quality": quality_analysis
+                "quality": quality_analysis,
+                "length": length,
+                "smoothing_factor": round(2.0 / (length + 1), 4)
             },
             "levels": {
                 "price_relationship": price_relationship,
-                "support_resistance": support_resistance
+                "support_resistance": support_resistance,
+                "current_level": round(cur_sma, 4),
+                "trend_direction": trend_analysis.get("consensus", "mixed")
             },
             "patterns": {
-                "crossovers": crossover_analysis
+                "crossovers": crossover_analysis,
+                "trend_alignment": slope_analysis.get("alignment", "mixed"),
+                "slope_direction": slope_analysis.get("direction", "flat")
             },
             "evidence": {
-                "signals": signals
+                "data_quality": {
+                    "original_periods": len(sma),
+                    "aligned_periods": len(sma_c),
+                    "valid_data_percentage": round(len(sma_c) / len(sma) * 100, 1),
+                    "had_prices": px_c is not None,
+                    "calculation_periods": length
+                },
+                "calculation_notes": f"SMA analysis based on {len(sma_c)} periods with length={length}"
             },
-            "signals": signals,
-            "confidence": confidence,
             "summary": self._generate_sma_summary(cur_sma, cur_px, trend_analysis, price_relationship)
         }
     

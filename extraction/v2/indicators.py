@@ -167,59 +167,71 @@ class TechnicalIndicators:
         """Calculate Simple Moving Average."""
         if len(df) < length:
             raise ValueError(f"Need at least {length} periods for SMA calculation, got {len(df)}")
-        
+
         sma_series = ta.sma(df['close'], length=length)
-        
+
         if sma_series is None or sma_series.empty:
             raise ValueError("SMA calculation failed")
-        
-        current = float(sma_series.iloc[-1])
-        current_price = float(df['close'].iloc[-1])
-        
-        # Simple analysis
-        price_vs_sma = (current_price - current) / current * 100
-        
-        return {
-            "indicator": "SMA",
-            "period": length,
-            "current": round(current, 4),
-            "analysis": {
-                "price_vs_sma": round(price_vs_sma, 2),
-                "price_position": "above" if current_price > current else "below",
-                "trend": self._determine_ma_trend(sma_series)
-            },
-            "values": sma_series.dropna().tolist(),
-            "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
-        }
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            # Use sophisticated preprocessing
+            prices = df['close'] if 'close' in df.columns else None
+            return self.preprocessor.preprocess_sma(sma_series, prices, length=length)
+        else:
+            # Simple analytical context (fallback)
+            current = float(sma_series.iloc[-1])
+            current_price = float(df['close'].iloc[-1])
+
+            # Simple analysis
+            price_vs_sma = (current_price - current) / current * 100
+
+            return {
+                "indicator": "SMA",
+                "period": length,
+                "current": round(current, 4),
+                "analysis": {
+                    "price_vs_sma": round(price_vs_sma, 2),
+                    "price_position": "above" if current_price > current else "below",
+                    "trend": self._determine_ma_trend(sma_series)
+                },
+                "values": sma_series.dropna().tolist(),
+                "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
+            }
     
     def calculate_ema(self, df: pd.DataFrame, length: int = 20) -> Dict[str, Any]:
         """Calculate Exponential Moving Average."""
         if len(df) < length:
             raise ValueError(f"Need at least {length} periods for EMA calculation, got {len(df)}")
-        
+
         ema_series = ta.ema(df['close'], length=length)
-        
+
         if ema_series is None or ema_series.empty:
             raise ValueError("EMA calculation failed")
-        
-        current = float(ema_series.iloc[-1])
-        current_price = float(df['close'].iloc[-1])
-        
-        # Simple analysis
-        price_vs_ema = (current_price - current) / current * 100
-        
-        return {
-            "indicator": "EMA",
-            "period": length,
-            "current": round(current, 4),
-            "analysis": {
-                "price_vs_ema": round(price_vs_ema, 2),
-                "price_position": "above" if current_price > current else "below",
-                "trend": self._determine_ma_trend(ema_series)
-            },
-            "values": ema_series.dropna().tolist(),
-            "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
-        }
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            # Use sophisticated preprocessing
+            prices = df['close'] if 'close' in df.columns else None
+            return self.preprocessor.preprocess_ema(ema_series, prices, length=length)
+        else:
+            # Simple analytical context (fallback)
+            current = float(ema_series.iloc[-1])
+            current_price = float(df['close'].iloc[-1])
+
+            # Simple analysis
+            price_vs_ema = (current_price - current) / current * 100
+
+            return {
+                "indicator": "EMA",
+                "period": length,
+                "current": round(current, 4),
+                "analysis": {
+                    "price_vs_ema": round(price_vs_ema, 2),
+                    "price_position": "above" if current_price > current else "below",
+                    "trend": self._determine_ma_trend(ema_series)
+                },
+                "values": ema_series.dropna().tolist(),
+                "timestamp": df['timestamp'].iloc[-1] if 'timestamp' in df.columns else datetime.now()
+            }
     
     def calculate_bollinger_bands(self, df: pd.DataFrame, length: int = 20, std: float = 2.0) -> Dict[str, Any]:
         """Calculate Bollinger Bands."""
@@ -625,7 +637,59 @@ class TechnicalIndicators:
                 elif indicator.lower() == "aroon":
                     length = params.get("aroon_length", 14)
                     results["aroon"] = self.calculate_aroon(df, length)
-                
+
+                elif indicator.lower() == "bbands":
+                    length = params.get("bbands_length", 20)
+                    std = params.get("bbands_std", 2.0)
+                    results["bbands"] = self.calculate_bollinger_bands(df, length, std)
+
+                elif indicator.lower() == "bbwidth":
+                    length = params.get("bbwidth_length", 20)
+                    std = params.get("bbwidth_std", 2.0)
+                    results["bbwidth"] = self.calculate_bollinger_band_width(df, length, std)
+
+                elif indicator.lower() == "cci":
+                    length = params.get("cci_length", 20)
+                    results["cci"] = self.calculate_cci(df, length)
+
+                elif indicator.lower() == "donchian":
+                    length = params.get("donchian_length", 20)
+                    results["donchian"] = self.calculate_donchian_channels(df, length)
+
+                elif indicator.lower() == "keltner":
+                    length = params.get("keltner_length", 20)
+                    multiplier = params.get("keltner_multiplier", 2.0)
+                    results["keltner"] = self.calculate_keltner_channels(df, length, multiplier)
+
+                elif indicator.lower() == "mfi":
+                    length = params.get("mfi_length", 14)
+                    results["mfi"] = self.calculate_mfi(df, length)
+
+                elif indicator.lower() == "obv":
+                    results["obv"] = self.calculate_obv(df)
+
+                elif indicator.lower() == "psar":
+                    af_start = params.get("psar_af_start", 0.02)
+                    af_increment = params.get("psar_af_increment", 0.02)
+                    af_max = params.get("psar_af_max", 0.2)
+                    results["psar"] = self.calculate_psar(df, af_start, af_increment, af_max)
+
+                elif indicator.lower() == "roc":
+                    length = params.get("roc_length", 10)
+                    results["roc"] = self.calculate_roc(df, length)
+
+                elif indicator.lower() == "trix":
+                    length = params.get("trix_length", 14)
+                    results["trix"] = self.calculate_trix(df, length)
+
+                elif indicator.lower() == "vortex":
+                    length = params.get("vortex_length", 14)
+                    results["vortex"] = self.calculate_vortex(df, length)
+
+                elif indicator.lower() == "vwap":
+                    anchor = params.get("vwap_anchor", "D")
+                    results["vwap"] = self.calculate_vwap(df, anchor)
+
                 else:
                     self._log.warning(f"Indicator '{indicator}' not implemented yet")
                     
@@ -634,7 +698,143 @@ class TechnicalIndicators:
                 results[indicator] = {"error": str(e)}
         
         return results
-    
+
+    def calculate_bollinger_band_width(self, df: pd.DataFrame, length: int = 20, std: float = 2.0) -> Dict[str, Any]:
+        """Calculate Bollinger Band Width."""
+        bb = ta.bbands(df['close'], length=length, std=std)
+        if bb is None or bb.empty:
+            raise ValueError("Bollinger Band Width calculation failed")
+
+        upper = bb[f'BBU_{length}_{std}']
+        lower = bb[f'BBL_{length}_{std}']
+        width = (upper - lower) / bb[f'BBM_{length}_{std}'] * 100
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_bbwidth(width, df['close'], length=length, std=std)
+        else:
+            return {"indicator": "BBWidth", "current": round(float(width.iloc[-1]), 4)}
+
+    def calculate_cci(self, df: pd.DataFrame, length: int = 20) -> Dict[str, Any]:
+        """Calculate Commodity Channel Index."""
+        cci_series = ta.cci(df['high'], df['low'], df['close'], length=length)
+        if cci_series is None or cci_series.empty:
+            raise ValueError("CCI calculation failed")
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_cci(cci_series, df['close'], length=length)
+        else:
+            return {"indicator": "CCI", "current": round(float(cci_series.iloc[-1]), 2)}
+
+    def calculate_donchian_channels(self, df: pd.DataFrame, length: int = 20) -> Dict[str, Any]:
+        """Calculate Donchian Channels."""
+        donchian = ta.donchian(df['high'], df['low'], length=length)
+        if donchian is None or donchian.empty:
+            raise ValueError("Donchian Channels calculation failed")
+
+        upper = donchian[f'DCU_{length}_{length}']
+        lower = donchian[f'DCL_{length}_{length}']
+        middle = donchian[f'DCM_{length}_{length}']
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_donchian(upper, middle, lower, df['close'], length=length)
+        else:
+            return {"indicator": "Donchian", "upper": round(float(upper.iloc[-1]), 4), "lower": round(float(lower.iloc[-1]), 4)}
+
+    def calculate_keltner_channels(self, df: pd.DataFrame, length: int = 20, multiplier: float = 2.0) -> Dict[str, Any]:
+        """Calculate Keltner Channels."""
+        keltner = ta.kc(df['high'], df['low'], df['close'], length=length, scalar=multiplier)
+        if keltner is None or keltner.empty:
+            raise ValueError("Keltner Channels calculation failed")
+
+        upper = keltner[f'KCU_{length}_{multiplier}']
+        lower = keltner[f'KCL_{length}_{multiplier}']
+        middle = keltner[f'KCB_{length}_{multiplier}']
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_keltner(upper, middle, lower, df['close'], length=length, multiplier=multiplier)
+        else:
+            return {"indicator": "Keltner", "upper": round(float(upper.iloc[-1]), 4), "lower": round(float(lower.iloc[-1]), 4)}
+
+    def calculate_mfi(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
+        """Calculate Money Flow Index."""
+        mfi_series = ta.mfi(df['high'], df['low'], df['close'], df['volume'], length=length)
+        if mfi_series is None or mfi_series.empty:
+            raise ValueError("MFI calculation failed")
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_mfi(mfi_series, df['close'], length=length)
+        else:
+            return {"indicator": "MFI", "current": round(float(mfi_series.iloc[-1]), 2)}
+
+    def calculate_obv(self, df: pd.DataFrame) -> Dict[str, Any]:
+        """Calculate On-Balance Volume."""
+        obv_series = ta.obv(df['close'], df['volume'])
+        if obv_series is None or obv_series.empty:
+            raise ValueError("OBV calculation failed")
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_obv(obv_series, df['close'], df['volume'])
+        else:
+            return {"indicator": "OBV", "current": round(float(obv_series.iloc[-1]), 0)}
+
+    def calculate_psar(self, df: pd.DataFrame, af_start: float = 0.02, af_increment: float = 0.02, af_max: float = 0.2) -> Dict[str, Any]:
+        """Calculate Parabolic SAR."""
+        psar_series = ta.psar(df['high'], df['low'], af0=af_start, af=af_increment, max_af=af_max)
+        if psar_series is None or psar_series.empty:
+            raise ValueError("PSAR calculation failed")
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_psar(psar_series, df['close'], df['high'], df['low'])
+        else:
+            return {"indicator": "PSAR", "current": round(float(psar_series.iloc[-1]), 4)}
+
+    def calculate_roc(self, df: pd.DataFrame, length: int = 10) -> Dict[str, Any]:
+        """Calculate Rate of Change."""
+        roc_series = ta.roc(df['close'], length=length)
+        if roc_series is None or roc_series.empty:
+            raise ValueError("ROC calculation failed")
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_roc(roc_series, df['close'], length=length)
+        else:
+            return {"indicator": "ROC", "current": round(float(roc_series.iloc[-1]), 3)}
+
+    def calculate_trix(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
+        """Calculate TRIX."""
+        trix_series = ta.trix(df['close'], length=length)
+        if trix_series is None or trix_series.empty:
+            raise ValueError("TRIX calculation failed")
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_trix(trix_series, df['close'], length=length)
+        else:
+            return {"indicator": "TRIX", "current": round(float(trix_series.iloc[-1]), 6)}
+
+    def calculate_vortex(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
+        """Calculate Vortex Indicator."""
+        vortex = ta.vortex(df['high'], df['low'], df['close'], length=length)
+        if vortex is None or vortex.empty:
+            raise ValueError("Vortex calculation failed")
+
+        vi_plus = vortex[f'VTXP_{length}']
+        vi_minus = vortex[f'VTXM_{length}']
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_vortex(vi_plus, vi_minus, df['close'], length=length)
+        else:
+            return {"indicator": "Vortex", "vi_plus": round(float(vi_plus.iloc[-1]), 4), "vi_minus": round(float(vi_minus.iloc[-1]), 4)}
+
+    def calculate_vwap(self, df: pd.DataFrame, anchor: str = "D") -> Dict[str, Any]:
+        """Calculate Volume Weighted Average Price."""
+        vwap_series = ta.vwap(df['high'], df['low'], df['close'], df['volume'], anchor=anchor)
+        if vwap_series is None or vwap_series.empty:
+            raise ValueError("VWAP calculation failed")
+
+        if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
+            return self.preprocessor.preprocess_vwap(vwap_series, df['close'], df['volume'], anchor=anchor)
+        else:
+            return {"indicator": "VWAP", "current": round(float(vwap_series.iloc[-1]), 4)}
+
     def _analyze_oscillator(self, series: pd.Series, overbought: float, oversold: float, name: str) -> Dict[str, Any]:
         """Simple oscillator analysis."""
         current = float(series.iloc[-1])
