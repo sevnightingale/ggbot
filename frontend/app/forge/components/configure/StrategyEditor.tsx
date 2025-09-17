@@ -254,7 +254,7 @@ export function StrategyEditor({
               },
               {
                 id: 'openai',
-                name: 'OpenAI GPT-4',
+                name: 'OpenAI GPT-5',
                 description: 'Reliable and well-tested for trading analysis',
                 premium: true
               }
@@ -311,7 +311,7 @@ export function StrategyEditor({
           <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
             <div className="text-sm text-[var(--text-muted)]">
               Current: <span className="text-[var(--text-primary)] font-medium">
-                {llmProvider === 'deepseek' ? 'DeepSeek R1' : 'OpenAI GPT-4'}
+                {llmProvider === 'deepseek' ? 'DeepSeek R1' : 'OpenAI GPT-5'}
               </span> • Using platform keys
             </div>
           </div>

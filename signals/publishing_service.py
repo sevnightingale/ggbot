@@ -273,9 +273,9 @@ class SignalPublishingService:
         decision_result: Dict,
         channel_config: TelegramChannel
     ) -> str:
-        """Format validated signal using user's custom message template."""
+        """Format validated signal with standardized ggbots format."""
 
-        # Extract data for template variables
+        # Extract data for formatting
         action = decision_result.get('action', 'UNKNOWN').upper()
         confidence = decision_result.get('confidence', 0.0)
         reasoning = decision_result.get('reasoning', 'No reasoning provided')
@@ -286,39 +286,27 @@ class SignalPublishingService:
         else:
             symbol = signal_data.get('symbol', 'UNKNOWN')
 
-        # Use user's custom message template if provided
-        if channel_config.message_template:
-            try:
-                # Format the message using user's template
-                message = channel_config.message_template.format(
-                    ACTION=action,
-                    SYMBOL=symbol,
-                    CONFIDENCE=f"{confidence:.1%}",
-                    REASONING=reasoning if channel_config.include_reasoning else ""
-                )
+        # Check if signal meets user's confidence threshold
+        threshold_met = confidence >= channel_config.confidence_threshold
+        approval_status = "APPROVED" if threshold_met else "REJECTED"
 
-                # Add market context if requested
-                if channel_config.include_market_context:
-                    raw_message = getattr(signal_data, 'raw_message', '') or signal_data.get('raw_message', '')
-                    if raw_message and raw_message.strip() and raw_message != "Manual trigger initiated by user":
-                        message += f"\n\nOriginal Signal:\n{raw_message}"
-
-                return message.strip()
-
-            except KeyError as e:
-                # Template variable missing, fall back to simple format
-                self.logger.warning(f"Invalid template variable {e}, using fallback format")
-            except Exception as e:
-                # Template formatting failed, fall back to simple format
-                self.logger.error(f"Template formatting failed: {e}, using fallback format")
-
-        # Fallback to simple format if no template or formatting failed
+        # Standardized ggbots message format
         message_parts = [
-            f"🔥 {action} {symbol} - Confidence: {confidence:.1%}"
+            f"Signal: {approval_status}",
+            f"🔥 {action} {symbol}",
+            f"Confidence: {confidence:.1%} (threshold: {channel_config.confidence_threshold:.1%})",
+            "",
+            f"Reasoning: {reasoning}"
         ]
 
-        if channel_config.include_reasoning and reasoning:
-            message_parts.append(f"\n{reasoning}")
+        # Add original signal context if available and not manual trigger
+        raw_message = getattr(signal_data, 'raw_message', '') or signal_data.get('raw_message', '')
+        if raw_message and raw_message.strip() and raw_message != "Manual trigger initiated by user":
+            message_parts.extend([
+                "",
+                "Original Signal:",
+                raw_message
+            ])
 
         return "\n".join(message_parts)
     
