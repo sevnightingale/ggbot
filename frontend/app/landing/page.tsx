@@ -1,21 +1,31 @@
-import Hero from '@/components/landing/Hero'
-import Features from '@/components/landing/Features'
-import AgentShowcase from '@/components/landing/AgentShowcase'
-import Footer from '@/components/landing/Footer'
+import Header from '@/components/new-landing/Header'
+import Hero from '@/components/new-landing/Hero'
+import Demo from '@/components/new-landing/Demo'
+import Process from '@/components/new-landing/Process'
+import PersonalStory from '@/components/new-landing/PersonalStory'
+import Features from '@/components/new-landing/Features'
+import Video from '@/components/new-landing/Video'
+import FAQ from '@/components/new-landing/FAQ'
+import Pricing from '@/components/new-landing/Pricing'
 
-export default function LandingPage() {
+export default function NewLandingPage() {
   return (
     <main className="min-h-screen bg-charcoal-900">
+      <Header />
       <Hero />
-      <AgentShowcase />
+      <Demo />
+      <Process />
+      <PersonalStory />
       <Features />
-      <Footer />
+      <Video />
+      <FAQ />
+      <Pricing />
     </main>
   )
 }
 
 export const metadata = {
-  title: 'ggbots - AI trading agents that trade like you',
-  description: 'deploy autonomous AI trading agents that analyze markets, adapt to conditions, and execute your strategies 24/7.',
-  keywords: 'AI trading, autonomous trading bots, cryptocurrency trading, algorithmic trading',
+  title: 'ggbots - AI trading agents that adapt like you do',
+  description: 'Create autonomous AI trading bots that think, adapt, and execute your strategies 24/7. Built by traders, for traders.',
+  keywords: 'AI trading, autonomous trading bots, cryptocurrency trading, algorithmic trading, adaptive bots',
 }
