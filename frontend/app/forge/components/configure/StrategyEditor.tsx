@@ -62,14 +62,18 @@ export function StrategyEditor({
   const handleProviderChange = (provider: string) => {
     // Check if user has access to premium LLMs
     if (provider === 'openai' && !canAccess('premium_llms')) {
-      alert('Premium AI models require a ggbase subscription. Upgrade to access OpenAI GPT-4!')
+      alert('Premium AI models require a ggbase subscription. Upgrade to access OpenAI GPT-5!')
       return
     }
+
+    // Set appropriate model for each provider
+    const model = provider === 'openai' ? 'gpt-5' : 'deepseek-reasoner'
 
     onUpdate?.({
       llm_config: {
         ...configData?.llm_config,
         provider,
+        model,
         use_platform_keys: true,
         use_own_key: false
       }
