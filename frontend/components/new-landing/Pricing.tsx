@@ -87,11 +87,11 @@ export default function Pricing() {
                   {plan.name}
                 </h3>
                 <div className="mb-4">
-                  <span className={`text-3xl font-bold text-bone-200 ${plan.price !== "Free" ? "blur-sm" : ""}`}>
+                  <span className={`text-3xl font-bold text-bone-200 ${plan.price !== "Free" ? "blur-xl" : ""}`}>
                     {plan.price}
                   </span>
                   {plan.price !== "Free" && (
-                    <span className="text-bone-200/60 ml-1 blur-sm">/month</span>
+                    <span className="text-bone-200/60 ml-1 blur-xl">/month</span>
                   )}
                 </div>
                 <p className="text-sm text-bone-200/70">
