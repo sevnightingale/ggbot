@@ -905,9 +905,9 @@ class GGBotOrchestrator:
                     "action": action
                 }
             
-            # Get trading config from config  
+            # Get trading config from config
             trading_config = config.trading or {}
-            symbol = config.selected_pair or "BTC/USDT"
+            symbol = decision_result.get("symbol") or config.selected_pair or "BTC/USDT"
             
             # Map decision actions to trading actions
             if action in ["enter", "long"]:
