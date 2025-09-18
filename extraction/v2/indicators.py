@@ -39,6 +39,7 @@ class TechnicalIndicators:
             "sma": {"length": 20},
             "ema": {"length": 20},
             "bollinger_bands": {"length": 20, "std": 2.0},
+            "bbands": {"length": 20, "std": 2.0},
             "stochastic": {"k": 14, "d": 3},
             "williams_r": {"length": 14},
             "atr": {"length": 14},
@@ -47,7 +48,16 @@ class TechnicalIndicators:
             "cci": {"length": 20},
             "mfi": {"length": 14},
             "obv": {},  # No parameters
-            "vwap": {"anchor": "D"}
+            "vwap": {"anchor": "D"},
+            "aroon": {"length": 14},
+            "bbwidth": {"length": 20, "std": 2.0},
+            "donchian": {"length": 20},
+            "keltner": {"length": 20, "multiplier": 2.0},
+            "psar": {"af_start": 0.02, "af_increment": 0.02, "af_max": 0.2},
+            "trix": {"length": 14},
+            "vortex": {"length": 14},
+            "dc": {"length": 20},
+            "bbw": {"length": 20, "std": 2.0}
         }
     
     def calculate_rsi(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
@@ -690,6 +700,20 @@ class TechnicalIndicators:
                     anchor = params.get("vwap_anchor", "D")
                     results["vwap"] = self.calculate_vwap(df, anchor)
 
+                elif indicator.lower() == "bbw":
+                    length = params.get("bbw_length", 20)
+                    std = params.get("bbw_std", 2.0)
+                    results["bbw"] = self.calculate_bollinger_band_width(df, length, std)
+
+                elif indicator.lower() == "dc":
+                    length = params.get("dc_length", 20)
+                    results["dc"] = self.calculate_donchian_channels(df, length)
+
+                elif indicator.lower() == "ggshot":
+                    # ggshot is a signal, not a technical indicator - skip gracefully
+                    self._log.debug(f"Skipping '{indicator}' - signals are not calculated in extraction phase")
+                    continue
+
                 else:
                     self._log.warning(f"Indicator '{indicator}' not implemented yet")
                     
@@ -746,9 +770,10 @@ class TechnicalIndicators:
         if keltner is None or keltner.empty:
             raise ValueError("Keltner Channels calculation failed")
 
-        upper = keltner[f'KCU_{length}_{multiplier}']
-        lower = keltner[f'KCL_{length}_{multiplier}']
-        middle = keltner[f'KCB_{length}_{multiplier}']
+        # pandas-ta uses 'e' suffix for Keltner columns
+        upper = keltner[f'KCUe_{length}_{multiplier}']
+        lower = keltner[f'KCLe_{length}_{multiplier}']
+        middle = keltner[f'KCBe_{length}_{multiplier}']
 
         if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
             return self.preprocessor.preprocess_keltner(upper, middle, lower, df['close'], length=length, multiplier=multiplier)
@@ -779,9 +804,19 @@ class TechnicalIndicators:
 
     def calculate_psar(self, df: pd.DataFrame, af_start: float = 0.02, af_increment: float = 0.02, af_max: float = 0.2) -> Dict[str, Any]:
         """Calculate Parabolic SAR."""
-        psar_series = ta.psar(df['high'], df['low'], af0=af_start, af=af_increment, max_af=af_max)
-        if psar_series is None or psar_series.empty:
+        if len(df) < 2:
+            raise ValueError("Need at least 2 periods for PSAR calculation")
+
+        psar_result = ta.psar(df['high'], df['low'], af0=af_start, af=af_increment, max_af=af_max)
+        if psar_result is None or psar_result.empty:
             raise ValueError("PSAR calculation failed")
+
+        # Extract the main PSAR series (long and short combined)
+        psar_long = psar_result[f'PSARl_{af_start}_{af_max}']
+        psar_short = psar_result[f'PSARs_{af_start}_{af_max}']
+
+        # Combine long and short PSAR values (one will be NaN, other will have value)
+        psar_series = psar_long.fillna(psar_short)
 
         if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
             return self.preprocessor.preprocess_psar(psar_series, df['close'], df['high'], df['low'])
@@ -801,9 +836,16 @@ class TechnicalIndicators:
 
     def calculate_trix(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
         """Calculate TRIX."""
-        trix_series = ta.trix(df['close'], length=length)
-        if trix_series is None or trix_series.empty:
+        if len(df) < length * 3:  # TRIX needs triple smoothing
+            raise ValueError(f"Need at least {length * 3} periods for TRIX calculation, got {len(df)}")
+
+        trix_result = ta.trix(df['close'], length=length)
+        if trix_result is None or trix_result.empty:
             raise ValueError("TRIX calculation failed")
+
+        # Extract the main TRIX series
+        signal_length = 9  # Default signal length used by pandas-ta
+        trix_series = trix_result[f'TRIX_{length}_{signal_length}']
 
         if self.use_advanced_preprocessing and hasattr(self, 'preprocessor'):
             return self.preprocessor.preprocess_trix(trix_series, df['close'], length=length)
@@ -826,7 +868,53 @@ class TechnicalIndicators:
 
     def calculate_vwap(self, df: pd.DataFrame, anchor: str = "D") -> Dict[str, Any]:
         """Calculate Volume Weighted Average Price."""
-        vwap_series = ta.vwap(df['high'], df['low'], df['close'], df['volume'], anchor=anchor)
+        if len(df) < 1:
+            raise ValueError("Need at least 1 period for VWAP calculation")
+
+        # Create a copy of the dataframe to avoid modifying the original
+        df_copy = df.copy()
+        vwap_series = None
+
+        # Check if we have a timestamp column and create proper datetime index
+        if 'timestamp' in df.columns:
+            df_copy.index = pd.to_datetime(df['timestamp'])
+            # Use pandas-ta VWAP with proper datetime index
+            try:
+                vwap_series = ta.vwap(df_copy['high'], df_copy['low'], df_copy['close'], df_copy['volume'], anchor=anchor)
+                # Ensure VWAP series has same index as original DataFrame for compatibility
+                if vwap_series is not None:
+                    vwap_series.index = df.index
+            except Exception:
+                # Fallback to simple VWAP calculation with original index
+                typical_price = (df['high'] + df['low'] + df['close']) / 3
+                cumulative_tp_volume = (typical_price * df['volume']).cumsum()
+                cumulative_volume = df['volume'].cumsum()
+                vwap_series = cumulative_tp_volume / cumulative_volume
+        elif not isinstance(df.index, pd.DatetimeIndex):
+            # If no timestamp column and index is not datetime, use default range index
+            # For VWAP without proper datetime index, calculate simple VWAP
+            typical_price = (df_copy['high'] + df_copy['low'] + df_copy['close']) / 3
+            cumulative_tp_volume = (typical_price * df_copy['volume']).cumsum()
+            cumulative_volume = df_copy['volume'].cumsum()
+            vwap_series = cumulative_tp_volume / cumulative_volume
+        else:
+            # Use pandas-ta VWAP with proper datetime index
+            try:
+                vwap_series = ta.vwap(df_copy['high'], df_copy['low'], df_copy['close'], df_copy['volume'], anchor=anchor)
+            except Exception:
+                # Fallback to simple VWAP calculation
+                typical_price = (df_copy['high'] + df_copy['low'] + df_copy['close']) / 3
+                cumulative_tp_volume = (typical_price * df_copy['volume']).cumsum()
+                cumulative_volume = df_copy['volume'].cumsum()
+                vwap_series = cumulative_tp_volume / cumulative_volume
+
+        # If still no vwap_series, use fallback calculation with original index
+        if vwap_series is None:
+            typical_price = (df['high'] + df['low'] + df['close']) / 3
+            cumulative_tp_volume = (typical_price * df['volume']).cumsum()
+            cumulative_volume = df['volume'].cumsum()
+            vwap_series = cumulative_tp_volume / cumulative_volume
+
         if vwap_series is None or vwap_series.empty:
             raise ValueError("VWAP calculation failed")
 
