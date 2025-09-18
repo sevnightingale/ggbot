@@ -4,7 +4,6 @@ import React, { useState, useEffect } from 'react'
 import { User, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
-import Image from 'next/image'
 
 interface UserProfileProps {
   className?: string
@@ -94,11 +93,9 @@ export function UserProfile({}: UserProfileProps) {
         title="User profile and settings"
       >
         {getAvatarUrl() ? (
-          <Image
-            src={getAvatarUrl()!}
+          <img
+            src={getAvatarUrl()}
             alt={getDisplayName()}
-            width={32}
-            height={32}
             className="h-full w-full object-cover"
           />
         ) : (
