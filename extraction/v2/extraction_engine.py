@@ -18,6 +18,7 @@ from .data_client import HummingbotDataClient
 from .indicators import TechnicalIndicators
 from .file_storage import FileStorage
 from .supabase_storage import SupabaseStorage
+from .smart_limits import get_batch_limit, get_efficiency_report
 
 
 class ExtractionEngineV2:
@@ -90,12 +91,19 @@ class ExtractionEngineV2:
         Returns:
             Dictionary with extraction results
         """
-        self._log.info(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe})")
-        
+        # Use smart limit if not explicitly provided
+        smart_limit = get_batch_limit(indicators, timeframe)
+        if smart_limit != 200:  # Only log if different from default
+            efficiency = get_efficiency_report(indicators, timeframe)
+            self._log.info(f"Smart limits: using {smart_limit} candles (vs 200 static), saving {efficiency['percent_reduction']}%")
+
+        actual_limit = limit if limit != 200 else smart_limit
+        self._log.info(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe}) with {actual_limit} candles")
+
         try:
             # Step 1: Fetch OHLCV data from Hummingbot
             async with self.data_client:
-                df = await self.data_client.get_candles(symbol, timeframe, limit, connector)
+                df = await self.data_client.get_candles(symbol, timeframe, actual_limit, connector)
             
             if df.empty:
                 raise ValueError(f"No data received for {symbol}")
