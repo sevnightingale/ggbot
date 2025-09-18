@@ -383,7 +383,7 @@ class SignalListenerService:
                     # Filter results to only include configs that actually have this signal in data_points
                     subscribers = []
                     for row in results:
-                        config_id, user_id, config_data = row[0], row[1], json.loads(row[2])
+                        config_id, user_id, config_data = row[0], row[1], row[2]
                         
                         # Handle nested config_data structure (same as publishing service)
                         if "config_data" in config_data:

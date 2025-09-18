@@ -117,9 +117,11 @@ function PipelineTicker({ executionStatus, isActive }: PipelineTickerProps) {
     <div className="flex items-center gap-2 text-xs">
       {stages.map((stage, index) => {
         const isCurrentStage = executionStatus === stage.key || (!isActive && stage.key === 'idle')
+        const isIdleStage = stage.key === 'idle'
+        const isLastStage = index === stages.length - 1
 
         return (
-          <div className="flex items-center" key={stage.key}>
+          <div className={`flex items-center ${isIdleStage ? 'hidden md:flex' : ''}`} key={stage.key}>
             <div className={`flex items-center gap-1 rounded-full px-2 py-1 transition-colors ${
               isCurrentStage
                 ? 'bg-[var(--bg-tertiary)] border border-[var(--border)]'
@@ -142,8 +144,11 @@ function PipelineTicker({ executionStatus, isActive }: PipelineTickerProps) {
                 {stage.label}
               </span>
             </div>
-            {index < stages.length - 1 && (
-              <div className="mx-1 h-3.5 w-3.5 text-[var(--text-muted)] opacity-40">→</div>
+            {/* Hide arrow before idle stage on mobile, and don't show arrow after last visible stage */}
+            {!isLastStage && (
+              <div className={`mx-1 h-3.5 w-3.5 text-[var(--text-muted)] opacity-40 ${
+                index === 2 ? 'hidden md:block' : ''
+              }`}>→</div>
             )}
           </div>
         )
