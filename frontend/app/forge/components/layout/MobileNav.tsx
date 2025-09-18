@@ -3,14 +3,37 @@
 import React, { useState } from 'react'
 import { Bot, X } from 'lucide-react'
 import { BotRail } from './BotRail'
+import { BotConfiguration } from '@/lib/api'
+
+interface Account {
+  config_id: string
+  account_id: string
+  current_balance: number
+  total_pnl: number
+  total_trades: number
+  win_trades: number
+  loss_trades: number
+  open_positions: number
+  updated_at: string
+  unrealized_pnl?: number
+  daily_pnl?: number
+  portfolio_return_pct?: number
+  total_balance?: number
+  win_rate?: number
+  avg_win?: number
+  avg_loss?: number
+  largest_win?: number
+  largest_loss?: number
+  sharpe_ratio?: number
+}
 
 interface MobileNavProps {
   className?: string
   // Bot rail props that need to be passed through
-  bots: any[]
+  bots: BotConfiguration[]
   selectedId: string | null
   onSelect: (configId: string) => void
-  accounts: any[]
+  accounts: Account[]
   onCreateNew: () => void
   isCreatingNew: boolean
   onRename: (configId: string, newName: string) => void
