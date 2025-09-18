@@ -96,6 +96,7 @@ export default function SignupPage() {
             providers={[]}
             view="sign_up"
             showLinks={true}
+            redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ggbot-app.vercel.app'}/forge`}
           />
         </div>
 
