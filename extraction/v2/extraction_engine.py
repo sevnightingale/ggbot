@@ -119,6 +119,7 @@ class ExtractionEngineV2:
                 "timeframe": timeframe,
                 "connector": connector,
                 "data_points": len(df),
+                "limit_used": actual_limit,
                 "timestamp": datetime.utcnow().isoformat(),
                 "indicators": indicator_results,
                 "config_id": config_id,
