@@ -1,18 +1,14 @@
 'use client'
 
+import { Auth } from '@supabase/auth-ui-react'
+import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { createClient } from '@/lib/supabase'
-import { useEffect, useState } from 'react'
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import OTPVerification from '@/components/OTPVerification'
 
 export default function LoginPage() {
   const supabase = createClient()
   const router = useRouter()
-  const [email, setEmail] = useState('')
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
-  const [showOTP, setShowOTP] = useState(false)
-  const [otpEmail, setOtpEmail] = useState('')
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -24,54 +20,6 @@ export default function LoginPage() {
     return () => subscription.unsubscribe()
   }, [supabase.auth, router])
 
-  const handleLogin = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setLoading(true)
-    setError('')
-
-    try {
-      const { error: otpError } = await supabase.auth.signInWithOtp({
-        email,
-        options: {
-          shouldCreateUser: false
-        }
-      })
-
-      if (otpError) {
-        setError(otpError.message)
-        return
-      }
-
-      setOtpEmail(email)
-      setShowOTP(true)
-    } catch {
-      setError('An unexpected error occurred')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const handleOtpSuccess = () => {
-    router.push('/forge')
-  }
-
-  const handleOtpBack = () => {
-    setShowOTP(false)
-    setOtpEmail('')
-  }
-
-  if (showOTP) {
-    return (
-      <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
-        <OTPVerification
-          email={otpEmail}
-          onSuccess={handleOtpSuccess}
-          onBack={handleOtpBack}
-        />
-      </div>
-    )
-  }
-
   return (
     <div className="min-h-screen bg-charcoal-900 flex items-center justify-center p-8">
       <div className="max-w-md w-full">
@@ -81,36 +29,74 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-charcoal-800 p-8 rounded-lg border border-gray-700">
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div>
-              <label htmlFor="email" className="block text-sm font-medium text-bone-300 mb-2">
-                Email
-              </label>
-              <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 bg-charcoal-900 border border-charcoal-600 rounded-lg text-bone-200 focus:border-orange-400 focus:outline-none"
-                placeholder="Enter your email"
-                required
-              />
-            </div>
-
-            {error && (
-              <div className="text-red-400 text-sm">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full px-4 py-3 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-600 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
-            >
-              {loading ? 'Sending code...' : 'Send login code'}
-            </button>
-          </form>
+          <Auth
+            supabaseClient={supabase}
+            appearance={{
+              theme: ThemeSupa,
+              variables: {
+                default: {
+                  colors: {
+                    brand: '#be6a47', // agent-trading orange to match your theme
+                    brandAccent: '#a85a3f', // slightly darker agent-trading
+                    brandButtonText: 'white',
+                    defaultButtonBackground: '#1f1f23', // charcoal-800
+                    defaultButtonBackgroundHover: '#2a2a30', // charcoal-700
+                    defaultButtonBorder: '#36363d', // charcoal-600
+                    defaultButtonText: '#e3e5e6', // bone-200
+                    dividerBackground: '#36363d', // charcoal-600
+                    inputBackground: '#161618', // charcoal-900
+                    inputBorder: '#36363d', // charcoal-600
+                    inputBorderHover: '#4b5563', // lighter on hover
+                    inputBorderFocus: '#be6a47', // agent-trading orange
+                    inputText: '#e3e5e6', // bone-200
+                    inputLabelText: '#d6d8da', // bone-300
+                    inputPlaceholder: '#9ca3af', // gray-400
+                    messageText: '#e3e5e6', // bone-200
+                    messageTextDanger: '#ef4444', // red-400 (your status color)
+                    messageBackground: '#1f1f23', // charcoal-800
+                    messageBackgroundDanger: '#2a1f1f', // dark red background
+                    anchorTextColor: '#be6a47', // agent-trading orange
+                    anchorTextHoverColor: '#a85a3f', // darker agent-trading
+                  },
+                  space: {
+                    spaceSmall: '4px',
+                    spaceMedium: '8px',
+                    spaceLarge: '16px',
+                    labelBottomMargin: '8px',
+                    anchorBottomMargin: '4px',
+                    emailInputSpacing: '4px',
+                    socialAuthSpacing: '4px',
+                    buttonPadding: '10px 15px',
+                    inputPadding: '10px 15px',
+                  },
+                  fontSizes: {
+                    baseBodySize: '13px',
+                    baseInputSize: '14px',
+                    baseLabelSize: '14px',
+                    baseButtonSize: '14px',
+                  },
+                  fonts: {
+                    bodyFontFamily: `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif`,
+                    buttonFontFamily: `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif`,
+                    inputFontFamily: `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif`,
+                    labelFontFamily: `ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", sans-serif`,
+                  },
+                  borderWidths: {
+                    buttonBorderWidth: '1px',
+                    inputBorderWidth: '1px',
+                  },
+                  radii: {
+                    borderRadiusButton: '6px',
+                    buttonBorderRadius: '6px',
+                    inputBorderRadius: '6px',
+                  },
+                },
+              },
+            }}
+            providers={[]}
+            view="sign_in"
+            showLinks={true}
+          />
         </div>
 
         <div className="text-center mt-6">
