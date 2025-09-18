@@ -3,12 +3,37 @@
 import { Auth } from '@supabase/auth-ui-react'
 import { ThemeSupa } from '@supabase/auth-ui-shared'
 import { createClient } from '@/lib/supabase'
-import { useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 export default function LoginPage() {
   const supabase = createClient()
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const [errorMessage, setErrorMessage] = useState<string | null>(null)
+
+  // Check for error messages from auth callback
+  useEffect(() => {
+    const error = searchParams.get('error')
+    if (error) {
+      switch (error) {
+        case 'oauth_error':
+          setErrorMessage('OAuth authentication failed. Please try again.')
+          break
+        case 'auth_error':
+          setErrorMessage('Authentication error occurred. Please try again.')
+          break
+        case 'no_session':
+          setErrorMessage('Session could not be established. Please try again.')
+          break
+        case 'callback_error':
+          setErrorMessage('Authentication callback failed. Please try again.')
+          break
+        default:
+          setErrorMessage('Authentication failed. Please try again.')
+      }
+    }
+  }, [searchParams])
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
@@ -29,6 +54,12 @@ export default function LoginPage() {
         </div>
 
         <div className="bg-charcoal-800 p-8 rounded-lg border border-gray-700">
+          {errorMessage && (
+            <div className="mb-4 p-3 bg-red-900/20 border border-red-500/50 rounded text-red-200 text-sm">
+              {errorMessage}
+            </div>
+          )}
+
           <Auth
             supabaseClient={supabase}
             appearance={{
@@ -96,7 +127,7 @@ export default function LoginPage() {
             providers={['google']}
             view="sign_in"
             showLinks={true}
-            redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ggbot-app.vercel.app'}/forge`}
+            redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.ggbots.ai'}/auth/callback`}
           />
         </div>
 
