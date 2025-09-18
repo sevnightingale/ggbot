@@ -962,7 +962,19 @@ function ForgeApp() {
           </main>
         </div>
 
-      <MobileNav className="md:hidden" />
+      <MobileNav
+        className="md:hidden"
+        bots={allBots}
+        selectedId={selectedConfigId}
+        onSelect={handleBotSelection}
+        accounts={accounts}
+        onCreateNew={handleCreateNewBot}
+        isCreatingNew={isCreatingNew}
+        onRename={handleRenameBot}
+        onDuplicate={handleDuplicateBot}
+        onDelete={handleDeleteBot}
+        isBotAction={isBotAction}
+      />
     </div>
   )
 }
