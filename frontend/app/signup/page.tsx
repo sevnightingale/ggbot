@@ -15,6 +15,11 @@ export default function SignupPage() {
       if (event === 'SIGNED_IN' && session) {
         router.push('/forge')
       }
+
+      // Handle OTP verification flow
+      if (event === 'USER_UPDATED' && session?.user?.email_confirmed_at) {
+        router.push('/forge')
+      }
     })
 
     return () => subscription.unsubscribe()
@@ -29,7 +34,7 @@ export default function SignupPage() {
         </div>
         
         <div className="bg-charcoal-800 p-8 rounded-lg border border-gray-700">
-          <Auth 
+          <Auth
             supabaseClient={supabase}
             appearance={{
               theme: ThemeSupa,
@@ -93,10 +98,11 @@ export default function SignupPage() {
                 },
               },
             }}
-            providers={[]} // Start with just email, add social providers when you set them up
+            providers={[]}
             view="sign_up"
             showLinks={true}
-            // No redirectTo needed for OTP flow - verification happens in-app
+            otpType="email"
+            onlyThirdPartyProviders={false}
           />
         </div>
         

@@ -44,7 +44,26 @@ class VWAPPreprocessor(BasePreprocessor):
             return {"error": "Price data required for VWAP analysis"}
         prices = _num(prices)
 
-        df = pd.concat({"vwap": vwap, "price": prices}, axis=1, join="inner").dropna()
+        # Robust alignment - handle different indices
+        if len(vwap) == 0:
+            return {"error": "No valid VWAP data after cleaning"}
+        if len(prices) == 0:
+            return {"error": "No valid price data after cleaning"}
+
+        # Align by position if indices don't match, or by index if they do
+        try:
+            df = pd.concat({"vwap": vwap, "price": prices}, axis=1, join="inner").dropna()
+        except Exception:
+            # Fallback: align by position (take shorter length)
+            min_len = min(len(vwap), len(prices))
+            if min_len < 5:
+                return {"error": "Insufficient aligned data for VWAP analysis"}
+
+            # Create new series with matching indices
+            vwap = pd.Series(vwap.iloc[-min_len:].values, index=range(min_len))
+            prices = pd.Series(prices.iloc[-min_len:].values, index=range(min_len))
+            df = pd.DataFrame({"vwap": vwap, "price": prices})
+
         if len(df) < 5:
             return {"error": "Insufficient data for VWAP analysis"}
 
