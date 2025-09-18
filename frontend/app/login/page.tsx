@@ -93,7 +93,7 @@ export default function LoginPage() {
                 },
               },
             }}
-            providers={[]}
+            providers={['google']}
             view="sign_in"
             showLinks={true}
             redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://ggbot-app.vercel.app'}/forge`}
