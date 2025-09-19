@@ -303,33 +303,12 @@ class GGBotOrchestrator:
                     )
                 else:
                     # Manual trigger - fetch latest real ggShot signal
-                    try:
-                        latest_signal = await self._fetch_latest_ggshot_signal()
-                        return await self._run_signal_validation_cycle(
-                            config, latest_signal, override_symbol
-                        )
-                    except Exception as e:
-                        # If fetching real signal fails, fall back to mock for manual testing
-                        self._log.warning(f"Could not fetch latest ggShot signal, using mock: {e}")
-                        from signals.listener_service import SignalData
-                        
-                        mock_signal = SignalData(
-                            source="manual_trigger",
-                            symbol=override_symbol or config.selected_pair,
-                            direction="LONG",
-                            timeframe="1h",
-                            confidence=0.8,
-                            entry_zone={"low": 0, "high": 0, "mid": 0},
-                            stop_loss=0,
-                            take_profit=0,
-                            reasoning="Manual trigger test - could not fetch real signal",
-                            raw_message="Manual trigger fallback - real signal unavailable",
-                            metadata={"manual_trigger": True, "fallback": True},
-                            timestamp=datetime.now(timezone.utc)
-                        )
-                        return await self._run_signal_validation_cycle(
-                            config, mock_signal, override_symbol
-                        )
+                    latest_signal = await self._fetch_latest_ggshot_signal()
+                    # Convert SignalData object to dict for decision engine
+                    signal_dict = self._signal_data_to_dict(latest_signal)
+                    return await self._run_signal_validation_cycle(
+                        config, signal_dict, override_symbol
+                    )
             else:
                 return await self._run_autonomous_trading_cycle(config)
             
@@ -747,7 +726,24 @@ class GGBotOrchestrator:
             self._log.warning("Publishing service not available - signals not published")
         except Exception as e:
             self._log.error(f"Error publishing signal for config {config.config_id}: {e}")
-    
+
+    def _signal_data_to_dict(self, signal_data) -> Dict:
+        """Convert SignalData object to dict for decision engine."""
+        return {
+            'source': signal_data.source,
+            'symbol': signal_data.symbol,
+            'direction': signal_data.direction,
+            'timeframe': signal_data.timeframe,
+            'confidence': signal_data.confidence,
+            'entry_zone': signal_data.entry_zone,
+            'stop_loss': signal_data.stop_loss,
+            'take_profit': signal_data.take_profit,
+            'reasoning': signal_data.reasoning,
+            'raw_message': signal_data.raw_message,
+            'metadata': signal_data.metadata,
+            'timestamp': signal_data.timestamp.isoformat() if hasattr(signal_data.timestamp, 'isoformat') else str(signal_data.timestamp)
+        }
+
     async def _get_extraction_engine(self, user_id: str) -> ExtractionEngineV2:
         """Get or create V2 extraction engine for user."""
         if user_id not in self._extraction_engines:

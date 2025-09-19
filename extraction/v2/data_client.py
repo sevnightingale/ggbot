@@ -140,7 +140,56 @@ class HummingbotDataClient:
         except Exception as e:
             self._log.error(f"Error fetching candles for {symbol}: {str(e)}")
             raise
-    
+
+    async def get_candles_with_fallback(
+        self,
+        symbol: str,
+        timeframe: str = "1h",
+        limit: int = 100
+    ) -> pd.DataFrame:
+        """
+        Get OHLCV candle data with automatic exchange fallback.
+
+        Tries multiple exchanges in priority order until one succeeds.
+
+        Args:
+            symbol: Trading pair (e.g., "BTC/USDT")
+            timeframe: Candle timeframe (e.g., "1h", "15m", "1d")
+            limit: Number of candles to retrieve
+
+        Returns:
+            pandas DataFrame with columns: timestamp, open, high, low, close, volume
+
+        Raises:
+            Exception: If symbol is not available on any exchange
+        """
+        exchanges = self.get_supported_connectors()
+
+        self._log.info(f"Attempting to fetch {symbol} from {len(exchanges)} exchanges")
+
+        for i, exchange in enumerate(exchanges):
+            try:
+                self._log.debug(f"Trying {symbol} on {exchange} (attempt {i+1}/{len(exchanges)})")
+
+                df = await self.get_candles(symbol, timeframe, limit, exchange)
+
+                if df is not None and len(df) > 0:
+                    if i > 0:  # Only log fallback if not first exchange
+                        self._log.info(f"✅ Fallback success: {symbol} retrieved from {exchange}")
+                    else:
+                        self._log.info(f"✅ {symbol} retrieved from {exchange}")
+                    return df
+
+            except Exception as e:
+                error_msg = str(e).strip()
+                self._log.debug(f"❌ {symbol} failed on {exchange}: {error_msg}")
+
+                # Continue to next exchange
+                continue
+
+        # All exchanges failed
+        raise Exception(f"Symbol {symbol} not available on any of {len(exchanges)} exchanges: {exchanges}")
+
     async def test_connection(self) -> Dict[str, Any]:
         """
         Test connection to Hummingbot API.

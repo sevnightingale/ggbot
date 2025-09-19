@@ -357,35 +357,31 @@ class DecisionEngineV2:
     
     async def _get_current_price(self, symbol: str) -> Decimal:
         """
-        Get current market price using the same Hummingbot API as paper trading.
+        Get current market price using multi-exchange fallback for maximum reliability.
         """
         try:
             from trading.paper.market_data import MarketDataAdapter
-            
+
             adapter = MarketDataAdapter()
-            market_price = await adapter.get_current_price(symbol)
-            
+            market_price = await adapter.get_current_price_with_fallback(symbol)
+
             # Use mid price (average of bid/ask)
             price = Decimal(str(market_price.mid))
-            
+
             logger.bind(
-                config_id=self.config_id, 
-                symbol=symbol, 
+                config_id=self.config_id,
+                symbol=symbol,
                 price=float(price),
                 bid=market_price.bid,
                 ask=market_price.ask
-            ).debug("Retrieved current price from Hummingbot API")
-            
+            ).debug("Retrieved current price with multi-exchange fallback")
+
             return price
-            
+
         except Exception as e:
-            logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to get current price from Hummingbot API: {e}")
-            
-            # Emergency fallback with warning
-            logger.bind(config_id=self.config_id, symbol=symbol).error(
-                "Price source failed - using emergency mock price"
-            )
-            return Decimal("100.00")
+            logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to get current price from all exchanges: {e}")
+            # No more dangerous mock fallback - let the error propagate for proper handling
+            raise MarketDataError(f"Unable to get current price for {symbol} from any exchange: {e}")
     
     async def _build_signal_validation_prompt(
         self, 
@@ -793,20 +789,21 @@ Take Profit: {take_profit_text}
     
     def _format_signal_for_llm(self, signal_data: Dict) -> str:
         """Format signal data for LLM consumption."""
+        # Get the raw ggShot signal (this is the most important part!)
+        raw_signal = signal_data.get('raw_message', 'No original message available')
+
         return f"""
-SIGNAL DETAILS:
+## GGSHOT SIGNAL (RAW)
+{raw_signal}
+
+## PARSED SIGNAL DATA
 - Source: {signal_data.get('source', 'Unknown')}
 - Symbol: {signal_data.get('symbol', 'Unknown')}
 - Direction: {signal_data.get('direction', 'Unknown')}
 - Timeframe: {signal_data.get('timeframe', 'Unknown')}
-- Confidence: {signal_data.get('confidence', 0):.1%}
 - Entry Zone: {signal_data.get('entry_zone', 'N/A')}
 - Stop Loss: {signal_data.get('stop_loss', 'N/A')}
 - Take Profit: {signal_data.get('take_profit', 'N/A')}
-- Reasoning: {signal_data.get('reasoning', 'No reasoning provided')}
-
-ORIGINAL MESSAGE:
-{signal_data.get('raw_message', 'No original message available')[:500]}...
 """
     
     async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> str:

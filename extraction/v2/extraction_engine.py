@@ -101,9 +101,9 @@ class ExtractionEngineV2:
         self._log.info(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe}) with {actual_limit} candles")
 
         try:
-            # Step 1: Fetch OHLCV data from Hummingbot
+            # Step 1: Fetch OHLCV data from Hummingbot with multi-exchange fallback
             async with self.data_client:
-                df = await self.data_client.get_candles(symbol, timeframe, actual_limit, connector)
+                df = await self.data_client.get_candles_with_fallback(symbol, timeframe, actual_limit)
             
             if df.empty:
                 raise ValueError(f"No data received for {symbol}")
