@@ -185,7 +185,59 @@ class MarketDataAdapter:
         except Exception as e:
             logger.error(f"Failed to get price for {symbol}: {e}")
             raise
-    
+
+    async def get_current_price_with_fallback(self, symbol: str) -> MarketPrice:
+        """
+        Get current market price with automatic exchange fallback.
+
+        Tries multiple exchanges in priority order until one succeeds.
+
+        Args:
+            symbol: Symbol in internal format (e.g., 'BTC/USDT')
+
+        Returns:
+            MarketPrice with bid, ask, last, and calculated mid price
+
+        Raises:
+            Exception: If symbol price is not available on any exchange
+        """
+        exchanges = ["kucoin", "binance", "okx", "gate_io", "ascend_ex"]
+        original_connector = self.connector
+
+        logger.debug(f"Attempting to fetch {symbol} price from {len(exchanges)} exchanges")
+
+        for i, exchange in enumerate(exchanges):
+            try:
+                logger.debug(f"Trying {symbol} price on {exchange} (attempt {i+1}/{len(exchanges)})")
+
+                # Temporarily set connector for this attempt
+                self.connector = exchange
+
+                price = await self.get_current_price(symbol)
+
+                if price is not None:
+                    if i > 0:  # Only log fallback if not first exchange
+                        logger.info(f"✅ Price fallback success: {symbol} retrieved from {exchange}")
+                    else:
+                        logger.info(f"✅ {symbol} price retrieved from {exchange}")
+
+                    return price
+
+            except Exception as e:
+                error_msg = str(e).strip()
+                logger.debug(f"❌ {symbol} price failed on {exchange}: {error_msg}")
+
+                # Continue to next exchange
+                continue
+
+            finally:
+                # Always restore original connector
+                self.connector = original_connector
+
+        # All exchanges failed
+        self.connector = original_connector  # Ensure it's restored
+        raise Exception(f"Price for {symbol} not available on any of {len(exchanges)} exchanges: {exchanges}")
+
     async def get_order_book(self, symbol: str, depth: int = 10) -> Dict[str, Any]:
         """
         Get order book data for symbol.

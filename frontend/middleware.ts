@@ -3,28 +3,39 @@ import { NextRequest, NextResponse } from 'next/server'
 export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   const pathname = request.nextUrl.pathname
-  
+
+  // If accessing via arena subdomain
+  if (hostname.startsWith('arena.')) {
+    // Handle root arena subdomain -> arena page
+    if (pathname === '/') {
+      return NextResponse.rewrite(new URL('/arena', request.url))
+    }
+
+    // All other arena subdomain routes should redirect to arena
+    return NextResponse.redirect(new URL('/', request.url))
+  }
+
   // If accessing via app subdomain
   if (hostname.startsWith('app.')) {
     // Allow auth pages and callbacks through
     if (pathname === '/login' || pathname === '/signup') {
       return NextResponse.next()
     }
-    
+
     // Handle root app subdomain -> forge
     if (pathname === '/') {
       return NextResponse.rewrite(new URL('/forge', request.url))
     }
-    
+
     // All other app subdomain routes go through normally
     return NextResponse.next()
   }
-  
+
   // Main domain routing
   if (pathname === '/') {
     return NextResponse.rewrite(new URL('/landing', request.url))
   }
-  
+
   // All other main domain routes go through normally
   return NextResponse.next()
 }
