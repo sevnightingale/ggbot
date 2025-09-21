@@ -96,7 +96,7 @@ export function ApiKeyManager({ onCredentialChange, className = '' }: ApiKeyMana
         const data = await response.json()
         setError(data.detail || 'Failed to add API key')
       }
-    } catch (error) {
+    } catch {
       setError('Network error. Please try again.')
     } finally {
       setLoading(false)
@@ -125,7 +125,7 @@ export function ApiKeyManager({ onCredentialChange, className = '' }: ApiKeyMana
       } else {
         setError('Failed to delete API key')
       }
-    } catch (error) {
+    } catch {
       setError('Network error. Please try again.')
     } finally {
       setLoading(false)
