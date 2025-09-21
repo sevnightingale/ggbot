@@ -186,8 +186,8 @@ function ForgeApp() {
         user_prompt: 'if RSI 1hr below 50 enter long, if above enter short'
       },
       llm_config: {
-        provider: 'deepseek',
-        model: 'deepseek-reasoner',
+        provider: 'default',
+        model: 'grok-4-fast-non-reasoning',
         use_platform_keys: true,
         use_own_key: false
       },

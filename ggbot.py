@@ -1750,8 +1750,8 @@ async def store_llm_credential(
         if not all([credential_name, provider, api_key]):
             raise HTTPException(status_code=400, detail="Missing required fields: credential_name, provider, api_key")
         
-        if provider not in ["openai", "deepseek", "anthropic"]:
-            raise HTTPException(status_code=400, detail="Invalid provider. Must be one of: openai, deepseek, anthropic")
+        if provider not in ["openai", "deepseek", "anthropic", "xai"]:
+            raise HTTPException(status_code=400, detail="Invalid provider. Must be one of: openai, deepseek, anthropic, xai")
         
         user_id = current_user.user_id
         credential_id = await store_credential(user_id, credential_name, provider, api_key)

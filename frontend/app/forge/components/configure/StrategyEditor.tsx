@@ -18,7 +18,7 @@ export function StrategyEditor({
   const { canAccess } = usePermissions()
   const currentStrategy = configData?.decision?.user_prompt || 'if RSI 1h below 50 enter long, if above 50 enter short'
   const analysisFrequency = configData?.decision?.analysis_frequency || '5m'
-  const llmProvider = configData?.llm_config?.provider || 'deepseek'
+  const llmProvider = configData?.llm_config?.provider || 'default'
 
   // State for collapsible sections
   const [showSystemSections, setShowSystemSections] = useState(false)
@@ -67,7 +67,20 @@ export function StrategyEditor({
     }
 
     // Set appropriate model for each provider
-    const model = provider === 'openai' ? 'gpt-5' : 'deepseek-reasoner'
+    let model
+    if (provider === 'openai') {
+      model = 'gpt-5'
+    } else if (provider === 'default') {
+      model = 'grok-4-fast-non-reasoning'
+    } else if (provider === 'deepseek') {
+      model = 'deepseek-reasoner'
+    } else if (provider === 'anthropic') {
+      model = 'claude-opus-4-1-20250805'
+    } else if (provider === 'xai') {
+      model = 'grok-4-fast-non-reasoning'
+    } else {
+      model = 'deepseek-reasoner' // fallback
+    }
 
     onUpdate?.({
       llm_config: {
@@ -249,20 +262,53 @@ export function StrategyEditor({
 
         <div className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {[
+            {(configData?.llm_config?.use_own_key ? [
+              // Show all providers when using personal keys
               {
-                id: 'deepseek',
-                name: 'DeepSeek R1',
-                description: 'Advanced reasoning model, excellent for complex strategies',
+                id: 'default',
+                name: 'Default LLM',
+                description: 'Platform recommended model (Grok 4 Fast)',
                 recommended: true
               },
               {
                 id: 'openai',
                 name: 'OpenAI GPT-5',
-                description: 'Reliable and well-tested for trading analysis',
+                description: 'Latest OpenAI model with advanced reasoning',
+                premium: false // Available with personal keys
+              },
+              {
+                id: 'deepseek',
+                name: 'DeepSeek R1',
+                description: 'Advanced reasoning model for complex strategies',
+                premium: false
+              },
+              {
+                id: 'anthropic',
+                name: 'Claude Opus',
+                description: 'Anthropic\'s most capable model',
+                premium: false
+              },
+              {
+                id: 'xai',
+                name: 'Grok 4 Fast',
+                description: 'XAI\'s fast reasoning model',
+                premium: false
+              }
+            ] : [
+              // Show limited options when using platform keys
+              {
+                id: 'default',
+                name: 'Default LLM',
+                description: 'Our recommended AI model optimized for trading performance',
+                recommended: true
+              },
+              {
+                id: 'openai',
+                name: 'OpenAI GPT-5',
+                description: 'Premium model for advanced analysis',
                 premium: true
               }
-            ].map((provider) => {
+            ]).map((provider) => {
               const isPremium = provider.premium
               const hasAccess = !isPremium || canAccess('premium_llms')
               const isLocked = isPremium && !hasAccess
@@ -312,12 +358,74 @@ export function StrategyEditor({
             })}
           </div>
 
-          <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-            <div className="text-sm text-[var(--text-muted)]">
-              Current: <span className="text-[var(--text-primary)] font-medium">
-                {llmProvider === 'deepseek' ? 'DeepSeek R1' : 'OpenAI GPT-5'}
-              </span> • Using platform keys
+          {/* API Key Configuration */}
+          <div className="space-y-3">
+            <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
+              <div className="text-sm text-[var(--text-muted)]">
+                Current: <span className="text-[var(--text-primary)] font-medium">
+                  {llmProvider === 'default' ? 'Default LLM' :
+                 llmProvider === 'openai' ? 'OpenAI GPT-5' :
+                 llmProvider === 'deepseek' ? 'DeepSeek R1' :
+                 llmProvider === 'anthropic' ? 'Claude Opus' :
+                 llmProvider === 'xai' ? 'Grok 4 Fast' : 'Default LLM'}
+                </span> • {configData?.llm_config?.use_own_key ? 'Using personal API keys' : 'Using platform keys'}
+              </div>
             </div>
+
+            {/* API Key Toggle */}
+            <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+              <div>
+                <div className="text-sm font-medium text-[var(--text-primary)]">
+                  Use Personal API Keys
+                </div>
+                <div className="text-xs text-[var(--text-muted)]">
+                  Use your own API keys instead of platform keys
+                </div>
+              </div>
+              <label className="relative inline-flex items-center cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={configData?.llm_config?.use_own_key || false}
+                  onChange={(e) => {
+                    onUpdate?.({
+                      llm_config: {
+                        ...configData?.llm_config,
+                        use_own_key: e.target.checked,
+                        use_platform_keys: !e.target.checked
+                      }
+                    })
+                  }}
+                  className="sr-only"
+                />
+                <div className={`w-11 h-6 rounded-full transition-colors ${
+                  configData?.llm_config?.use_own_key
+                    ? 'bg-[var(--agent-decision)]'
+                    : 'bg-[var(--border)]'
+                }`}>
+                  <div className={`w-5 h-5 bg-white rounded-full transition-transform duration-200 ease-in-out ${
+                    configData?.llm_config?.use_own_key ? 'translate-x-5' : 'translate-x-0'
+                  } mt-0.5 ml-0.5`}></div>
+                </div>
+              </label>
+            </div>
+
+            {/* Show API Key Manager if using personal keys */}
+            {configData?.llm_config?.use_own_key && (
+              <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                <div className="text-sm text-[var(--text-primary)] mb-3">
+                  Personal API Keys Required
+                </div>
+                <div className="text-xs text-[var(--text-muted)] mb-3">
+                  Add your API keys in Settings → API Keys to use personal credentials.
+                </div>
+                <button
+                  onClick={() => window.open('/settings/api-keys', '_blank')}
+                  className="text-xs text-[var(--agent-decision)] hover:underline"
+                >
+                  Manage API Keys →
+                </button>
+              </div>
+            )}
           </div>
         </div>
       </div>

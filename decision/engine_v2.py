@@ -87,18 +87,40 @@ class DecisionEngineV2:
             llm_config = self.config.llm_config if hasattr(self.config, 'llm_config') else {}
 
             if isinstance(llm_config, dict) and llm_config:
-                provider_name = llm_config.get('provider', 'deepseek')
-                model_name = llm_config.get('model', 'deepseek-reasoner')  # Use optimized trading model
+                provider_name = llm_config.get('provider', 'default')
+                model_name = llm_config.get('model', None)
+
+                # Handle default provider mapping to XAI/Grok
+                if provider_name == 'default':
+                    provider_name = 'xai'
+                    model_name = model_name or 'grok-4-fast-non-reasoning'
+                elif not model_name:
+                    # Set default models for explicit providers
+                    if provider_name == 'xai':
+                        model_name = 'grok-4-fast-non-reasoning'
+                    elif provider_name == 'deepseek':
+                        model_name = 'deepseek-reasoner'
+                    elif provider_name == 'openai':
+                        model_name = 'gpt-5'
+                    elif provider_name == 'anthropic':
+                        model_name = 'claude-opus-4-1-20250805'
             else:
                 # Fallback to legacy decision config
                 decision_config = self.config.decision if hasattr(self.config, 'decision') else {}
                 if isinstance(decision_config, dict):
-                    provider_name = decision_config.get('llm_provider', 'deepseek')  # Default to DeepSeek
-                    model_name = decision_config.get('llm_model', 'deepseek-reasoner')  # Updated default model
+                    provider_name = decision_config.get('llm_provider', 'default')
+                    model_name = decision_config.get('llm_model', None)
+
+                    # Handle default provider mapping
+                    if provider_name == 'default':
+                        provider_name = 'xai'
+                        model_name = model_name or 'grok-4-fast-non-reasoning'
+                    elif not model_name:
+                        model_name = 'grok-4-fast-non-reasoning' if provider_name == 'xai' else 'deepseek-reasoner'
                 else:
                     # Handle legacy format where decision might be a string or other type
-                    provider_name = 'deepseek'  # Safe default
-                    model_name = 'deepseek-reasoner'  # Updated default model
+                    provider_name = 'xai'  # New default is XAI/Grok
+                    model_name = 'grok-4-fast-non-reasoning'
 
             # Get API key with user/platform priority
             api_key = await LLMKeyService.get_api_key(self.user_id, provider_name)

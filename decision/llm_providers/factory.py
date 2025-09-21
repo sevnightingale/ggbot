@@ -11,6 +11,7 @@ from decision.llm_providers.base import LLMProvider
 from decision.llm_providers.deepseek_provider import DeepSeekProvider
 from decision.llm_providers.openai_provider import OpenAIProvider
 from decision.llm_providers.anthropic_provider import AnthropicProvider
+from decision.llm_providers.xai_provider import XAIProvider
 
 
 def get_llm_provider(
@@ -35,8 +36,16 @@ def get_llm_provider(
         ValueError: If the provider name is not supported
     """
     provider_name = provider_name.lower()
-    
-    if provider_name == 'deepseek':
+
+    # Handle default provider mapping to XAI/Grok
+    if provider_name == 'default':
+        return XAIProvider(
+            api_key=api_key,
+            model=model or 'grok-4-fast-non-reasoning',
+            **kwargs
+        )
+
+    elif provider_name == 'deepseek':
         return DeepSeekProvider(
             api_key=api_key,
             model=model or 'deepseek-reasoner',
@@ -57,10 +66,17 @@ def get_llm_provider(
             **kwargs
         )
 
+    elif provider_name in ['xai', 'grok']:
+        return XAIProvider(
+            api_key=api_key,
+            model=model or 'grok-4-fast-non-reasoning',
+            **kwargs
+        )
+
     else:
         raise ValueError(
             f"Unsupported LLM provider: {provider_name}. "
-            f"Supported providers: deepseek, openai, anthropic"
+            f"Supported providers: deepseek, openai, anthropic, xai"
         )
 
 
@@ -71,4 +87,4 @@ def get_available_providers() -> list[str]:
     Returns:
         list[str]: List of provider names that can be used with get_llm_provider
     """
-    return ['deepseek', 'openai', 'anthropic']
+    return ['default', 'deepseek', 'openai', 'anthropic', 'xai']

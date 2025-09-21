@@ -43,7 +43,7 @@ class BotConfigV2:
         self.trading = trading
         self.config_type = config_type
         self.schema_version = schema_version
-        self.llm_config = llm_config or {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}
+        self.llm_config = llm_config or {"provider": "default", "use_platform_keys": True, "use_own_key": False}
         self.telegram_integration = telegram_integration or {}
         self.state = state
         self.created_at = created_at or datetime.now()

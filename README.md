@@ -118,7 +118,7 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 **🎯 [ggShot Signal Validation](signals/)** - V2 Production Signal Processing
 - **Signal validation mode** integrated into V2 decision engine
-- **Template-based prompt system** for flexible signal analysis
+- **AI confidence evaluation** of external trading signals with strategy alignment
 - **Real-time Telegram integration** with publishing capabilities
 - **Premium business model** with subscription-based access
 - **V2 orchestrator integration** using extraction → decision → trading pipeline
