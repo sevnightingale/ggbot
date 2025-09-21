@@ -33,7 +33,7 @@ export default function RootLayout({
             <div className="text-center">
               <h1 className="text-4xl font-bold text-white mb-4">Under Maintenance</h1>
               <p className="text-gray-300 mb-8">
-                We're currently performing scheduled maintenance. Please check back soon.
+                We&apos;re currently performing scheduled maintenance. Please check back soon.
               </p>
               <div className="text-sm text-gray-500">
                 Follow us for updates: <a href="https://twitter.com/ggbots" className="text-blue-400">@ggbots</a>
