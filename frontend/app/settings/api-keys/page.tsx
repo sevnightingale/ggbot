@@ -78,7 +78,7 @@ export default function ApiKeysPage() {
           <div className="space-y-2">
             <h4 className="font-medium text-[var(--text-primary)]">🎯 Custom Models</h4>
             <p className="text-sm text-[var(--text-muted)]">
-              Access latest models and features as soon as they're released
+              Access latest models and features as soon as they&apos;re released
             </p>
           </div>
         </CardContent>
