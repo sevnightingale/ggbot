@@ -36,7 +36,7 @@ export default function RootLayout({
                 We&apos;re currently performing scheduled maintenance. Please check back soon.
               </p>
               <div className="text-sm text-gray-500">
-                Follow us for updates: <a href="https://twitter.com/ggbots" className="text-blue-400">@ggbots</a>
+                Follow us for updates: <a href="https://twitter.com/ggbots_ai" className="text-blue-400">@ggbots_ai</a>
               </div>
             </div>
           </div>
