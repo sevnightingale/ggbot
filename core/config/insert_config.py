@@ -109,7 +109,7 @@ CONFIG_DATA = {
         }
     },
     "decision": {
-        "llm_provider": "deepseek",
+        "llm_provider": "default",
         "system_prompt": "",
         "strategy": STRATEGY,
         "additional_context": f"Configuration with {len(INDICATORS)} indicators for {CONFIG_TYPE} purposes"

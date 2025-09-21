@@ -76,7 +76,7 @@
 
 ### **Signal Validation System**
 - **Generic framework** supporting multiple signal sources (ggShot implemented)
-- **User-configured strategies** via decision engine prompts
+- **AI confidence evaluation** of external signals using user strategies
 - **Premium gating** through ggBase subscription tier
 - **Telegram publishing** to user-specified channels
 - **Complete V2 integration** using standard extraction → decision → trading flow
@@ -169,7 +169,7 @@ df -h
 - **Tests**: `tests/test_scheduler.py`
 
 ### **Signal Validation** (Complete)
-- **Files**: `signals/listener_service.py`, `signals/publishing_service.py`
+- **Files**: `signals/listener_service.py`, `signals/publishing_service.py`, `decision/prompts/signal_validation.py`
 - **Templates**: `core/config/template_signal_validation.json`
 - **PM2 Services**: `signal-listener`, `signal-publisher` (configured)
 

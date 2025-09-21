@@ -496,8 +496,8 @@ CREATE TABLE public.decisions (
   parent_decision_id uuid,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT decisions_pkey PRIMARY KEY (decision_id),
-  CONSTRAINT decisions_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id),
   CONSTRAINT decisions_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT decisions_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id),
   CONSTRAINT decisions_parent_fkey FOREIGN KEY (parent_decision_id) REFERENCES public.decisions(decision_id)
 );
 CREATE TABLE public.logs (
@@ -552,8 +552,8 @@ CREATE TABLE public.paper_orders (
   fees numeric NOT NULL DEFAULT 0.00,
   filled_at timestamp with time zone NOT NULL DEFAULT now(),
   CONSTRAINT paper_orders_pkey PRIMARY KEY (order_id),
-  CONSTRAINT paper_orders_trade_fkey FOREIGN KEY (trade_id) REFERENCES public.paper_trades(trade_id),
-  CONSTRAINT paper_orders_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
+  CONSTRAINT paper_orders_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
+  CONSTRAINT paper_orders_trade_fkey FOREIGN KEY (trade_id) REFERENCES public.paper_trades(trade_id)
 );
 CREATE TABLE public.paper_trades (
   trade_id uuid NOT NULL DEFAULT uuid_generate_v4(),
@@ -599,7 +599,7 @@ CREATE TABLE public.user_llm_credentials (
   id uuid NOT NULL DEFAULT gen_random_uuid(),
   user_id uuid NOT NULL,
   credential_name text NOT NULL,
-  provider text NOT NULL CHECK (provider = ANY (ARRAY['openai'::text, 'deepseek'::text, 'anthropic'::text])),
+  provider text NOT NULL CHECK (provider = ANY (ARRAY['openai'::text, 'deepseek'::text, 'anthropic'::text, 'xai'::text])),
   vault_secret_id uuid NOT NULL,
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),

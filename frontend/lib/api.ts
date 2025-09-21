@@ -46,7 +46,7 @@ export interface ConfigData {
     user_prompt?: string
   }
   llm_config: {
-    provider: string  // 'openai' | 'deepseek' | 'anthropic' | 'xai' | 'google'
+    provider: string  // 'default' | 'openai' | 'deepseek' | 'anthropic' | 'xai'
     model?: string    // Model name for the provider
     use_platform_keys: boolean
     use_own_key: boolean
@@ -499,8 +499,8 @@ export function createDefaultConfigData(): ConfigData {
       user_prompt: "If 1h RSI is below 40, enter long. If 1h RSI is above 60, enter short. Otherwise, wait."
     },
     llm_config: {
-      provider: "deepseek",
-      model: "deepseek-reasoner", // Optimized for trading with reasoning capabilities
+      provider: "default",
+      model: "grok-4-fast-non-reasoning", // Optimized for fast trading decisions
       use_platform_keys: true, // Use platform-managed keys by default
       use_own_key: false
     },
