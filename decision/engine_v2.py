@@ -401,13 +401,17 @@ class DecisionEngineV2:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
         user_strategy = user_prompt
         
+        # Extract signal direction for prompt
+        signal_direction = signal_data.get('direction', 'UNKNOWN')
+
         return build_signal_validation_prompt(
             symbol=symbol,
             current_price=f"${current_price:,.2f}",
             market_data=market_context,
             volume_analysis=volume_analysis,
             signal_context=signal_context,
-            user_strategy=user_strategy
+            user_strategy=user_strategy,
+            signal_direction=signal_direction
         )
     
     async def _build_opportunity_analysis_prompt(self, symbol: str,

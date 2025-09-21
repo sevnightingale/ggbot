@@ -11,7 +11,8 @@ def build_signal_validation_prompt(
     market_data: str,
     volume_analysis: str,
     signal_context: str,
-    user_strategy: str
+    user_strategy: str,
+    signal_direction: str
 ) -> str:
     """Build signal validation prompt with hardcoded structure."""
     
@@ -52,7 +53,7 @@ Based on your analysis:
 Your reasoning should cite specific indicator values from the market data that support or contradict the external signal according to your trading strategy.
 
 ## OUTPUT FORMAT
-ACTION: [long/short/hold/wait]
+ACTION: {signal_direction.upper()}
 CONFIDENCE: [0.000-1.000]
 REASONING: [Explain how your strategy interprets the market data in relation to the external signal]
 STOP_LOSS: [price or null]

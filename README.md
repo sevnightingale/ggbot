@@ -22,13 +22,15 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 **🔍 [Extraction Agent](extraction/)** - Market Intelligence Gathering
 - **V2 System**: 21 advanced preprocessors with pandas-ta integration (12x performance improvement)
+- **Multi-exchange fallback**: Automatic failover across 5 exchanges (kucoin→binance→okx→gate_io→ascend_ex)
 - **Direct Hummingbot API**: Real-time market data without MCP overhead
 - **Technical indicators**: Pure Python pandas-ta integration (RSI, MACD, 20+ professional indicators)
 - **Multi-timeframe analysis**: 5m, 15m, 30m, 1h, 4h, 1d with consolidated data
 - **Supabase database storage**: Real-time updates with orchestrator integration
 
-**🧠 [Decision Agent](decision/)** - AI-Powered Trading Intelligence  
+**🧠 [Decision Agent](decision/)** - AI-Powered Trading Intelligence
 - **GPT-5 Integration**: High-effort reasoning via OpenAI Responses API
+- **Multi-exchange price feeds**: Real-time pricing with automatic exchange fallback
 - **Template-based prompts**: Opportunity analysis, signal validation, position management
 - **Multi-mode operation**: New trade discovery + Active trade management
 - **User customization**: Natural language strategy definition with config integration
@@ -136,7 +138,7 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 ### Enterprise-Grade Execution
 
 **🏛️ [Paper Trading Engine](trading/)** (Production Ready)
-- **$34B+ proven Hummingbot API** for real-time market data (KuCoin connector)
+- **$34B+ proven Hummingbot API** with multi-exchange fallback (5 exchanges)
 - **Professional simulation** - Real prices, realistic spreads, accurate fees (0.06% taker)
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
 - **Automated risk management** - 7-second monitoring with auto TP/SL execution
