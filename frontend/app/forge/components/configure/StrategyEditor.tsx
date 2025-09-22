@@ -71,7 +71,7 @@ export function StrategyEditor({
     if (provider === 'openai') {
       model = 'gpt-5'
     } else if (provider === 'default') {
-      model = 'grok-4-fast-non-reasoning'
+      model = 'default'
     } else if (provider === 'deepseek') {
       model = 'deepseek-reasoner'
     } else if (provider === 'anthropic') {
@@ -85,7 +85,7 @@ export function StrategyEditor({
     onUpdate?.({
       llm_config: {
         provider: 'default',
-        model: 'grok-4-fast-non-reasoning',
+        model: 'default',
         use_platform_keys: true,
         use_own_key: false,
         ...configData?.llm_config,
@@ -392,7 +392,7 @@ export function StrategyEditor({
                     onUpdate?.({
                       llm_config: {
                         provider: 'default',
-                        model: 'grok-4-fast-non-reasoning',
+                        model: 'default',
                         ...configData?.llm_config,
                         use_own_key: e.target.checked,
                         use_platform_keys: !e.target.checked
