@@ -206,4 +206,6 @@ df -h
 
 ---
 
+telegram group invite link: https://t.me/+ndI762EkfcszZTUx
+
 *Last major update: Forge architecture Phase 1 complete - data foundation with multi-bot support and SSE integration (2025-09-13)*
