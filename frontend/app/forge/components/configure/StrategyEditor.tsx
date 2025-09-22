@@ -84,13 +84,11 @@ export function StrategyEditor({
 
     onUpdate?.({
       llm_config: {
-        provider: 'default',
-        model: 'default',
+        provider,
+        model,
         use_platform_keys: true,
         use_own_key: false,
-        ...configData?.llm_config,
-        provider,
-        model
+        ...configData?.llm_config
       }
     })
   }

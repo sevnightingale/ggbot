@@ -14,7 +14,7 @@ function SignupForm() {
 
   // Check for error messages from auth callback
   useEffect(() => {
-    const error = searchParams.get('error')
+    const error = searchParams?.get('error')
     if (error) {
       switch (error) {
         case 'oauth_error':
