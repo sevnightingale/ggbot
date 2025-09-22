@@ -500,7 +500,7 @@ export function createDefaultConfigData(): ConfigData {
     },
     llm_config: {
       provider: "default",
-      model: "grok-4-fast-non-reasoning", // Optimized for fast trading decisions
+      model: "default", // Backend resolves to current default model
       use_platform_keys: true, // Use platform-managed keys by default
       use_own_key: false
     },

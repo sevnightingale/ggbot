@@ -187,7 +187,7 @@ function ForgeApp() {
       },
       llm_config: {
         provider: 'default',
-        model: 'grok-4-fast-non-reasoning',
+        model: 'default',
         use_platform_keys: true,
         use_own_key: false
       },
