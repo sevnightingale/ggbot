@@ -84,11 +84,13 @@ export function StrategyEditor({
 
     onUpdate?.({
       llm_config: {
+        provider: 'default',
+        model: 'grok-4-fast-non-reasoning',
+        use_platform_keys: true,
+        use_own_key: false,
         ...configData?.llm_config,
         provider,
-        model,
-        use_platform_keys: true,
-        use_own_key: false
+        model
       }
     })
   }
@@ -389,6 +391,8 @@ export function StrategyEditor({
                   onChange={(e) => {
                     onUpdate?.({
                       llm_config: {
+                        provider: 'default',
+                        model: 'grok-4-fast-non-reasoning',
                         ...configData?.llm_config,
                         use_own_key: e.target.checked,
                         use_platform_keys: !e.target.checked
