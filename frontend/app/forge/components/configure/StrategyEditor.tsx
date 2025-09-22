@@ -16,7 +16,7 @@ export function StrategyEditor({
   className = ''
 }: StrategyEditorProps) {
   const { canAccess } = usePermissions()
-  const currentStrategy = configData?.decision?.user_prompt || 'if RSI 1h below 50 enter long, if above 50 enter short'
+  const currentStrategy = configData?.decision?.user_prompt || ''
   const analysisFrequency = configData?.decision?.analysis_frequency || '5m'
   const llmProvider = configData?.llm_config?.provider || 'default'
 

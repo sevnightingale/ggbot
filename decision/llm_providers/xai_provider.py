@@ -8,6 +8,7 @@ Supports Grok models including grok-4-fast-non-reasoning, grok-4, and grok-code-
 import json
 import asyncio
 import aiohttp
+import time
 from typing import Optional, Dict, Any, List
 from core.common.logger import logger
 from decision.interfaces.llm_provider import LLMProvider
@@ -38,43 +39,43 @@ class XAIProvider(LLMProvider):
             f"Initialized XAI provider with model: {self.model}"
         )
 
-    async def generate_response(self, messages: List[Dict[str, str]], **kwargs) -> str:
+    async def generate_response(self,
+                              prompt: str,
+                              conversation_history: Optional[List[Dict[str, str]]] = None,
+                              temperature: float = 0.7,
+                              custom_mode: Optional[str] = None) -> tuple[str, Dict[str, Any]]:
         """
         Generate a response from XAI Grok.
 
         Args:
-            messages: List of message objects with 'role' and 'content'
-            **kwargs: Additional generation parameters
+            prompt (str): The complete prompt containing all context and instructions
+            conversation_history (Optional[List[Dict[str, str]]]): Previous conversation messages
+            temperature (float): Controls randomness (0.0 = deterministic, 1.0 = creative)
+            custom_mode (Optional[str]): Custom mode for specialized system prompts
 
         Returns:
-            str: Generated response content
+            tuple[str, Dict[str, Any]]: Response text and metadata
 
         Raises:
             Exception: If API call fails after retries
         """
+        # Convert prompt to messages format using helper method
+        messages = self._prepare_messages(prompt, conversation_history)
         url = f"{self.base_url}/chat/completions"
 
         # Build request payload
         payload = {
             "model": self.model,
             "messages": messages,
-            "max_tokens": kwargs.get('max_tokens', 4000),
-            "temperature": kwargs.get('temperature', 0.1),
-            "top_p": kwargs.get('top_p', 0.9),
+            "max_tokens": 4000,  # Fixed value for consistency
+            "temperature": temperature,  # Use parameter value
+            "top_p": 0.9,
         }
 
-        # Add optional parameters if supported by model
-        if 'seed' in kwargs:
-            payload['seed'] = kwargs['seed']
-
-        # Note: grok-4 and grok-4-fast models don't support presencePenalty, frequencyPenalty, stop
-        if not self.model.startswith('grok-4'):
-            if 'presence_penalty' in kwargs:
-                payload['presence_penalty'] = kwargs['presence_penalty']
-            if 'frequency_penalty' in kwargs:
-                payload['frequency_penalty'] = kwargs['frequency_penalty']
-            if 'stop' in kwargs:
-                payload['stop'] = kwargs['stop']
+        # Add optional custom mode handling if needed
+        if custom_mode:
+            # Custom modes could modify temperature or add system messages
+            pass
 
         headers = {
             "Authorization": f"Bearer {self.api_key}",
@@ -91,19 +92,31 @@ class XAIProvider(LLMProvider):
                     f"Sending request to XAI (attempt {attempt + 1})"
                 )
 
+                start_time = time.time()
                 timeout = aiohttp.ClientTimeout(total=self.timeout)
                 async with aiohttp.ClientSession(timeout=timeout) as session:
                     async with session.post(url, json=payload, headers=headers) as response:
                         if response.status == 200:
                             data = await response.json()
+                            end_time = time.time()
+                            latency = end_time - start_time
 
                             # Extract response content
                             if 'choices' in data and len(data['choices']) > 0:
                                 content = data['choices'][0]['message']['content']
+
+                                # Prepare metadata
+                                metadata = {
+                                    'model': self.model,
+                                    'latency': latency,
+                                    'usage': data.get('usage', {}),
+                                    'status': 'success'
+                                }
+
                                 logger.bind(module="decision.xai").info(
-                                    "Successfully received response from XAI"
+                                    f"Successfully received response from XAI (latency: {latency:.2f}s)"
                                 )
-                                return content
+                                return content, metadata
                             else:
                                 logger.bind(module="decision.xai").warning(
                                     "Unexpected response format from XAI"

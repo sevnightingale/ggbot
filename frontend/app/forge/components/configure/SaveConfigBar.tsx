@@ -3,6 +3,7 @@
 import React from 'react'
 import { Save, X, RotateCcw } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
+import { PermissionGate } from '@/lib/permission-gate'
 
 interface SaveConfigBarProps {
   selectedBot?: BotConfiguration | null
@@ -46,16 +47,31 @@ export function SaveConfigBar({
             >
               Autonomous
             </button>
-            <button
-              onClick={() => onBotTypeChange?.('signal_validation')}
-              className={`px-3 py-2 text-sm rounded-r-xl transition-colors ${
-                currentBotType === 'signal_validation'
-                  ? 'bg-[var(--agent-decision)] text-white'
-                  : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
-              }`}
+            <PermissionGate
+              feature="signal_validation_mode"
+              fallback={
+                <button
+                  disabled
+                  className="px-3 py-2 text-sm rounded-r-xl bg-gray-100 text-gray-400 cursor-not-allowed relative"
+                >
+                  Signal Validation
+                  <span className="absolute -top-1 -right-1 text-xs bg-amber-500 text-white rounded-full px-1 py-0.5 text-[10px]">
+                    PRO
+                  </span>
+                </button>
+              }
             >
-              Signal Validation
-            </button>
+              <button
+                onClick={() => onBotTypeChange?.('signal_validation')}
+                className={`px-3 py-2 text-sm rounded-r-xl transition-colors ${
+                  currentBotType === 'signal_validation'
+                    ? 'bg-[var(--agent-decision)] text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+              >
+                Signal Validation
+              </button>
+            </PermissionGate>
           </div>
         </div>
 
