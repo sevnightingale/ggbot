@@ -43,6 +43,32 @@ export function TradeSettings({
 
   return (
     <div className={`space-y-6 ${className}`}>
+      {/* Trading Pair Selection */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
+          Trading Pair
+        </h3>
+        <p className="text-sm text-[var(--text-muted)] mb-4">
+          Select the cryptocurrency pair you want to trade
+        </p>
+
+        <div>
+          <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+            Symbol
+          </label>
+          <input
+            type="text"
+            value={configData?.selected_pair || 'BTC/USDT'}
+            onChange={(e) => updateConfig({ selected_pair: e.target.value.toUpperCase() })}
+            placeholder="BTC/USDT"
+            className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+          />
+          <div className="text-xs text-[var(--text-muted)] mt-1">
+            Enter pairs like BTC/USDT, ETH/USDT, SOL/USDT, etc.
+          </div>
+        </div>
+      </div>
+
       {/* Position Sizing */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
@@ -392,29 +418,16 @@ export function TradeSettings({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                Exchange
-              </label>
-              <select
-                disabled
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-              >
-                <option>Binance (Coming Soon)</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                Trading Pair
-              </label>
-              <input
-                type="text"
-                value={configData?.selected_pair || 'BTC/USDT'}
-                disabled
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-              />
-            </div>
+          <div>
+            <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+              Exchange
+            </label>
+            <select
+              disabled
+              className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
+            >
+              <option>Binance (Coming Soon)</option>
+            </select>
           </div>
 
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">

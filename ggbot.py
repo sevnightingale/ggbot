@@ -428,8 +428,8 @@ class GGBotOrchestrator:
         
         try:
             # Extract symbol from signal or override
-            symbol = override_symbol or signal_data.symbol or config.selected_pair
-            
+            symbol = override_symbol or signal_data.get('symbol') or config.selected_pair
+
             if not symbol:
                 raise ValueError("No symbol specified for signal validation")
             
@@ -693,11 +693,8 @@ class GGBotOrchestrator:
             self._log.error(f"Failed to check subscription for signal publishing: {e}")
             return False
 
-        # Check confidence threshold
-        confidence_threshold = publisher_config.get('confidence_threshold', 0.6)
-        signal_confidence = decision_result.get('confidence', 0.0)
-
-        return signal_confidence >= confidence_threshold
+        # Always publish signals (approval/rejection status handled by publishing service)
+        return True
     
     async def _trigger_signal_publishing(
         self,
@@ -853,7 +850,13 @@ class GGBotOrchestrator:
             decision_engine = await self._get_decision_engine(config_id, config.user_id)
             
             # Get symbol from config or signal data
-            symbol = signal_data.symbol if signal_data else config.selected_pair or "BTC/USDT"
+            if signal_data:
+                symbol = signal_data['symbol']
+            else:
+                symbol = config.selected_pair
+
+            if not symbol:
+                raise ValueError("No symbol specified for decision")
             
             # Run decision using V2 engine with full context management
             decision_result = await decision_engine.make_decision(
