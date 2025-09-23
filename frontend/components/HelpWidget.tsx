@@ -48,7 +48,7 @@ export function HelpWidget() {
               </div>
 
               <p className="text-[var(--text-secondary)] mb-6 leading-relaxed">
-                Have questions or feedback? Join our Telegram community to get help from other traders and the ggbots team.
+                Have questions or feedback? Join our Telegram community to get help from other traders and the ggbots team!
               </p>
 
               {/* Action Buttons */}
