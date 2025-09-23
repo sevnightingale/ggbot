@@ -49,7 +49,7 @@ export function TradeSettings({
           Trading Pair
         </h3>
         <p className="text-sm text-[var(--text-muted)] mb-4">
-          Select the cryptocurrency pair you want to trade
+          Choose the cryptocurrency pair you want to trade
         </p>
 
         <div>
