@@ -200,7 +200,16 @@ async def lifespan(app: FastAPI):
         # Test LLM service
         # await llm_service.test_hosted_keys()
         logger.info("✅ LLM service initialized")
-        
+
+        # Initialize log cleanup service
+        from core.services.log_cleanup_service import log_cleanup_service
+        try:
+            # Run initial cleanup on startup
+            cleanup_stats = await log_cleanup_service.cleanup_all_logs()
+            logger.info(f"✅ Initial log cleanup completed: {cleanup_stats['total_files_deleted']} files deleted")
+        except Exception as e:
+            logger.warning(f"⚠️ Initial log cleanup failed: {str(e)}")
+
         # Start APScheduler
         scheduler.start()
         logger.info("✅ APScheduler started")
@@ -1015,6 +1024,33 @@ scheduler = AsyncIOScheduler()
 execution_semaphore = asyncio.Semaphore(50)  # Global concurrency limit
 
 
+# Add daily log cleanup job
+async def daily_log_cleanup():
+    """Daily log cleanup job executed by APScheduler."""
+    try:
+        from core.services.log_cleanup_service import log_cleanup_service
+        cleanup_stats = await log_cleanup_service.cleanup_all_logs()
+        logger.bind(service="orchestrator").info(
+            f"🧹 Daily log cleanup completed: {cleanup_stats['total_files_deleted']} files deleted, "
+            f"{cleanup_stats['total_space_freed'] / (1024*1024):.2f} MB freed"
+        )
+    except Exception as e:
+        logger.bind(service="orchestrator").error(f"❌ Daily log cleanup failed: {str(e)}")
+
+
+# Schedule daily cleanup at 3:00 AM
+scheduler.add_job(
+    daily_log_cleanup,
+    'cron',
+    hour=3,
+    minute=0,
+    id='daily_log_cleanup',
+    replace_existing=True,
+    max_instances=1,
+    coalesce=True
+)
+
+
 async def run_once(user_id: str, config_id: str, timeframe: str):
     """
     Job function executed by APScheduler for each bot.
@@ -1681,6 +1717,59 @@ async def search_symbols(query: str) -> Dict[str, Any]:
                 "display": [],
                 "count": 0
             },
+            "error": str(e)
+        }
+
+
+# Log Management Endpoints
+@app.get("/api/v2/logs/usage")
+async def get_log_usage() -> Dict[str, Any]:
+    """Get current log disk usage statistics."""
+    try:
+        from core.services.log_cleanup_service import log_cleanup_service
+        usage_stats = await log_cleanup_service.get_log_disk_usage()
+
+        return {
+            "status": "success",
+            "data": {
+                "total_size_mb": round(usage_stats["total_size_mb"], 2),
+                "total_files": usage_stats["total_files"],
+                "locations": usage_stats["locations"],
+                "retention_days": log_cleanup_service.retention_days,
+                "last_scan": usage_stats["scan_time"]
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get log usage: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
+@app.post("/api/v2/logs/cleanup")
+async def manual_log_cleanup() -> Dict[str, Any]:
+    """Manually trigger log cleanup (7-day retention)."""
+    try:
+        from core.services.log_cleanup_service import log_cleanup_service
+        cleanup_stats = await log_cleanup_service.cleanup_all_logs()
+
+        return {
+            "status": "success",
+            "data": {
+                "files_deleted": cleanup_stats["total_files_deleted"],
+                "space_freed_mb": round(cleanup_stats["total_space_freed"] / (1024*1024), 2),
+                "locations_cleaned": cleanup_stats["locations_cleaned"],
+                "errors": cleanup_stats["errors"],
+                "cleanup_time": cleanup_stats["cleanup_time"]
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to run manual log cleanup: {e}")
+        return {
+            "status": "error",
             "error": str(e)
         }
 

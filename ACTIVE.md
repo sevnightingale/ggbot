@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-09-19 (Multi-exchange integration)
-**System Health**: 🟢 Operational (enhanced reliability)
+**Last Updated**: 2025-09-23 (Symbol validation, Telegram publishing fixes, Help widget)
+**System Health**: 🟢 Operational (enhanced reliability + UX improvements)
 **V2 Architecture**: Complete - Full E2E Pipeline with Multi-Exchange Fallback
 
 ---
@@ -31,10 +31,14 @@
 ### Core API Endpoints
 **Bot Control & Scheduling**
 - `POST /api/v2/bot/{config_id}/start` - Start autonomous bot with scheduling
-- `POST /api/v2/bot/{config_id}/stop` - Stop bot and remove scheduler jobs  
+- `POST /api/v2/bot/{config_id}/stop` - Stop bot and remove scheduler jobs
 - `GET /api/v2/scheduler/status` - Active scheduled jobs per user
 - `GET /api/v2/bot/{config_id}/status` - Real-time bot status
 - `WS /ws/bot-status/{user_id}` - WebSocket for real-time updates
+
+**Symbol Validation**
+- `GET /api/v2/symbols/supported` - Get all 141 supported trading symbols
+- `GET /api/v2/symbols/search/{query}` - Search symbols by base currency
 
 **Signal Processing**
 - `POST /api/v2/orchestrate/{config_id}/signal` - Signal validation endpoint
@@ -78,7 +82,8 @@
 - **Generic framework** supporting multiple signal sources (ggShot implemented)
 - **AI confidence evaluation** of external signals using user strategies
 - **Premium gating** through ggBase subscription tier
-- **Telegram publishing** to user-specified channels
+- **Telegram publishing** to user-specified channels with APPROVED/REJECTED status
+- **Fixed confidence threshold** - all signals publish (classification handled by service)
 - **Complete V2 integration** using standard extraction → decision → trading flow
 
 ### **Paper Trading Engine**
@@ -208,4 +213,21 @@ df -h
 
 telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 
-*Last major update: Forge architecture Phase 1 complete - data foundation with multi-bot support and SSE integration (2025-09-13)*
+### 📡 Recent Session Fixes (2025-09-23)
+
+**Critical Bug Fixes**:
+- ✅ **XAI Provider Interface** - Fixed signature mismatch causing signal validation failures
+- ✅ **Telegram Publishing Gate** - Removed confidence threshold blocking all low-confidence signals
+- ✅ **Symbol Selection UX** - Moved from locked exchange section to accessible trading settings
+
+**New Features**:
+- ✅ **Symbol Validation System** - 141 supported trading pairs with dropdown + search
+- ✅ **Help Widget** - Floating question mark with Telegram community invitation
+- ✅ **Signal Publishing Transparency** - All signals publish with APPROVED/REJECTED status
+
+**UX Improvements**:
+- ✅ **Trading Pair Selection** - Professional dropdown replacing free-text input
+- ✅ **Symbol Search** - Type-ahead search by base currency (BTC, ETH, SOL, etc.)
+- ✅ **Community Access** - Always-visible help widget for user support
+
+*Last major update: Symbol validation system + Telegram publishing fixes + UX enhancements (2025-09-23)*
