@@ -71,12 +71,13 @@ class MarketDataRepository:
                         user_id, symbol, timeframe, source, data_type,
                         indicators, raw_data, updated_at, config_id
                     ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    ON CONFLICT (user_id, symbol, timeframe, updated_at) 
+                    ON CONFLICT (user_id, symbol, timeframe, config_id)
                     DO UPDATE SET
                         indicators = EXCLUDED.indicators,
                         raw_data = EXCLUDED.raw_data,
                         source = EXCLUDED.source,
-                        data_type = EXCLUDED.data_type
+                        data_type = EXCLUDED.data_type,
+                        updated_at = EXCLUDED.updated_at
                 """, (
                     "universal",  # Universal data for all users
                     snapshot.symbol.internal_format,

@@ -1600,6 +1600,91 @@ async def test_signal_publishing(
         raise HTTPException(status_code=500, detail=f"Signal publishing test failed: {str(e)}")
 
 
+# Symbols API Endpoints
+@app.get("/api/v2/symbols/supported")
+async def get_supported_symbols() -> Dict[str, Any]:
+    """Get all 141 supported trading symbols."""
+    try:
+        from core.symbols.standardizer import UniversalSymbolStandardizer
+        standardizer = UniversalSymbolStandardizer()
+
+        # Get symbols in different formats for frontend use
+        platform_symbols = standardizer.get_supported_symbols("platform")  # BTC-USDT format
+        ccxt_symbols = standardizer.get_supported_symbols("ccxt")          # BTC/USDT format
+
+        return {
+            "status": "success",
+            "data": {
+                "platform": sorted(platform_symbols),  # For internal use
+                "display": sorted(ccxt_symbols),       # For UI display (BTC/USDT looks better)
+                "count": len(platform_symbols)
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get supported symbols: {e}")
+        return {
+            "status": "error",
+            "data": {
+                "platform": [],
+                "display": [],
+                "count": 0
+            },
+            "error": str(e)
+        }
+
+
+@app.get("/api/v2/symbols/search/{query}")
+async def search_symbols(query: str) -> Dict[str, Any]:
+    """Search symbols by base currency or partial match."""
+    try:
+        from core.symbols.standardizer import UniversalSymbolStandardizer
+        standardizer = UniversalSymbolStandardizer()
+
+        platform_symbols = standardizer.get_supported_symbols("platform")
+        ccxt_symbols = standardizer.get_supported_symbols("ccxt")
+
+        query = query.upper().strip()
+
+        # Search logic
+        platform_matches = []
+        display_matches = []
+
+        for platform_symbol, ccxt_symbol in zip(platform_symbols, ccxt_symbols):
+            # Match base currency (BTC from BTC-USDT)
+            base_currency = platform_symbol.split('-')[0]
+
+            # Check if query matches base currency or symbol
+            if (query in platform_symbol or
+                query in base_currency or
+                query in ccxt_symbol):
+                platform_matches.append(platform_symbol)
+                display_matches.append(ccxt_symbol)
+
+        return {
+            "status": "success",
+            "data": {
+                "query": query,
+                "platform": platform_matches[:20],  # Limit results
+                "display": display_matches[:20],
+                "count": len(platform_matches)
+            }
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to search symbols: {e}")
+        return {
+            "status": "error",
+            "data": {
+                "query": query,
+                "platform": [],
+                "display": [],
+                "count": 0
+            },
+            "error": str(e)
+        }
+
+
 # User Management Endpoints
 @app.get("/api/v2/user/profile")
 async def get_user_profile(
