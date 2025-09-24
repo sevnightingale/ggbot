@@ -100,11 +100,10 @@ def upsert_market_data(user_id, symbol, config_id, data_dict, data_type=None, so
                 cur.execute("""
                     INSERT INTO market_data (user_id, symbol, config_id, timeframe, indicators, source, data_type, updated_at)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, NOW())
-                    ON CONFLICT (user_id, symbol, timeframe, updated_at)
+                    ON CONFLICT (user_id, symbol, timeframe, config_id)
                     DO UPDATE SET indicators = EXCLUDED.indicators,
                                 source = EXCLUDED.source,
                                 data_type = EXCLUDED.data_type,
-                                config_id = EXCLUDED.config_id,
                                 updated_at = NOW();
                 """, (user_id, symbol, config_id, timeframe, json_data, source, data_type))
             conn.commit()

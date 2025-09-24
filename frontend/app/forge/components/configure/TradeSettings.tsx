@@ -3,6 +3,7 @@
 import React, { useState } from 'react'
 import { ChevronDown, ChevronUp, Lock } from 'lucide-react'
 import { ConfigData, createDefaultConfigData } from '@/lib/api'
+import { SymbolSelector } from '@/components/SymbolSelector'
 
 interface TradeSettingsProps {
   configData?: ConfigData
@@ -56,15 +57,12 @@ export function TradeSettings({
           <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
             Symbol
           </label>
-          <input
-            type="text"
+          <SymbolSelector
             value={configData?.selected_pair || 'BTC/USDT'}
-            onChange={(e) => updateConfig({ selected_pair: e.target.value.toUpperCase() })}
-            placeholder="BTC/USDT"
-            className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+            onChange={(symbol) => updateConfig({ selected_pair: symbol })}
           />
           <div className="text-xs text-[var(--text-muted)] mt-1">
-            Enter pairs like BTC/USDT, ETH/USDT, SOL/USDT, etc.
+            Choose from 141 supported trading pairs
           </div>
         </div>
       </div>

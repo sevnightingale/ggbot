@@ -125,8 +125,8 @@ class SupabaseStorage:
                 "updated_at": datetime.utcnow().isoformat()
             }
             
-            # Insert record (simple insert for now, can add upsert later if needed)
-            result = self.client.table('market_data').insert(record).execute()
+            # Upsert record to prevent duplicates (overwrites based on user_id,symbol,timeframe,config_id)
+            result = self.client.table('market_data').upsert(record).execute()
             
             if result.data:
                 record_id = result.data[0]['id']
@@ -177,7 +177,7 @@ class SupabaseStorage:
             cutoff_time = datetime.utcnow().replace(microsecond=0)
             cutoff_time = (cutoff_time - pd.Timedelta(minutes=max_age_minutes))
             
-            result = self.client.table('market_data').select('*').eq(
+            result = self.client.table('market_data').select('id,symbol,timeframe,data_points,updated_at').eq(
                 'user_id', user_id
             ).eq(
                 'symbol', symbol  
