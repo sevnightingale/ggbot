@@ -304,21 +304,28 @@ class GGBotOrchestrator:
                 raise HTTPException(status_code=404, detail="Configuration not found")
             
             # 2. Route based on config type
+            self._log.info(f"🔍 DEBUG: config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
+
             if config.config_type == "signal_validation":
                 if signal_data:
                     # Real signal from external source
+                    self._log.info("🔍 DEBUG: Routing to signal validation cycle (external signal)")
                     return await self._run_signal_validation_cycle(
                         config, signal_data, override_symbol
                     )
                 else:
                     # Manual trigger - fetch latest real ggShot signal
+                    self._log.info("🔍 DEBUG: Manual trigger - fetching latest ggShot signal")
                     latest_signal = await self._fetch_latest_ggshot_signal()
+                    self._log.info(f"🔍 DEBUG: Fetched signal: {latest_signal.symbol} {latest_signal.direction}")
                     # Convert SignalData object to dict for decision engine
                     signal_dict = self._signal_data_to_dict(latest_signal)
+                    self._log.info("🔍 DEBUG: Routing to signal validation cycle (manual trigger)")
                     return await self._run_signal_validation_cycle(
                         config, signal_dict, override_symbol
                     )
             else:
+                self._log.info("🔍 DEBUG: Routing to autonomous trading cycle")
                 return await self._run_autonomous_trading_cycle(config)
             
         except Exception as e:

@@ -164,17 +164,21 @@ class DecisionEngineV2:
             # Route based on config type and signal data presence
             config_type = getattr(self.config, 'config_type', 'autonomous_trading')
 
+            logger.bind(config_id=self.config_id).info(
+                f"🔍 DECISION DEBUG: config_type='{config_type}', signal_data present={signal_data is not None}, signal_data type={type(signal_data)}"
+            )
+
             if config_type == "signal_validation" and signal_data:
                 # Signal validation mode: Always evaluate signals independently
                 # Bypasses position management to allow multiple concurrent positions
                 logger.bind(config_id=self.config_id, symbol=symbol).info(
-                    "Signal validation mode: Evaluating signal independently (bypassing position management)"
+                    "🔍 DECISION DEBUG: Signal validation mode: Evaluating signal independently (bypassing position management)"
                 )
                 return await self._handle_signal_validation(symbol, signal_data)
             else:
                 # Autonomous trading mode: Check for existing positions first
                 logger.bind(config_id=self.config_id, symbol=symbol).info(
-                    "Autonomous trading mode: Checking for existing positions"
+                    f"🔍 DECISION DEBUG: Autonomous trading mode: Checking for existing positions (config_type={config_type}, signal_data={signal_data is not None})"
                 )
                 return await self._handle_autonomous_trading(symbol)
                 

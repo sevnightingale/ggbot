@@ -6,12 +6,14 @@ import { ConfigData } from '@/lib/api'
 
 interface StrategyEditorProps {
   configData?: ConfigData
+  configType?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
   className?: string
 }
 
 export function StrategyEditor({
   configData,
+  configType,
   onUpdate,
   className = ''
 }: StrategyEditorProps) {
@@ -19,7 +21,7 @@ export function StrategyEditor({
   const currentStrategy = configData?.decision?.user_prompt || ''
   const analysisFrequency = configData?.decision?.analysis_frequency || '1h'
   const llmProvider = configData?.llm_config?.provider || 'default'
-  const configType = configData?.config_type || 'autonomous_trading'
+  const currentConfigType = configType || configData?.config_type || 'autonomous_trading'
 
   // State for collapsible sections
   const [showSystemSections, setShowSystemSections] = useState(false)
@@ -103,7 +105,7 @@ export function StrategyEditor({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Analysis Frequency - Hide for signal_validation configs */}
-      {configType !== 'signal_validation' && (
+      {currentConfigType !== 'signal_validation' && (
         <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
             Analysis Frequency
