@@ -96,6 +96,7 @@ export function ConfigureLayout({
         {activeConfigTab === 'strategy' && (
           <StrategyEditor
             configData={configData}
+            configType={editingTableFields?.config_type || selectedBot?.config_type}
             onUpdate={onUpdateConfig}
           />
         )}
