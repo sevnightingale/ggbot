@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { ChevronDown, Search, X } from 'lucide-react'
 
 interface SymbolSelectorProps {
@@ -40,7 +40,7 @@ export function SymbolSelector({ value, onChange, className = '' }: SymbolSelect
     } else {
       setFilteredSymbols({ platform: symbols.platform, display: symbols.display })
     }
-  }, [searchQuery, symbols])
+  }, [searchQuery, symbols, searchSymbols])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -78,7 +78,7 @@ export function SymbolSelector({ value, onChange, className = '' }: SymbolSelect
     }
   }
 
-  const searchSymbols = async (query: string) => {
+  const searchSymbols = useCallback(async (query: string) => {
     if (!query.trim()) {
       setFilteredSymbols({ platform: symbols.platform, display: symbols.display })
       return
@@ -104,9 +104,9 @@ export function SymbolSelector({ value, onChange, className = '' }: SymbolSelect
         platform: indices.map(i => symbols.platform[i])
       })
     }
-  }
+  }, [symbols])
 
-  const handleSelect = (displaySymbol: string, platformSymbol: string) => {
+  const handleSelect = (displaySymbol: string) => {
     onChange(displaySymbol) // Use display format (BTC/USDT) for consistency
     setIsOpen(false)
     setSearchQuery('')
@@ -158,14 +158,13 @@ export function SymbolSelector({ value, onChange, className = '' }: SymbolSelect
             ) : filteredSymbols.display.length > 0 ? (
               <div className="p-2">
                 {filteredSymbols.display.map((displaySymbol, index) => {
-                  const platformSymbol = filteredSymbols.platform[index]
                   const isSelected = displaySymbol === displayValue
                   const baseCurrency = displaySymbol.split('/')[0]
 
                   return (
                     <button
                       key={displaySymbol}
-                      onClick={() => handleSelect(displaySymbol, platformSymbol)}
+                      onClick={() => handleSelect(displaySymbol)}
                       className={`w-full p-3 rounded-lg text-left hover:bg-[var(--bg-tertiary)] transition-colors flex items-center justify-between ${
                         isSelected ? 'bg-[var(--agent-trading)]/20 text-[var(--agent-trading)]' : 'text-[var(--text-primary)]'
                       }`}
