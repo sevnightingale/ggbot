@@ -26,6 +26,9 @@ module.exports = {
       out_file: '/home/sev/.pm2/logs/ggbot-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
+      log_type: 'json',
+      max_log_files: 7,        // Keep 7 rotated log files (7-day retention)
+      max_log_size: '10M',     // Rotate when log reaches 10MB
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
@@ -56,6 +59,9 @@ module.exports = {
       out_file: '/home/sev/.pm2/logs/signal-listener-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
+      log_type: 'json',
+      max_log_files: 7,        // Keep 7 rotated log files (7-day retention)
+      max_log_size: '10M',     // Rotate when log reaches 10MB
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
@@ -82,6 +88,9 @@ module.exports = {
       out_file: '/home/sev/.pm2/logs/signal-publisher-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
+      log_type: 'json',
+      max_log_files: 7,        // Keep 7 rotated log files (7-day retention)
+      max_log_size: '10M',     // Rotate when log reaches 10MB
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000

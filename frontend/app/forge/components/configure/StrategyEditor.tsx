@@ -17,14 +17,21 @@ export function StrategyEditor({
 }: StrategyEditorProps) {
   const { canAccess } = usePermissions()
   const currentStrategy = configData?.decision?.user_prompt || ''
-  const analysisFrequency = configData?.decision?.analysis_frequency || '5m'
+  const analysisFrequency = configData?.decision?.analysis_frequency || '1h'
   const llmProvider = configData?.llm_config?.provider || 'default'
+  const configType = configData?.config_type || 'autonomous_trading'
 
   // State for collapsible sections
   const [showSystemSections, setShowSystemSections] = useState(false)
 
   // Handle frequency selection
   const handleFrequencyChange = (freq: string) => {
+    // Check permissions for high-frequency options
+    if ((freq === '5m' || freq === '15m') && !canAccess('premium_llms')) {
+      alert('High-frequency analysis requires a premium subscription. Upgrade to access 5m and 15m frequencies!')
+      return
+    }
+
     onUpdate?.({
       decision: {
         analysis_frequency: freq,
@@ -95,37 +102,71 @@ export function StrategyEditor({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Analysis Frequency */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-          Analysis Frequency
-        </h3>
-        <p className="text-sm text-[var(--text-muted)] mb-4">
-          How often your bot analyzes the market and makes decisions
-        </p>
+      {/* Analysis Frequency - Hide for signal_validation configs */}
+      {configType !== 'signal_validation' && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
+            Analysis Frequency
+          </h3>
+          <p className="text-sm text-[var(--text-muted)] mb-4">
+            How often your bot analyzes the market and makes decisions
+          </p>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-          {['5m', '15m', '1h', '4h'].map((freq) => (
-            <button
-              key={freq}
-              onClick={() => handleFrequencyChange(freq)}
-              className={`px-4 py-3 text-sm rounded-xl border transition-colors ${
-                analysisFrequency === freq
-                  ? 'bg-[var(--agent-decision)] text-white border-[var(--agent-decision)]'
-                  : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
-              }`}
-            >
-              Every {freq}
-            </button>
-          ))}
-        </div>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {['5m', '15m', '1h', '4h'].map((freq) => {
+              const isPremium = freq === '5m' || freq === '15m'
+              const hasAccess = !isPremium || canAccess('premium_llms')
+              const isLocked = isPremium && !hasAccess
 
-        <div className="mt-4 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-          <div className="text-sm text-[var(--text-muted)]">
-            Current: <span className="text-[var(--text-primary)] font-medium">Every {analysisFrequency}</span>
+              return (
+                <button
+                  key={freq}
+                  onClick={() => handleFrequencyChange(freq)}
+                  disabled={isLocked}
+                  className={`px-4 py-3 text-sm rounded-xl border transition-colors relative ${
+                    analysisFrequency === freq
+                      ? 'bg-[var(--agent-decision)] text-white border-[var(--agent-decision)]'
+                      : isLocked
+                        ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 cursor-not-allowed'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <span>Every {freq}</span>
+                    {isPremium && (
+                      <div className="flex items-center gap-1">
+                        {isLocked && (
+                          <svg className="h-3 w-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 0h12m-6 0V9a6 6 0 012.121-4.586M12 15v2m-6 0h12m-6 0V9a6 6 0 00-2.121-4.586" />
+                          </svg>
+                        )}
+                        <span className={`text-xs px-1 py-0.5 rounded-full ${
+                          isLocked
+                            ? 'bg-amber-500/20 text-amber-500/70'
+                            : 'bg-amber-500/20 text-amber-500'
+                        }`}>
+                          Pro
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+
+          <div className="mt-4 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
+            <div className="text-sm text-[var(--text-muted)]">
+              Current: <span className="text-[var(--text-primary)] font-medium">Every {analysisFrequency}</span>
+              {(analysisFrequency === '5m' || analysisFrequency === '15m') && (
+                <span className="ml-2 text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-500">
+                  Pro Feature
+                </span>
+              )}
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       {/* Trading Strategy - Main Section */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">

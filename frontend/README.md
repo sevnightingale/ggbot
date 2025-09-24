@@ -67,6 +67,10 @@ Legacy/Archive (Moved to /archive/):
     ├── ThemeToggle.tsx     # Dark/light mode switching
     ├── EmptyState.tsx      # Guidance for empty states
     └── LoadingSkeleton.tsx # Loading placeholders
+
+/components/                 # Global components
+├── HelpWidget.tsx          # Floating help widget with Telegram community invite
+└── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
 ```
 
 ---
@@ -274,7 +278,7 @@ const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 - **Market Data**: 21+ technical indicators with premium feature gating
 - **Signal Sources**: ggShot integration with subscription gatekeeping
 - **Strategy Editor**: AI prompt templates with LLM provider selection
-- **Trading Settings**: Position sizing, risk management, Telegram integration
+- **Trading Settings**: Symbol selection (141 pairs), position sizing, risk management, Telegram integration
 
 ### **Real-time Monitoring**
 - **Live Positions**: Real-time P&L updates with color-coded performance
@@ -322,6 +326,9 @@ const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 - ✅ **Critical routing fix**: Updated middleware to redirect `app.ggbots.ai` to `/forge` instead of non-existent `/dashboard`
 - ✅ **Legacy API cleanup**: Removed duplicate API client, single authenticated client architecture
 - ✅ **Complete component cleanup**: All unused legacy components archived to `/archive/frontend-*`
+- ✅ **Symbol validation system**: 141 supported trading pairs with dropdown + search functionality
+- ✅ **Help widget integration**: Floating community support with Telegram group access
+- ✅ **UX improvements**: Symbol selection moved from locked exchange section to accessible location
 
 ### **🔴 Critical Issues (RESOLVED)**
 - **Routing Architecture**: ✅ Fixed middleware redirecting to non-existent dashboard route

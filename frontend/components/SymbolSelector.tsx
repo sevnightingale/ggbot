@@ -33,6 +33,34 @@ export function SymbolSelector({ value, onChange, className = '' }: SymbolSelect
     loadSymbols()
   }, [])
 
+  const searchSymbols = useCallback(async (query: string) => {
+    if (!query.trim()) {
+      setFilteredSymbols({ platform: symbols.platform, display: symbols.display })
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/v2/symbols/search/${encodeURIComponent(query)}`)
+      const result = await response.json()
+
+      if (result.status === 'success') {
+        setFilteredSymbols({ platform: result.data.platform, display: result.data.display })
+      }
+    } catch (error) {
+      console.error('Failed to search symbols:', error)
+      // Fallback to client-side filtering
+      const filtered = symbols.display.filter(symbol =>
+        symbol.toLowerCase().includes(query.toLowerCase()) ||
+        symbol.split('/')[0].toLowerCase().includes(query.toLowerCase())
+      )
+      const indices = filtered.map(display => symbols.display.indexOf(display))
+      setFilteredSymbols({
+        display: filtered,
+        platform: indices.map(i => symbols.platform[i])
+      })
+    }
+  }, [symbols])
+
   // Handle search/filter
   useEffect(() => {
     if (searchQuery.trim()) {
@@ -77,34 +105,6 @@ export function SymbolSelector({ value, onChange, className = '' }: SymbolSelect
       setLoading(false)
     }
   }
-
-  const searchSymbols = useCallback(async (query: string) => {
-    if (!query.trim()) {
-      setFilteredSymbols({ platform: symbols.platform, display: symbols.display })
-      return
-    }
-
-    try {
-      const response = await fetch(`/api/v2/symbols/search/${encodeURIComponent(query)}`)
-      const result = await response.json()
-
-      if (result.status === 'success') {
-        setFilteredSymbols({ platform: result.data.platform, display: result.data.display })
-      }
-    } catch (error) {
-      console.error('Failed to search symbols:', error)
-      // Fallback to client-side filtering
-      const filtered = symbols.display.filter(symbol =>
-        symbol.toLowerCase().includes(query.toLowerCase()) ||
-        symbol.split('/')[0].toLowerCase().includes(query.toLowerCase())
-      )
-      const indices = filtered.map(display => symbols.display.indexOf(display))
-      setFilteredSymbols({
-        display: filtered,
-        platform: indices.map(i => symbols.platform[i])
-      })
-    }
-  }, [symbols])
 
   const handleSelect = (displaySymbol: string) => {
     onChange(displaySymbol) // Use display format (BTC/USDT) for consistency
@@ -157,7 +157,7 @@ export function SymbolSelector({ value, onChange, className = '' }: SymbolSelect
               </div>
             ) : filteredSymbols.display.length > 0 ? (
               <div className="p-2">
-                {filteredSymbols.display.map((displaySymbol, index) => {
+                {filteredSymbols.display.map((displaySymbol) => {
                   const isSelected = displaySymbol === displayValue
                   const baseCurrency = displaySymbol.split('/')[0]
 
