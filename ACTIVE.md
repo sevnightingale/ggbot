@@ -83,6 +83,7 @@
 - **Generic framework** supporting multiple signal sources (ggShot implemented)
 - **AI confidence evaluation** of external signals using user strategies
 - **Premium gating** through ggBase subscription tier
+- **Service-to-service authentication** with dedicated `/api/v2/signal-validation` endpoint
 - **Telegram publishing** to user-specified channels with APPROVED/REJECTED status (integrated into ggbot.py orchestrator)
 - **Fixed confidence threshold** - all signals publish (classification handled by orchestrator)
 - **Complete V2 integration** using standard extraction → decision → trading flow
