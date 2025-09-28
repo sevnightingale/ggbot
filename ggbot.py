@@ -39,6 +39,44 @@ from core.scheduler import (
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, require_premium_user_v2
 from core.sse import get_unified_dashboard_data
 
+# Service Authentication Classes
+class ServiceUser:
+    """Represents an authenticated service."""
+    def __init__(self, service_name: str):
+        self.service_name = service_name
+
+import time
+from collections import defaultdict
+
+# Simple rate limiting for service endpoints
+service_calls = defaultdict(list)
+
+async def get_service_user(request: Request):
+    """Authenticate service-to-service requests."""
+    auth_header = request.headers.get('authorization', '')
+    service_header = request.headers.get('x-service-auth', '')
+
+    if not auth_header.startswith('Bearer ') or service_header != 'signal-listener':
+        raise HTTPException(status_code=401, detail="Service authentication required")
+
+    # Simple rate limiting: max 120 calls per minute
+    now = time.time()
+    calls = service_calls['signal-listener']
+    service_calls['signal-listener'] = [t for t in calls if now - t < 60]  # Keep last minute
+
+    if len(service_calls['signal-listener']) >= 120:
+        raise HTTPException(status_code=429, detail="Service rate limit exceeded")
+
+    service_calls['signal-listener'].append(now)
+
+    token = auth_header.split(' ')[1]
+    service_key = os.getenv('SUPABASE_SERVICE_KEY')
+
+    if not service_key or token != service_key:
+        raise HTTPException(status_code=401, detail="Invalid service token")
+
+    return ServiceUser(service_name='signal-listener')
+
 # Development Mock User (TODO: Remove when Phase 5 authentication is complete)
 async def get_mock_user_for_dev():
     """Mock user for Phase 7 development - replace with real auth in Phase 5."""
@@ -1597,6 +1635,43 @@ async def run_orchestration(
     except Exception as e:
         # Log any unexpected exceptions
         logger.error(f"Unexpected error in orchestration endpoint for config {config_id}: {e}")
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")
+
+
+@app.post("/api/v2/signal-validation/{config_id}")
+async def run_signal_validation(
+    config_id: str,
+    user_id: str,
+    request: SignalOrchestrationRequest,
+    _: ServiceUser = Depends(get_service_user)
+) -> OrchestrationResult:
+    """Signal validation endpoint for service-to-service calls."""
+    try:
+        logger.info(f"Signal validation triggered by service for config {config_id}, user {user_id}")
+
+        result = await orchestrator.run_autonomous_cycle(
+            config_id,
+            user_id,
+            signal_data=request.signal_data,
+            override_symbol=request.override_symbol
+        )
+
+        if result.status == "error":
+            error_detail = "Unknown signal validation error"
+            if result.extraction_result and isinstance(result.extraction_result, dict):
+                error_detail = result.extraction_result.get('error', error_detail)
+
+            logger.error(f"Signal validation failed for config {config_id}: {error_detail}")
+            raise HTTPException(status_code=500, detail=f"Signal validation failed: {error_detail}")
+
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Unexpected error in signal validation for config {config_id}: {e}")
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Internal server error: {str(e)}")

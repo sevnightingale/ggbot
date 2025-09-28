@@ -1,5 +1,6 @@
 import type { Metadata } from "next"
 import { Inter, Kanit } from 'next/font/google'
+import { Analytics } from "@vercel/analytics/next"
 import "./globals.css"
 
 const inter = Inter({ 
@@ -28,6 +29,7 @@ export default function RootLayout({
         <div className="min-h-screen bg-charcoal-900 text-bone-200">
           {children}
         </div>
+        <Analytics />
       </body>
     </html>
   )
