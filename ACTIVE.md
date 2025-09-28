@@ -41,8 +41,9 @@
 - `GET /api/v2/symbols/search/{query}` - Search symbols by base currency
 
 **Signal Processing**
-- `POST /api/v2/orchestrate/{config_id}/signal` - Signal validation endpoint
-- Signal listener and publisher services (PM2 background processes)
+- `POST /api/v2/signal-validation/{config_id}` - Service-to-service signal validation endpoint
+- `POST /api/v2/orchestrate/{config_id}` - General orchestration endpoint
+- Signal listener service (PM2 background process with service authentication)
 
 **Trading & Analytics**
 - `GET /api/live-position-data` - Current positions with real-time P&L
