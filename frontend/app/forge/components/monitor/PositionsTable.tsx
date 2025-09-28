@@ -28,31 +28,35 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
   const [priceFlashes, setPriceFlashes] = useState<Record<string, 'up' | 'down' | null>>({})
   const prevPricesRef = useRef<Record<string, number>>({})
 
-  // Detect price changes and trigger flash animations
+  // Trigger flash animations on every SSE update
   useEffect(() => {
+    if (positions.length === 0) return
+
     const newFlashes: Record<string, 'up' | 'down' | null> = {}
 
     positions.forEach(position => {
       const prevPrice = prevPricesRef.current[position.trade_id]
       const currentPrice = position.current_price
 
+      // Always flash on SSE update, use price change direction if available
       if (prevPrice !== undefined && prevPrice !== currentPrice) {
         newFlashes[position.trade_id] = currentPrice > prevPrice ? 'up' : 'down'
+      } else {
+        // Default to neutral flash (up) when no price change detected
+        newFlashes[position.trade_id] = 'up'
       }
 
       // Update prev price
       prevPricesRef.current[position.trade_id] = currentPrice
     })
 
-    // Apply flash states
-    if (Object.keys(newFlashes).length > 0) {
-      setPriceFlashes(newFlashes)
+    // Always apply flash states on SSE update
+    setPriceFlashes(newFlashes)
 
-      // Clear flash states after animation
-      setTimeout(() => {
-        setPriceFlashes({})
-      }, 800)
-    }
+    // Clear flash states after animation
+    setTimeout(() => {
+      setPriceFlashes({})
+    }, 800)
   }, [positions])
 
   // Get flash animation classes

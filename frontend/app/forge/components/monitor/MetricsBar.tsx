@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 
 interface Account {
@@ -33,37 +33,16 @@ interface MetricsBarProps {
 }
 
 export function MetricsBar({ account, className = '' }: MetricsBarProps) {
-  // Track metric changes for pulse animations
+  // Track SSE updates for pulse animations
   const [isUpdating, setIsUpdating] = useState(false)
-  const prevMetricsRef = useRef<{
-    portfolioReturn?: number
-    dailyPnl?: number
-    winRate?: number
-    totalTrades?: number
-  }>({})
 
-  // Detect metric changes and trigger pulse animation
+  // Trigger pulse animation on every SSE update (account prop change)
   useEffect(() => {
     if (!account) return
 
-    const currentMetrics = {
-      portfolioReturn: account.portfolio_return_pct || 0,
-      dailyPnl: account.daily_pnl || 0,
-      winRate: account.win_rate || 0,
-      totalTrades: account.total_trades || 0
-    }
-
-    const prevMetrics = prevMetricsRef.current
-    const hasChanged = Object.keys(currentMetrics).some(
-      key => prevMetrics[key as keyof typeof prevMetrics] !== currentMetrics[key as keyof typeof currentMetrics]
-    )
-
-    if (hasChanged && Object.keys(prevMetrics).length > 0) {
-      setIsUpdating(true)
-      setTimeout(() => setIsUpdating(false), 600)
-    }
-
-    prevMetricsRef.current = currentMetrics
+    // Always trigger animation when account data updates (SSE received)
+    setIsUpdating(true)
+    setTimeout(() => setIsUpdating(false), 600)
   }, [account])
 
   if (!account) {
@@ -95,7 +74,7 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
       {/* KPI 1: Portfolio Return */}
       <KPICard
         label="Portfolio Return"
-        value={`${portfolioReturnPct >= 0 ? '+' : ''}${(portfolioReturnPct * 100).toFixed(2)}%`}
+        value={`${portfolioReturnPct >= 0 ? '+' : ''}${portfolioReturnPct.toFixed(2)}%`}
         delta={portfolioReturnPct}
         isPercentage={true}
       />
@@ -168,7 +147,7 @@ function KPICard({ label, value, delta, isPercentage }: KPICardProps) {
             <TrendingDown className="mr-1 h-3 w-3" />
           )}
           {isPercentage
-            ? `${Math.abs((delta || 0) * 100).toFixed(2)}%`
+            ? `${Math.abs(delta || 0).toFixed(2)}%`
             : `$${Math.abs(delta || 0).toFixed(2)}`
           }
         </div>

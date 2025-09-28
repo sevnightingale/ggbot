@@ -112,6 +112,7 @@ export function ConfigureLayout({
         {activeConfigTab === 'trade-settings' && (
           <TradeSettings
             configData={configData}
+            configId={selectedBot?.config_id}
             onUpdate={onUpdateConfig}
           />
         )}

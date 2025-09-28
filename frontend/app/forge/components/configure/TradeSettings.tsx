@@ -5,19 +5,33 @@ import { Lock } from 'lucide-react'
 import { ConfigData, createDefaultConfigData } from '@/lib/api'
 import { SymbolSelector } from '@/components/SymbolSelector'
 import { usePermissions } from '@/lib/permissions'
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
+import { useEffect, useState } from 'react'
 
 interface TradeSettingsProps {
   configData?: ConfigData
+  configId?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
   className?: string
 }
 
 export function TradeSettings({
   configData,
+  configId,
   onUpdate,
   className = ''
 }: TradeSettingsProps) {
   const { canAccess } = usePermissions()
+  const [session, setSession] = useState<{ access_token?: string } | null>(null)
+
+  useEffect(() => {
+    const supabase = createClientComponentClient()
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setSession(session)
+    }
+    getSession()
+  }, [])
 
   const defaultConfig = createDefaultConfigData()
   const trading = configData?.trading || defaultConfig.trading
@@ -273,19 +287,19 @@ export function TradeSettings({
 
         {/* Premium Gate */}
         {!canAccess('telegram_publishing') ? (
-          <div className="p-6 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
+          <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border)]">
             <div className="flex items-center gap-3 mb-3">
-              <Lock className="h-5 w-5 text-amber-600" />
-              <div className="font-medium text-amber-800 dark:text-amber-200">
+              <Lock className="h-5 w-5 text-[var(--text-muted)]" />
+              <div className="font-medium text-[var(--text-primary)]">
                 Premium Feature Locked
               </div>
             </div>
-            <div className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+            <div className="text-sm text-[var(--text-muted)] mb-4">
               Telegram signal publishing is available with a ggbase subscription. Upgrade to automatically publish your bot&apos;s trading decisions to your Telegram channel.
             </div>
             <button
               onClick={() => window.open('/pricing', '_blank')}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--agent-decision)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
             >
               Upgrade to ggbase →
             </button>
@@ -323,23 +337,23 @@ export function TradeSettings({
           {publisher.enabled && (
             <div className="space-y-4">
               {/* Setup Instructions */}
-              <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30">
-                <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-3">Setup Instructions</h4>
-                <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
+              <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                <h4 className="font-medium text-[var(--text-primary)] mb-3">Setup Instructions</h4>
+                <ol className="text-sm text-[var(--text-muted)] space-y-2">
                   <li className="flex items-start gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">1</span>
-                    <span>Add <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-blue-900 dark:text-blue-200">@ggFilter_Bot</code> bot to your Telegram channel</span>
+                    <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">1</span>
+                    <span>Add <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">@ggFilter_Bot</code> bot to your Telegram channel</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">2</span>
+                    <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">2</span>
                     <span>Make the bot an admin with &quot;Post Messages&quot; permission</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">3</span>
-                    <span>Send <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-blue-900 dark:text-blue-200">/chatid</code> in the channel to get your Channel ID</span>
+                    <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">3</span>
+                    <span>Send <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">/chatid</code> in the channel to get your Channel ID</span>
                   </li>
                   <li className="flex items-start gap-2">
-                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">4</span>
+                    <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">4</span>
                     <span>Copy the Channel ID below</span>
                   </li>
                 </ol>
@@ -371,11 +385,27 @@ export function TradeSettings({
               {publisher.filter_channel && (
                 <div>
                   <button
-                    onClick={() => {
-                      // TODO: Implement test message API call
-                      alert('Test message feature coming soon!')
+                    onClick={async () => {
+                      try {
+                        const response = await fetch(`/api/v2/test/signal-publishing/${configId}`, {
+                          method: 'POST',
+                          headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${session?.access_token}`
+                          }
+                        })
+
+                        if (response.ok) {
+                          alert('✅ Test message sent successfully!')
+                        } else {
+                          const error = await response.text()
+                          alert(`❌ Failed to send test message: ${error}`)
+                        }
+                      } catch (error) {
+                        alert(`❌ Error sending test message: ${error}`)
+                      }
                     }}
-                    className="w-full p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
+                    className="w-full p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
                   >
                     Send Test Message
                   </button>
