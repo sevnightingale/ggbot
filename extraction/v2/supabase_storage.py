@@ -126,7 +126,11 @@ class SupabaseStorage:
             }
             
             # Upsert record to prevent duplicates (overwrites based on user_id,symbol,timeframe,config_id)
-            result = self.client.table('market_data').upsert(record).execute()
+            # on_conflict parameter specifies which constraint to use for upsert
+            result = self.client.table('market_data').upsert(
+                record,
+                on_conflict='user_id,config_id,symbol,timeframe'
+            ).execute()
             
             if result.data:
                 record_id = result.data[0]['id']

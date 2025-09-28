@@ -1164,25 +1164,32 @@ async def reconcile_active_bots():
             with conn.cursor() as cur:
                 # Get all active bot configurations
                 cur.execute("""
-                    SELECT config_id, user_id, config_data 
-                    FROM configurations 
+                    SELECT config_id, user_id, config_type, config_data
+                    FROM configurations
                     WHERE state = 'active'
                 """)
-                
+
                 active_configs = cur.fetchall()
                 scheduled_count = 0
-                
+
                 for row in active_configs:
-                    config_id, user_id, config_data = row
-                    
+                    config_id, user_id, config_type, config_data = row
+
                     try:
+                        # Only schedule autonomous_trading configs, not signal_validation configs
+                        # Use the actual config_type column, default to autonomous_trading if null
+                        actual_config_type = config_type or 'autonomous_trading'
+                        if actual_config_type != 'autonomous_trading':
+                            logger.info(f"Skipping {actual_config_type} config {config_id} - not scheduling signal_validation configs")
+                            continue
+
                         # Extract timeframe from config_data using the proper extraction function
                         timeframe = extract_timeframe_from_config(config_data)
-                        
+
                         # Schedule the bot
                         add_bot_job(user_id, config_id, timeframe)
                         scheduled_count += 1
-                        
+
                     except Exception as e:
                         logger.error(f"Failed to schedule bot {config_id} for user {user_id}: {e}")
                 

@@ -75,9 +75,9 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         WHERE c.user_id = %s AND c.state != 'archived'
     ),
     open_positions AS (
-        SELECT pt.config_id, pt.trade_id, pt.symbol, pt.side, pt.size_usd, 
+        SELECT pt.config_id, pt.trade_id, pt.symbol, pt.side, pt.size_usd,
                pt.entry_price, pt.current_price, pt.unrealized_pnl, pt.opened_at,
-               pt.stop_loss, pt.take_profit
+               pt.stop_loss, pt.take_profit, pt.leverage
         FROM paper_trades pt
         INNER JOIN bot_configs bc ON pt.config_id = bc.config_id
         WHERE pt.status = 'open'
@@ -85,17 +85,16 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     ),
     recent_decisions AS (
         SELECT * FROM (
-            SELECT d.config_id, d.decision_id, d.symbol, d.action, d.confidence, 
+            SELECT d.config_id, d.decision_id, d.symbol, d.action, d.confidence,
                    d.reasoning, d.created_at,
                    ROW_NUMBER() OVER (
-                       PARTITION BY d.config_id 
+                       PARTITION BY d.config_id
                        ORDER BY d.created_at DESC
                    ) AS rn
             FROM decisions d
             INNER JOIN bot_configs bc ON d.config_id = bc.config_id
-            WHERE d.created_at > NOW() - INTERVAL '2 hours'
-        ) ranked_decisions 
-        WHERE rn <= 5  -- 5 most recent decisions per bot
+        ) ranked_decisions
+        WHERE rn <= 5  -- 5 most recent decisions per bot (no time filter)
     ),
     account_summaries AS (
         SELECT pa.config_id, pa.account_id, pa.current_balance, pa.total_pnl, 

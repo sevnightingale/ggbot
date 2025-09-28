@@ -228,7 +228,8 @@ class PositionManager:
                     available_balance = float(account["current_balance"])
                     total_pnl = float(account["total_pnl"]) + total_unrealized_pnl
                     initial_balance = float(account["initial_balance"])
-                    portfolio_return_pct = (total_pnl / initial_balance) * 100
+                    # Fix: Portfolio return should be based on total value change, not P&L tracking
+                    portfolio_return_pct = ((total_balance - initial_balance) / initial_balance) * 100
                     
                     return PortfolioSummary(
                         config_id=config_id,

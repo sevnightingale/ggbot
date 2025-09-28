@@ -26,6 +26,7 @@ interface Position {
   unrealized_pnl: number
   status: string
   opened_at: string
+  leverage: number
 }
 
 interface Decision {

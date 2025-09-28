@@ -75,24 +75,21 @@ class MonitoringService:
             try:
                 start_time = time.time()
                 
-                # Get all configs with open positions
+                # Get all configs with open positions (for logging only)
                 configs_with_positions = await self._get_configs_with_positions()
-                
+
                 if configs_with_positions and self.cycle_count % 20 == 0:  # Log every minute
                     logger.info(f"📊 Monitoring {len(configs_with_positions)} configs with open positions")
-                
-                for config_id, user_id in configs_with_positions:
-                    try:
-                        # Update position prices (critical for risk management)
-                        updated_count = await self.paper_trading.update_position_prices(config_id)
-                        
-                        # 🔥 WEBSOCKET BROADCAST DELETED! Positions now via SSE stream
-                        if updated_count > 0:
-                            logger.debug(f"📊 Updated {updated_count} positions for config {config_id[:8]}")
-                                
-                    except Exception as e:
-                        logger.error(f"❌ Position update failed for {config_id}: {e}")
-                        continue
+
+                # 🚀 BATCH OPTIMIZATION: Update ALL positions at once instead of per-config
+                try:
+                    total_updated = await self.paper_trading.update_position_prices(config_id=None)
+
+                    if total_updated > 0:
+                        logger.debug(f"📊 Batch updated {total_updated} positions across all configs")
+
+                except Exception as e:
+                    logger.error(f"❌ Batch position update failed: {e}")
                 
                 self.cycle_count += 1
                 

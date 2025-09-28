@@ -182,47 +182,17 @@ class TelegramBot:
 
 
 class SignalPublishingService:
-    """Main service for publishing validated signals to user channels."""
-    
+    """Signal publishing service for telegram integration (PM2 service methods removed)."""
+
     def __init__(self):
+        # Use platform bot token from environment
         self.bot_token = os.getenv('GG_FILTER_TOKEN')
         if not self.bot_token:
             raise ValueError("GG_FILTER_TOKEN environment variable is required")
-            
         self.telegram_bot = TelegramBot(self.bot_token)
         self.access_control = AccessControlService()
         self.logger = logger.bind(service='signal_publisher')
-        self.running = False
-    
-    async def start(self):
-        """Start the signal publishing service."""
-        self.logger.info("🚀 Starting Signal Publishing Service")
-        
-        try:
-            # Test telegram bot connection
-            if not await self.telegram_bot.test_connection():
-                raise ValueError("Failed to connect to Telegram bot")
-            
-            self.running = True
-            self.logger.info("✅ Signal Publishing Service ready")
-            
-            # Start the publishing queue processor
-            await self._run_publishing_queue()
-            
-        except Exception as e:
-            self.logger.error(f"Signal publishing service failed to start: {e}")
-            raise
-    
-    async def _run_publishing_queue(self):
-        """Process signal publishing queue (placeholder - would use actual queue system)."""
-        self.logger.info("📤 Signal publishing queue processor started")
-        
-        # TODO: Implement actual queue processing
-        # For now, this would be triggered by the orchestrator directly
-        while self.running:
-            await asyncio.sleep(5)  # Polling interval
-            # In production, this would process a queue (Redis, database, etc.)
-    
+
     async def publish_validated_signal(
         self,
         config_id: str,
@@ -233,40 +203,40 @@ class SignalPublishingService:
         """Publish validated signal to user's configured telegram channel."""
         try:
             self.logger.info(f"📡 Publishing signal for config {config_id}")
-            
+
             # 1. Check user access (ggBase tier only)
             if not await self.access_control.can_publish_signals(user_id):
                 self.logger.info(f"User {user_id} not authorized for signal publishing")
                 return False
-            
+
             # 2. Get user's telegram channel configuration
             channel_config = await self.access_control.get_user_telegram_config(config_id)
             if not channel_config:
                 self.logger.info(f"No telegram config found for config {config_id}")
                 return False
-            
+
             # 3. Format message with validation results
             message = self._format_signal_message(signal_data, decision_result, channel_config)
-            
-            # 4. Send to user's channel
+
+            # 4. Send to user's channel (using user's bot token passed via telegram_bot)
             success = await self.telegram_bot.send_message(
                 chat_id=channel_config.chat_id,
                 text=message
             )
-            
+
             if success:
                 # 5. Update usage metrics
                 await self._update_signal_metrics(user_id, decision_result)
                 self.logger.info(f"✅ Signal published successfully to {channel_config.chat_id}")
             else:
                 self.logger.error(f"❌ Failed to publish signal to {channel_config.chat_id}")
-            
+
             return success
-            
+
         except Exception as e:
             self.logger.error(f"Error publishing signal: {e}")
             return False
-    
+
     def _format_signal_message(
         self,
         signal_data: Dict,
@@ -309,7 +279,7 @@ class SignalPublishingService:
             ])
 
         return "\n".join(message_parts)
-    
+
     async def _update_signal_metrics(self, user_id: str, decision_result: Dict) -> None:
         """Update user's signal publishing usage metrics."""
         try:
@@ -326,88 +296,20 @@ class SignalPublishingService:
                     
         except Exception as e:
             self.logger.error(f"Failed to update signal metrics: {e}")
-    
-    async def health_check(self) -> Dict[str, Any]:
-        """Health check for monitoring."""
-        bot_status = await self.telegram_bot.test_connection()
-        
-        return {
-            'status': 'healthy' if (self.running and bot_status) else 'unhealthy',
-            'timestamp': datetime.now(timezone.utc).isoformat(),
-            'telegram_bot_connected': bot_status,
-            'service_running': self.running
-        }
-    
-    async def shutdown(self):
-        """Shutdown the publishing service."""
-        self.running = False
-        self.logger.info("🔄 Signal Publishing Service shutdown complete")
-
-
-# Convenience function for integration with orchestrator
-async def publish_validated_signal(
-    config_id: str,
-    user_id: str,
-    signal_data: Dict,
-    decision_result: Dict
-) -> bool:
-    """
-    Convenience function to publish a validated signal.
-    
-    This can be called directly by the orchestrator or via a queue system.
-    """
-    service = SignalPublishingService()
-    return await service.publish_validated_signal(
-        config_id, user_id, signal_data, decision_result
-    )
 
 
 # Orchestrator integration function
 async def publish_signal_to_telegram(
     config_id: str,
-    user_id: str, 
+    user_id: str,
     signal_data: Dict,
     decision_result: Dict
 ) -> bool:
-    """Publish signal to telegram - called by orchestrator after signal validation."""
+    """Publish signal to telegram using platform bot - called by orchestrator after signal validation."""
     try:
-        # Get user's bot token from their config
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT config_data 
-                    FROM configurations 
-                    WHERE config_id = %s
-                """, (config_id,))
-                
-                result = cur.fetchone()
-                if not result:
-                    logger.warning(f"Config {config_id} not found")
-                    return False
-                
-                config_data = result[0]
-                
-                # Handle nested config_data structure like in config_service
-                if "config_data" in config_data:
-                    inner_config = config_data["config_data"] 
-                    telegram_config = inner_config.get('telegram_integration', {})
-                else:
-                    telegram_config = config_data.get('telegram_integration', {})
-                
-                publisher_config = telegram_config.get('publisher', {})
-                bot_token = publisher_config.get('bot_token')
-                
-                if not bot_token:
-                    logger.warning(f"No bot token configured for config {config_id}")
-                    logger.debug(f"Config structure: telegram_integration keys = {list(telegram_config.keys()) if telegram_config else 'None'}")
-                    logger.debug(f"Publisher config keys = {list(publisher_config.keys()) if publisher_config else 'None'}")
-                    return False
-        
-        # Create a temporary service instance with user's bot token
+        # Create service instance using platform bot token from environment
         service = SignalPublishingService()
-        service.bot_token = bot_token  # Override with user's token
-        service.telegram_bot = TelegramBot(bot_token)  # Create new bot with user's token
-        
+
         return await service.publish_validated_signal(
             config_id, user_id, signal_data, decision_result
         )
@@ -417,29 +319,5 @@ async def publish_signal_to_telegram(
         return False
 
 
-async def main():
-    """Main entry point for the signal publishing service."""
-    service = SignalPublishingService()
-    
-    try:
-        await service.start()
-    except KeyboardInterrupt:
-        logger.info("Service interrupted by user")
-    except Exception as e:
-        logger.error(f"Service failed: {e}")
-        import traceback
-        traceback.print_exc()
-    finally:
-        await service.shutdown()
-
-
-if __name__ == "__main__":
-    # Set up logging for the service
-    import logging
-    logging.basicConfig(
-        level=logging.INFO,
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
-    )
-    
-    # Run the service
-    asyncio.run(main())
+# NOTE: PM2 service main() removed - this module now only provides utility functions
+# Telegram publishing is handled directly by the orchestrator (ggbot.py)

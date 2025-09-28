@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 
 interface Position {
@@ -15,6 +15,7 @@ interface Position {
   opened_at: string
   stop_loss?: number
   take_profit?: number
+  leverage: number
 }
 
 interface PositionsTableProps {
@@ -23,6 +24,46 @@ interface PositionsTableProps {
 }
 
 export function PositionsTable({ positions = [], className = '' }: PositionsTableProps) {
+  // Track price changes for flash animations
+  const [priceFlashes, setPriceFlashes] = useState<Record<string, 'up' | 'down' | null>>({})
+  const prevPricesRef = useRef<Record<string, number>>({})
+
+  // Detect price changes and trigger flash animations
+  useEffect(() => {
+    const newFlashes: Record<string, 'up' | 'down' | null> = {}
+
+    positions.forEach(position => {
+      const prevPrice = prevPricesRef.current[position.trade_id]
+      const currentPrice = position.current_price
+
+      if (prevPrice !== undefined && prevPrice !== currentPrice) {
+        newFlashes[position.trade_id] = currentPrice > prevPrice ? 'up' : 'down'
+      }
+
+      // Update prev price
+      prevPricesRef.current[position.trade_id] = currentPrice
+    })
+
+    // Apply flash states
+    if (Object.keys(newFlashes).length > 0) {
+      setPriceFlashes(newFlashes)
+
+      // Clear flash states after animation
+      setTimeout(() => {
+        setPriceFlashes({})
+      }, 800)
+    }
+  }, [positions])
+
+  // Get flash animation classes
+  const getPriceFlashClass = (tradeId: string) => {
+    const flash = priceFlashes[tradeId]
+    if (!flash) return ''
+
+    return flash === 'up'
+      ? 'animate-pulse bg-green-100 dark:bg-green-900/20'
+      : 'animate-pulse bg-red-100 dark:bg-red-900/20'
+  }
   if (positions.length === 0) {
     return (
       <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
@@ -38,10 +79,29 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
   }
 
   const formatPrice = (price: number) => {
-    if (price >= 1000) {
-      return `$${(price / 1000).toFixed(1)}k`
+    // Smart crypto price formatting based on price range
+    if (price >= 10000) {
+      // Large prices like BTC: $45,123.45
+      return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+    } else if (price >= 1000) {
+      // Medium prices like ETH: $3,456.78
+      return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+    } else if (price >= 100) {
+      // Smaller coins: $123.45
+      return `$${price.toFixed(2)}`
+    } else if (price >= 1) {
+      // Sub-$100 coins: $12.3456
+      return `$${price.toFixed(4)}`
+    } else if (price >= 0.01) {
+      // Small coins: $0.123456
+      return `$${price.toFixed(6)}`
+    } else if (price >= 0.0001) {
+      // Micro coins: $0.00123456
+      return `$${price.toFixed(8)}`
+    } else {
+      // Very small altcoins: $0.0000123456
+      return `$${price.toFixed(10)}`
     }
-    return `$${price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
   const formatPnL = (pnl: number) => {
@@ -99,6 +159,8 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Symbol</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Side</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Size</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Leverage</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Collateral</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Entry</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Current</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">P&L</th>
@@ -109,7 +171,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
             </thead>
             <tbody>
               {positions.map((position) => (
-                <tr key={position.trade_id} className="border-b border-[var(--border)] last:border-b-0">
+                <tr key={position.trade_id} className={`border-b border-[var(--border)] last:border-b-0 transition-all duration-300 ${getPriceFlashClass(position.trade_id)}`}>
                   <td className="py-3 px-2 text-sm text-[var(--text-primary)] font-medium">
                     {position.symbol}
                   </td>
@@ -121,6 +183,12 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
                   </td>
                   <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
                     ${position.size_usd.toLocaleString()}
+                  </td>
+                  <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
+                    {position.leverage}x
+                  </td>
+                  <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
+                    ${(position.size_usd / position.leverage).toLocaleString()}
                   </td>
                   <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
                     {formatPrice(position.entry_price)}
@@ -160,7 +228,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {positions.map((position) => (
-          <div key={position.trade_id} className="border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-primary)]">
+          <div key={position.trade_id} className={`border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-primary)] transition-all duration-300 ${getPriceFlashClass(position.trade_id)}`}>
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -183,6 +251,16 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
               <div className="flex justify-between">
                 <span className="text-[var(--text-muted)]">Size:</span>
                 <span className="text-[var(--text-secondary)]">${position.size_usd.toLocaleString()}</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-[var(--text-muted)]">Leverage:</span>
+                <span className="text-[var(--text-secondary)]">{position.leverage}x</span>
+              </div>
+
+              <div className="flex justify-between">
+                <span className="text-[var(--text-muted)]">Collateral:</span>
+                <span className="text-[var(--text-secondary)]">${(position.size_usd / position.leverage).toLocaleString()}</span>
               </div>
 
               <div className="flex justify-between">

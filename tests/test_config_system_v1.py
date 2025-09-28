@@ -90,7 +90,6 @@ class TestConfigModels:
                 },
                 "publisher": {
                     "enabled": False,
-                    "bot_token": "",
                     "filter_channel": "",
                     "confidence_threshold": 0.8,
                     "include_reasoning": True,

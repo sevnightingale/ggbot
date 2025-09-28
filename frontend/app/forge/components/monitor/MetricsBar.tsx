@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 
 interface Account {
@@ -32,7 +32,39 @@ interface MetricsBarProps {
   className?: string
 }
 
-export function MetricsBar({ account, positions = [], className = '' }: MetricsBarProps) {
+export function MetricsBar({ account, className = '' }: MetricsBarProps) {
+  // Track metric changes for pulse animations
+  const [isUpdating, setIsUpdating] = useState(false)
+  const prevMetricsRef = useRef<{
+    portfolioReturn?: number
+    dailyPnl?: number
+    winRate?: number
+    totalTrades?: number
+  }>({})
+
+  // Detect metric changes and trigger pulse animation
+  useEffect(() => {
+    if (!account) return
+
+    const currentMetrics = {
+      portfolioReturn: account.portfolio_return_pct || 0,
+      dailyPnl: account.daily_pnl || 0,
+      winRate: account.win_rate || 0,
+      totalTrades: account.total_trades || 0
+    }
+
+    const prevMetrics = prevMetricsRef.current
+    const hasChanged = Object.keys(currentMetrics).some(
+      key => prevMetrics[key as keyof typeof prevMetrics] !== currentMetrics[key as keyof typeof currentMetrics]
+    )
+
+    if (hasChanged && Object.keys(prevMetrics).length > 0) {
+      setIsUpdating(true)
+      setTimeout(() => setIsUpdating(false), 600)
+    }
+
+    prevMetricsRef.current = currentMetrics
+  }, [account])
 
   if (!account) {
     return (
@@ -53,13 +85,13 @@ export function MetricsBar({ account, positions = [], className = '' }: MetricsB
   const portfolioReturnPct = account.portfolio_return_pct || 0
   const dailyPnl = account.daily_pnl || 0
   const winRate = account.win_rate || 0
-  const openPositions = positions.length || account.open_positions || 0
+  const totalTrades = account.total_trades || 0
 
   // Note: totalPnl calculation available if needed for future metrics
   // const totalPnl = (account.total_pnl || 0) + (account.unrealized_pnl || 0)
 
   return (
-    <div className={`grid grid-cols-2 gap-3 ${className}`}>
+    <div className={`grid grid-cols-2 gap-3 transition-all duration-300 ${isUpdating ? 'scale-[1.02] opacity-90' : ''} ${className}`}>
       {/* KPI 1: Portfolio Return */}
       <KPICard
         label="Portfolio Return"
@@ -84,11 +116,11 @@ export function MetricsBar({ account, positions = [], className = '' }: MetricsB
         isPercentage={false}
       />
 
-      {/* KPI 4: Open Positions */}
+      {/* KPI 4: Total Trades */}
       <KPICard
-        label="Open Positions"
-        value={`${openPositions} ${openPositions === 1 ? 'open' : 'open'}`}
-        delta={null} // No trend indicator for position count
+        label="Total Trades"
+        value={`${totalTrades} ${totalTrades === 1 ? 'trade' : 'trades'}`}
+        delta={null} // No trend indicator for trade count
         isPercentage={false}
       />
     </div>

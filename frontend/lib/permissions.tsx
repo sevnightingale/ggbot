@@ -97,7 +97,13 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
       case 'premium_llms':
       case 'openai_gpt4':
-        return userProfile.can_use_premium_features && !userProfile.requires_own_llm_keys
+        const hasAccess = userProfile.can_use_premium_features && !userProfile.requires_own_llm_keys
+        console.log('premium_llms permission check:', {
+          can_use_premium_features: userProfile.can_use_premium_features,
+          requires_own_llm_keys: userProfile.requires_own_llm_keys,
+          hasAccess
+        })
+        return hasAccess
 
       case 'platform_llm_keys':
         return userProfile.can_use_premium_features && !userProfile.requires_own_llm_keys

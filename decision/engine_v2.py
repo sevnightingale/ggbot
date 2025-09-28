@@ -12,8 +12,8 @@ from typing import Dict, Any, Optional, List
 from decimal import Decimal
 
 from core.common.logger import logger
-from core.config import ConfigRepository, BotConfig, config_repo
-from core.common.db import get_db_connection
+from core.services.config_service import config_service
+from core.common.db import get_db_connection, DecimalEncoder
 from core.services.llm_key_service import LLMKeyService
 from decision.llm_providers import get_llm_provider
 from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
@@ -21,6 +21,15 @@ from decision.prompts.signal_validation import build_signal_validation_prompt
 from decision.prompts.position_management import build_position_management_prompt
 import uuid
 import json
+
+
+# Custom JSON encoder for database serialization
+class DecisionJSONEncoder(DecimalEncoder):
+    """Extended JSON encoder that handles Decimal and datetime objects."""
+    def default(self, obj):
+        if isinstance(obj, datetime):
+            return obj.isoformat()
+        return super().default(obj)
 
 
 # Custom exceptions for clean error handling
@@ -58,7 +67,7 @@ class DecisionEngineV2:
         """Initialize decision engine for a specific configuration."""
         self.config_id = config_id
         self.user_id = user_id
-        self.config: Optional[BotConfig] = None
+        self.config = None
         self.llm_provider = None  # Will be initialized dynamically based on config
 
         logger.bind(config_id=config_id).info("DecisionEngineV2 initialized")
@@ -66,15 +75,15 @@ class DecisionEngineV2:
     async def initialize(self) -> None:
         """Load configuration and validate setup."""
         try:
-            self.config = config_repo.get_config(self.config_id, self.user_id)
+            self.config = await config_service.get_config(self.config_id, self.user_id)
             if not self.config:
                 raise ConfigurationError(f"Configuration {self.config_id} not found")
 
             # Initialize LLM provider based on config
             await self._initialize_llm_provider()
 
-            # Use getattr to safely access config_type, default to "autonomous" if not found
-            config_type = getattr(self.config, 'config_type', 'autonomous')
+            # Now using BotConfigV2 which has config_type
+            config_type = self.config.config_type
             logger.bind(config_id=self.config_id, mode=config_type).info("Configuration and LLM provider loaded")
         except Exception as e:
             logger.bind(config_id=self.config_id).error(f"Failed to load config: {e}")
@@ -125,11 +134,12 @@ class DecisionEngineV2:
             # Get API key with user/platform priority
             api_key = await LLMKeyService.get_api_key(self.user_id, provider_name)
 
-            # Create provider instance
+            # Create provider instance - resolve "default" model to None for proper default handling
+            resolved_model = None if model_name == "default" else model_name
             self.llm_provider = get_llm_provider(
                 provider_name=provider_name,
                 api_key=api_key,
-                model=model_name  # Uses provider default if None
+                model=resolved_model  # Uses provider default if None
             )
 
             logger.bind(
@@ -162,7 +172,7 @@ class DecisionEngineV2:
         
         try:
             # Route based on config type and signal data presence
-            config_type = getattr(self.config, 'config_type', 'autonomous_trading')
+            config_type = self.config.config_type
 
             logger.bind(config_id=self.config_id).info(
                 f"🔍 DECISION DEBUG: config_type='{config_type}', signal_data present={signal_data is not None}, signal_data type={type(signal_data)}"
@@ -612,14 +622,13 @@ Take Profit: {take_profit_text}
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    decision_data_json = {**decision_data, 'raw_action': raw_action}  # Preserve original action
+
                     cur.execute("""
                         INSERT INTO decisions (
                             decision_id, user_id, config_id, symbol, action, status,
-                            confidence, reasoning, prompt, market_data, decision_data,
-                            created_at
-                        ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                        )
+                            confidence, reasoning, prompt, decision_data, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         decision_id,
                         self.user_id,
@@ -630,21 +639,19 @@ Take Profit: {take_profit_text}
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
                         prompt,
-                        json.dumps(market_data, default=str),
-                        json.dumps({**decision_data, 'raw_action': raw_action}, default=str),  # Preserve original action in decision_data
-                        datetime.now(timezone.utc)
+                        json.dumps(decision_data_json, cls=DecisionJSONEncoder),
+                        datetime.now(timezone.utc).isoformat()
                     ))
-                    
-                    conn.commit()  # Commit the transaction to save the decision
-                    
-                    logger.bind(
-                        config_id=self.config_id,
-                        decision_id=decision_id,
-                        symbol=symbol,
-                        action=decision_data.get('action')
-                    ).info("Decision saved to database")
-                    
-                    return decision_id
+                    conn.commit()
+
+            logger.bind(
+                config_id=self.config_id,
+                decision_id=decision_id,
+                symbol=symbol,
+                action=decision_data.get('action')
+            ).info("Decision saved to database")
+
+            return decision_id
                     
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save decision: {e}")
@@ -1000,14 +1007,19 @@ Take Profit: {take_profit_text}
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    decision_data_json = {
+                        'signal_source': signal_data.get('source'),
+                        'signal_data': signal_data,
+                        'validation_framework': '4-pillar',
+                        'current_price': float(current_price),
+                        'raw_action': raw_action  # Preserve original action
+                    }
+
                     cur.execute("""
                         INSERT INTO decisions (
                             decision_id, user_id, config_id, symbol, action, status,
-                            confidence, reasoning, prompt, market_data, decision_data,
-                            created_at
-                        ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                        )
+                            confidence, reasoning, prompt, decision_data, created_at
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         decision_id,
                         self.user_id,
@@ -1018,25 +1030,19 @@ Take Profit: {take_profit_text}
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
                         prompt,
-                        json.dumps(market_data, default=str),
-                        json.dumps({
-                            'signal_source': signal_data.get('source'),
-                            'signal_data': signal_data,
-                            'validation_framework': '4-pillar',
-                            'current_price': float(current_price),
-                            'raw_action': raw_action  # Preserve original action
-                        }, default=str),
-                        datetime.now(timezone.utc)
+                        json.dumps(decision_data_json, cls=DecisionJSONEncoder),
+                        datetime.now(timezone.utc).isoformat()
                     ))
-                    
-                    logger.bind(
-                        config_id=self.config_id,
-                        decision_id=decision_id,
-                        symbol=symbol,
-                        action=decision_data.get('action')
-                    ).info("Signal validation decision saved to database")
-                    
-                    return decision_id
+                    conn.commit()
+
+            logger.bind(
+                config_id=self.config_id,
+                decision_id=decision_id,
+                symbol=symbol,
+                action=decision_data.get('action')
+            ).info("Signal validation decision saved to database")
+
+            return decision_id
                     
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save signal decision: {e}")
@@ -1319,14 +1325,20 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    decision_data_json = {
+                        'decision_type': 'position_management',
+                        'position_data': position_data,
+                        'current_price': float(current_price),
+                        'raw_action': raw_action,  # Preserve original action
+                        **decision_data
+                    }
+
                     cur.execute("""
                         INSERT INTO decisions (
                             decision_id, user_id, config_id, symbol, action, status,
                             confidence, reasoning, prompt, market_data, decision_data,
                             parent_decision_id, created_at
-                        ) VALUES (
-                            %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s
-                        )
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         decision_id,
                         self.user_id,
@@ -1337,27 +1349,23 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
                         prompt,
-                        json.dumps(market_data, default=str),
-                        json.dumps({
-                            'decision_type': 'position_management',
-                            'position_data': position_data,
-                            'current_price': float(current_price),
-                            'raw_action': raw_action,  # Preserve original action
-                            **decision_data
-                        }, default=str),
+                        json.dumps(market_data, cls=DecisionJSONEncoder),
+                        json.dumps(decision_data_json, cls=DecisionJSONEncoder),
                         position_data.get('entry_decision_id'),  # Link to original entry decision
-                        datetime.now(timezone.utc)
+                        datetime.now(timezone.utc).isoformat()
                     ))
-                    
-                    logger.bind(
-                        config_id=self.config_id,
-                        decision_id=decision_id,
-                        symbol=symbol,
-                        action=decision_data.get('action'),
-                        trade_id=position_data.get('trade_id')
-                    ).info("Position management decision saved to database")
-                    
-                    return decision_id
+                    conn.commit()
+
+
+            logger.bind(
+                config_id=self.config_id,
+                decision_id=decision_id,
+                symbol=symbol,
+                action=decision_data.get('action'),
+                trade_id=position_data.get('trade_id')
+            ).info("Position management decision saved to database")
+
+            return decision_id
                     
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save position decision: {e}")

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import { usePermissions } from '@/lib/permissions'
 import { ConfigData } from '@/lib/api'
 
@@ -25,6 +25,22 @@ export function StrategyEditor({
 
   // State for collapsible sections
   const [showSystemSections, setShowSystemSections] = useState(false)
+
+  // Ref for textarea auto-resize
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-resize textarea when content changes or component mounts
+  useEffect(() => {
+    const resizeTextarea = () => {
+      if (textareaRef.current) {
+        textareaRef.current.style.height = 'auto'
+        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
+      }
+    }
+
+    // Resize immediately when content changes
+    resizeTextarea()
+  }, [currentStrategy])
 
   // Handle frequency selection
   const handleFrequencyChange = (freq: string) => {
@@ -69,11 +85,17 @@ export function StrategyEditor({
 
   // Handle LLM provider change
   const handleProviderChange = (provider: string) => {
+    console.log('handleProviderChange called with:', provider)
+    console.log('canAccess premium_llms:', canAccess('premium_llms'))
+
     // Check if user has access to premium LLMs
     if (provider === 'openai' && !canAccess('premium_llms')) {
+      console.log('Permission denied for OpenAI')
       alert('Premium AI models require a ggbase subscription. Upgrade to access OpenAI GPT-5!')
       return
     }
+
+    console.log('Permission check passed, proceeding with provider change')
 
     // Set appropriate model for each provider
     let model
@@ -186,6 +208,7 @@ export function StrategyEditor({
               Strategy Logic
             </label>
             <textarea
+              ref={textareaRef}
               value={currentStrategy}
               onChange={handleTextareaResize}
               rows={6}
