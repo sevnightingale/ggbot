@@ -40,6 +40,10 @@ export function ConfigureLayout({
 }: ConfigureLayoutProps) {
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabType>('strategy')
 
+  // Local state for MarketDataSelector
+  const [marketDataActiveTab, setMarketDataActiveTab] = useState('technical_analysis')
+  const [marketDataSearchTerm, setMarketDataSearchTerm] = useState('')
+
   if (!selectedBot) {
     return (
       <div className={className}>
@@ -83,6 +87,10 @@ export function ConfigureLayout({
             configData={configData}
             onUpdate={onUpdateConfig}
             dataSources={dataSources}
+            activeTab={marketDataActiveTab}
+            searchTerm={marketDataSearchTerm}
+            onTabChange={setMarketDataActiveTab}
+            onSearchChange={setMarketDataSearchTerm}
           />
         )}
 

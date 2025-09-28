@@ -56,7 +56,8 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|--------|---------|
-| ggbot | 🟢 Online | 0% | 218MB | V2 Orchestrator API server with integrated scheduler |
+| ggbot | 🟢 Online | 0% | 218MB | V2 Orchestrator API server with integrated scheduler & telegram publishing |
+| pm2-logrotate | 🟢 Online | 0% | 52MB | Automated log rotation and compression (10MB/7-day retention) |
 
 ### Infrastructure Services
 | Service | Status | Port | Purpose |
@@ -82,14 +83,14 @@
 - **Generic framework** supporting multiple signal sources (ggShot implemented)
 - **AI confidence evaluation** of external signals using user strategies
 - **Premium gating** through ggBase subscription tier
-- **Telegram publishing** to user-specified channels with APPROVED/REJECTED status
-- **Fixed confidence threshold** - all signals publish (classification handled by service)
+- **Telegram publishing** to user-specified channels with APPROVED/REJECTED status (integrated into ggbot.py orchestrator)
+- **Fixed confidence threshold** - all signals publish (classification handled by orchestrator)
 - **Complete V2 integration** using standard extraction → decision → trading flow
 
 ### **Paper Trading Engine**
 - **Multi-exchange Hummingbot integration** with automatic fallback (5 exchanges)
 - **$10,000 isolated accounts** per configuration
-- **❌ 7-second monitoring** MISSING (needs re-integration)
+- **✅ 3-second position monitoring** ACTIVE (batch SQL updates for efficiency)
 - **Confidence-based position sizing**
 - **Enhanced reliability** - eliminates single exchange failure points
 
@@ -134,6 +135,8 @@
 - **Paper Trading Monitor**: ❌ MISSING (needs re-integration from legacy)
 - **ggShot Filter Service**: ❌ REMOVED (functionality integrated into V2)
 - **Autonomous Trading**: ✅ ACTIVE (scheduled bot execution with APScheduler)
+- **Log Rotation**: ✅ ACTIVE (PM2-logrotate with 10MB size limits and compression)
+- **Disk Space Monitoring**: ✅ ACTIVE (automated checks every 6 hours)
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
 - **Demo Mode**: On-demand (V2 orchestrator integration)
@@ -147,8 +150,17 @@
 pm2 list
 pm2 monit
 
-# Logs  
+# Logs
 pm2 logs ggbot
+
+# Disk space monitoring (includes Docker logs)
+/home/sev/ggbot/scripts/disk_monitor.sh
+
+# Setup monitoring cron job (if needed)
+/home/sev/ggbot/scripts/setup_monitoring.sh
+
+# Docker log management
+/home/sev/ggbot/scripts/fix_docker_logging.sh
 
 # E2E Testing
 python -m tests.test_full_e2e_integration
@@ -176,7 +188,7 @@ df -h
 ### **Signal Validation** (Complete)
 - **Files**: `signals/listener_service.py`, `signals/publishing_service.py`, `decision/prompts/signal_validation.py`
 - **Templates**: `core/config/template_signal_validation.json`
-- **PM2 Services**: `signal-listener`, `signal-publisher` (configured)
+- **Publishing**: Integrated into ggbot.py orchestrator (signal-publisher PM2 service discontinued)
 
 ### **Multi-Timeframe Architecture** (Complete)
 - **7 timeframes**: 5m, 15m, 30m, 1h, 4h, 1d, 1w extraction
@@ -189,7 +201,7 @@ df -h
 
 ### 🟡 Production Status (Transition Phase)
 **Autonomous Scheduling** - ✅ Multi-timeframe bots running with zero-drift execution
-**Paper Trading Engine** - ❌ Missing real-time position monitoring (manual testing phase)
+**Paper Trading Engine** - ✅ Real-time position monitoring active (3-second cycles with batch SQL updates)
 **V2 Dashboard** - 🟡 Transitioning to Forge architecture (legacy dashboard deprecated)
 
 ### 🔄 Frontend Architecture Transition
@@ -230,4 +242,30 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - ✅ **Symbol Search** - Type-ahead search by base currency (BTC, ETH, SOL, etc.)
 - ✅ **Community Access** - Always-visible help widget for user support
 
-*Last major update: Symbol validation system + Telegram publishing fixes + UX enhancements (2025-09-23)*
+### 💽 Disk Space Crisis Resolution (Complete - 2025-09-27)
+- **Root Cause**: Single Docker container log file reached 26GB (hummingbot-api)
+- **Space Recovery**: 25GB+ freed (disk usage: 67% → 41%)
+- **Docker Log Rotation**: Configured 10MB max-size, 3 files (30MB total cap)
+- **PM2 Log Rotation**: `pm2-logrotate` with 10MB rotation and compression
+- **System Log Management**: Fail2ban installed to prevent auth log bloat
+- **Error Rate Limiting**: Connection errors limited to prevent log spam
+- **Monitoring**: Enhanced scripts check Docker, PM2, and system logs
+- **hummingbot-API**: Restored with proper network, database, and auth configuration
+
+### 🔧 Signal Publishing Consolidation (Complete - 2025-09-27)
+- **Architecture Cleanup**: Removed unused `signal-publisher` PM2 service and empty queue processing
+- **Publishing Integration**: Telegram publishing now handled directly by ggbot.py orchestrator
+- **Code Consolidation**: Preserved working publishing functions while removing PM2 service scaffolding
+- **Production Mode**: Fixed `DEVELOPMENT_MODE=false` for proper Supabase authentication
+- **Ecosystem Update**: Removed signal-publisher from PM2 configuration (ecosystem.config.js)
+
+### 🚀 Position Monitoring Reliability Fix (Complete - 2025-09-27)
+- **Critical Issue**: ConnectionTerminated errors preventing stop-loss/take-profit execution
+- **Root Cause**: 100+ individual HTTP requests to Supabase every 3 seconds (1200+ requests/minute)
+- **Elegant Solution**: Batch SQL updates using PostgreSQL `UPDATE FROM VALUES` pattern
+- **Performance**: 100 position updates = 1 SQL query instead of 100 HTTP requests (99% reduction)
+- **Trading Safety**: Position closures now execute before price updates (no more failed SL/TP)
+- **Graceful Fallback**: Automatic fallback to individual updates if batch fails
+- **Results**: ConnectionTerminated errors eliminated, monitoring running reliably
+
+*Last major update: Position monitoring reliability fix (2025-09-27)*

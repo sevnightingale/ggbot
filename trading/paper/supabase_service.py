@@ -8,13 +8,16 @@ Handles trade execution, position tracking, and portfolio management via Supabas
 import os
 import uuid
 import asyncio
+import time
 from datetime import datetime, timezone
 from typing import Dict, List, Optional, Any, Union
 from decimal import Decimal
 from dotenv import load_dotenv
 from supabase import create_client, Client
+from psycopg2.extras import execute_values
 
 from core.common.logger import logger
+from core.common.db import get_db_connection
 from core.symbols.standardizer import UniversalSymbolStandardizer
 from core.config import config_repo, BotConfig, PositionSizingMethod
 from core.domain.models.account import Account
@@ -24,6 +27,24 @@ from .market_data import MarketDataAdapter, MarketPrice
 
 # Load environment variables
 load_dotenv()
+
+
+class ErrorRateLimiter:
+    """Simple rate limiter for error logging to prevent spam."""
+
+    def __init__(self, interval_seconds: int = 60):
+        self.interval = interval_seconds
+        self.last_logged = {}
+
+    def should_log(self, error_key: str) -> bool:
+        """Check if error should be logged based on rate limit."""
+        current_time = time.time()
+        last_time = self.last_logged.get(error_key, 0)
+
+        if current_time - last_time >= self.interval:
+            self.last_logged[error_key] = current_time
+            return True
+        return False
 
 
 class SupabasePaperTradingService:
@@ -45,7 +66,8 @@ class SupabasePaperTradingService:
         self.market_data = MarketDataAdapter()
         self.symbol_standardizer = UniversalSymbolStandardizer()
         self.account_repo = supabase_account_repo
-        
+        self.error_limiter = ErrorRateLimiter(interval_seconds=60)  # Rate limit errors to once per minute
+
         # Default configuration
         self.taker_fee = 0.0006  # 0.06% taker fee
     
@@ -505,90 +527,171 @@ class SupabasePaperTradingService:
             logger.error(f"Failed to get account summary: {str(e)}")
             return {"error": str(e)}
     
+    async def _batch_update_positions_sql(self, updates: List[Dict[str, Any]]) -> int:
+        """
+        Batch update position prices using raw SQL for efficiency.
+
+        Args:
+            updates: List of dicts with trade_id, current_price, unrealized_pnl
+
+        Returns:
+            Number of positions updated
+        """
+        if not updates:
+            return 0
+
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Use PostgreSQL UPDATE FROM VALUES for true batch update
+                    sql = """
+                    UPDATE paper_trades SET
+                        current_price = v.price::numeric,
+                        unrealized_pnl = v.pnl::numeric
+                    FROM (VALUES %s) AS v(trade_id, price, pnl)
+                    WHERE paper_trades.trade_id = v.trade_id::uuid
+                    """
+
+                    # Prepare values for execute_values
+                    values = [
+                        (update['trade_id'], update['current_price'], update['unrealized_pnl'])
+                        for update in updates
+                    ]
+
+                    # Execute batch update (single query for all positions)
+                    execute_values(cur, sql, values, template=None, page_size=100)
+                    conn.commit()
+
+                    logger.debug(f"✅ Batch updated {len(updates)} positions via raw SQL")
+                    return len(updates)
+
+        except Exception as e:
+            logger.error(f"❌ Batch SQL update failed: {e}")
+            raise  # Re-raise to allow fallback handling
+
+    async def _fallback_individual_updates(self, updates: List[Dict[str, Any]]) -> int:
+        """
+        Fallback to individual Supabase updates if batch fails.
+
+        Args:
+            updates: List of dicts with trade_id, current_price, unrealized_pnl
+
+        Returns:
+            Number of positions successfully updated
+        """
+        successful_updates = 0
+
+        for update in updates:
+            try:
+                self.supabase.table('paper_trades').update({
+                    'current_price': update['current_price'],
+                    'unrealized_pnl': update['unrealized_pnl']
+                }).eq('trade_id', update['trade_id']).execute()
+                successful_updates += 1
+            except Exception as e:
+                # Rate limit individual failures to prevent log spam
+                error_key = f"individual_update_{update['trade_id']}"
+                if self.error_limiter.should_log(error_key):
+                    logger.warning(f"Individual update failed for {update['trade_id']}: {e}")
+
+        logger.info(f"🔄 Fallback: {successful_updates}/{len(updates)} positions updated individually")
+        return successful_updates
+
     async def update_position_prices(self, config_id: Optional[str] = None) -> int:
         """
         Update current prices and unrealized P&L for open positions.
-        
+
         Args:
             config_id: Update positions for specific config (all if None)
-            
+
         Returns:
             Number of positions updated
         """
         try:
-            # Get open positions
+            # Get ALL open positions (batch optimization)
             if config_id:
                 response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit").eq('config_id', config_id).eq('status', 'open').execute()
             else:
                 response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit").eq('status', 'open').execute()
-            
+
             positions = response.data
             if not positions:
                 return 0
-            
+
             # Get unique symbols for batch price fetch
             symbols = list(set(pos["symbol"] for pos in positions))
             prices = await self.market_data.get_multiple_prices(symbols)
-            
-            updated_count = 0
+
+            batch_updates = []
             positions_to_close = []
-            
-            # Update each position
+
+            # Process each position and collect batch updates
             for pos in positions:
                 symbol = pos["symbol"]
                 if symbol not in prices:
                     logger.warning(f"No price data for {symbol}, skipping update")
                     continue
-                
+
                 current_price = prices[symbol].mid
-                
+
                 # Calculate unrealized P&L
                 entry_price = float(pos["entry_price"])
                 size_usd = float(pos["size_usd"])
                 side = pos["side"]
-                
+
                 # Calculate size in contracts
                 size_contracts = size_usd / entry_price
-                
+
                 if side == "long":
                     unrealized_pnl = (current_price - entry_price) * size_contracts
                 else:  # short
                     unrealized_pnl = (entry_price - current_price) * size_contracts
-                
+
                 # Check for stop loss/take profit triggers
                 should_close = None
-                if pos["stop_loss"] and ((side == "long" and current_price <= pos["stop_loss"]) or 
+                if pos["stop_loss"] and ((side == "long" and current_price <= pos["stop_loss"]) or
                                         (side == "short" and current_price >= pos["stop_loss"])):
                     should_close = "stop_loss"
                 elif pos["take_profit"] and ((side == "long" and current_price >= pos["take_profit"]) or
                                             (side == "short" and current_price <= pos["take_profit"])):
                     should_close = "take_profit"
-                
+
                 if should_close:
                     positions_to_close.append((pos["trade_id"], should_close, current_price))
                 else:
-                    # Update position with current price and P&L
-                    update_data = {
+                    # Collect update for batch processing
+                    batch_updates.append({
+                        'trade_id': pos['trade_id'],
                         'current_price': current_price,
                         'unrealized_pnl': unrealized_pnl
-                    }
-                    
-                    self.supabase.table('paper_trades').update(update_data).eq('trade_id', pos['trade_id']).execute()
-                
-                updated_count += 1
-            
-            # Close triggered positions
+                    })
+
+            # CRITICAL: Always close triggered positions first (trading safety)
             for trade_id, reason, close_price in positions_to_close:
                 await self.close_position(trade_id, reason, close_price)
                 logger.info(f"Auto-closed position {trade_id} due to {reason} trigger")
-            
+
+            # Then batch update remaining positions (performance optimization)
+            updated_count = 0
+            if batch_updates:
+                try:
+                    # Try batch SQL update first (single query for all positions)
+                    updated_count = await self._batch_update_positions_sql(batch_updates)
+                except Exception as e:
+                    logger.warning(f"Batch update failed, falling back to individual updates: {e}")
+                    # Fallback to individual Supabase updates if batch fails
+                    updated_count = await self._fallback_individual_updates(batch_updates)
+
             if updated_count > 0:
                 logger.debug(f"Updated {updated_count} paper positions, closed {len(positions_to_close)} triggered positions")
-            
+
             return updated_count
                     
         except Exception as e:
-            logger.error(f"Failed to update position prices: {e}")
+            # Rate limit connection errors to prevent log spam
+            error_key = f"update_position_prices_{type(e).__name__}"
+            if self.error_limiter.should_log(error_key):
+                logger.error(f"Failed to update position prices: {e}")
             return 0
     
     async def get_trade_history(self, config_id: str, limit: int = 100) -> List[Dict[str, Any]]:

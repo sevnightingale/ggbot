@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState } from 'react'
-import { ChevronDown, ChevronUp, Lock } from 'lucide-react'
+import React from 'react'
+import { Lock } from 'lucide-react'
 import { ConfigData, createDefaultConfigData } from '@/lib/api'
 import { SymbolSelector } from '@/components/SymbolSelector'
+import { usePermissions } from '@/lib/permissions'
 
 interface TradeSettingsProps {
   configData?: ConfigData
@@ -16,7 +17,7 @@ export function TradeSettings({
   onUpdate,
   className = ''
 }: TradeSettingsProps) {
-  const [showMessageTemplate, setShowMessageTemplate] = useState(false)
+  const { canAccess } = usePermissions()
 
   const defaultConfig = createDefaultConfigData()
   const trading = configData?.trading || defaultConfig.trading
@@ -259,77 +260,130 @@ export function TradeSettings({
 
       {/* Telegram Integration */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-          Telegram Publishing
-        </h3>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
+            Telegram Publishing
+          </h3>
+          {!canAccess('telegram_publishing') && (
+            <span className="text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-500 border border-amber-500/30">
+              Premium Feature
+            </span>
+          )}
+        </div>
 
-        <div className="space-y-4">
-          {/* Enable Toggle */}
-          <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-            <div>
-              <div className="font-medium text-[var(--text-primary)]">Publish Signals</div>
-              <div className="text-sm text-[var(--text-muted)]">Send trading decisions to Telegram channel</div>
+        {/* Premium Gate */}
+        {!canAccess('telegram_publishing') ? (
+          <div className="p-6 rounded-xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
+            <div className="flex items-center gap-3 mb-3">
+              <Lock className="h-5 w-5 text-amber-600" />
+              <div className="font-medium text-amber-800 dark:text-amber-200">
+                Premium Feature Locked
+              </div>
+            </div>
+            <div className="text-sm text-amber-700 dark:text-amber-300 mb-4">
+              Telegram signal publishing is available with a ggbase subscription. Upgrade to automatically publish your bot&apos;s trading decisions to your Telegram channel.
             </div>
             <button
-              onClick={() => updateConfig({
-                telegram_integration: {
-                  ...telegramConfig,
-                  publisher: { ...publisher, enabled: !publisher.enabled }
-                }
-              })}
-              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                publisher.enabled
-                  ? 'bg-emerald-500'
-                  : 'bg-[var(--border)]'
-              }`}
+              onClick={() => window.open('/pricing', '_blank')}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 text-white text-sm font-medium hover:bg-amber-700 transition-colors"
             >
-              <span
-                className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                  publisher.enabled ? 'translate-x-6' : 'translate-x-1'
-                }`}
-              />
+              Upgrade to ggbase →
             </button>
           </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Enable Toggle */}
+            <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
+              <div>
+                <div className="font-medium text-[var(--text-primary)]">Publish Signals</div>
+                <div className="text-sm text-[var(--text-muted)]">Send trading decisions to Telegram channel</div>
+              </div>
+              <button
+                onClick={() => updateConfig({
+                  telegram_integration: {
+                    ...telegramConfig,
+                    publisher: { ...publisher, enabled: !publisher.enabled }
+                  }
+                })}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  publisher.enabled
+                    ? 'bg-emerald-500'
+                    : 'bg-[var(--border)]'
+                }`}
+              >
+                <span
+                  className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                    publisher.enabled ? 'translate-x-6' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
 
           {/* Channel Settings (when enabled) */}
           {publisher.enabled && (
             <div className="space-y-4">
-              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                    Bot Token
-                  </label>
-                  <input
-                    type="password"
-                    value={(publisher.bot_token as string) || ''}
-                    onChange={(e) => updateConfig({
-                      telegram_integration: {
-                        ...telegramConfig,
-                        publisher: { ...publisher, bot_token: e.target.value }
-                      }
-                    })}
-                    placeholder="Your Telegram bot token"
-                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                    Channel ID
-                  </label>
-                  <input
-                    type="text"
-                    value={(publisher.filter_channel as string) || ''}
-                    onChange={(e) => updateConfig({
-                      telegram_integration: {
-                        ...telegramConfig,
-                        publisher: { ...publisher, filter_channel: e.target.value }
-                      }
-                    })}
-                    placeholder="-1001234567890"
-                    className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
-                  />
+              {/* Setup Instructions */}
+              <div className="p-4 rounded-xl bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800/30">
+                <h4 className="font-medium text-blue-900 dark:text-blue-200 mb-3">Setup Instructions</h4>
+                <ol className="text-sm text-blue-800 dark:text-blue-300 space-y-2">
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">1</span>
+                    <span>Add <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-blue-900 dark:text-blue-200">@ggFilter_Bot</code> bot to your Telegram channel</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">2</span>
+                    <span>Make the bot an admin with &quot;Post Messages&quot; permission</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">3</span>
+                    <span>Send <code className="px-1 py-0.5 bg-blue-100 dark:bg-blue-800 rounded text-blue-900 dark:text-blue-200">/chatid</code> in the channel to get your Channel ID</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <span className="flex-shrink-0 w-5 h-5 bg-blue-600 text-white text-xs rounded-full flex items-center justify-center font-medium">4</span>
+                    <span>Copy the Channel ID below</span>
+                  </li>
+                </ol>
+              </div>
+
+              {/* Channel ID Input */}
+              <div>
+                <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
+                  Channel ID
+                </label>
+                <input
+                  type="text"
+                  value={(publisher.filter_channel as string) || ''}
+                  onChange={(e) => updateConfig({
+                    telegram_integration: {
+                      ...telegramConfig,
+                      publisher: { ...publisher, filter_channel: e.target.value }
+                    }
+                  })}
+                  placeholder="-1001234567890 or @YourChannel"
+                  className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
+                />
+                <div className="text-xs text-[var(--text-muted)] mt-1">
+                  Get this by sending /chatid in your channel after adding our bot
                 </div>
               </div>
+
+              {/* Test Message Button */}
+              {publisher.filter_channel && (
+                <div>
+                  <button
+                    onClick={() => {
+                      // TODO: Implement test message API call
+                      alert('Test message feature coming soon!')
+                    }}
+                    className="w-full p-3 rounded-xl bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-800/30 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-colors"
+                  >
+                    Send Test Message
+                  </button>
+                  <div className="text-xs text-[var(--text-muted)] mt-1">
+                    Verify that our bot can send messages to your channel
+                  </div>
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
@@ -353,44 +407,10 @@ export function TradeSettings({
                 <div className="text-xs text-[var(--text-muted)] mt-1">Only publish signals above this confidence level</div>
               </div>
 
-              {/* Collapsible Message Template */}
-              <div>
-                <button
-                  onClick={() => setShowMessageTemplate(!showMessageTemplate)}
-                  className="flex items-center justify-between w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-left hover:bg-[var(--bg-tertiary)] transition-colors"
-                >
-                  <span className="font-medium text-[var(--text-primary)]">Message Template</span>
-                  {showMessageTemplate ? (
-                    <ChevronUp className="h-4 w-4 text-[var(--text-muted)]" />
-                  ) : (
-                    <ChevronDown className="h-4 w-4 text-[var(--text-muted)]" />
-                  )}
-                </button>
-
-                {showMessageTemplate && (
-                  <div className="mt-3">
-                    <textarea
-                      value={(publisher.message_template as string) || '🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}'}
-                      onChange={(e) => updateConfig({
-                        telegram_integration: {
-                          ...telegramConfig,
-                          publisher: { ...publisher, message_template: e.target.value }
-                        }
-                      })}
-                      rows={4}
-                      className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
-                      placeholder="🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}
-{REASONING}"
-                    />
-                    <div className="text-xs text-[var(--text-muted)] mt-1">
-                      Use {'{ACTION}'}, {'{SYMBOL}'}, {'{CONFIDENCE}'}, {'{REASONING}'} as placeholders
-                    </div>
-                  </div>
-                )}
-              </div>
             </div>
           )}
-        </div>
+          </div>
+        )}
       </div>
 
       {/* Exchange Connection (Locked for MVP) */}

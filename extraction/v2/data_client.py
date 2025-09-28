@@ -61,7 +61,7 @@ class HummingbotDataClient:
     async def connect(self):
         """Establish connection to Hummingbot API."""
         if not self.session:
-            timeout = aiohttp.ClientTimeout(total=30)
+            timeout = aiohttp.ClientTimeout(total=5)
             self.session = aiohttp.ClientSession(
                 headers=self.headers,
                 timeout=timeout
@@ -239,7 +239,7 @@ class HummingbotDataClient:
         Returns:
             List of supported connector names
         """
-        return ["kucoin", "binance", "gate_io", "ascend_ex", "okx"]
+        return ["binance", "kucoin", "gate_io", "ascend_ex", "okx"]
     
     def normalize_symbol(self, symbol: str) -> str:
         """

@@ -170,13 +170,16 @@ class TelegramListenerConfig(BaseModel):
 class TelegramPublisherConfig(BaseModel):
     """Telegram publisher configuration."""
     enabled: bool = Field(default=False, description="Whether publisher is enabled")
-    bot_token: str = Field(default="", description="Telegram bot token")
     filter_channel: str = Field(default="", description="Channel to publish to")
     confidence_threshold: float = Field(default=0.7, ge=0.0, le=1.0, description="Minimum confidence threshold")
     include_reasoning: bool = Field(default=True, description="Include AI reasoning in messages")
     include_market_context: bool = Field(default=True, description="Include market context in messages")
-    message_template: str = Field(default="🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}", 
+    message_template: str = Field(default="🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}",
                                  description="Message template with placeholders")
+
+    class Config:
+        """Allow extra fields for backward compatibility (e.g., legacy bot_token field)."""
+        extra = "ignore"
 
 
 class TelegramIntegrationConfig(BaseModel):
