@@ -139,13 +139,13 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
     return new Date(timestamp).toLocaleDateString()
   }
 
-  // Animated value component
+  // Animated value component - matches MetricsBar style exactly
   const AnimatedValue = ({ value, className, isAnimating }: { value: string; className?: string; isAnimating: boolean }) => (
-    <div className="relative overflow-hidden h-5">
+    <div className="relative overflow-hidden h-6">
       <div
-        className={`transition-all duration-150 ease-out ${className} ${
+        className={`transition-all duration-150 ease-out ${className || ''} ${
           isAnimating
-            ? 'transform translate-y-6 opacity-0'
+            ? 'transform translate-y-8 opacity-0'
             : 'transform translate-y-0 opacity-100'
         }`}
       >

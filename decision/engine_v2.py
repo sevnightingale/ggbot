@@ -1336,9 +1336,9 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                     cur.execute("""
                         INSERT INTO decisions (
                             decision_id, user_id, config_id, symbol, action, status,
-                            confidence, reasoning, prompt, market_data, decision_data,
+                            confidence, reasoning, prompt, decision_data,
                             parent_decision_id, created_at
-                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     """, (
                         decision_id,
                         self.user_id,
@@ -1349,7 +1349,6 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
                         prompt,
-                        json.dumps(market_data, cls=DecisionJSONEncoder),
                         json.dumps(decision_data_json, cls=DecisionJSONEncoder),
                         position_data.get('entry_decision_id'),  # Link to original entry decision
                         datetime.now(timezone.utc).isoformat()
