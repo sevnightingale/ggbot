@@ -68,7 +68,6 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
     const newDisplayPrices: Record<string, { current: string; pnl: string; percentage: string }> = {}
 
     positions.forEach(position => {
-      const prevPrice = prevPricesRef.current[position.trade_id]
       const currentPrice = position.current_price
 
       // Format new values
@@ -78,29 +77,21 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
         percentage: formatPercentage(position.entry_price, currentPrice)
       }
 
-      // Trigger animation on price change or initial load
-      if (prevPrice === undefined || prevPrice !== currentPrice) {
-        newAnimations[position.trade_id] = true
+      // Always trigger animation on SSE update (like MetricsBar)
+      newAnimations[position.trade_id] = true
 
-        // After slide-out completes, update display and slide-in
-        setTimeout(() => {
-          setDisplayPrices(prev => ({
-            ...prev,
-            [position.trade_id]: newDisplayPrices[position.trade_id]
-          }))
-          setAnimatingPrices(prev => ({
-            ...prev,
-            [position.trade_id]: false
-          }))
-        }, 150)
-      }
-
-      // Update prev price
+      // Update prev price for potential future use
       prevPricesRef.current[position.trade_id] = currentPrice
     })
 
-    // Start animations
+    // Start animations for all positions
     setAnimatingPrices(newAnimations)
+
+    // After slide-out completes, update display values and slide-in
+    setTimeout(() => {
+      setDisplayPrices(newDisplayPrices)
+      setAnimatingPrices({})
+    }, 150)
   }, [positions])
   if (positions.length === 0) {
     return (
