@@ -33,16 +33,40 @@ interface MetricsBarProps {
 }
 
 export function MetricsBar({ account, className = '' }: MetricsBarProps) {
-  // Track SSE updates for pulse animations
-  const [isUpdating, setIsUpdating] = useState(false)
+  // Track SSE updates for slide animations
+  const [isAnimating, setIsAnimating] = useState(false)
+  const [displayValues, setDisplayValues] = useState<{
+    portfolioReturn: string
+    dailyPnl: string
+    winRate: string
+    totalTrades: string
+  } | null>(null)
 
-  // Trigger pulse animation on every SSE update (account prop change)
+  // Trigger slide animation on every SSE update (account prop change)
   useEffect(() => {
     if (!account) return
 
-    // Always trigger animation when account data updates (SSE received)
-    setIsUpdating(true)
-    setTimeout(() => setIsUpdating(false), 600)
+    // Calculate new values
+    const portfolioReturnPct = account.portfolio_return_pct || 0
+    const dailyPnl = account.daily_pnl || 0
+    const winRate = account.win_rate || 0
+    const totalTrades = account.total_trades || 0
+
+    const newValues = {
+      portfolioReturn: `${portfolioReturnPct >= 0 ? '+' : ''}${portfolioReturnPct.toFixed(2)}%`,
+      dailyPnl: `${dailyPnl >= 0 ? '+' : ''}$${Math.abs(dailyPnl).toFixed(2)}`,
+      winRate: `${winRate.toFixed(0)}%`,
+      totalTrades: `${totalTrades} ${totalTrades === 1 ? 'trade' : 'trades'}`
+    }
+
+    // Start slide-out animation
+    setIsAnimating(true)
+
+    // After slide-out completes, update values and slide-in
+    setTimeout(() => {
+      setDisplayValues(newValues)
+      setIsAnimating(false)
+    }, 150)
   }, [account])
 
   if (!account) {
@@ -60,47 +84,55 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
     )
   }
 
-  // Calculate metrics
+  // Use current values or fallback to calculated values
   const portfolioReturnPct = account.portfolio_return_pct || 0
   const dailyPnl = account.daily_pnl || 0
   const winRate = account.win_rate || 0
   const totalTrades = account.total_trades || 0
 
-  // Note: totalPnl calculation available if needed for future metrics
-  // const totalPnl = (account.total_pnl || 0) + (account.unrealized_pnl || 0)
+  const currentValues = displayValues || {
+    portfolioReturn: `${portfolioReturnPct >= 0 ? '+' : ''}${portfolioReturnPct.toFixed(2)}%`,
+    dailyPnl: `${dailyPnl >= 0 ? '+' : ''}$${Math.abs(dailyPnl).toFixed(2)}`,
+    winRate: `${winRate.toFixed(0)}%`,
+    totalTrades: `${totalTrades} ${totalTrades === 1 ? 'trade' : 'trades'}`
+  }
 
   return (
-    <div className={`grid grid-cols-2 gap-3 transition-all duration-300 ${isUpdating ? 'scale-[1.02] opacity-90' : ''} ${className}`}>
+    <div className={`grid grid-cols-2 gap-3 ${className}`}>
       {/* KPI 1: Portfolio Return */}
       <KPICard
         label="Portfolio Return"
-        value={`${portfolioReturnPct >= 0 ? '+' : ''}${portfolioReturnPct.toFixed(2)}%`}
+        value={currentValues.portfolioReturn}
         delta={portfolioReturnPct}
         isPercentage={true}
+        isAnimating={isAnimating}
       />
 
       {/* KPI 2: Daily P&L */}
       <KPICard
         label="Daily P&L"
-        value={`${dailyPnl >= 0 ? '+' : ''}$${Math.abs(dailyPnl).toFixed(2)}`}
+        value={currentValues.dailyPnl}
         delta={dailyPnl}
         isPercentage={false}
+        isAnimating={isAnimating}
       />
 
       {/* KPI 3: Win Rate */}
       <KPICard
         label="Win Rate"
-        value={`${winRate.toFixed(0)}%`}
+        value={currentValues.winRate}
         delta={null} // No trend indicator for win rate
         isPercentage={false}
+        isAnimating={isAnimating}
       />
 
       {/* KPI 4: Total Trades */}
       <KPICard
         label="Total Trades"
-        value={`${totalTrades} ${totalTrades === 1 ? 'trade' : 'trades'}`}
+        value={currentValues.totalTrades}
         delta={null} // No trend indicator for trade count
         isPercentage={false}
+        isAnimating={isAnimating}
       />
     </div>
   )
@@ -111,9 +143,10 @@ interface KPICardProps {
   value: string
   delta?: number | null
   isPercentage: boolean
+  isAnimating: boolean
 }
 
-function KPICard({ label, value, delta, isPercentage }: KPICardProps) {
+function KPICard({ label, value, delta, isPercentage, isAnimating }: KPICardProps) {
   const hasPositiveDelta = (delta ?? 0) >= 0
   const showTrend = delta !== null && delta !== undefined
 
@@ -134,8 +167,16 @@ function KPICard({ label, value, delta, isPercentage }: KPICardProps) {
   return (
     <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
       <div className="text-xs text-[var(--text-muted)]">{label}</div>
-      <div className={`mt-1 text-xl font-semibold tracking-tight ${valueColorClass}`}>
-        {value}
+      <div className="relative overflow-hidden h-7 mt-1">
+        <div
+          className={`text-xl font-semibold tracking-tight transition-all duration-150 ease-out ${valueColorClass} ${
+            isAnimating
+              ? 'transform translate-y-8 opacity-0'
+              : 'transform translate-y-0 opacity-100'
+          }`}
+        >
+          {value}
+        </div>
       </div>
       {showTrend && (
         <div className={`mt-1 flex items-center text-xs ${

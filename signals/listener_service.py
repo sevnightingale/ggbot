@@ -189,8 +189,8 @@ class OrchestratorClient:
         self.logger = logger.bind(component='orchestrator_client')
     
     async def trigger_signal_validation(
-        self, 
-        config_id: str, 
+        self,
+        config_id: str,
         user_id: str,
         signal_data: SignalData
     ) -> bool:
@@ -213,14 +213,26 @@ class OrchestratorClient:
                 },
                 'override_symbol': signal_data.symbol
             }
-            
-            # For now, use the regular orchestration endpoint
-            # TODO: Create dedicated signal validation endpoint
-            url = f"{self.api_base}/api/v2/orchestrate/{config_id}"
-            
+
+            # Use dedicated signal validation endpoint with service authentication
+            url = f"{self.api_base}/api/v2/signal-validation/{config_id}"
+
+            # Get service authentication key
+            service_key = os.getenv('SUPABASE_SERVICE_KEY')
+            if not service_key:
+                self.logger.error("SUPABASE_SERVICE_KEY not found in environment")
+                return False
+
+            headers = {
+                'Content-Type': 'application/json',
+                'Authorization': f'Bearer {service_key}',
+                'X-Service-Auth': 'signal-listener'
+            }
+
+            params = {'user_id': user_id}  # Pass user_id as query parameter
+
             async with aiohttp.ClientSession() as session:
-                # TODO: Add proper authentication headers once available
-                async with session.post(url, json=payload, timeout=60) as response:
+                async with session.post(url, json=payload, headers=headers, params=params, timeout=60) as response:
                     if response.status == 200:
                         result = await response.json()
                         self.logger.info(f"Signal validation triggered successfully for config {config_id}")
@@ -229,7 +241,7 @@ class OrchestratorClient:
                         error_text = await response.text()
                         self.logger.error(f"Signal validation failed: {response.status} - {error_text}")
                         return False
-                        
+
         except Exception as e:
             self.logger.error(f"Failed to trigger signal validation: {e}")
             return False

@@ -24,86 +24,27 @@ interface PositionsTableProps {
 }
 
 export function PositionsTable({ positions = [], className = '' }: PositionsTableProps) {
-  // Track price changes for flash animations
-  const [priceFlashes, setPriceFlashes] = useState<Record<string, 'up' | 'down' | null>>({})
+  // Track price changes for slide animations
+  const [animatingPrices, setAnimatingPrices] = useState<Record<string, boolean>>({})
+  const [displayPrices, setDisplayPrices] = useState<Record<string, { current: string; pnl: string; percentage: string }>>({})
   const prevPricesRef = useRef<Record<string, number>>({})
 
-  // Trigger flash animations on every SSE update
-  useEffect(() => {
-    if (positions.length === 0) return
-
-    const newFlashes: Record<string, 'up' | 'down' | null> = {}
-
-    positions.forEach(position => {
-      const prevPrice = prevPricesRef.current[position.trade_id]
-      const currentPrice = position.current_price
-
-      // Always flash on SSE update, use price change direction if available
-      if (prevPrice !== undefined && prevPrice !== currentPrice) {
-        newFlashes[position.trade_id] = currentPrice > prevPrice ? 'up' : 'down'
-      } else {
-        // Default to neutral flash (up) when no price change detected
-        newFlashes[position.trade_id] = 'up'
-      }
-
-      // Update prev price
-      prevPricesRef.current[position.trade_id] = currentPrice
-    })
-
-    // Always apply flash states on SSE update
-    setPriceFlashes(newFlashes)
-
-    // Clear flash states after animation
-    setTimeout(() => {
-      setPriceFlashes({})
-    }, 800)
-  }, [positions])
-
-  // Get flash animation classes
-  const getPriceFlashClass = (tradeId: string) => {
-    const flash = priceFlashes[tradeId]
-    if (!flash) return ''
-
-    return flash === 'up'
-      ? 'animate-pulse bg-green-100 dark:bg-green-900/20'
-      : 'animate-pulse bg-red-100 dark:bg-red-900/20'
-  }
-  if (positions.length === 0) {
-    return (
-      <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
-        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Active Trades</h3>
-        <div className="text-center py-8">
-          <div className="text-[var(--text-muted)] mb-2">No active trades</div>
-          <div className="text-sm text-[var(--text-muted)]">
-            Your positions will appear here when the bot enters trades
-          </div>
-        </div>
-      </div>
-    )
-  }
-
+  // Helper functions
   const formatPrice = (price: number) => {
     // Smart crypto price formatting based on price range
     if (price >= 10000) {
-      // Large prices like BTC: $45,123.45
       return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
     } else if (price >= 1000) {
-      // Medium prices like ETH: $3,456.78
       return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
     } else if (price >= 100) {
-      // Smaller coins: $123.45
       return `$${price.toFixed(2)}`
     } else if (price >= 1) {
-      // Sub-$100 coins: $12.3456
       return `$${price.toFixed(4)}`
     } else if (price >= 0.01) {
-      // Small coins: $0.123456
       return `$${price.toFixed(6)}`
     } else if (price >= 0.0001) {
-      // Micro coins: $0.00123456
       return `$${price.toFixed(8)}`
     } else {
-      // Very small altcoins: $0.0000123456
       return `$${price.toFixed(10)}`
     }
   }
@@ -118,6 +59,63 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
     const sign = change >= 0 ? '+' : ''
     return `${sign}${change.toFixed(2)}%`
   }
+
+  // Trigger slide animations on every SSE update
+  useEffect(() => {
+    if (positions.length === 0) return
+
+    const newAnimations: Record<string, boolean> = {}
+    const newDisplayPrices: Record<string, { current: string; pnl: string; percentage: string }> = {}
+
+    positions.forEach(position => {
+      const prevPrice = prevPricesRef.current[position.trade_id]
+      const currentPrice = position.current_price
+
+      // Format new values
+      newDisplayPrices[position.trade_id] = {
+        current: formatPrice(currentPrice),
+        pnl: formatPnL(position.unrealized_pnl),
+        percentage: formatPercentage(position.entry_price, currentPrice)
+      }
+
+      // Trigger animation on price change or initial load
+      if (prevPrice === undefined || prevPrice !== currentPrice) {
+        newAnimations[position.trade_id] = true
+
+        // After slide-out completes, update display and slide-in
+        setTimeout(() => {
+          setDisplayPrices(prev => ({
+            ...prev,
+            [position.trade_id]: newDisplayPrices[position.trade_id]
+          }))
+          setAnimatingPrices(prev => ({
+            ...prev,
+            [position.trade_id]: false
+          }))
+        }, 150)
+      }
+
+      // Update prev price
+      prevPricesRef.current[position.trade_id] = currentPrice
+    })
+
+    // Start animations
+    setAnimatingPrices(newAnimations)
+  }, [positions])
+  if (positions.length === 0) {
+    return (
+      <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
+        <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Active Trades</h3>
+        <div className="text-center py-8">
+          <div className="text-[var(--text-muted)] mb-2">No active trades</div>
+          <div className="text-sm text-[var(--text-muted)]">
+            Your positions will appear here when the bot enters trades
+          </div>
+        </div>
+      </div>
+    )
+  }
+
 
   const getSideColor = (side: string) => {
     return side.toLowerCase() === 'long' ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
@@ -150,6 +148,21 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
     return new Date(timestamp).toLocaleDateString()
   }
 
+  // Animated value component
+  const AnimatedValue = ({ value, className, isAnimating }: { value: string; className?: string; isAnimating: boolean }) => (
+    <div className="relative overflow-hidden h-5">
+      <div
+        className={`transition-all duration-150 ease-out ${className} ${
+          isAnimating
+            ? 'transform translate-y-6 opacity-0'
+            : 'transform translate-y-0 opacity-100'
+        }`}
+      >
+        {value}
+      </div>
+    </div>
+  )
+
   return (
     <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
       <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Active Trades</h3>
@@ -175,7 +188,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
             </thead>
             <tbody>
               {positions.map((position) => (
-                <tr key={position.trade_id} className={`border-b border-[var(--border)] last:border-b-0 transition-all duration-300 ${getPriceFlashClass(position.trade_id)}`}>
+                <tr key={position.trade_id} className="border-b border-[var(--border)] last:border-b-0">
                   <td className="py-3 px-2 text-sm text-[var(--text-primary)] font-medium">
                     {position.symbol}
                   </td>
@@ -198,13 +211,22 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
                     {formatPrice(position.entry_price)}
                   </td>
                   <td className="py-3 px-2 text-sm text-[var(--text-primary)] font-medium">
-                    {formatPrice(position.current_price)}
+                    <AnimatedValue
+                      value={displayPrices[position.trade_id]?.current || formatPrice(position.current_price)}
+                      isAnimating={animatingPrices[position.trade_id] || false}
+                    />
                   </td>
                   <td className={`py-3 px-2 text-sm font-medium ${getPnLColor(position.unrealized_pnl)}`}>
-                    {formatPnL(position.unrealized_pnl)}
+                    <AnimatedValue
+                      value={displayPrices[position.trade_id]?.pnl || formatPnL(position.unrealized_pnl)}
+                      isAnimating={animatingPrices[position.trade_id] || false}
+                    />
                   </td>
                   <td className={`py-3 px-2 text-sm font-medium ${getPnLColor(position.unrealized_pnl)}`}>
-                    {formatPercentage(position.entry_price, position.current_price)}
+                    <AnimatedValue
+                      value={displayPrices[position.trade_id]?.percentage || formatPercentage(position.entry_price, position.current_price)}
+                      isAnimating={animatingPrices[position.trade_id] || false}
+                    />
                   </td>
                   <td className="py-3 px-2 text-sm text-[var(--text-muted)]">
                     <div className="space-y-1">
@@ -232,7 +254,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
         {positions.map((position) => (
-          <div key={position.trade_id} className={`border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-primary)] transition-all duration-300 ${getPriceFlashClass(position.trade_id)}`}>
+          <div key={position.trade_id} className="border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-primary)]">
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -246,7 +268,10 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
                 </div>
               </div>
               <div className={`text-sm font-semibold ${getPnLColor(position.unrealized_pnl)}`}>
-                {formatPercentage(position.entry_price, position.current_price)}
+                <AnimatedValue
+                  value={displayPrices[position.trade_id]?.percentage || formatPercentage(position.entry_price, position.current_price)}
+                  isAnimating={animatingPrices[position.trade_id] || false}
+                />
               </div>
             </div>
 
@@ -270,14 +295,22 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
               <div className="flex justify-between">
                 <span className="text-[var(--text-muted)]">Price:</span>
                 <span className="text-[var(--text-secondary)]">
-                  {formatPrice(position.entry_price)} → {formatPrice(position.current_price)}
+                  {formatPrice(position.entry_price)} →
+                  <AnimatedValue
+                    value={displayPrices[position.trade_id]?.current || formatPrice(position.current_price)}
+                    isAnimating={animatingPrices[position.trade_id] || false}
+                    className="inline-block ml-1"
+                  />
                 </span>
               </div>
 
               <div className="flex justify-between">
                 <span className="text-[var(--text-muted)]">P&L:</span>
                 <span className={`font-medium ${getPnLColor(position.unrealized_pnl)}`}>
-                  {formatPnL(position.unrealized_pnl)}
+                  <AnimatedValue
+                    value={displayPrices[position.trade_id]?.pnl || formatPnL(position.unrealized_pnl)}
+                    isAnimating={animatingPrices[position.trade_id] || false}
+                  />
                 </span>
               </div>
 
