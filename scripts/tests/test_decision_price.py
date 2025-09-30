@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
 from decision.engine import DecisionEngine
-from core.common.logging_config import setup_logging, logger
+from core.common.logger import logger
 
 async def test_decision_price():
     """Test the decision engine price fetching."""
@@ -52,7 +52,6 @@ async def test_decision_price():
 
 if __name__ == "__main__":
     # Setup logging
-    setup_logging()
     
     # Run the test
     asyncio.run(test_decision_price())

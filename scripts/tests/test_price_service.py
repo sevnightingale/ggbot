@@ -10,7 +10,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from decision.services.price_service import PriceService
-from core.common.logging_config import setup_logging, logger
+from core.common.logger import logger
 
 async def test_price_service():
     """Test the new PriceService with real market data."""
@@ -63,7 +63,7 @@ async def test_price_service():
 
 if __name__ == "__main__":
     # Setup logging
-    setup_logging()
+    # Standard logger is already configured
     
     # Run the test
     asyncio.run(test_price_service())

@@ -91,7 +91,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
     setTimeout(() => {
       setDisplayPrices(newDisplayPrices)
       setAnimatingPrices({})
-    }, 150)
+    }, 250)
   }, [positions])
   if (positions.length === 0) {
     return (
@@ -143,7 +143,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
   const AnimatedValue = ({ value, className, isAnimating }: { value: string; className?: string; isAnimating: boolean }) => (
     <div className="relative overflow-hidden h-6">
       <div
-        className={`transition-all duration-150 ease-out ${className || ''} ${
+        className={`transition-all duration-250 ease-in-out ${className || ''} ${
           isAnimating
             ? 'transform translate-y-8 opacity-0'
             : 'transform translate-y-0 opacity-100'

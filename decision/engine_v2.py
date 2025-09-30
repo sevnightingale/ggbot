@@ -849,9 +849,7 @@ Take Profit: {take_profit_text}
             await self.initialize()  # Initialize if not already done
 
         try:
-            # Log the prompt being sent to the LLM
-            logger.bind(config_id=self.config_id, user_id=self.user_id).info("🤖 Prompt sent to Decision LLM")
-            logger.bind(config_id=self.config_id, user_id=self.user_id).info(f"PROMPT:\n{prompt}")
+            # Prompt is saved to decisions table for audit trail
 
             # Call the configured LLM provider
             response_text, metadata = await self.llm_provider.generate_response(
