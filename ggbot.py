@@ -39,7 +39,6 @@ from core.scheduler import (
 from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2, require_premium_user_v2
 from core.sse import get_unified_dashboard_data
 
-# Service Authentication Classes
 class ServiceUser:
     """Represents an authenticated service."""
     def __init__(self, service_name: str):
@@ -48,7 +47,6 @@ class ServiceUser:
 import time
 from collections import defaultdict
 
-# Simple rate limiting for service endpoints
 service_calls = defaultdict(list)
 
 async def get_service_user(request: Request):
@@ -59,10 +57,9 @@ async def get_service_user(request: Request):
     if not auth_header.startswith('Bearer ') or service_header != 'signal-listener':
         raise HTTPException(status_code=401, detail="Service authentication required")
 
-    # Simple rate limiting: max 120 calls per minute
     now = time.time()
     calls = service_calls['signal-listener']
-    service_calls['signal-listener'] = [t for t in calls if now - t < 60]  # Keep last minute
+    service_calls['signal-listener'] = [t for t in calls if now - t < 60]
 
     if len(service_calls['signal-listener']) >= 120:
         raise HTTPException(status_code=429, detail="Service rate limit exceeded")
@@ -77,12 +74,11 @@ async def get_service_user(request: Request):
 
     return ServiceUser(service_name='signal-listener')
 
-# Development Mock User (TODO: Remove when Phase 5 authentication is complete)
 async def get_mock_user_for_dev():
-    """Mock user for Phase 7 development - replace with real auth in Phase 5."""
+    """Mock user for development."""
     return AuthenticatedUser(
-        user_id="3d47c173-9234-47c7-b57b-9159c9df5dbd",  # Real Supabase user ID
-        email="user@example.com",  # Placeholder email
+        user_id="3d47c173-9234-47c7-b57b-9159c9df5dbd",
+        email="user@example.com",
         claims={"sub": "3d47c173-9234-47c7-b57b-9159c9df5dbd", "email": "user@example.com"}
     )
 from core.services.config_service import ConfigService, BotConfigV2, config_service
@@ -91,65 +87,15 @@ from core.services.llm_service import LLMService, llm_service
 from core.services.indicator_service import IndicatorService
 from core.common.logger import logger as base_logger
 
-# Set up orchestrator-specific logger for core trading activities
-def is_orchestrator_log(record):
-    """Filter for important orchestrator and trading activities only."""
-    service = record["extra"].get("service")
-    message = record.get("message", "")
-    function_name = record.get("function", "")
-    
-    # Only include orchestrator service logs
-    if service == "orchestrator":
-        # Exclude old WebSocket spam (now using SSE)
-        if "WebSocket" in message or "broadcast" in function_name:
-            return False
-        return True
-    
-    # Include critical extraction/decision/trading logs regardless of service
-    important_messages = [
-        "Manual trigger", "V2 autonomous cycle", "V2 Extraction completed", 
-        "V2 Decision completed", "Paper trade executed", "Position closed",
-        "Extraction complete", "Decision saved", "Trading result"
-    ]
-    
-    if any(msg in message for msg in important_messages):
-        return True
-    
-    return False
-
-# Configure log directory and ensure it exists
-LOG_DIR = os.getenv("GGBOT_LOG_DIR", "/home/sev/ggbot/logs")
-os.makedirs(LOG_DIR, exist_ok=True)
-LOG_PATH = os.path.join(LOG_DIR, "orchestrator.log")
-
-# Demo mode configuration for artificial delays
 DEMO_MODE = os.getenv("GGBOT_DEMO_MODE", "false").lower() == "true"
 
-base_logger.add(
-    LOG_PATH,
-    filter=is_orchestrator_log,
-    format="{time:YYYY-MM-DD HH:mm:ss} | {level} | {name}:{function}:{line} - {message}",
-    rotation="50 MB",      # Larger rotation for important logs
-    retention="7 days",    # Keep longer for business analysis
-    compression="gz",
-    enqueue=True,
-    level="INFO"
-)
+logger = base_logger
 
-# Create orchestrator logger for core business logic
-logger = base_logger.bind(service="orchestrator")
-
-# V2 Module Integration - Complete Integration
 from extraction.v2.extraction_engine import ExtractionEngineV2
 from decision.engine_v2 import DecisionEngineV2
 from trading.paper.supabase_service import SupabasePaperTradingService
 from signals.publishing_service import publish_signal_to_telegram
-
-# Domain Models  
 from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
-
-
-# Pydantic Models for API
 class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
@@ -239,14 +185,6 @@ async def lifespan(app: FastAPI):
         # await llm_service.test_hosted_keys()
         logger.info("✅ LLM service initialized")
 
-        # Initialize log cleanup service
-        from core.services.log_cleanup_service import log_cleanup_service
-        try:
-            # Run initial cleanup on startup
-            cleanup_stats = await log_cleanup_service.cleanup_all_logs()
-            logger.info(f"✅ Initial log cleanup completed: {cleanup_stats['total_files_deleted']} files deleted")
-        except Exception as e:
-            logger.warning(f"⚠️ Initial log cleanup failed: {str(e)}")
 
         # Start APScheduler
         scheduler.start()
@@ -297,9 +235,7 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS handled by nginx proxy - no FastAPI CORS middleware needed
 
-# Services
 class GGBotOrchestrator:
     """Main orchestrator class coordinating all V2 modules with full integration."""
     
@@ -309,9 +245,8 @@ class GGBotOrchestrator:
         self.paper_trading = SupabasePaperTradingService()
         self._log = logger.bind(component="orchestrator")
         
-        # V2 Engine instances - created per request for proper isolation
-        self._extraction_engines = {}  # Cache by user_id for efficiency
-        self._decision_engines = {}    # Cache by config_id
+        self._extraction_engines = {}
+        self._decision_engines = {}
     
     async def run_autonomous_cycle(
         self,
@@ -336,34 +271,23 @@ class GGBotOrchestrator:
         self._log.info(f"Starting V2 autonomous cycle for config {config_id}")
         
         try:
-            # 1. Load user configuration
             config = await self.config_service.get_config(config_id, user_id)
             if not config:
                 raise HTTPException(status_code=404, detail="Configuration not found")
-            
-            # 2. Route based on config type
             self._log.info(f"🔍 DEBUG: config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
 
             if config.config_type == "signal_validation":
                 if signal_data:
-                    # Real signal from external source
-                    self._log.info("🔍 DEBUG: Routing to signal validation cycle (external signal)")
                     return await self._run_signal_validation_cycle(
                         config, signal_data, override_symbol
                     )
                 else:
-                    # Manual trigger - fetch latest real ggShot signal
-                    self._log.info("🔍 DEBUG: Manual trigger - fetching latest ggShot signal")
                     latest_signal = await self._fetch_latest_ggshot_signal()
-                    self._log.info(f"🔍 DEBUG: Fetched signal: {latest_signal.symbol} {latest_signal.direction}")
-                    # Convert SignalData object to dict for decision engine
                     signal_dict = self._signal_data_to_dict(latest_signal)
-                    self._log.info("🔍 DEBUG: Routing to signal validation cycle (manual trigger)")
                     return await self._run_signal_validation_cycle(
                         config, signal_dict, override_symbol
                     )
             else:
-                self._log.info("🔍 DEBUG: Routing to autonomous trading cycle")
                 return await self._run_autonomous_trading_cycle(config)
             
         except Exception as e:
@@ -380,16 +304,12 @@ class GGBotOrchestrator:
         config_id = config.config_id
         
         try:
-            # Get or create V2 extraction engine
             extraction_engine = await self._get_extraction_engine(user_id)
-            
-            # Extract indicators and timeframes from config structure
+
             extraction_config = config.extraction or {}
             requested_indicators = self._extract_indicators_from_config(extraction_config)
             timeframes = self._extract_timeframes_from_config(extraction_config)
-            
-            # 4. Run V2 extraction for all timeframes
-            # 🔥 WEBSOCKET DELETED - Now using Redis status for SSE stream!
+
             from core.sse import set_execution_phase
             await set_execution_phase(config_id, "extracting", f"Extracting {len(requested_indicators)} indicators for {config.selected_pair}...")
             
@@ -397,24 +317,18 @@ class GGBotOrchestrator:
                 extraction_engine, config, user_id, requested_indicators, timeframes
             )
             
-            # Allow users to see extraction phase for 7 seconds (better UX) - only in demo mode
             if DEMO_MODE:
                 await asyncio.sleep(7)
-            
-            # 5. Run V2 decision engine
-            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
+
             await set_execution_phase(config_id, "deciding", "AI decision engine analyzing market data across multiple timeframes...")
             
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result
             )
             
-            # Allow users to see decision phase for 3 seconds (better UX) - only in demo mode
             if DEMO_MODE:
                 await asyncio.sleep(3)
-            
-            # 6. Execute trading
-            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
+
             action = decision_result.get('action', 'wait')
             if action in ['wait', 'no_action', 'hold']:
                 message = f"Holding position - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
@@ -427,13 +341,11 @@ class GGBotOrchestrator:
                 config, user_id, decision_result
             )
             
-            # 7. Publish to telegram if configured
             if self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
-                    config, {}, decision_result  # Empty signal_data for autonomous trading
+                    config, {}, decision_result
                 )
             
-            # Calculate execution time
             end_time = datetime.now(timezone.utc)
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
@@ -447,8 +359,6 @@ class GGBotOrchestrator:
                 timestamp=end_time.isoformat()
             )
             
-            # 8. Send completion status
-            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
             await set_execution_phase(config_id, "completed", f"Cycle completed in {execution_time_ms/1000:.1f}s")
             
             self._log.info(f"V2 autonomous cycle completed in {execution_time_ms}ms")
@@ -481,43 +391,34 @@ class GGBotOrchestrator:
         config_id = config.config_id
         
         try:
-            # Extract symbol from signal or override
             symbol = override_symbol or signal_data.get('symbol') or config.selected_pair
 
             if not symbol:
                 raise ValueError("No symbol specified for signal validation")
-            
+
             self._log.info(f"Running signal validation for {symbol}")
-            
-            # Get indicators and timeframes from user's config (same as autonomous trading)
+
             extraction_config = config.extraction or {}
             signal_indicators = self._extract_indicators_from_config(extraction_config)
             timeframes = self._extract_timeframes_from_config(extraction_config)
 
-            # Get or create extraction engine
             extraction_engine = await self._get_extraction_engine(user_id)
 
-            # Add extracting phase for UI consistency
             from core.sse import set_execution_phase
             await set_execution_phase(config_id, "extracting", f"Extracting indicators for {symbol}...")
 
-            # Run extraction for all configured timeframes
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id,
                 signal_indicators, timeframes,
                 override_symbol=symbol
             )
 
-            # Add deciding phase for UI consistency
             await set_execution_phase(config_id, "deciding", "AI decision engine analyzing signal context...")
 
-            # Run decision with signal context
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result, signal_data
             )
             
-            # Execute trading
-            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
             action = decision_result.get('action', 'wait')
             if action in ['wait', 'no_action', 'hold']:
                 message = f"Signal rejected - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
@@ -530,13 +431,11 @@ class GGBotOrchestrator:
                 config, user_id, decision_result
             )
             
-            # Check if signal should be published to telegram
             if self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
                     config, signal_data, decision_result
                 )
             
-            # Calculate execution time
             end_time = datetime.now(timezone.utc)
             execution_time_ms = int((end_time - start_time).total_seconds() * 1000)
             
@@ -550,8 +449,6 @@ class GGBotOrchestrator:
                 timestamp=end_time.isoformat()
             )
             
-            # Send completion status
-            # 🔥 WEBSOCKET DELETED - Using Redis status for SSE stream!
             await set_execution_phase(config_id, "completed", f"Signal validation completed in {execution_time_ms/1000:.1f}s")
             
             self._log.info(f"Signal validation completed in {execution_time_ms}ms")
@@ -576,7 +473,6 @@ class GGBotOrchestrator:
         """Extract indicators from user's extraction config."""
         requested_indicators = []
         
-        # Handle new structure (selected_data_sources) 
         if "selected_data_sources" in extraction_config:
             data_sources = extraction_config.get("selected_data_sources", {})
             for source_name, source_config in data_sources.items():
@@ -585,31 +481,26 @@ class GGBotOrchestrator:
                     data_points = source_config.get("data_points", [])
                     requested_indicators.extend(data_points)
                         
-        # Fallback to legacy structures
         elif "indicators" in extraction_config:
             requested_indicators = extraction_config["indicators"]
         else:
-            # Fallback to old data_sources structure
             data_sources = extraction_config.get("data_sources", {})
             for category, indicators in data_sources.items():
                 if isinstance(indicators, list):
                     requested_indicators.extend(indicators)
         
         if not requested_indicators:
-            # Default to basic indicators if none specified
             requested_indicators = ["rsi", "macd", "ema"]
             
         return requested_indicators
     
     def _extract_timeframes_from_config(self, extraction_config: Dict) -> List[str]:
         """Extract timeframes from user's extraction config."""
-        timeframes = ["1h"]  # Default single timeframe
+        timeframes = ["1h"]
         
-        # Handle new structure (selected_data_sources)
         if "selected_data_sources" in extraction_config:
             data_sources = extraction_config.get("selected_data_sources", {})
             
-            # First, try to get timeframes from technical_analysis (most common case)
             if "technical_analysis" in data_sources:
                 ta_config = data_sources["technical_analysis"]
                 if isinstance(ta_config, dict):
@@ -619,13 +510,11 @@ class GGBotOrchestrator:
                         self._log.debug(f"Found {len(timeframes)} timeframes from technical_analysis: {timeframes}")
                         return timeframes
             
-            # Fallback: collect all unique timeframes from all sources with data_points
             all_timeframes = set()
             for source_name, source_config in data_sources.items():
                 if isinstance(source_config, dict) and source_name != "signals":
-                    # Only include sources that have actual data_points configured
                     data_points = source_config.get("data_points", [])
-                    if data_points:  # Only consider sources with actual indicators
+                    if data_points:
                         source_timeframes = source_config.get("timeframes", [])
                         all_timeframes.update(source_timeframes)
             
@@ -643,9 +532,8 @@ class GGBotOrchestrator:
         import os
         import sys
         from dotenv import load_dotenv
-        
+
         try:
-            # Ensure .env is loaded
             load_dotenv()
             
             api_id = int(os.getenv('TG_API_ID'))
@@ -655,7 +543,6 @@ class GGBotOrchestrator:
             if not api_id or not api_hash:
                 raise ValueError("Missing TG_API_ID or TG_API_HASH environment variables")
             
-            # Use separate session file for manual trigger to avoid conflicts
             session_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'sessions')
             session_path = os.path.join(session_dir, 'manual_trigger_session')
             
@@ -663,25 +550,19 @@ class GGBotOrchestrator:
             await client.start()
             
             try:
-                # Get channel entity
                 channel = await client.get_entity(channel_name)
-                
-                # Fetch latest messages (limit to recent ones)
                 messages = await client.get_messages(channel, limit=10)
-                
-                # Import ggShot parser
+
                 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ggshot'))
                 from ggshot_parser import GGShotParser
                 parser = GGShotParser()
                 
-                # Find the most recent valid signal
                 for message in messages:
                     if message.message:
                         signal_data = parser.parse_signal(message.message)
                         if signal_data:
                             self._log.info(f"Found latest ggShot signal: {signal_data['symbol']} {signal_data['direction']}")
-                            
-                            # Convert to StandardizedSignalData format
+
                             return SignalData(
                                 source='ggshot',
                                 symbol=signal_data['symbol'],
@@ -716,11 +597,9 @@ class GGBotOrchestrator:
         telegram_config = config.telegram_integration or {}
         publisher_config = telegram_config.get('publisher', {})
 
-        # Check if telegram publishing is enabled
         if not publisher_config.get('enabled', False):
             return False
 
-        # Check if user has ggbase subscription (required for signal publishing)
         try:
             from core.common.db import get_db_connection
             with get_db_connection() as conn:
@@ -738,7 +617,6 @@ class GGBotOrchestrator:
 
                     tier, status = result
 
-                    # Must be ggbase tier with active subscription
                     if tier != 'ggbase' or status != 'active':
                         self._log.info(f"User {config.user_id} requires ggbase subscription for signal publishing")
                         return False
@@ -747,7 +625,6 @@ class GGBotOrchestrator:
             self._log.error(f"Failed to check subscription for signal publishing: {e}")
             return False
 
-        # Always publish signals (approval/rejection status handled by publishing service)
         return True
     
     async def _trigger_signal_publishing(
@@ -758,7 +635,6 @@ class GGBotOrchestrator:
     ) -> None:
         """Trigger signal publishing to user's Telegram channel."""
         try:
-            # Import the publishing service function
             from signals.publishing_service import publish_signal_to_telegram
             
             success = await publish_signal_to_telegram(
@@ -802,7 +678,7 @@ class GGBotOrchestrator:
                 user_id=user_id,
                 use_advanced_preprocessing=True,
                 use_database_storage=True,
-                use_file_storage=False  # Disable file storage for production (prevents bloat)
+                use_file_storage=False
             )
         return self._extraction_engines[user_id]
     
@@ -817,17 +693,14 @@ class GGBotOrchestrator:
     ) -> Dict[str, Any]:
         """Run V2 extraction engine for multiple timeframes with proper integration."""
         try:
-            # Get symbol from override or config
             symbol = override_symbol or config.selected_pair or "BTC/USDT"
-            
-            # Extract for all timeframes
+
             timeframe_results = {}
             successful_extractions = 0
             
             for timeframe in timeframes:
                 self._log.info(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe})")
-                
-                # Extract using the V2 system with all 21 preprocessors
+
                 result = await extraction_engine.extract_for_symbol(
                     symbol=symbol,
                     indicators=indicators,
@@ -845,7 +718,6 @@ class GGBotOrchestrator:
                 else:
                     self._log.error(f"❌ V2 Extraction failed for {symbol} ({timeframe}): {result.get('error')}")
             
-            # Prepare consolidated result
             overall_result = {
                 "status": "success" if successful_extractions > 0 else "error",
                 "symbol": symbol,
@@ -891,7 +763,6 @@ class GGBotOrchestrator:
     ) -> Dict[str, Any]:
         """Run V2 decision engine with full context management."""
         try:
-            # Check if extraction was successful
             if extraction_result.get("status") == "error":
                 return {
                     "status": "error",
@@ -899,11 +770,9 @@ class GGBotOrchestrator:
                     "action": "wait",
                     "confidence": 0.0
                 }
-            
-            # Get or create V2 decision engine
+
             decision_engine = await self._get_decision_engine(config_id, config.user_id)
-            
-            # Get symbol from config or signal data
+
             if signal_data:
                 symbol = signal_data['symbol']
             else:
@@ -912,15 +781,12 @@ class GGBotOrchestrator:
             if not symbol:
                 raise ValueError("No symbol specified for decision")
             
-            # Run decision using V2 engine with full context management
             decision_result = await decision_engine.make_decision(
                 symbol=symbol,
-                signal_data=signal_data  # Pass signal data for validation mode
+                signal_data=signal_data
             )
             
-            # Log the full decision result
             self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
-            self._log.info(f"🎯 Decision Engine Output: {decision_result}")
             return decision_result
             
         except Exception as e:
@@ -940,7 +806,6 @@ class GGBotOrchestrator:
     ) -> Dict[str, Any]:
         """Run V2 trading execution with full paper trading integration."""
         try:
-            # Check if decision was successful
             if decision_result.get("status") == "error":
                 return {
                     "status": "skipped",
@@ -950,7 +815,6 @@ class GGBotOrchestrator:
             action = decision_result.get("action", "wait")
             confidence = decision_result.get("confidence", 0.0)
             
-            # Skip trading if action is wait, no_action, or hold
             if action in ["wait", "no_action", "hold"]:
                 return {
                     "status": "skipped",
@@ -958,7 +822,6 @@ class GGBotOrchestrator:
                     "action": action
                 }
             
-            # Get trading config from config
             trading_config = config.trading or {}
             symbol = decision_result.get("symbol") or config.selected_pair
 
@@ -970,7 +833,6 @@ class GGBotOrchestrator:
                     "action": action
                 }
             
-            # Map decision actions to trading actions
             if action in ["enter", "long"]:
                 trading_action = "long"
             elif action == "short":
@@ -978,14 +840,12 @@ class GGBotOrchestrator:
             elif action in ["exit", "close"]:
                 trading_action = "close"
             else:
-                # Fallback for unexpected actions - skip trading
                 return {
                     "status": "skipped",
                     "reason": f"Unknown action: {action}",
                     "action": action
                 }
             
-            # Create comprehensive trading intent for paper trading service
             trading_intent = {
                 "decision_id": decision_result.get("decision_id"),
                 "user_id": user_id,
@@ -998,12 +858,8 @@ class GGBotOrchestrator:
                 "reasoning": decision_result.get("reasoning", "V2 Decision Engine decision")
             }
             
-            # Handle different trading actions
             if trading_action == "close":
-                # For close actions, we need to close existing positions
-                # First, get any open positions for this symbol and config
                 try:
-                    # Check if there are open positions for this config and symbol
                     from core.common.db import get_db_connection
                     open_positions = []
                     with get_db_connection() as conn:
@@ -1028,10 +884,9 @@ class GGBotOrchestrator:
                             "action": "close"
                         }
                     
-                    # Close the most recent open position
                     position = open_positions[0]
                     trade_result = await self.paper_trading.close_position(
-                        position['trade_id'], 
+                        position['trade_id'],
                         reason="ai_decision"
                     )
                     
@@ -1045,7 +900,6 @@ class GGBotOrchestrator:
                         "error": f"Failed to close position: {str(e)}"
                     }
             else:
-                # For long/short actions, execute normal trade
                 trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
                 
                 self._log.info(f"V2 Trading completed: {trade_result.get('status')} for {symbol}")
@@ -1060,40 +914,12 @@ class GGBotOrchestrator:
     
 
 
-# Initialize orchestrator
 orchestrator = GGBotOrchestrator()
 
-
-# APScheduler Setup and Job Functions
 scheduler = AsyncIOScheduler()
-execution_semaphore = asyncio.Semaphore(50)  # Global concurrency limit
+execution_semaphore = asyncio.Semaphore(50)
 
 
-# Add daily log cleanup job
-async def daily_log_cleanup():
-    """Daily log cleanup job executed by APScheduler."""
-    try:
-        from core.services.log_cleanup_service import log_cleanup_service
-        cleanup_stats = await log_cleanup_service.cleanup_all_logs()
-        logger.bind(service="orchestrator").info(
-            f"🧹 Daily log cleanup completed: {cleanup_stats['total_files_deleted']} files deleted, "
-            f"{cleanup_stats['total_space_freed'] / (1024*1024):.2f} MB freed"
-        )
-    except Exception as e:
-        logger.bind(service="orchestrator").error(f"❌ Daily log cleanup failed: {str(e)}")
-
-
-# Schedule daily cleanup at 3:00 AM
-scheduler.add_job(
-    daily_log_cleanup,
-    'cron',
-    hour=3,
-    minute=0,
-    id='daily_log_cleanup',
-    replace_existing=True,
-    max_instances=1,
-    coalesce=True
-)
 
 
 async def run_once(user_id: str, config_id: str, timeframe: str):
@@ -1104,40 +930,28 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
     close_ts = last_closed_close_ts(timeframe)
     key = format_redis_idempotency_key(user_id, config_id, timeframe, close_ts)
     
-    # Redis client setup
     redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
     redis_client = redis.from_url(redis_url, decode_responses=True)
     
     async with execution_semaphore:
         try:
-            # Try to acquire idempotency lock with appropriate TTL
             ttl = get_redis_ttl_for_timeframe(timeframe)
             if not await redis_client.set(key, "executing", ex=ttl, nx=True):
                 logger.info(f"Skipping execution for {user_id}:{config_id}:{timeframe}:{close_ts} - already executed")
-                return  # Already executing/executed
+                return
             
-            # Get job info for next fire time
             job_id = f"bot:{user_id}:{config_id}:{timeframe}"
             job = scheduler.get_job(job_id)
             next_fire = job.next_run_time.strftime('%Y-%m-%dT%H:%M:%SZ') if job and job.next_run_time else None
             
-            # Status is handled inside orchestrator via set_execution_phase() calls
-            
             try:
-                # Run the autonomous cycle
                 result = await orchestrator.run_autonomous_cycle(config_id, user_id)
-                
-                # 🔥 WEBSOCKET DELETED! Completion status handled in orchestrator via Redis + SSE
-                
-                # Mark as completed in Redis
+
                 await redis_client.set(key, "completed", ex=ttl)
                 logger.info(f"Completed execution for {user_id}:{config_id}:{timeframe}:{close_ts} in {result.execution_time_ms}ms")
                 
             except Exception as e:
-                # 🔥 WEBSOCKET DELETED! Error status would be handled via Redis + SSE if needed
-                
                 logger.error(f"Execution failed for {user_id}:{config_id}:{timeframe}:{close_ts}: {e}")
-                # Leave key as "executing" to prevent retries on same candle
                 
         finally:
             await redis_client.aclose()
@@ -1176,7 +990,6 @@ def remove_bot_job(user_id: str, config_id: str, timeframe: str):
     """Remove a scheduled job for a bot configuration."""
     job_id = f"bot:{user_id}:{config_id}:{timeframe}"
     try:
-        # Check if job exists first
         job = scheduler.get_job(job_id)
         if job:
             scheduler.remove_job(job_id)
@@ -1184,23 +997,19 @@ def remove_bot_job(user_id: str, config_id: str, timeframe: str):
             return True
         else:
             logger.info(f"Job {job_id} was already removed or never existed")
-            return True  # Consider it successful since the desired state (no job) is achieved
+            return True
     except Exception as e:
         logger.warning(f"Failed to remove job {job_id}: {e}")
         return False
 
 
 async def reconcile_active_bots():
-    """
-    Reconcile active bots from database on startup.
-    Schedules jobs for all configurations with state='active'.
-    """
+    """Reconcile active bots from database on startup."""
     try:
         from core.common.db import get_db_connection
-        
+
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Get all active bot configurations
                 cur.execute("""
                     SELECT config_id, user_id, config_type, config_data
                     FROM configurations
@@ -1214,17 +1023,13 @@ async def reconcile_active_bots():
                     config_id, user_id, config_type, config_data = row
 
                     try:
-                        # Only schedule autonomous_trading configs, not signal_validation configs
-                        # Use the actual config_type column, default to autonomous_trading if null
                         actual_config_type = config_type or 'autonomous_trading'
                         if actual_config_type != 'autonomous_trading':
                             logger.info(f"Skipping {actual_config_type} config {config_id} - not scheduling signal_validation configs")
                             continue
 
-                        # Extract timeframe from config_data using the proper extraction function
                         timeframe = extract_timeframe_from_config(config_data)
 
-                        # Schedule the bot
                         add_bot_job(user_id, config_id, timeframe)
                         scheduled_count += 1
 
@@ -1810,57 +1615,6 @@ async def search_symbols(query: str) -> Dict[str, Any]:
         }
 
 
-# Log Management Endpoints
-@app.get("/api/v2/logs/usage")
-async def get_log_usage() -> Dict[str, Any]:
-    """Get current log disk usage statistics."""
-    try:
-        from core.services.log_cleanup_service import log_cleanup_service
-        usage_stats = await log_cleanup_service.get_log_disk_usage()
-
-        return {
-            "status": "success",
-            "data": {
-                "total_size_mb": round(usage_stats["total_size_mb"], 2),
-                "total_files": usage_stats["total_files"],
-                "locations": usage_stats["locations"],
-                "retention_days": log_cleanup_service.retention_days,
-                "last_scan": usage_stats["scan_time"]
-            }
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to get log usage: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
-
-
-@app.post("/api/v2/logs/cleanup")
-async def manual_log_cleanup() -> Dict[str, Any]:
-    """Manually trigger log cleanup (7-day retention)."""
-    try:
-        from core.services.log_cleanup_service import log_cleanup_service
-        cleanup_stats = await log_cleanup_service.cleanup_all_logs()
-
-        return {
-            "status": "success",
-            "data": {
-                "files_deleted": cleanup_stats["total_files_deleted"],
-                "space_freed_mb": round(cleanup_stats["total_space_freed"] / (1024*1024), 2),
-                "locations_cleaned": cleanup_stats["locations_cleaned"],
-                "errors": cleanup_stats["errors"],
-                "cleanup_time": cleanup_stats["cleanup_time"]
-            }
-        }
-
-    except Exception as e:
-        logger.error(f"Failed to run manual log cleanup: {e}")
-        return {
-            "status": "error",
-            "error": str(e)
-        }
 
 
 # User Management Endpoints
@@ -2653,18 +2407,8 @@ async def get_bot_status(
         raise HTTPException(status_code=500, detail=f"Failed to get bot status: {str(e)}")
 
 
-# 🔥 OLD WEBSOCKET SUPPORT DELETED - Now using SSE stream!
-# 🔥 WEBSOCKET STATUS FUNCTIONS DELETED! 
-# Status now via Redis + SSE stream at /api/dashboard-stream
 
 
-# 🔥 ALL WEBSOCKET MESSAGE FUNCTIONS DELETED!
-
-
-# 🔥 WEBSOCKET CODE DELETED! Now using SSE at /api/dashboard-stream 🔥
-
-
-# Error handlers
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request, exc: HTTPException):
     """Handle HTTP exceptions with consistent format."""
@@ -2678,18 +2422,16 @@ async def http_exception_handler(request, exc: HTTPException):
     )
 
 
-# Development Mode: Override authentication for Phase 7 testing
 import os
 if os.getenv("DEVELOPMENT_MODE", "false").lower() == "true":
     logger.warning("⚠️  DEVELOPMENT MODE ACTIVE: Using mock authentication - DO NOT USE IN PRODUCTION")
     app.dependency_overrides[get_current_user_v2] = get_mock_user_for_dev
 
 if __name__ == "__main__":
-    # Development server
     uvicorn.run(
         "ggbot:app",
         host="0.0.0.0",
-        port=8000,  # V2 Orchestrator port (matches nginx configuration)
+        port=8000,
         reload=True,
         log_level="info"
     )

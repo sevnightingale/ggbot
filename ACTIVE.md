@@ -1,22 +1,22 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-09-23 (Symbol validation, Telegram publishing fixes, Help widget)
-**System Health**: 🟢 Operational (enhanced reliability + UX improvements)
-**V2 Architecture**: Complete - Full E2E Pipeline with Multi-Exchange Fallback
+**Last Updated**: 2025-09-29 (Logging consolidation, system architecture cleanup)
+**System Health**: 🟢 Production Live (225+ users, 100+ active bots)
+**Project Status**: Live application with focus on feature refinement and monetization
 
 ---
 
-## 🔄 V2 Architecture Transition
+## 🎯 Current Development Focus
 
-**Current Status**: V2 implementation complete but codebase cleanup in progress
+**Production Status**: Live platform with 225+ active users managing 100+ autonomous trading bots
 
-**Module Status**:
-- `extraction/` - Legacy code + `v2/` folder (use v2)
-- `decision/` - Legacy code + V2 engine integrated (use V2 engine)
-- `trading/` - Current and up-to-date
-- `core/` - V2 architecture (scheduler, config, etc.)
+**Primary Objectives**:
+- **Feature Refinement**: Trading system completeness (manual position management, SL/TP verification)
+- **Monetization**: Stripe integration and paid tier implementation (ggbase subscription)
+- **User Experience**: API key management, settings interface, status messaging improvements
+- **System Polish**: Error handling, mobile responsiveness, comprehensive testing
 
-**Legacy cleanup pending** - old modules preserved for reference during transition
+**Architecture Status**: V2 implementation complete and operational in production
 
 ---
 
@@ -57,8 +57,9 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|--------|---------|
-| ggbot | 🟢 Online | 0% | 218MB | V2 Orchestrator API server with integrated scheduler & telegram publishing |
-| pm2-logrotate | 🟢 Online | 0% | 52MB | Automated log rotation and compression (10MB/7-day retention) |
+| ggbot | 🟢 Online | 0% | ~165MB | V2 Orchestrator API server with integrated scheduler & telegram publishing |
+| signal-listener | 🟢 Online | 0% | ~63MB | External signal processing service (ggShot integration) |
+| pm2-logrotate | 🟢 Online | 0% | ~57MB | Automated log rotation and compression (10MB rotation, 5 files max) |
 
 ### Infrastructure Services
 | Service | Status | Port | Purpose |
@@ -134,14 +135,13 @@
 
 ## 🔄 Background Tasks
 
-- **Paper Trading Monitor**: ❌ MISSING (needs re-integration from legacy)
-- **ggShot Filter Service**: ❌ REMOVED (functionality integrated into V2)
-- **Autonomous Trading**: ✅ ACTIVE (scheduled bot execution with APScheduler)
-- **Log Rotation**: ✅ ACTIVE (PM2-logrotate with 10MB size limits and compression)
+- **Position Monitoring**: ✅ ACTIVE (3-second cycles monitoring 120+ configs with open positions)
+- **Autonomous Trading**: ✅ ACTIVE (scheduled bot execution across multiple timeframes with APScheduler)
+- **Signal Processing**: ✅ ACTIVE (ggShot signal validation and telegram publishing)
+- **Log Rotation**: ✅ ACTIVE (pm2-logrotate with 10MB rotation, 5 file retention, compression)
 - **Disk Space Monitoring**: ✅ ACTIVE (automated checks every 6 hours)
 - **Process Cleanup**: Every 5min (terminated processes)
 - **Cache Cleanup**: Every hour (old statuses/decisions)
-- **Demo Mode**: On-demand (V2 orchestrator integration)
 
 ---
 
@@ -201,27 +201,27 @@ df -h
 
 ## 🎯 Current Focus
 
-### 🟡 Production Status (Transition Phase)
-**Autonomous Scheduling** - ✅ Multi-timeframe bots running with zero-drift execution
-**Paper Trading Engine** - ✅ Real-time position monitoring active (3-second cycles with batch SQL updates)
-**V2 Dashboard** - 🟡 Transitioning to Forge architecture (legacy dashboard deprecated)
+### 🟢 Production Status (Live Platform)
+**User Base**: 225+ active users managing 100+ autonomous trading bots
+**System Health**: All core systems operational with real-time monitoring
+**Platform Focus**: Feature refinement, monetization implementation, and user experience polish
 
-### 🔄 Frontend Architecture Transition
+### 📈 Active Development Priorities
 
-**Legacy Dashboard Issues**:
-- Complex WebSocket system with infinite loop errors (React #185)
-- 600+ line botStore with data transformation layers
-- Architectural debt preventing elegant evolution
-- Global state management complexity
+**Trading System Completeness**:
+- Manual position management and close functionality
+- Stop loss/take profit verification and automated execution
+- Volume analysis fixes and trading parameter validation
 
-**New Forge Implementation** (see `FORGE.md`):
-- ✅ Clean local state architecture with direct API types
-- ✅ Simple SSE streams replacing complex WebSocket patterns
-- ✅ Multi-bot switching with `selectedConfigId` pattern
-- ✅ Phase 1 data foundation complete, ready for Phase 2 (design system)
-- **Working Document**: All development guided by `FORGE.md`
+**Monetization Implementation**:
+- Stripe integration for ggbase subscription tier
+- Premium feature gating and usage enforcement
+- Subscription management interface
 
-**Migration Status**: Legacy dashboard functional but buggy. Forge page under active development as complete replacement using elegant, maintainable patterns.
+**User Experience Enhancement**:
+- Complete user settings and API key management
+- Status messaging improvements and tooltips
+- Mobile responsive design implementation
 
 ---
 
@@ -253,6 +253,14 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Error Rate Limiting**: Connection errors limited to prevent log spam
 - **Monitoring**: Enhanced scripts check Docker, PM2, and system logs
 - **hummingbot-API**: Restored with proper network, database, and auth configuration
+
+### 📝 Logging System Consolidation (Complete - 2025-09-29)
+- **Architecture Cleanup**: Consolidated dual logging systems into single standard configuration
+- **Legacy Removal**: Deleted redundant `core/common/logging_config.py` (test files using legacy system ignored)
+- **PM2 Integration**: All logs routed through PM2 to `/home/sev/ggbot/logs/` directory structure
+- **Log Structure**: Separated by service (ggbot, signal-listener) and type (error, out)
+- **Rotation Management**: pm2-logrotate handles compression and cleanup (10MB rotation, 5 files max)
+- **Verbosity Reduction**: Removed excessive prompt logging from decision engine (saved to database instead)
 
 ### 🔧 Signal Publishing Consolidation (Complete - 2025-09-27)
 - **Architecture Cleanup**: Removed unused `signal-publisher` PM2 service and empty queue processing

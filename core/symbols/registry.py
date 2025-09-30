@@ -1039,6 +1039,15 @@ SYMBOL_REGISTRY = {
         "platform": "SKLUS-USDT",
         "coingecko_id": "skl"
     },
+    "skl": {
+        "base": "SKL",
+        "quote": "USDT",
+        "ggshot": "SKLUSDT",
+        "ccxt": "SKL/USDT",
+        "hummingbot": "SKL-USDT",
+        "platform": "SKL-USDT",
+        "coingecko_id": "skale"
+    },
     "snx": {
         "base": "SNX",
         "quote": "USDT",

@@ -66,7 +66,7 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
     setTimeout(() => {
       setDisplayValues(newValues)
       setIsAnimating(false)
-    }, 150)
+    }, 250)
   }, [account])
 
   if (!account) {
@@ -169,7 +169,7 @@ function KPICard({ label, value, delta, isPercentage, isAnimating }: KPICardProp
       <div className="text-xs text-[var(--text-muted)]">{label}</div>
       <div className="relative overflow-hidden h-7 mt-1">
         <div
-          className={`text-xl font-semibold tracking-tight transition-all duration-150 ease-out ${valueColorClass} ${
+          className={`text-xl font-semibold tracking-tight transition-all duration-250 ease-in-out ${valueColorClass} ${
             isAnimating
               ? 'transform translate-y-8 opacity-0'
               : 'transform translate-y-0 opacity-100'

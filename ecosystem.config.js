@@ -22,13 +22,11 @@ module.exports = {
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY
       },
-      error_file: '/home/sev/.pm2/logs/ggbot-error.log',
-      out_file: '/home/sev/.pm2/logs/ggbot-out.log',
+      error_file: '/home/sev/ggbot/logs/ggbot-error.log',
+      out_file: '/home/sev/ggbot/logs/ggbot-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       log_type: 'json',
-      max_log_files: 7,        // Keep 7 rotated log files (7-day retention)
-      max_log_size: '10M',     // Rotate when log reaches 10MB
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
@@ -55,13 +53,11 @@ module.exports = {
         SUPABASE_URL: process.env.SUPABASE_URL,
         SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
       },
-      error_file: '/home/sev/.pm2/logs/signal-listener-error.log',
-      out_file: '/home/sev/.pm2/logs/signal-listener-out.log',
+      error_file: '/home/sev/ggbot/logs/signal-listener-error.log',
+      out_file: '/home/sev/ggbot/logs/signal-listener-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       log_type: 'json',
-      max_log_files: 7,        // Keep 7 rotated log files (7-day retention)
-      max_log_size: '10M',     // Rotate when log reaches 10MB
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
