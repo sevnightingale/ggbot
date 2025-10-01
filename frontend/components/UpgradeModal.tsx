@@ -76,7 +76,9 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
-            <Sparkles className="h-6 w-6 text-amber-500" />
+            <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
+              <Sparkles className="h-5 w-5 text-[var(--text-primary)]" />
+            </div>
             <DialogTitle className="text-2xl">Upgrade to Pro Plan</DialogTitle>
           </div>
           <DialogDescription>
@@ -90,8 +92,8 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             onClick={() => setBillingPeriod('monthly')}
             className={`px-6 py-2 rounded-lg font-medium transition-all ${
               billingPeriod === 'monthly'
-                ? 'bg-amber-600 text-white'
-                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-hover)]'
+                : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)]'
             }`}
           >
             Monthly
@@ -100,13 +102,13 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             onClick={() => setBillingPeriod('annual')}
             className={`px-6 py-2 rounded-lg font-medium transition-all relative ${
               billingPeriod === 'annual'
-                ? 'bg-amber-600 text-white'
-                : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-hover)]'
+                : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)]'
             }`}
           >
             Annual
             {billingPeriod === 'annual' && (
-              <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
+              <span className="absolute -top-2 -right-2 bg-[var(--profit-color)] text-white text-xs px-2 py-0.5 rounded-full">
                 Save 20%
               </span>
             )}
@@ -124,7 +126,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             </span>
           </div>
           {billingPeriod === 'annual' && (
-            <p className="text-sm text-green-500 mt-2 font-medium">
+            <p className="text-sm text-[var(--profit-color)] mt-2 font-medium">
               {pricing.annual.savings} • Just $23.25/month
             </p>
           )}
@@ -146,7 +148,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
                   {feature.description}
                 </p>
               </div>
-              <Check className="text-green-500 flex-shrink-0 mt-1" size={20} />
+              <Check className="text-[var(--profit-color)] flex-shrink-0 mt-1" size={20} />
             </div>
           ))}
         </div>
@@ -170,8 +172,8 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-red-500/10 border border-red-500/30 rounded-lg">
-            <p className="text-sm text-red-500">{error}</p>
+          <div className="mb-4 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
+            <p className="text-sm text-[var(--loss-color)]">{error}</p>
           </div>
         )}
 
@@ -179,7 +181,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         <button
           onClick={handleUpgrade}
           disabled={loading}
-          className="w-full bg-amber-600 hover:bg-amber-700 disabled:bg-amber-600/50 text-white font-medium py-3 px-6 rounded-lg transition-all flex items-center justify-center gap-2"
+          className="w-full bg-[var(--profit-color)] hover:opacity-90 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-lg transition-opacity flex items-center justify-center gap-2"
         >
           {loading ? (
             <>

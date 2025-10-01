@@ -1,8 +1,10 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import { Crown } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
 import { ConfigData } from '@/lib/api'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 interface StrategyEditorProps {
   configData?: ConfigData
@@ -25,6 +27,7 @@ export function StrategyEditor({
 
   // State for collapsible sections
   const [showSystemSections, setShowSystemSections] = useState(false)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
 
   // Ref for textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -46,7 +49,7 @@ export function StrategyEditor({
   const handleFrequencyChange = (freq: string) => {
     // Check permissions for high-frequency options
     if ((freq === '5m' || freq === '15m') && !canAccess('premium_llms')) {
-      alert('High-frequency analysis requires a premium subscription. Upgrade to access 5m and 15m frequencies!')
+      setUpgradeModalOpen(true)
       return
     }
 
@@ -85,17 +88,11 @@ export function StrategyEditor({
 
   // Handle LLM provider change
   const handleProviderChange = (provider: string) => {
-    console.log('handleProviderChange called with:', provider)
-    console.log('canAccess premium_llms:', canAccess('premium_llms'))
-
     // Check if user has access to premium LLMs
     if (provider === 'openai' && !canAccess('premium_llms')) {
-      console.log('Permission denied for OpenAI')
-      alert('Premium AI models require a ggbase subscription. Upgrade to access OpenAI GPT-5!')
+      setUpgradeModalOpen(true)
       return
     }
-
-    console.log('Permission check passed, proceeding with provider change')
 
     // Set appropriate model for each provider
     let model
@@ -146,33 +143,17 @@ export function StrategyEditor({
                 <button
                   key={freq}
                   onClick={() => handleFrequencyChange(freq)}
-                  disabled={isLocked}
-                  className={`px-4 py-3 text-sm rounded-xl border transition-colors relative ${
+                  className={`px-4 py-3 text-sm rounded-xl border transition-all relative ${
                     analysisFrequency === freq
                       ? 'bg-[var(--agent-decision)] text-white border-[var(--agent-decision)]'
                       : isLocked
-                        ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 cursor-not-allowed'
+                        ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 hover:opacity-80'
                         : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
                   }`}
                 >
-                  <div className="flex items-center justify-between">
+                  <div className="flex items-center justify-between gap-2">
                     <span>Every {freq}</span>
-                    {isPremium && (
-                      <div className="flex items-center gap-1">
-                        {isLocked && (
-                          <svg className="h-3 w-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 0h12m-6 0V9a6 6 0 012.121-4.586M12 15v2m-6 0h12m-6 0V9a6 6 0 00-2.121-4.586" />
-                          </svg>
-                        )}
-                        <span className={`text-xs px-1 py-0.5 rounded-full ${
-                          isLocked
-                            ? 'bg-amber-500/20 text-amber-500/70'
-                            : 'bg-amber-500/20 text-amber-500'
-                        }`}>
-                          Pro
-                        </span>
-                      </div>
-                    )}
+                    {isLocked && <Crown className="h-3 w-3" />}
                   </div>
                 </button>
               )
@@ -180,12 +161,13 @@ export function StrategyEditor({
           </div>
 
           <div className="mt-4 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-            <div className="text-sm text-[var(--text-muted)]">
+            <div className="text-sm text-[var(--text-muted)] flex items-center gap-2">
               Current: <span className="text-[var(--text-primary)] font-medium">Every {analysisFrequency}</span>
               {(analysisFrequency === '5m' || analysisFrequency === '15m') && (
-                <span className="ml-2 text-xs px-2 py-1 rounded-full bg-amber-500/20 text-amber-500">
-                  Pro Feature
-                </span>
+                <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
+                  <Crown className="h-3 w-3" />
+                  <span>Pro</span>
+                </div>
               )}
             </div>
           </div>
@@ -383,37 +365,23 @@ export function StrategyEditor({
                 <button
                   key={provider.id}
                   onClick={() => handleProviderChange(provider.id)}
-                  disabled={isLocked}
-                  className={`p-4 rounded-xl border text-left transition-colors relative ${
+                  className={`p-4 rounded-xl border text-left transition-all relative ${
                     llmProvider === provider.id
                       ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
                       : isLocked
-                        ? 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 cursor-not-allowed'
+                        ? 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 hover:opacity-80'
                         : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                   }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium">{provider.name}</div>
+                  <div className="font-medium flex items-center gap-2">
+                    {provider.name}
+                    {isLocked && <Crown className="h-3 w-3" />}
+                  </div>
                   {provider.recommended && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-emerald-500/20 text-emerald-500">
+                    <span className="text-xs px-2 py-1 rounded-full bg-[var(--profit-color)]/20 text-[var(--profit-color)]">
                       Recommended
                     </span>
-                  )}
-                  {isPremium && (
-                    <div className="flex items-center gap-1">
-                      {isLocked && (
-                        <svg className="h-3 w-3 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 0h12m-6 0V9a6 6 0 012.121-4.586M12 15v2m-6 0h12m-6 0V9a6 6 0 00-2.121-4.586" />
-                        </svg>
-                      )}
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        isLocked
-                          ? 'bg-amber-500/20 text-amber-500/70'
-                          : 'bg-amber-500/20 text-amber-500'
-                      }`}>
-                        Premium
-                      </span>
-                    </div>
                   )}
                 </div>
                 <div className="text-xs text-[var(--text-muted)]">
@@ -497,6 +465,12 @@ export function StrategyEditor({
           </div>
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+      />
     </div>
   )
 }

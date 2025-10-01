@@ -198,9 +198,9 @@ function MenuButton({ icon: Icon, label, onClick, highlight = false }: MenuButto
   return (
     <button
       onClick={onClick}
-      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-all ${
         highlight
-          ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 font-medium'
+          ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] hover:bg-[var(--border)] border border-[var(--border-hover)] font-medium'
           : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
       }`}
     >

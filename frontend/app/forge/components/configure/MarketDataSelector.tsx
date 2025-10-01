@@ -1,7 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import { Crown } from 'lucide-react'
 import { ConfigData } from '@/lib/api'
+import { usePermissions } from '@/lib/permissions'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 // Types based on database schema
 interface DataPoint {
@@ -45,6 +48,8 @@ export function MarketDataSelector({
   onSearchChange,
   className = ''
 }: MarketDataSelectorProps) {
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const { hasPaidDataPoint } = usePermissions()
 
   // Get selected data points from config (derived state)
   const selectedDataPoints: string[] = []
@@ -72,6 +77,12 @@ export function MarketDataSelector({
 
     const dataPoint = activeDataSource.data_points.find(p => p.data_point_id === dataPointId)
     if (!dataPoint) return
+
+    // Check if this is a premium data point and user doesn't have access
+    if (dataPoint.requires_premium && !hasPaidDataPoint(dataPoint.name)) {
+      setUpgradeModalOpen(true)
+      return
+    }
 
     const currentConfig = configData?.extraction?.selected_data_sources || {}
     const category = activeDataSource.name as keyof typeof currentConfig
@@ -178,15 +189,20 @@ export function MarketDataSelector({
           {filteredDataPoints.length > 0 ? (
             filteredDataPoints.map(dataPoint => {
               const isSelected = selectedDataPoints.includes(dataPoint.name)
+              const isPremium = dataPoint.requires_premium
+              const hasAccess = !isPremium || hasPaidDataPoint(dataPoint.name)
+              const isLocked = isPremium && !hasAccess
 
               return (
                 <div key={dataPoint.data_point_id} className="relative">
                   <button
                     onClick={() => handleToggleDataPoint(dataPoint.data_point_id)}
-                    className={`w-full text-left p-3 border transition-colors rounded-xl ${
+                    className={`w-full text-left p-3 border transition-all rounded-xl ${
                       isSelected
                         ? 'bg-[var(--agent-extraction)]/10 border-[var(--agent-extraction)] text-[var(--text-primary)]'
-                        : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--agent-extraction)] hover:bg-[var(--agent-extraction)]/5'
+                        : isLocked
+                          ? 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 hover:opacity-80'
+                          : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-primary)] hover:border-[var(--agent-extraction)] hover:bg-[var(--agent-extraction)]/5'
                     }`}
                   >
                     <div className="flex items-center justify-between">
@@ -202,12 +218,10 @@ export function MarketDataSelector({
                             </svg>
                           )}
                         </div>
-                        <div>
+                        <div className="flex-1">
                           <div className="text-sm font-medium flex items-center gap-2">
                             {dataPoint.display_name}
-                            {dataPoint.requires_premium && (
-                              <span className="text-xs text-amber-500">Premium</span>
-                            )}
+                            {isLocked && <Crown className="h-3 w-3" />}
                           </div>
                           <div className="text-xs text-[var(--text-muted)] mt-1">{dataPoint.description}</div>
                         </div>
@@ -238,6 +252,12 @@ export function MarketDataSelector({
           )}
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+      />
     </div>
   )
 }

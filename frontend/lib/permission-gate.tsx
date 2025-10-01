@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
+import { Crown } from 'lucide-react'
 import { usePermissions } from './permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 
@@ -30,28 +31,26 @@ export function PermissionGate({
     return <>{fallback}</>
   }
 
-  // Default upgrade prompt
+  // Default upgrade prompt (charcoal/bone styling)
   if (showUpgrade) {
     return (
       <>
         <div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-full bg-amber-100 p-2">
-              <svg className="h-5 w-5 text-amber-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m0 0v2m0-2h2m-2 0H10m2-12a9 9 0 110 18 9 9 0 010-18z" />
-              </svg>
+            <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
+              <Crown className="h-5 w-5 text-[var(--text-muted)]" />
             </div>
             <div className="flex-1">
               <h3 className="text-sm font-medium text-[var(--text-primary)]">
                 Premium Feature
               </h3>
-              <p className="text-xs text-[var(--text-secondary)]">
+              <p className="text-xs text-[var(--text-muted)]">
                 Upgrade to Pro to access {getFeatureDescription(feature)}
               </p>
             </div>
             <button
               onClick={() => setUpgradeModalOpen(true)}
-              className="rounded-lg bg-amber-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-amber-700 transition-colors"
+              className="rounded-lg bg-[var(--profit-color)] px-3 py-1.5 text-xs font-medium text-white hover:opacity-90 transition-opacity"
             >
               Upgrade
             </button>
