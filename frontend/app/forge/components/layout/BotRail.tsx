@@ -29,6 +29,7 @@ interface BotRailProps {
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
   onDelete?: (configId: string) => void
+  onResetAccount?: (configId: string) => void
   isBotAction?: boolean
   className?: string
 }
@@ -43,6 +44,7 @@ export function BotRail({
   onRename,
   onDuplicate,
   onDelete,
+  onResetAccount,
   isBotAction = false,
   className = ''
 }: BotRailProps) {
@@ -106,6 +108,7 @@ export function BotRail({
                 onRename={onRename}
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
+                onResetAccount={onResetAccount}
                 isBotAction={isBotAction}
               />
             ))
@@ -130,6 +133,7 @@ interface BotRowProps {
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
   onDelete?: (configId: string) => void
+  onResetAccount?: (configId: string) => void
   isBotAction: boolean
 }
 
@@ -141,6 +145,7 @@ function BotRow({
   onRename,
   onDuplicate,
   onDelete,
+  onResetAccount,
   isBotAction
 }: BotRowProps) {
   // Get bot metadata
@@ -168,12 +173,13 @@ function BotRow({
             </div>
             <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
           </div>
-          {(onRename || onDuplicate || onDelete) && (
+          {(onRename || onDuplicate || onDelete || onResetAccount) && (
             <BotManagementMenu
               bot={bot}
               onRename={onRename || (() => {})}
               onDuplicate={onDuplicate || (() => {})}
               onDelete={onDelete || (() => {})}
+              onResetAccount={onResetAccount}
               isBotAction={isBotAction}
             />
           )}

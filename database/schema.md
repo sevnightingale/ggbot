@@ -536,6 +536,7 @@ CREATE TABLE public.paper_accounts (
   loss_trades integer NOT NULL DEFAULT 0,
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
+  last_reset_at timestamp with time zone,
   CONSTRAINT paper_accounts_pkey PRIMARY KEY (account_id),
   CONSTRAINT paper_accounts_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT paper_accounts_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id)
@@ -575,7 +576,7 @@ CREATE TABLE public.paper_trades (
   opened_at timestamp with time zone NOT NULL DEFAULT now(),
   closed_at timestamp with time zone,
   margin_used numeric,
-  close_reason character varying CHECK ((close_reason::text = ANY (ARRAY['take_profit'::character varying, 'stop_loss'::character varying, 'manual'::character varying, 'liquidation'::character varying, 'system_reset_v2'::character varying, 'position_management'::character varying]::text[])) OR close_reason IS NULL),
+  close_reason character varying CHECK (close_reason IS NULL OR (close_reason::text = ANY (ARRAY['take_profit'::character varying, 'stop_loss'::character varying, 'manual'::character varying, 'liquidation'::character varying, 'system_reset_v2'::character varying, 'position_management'::character varying, 'account_reset'::character varying]::text[]))),
   CONSTRAINT paper_trades_pkey PRIMARY KEY (trade_id),
   CONSTRAINT paper_trades_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT paper_trades_account_fkey FOREIGN KEY (account_id) REFERENCES public.paper_accounts(account_id),

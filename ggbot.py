@@ -2291,6 +2291,51 @@ async def stop_bot(
         raise HTTPException(status_code=500, detail=f"Failed to stop bot: {str(e)}")
 
 
+@app.post("/api/v2/bot/{config_id}/reset-account")
+async def reset_account(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Reset paper trading account to initial state.
+
+    Closes all open positions, resets balance to $10k, clears all stats,
+    but preserves trade history for analysis. Sets last_reset_at timestamp
+    to distinguish current run metrics from historical data.
+    """
+    try:
+        # Verify user owns this configuration
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Initialize paper trading service
+        paper_trading = SupabasePaperTradingService()
+
+        # Execute reset
+        result = await paper_trading.reset_account(config_id, current_user.user_id)
+
+        if result['status'] == 'failed':
+            raise HTTPException(status_code=500, detail=result.get('reason', 'Reset failed'))
+
+        logger.info(f"Account reset successful for config_id={config_id}, user_id={current_user.user_id}")
+
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "positions_closed": result.get('positions_closed', 0),
+            "new_balance": result.get('new_balance', 10000.0),
+            "reset_at": result.get('reset_at'),
+            "message": result.get('message', 'Account reset successfully')
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to reset account {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to reset account: {str(e)}")
+
+
 @app.get("/api/v2/scheduler/status")
 async def get_scheduler_status(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
@@ -2452,7 +2497,7 @@ async def create_checkout_session(
                 'quantity': 1
             }],
             'success_url': f"{os.environ['FRONTEND_URL']}/success?session_id={{CHECKOUT_SESSION_ID}}",
-            'cancel_url': f"{os.environ['FRONTEND_URL']}/pricing",
+            'cancel_url': f"{os.environ['FRONTEND_URL']}/forge",
             'client_reference_id': str(current_user.user_id),
             'subscription_data': {
                 'trial_period_days': 14,

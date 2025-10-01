@@ -257,6 +257,19 @@ export class ApiClient {
     }
   }
 
+  async resetAccount(configId: string): Promise<{ status: string; positions_closed: number; new_balance: number; message: string }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/bot/${configId}/reset-account`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to reset account: ${error}`)
+    }
+
+    return await response.json()
+  }
+
   // Data Sources Management  
   async getDataSourcesWithPoints(): Promise<DataSource[]> {
     console.log('🔍 API Call: getDataSourcesWithPoints to', `${this.baseUrl}/api/v2/data-sources-with-points`)
