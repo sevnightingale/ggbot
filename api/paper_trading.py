@@ -112,12 +112,13 @@ async def get_paper_trading_positions(
             size_usd = float(pos["size_usd"])
             side = pos["side"]
             
-            # Calculate P&L
+            # Calculate P&L with leverage
+            leverage = int(pos.get("leverage", 1))
             size_contracts = size_usd / entry_price
             if side == "long":
-                pnl = (current_price - entry_price) * size_contracts
+                pnl = (current_price - entry_price) * size_contracts * leverage
             else:
-                pnl = (entry_price - current_price) * size_contracts
+                pnl = (entry_price - current_price) * size_contracts * leverage
             
             # Calculate time in trade
             opened_at = datetime.fromisoformat(pos["opened_at"].replace('Z', '+00:00'))
@@ -259,6 +260,59 @@ async def get_paper_trading_account(
     except Exception as e:
         logger.error(f"Failed to get paper trading account for {config_id}: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get account: {str(e)}")
+
+
+@router.post("/{config_id}/positions/{trade_id}/close")
+async def close_paper_position(
+    config_id: str,
+    trade_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Manually close an open paper trading position.
+
+    Args:
+        config_id: Bot configuration ID
+        trade_id: Trade ID to close
+        current_user: Authenticated user from JWT token
+
+    Returns:
+        - status: "success" or "failed"
+        - close_price: Price at which position was closed
+        - realized_pnl: Final P&L with correct leverage calculation
+        - close_reason: "manual"
+    """
+    try:
+        service = SupabasePaperTradingService()
+
+        # Close the position at current market price
+        result = await service.close_position(
+            trade_id=trade_id,
+            reason="manual",
+            close_price=None  # Will use current market price
+        )
+
+        if result.get("status") == "closed":
+            logger.info(f"Manual close: trade {trade_id} for user {current_user.user_id}, config {config_id}")
+            return {
+                "status": "success",
+                "trade_id": trade_id,
+                "close_price": result.get("close_price"),
+                "realized_pnl": result.get("pnl"),
+                "close_reason": "manual",
+                "message": "Position closed successfully"
+            }
+        else:
+            # Failed to close
+            error_reason = result.get("reason", "Unknown error")
+            logger.warning(f"Failed to close trade {trade_id}: {error_reason}")
+            raise HTTPException(status_code=400, detail=f"Failed to close position: {error_reason}")
+
+    except HTTPException:
+        raise  # Re-raise HTTP exceptions
+    except Exception as e:
+        logger.error(f"Error closing position {trade_id} for config {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Internal error closing position: {str(e)}")
 
 
 # Helper functions

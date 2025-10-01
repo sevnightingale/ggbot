@@ -9,9 +9,10 @@ export default function Pricing() {
       price: "Free",
       description: "Perfect for learning and testing strategies",
       features: [
-        "Paper Trading",
-        "User API LLM",
-        "Basic strategy templates",
+        "1 active ggbot",
+        "Hourly analysis frequency",
+        "Basic AI models",
+        "Paper trading",
         "Community support"
       ],
       cta: "Sign up",
@@ -19,34 +20,20 @@ export default function Pricing() {
       popular: false
     },
     {
-      name: "Base Plan", 
-      price: "$49/mo",
-      description: "For serious traders ready to automate",
+      name: "Pro Plan",
+      price: "$29/mo",
+      description: "For serious traders ready to scale",
       features: [
-        "No API LLM costs",
-        "Telegram Signals",
-        "Live trading execution",
+        "Up to 10 active ggbots",
+        "5-minute analysis frequency",
+        "Frontier reasoning models",
+        "Telegram signal publishing",
         "Priority support"
       ],
-      cta: "Coming Soon",
-      href: "#",
-      popular: true
-    },
-    {
-      name: "Premium Plan",
-      price: "$149/mo", 
-      description: "Advanced features for professional traders",
-      features: [
-        "Full Automation",
-        "Plus paper trading",
-        "Advanced AI models",
-        "Custom indicators",
-        "Portfolio management",
-        "White-glove setup"
-      ],
-      cta: "Coming Soon",
-      href: "#",
-      popular: false
+      cta: "Start Free Trial",
+      href: "https://app.ggbots.ai/signup",
+      popular: true,
+      badge: "14-day free trial"
     }
   ]
 
@@ -62,13 +49,13 @@ export default function Pricing() {
           </p>
         </div>
 
-        <div className="grid md:grid-cols-3 gap-8 max-w-5xl mx-auto">
+        <div className="grid md:grid-cols-2 gap-8 max-w-4xl mx-auto">
           {plans.map((plan, index) => (
             <div
               key={index}
               className={`relative bg-charcoal-900 border-2 rounded-sm p-8 ${
-                plan.popular 
-                  ? 'border-agents-decision shadow-[0_0_25px_rgba(44,190,119,0.3)]' 
+                plan.popular
+                  ? 'border-agents-decision shadow-[0_0_25px_rgba(44,190,119,0.3)]'
                   : 'border-bone-200/20'
               }`}
             >
@@ -87,13 +74,18 @@ export default function Pricing() {
                   {plan.name}
                 </h3>
                 <div className="mb-4">
-                  <span className={`text-3xl font-bold text-bone-200 ${plan.price !== "Free" ? "blur-xl" : ""}`}>
+                  <span className="text-3xl font-bold text-bone-200">
                     {plan.price}
                   </span>
                   {plan.price !== "Free" && (
-                    <span className="text-bone-200/60 ml-1 blur-xl">/month</span>
+                    <span className="text-bone-200/60 ml-1">/month</span>
                   )}
                 </div>
+                {plan.badge && (
+                  <div className="inline-block bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full mb-2">
+                    {plan.badge}
+                  </div>
+                )}
                 <p className="text-sm text-bone-200/70">
                   {plan.description}
                 </p>
@@ -112,18 +104,16 @@ export default function Pricing() {
               </ul>
 
               {/* CTA Button */}
-              {plan.cta === "Coming Soon" ? (
-                <div className="block w-full text-center py-3 px-6 rounded-sm font-medium bg-charcoal-700 text-bone-200/60 border border-bone-200/20 cursor-not-allowed">
-                  {plan.cta}
-                </div>
-              ) : (
-                <a
-                  href={plan.href}
-                  className="block w-full text-center py-3 px-6 rounded-sm font-medium transition-all duration-200 bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 border border-bone-200/20 hover:border-bone-200/40"
-                >
-                  {plan.cta}
-                </a>
-              )}
+              <a
+                href={plan.href}
+                className={`block w-full text-center py-3 px-6 rounded-sm font-medium transition-all duration-200 ${
+                  plan.popular
+                    ? 'bg-agents-decision hover:bg-agents-decision/90 text-bone-200 shadow-[0_0_15px_rgba(44,190,119,0.3)]'
+                    : 'bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 border border-bone-200/20 hover:border-bone-200/40'
+                }`}
+              >
+                {plan.cta}
+              </a>
 
             </div>
           ))}
@@ -132,12 +122,12 @@ export default function Pricing() {
         {/* Bottom Note */}
         <div className="text-center mt-12 p-6 bg-charcoal-900 border border-bone-200/20 rounded-sm">
           <p className="text-bone-200/70 mb-4">
-            <strong className="text-bone-200">Early Access Pricing:</strong> Lock in these rates during our beta period.
+            <strong className="text-bone-200">Early Adopter Special:</strong> Get 50% off for 6 months with code <span className="font-mono bg-charcoal-800 px-2 py-1 rounded text-agents-decision">EARLY50</span>
           </p>
           <div className="flex flex-wrap justify-center gap-6 text-sm text-bone-200/60">
-            <span>• 7-day free trial on all plans</span>
+            <span>• 14-day free trial</span>
+            <span>• No credit card required</span>
             <span>• Cancel anytime</span>
-            <span>• 30-day money-back guarantee</span>
           </div>
         </div>
 

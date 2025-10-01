@@ -7,11 +7,14 @@ import { SymbolSelector } from '@/components/SymbolSelector'
 import { usePermissions } from '@/lib/permissions'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
 import { useEffect, useState } from 'react'
+import { useFieldValidation, ValidationRules } from '@/lib/useTradeValidation'
+import { ValidationMessage } from '@/components/ValidationMessage'
 
 interface TradeSettingsProps {
   configData?: ConfigData
   configId?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
+  onValidationChange?: (hasErrors: boolean) => void
   className?: string
 }
 
@@ -19,6 +22,7 @@ export function TradeSettings({
   configData,
   configId,
   onUpdate,
+  onValidationChange,
   className = ''
 }: TradeSettingsProps) {
   const { canAccess } = usePermissions()
@@ -39,6 +43,37 @@ export function TradeSettings({
   const riskManagement = trading.risk_management || defaultConfig.trading.risk_management
   const telegramConfig = configData?.telegram_integration || defaultConfig.telegram_integration
   const publisher = telegramConfig.publisher || defaultConfig.telegram_integration.publisher
+
+  // Validation hooks for each field
+  const accountBalance = 10000 // Paper trading default balance
+  const leverageValidation = useFieldValidation(trading.leverage, ValidationRules.leverage)
+  const stopLossValidation = useFieldValidation(riskManagement.default_stop_loss_percent, ValidationRules.stopLoss)
+  const takeProfitValidation = useFieldValidation(riskManagement.default_take_profit_percent, ValidationRules.takeProfit)
+  const positionPercentValidation = useFieldValidation(positionSizing.account_percent, ValidationRules.positionSizePercent)
+  const fixedAmountValidation = useFieldValidation(positionSizing.fixed_amount_usd, ValidationRules.fixedAmountUsd(accountBalance))
+  const maxPositionsValidation = useFieldValidation(riskManagement.max_positions, ValidationRules.maxPositions)
+
+  // Notify parent of validation state
+  useEffect(() => {
+    const hasErrors = !leverageValidation.isValid ||
+                     !stopLossValidation.isValid ||
+                     !takeProfitValidation.isValid ||
+                     !positionPercentValidation.isValid ||
+                     !fixedAmountValidation.isValid ||
+                     !maxPositionsValidation.isValid
+
+    if (onValidationChange) {
+      onValidationChange(hasErrors)
+    }
+  }, [
+    leverageValidation.isValid,
+    stopLossValidation.isValid,
+    takeProfitValidation.isValid,
+    positionPercentValidation.isValid,
+    fixedAmountValidation.isValid,
+    maxPositionsValidation.isValid,
+    onValidationChange
+  ])
 
   const updateConfig = (updates: Partial<ConfigData>) => {
     if (onUpdate) {
@@ -131,10 +166,15 @@ export function TradeSettings({
                     position_sizing: { ...positionSizing, fixed_amount_usd: Number(e.target.value) }
                 })}
                 min="10"
-                max="10000"
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                max={accountBalance}
+                className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
+                  fixedAmountValidation.error
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-[var(--border)] focus:ring-[var(--agent-trading)]'
+                }`}
                 placeholder="100"
               />
+              <ValidationMessage error={fixedAmountValidation.error} />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
@@ -147,11 +187,18 @@ export function TradeSettings({
                     position_sizing: { ...positionSizing, account_percent: Number(e.target.value) }
                 })}
                 min="0.1"
-                max="50"
+                max="100"
                 step="0.1"
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
+                  positionPercentValidation.error
+                    ? 'border-red-500 focus:ring-red-500'
+                    : positionPercentValidation.warning
+                    ? 'border-yellow-500 focus:ring-yellow-500'
+                    : 'border-[var(--border)] focus:ring-[var(--agent-trading)]'
+                }`}
                 placeholder="5"
               />
+              <ValidationMessage error={positionPercentValidation.error} warning={positionPercentValidation.warning} />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
@@ -164,11 +211,12 @@ export function TradeSettings({
                     position_sizing: { ...positionSizing, max_position_percent: Number(e.target.value) }
                 })}
                 min="1"
-                max="25"
+                max="100"
                 step="0.5"
                 className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
                 placeholder="10"
               />
+              <div className="text-xs text-[var(--text-muted)] mt-1">For confidence-based sizing only</div>
             </div>
           </div>
         </div>
@@ -192,12 +240,17 @@ export function TradeSettings({
                 onChange={(e) => updateTradingConfig({
                     risk_management: { ...riskManagement, default_stop_loss_percent: Number(e.target.value) }
                 })}
-                min="0.1"
+                min="1"
                 max="50"
                 step="0.1"
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-rose-500 focus:border-transparent"
+                className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
+                  stopLossValidation.error
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-[var(--border)] focus:ring-rose-500'
+                }`}
                 placeholder="5"
               />
+              <ValidationMessage error={stopLossValidation.error} />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
@@ -209,12 +262,17 @@ export function TradeSettings({
                 onChange={(e) => updateTradingConfig({
                     risk_management: { ...riskManagement, default_take_profit_percent: Number(e.target.value) }
                 })}
-                min="0.1"
-                max="100"
+                min="1"
+                max="500"
                 step="0.1"
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent"
+                className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
+                  takeProfitValidation.error
+                    ? 'border-red-500 focus:ring-red-500'
+                    : 'border-[var(--border)] focus:ring-emerald-500'
+                }`}
                 placeholder="10"
               />
+              <ValidationMessage error={takeProfitValidation.error} />
             </div>
           </div>
 
@@ -231,10 +289,19 @@ export function TradeSettings({
                 })}
                 min="1"
                 max="100"
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
+                  leverageValidation.error
+                    ? 'border-red-500 focus:ring-red-500'
+                    : leverageValidation.warning
+                    ? 'border-yellow-500 focus:ring-yellow-500'
+                    : 'border-[var(--border)] focus:ring-[var(--agent-trading)]'
+                }`}
                 placeholder="1"
               />
-              <div className="text-xs text-[var(--text-muted)] mt-1">1x = spot trading, higher = leveraged</div>
+              <ValidationMessage error={leverageValidation.error} warning={leverageValidation.warning} />
+              {!leverageValidation.error && !leverageValidation.warning && (
+                <div className="text-xs text-[var(--text-muted)] mt-1">1x = spot trading, higher = leveraged</div>
+              )}
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
@@ -247,10 +314,17 @@ export function TradeSettings({
                     risk_management: { ...riskManagement, max_positions: Number(e.target.value) }
                 })}
                 min="1"
-                max="20"
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                max="50"
+                className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
+                  maxPositionsValidation.error
+                    ? 'border-red-500 focus:ring-red-500'
+                    : maxPositionsValidation.warning
+                    ? 'border-yellow-500 focus:ring-yellow-500'
+                    : 'border-[var(--border)] focus:ring-[var(--agent-trading)]'
+                }`}
                 placeholder="5"
               />
+              <ValidationMessage error={maxPositionsValidation.error} warning={maxPositionsValidation.warning} />
             </div>
             <div>
               <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">

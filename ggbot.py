@@ -19,6 +19,7 @@ import uvicorn
 import json
 import psycopg2.extras
 import numpy as np
+import stripe
 
 # APScheduler imports
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
@@ -2407,6 +2408,342 @@ async def get_bot_status(
         raise HTTPException(status_code=500, detail=f"Failed to get bot status: {str(e)}")
 
 
+# =============================================================================
+# STRIPE INTEGRATION
+# =============================================================================
+
+# Initialize Stripe
+stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
+
+# Request models
+class CheckoutRequest(BaseModel):
+    plan: str  # 'monthly' or 'annual'
+    coupon: Optional[str] = None
+
+@app.post("/api/v2/create-checkout-session")
+async def create_checkout_session(
+    request: CheckoutRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """Create Stripe Checkout session for Pro Plan upgrade."""
+
+    # Map plan to price ID
+    price_ids = {
+        'monthly': os.environ['STRIPE_PRICE_ID_MONTHLY'],
+    }
+
+    # Add annual if available
+    if os.environ.get('STRIPE_PRICE_ID_ANNUAL'):
+        price_ids['annual'] = os.environ['STRIPE_PRICE_ID_ANNUAL']
+
+    if request.plan not in price_ids:
+        raise HTTPException(400, "Invalid plan. Must be 'monthly' or 'annual'")
+
+    try:
+        # Get or create Stripe customer
+        customer_id = await get_or_create_stripe_customer(current_user.user_id, current_user.email)
+
+        # Build checkout session params
+        checkout_params = {
+            'customer': customer_id,
+            'mode': 'subscription',
+            'line_items': [{
+                'price': price_ids[request.plan],
+                'quantity': 1
+            }],
+            'success_url': f"{os.environ['FRONTEND_URL']}/success?session_id={{CHECKOUT_SESSION_ID}}",
+            'cancel_url': f"{os.environ['FRONTEND_URL']}/pricing",
+            'client_reference_id': str(current_user.user_id),
+            'subscription_data': {
+                'trial_period_days': 14,
+                'metadata': {
+                    'user_id': str(current_user.user_id),
+                    'plan': request.plan
+                }
+            },
+            'metadata': {
+                'user_id': str(current_user.user_id)
+            },
+            'allow_promotion_codes': True,
+        }
+
+        # Add coupon if provided
+        if request.coupon:
+            checkout_params['discounts'] = [{'coupon': request.coupon}]
+
+        # Create Stripe Checkout session
+        session = stripe.checkout.Session.create(**checkout_params)
+
+        logger.bind(user_id=str(current_user.user_id)).info(
+            f"Created Stripe checkout session: {session.id} for plan: {request.plan}"
+        )
+
+        return {'checkout_url': session.url}
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating checkout: {e}")
+        raise HTTPException(500, f"Payment system error: {str(e)}")
+    except Exception as e:
+        logger.error(f"Error creating checkout session: {e}")
+        raise HTTPException(500, "Internal server error")
+
+
+@app.post("/api/v2/stripe-webhook")
+async def stripe_webhook(request: Request):
+    """Handle Stripe webhook events."""
+
+    payload = await request.body()
+    sig_header = request.headers.get('stripe-signature')
+    webhook_secret = os.environ['STRIPE_WEBHOOK_SECRET']
+
+    try:
+        # Verify webhook signature
+        event = stripe.Webhook.construct_event(
+            payload, sig_header, webhook_secret
+        )
+    except ValueError:
+        logger.error("Invalid webhook payload")
+        raise HTTPException(400, "Invalid payload")
+    except stripe.error.SignatureVerificationError:
+        logger.error("Invalid webhook signature")
+        raise HTTPException(400, "Invalid signature")
+
+    # Log webhook event
+    logger.info(f"Received Stripe webhook: {event['type']}")
+
+    # Handle different event types
+    event_type = event['type']
+
+    if event_type == 'checkout.session.completed':
+        await handle_checkout_completed(event['data']['object'])
+
+    elif event_type == 'customer.subscription.updated':
+        await handle_subscription_updated(event['data']['object'])
+
+    elif event_type == 'customer.subscription.deleted':
+        await handle_subscription_deleted(event['data']['object'])
+
+    elif event_type == 'invoice.payment_failed':
+        await handle_payment_failed(event['data']['object'])
+
+    return {'received': True}
+
+
+@app.post("/api/v2/create-portal-session")
+async def create_portal_session(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """Create Stripe billing portal session."""
+
+    from core.common.db import get_db_connection
+
+    # Get Stripe customer ID from database
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT stripe_customer_id
+                FROM user_profiles
+                WHERE user_id = %s
+            """, (str(current_user.user_id),))
+            result = cur.fetchone()
+
+    if not result or not result[0]:
+        raise HTTPException(404, "No active subscription found. Please upgrade first.")
+
+    customer_id = result[0]
+
+    try:
+        session = stripe.billing_portal.Session.create(
+            customer=customer_id,
+            return_url=f"{os.environ['FRONTEND_URL']}/settings",
+        )
+
+        logger.bind(user_id=str(current_user.user_id)).info(
+            f"Created billing portal session for customer: {customer_id}"
+        )
+
+        return {'portal_url': session.url}
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating portal session: {e}")
+        raise HTTPException(500, f"Error accessing billing portal: {str(e)}")
+
+
+@app.get("/api/v2/me")
+async def get_current_user_profile(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """Get current user's profile with subscription info."""
+    profile = await current_user.load_profile()
+
+    return {
+        "user_id": current_user.user_id,
+        "email": current_user.email,
+        "subscription_tier": profile.subscription_tier.value,
+        "subscription_status": profile.subscription_status.value,
+        "can_use_premium_features": profile.can_use_premium_features,
+        "can_publish_telegram_signals": profile.can_publish_telegram_signals,
+        "has_stripe_integration": profile.has_stripe_integration,
+        "subscription_expires_at": profile.subscription_expires_at.isoformat() if profile.subscription_expires_at else None
+    }
+
+
+# =============================================================================
+# WEBHOOK HANDLERS
+# =============================================================================
+
+async def handle_checkout_completed(session):
+    """Handle successful checkout - activate Pro subscription."""
+    from core.common.db import get_db_connection
+
+    user_id = session['metadata']['user_id']
+    customer_id = session['customer']
+    subscription_id = session['subscription']
+
+    # Get subscription details to find trial end date
+    subscription = stripe.Subscription.retrieve(subscription_id)
+    trial_end = None
+    if subscription.trial_end:
+        from datetime import datetime
+        trial_end = datetime.fromtimestamp(subscription.trial_end)
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE user_profiles
+                SET subscription_tier = 'ggbase',
+                    subscription_status = 'active',
+                    stripe_customer_id = %s,
+                    stripe_subscription_id = %s,
+                    subscription_expires_at = %s,
+                    updated_at = NOW()
+                WHERE user_id = %s
+            """, (customer_id, subscription_id, trial_end, user_id))
+            conn.commit()
+
+    logger.bind(user_id=user_id).info(
+        f"Pro subscription activated. Customer: {customer_id}, Subscription: {subscription_id}"
+    )
+
+
+async def handle_subscription_updated(subscription):
+    """Handle subscription updates."""
+    from core.common.db import get_db_connection
+
+    subscription_id = subscription['id']
+    status = subscription['status']
+
+    # Map Stripe status to our status
+    status_map = {
+        'active': 'active',
+        'canceled': 'cancelled',
+        'past_due': 'past_due',
+        'unpaid': 'past_due',
+        'incomplete': 'past_due'
+    }
+
+    our_status = status_map.get(status, 'active')
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE user_profiles
+                SET subscription_status = %s,
+                    updated_at = NOW()
+                WHERE stripe_subscription_id = %s
+            """, (our_status, subscription_id))
+            conn.commit()
+
+    logger.info(f"Subscription updated: {subscription_id}, status: {our_status}")
+
+
+async def handle_subscription_deleted(subscription):
+    """Handle subscription cancellation."""
+    from core.common.db import get_db_connection
+    from datetime import datetime
+
+    subscription_id = subscription['id']
+    cancel_at = datetime.fromtimestamp(subscription['ended_at'])
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE user_profiles
+                SET subscription_tier = 'free',
+                    subscription_status = 'cancelled',
+                    subscription_expires_at = %s,
+                    updated_at = NOW()
+                WHERE stripe_subscription_id = %s
+            """, (cancel_at, subscription_id))
+            conn.commit()
+
+    logger.info(f"Subscription cancelled: {subscription_id}, access until: {cancel_at}")
+
+
+async def handle_payment_failed(invoice):
+    """Handle failed payment."""
+    from core.common.db import get_db_connection
+
+    subscription_id = invoice['subscription']
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                UPDATE user_profiles
+                SET subscription_status = 'past_due',
+                    updated_at = NOW()
+                WHERE stripe_subscription_id = %s
+            """, (subscription_id,))
+            conn.commit()
+
+    logger.warning(f"Payment failed for subscription: {subscription_id}")
+
+
+# =============================================================================
+# HELPER FUNCTIONS
+# =============================================================================
+
+async def get_or_create_stripe_customer(user_id: str, email: str) -> str:
+    """Get existing Stripe customer ID or create new customer."""
+    from core.common.db import get_db_connection
+
+    # Check database for existing customer
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT stripe_customer_id
+                FROM user_profiles
+                WHERE user_id = %s
+            """, (user_id,))
+            result = cur.fetchone()
+
+    if result and result[0]:
+        return result[0]
+
+    # Create new Stripe customer
+    try:
+        customer = stripe.Customer.create(
+            email=email,
+            metadata={'user_id': user_id}
+        )
+
+        # Save to database
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE user_profiles
+                    SET stripe_customer_id = %s,
+                        updated_at = NOW()
+                    WHERE user_id = %s
+                """, (customer.id, user_id))
+                conn.commit()
+
+        logger.bind(user_id=user_id).info(f"Created Stripe customer: {customer.id}")
+        return customer.id
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Error creating Stripe customer: {e}")
+        raise
 
 
 @app.exception_handler(HTTPException)

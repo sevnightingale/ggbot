@@ -1,9 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { User, LogOut } from 'lucide-react'
+import { User, LogOut, Crown, CreditCard } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
+import { usePermissions } from '@/lib/permissions'
+import { UpgradeModal } from '@/components/UpgradeModal'
+import { apiClient } from '@/lib/api'
 
 interface UserProfileProps {
   className?: string
@@ -23,8 +26,10 @@ export function UserProfile({}: UserProfileProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
+  const { hasSubscription } = usePermissions()
 
   // Fetch user data
   useEffect(() => {
@@ -63,6 +68,20 @@ export function UserProfile({}: UserProfileProps) {
       console.error('Error logging out:', error)
     }
   }
+
+  // Billing portal handler
+  const handleManageBilling = async () => {
+    try {
+      const { portal_url } = await apiClient.createPortalSession()
+      window.location.href = portal_url
+    } catch (error) {
+      console.error('Error opening billing portal:', error)
+      alert('Failed to open billing portal. Please try again.')
+    }
+  }
+
+  // Check if user is Pro
+  const isPro = hasSubscription('ggbase')
 
   // Get display name from user metadata
   const getDisplayName = () => {
@@ -113,17 +132,55 @@ export function UserProfile({}: UserProfileProps) {
 
           {/* Dropdown */}
           <div className="absolute right-0 top-10 z-50 w-56 rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-2 shadow-lg">
+            {/* User Info */}
             <div className="border-b border-[var(--border)] px-3 py-2 mb-2">
               <div className="text-sm font-medium text-[var(--text-primary)]">{getDisplayName()}</div>
               <div className="text-xs text-[var(--text-muted)] truncate" title={getDisplayEmail()}>
                 {getDisplayEmail()}
               </div>
+              {/* Subscription Badge */}
+              <div className="mt-2">
+                {isPro ? (
+                  <div className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-500">
+                    <Crown className="h-3 w-3" />
+                    Pro Plan
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
+                    Free Plan
+                  </div>
+                )}
+              </div>
             </div>
 
+            {/* Menu Items */}
             <div className="space-y-1">
+              {isPro ? (
+                <MenuButton
+                  icon={CreditCard}
+                  label="Manage Billing"
+                  onClick={handleManageBilling}
+                />
+              ) : (
+                <MenuButton
+                  icon={Crown}
+                  label="Upgrade to Pro"
+                  onClick={() => {
+                    setIsOpen(false)
+                    setUpgradeModalOpen(true)
+                  }}
+                  highlight
+                />
+              )}
               <MenuButton icon={LogOut} label="Log out" onClick={handleLogout} />
             </div>
           </div>
+
+          {/* Upgrade Modal */}
+          <UpgradeModal
+            open={upgradeModalOpen}
+            onOpenChange={setUpgradeModalOpen}
+          />
         </>
       )}
     </div>
@@ -134,13 +191,18 @@ interface MenuButtonProps {
   icon: React.ComponentType<{ className?: string }>
   label: string
   onClick?: () => void
+  highlight?: boolean
 }
 
-function MenuButton({ icon: Icon, label, onClick }: MenuButtonProps) {
+function MenuButton({ icon: Icon, label, onClick, highlight = false }: MenuButtonProps) {
   return (
     <button
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+      className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm transition-colors ${
+        highlight
+          ? 'bg-amber-500/20 text-amber-500 hover:bg-amber-500/30 font-medium'
+          : 'text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)]'
+      }`}
     >
       <Icon className="h-4 w-4" />
       {label}

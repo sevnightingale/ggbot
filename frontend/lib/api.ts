@@ -434,7 +434,7 @@ export class ApiClient {
     job_count: number
   }> {
     console.log('🔍 API Call: getSchedulerStatus to', `${this.baseUrl}/api/v2/scheduler/status`)
-    
+
     try {
       const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/scheduler/status`)
       console.log('📡 Response status:', response.status, response.statusText)
@@ -448,6 +448,62 @@ export class ApiClient {
       return result
     } catch (err) {
       console.error('💥 Network error:', err)
+      throw err
+    }
+  }
+
+  // Stripe Subscription Management
+  async createCheckoutSession(params: {
+    plan: 'monthly' | 'annual'
+    coupon?: string
+  }): Promise<{ checkout_url: string }> {
+    console.log('🔍 API Call: createCheckoutSession', params)
+
+    try {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/create-checkout-session`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(params)
+      })
+
+      console.log('📡 Response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('❌ Stripe API Error:', error)
+        throw new Error(error.detail || 'Failed to create checkout session')
+      }
+
+      const result = await response.json()
+      console.log('✅ Checkout session created:', result)
+      return result
+    } catch (err) {
+      console.error('💥 Checkout error:', err)
+      throw err
+    }
+  }
+
+  async createPortalSession(): Promise<{ portal_url: string }> {
+    console.log('🔍 API Call: createPortalSession')
+
+    try {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/create-portal-session`, {
+        method: 'POST'
+      })
+
+      console.log('📡 Response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const error = await response.json()
+        console.error('❌ Stripe API Error:', error)
+        throw new Error(error.detail || 'Failed to create billing portal session')
+      }
+
+      const result = await response.json()
+      console.log('✅ Portal session created:', result)
+      return result
+    } catch (err) {
+      console.error('💥 Portal error:', err)
       throw err
     }
   }

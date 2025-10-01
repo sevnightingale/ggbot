@@ -99,13 +99,15 @@ class PositionManager:
                     # Calculate metrics
                     entry_price = float(trade["entry_price"])
                     size_usd = float(trade["size_usd"])
+                    leverage = int(trade.get("leverage", 1))  # Get leverage from trade
                     # Calculate size in contracts from USD size
                     size_contracts = size_usd / entry_price
 
+                    # Apply leverage multiplier to P&L
                     if trade["side"] == "long":
-                        unrealized_pnl = (current_price - entry_price) * size_contracts
+                        unrealized_pnl = (current_price - entry_price) * size_contracts * leverage
                     else:  # short
-                        unrealized_pnl = (entry_price - current_price) * size_contracts
+                        unrealized_pnl = (entry_price - current_price) * size_contracts * leverage
                     
                     unrealized_pnl_pct = (unrealized_pnl / size_usd) * 100
                     
@@ -182,13 +184,15 @@ class PositionManager:
                                 current_price = prices[pos["symbol"]].mid
                                 entry_price = float(pos["entry_price"])
                                 size_usd = float(pos["size_usd"])
+                                leverage = int(pos.get("leverage", 1))  # Get leverage from position
                                 # Calculate size in contracts from USD size
                                 size_contracts = size_usd / entry_price
 
+                                # Apply leverage multiplier to P&L
                                 if pos["side"] == "long":
-                                    pnl = (current_price - entry_price) * size_contracts
+                                    pnl = (current_price - entry_price) * size_contracts * leverage
                                 else:
-                                    pnl = (entry_price - current_price) * size_contracts
+                                    pnl = (entry_price - current_price) * size_contracts * leverage
 
                                 total_unrealized_pnl += pnl
                                 total_position_value += current_price * size_contracts
