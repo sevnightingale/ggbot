@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
-import { TrendingUp, TrendingDown } from 'lucide-react'
+import { TrendingUp, TrendingDown, X } from 'lucide-react'
 
 interface Position {
   trade_id: string
@@ -21,13 +21,18 @@ interface Position {
 interface PositionsTableProps {
   positions?: Position[]
   className?: string
+  selectedConfigId?: string
+  onPositionClosed?: () => void
 }
 
-export function PositionsTable({ positions = [], className = '' }: PositionsTableProps) {
+export function PositionsTable({ positions = [], className = '', selectedConfigId, onPositionClosed }: PositionsTableProps) {
   // Track price changes for slide animations
   const [animatingPrices, setAnimatingPrices] = useState<Record<string, boolean>>({})
   const [displayPrices, setDisplayPrices] = useState<Record<string, { current: string; pnl: string; percentage: string }>>({})
   const prevPricesRef = useRef<Record<string, number>>({})
+
+  // Track closing positions
+  const [closingPositions, setClosingPositions] = useState<Record<string, boolean>>({})
 
   // Helper functions
   const formatPrice = (price: number) => {
@@ -58,6 +63,51 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
     const change = ((current - entry) / entry) * 100
     const sign = change >= 0 ? '+' : ''
     return `${sign}${change.toFixed(2)}%`
+  }
+
+  // Handle closing a position
+  const handleClosePosition = async (tradeId: string) => {
+    if (!selectedConfigId) {
+      console.error('No config ID selected')
+      return
+    }
+
+    if (closingPositions[tradeId]) {
+      return // Already closing
+    }
+
+    try {
+      setClosingPositions(prev => ({ ...prev, [tradeId]: true }))
+
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/v2/bot/${selectedConfigId}/positions/${tradeId}/close`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${localStorage.getItem('sb-access-token')}`
+          }
+        }
+      )
+
+      if (!response.ok) {
+        const error = await response.json()
+        throw new Error(error.detail || 'Failed to close position')
+      }
+
+      const result = await response.json()
+      console.log('Position closed:', result)
+
+      // Notify parent component to refresh data
+      if (onPositionClosed) {
+        onPositionClosed()
+      }
+    } catch (error) {
+      console.error('Error closing position:', error)
+      alert(`Failed to close position: ${error instanceof Error ? error.message : 'Unknown error'}`)
+    } finally {
+      setClosingPositions(prev => ({ ...prev, [tradeId]: false }))
+    }
   }
 
   // Trigger slide animations on every SSE update
@@ -175,6 +225,7 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">%</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">SL/TP</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Age</th>
+                <th className="text-right py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -234,6 +285,17 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
                   </td>
                   <td className="py-3 px-2 text-sm text-[var(--text-muted)]">
                     {getTimeAgo(position.opened_at)}
+                  </td>
+                  <td className="py-3 px-2 text-right">
+                    <button
+                      onClick={() => handleClosePosition(position.trade_id)}
+                      disabled={closingPositions[position.trade_id]}
+                      className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--loss-color)] hover:bg-red-500/10 border border-[var(--loss-color)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                      title="Close position"
+                    >
+                      <X className="h-3 w-3" />
+                      {closingPositions[position.trade_id] ? 'Closing...' : 'Close'}
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -320,6 +382,16 @@ export function PositionsTable({ positions = [], className = '' }: PositionsTabl
                 <span className="text-[var(--text-muted)] text-xs">{getTimeAgo(position.opened_at)}</span>
               </div>
             </div>
+
+            {/* Close Button */}
+            <button
+              onClick={() => handleClosePosition(position.trade_id)}
+              disabled={closingPositions[position.trade_id]}
+              className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[var(--loss-color)] hover:bg-red-500/10 border border-[var(--loss-color)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <X className="h-4 w-4" />
+              {closingPositions[position.trade_id] ? 'Closing Position...' : 'Close Position'}
+            </button>
           </div>
         ))}
       </div>

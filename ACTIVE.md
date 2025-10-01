@@ -1,8 +1,8 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-09-29 (Logging consolidation, system architecture cleanup)
+**Last Updated**: 2025-10-01 (Stripe subscription system + trading validation)
 **System Health**: 🟢 Production Live (225+ users, 100+ active bots)
-**Project Status**: Live application with focus on feature refinement and monetization
+**Project Status**: Live application with complete Stripe monetization and trading validation
 
 ---
 
@@ -214,14 +214,49 @@ df -h
 - Volume analysis fixes and trading parameter validation
 
 **Monetization Implementation**:
-- Stripe integration for ggbase subscription tier
-- Premium feature gating and usage enforcement
-- Subscription management interface
+- ✅ Stripe integration complete (checkout, webhooks, billing portal)
+- ✅ Pro Plan subscription ($29/mo, 14-day free trial, 50% off early adopter coupon)
+- ✅ Premium feature gating with UpgradeModal and subscription status display
+- ✅ Subscription management via Stripe Customer Portal
 
 **User Experience Enhancement**:
+- ✅ Trading settings validation with real-time error/warning feedback
 - Complete user settings and API key management
 - Status messaging improvements and tooltips
 - Mobile responsive design implementation
+
+---
+
+## 💳 Stripe Subscription System
+
+### Pro Plan Features ($29/month)
+| Feature | Free Plan | Pro Plan |
+|---------|-----------|----------|
+| **Active Bots** | 1 bot | 10 bots |
+| **Analysis Frequency** | 1 hour minimum | 5 minutes minimum |
+| **AI Models** | Basic models | Frontier reasoning models |
+| **Telegram Publishing** | ❌ | ✅ |
+| **Priority Support** | ❌ | ✅ |
+
+### Stripe Integration (Complete)
+**Backend API Endpoints** (`/api/v2/`):
+- `POST /create-checkout-session` - Create Stripe Checkout with 14-day free trial
+- `POST /stripe-webhook` - Handle subscription events (HMAC verified)
+- `POST /create-portal-session` - Stripe billing portal for self-service management
+- `GET /me` - User profile with subscription status
+
+**Frontend Components**:
+- `<UpgradeModal>` - Pricing modal with monthly/annual toggle (Dialog system)
+- `<PermissionGate>` - Premium feature gates that trigger upgrade modal
+- `<UserProfile>` - Subscription badge (Free/Pro) with upgrade/billing buttons
+- Updated landing page with accurate Pro Plan pricing
+
+**Early Adopter Promotion**:
+- Coupon code: `EARLY50` (50% off for 6 months)
+- Coupon ID: `DehSHqyc` (configured in Stripe dashboard)
+
+**Testing Keys**: Currently in Stripe test mode for validation
+**Production Switch**: Ready to swap environment variable suffixes for go-live
 
 ---
 
@@ -278,4 +313,20 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Graceful Fallback**: Automatic fallback to individual updates if batch fails
 - **Results**: ConnectionTerminated errors eliminated, monitoring running reliably
 
-*Last major update: Position monitoring reliability fix (2025-09-27)*
+### 💳 Stripe Subscription System (Complete - 2025-10-01)
+- **Pro Plan Implementation**: $29/month with 14-day free trial, annual option at $279/year
+- **Complete Backend Integration**: Checkout sessions, webhook handlers (4 events), billing portal, user profile endpoint
+- **Frontend Upgrade Flow**: Modal-based upgrade system with permission gate integration
+- **Subscription UI**: Pro/Free badges in UserProfile, upgrade buttons, billing portal access
+- **Early Adopter Campaign**: 50% off for 6 months (coupon: EARLY50)
+- **Landing Page Update**: Accurate pricing display (removed blur, updated features)
+- **Testing Ready**: Full Stripe test mode integration, ready for production key swap
+
+### ✅ Trading Settings Validation (Complete - 2025-10-01)
+- **Validation Hook**: Real-time field validation with error/warning states
+- **6 Validated Fields**: Leverage (1-100, warning >20), Stop Loss (1-50%), Take Profit (1-500%), Position Size (0.1-100%, warning >50%), Fixed Amount (max account balance), Max Positions (1-50, warning >10)
+- **Visual Feedback**: Red borders/text for errors, yellow for warnings, inline messages with icons
+- **UX Enhancement**: Errors block save, warnings allow save with notification
+- **Component**: ValidationMessage with AlertCircle/AlertTriangle icons
+
+*Last major update: Stripe subscription system + trading validation (2025-10-01)*

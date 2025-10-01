@@ -1,16 +1,16 @@
 # TODO.md - ggbots Implementation Plan
 
-**Status**: ✅ **Core V2 pipeline operational!** - Scheduler, signal flow, multi-timeframe extraction, SSE updates, and decision display all working. Frontend animations polished. Database market_data column issue resolved. Focus now on trading features and system polish.
+**Status**: ✅ **Core V2 + Monetization Complete!** - Scheduler, signal flow, multi-timeframe extraction, SSE updates all working. Stripe subscription system fully integrated ($29/mo Pro Plan with 14-day trial). Trading validation implemented. Focus now on remaining trading features and mobile polish.
 
 ## 🔧 **HIGH PRIORITY - Trading System Completeness**
 
 **Timeline**: 2-3 days - Core trading functionality verification and enhancement
 
-- [ ] **Manual Position Management**
-  - [ ] Add "Close Position" button to active trades in PositionsTable
-  - [ ] Implement API endpoint: `POST /api/positions/{trade_id}/close`
-  - [ ] Update paper trading service to handle manual position closure
-  - [ ] Test manual close functionality with real-time SSE updates
+- [x] **Manual Position Management** ✅ COMPLETE
+  - [x] Add "Close Position" button to active trades in PositionsTable
+  - [x] Implement API endpoint: `POST /api/v2/bot/{config_id}/positions/{trade_id}/close`
+  - [x] Update paper trading service to handle manual position closure
+  - [x] Test manual close functionality with real-time SSE updates
 
 - [ ] **Stop Loss / Take Profit Verification**
   - [ ] Check if SL/TP values are being read from configuration properly
@@ -18,34 +18,51 @@
   - [ ] Test automated position closing at profit/loss targets
   - [ ] Ensure SL/TP levels display correctly in positions table
 
-- [ ] **Trading Settings Validation**
-  - [ ] Verify leverage settings are applied correctly to new positions
+- [x] **Trading Settings Validation** ✅ COMPLETE
+  - [x] Frontend validation with real-time error/warning feedback
+  - [x] Leverage (1-100, warning >20x), Stop Loss (1-50%), Take Profit (1-500%)
+  - [x] Position sizing (0.1-100%, warning >50%), Max positions (1-50, warning >10)
+  - [x] Red borders for errors (blocking), yellow borders for warnings (non-blocking)
   - [ ] Test position sizing calculations match configuration
   - [ ] Validate risk management parameters are enforced
   - [ ] Implement open position limits per user/bot configuration
 
-- [ ] **Volume Analysis Fixes**
-  - [ ] Debug volume analysis broken in technical indicators
-  - [ ] Fix volume data not appearing in decision prompts
-  - [ ] Test volume-based signal validation
-  - [ ] Verify volume metrics in market analysis formatting
+- [x] **Volume Analysis Fixes** ✅ COMPLETE
+  - [x] Debug volume analysis broken in technical indicators
+  - [x] Fix volume data not appearing in decision prompts
+  - [x] Test volume-based signal validation
+  - [x] Verify volume metrics in market analysis formatting
 
-## 💰 **HIGH PRIORITY - Monetization & Business Model**
+## 🚀 **HIGH PRIORITY - Paper Trading Engine 2.0 Launch**
 
-**Timeline**: 2-3 days - Critical for revenue generation and business viability
+**Timeline**: TBD - Coordinate with Pro Plan announcement
+**Impact**: 319 accounts reset, 92 default bots deactivated, 83 users affected
 
-- [ ] **Stripe Integration & Paid Tiers**
-  - [ ] Complete Stripe subscription integration for ggbase tier
-  - [ ] Implement subscription upgrade/downgrade workflows
-  - [ ] Test payment processing and webhook handling
-  - [ ] Add subscription status enforcement throughout the platform
-  - [ ] Implement billing portal and payment management interface
+- [ ] **Database Reset Execution**
+  - [ ] Review reset SQL: `/tmp/reset_sequence.sql` (6-step process with verification)
+  - [ ] Backup verification: Creates `paper_*_backup_20251001` tables with full data
+  - [ ] Execute Step 1: Create backups of paper_accounts, paper_trades, paper_orders, configurations
+  - [ ] Execute Step 2: Deactivate 92 active default strategy bots (pattern: "RSI 1hr below 50%enter long%")
+  - [ ] Execute Step 3: Close 133 open positions with `close_reason: 'system_reset_v2'`
+  - [ ] Execute Step 4: Reset all 319 paper accounts to $10,000 balance, zero stats
+  - [ ] Execute Step 5: Run post-reset verification queries (check for any remaining issues)
+  - [ ] Execute Step 6: Generate summary report and log results
 
-- [ ] **Premium Feature Gating**
-  - [ ] Enforce ggShot signal access for ggbase subscribers only
-  - [ ] Add subscription tier validation to API endpoints
-  - [ ] Implement usage limits and tracking for free tier
-  - [ ] Add premium features showcase and upgrade prompts
+- [ ] **User Communication**
+  - [ ] Review communication copy: `/home/sev/ggbot/DOCS/USER_COMMUNICATION_V2.md`
+  - [ ] Deploy popup notification (Version A for custom strategy users, Version B for default strategy users)
+  - [ ] Optional: Send email notifications to affected users
+  - [ ] Add persistent banner: "ggbots Pro is live! 50% OFF Early Adopter Pricing - Code EARLY50"
+  - [ ] Monitor user feedback channels (Telegram community, support tickets)
+
+- [ ] **Post-Launch Verification**
+  - [ ] Verify all accounts show $10,000 balance
+  - [ ] Verify no open positions remain (all closed with system_reset_v2)
+  - [ ] Verify custom strategy bots still active (22 bots should remain active)
+  - [ ] Verify default strategy bots deactivated (92 bots should be inactive)
+  - [ ] Test new trades with V2.0 leverage fixes (5x leverage = 5x P&L)
+  - [ ] Test manual close functionality stores close_reason correctly
+  - [ ] Monitor error logs for any reset-related issues
 
 ## 🔧 **HIGH PRIORITY - User Settings & API Key Management**
 
@@ -64,8 +81,10 @@
   - [ ] Test credential encryption/decryption flow
 
 - [ ] **Subscription & Profile Management**
-  - [ ] Display current subscription tier and status
-  - [ ] Add subscription upgrade/downgrade interface
+  - [x] Display current subscription tier and status (Pro/Free badges in UserProfile)
+  - [x] Add subscription upgrade interface (UpgradeModal with Stripe Checkout)
+  - [x] Add subscription management interface (Stripe Customer Portal)
+  - [ ] Implement downgrade workflow (cancellation flow)
   - [ ] Implement user profile settings (Telegram integration, preferences)
   - [ ] Add account settings and preferences management
 
@@ -84,6 +103,14 @@
   - [ ] Implement "Show Analysis" toggle for power users
   - [ ] Add hover tooltips showing key indicators that influenced decisions
   - [ ] Design market context drawer/modal for detailed technical analysis
+
+- [ ] **Trade History Modal**
+  - [ ] Add clickable "Total Trades" metric in MetricsBar
+  - [ ] Implement full-screen modal with minimalist design
+  - [ ] Display last 50 closed trades: Symbol, Side, P&L, Close Reason, Timestamp
+  - [ ] Color-code by win/loss for quick scanning
+  - [ ] Show summary stats at top: win count, loss count, win rate
+  - [ ] Optional: Click individual trade to expand details (entry/exit prices, duration, confidence)
 
 ## 🚀 **MAJOR PROJECT - Market Data Expansion**
 
@@ -192,18 +219,29 @@
 
 ## 🎯 **COMPLETION TIMELINE**
 
-**IMMEDIATE (Days 1-3)**: Monetization & Business Model (Stripe integration, paid tiers, premium gating)
-**Days 4-5**: User Settings & API Key Management (critical for user onboarding)
-**Days 6-7**: Trading system completeness (manual close, SL/TP verification, volume fixes)
-**Week 2**: User experience polish (status messaging, optional market data display)
-**Week 3**: System robustness (error handling, Node.js upgrade, code quality)
-**Weeks 4-7**: Market Data Expansion (major project - user research → integration → flagship bot)
-**Week 8+**: Mobile responsive design and comprehensive testing
+**~~IMMEDIATE (Days 1-3)~~**: ✅ **COMPLETE** - Monetization & Business Model (Stripe integration, paid tiers, premium gating)
+**Days 1-2 (NEW IMMEDIATE)**: User Settings & API Key Management (critical for user onboarding)
+**Days 3-4**: Trading system completeness (manual close, SL/TP verification, volume fixes)
+**Days 5-6**: User experience polish (status messaging, optional market data display)
+**Week 2**: System robustness (error handling, Node.js upgrade, code quality)
+**Weeks 3-6**: Market Data Expansion (major project - user research → integration → flagship bot)
+**Week 7+**: Mobile responsive design and comprehensive testing
 
-**Current Focus**: Revenue generation (Stripe + premium features) → User onboarding (settings) → Trading completeness → Major platform enhancement (market data expansion)
+**Current Focus**: ✅ Monetization DONE → User onboarding (settings) → Trading completeness → Major platform enhancement (market data expansion)
 
 ## ✅ **RECENTLY COMPLETED**
 
+### **2025-10-01: Stripe Monetization + Trading Validation**
+- ✅ **Complete Stripe Integration**: Pro Plan ($29/mo, $279/year) with 14-day free trial
+- ✅ **Backend Stripe APIs**: Checkout sessions, webhook handlers (4 events), billing portal, user profile endpoint
+- ✅ **Frontend Upgrade Flow**: UpgradeModal with monthly/annual toggle, PermissionGate integration
+- ✅ **Subscription UI**: Pro/Free badges in UserProfile, upgrade/billing buttons, landing page pricing update
+- ✅ **Early Adopter Promo**: EARLY50 coupon (50% off for 6 months), configured in Stripe
+- ✅ **Trading Settings Validation**: Real-time error/warning feedback for 6 critical fields
+- ✅ **Validation UX**: Red borders (errors block save), yellow borders (warnings allow save), inline messages with icons
+- ✅ **Validated Fields**: Leverage, Stop Loss, Take Profit, Position Size (% and USD), Max Positions
+
+### **Previous Completions**
 - ✅ Core V2 pipeline operational (scheduler, signal flow, multi-timeframe extraction)
 - ✅ Frontend SSE real-time updates working
 - ✅ Decision carousel display fixed and working

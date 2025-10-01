@@ -70,7 +70,24 @@ Legacy/Archive (Moved to /archive/):
 
 /components/                 # Global components
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
-└── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
+├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
+├── UpgradeModal.tsx        # Stripe checkout modal with monthly/annual pricing toggle
+└── ValidationMessage.tsx   # Error/warning message component with icons
+
+/components/ui/              # shadcn UI components
+├── dialog.tsx              # Radix UI Dialog wrapper for modals
+├── button.tsx              # Button component with variants
+├── card.tsx                # Card layout component
+├── badge.tsx               # Badge/pill component
+└── input.tsx               # Input field component
+
+/lib/                        # Core utilities
+├── permissions.tsx         # Permission context with subscription checks
+├── permission-gate.tsx     # Component for gating premium features
+├── useTradeValidation.ts   # Trading settings validation hook
+├── api.ts                  # API client with Stripe methods
+├── theme.tsx               # Dark/light theme provider
+└── supabase.ts             # Supabase client setup
 ```
 
 ---
@@ -125,7 +142,7 @@ const updateEditingConfig = (updates: Partial<ConfigData>) => {
 
 ---
 
-## 🔐 Permission System
+## 🔐 Permission System & Monetization
 
 ### **Subscription Tier Architecture**
 ```typescript
@@ -152,11 +169,39 @@ const canUseSignals = canAccess('ggshot')
 <Toggle enabled={canUseSignals && isGgShotEnabled} />
 ```
 
+### **Upgrade Flow (Stripe Integration)**
+```typescript
+// PermissionGate with UpgradeModal
+import { UpgradeModal } from '@/components/UpgradeModal'
+
+<PermissionGate feature="telegram_publishing">
+  <TelegramSettings />
+</PermissionGate>
+
+// Auto-shows upgrade prompt with modal trigger:
+// - Monthly/Annual pricing toggle
+// - 14-day free trial messaging
+// - Early adopter coupon input
+// - Redirects to Stripe Checkout on confirm
+```
+
 ### **Feature Gatekeeping**
-- **OpenAI GPT-4**: Requires `premium_llms` access
-- **ggShot Signals**: Requires `ggshot` subscription
-- **Telegram Publishing**: Requires `telegram_publishing` access
-- **Platform LLM Keys**: Requires `platform_llm_keys` access
+- **Multiple Bots (10 vs 1)**: Requires Pro Plan subscription
+- **High Frequency (5min vs 1h)**: Requires Pro Plan subscription
+- **OpenAI GPT-4**: Requires `premium_llms` access (Pro Plan)
+- **ggShot Signals**: Requires `ggshot` subscription (Pro Plan)
+- **Telegram Publishing**: Requires `telegram_publishing` access (Pro Plan)
+- **Platform LLM Keys**: Requires `platform_llm_keys` access (Pro Plan)
+
+### **Stripe Integration**
+```typescript
+// API methods in /lib/api.ts
+apiClient.createCheckoutSession({ plan: 'monthly', coupon: 'EARLY50' })
+apiClient.createPortalSession() // For subscription management
+```
+
+**Pro Plan**: $29/month or $279/year (14-day free trial)
+**Early Adopter**: 50% off for 6 months with code `EARLY50`
 
 ---
 
@@ -286,6 +331,34 @@ const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 - **Portfolio Metrics**: Balance, daily P&L, win rate, and position tracking
 - **Execution Pipeline**: Visual extraction → decision → trading status tracking
 
+### **Trading Settings Validation**
+```typescript
+// Real-time validation with error/warning states
+import { useFieldValidation, ValidationRules } from '@/lib/useTradeValidation'
+import { ValidationMessage } from '@/components/ValidationMessage'
+
+const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage)
+
+<input
+  value={leverage}
+  className={leverageValidation.error ? 'border-red-500' : 'border-gray-300'}
+/>
+<ValidationMessage error={leverageValidation.error} warning={leverageValidation.warning} />
+```
+
+**Validated Fields**:
+- **Leverage**: 1-100 (⚠️ warning if >20x)
+- **Stop Loss**: 1-50%
+- **Take Profit**: 1-500%
+- **Position Size (%)**: 0.1-100% (⚠️ warning if >50%)
+- **Position Size (USD)**: 10 - account balance
+- **Max Positions**: 1-50 (⚠️ warning if >10)
+
+**Validation Behavior**:
+- 🔴 **Errors**: Red borders + error message + blocks save
+- 🟡 **Warnings**: Yellow borders + warning message + allows save
+- ✅ **Valid**: Normal borders + no message
+
 ---
 
 ## ✅ Production Readiness Checklist
@@ -308,6 +381,16 @@ const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 - [x] Dark/light theme system with localStorage persistence
 - [x] Loading states, empty states, and error boundaries
 - [x] Professional design system with agent color scheme
+- [x] Trading settings validation with error/warning feedback
+- [x] Real-time input validation preventing invalid configurations
+
+### **Monetization & Subscriptions**
+- [x] Stripe integration (checkout, webhooks, billing portal)
+- [x] Pro Plan pricing and feature differentiation
+- [x] UpgradeModal with monthly/annual toggle
+- [x] Subscription status display in UserProfile
+- [x] Permission gates triggering upgrade flow
+- [x] Early adopter coupon system
 
 ### **Integration & Deployment**
 - [x] V2 backend API integration with real-time data
@@ -329,6 +412,8 @@ const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 - ✅ **Symbol validation system**: 141 supported trading pairs with dropdown + search functionality
 - ✅ **Help widget integration**: Floating community support with Telegram group access
 - ✅ **UX improvements**: Symbol selection moved from locked exchange section to accessible location
+- ✅ **Stripe subscription system**: Complete monetization with Pro Plan ($29/mo), checkout flow, webhooks, billing portal
+- ✅ **Trading settings validation**: Real-time error/warning feedback for 6 critical trading parameters
 
 ### **🔴 Critical Issues (RESOLVED)**
 - **Routing Architecture**: ✅ Fixed middleware redirecting to non-existent dashboard route

@@ -260,12 +260,21 @@ class SupabasePaperTradingService:
             
             # Calculate position size using configuration
             position_size_usd = self._calculate_position_size(config, confidence, float(account.current_balance.amount))
-            
-            # Calculate fees
+
+            # Get leverage from config
+            leverage = config.trading.leverage
+
+            # Calculate margin required (position size / leverage)
+            margin_required = position_size_usd / leverage
+
+            # Calculate fees on the margin amount
             fees = self._calculate_fees(position_size_usd)
-            
-            # Reserve balance for the trade (includes fees)
-            trade_cost = Money(amount=Decimal(str(position_size_usd + fees)), currency="USD")
+
+            # Total margin to reserve (margin + fees)
+            margin_with_fees = margin_required + fees
+
+            # Reserve balance for the trade (margin + fees, not full position size)
+            trade_cost = Money(amount=Decimal(str(margin_with_fees)), currency="USD")
             try:
                 account.reserve_balance(trade_cost)
                 account.update_position_count(1)  # Open new position
@@ -275,9 +284,6 @@ class SupabasePaperTradingService:
                     "reason": f"Cannot reserve balance: {str(e)}",
                     "trade_id": None
                 }
-            
-            # Get leverage from config
-            leverage = config.trading.leverage
             
             # Calculate position size in contracts for order tracking
             # Note: paper_trades table only stores size_usd, not size_contracts
@@ -301,6 +307,7 @@ class SupabasePaperTradingService:
                     'size_usd': position_size_usd,
                     # Note: size_contracts not in schema - using size_usd/entry_price calculation
                     'leverage': leverage,
+                    'margin_used': margin_with_fees,  # Store actual reserved amount for later release
                     'unrealized_pnl': 0.0,
                     'status': 'open',
                     'stop_loss': stop_loss,
@@ -403,14 +410,16 @@ class SupabasePaperTradingService:
             entry_price = float(trade["entry_price"])
             size_usd = float(trade["size_usd"])
             side = trade["side"]
-            
+            leverage = int(trade.get("leverage", 1))  # Get leverage from trade
+
             # Calculate size in contracts from USD size
             size_contracts = size_usd / entry_price
-            
+
+            # Apply leverage multiplier to P&L
             if side == "long":
-                pnl = (close_price - entry_price) * size_contracts
+                pnl = (close_price - entry_price) * size_contracts * leverage
             else:  # short
-                pnl = (entry_price - close_price) * size_contracts
+                pnl = (entry_price - close_price) * size_contracts * leverage
             
             # Calculate close fees
             close_size_usd = close_price * size_contracts
@@ -430,7 +439,8 @@ class SupabasePaperTradingService:
                 'status': 'closed',
                 'current_price': close_price,
                 'realized_pnl': net_pnl,
-                'closed_at': datetime.now(timezone.utc).isoformat()
+                'closed_at': datetime.now(timezone.utc).isoformat(),
+                'close_reason': reason
             }
             
             response = self.supabase.table('paper_trades').update(update_data).eq('trade_id', trade_id).execute()
@@ -459,9 +469,9 @@ class SupabasePaperTradingService:
             )
             
             if account:
-                # Return original position size to balance
-                original_size_usd = float(trade["size_usd"])
-                account.release_balance(Money(amount=Decimal(str(original_size_usd)), currency="USD"))
+                # Return margin that was reserved (not full position size)
+                margin_reserved = float(trade.get("margin_used", trade["size_usd"]))  # Fallback to size_usd for old trades
+                account.release_balance(Money(amount=Decimal(str(margin_reserved)), currency="USD"))
                 
                 # Realize P&L and update statistics
                 # Money class now properly handles negative amounts
@@ -638,14 +648,16 @@ class SupabasePaperTradingService:
                 entry_price = float(pos["entry_price"])
                 size_usd = float(pos["size_usd"])
                 side = pos["side"]
+                leverage = int(pos.get("leverage", 1))  # Default to 1x if not set
 
                 # Calculate size in contracts
                 size_contracts = size_usd / entry_price
 
+                # Apply leverage multiplier to P&L calculation
                 if side == "long":
-                    unrealized_pnl = (current_price - entry_price) * size_contracts
+                    unrealized_pnl = (current_price - entry_price) * size_contracts * leverage
                 else:  # short
-                    unrealized_pnl = (entry_price - current_price) * size_contracts
+                    unrealized_pnl = (entry_price - current_price) * size_contracts * leverage
 
                 # Check for stop loss/take profit triggers
                 should_close = None

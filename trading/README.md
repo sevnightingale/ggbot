@@ -4,17 +4,26 @@
 
 The paper trading engine provides realistic trading simulation using real-time market data from Hummingbot API while implementing our own execution and portfolio management logic via Supabase. Each strategy (config_id) gets an isolated $10,000 paper trading account with professional-grade risk management and real-time dashboard integration.
 
-## Recent Updates (September 2025)
+## Recent Updates (October 2025)
 
 **Major architectural update**: The paper trading system has been migrated from direct PostgreSQL to Supabase integration with full dashboard connectivity and real-time data display.
 
 ### Key Changes Made:
+
+**Paper Trading Engine 2.0 (October 2025):**
+1. **Leverage Calculation Fix**: P&L now correctly applies leverage multiplier (5x leverage = 5x gains/losses)
+2. **Margin-Based Reservations**: Account reserves margin (position_size/leverage + fees) instead of full position size
+3. **Margin Release Fix**: Positions now release the correct reserved amount via new `margin_used` field
+4. **Manual Position Close**: Users can manually close positions via API and frontend button
+5. **Multi-Exchange Fallback**: Automatic failover across 5 exchanges for market data reliability
+6. **Position Monitoring**: Real-time 3-second price updates with batch SQL optimization (99% reduction in API calls)
+
+**Earlier Updates (September 2025):**
 1. **Fixed Money Class**: Now properly handles negative amounts for trading losses (critical bug fix)
 2. **Supabase Migration**: Complete migration from direct PostgreSQL to Supabase REST API
 3. **Schema Alignment**: Cleaned up field mismatches between service and database schema
 4. **Configuration Fix**: Fixed validation system to work with existing config types
 5. **Dashboard Integration**: Full API endpoints and frontend components for real-time data
-6. **Real-time Updates**: Background position monitoring (architecture ready, scheduler pending)
 
 ## Architecture Overview
 
@@ -130,10 +139,12 @@ Isolated trading accounts with $10,000 starting balance per config_id.
 - **Performance Tracking**: Win rate, total trades, cumulative P&L
 - **Balance Management**: Real-time available balance updates
 
-### paper_trades  
-Position tracking with real-time P&L calculation.
+### paper_trades
+Position tracking with real-time P&L calculation (V2.0 with leverage fixes).
 - **Trade Lifecycle**: Open → monitoring → closed
-- **Risk Management**: Stop loss and take profit levels
+- **Leverage Support**: Stores leverage multiplier and calculates correct P&L
+- **Margin Tracking**: `margin_used` field tracks actual reserved amount for accurate release
+- **Risk Management**: Stop loss and take profit levels with leveraged execution
 - **Decision Integration**: Links to Decision Module via decision_id
 - **Confidence Tracking**: Preserves AI confidence scores
 
@@ -147,11 +158,12 @@ Complete audit trail of all paper orders.
 
 **UPDATED**: All endpoints now use Supabase backend and are integrated into main API at `/api/v2/bot/*`.
 
-### Dashboard Integration (NEW)
+### Dashboard Integration (V2.0)
 - `GET /api/v2/bot/{config_id}/metrics` - Performance metrics with P&L data for dashboard charts
-- `GET /api/v2/bot/{config_id}/positions` - Live positions formatted for dashboard tables  
+- `GET /api/v2/bot/{config_id}/positions` - Live positions formatted for dashboard tables (with correct leverage P&L)
 - `GET /api/v2/bot/{config_id}/trades` - Closed trade history for dashboard
 - `GET /api/v2/bot/{config_id}/account` - Account summary and statistics
+- `POST /api/v2/bot/{config_id}/positions/{trade_id}/close` - **NEW**: Manually close any open position
 
 ### Legacy Paper Trading Endpoints (if still needed)
 - `POST /paper/execute` - Execute trade from Decision Module intent
@@ -205,14 +217,15 @@ max_positions = 5               # Maximum concurrent positions
 
 ## Background Processing
 
-### Position Monitoring (7-second intervals)
+### Position Monitoring (3-second intervals)
 Automated real-time position management running as background task.
 
 **Features:**
-- **Price Updates**: Fetches current market prices every 7 seconds
-- **P&L Calculation**: Updates unrealized P&L for all open positions
-- **Risk Management**: Automatically triggers stop loss and take profit orders
-- **Performance**: ~15KB memory per cycle, no accumulation
+- **Price Updates**: Fetches current market prices every 3 seconds
+- **P&L Calculation**: Updates unrealized P&L with correct leverage multiplier for all open positions
+- **Risk Management**: Automatically triggers stop loss and take profit orders with leveraged P&L
+- **Batch Optimization**: Single SQL query updates 100+ positions (99% reduction from individual HTTP requests)
+- **Performance**: Reliable monitoring with ConnectionTerminated errors eliminated
 
 **Automatic Execution:**
 ```python
@@ -296,11 +309,12 @@ response = await client.post(paper_trading_url, json=intent)
 - **Database**: Simple UPDATE queries, indexed by trade_id
 - **CPU**: Minimal for price comparisons and P&L calculations
 
-### Execution Performance
+### Execution Performance (V2.0)
 - **Trade Execution**: <2 seconds from Decision Module intent to database
-- **Position Updates**: Every 7 seconds for responsive risk management
-- **Stop/Take Profit**: ≤7 second reaction time to market triggers
-- **Concurrent Support**: 10+ positions per strategy, multiple strategies
+- **Position Updates**: Every 3 seconds for responsive risk management
+- **Stop/Take Profit**: ≤3 second reaction time to market triggers with correct leverage
+- **Batch Optimization**: 100+ positions updated in single SQL query
+- **Concurrent Support**: 100+ positions across multiple strategies simultaneously
 
 ## Monitoring & Health Checks
 
@@ -369,42 +383,50 @@ curl http://localhost:8000/api/v2/bot/{config_id}/positions
 curl http://localhost:8000/api/v2/bot/{config_id}/account
 ```
 
-### Current Testing Status (September 2025)
-**✅ WORKING**: 
-- Trade execution with real money management
-- Account creation and P&L tracking
-- Supabase database integration
-- Dashboard API endpoints with real data
-- Configuration loading fixed
-- Loss tracking (negative P&L) working
+### Current Testing Status (October 2025 - V2.0)
+**✅ WORKING (Paper Trading Engine 2.0)**:
+- Trade execution with correct leverage calculations (5x = 5x gains/losses)
+- Margin-based balance reservations (position_size/leverage + fees)
+- Manual position closing via API and frontend
+- Account creation and accurate P&L tracking
+- Supabase database integration with `margin_used` field
+- Dashboard API endpoints with leveraged P&L display
+- Background position monitoring (3-second intervals, batch SQL optimization)
+- Stop loss and take profit execution with correct leverage
+- Multi-exchange fallback (5 exchanges: kucoin→binance→okx→gate_io→ascend_ex)
 
-**✅ TESTED**:
-- Account balance: $9,900.02 (started with $10,000)
-- Total P&L: -$0.18 (realistic trading losses from fees)
-- Multiple successful trades executed and closed
-- Dashboard showing live data from database
-
-**⏳ PENDING**: Background position monitoring scheduler integration
+**✅ TESTED (V2.0)**:
+- Leverage P&L calculations: 5x leverage correctly multiplies gains/losses
+- Margin reservations: $700 position at 5x reserves $140.84 (not $704.20)
+- Position closing: Releases correct margin amount via `margin_used` field
+- Balance reconciliation: All trades maintain correct balances with fees
+- Manual close functionality: API and frontend button working
+- Multiple test scenarios: 1x to 20x leverage all calculate correctly
 
 ## Production Deployment
 
-### Startup Sequence (UPDATED)
-1. **Supabase Setup**: Ensure paper_accounts, paper_trades, paper_orders tables exist
+### Startup Sequence (V2.0)
+1. **Supabase Setup**: Ensure paper_accounts, paper_trades, paper_orders tables exist (with `margin_used` field)
 2. **Environment Setup**: Configure SUPABASE_URL, SUPABASE_SERVICE_KEY, HBOT credentials
 3. **Service Health**: Verify Supabase and Hummingbot API connectivity
-4. **Background Task**: Position monitoring scheduler (PENDING - see below)
-5. **API Endpoints**: Dashboard routes available at `/api/v2/bot/*`
+4. **Background Task**: Position monitoring running at 3-second intervals with batch optimization
+5. **API Endpoints**: Dashboard routes available at `/api/v2/bot/*` with leverage-corrected P&L
 
-### Critical Missing Component: Background Position Monitoring
-**STATUS**: Architecture implemented but scheduler not yet configured.
+### Position Monitoring (ACTIVE)
+**STATUS**: ✅ Running in production with batch SQL optimization
 
-The `update_position_prices()` method exists and works but needs to be scheduled to run every 7 seconds:
+The position monitoring system updates all open positions every 3 seconds:
 ```python
-# This method exists but is not scheduled:
+# Automatically runs every 3 seconds as background task
 updated_count = await service.update_position_prices()  # Updates all open positions
+# Uses batch SQL: 100 positions = 1 query (99% reduction from 100 HTTP requests)
 ```
 
-**TODO for Production**: Add paper trading position monitoring to the existing scheduler system.
+**Features**:
+- Real-time P&L updates with correct leverage multiplier
+- Automatic SL/TP execution
+- Batch SQL optimization for reliability
+- Multi-exchange price fallback
 
 ### Monitoring
 - **Position Updates**: Logged every ~30 seconds (consolidated logging)
@@ -420,4 +442,20 @@ updated_count = await service.update_position_prices()  # Updates all open posit
 
 ---
 
-The paper trading engine provides professional-grade simulation with real market data, automated risk management, and comprehensive performance analytics. It integrates seamlessly with the existing ggbots platform while maintaining complete isolation between strategies and realistic trading conditions.
+## Paper Trading Engine 2.0 Summary
+
+The paper trading engine provides **professional-grade simulation** with real market data, automated risk management, and comprehensive performance analytics.
+
+### V2.0 Key Improvements:
+- ✅ **Accurate Leverage**: 5x leverage now shows 5x gains/losses (previously showed 1x)
+- ✅ **Correct Margin**: Reserves position_size/leverage + fees (previously reserved full position size)
+- ✅ **Manual Control**: Users can close positions anytime via frontend button
+- ✅ **Reliable Monitoring**: 3-second updates with batch SQL (99% reduction in API calls)
+- ✅ **Multi-Exchange**: Automatic failover across 5 exchanges for market data
+
+### Upcoming: Database Reset
+All paper accounts will be reset to $10,000 as part of the V2.0 launch to ensure accurate simulation with the corrected leverage calculations. Bots with custom strategies will remain active; default strategy bots will be deactivated for user reconfiguration.
+
+---
+
+The paper trading engine integrates seamlessly with the ggbots platform while maintaining complete isolation between strategies and realistic trading conditions that prepare users for real trading.
