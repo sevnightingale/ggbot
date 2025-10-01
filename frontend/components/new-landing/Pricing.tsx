@@ -122,7 +122,7 @@ export default function Pricing() {
         {/* Bottom Note */}
         <div className="text-center mt-12 p-6 bg-charcoal-900 border border-bone-200/20 rounded-sm">
           <p className="text-bone-200/70 mb-4">
-            <strong className="text-bone-200">Early Adopter Special:</strong> Get 50% off for 6 months with code <span className="font-mono bg-charcoal-800 px-2 py-1 rounded text-agents-decision">EARLY50</span>
+            <strong className="text-bone-200">Limited Offer:</strong> First 100 users get 50% off for 6 months with code <span className="font-mono bg-charcoal-800 px-2 py-1 rounded text-agents-decision">FIRST100</span>
           </p>
           <div className="flex flex-wrap justify-center gap-6 text-sm text-bone-200/60">
             <span>• 14-day free trial</span>
