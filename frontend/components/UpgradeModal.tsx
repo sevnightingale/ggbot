@@ -162,11 +162,11 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             type="text"
             value={couponCode}
             onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-            placeholder="EARLY50"
+            placeholder="FIRST100"
             className="w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
           <p className="text-xs text-[var(--text-tertiary)] mt-1">
-            Early adopters get 50% off for 6 months with code EARLY50
+            First 100 users get 50% off for 6 months with code FIRST100
           </p>
         </div>
 
