@@ -6,7 +6,7 @@ Extends Supabase auth.users with subscription tiers and premium features.
 """
 
 from dataclasses import dataclass, field
-from datetime import datetime
+from datetime import datetime, timezone
 from enum import Enum
 from typing import Optional
 import uuid
@@ -82,8 +82,8 @@ class UserProfile:
         """Check if user has active subscription."""
         return (
             self.subscription_status == SubscriptionStatus.ACTIVE and
-            (self.subscription_expires_at is None or 
-             self.subscription_expires_at > datetime.now())
+            (self.subscription_expires_at is None or
+             self.subscription_expires_at > datetime.now(timezone.utc))
         )
     
     @property
@@ -91,7 +91,7 @@ class UserProfile:
         """Check if subscription has expired."""
         return (
             self.subscription_expires_at is not None and
-            self.subscription_expires_at <= datetime.now()
+            self.subscription_expires_at <= datetime.now(timezone.utc)
         )
     
     @property

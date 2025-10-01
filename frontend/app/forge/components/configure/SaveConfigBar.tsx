@@ -1,9 +1,10 @@
 'use client'
 
-import React from 'react'
-import { Save, X, RotateCcw } from 'lucide-react'
+import React, { useState } from 'react'
+import { Save, X, RotateCcw, Crown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
-import { PermissionGate } from '@/lib/permission-gate'
+import { UpgradeModal } from '@/components/UpgradeModal'
+import { usePermissions } from '@/lib/permissions'
 
 interface SaveConfigBarProps {
   selectedBot?: BotConfiguration | null
@@ -26,8 +27,12 @@ export function SaveConfigBar({
   onReset,
   onBotTypeChange
 }: SaveConfigBarProps) {
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const { canAccess } = usePermissions()
+
   // Use editing config type if available, otherwise fall back to selected bot config type
   const currentBotType = editingTableFields?.config_type || selectedBot?.config_type || 'autonomous_trading'
+  const hasSignalValidation = canAccess('signal_validation_mode')
 
   return (
     <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">
@@ -47,20 +52,7 @@ export function SaveConfigBar({
             >
               Autonomous
             </button>
-            <PermissionGate
-              feature="signal_validation_mode"
-              fallback={
-                <button
-                  disabled
-                  className="px-3 py-2 text-sm rounded-r-xl bg-gray-100 text-gray-400 cursor-not-allowed relative"
-                >
-                  Signal Validation
-                  <span className="absolute -top-1 -right-1 text-xs bg-amber-500 text-white rounded-full px-1 py-0.5 text-[10px]">
-                    PRO
-                  </span>
-                </button>
-              }
-            >
+            {hasSignalValidation ? (
               <button
                 onClick={() => onBotTypeChange?.('signal_validation')}
                 className={`px-3 py-2 text-sm rounded-r-xl transition-colors ${
@@ -71,7 +63,15 @@ export function SaveConfigBar({
               >
                 Signal Validation
               </button>
-            </PermissionGate>
+            ) : (
+              <button
+                onClick={() => setUpgradeModalOpen(true)}
+                className="px-3 py-2 text-sm rounded-r-xl opacity-60 hover:opacity-80 transition-opacity text-[var(--text-muted)] relative flex items-center gap-1.5"
+              >
+                Signal Validation
+                <Crown className="h-3 w-3" />
+              </button>
+            )}
           </div>
         </div>
 
@@ -126,6 +126,12 @@ export function SaveConfigBar({
           )}
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+      />
     </div>
   )
 }

@@ -75,7 +75,7 @@
   - [ ] Add interface for managing multiple API keys per provider
 
 - [ ] **LLM Provider Management**
-  - [ ] Support OpenAI, DeepSeek, Anthropic, and XAI credential management
+  - [ ] Support OpenAI, DeepSeek, Anwhythropic, and XAI credential management
   - [ ] Add credential naming and organization features
   - [ ] Implement credential usage tracking and validation
   - [ ] Test credential encryption/decryption flow

@@ -1,8 +1,11 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
+import { Crown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
+import { usePermissions } from '@/lib/permissions'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 interface Account {
   config_id: string
@@ -43,20 +46,47 @@ export function BotRail({
   isBotAction = false,
   className = ''
 }: BotRailProps) {
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const { hasSubscription } = usePermissions()
+
+  const isPro = hasSubscription('ggbase')
+  const botLimit = isPro ? 10 : 1
+  const currentBotCount = bots.length
+  const atLimit = currentBotCount >= botLimit
+
+  const handleCreateNew = () => {
+    if (atLimit && !isPro) {
+      setUpgradeModalOpen(true)
+      return
+    }
+    onCreateNew?.()
+  }
+
   return (
     <aside className={className}>
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
             <div className="h-4 w-4">📊</div>
-            Bots
+            <div className="flex items-center gap-2">
+              <span>Bots</span>
+              <span className="text-xs text-[var(--text-muted)] font-normal">
+                {currentBotCount}/{botLimit}
+              </span>
+            </div>
           </div>
           <button
-            onClick={onCreateNew}
+            onClick={handleCreateNew}
             disabled={isCreatingNew}
-            className="rounded-xl border border-[var(--border)] px-2 py-1 text-xs hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+            className={`rounded-xl border border-[var(--border)] px-2 py-1 text-xs transition-all text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed ${
+              atLimit && !isPro ? 'hover:opacity-80 opacity-60' : 'hover:bg-[var(--bg-tertiary)]'
+            }`}
           >
-            {isCreatingNew ? '⟳ Creating...' : '+ New'}
+            {isCreatingNew ? '⟳ Creating...' : atLimit && !isPro ? (
+              <span className="flex items-center gap-1">
+                + New <Crown className="h-3 w-3" />
+              </span>
+            ) : '+ New'}
           </button>
         </div>
 
@@ -82,6 +112,12 @@ export function BotRail({
           )}
         </div>
       </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+      />
     </aside>
   )
 }
