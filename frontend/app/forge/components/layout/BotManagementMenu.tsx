@@ -8,6 +8,7 @@ interface BotManagementMenuProps {
   onRename: (configId: string, newName: string) => void
   onDuplicate: (configId: string) => void
   onDelete: (configId: string) => void
+  onResetAccount?: (configId: string) => void
   isBotAction: boolean
   hasUnsavedChanges?: boolean
 }
@@ -17,6 +18,7 @@ export function BotManagementMenu({
   onRename,
   onDuplicate,
   onDelete,
+  onResetAccount,
   isBotAction,
   hasUnsavedChanges = false
 }: BotManagementMenuProps) {
@@ -24,6 +26,7 @@ export function BotManagementMenu({
   const [isRenamingLocal, setIsRenamingLocal] = useState(false)
   const [newName, setNewName] = useState(bot.config_name)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [showResetConfirm, setShowResetConfirm] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
@@ -39,6 +42,7 @@ export function BotManagementMenu({
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
         setIsOpen(false)
         setShowDeleteConfirm(false)
+        setShowResetConfirm(false)
         if (isRenamingLocal) {
           handleRenameCancel() // Automatically discard changes
         }
@@ -78,6 +82,16 @@ export function BotManagementMenu({
   const handleDeleteConfirm = () => {
     onDelete(bot.config_id)
     setShowDeleteConfirm(false)
+  }
+
+  const handleResetClick = () => {
+    setShowResetConfirm(true)
+    setIsOpen(false)
+  }
+
+  const handleResetConfirm = () => {
+    onResetAccount?.(bot.config_id)
+    setShowResetConfirm(false)
   }
 
   if (isRenamingLocal) {
@@ -150,6 +164,44 @@ export function BotManagementMenu({
     )
   }
 
+  if (showResetConfirm) {
+    return (
+      <div ref={menuRef} className="absolute right-0 top-8 z-50 min-w-56 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
+        <div className="p-3">
+          <div className="text-xs text-[var(--text-primary)] mb-2">
+            Reset Trading Account?
+          </div>
+          <div className="text-xs text-[var(--text-muted)] mb-3">
+            This will:
+            <ul className="list-disc list-inside mt-1 space-y-0.5">
+              <li>Close all open positions</li>
+              <li>Reset balance to $10,000</li>
+              <li>Clear all trading statistics</li>
+            </ul>
+            <div className="mt-2">
+              Your bot configuration will not be affected. Trade history is preserved for analysis.
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={handleResetConfirm}
+              disabled={isBotAction}
+              className="flex-1 px-2 py-1 text-xs bg-amber-600 text-white rounded hover:bg-amber-700 disabled:opacity-50"
+            >
+              {isBotAction ? 'Resetting...' : 'Reset Account'}
+            </button>
+            <button
+              onClick={() => setShowResetConfirm(false)}
+              className="flex-1 px-2 py-1 text-xs border border-[var(--border)] rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)]"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div ref={menuRef} className="relative">
       <button
@@ -181,6 +233,15 @@ export function BotManagementMenu({
             >
               Duplicate
             </button>
+            {onResetAccount && (
+              <button
+                onClick={handleResetClick}
+                disabled={isBotAction}
+                className="w-full px-3 py-2 text-left text-xs text-amber-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Reset Account
+              </button>
+            )}
             <hr className="my-1 border-[var(--border)]" />
             <button
               onClick={handleDeleteClick}

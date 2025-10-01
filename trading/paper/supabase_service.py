@@ -503,7 +503,84 @@ class SupabasePaperTradingService:
                 "status": "failed",
                 "reason": str(e)
             }
-    
+
+    async def reset_account(self, config_id: str, user_id: str) -> Dict[str, Any]:
+        """
+        Reset paper trading account to initial state.
+
+        Closes all open positions, resets balance to $10k, clears stats,
+        but preserves trade history for analysis.
+
+        Args:
+            config_id: Configuration ID
+            user_id: User ID
+
+        Returns:
+            Reset result with summary of changes
+        """
+        try:
+            # Get all open positions
+            open_positions = await self.get_open_positions(config_id)
+
+            # Close all open positions with 'account_reset' reason
+            closed_count = 0
+            failed_closes = []
+            for position in open_positions:
+                result = await self.close_position(
+                    trade_id=position['trade_id'],
+                    reason='account_reset'
+                )
+                if result['status'] == 'closed':
+                    closed_count += 1
+                else:
+                    failed_closes.append(position['trade_id'])
+
+            if failed_closes:
+                logger.warning(f"Failed to close {len(failed_closes)} positions during reset: {failed_closes}")
+
+            # Reset account stats using direct SQL update
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE paper_accounts
+                        SET current_balance = 10000.00,
+                            total_pnl = 0.00,
+                            open_positions = 0,
+                            total_trades = 0,
+                            win_trades = 0,
+                            loss_trades = 0,
+                            last_reset_at = NOW(),
+                            updated_at = NOW()
+                        WHERE config_id = %s AND user_id = %s
+                        RETURNING account_id, current_balance, last_reset_at;
+                    """, (config_id, user_id))
+
+                    result = cur.fetchone()
+                    conn.commit()
+
+                    if not result:
+                        raise Exception("Account not found or update failed")
+
+                    account_id, new_balance, reset_at = result
+
+            logger.info(f"Account reset successful for config_id={config_id}, closed {closed_count} positions")
+
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "positions_closed": closed_count,
+                "new_balance": float(new_balance),
+                "reset_at": reset_at.isoformat() if reset_at else None,
+                "message": f"Account reset to $10,000. Closed {closed_count} positions."
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to reset account {config_id}: {e}")
+            return {
+                "status": "failed",
+                "reason": str(e)
+            }
+
     async def get_open_positions(self, config_id: str) -> List[Dict[str, Any]]:
         """Get all open positions for a config_id"""
         try:

@@ -33,36 +33,28 @@
   - [x] Test volume-based signal validation
   - [x] Verify volume metrics in market analysis formatting
 
-## 🚀 **HIGH PRIORITY - Paper Trading Engine 2.0 Launch**
+## 🚀 **HIGH PRIORITY - Self-Service Account Reset Feature**
 
-**Timeline**: TBD - Coordinate with Pro Plan announcement
-**Impact**: 319 accounts reset, 92 default bots deactivated, 83 users affected
+**Timeline**: 1-2 days - User-controlled paper account resets
+**Status**: Default bot cleanup complete (92 bots deactivated, 83 users affected)
 
-- [ ] **Database Reset Execution**
-  - [ ] Review reset SQL: `/tmp/reset_sequence.sql` (6-step process with verification)
-  - [ ] Backup verification: Creates `paper_*_backup_20251001` tables with full data
-  - [ ] Execute Step 1: Create backups of paper_accounts, paper_trades, paper_orders, configurations
-  - [ ] Execute Step 2: Deactivate 92 active default strategy bots (pattern: "RSI 1hr below 50%enter long%")
-  - [ ] Execute Step 3: Close 133 open positions with `close_reason: 'system_reset_v2'`
-  - [ ] Execute Step 4: Reset all 319 paper accounts to $10,000 balance, zero stats
-  - [ ] Execute Step 5: Run post-reset verification queries (check for any remaining issues)
-  - [ ] Execute Step 6: Generate summary report and log results
+- [x] **Default Bot Cleanup** ✅ COMPLETE (2025-10-01)
+  - [x] Deactivated 92 active default strategy bots (pattern: "RSI 1hr below 50%enter long%")
+  - [x] Verified 22 custom strategy bots remain active
+  - [x] No forced account resets - V2.0 leverage fixes work with existing accounts
+
+- [ ] **Reset Trading Account Button**
+  - [ ] Add "Reset Account" option to bot 3-dot dropdown menu (alongside Rename/Delete)
+  - [ ] Implement backend endpoint: `POST /api/v2/bot/{config_id}/reset-account`
+  - [ ] Reset logic: Close all open positions, reset balance to $10k, clear trade history, preserve bot config
+  - [ ] Add confirmation modal: "This will close all positions and reset your account to $10,000. This cannot be undone."
+  - [ ] Test reset functionality with active positions and historical trades
+  - [ ] Add success toast notification after reset completes
 
 - [ ] **User Communication**
-  - [ ] Review communication copy: `/home/sev/ggbot/DOCS/USER_COMMUNICATION_V2.md`
-  - [ ] Deploy popup notification (Version A for custom strategy users, Version B for default strategy users)
-  - [ ] Optional: Send email notifications to affected users
-  - [ ] Add persistent banner: "ggbots Pro is live! 50% OFF Early Adopter Pricing - Code EARLY50"
+  - [ ] Email encouraging users to try reset feature for clean V2.0 accounting
+  - [ ] Optional: Add banner promoting account reset for fresh start with leverage fixes
   - [ ] Monitor user feedback channels (Telegram community, support tickets)
-
-- [ ] **Post-Launch Verification**
-  - [ ] Verify all accounts show $10,000 balance
-  - [ ] Verify no open positions remain (all closed with system_reset_v2)
-  - [ ] Verify custom strategy bots still active (22 bots should remain active)
-  - [ ] Verify default strategy bots deactivated (92 bots should be inactive)
-  - [ ] Test new trades with V2.0 leverage fixes (5x leverage = 5x P&L)
-  - [ ] Test manual close functionality stores close_reason correctly
-  - [ ] Monitor error logs for any reset-related issues
 
 ## 🔧 **HIGH PRIORITY - User Settings & API Key Management**
 

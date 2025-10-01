@@ -816,6 +816,26 @@ function ForgeApp() {
     }
   }
 
+  // Handler function for resetting bot account
+  const handleResetAccount = async (configId: string) => {
+    setIsBotAction(true)
+
+    try {
+      const result = await apiClient.resetAccount(configId)
+
+      console.log(`✅ Account reset: ${result.message}`)
+      console.log(`📊 Positions closed: ${result.positions_closed}, New balance: $${result.new_balance}`)
+
+      // Refresh accounts data to show new balance
+      // The SSE stream will automatically update the UI with the new account state
+
+    } catch (error) {
+      console.error('❌ Failed to reset account:', error)
+    } finally {
+      setIsBotAction(false)
+    }
+  }
+
   // Helper function to refresh bot list from server (for error recovery)
   const refreshBotList = async () => {
     try {
@@ -886,6 +906,7 @@ function ForgeApp() {
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
             onDelete={handleDeleteBot}
+            onResetAccount={handleResetAccount}
             isBotAction={isBotAction}
             className="col-span-12 hidden md:col-span-3 md:block"
           />
