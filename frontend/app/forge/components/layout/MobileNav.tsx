@@ -16,8 +16,8 @@ interface Account {
   open_positions: number
   updated_at: string
   unrealized_pnl?: number
-  daily_pnl?: number
-  portfolio_return_pct?: number
+  current_pnl?: number  // Aggregate unrealized P&L of open positions
+  portfolio_return_pct?: number  // Total P&L as % of initial balance
   total_balance?: number
   win_rate?: number
   avg_win?: number

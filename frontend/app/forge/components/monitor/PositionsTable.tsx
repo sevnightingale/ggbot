@@ -216,13 +216,9 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
               <tr className="border-b border-[var(--border)]">
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Symbol</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Side</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Size</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Leverage</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Collateral</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Entry</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Current</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Position</th>
+                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Entry → Current</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">P&L</th>
-                <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">%</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">SL/TP</th>
                 <th className="text-left py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Age</th>
                 <th className="text-right py-3 px-2 text-sm font-medium text-[var(--text-muted)]">Actions</th>
@@ -240,35 +236,47 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                       {position.side.toUpperCase()}
                     </div>
                   </td>
-                  <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
-                    ${position.size_usd.toLocaleString()}
+                  {/* Position: Size + Leverage stacked */}
+                  <td className="py-3 px-2">
+                    <div className="space-y-0.5">
+                      <div className="text-sm text-[var(--text-primary)]">
+                        ${position.size_usd.toLocaleString()}
+                      </div>
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {position.leverage}x leverage
+                      </div>
+                    </div>
                   </td>
-                  <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
-                    {position.leverage}x
+                  {/* Entry → Current price */}
+                  <td className="py-3 px-2">
+                    <div className="space-y-0.5">
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {formatPrice(position.entry_price)}
+                      </div>
+                      <div className="text-sm text-[var(--text-primary)] font-medium">
+                        <AnimatedValue
+                          value={displayPrices[position.trade_id]?.current || formatPrice(position.current_price)}
+                          isAnimating={animatingPrices[position.trade_id] || false}
+                        />
+                      </div>
+                    </div>
                   </td>
-                  <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
-                    ${(position.size_usd / position.leverage).toLocaleString()}
-                  </td>
-                  <td className="py-3 px-2 text-sm text-[var(--text-secondary)]">
-                    {formatPrice(position.entry_price)}
-                  </td>
-                  <td className="py-3 px-2 text-sm text-[var(--text-primary)] font-medium">
-                    <AnimatedValue
-                      value={displayPrices[position.trade_id]?.current || formatPrice(position.current_price)}
-                      isAnimating={animatingPrices[position.trade_id] || false}
-                    />
-                  </td>
-                  <td className={`py-3 px-2 text-sm font-medium ${getPnLColor(position.unrealized_pnl)}`}>
-                    <AnimatedValue
-                      value={displayPrices[position.trade_id]?.pnl || formatPnL(position.unrealized_pnl)}
-                      isAnimating={animatingPrices[position.trade_id] || false}
-                    />
-                  </td>
-                  <td className={`py-3 px-2 text-sm font-medium ${getPnLColor(position.unrealized_pnl)}`}>
-                    <AnimatedValue
-                      value={displayPrices[position.trade_id]?.percentage || formatPercentage(position.entry_price, position.current_price)}
-                      isAnimating={animatingPrices[position.trade_id] || false}
-                    />
+                  {/* P&L: Dollar amount + percentage stacked */}
+                  <td className={`py-3 px-2 font-medium ${getPnLColor(position.unrealized_pnl)}`}>
+                    <div className="space-y-0.5">
+                      <div className="text-sm">
+                        <AnimatedValue
+                          value={displayPrices[position.trade_id]?.pnl || formatPnL(position.unrealized_pnl)}
+                          isAnimating={animatingPrices[position.trade_id] || false}
+                        />
+                      </div>
+                      <div className="text-xs">
+                        <AnimatedValue
+                          value={displayPrices[position.trade_id]?.percentage || formatPercentage(position.entry_price, position.current_price)}
+                          isAnimating={animatingPrices[position.trade_id] || false}
+                        />
+                      </div>
+                    </div>
                   </td>
                   <td className="py-3 px-2 text-sm text-[var(--text-muted)]">
                     <div className="space-y-1">
