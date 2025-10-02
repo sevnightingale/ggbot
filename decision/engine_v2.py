@@ -99,20 +99,20 @@ class DecisionEngineV2:
                 provider_name = llm_config.get('provider', 'default')
                 model_name = llm_config.get('model', None)
 
-                # Handle default provider mapping to XAI/Grok
+                # Handle default provider mapping to XAI/Grok (basic intelligence)
                 if provider_name == 'default':
                     provider_name = 'xai'
-                    model_name = model_name or 'grok-4-fast-non-reasoning'
+                    model_name = model_name or 'grok-4-fast-non-reasoning'  # Basic non-reasoning model
                 elif not model_name:
-                    # Set default models for explicit providers
+                    # Set best reasoning models for pro providers
                     if provider_name == 'xai':
-                        model_name = 'grok-4-fast-non-reasoning'
+                        model_name = 'grok-4-fast-reasoning'  # Frontier reasoning model
                     elif provider_name == 'deepseek':
-                        model_name = 'deepseek-reasoner'
+                        model_name = 'deepseek-reasoner'  # Frontier reasoning
                     elif provider_name == 'openai':
-                        model_name = 'gpt-5'
+                        model_name = 'gpt-5'  # Frontier reasoning
                     elif provider_name == 'anthropic':
-                        model_name = 'claude-opus-4-1-20250805'
+                        model_name = 'claude-opus-4-1-20250805'  # Frontier reasoning
             else:
                 # Fallback to legacy decision config
                 decision_config = self.config.decision if hasattr(self.config, 'decision') else {}
