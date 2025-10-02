@@ -25,6 +25,9 @@ export function StrategyEditor({
   const llmProvider = configData?.llm_config?.provider || 'default'
   const currentConfigType = configType || configData?.config_type || 'autonomous_trading'
 
+  // Check premium access once to avoid repeated permission checks
+  const hasPremiumAccess = canAccess('premium_llms')
+
   // State for collapsible sections
   const [showSystemSections, setShowSystemSections] = useState(false)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
@@ -48,7 +51,7 @@ export function StrategyEditor({
   // Handle frequency selection
   const handleFrequencyChange = (freq: string) => {
     // Check permissions for high-frequency options
-    if ((freq === '5m' || freq === '15m') && !canAccess('premium_llms')) {
+    if ((freq === '5m' || freq === '15m') && !hasPremiumAccess) {
       setUpgradeModalOpen(true)
       return
     }
@@ -89,7 +92,7 @@ export function StrategyEditor({
   // Handle LLM provider change
   const handleProviderChange = (provider: string) => {
     // Check if user has access to premium LLMs (frontier reasoning models)
-    if (provider !== 'default' && !canAccess('premium_llms')) {
+    if (provider !== 'default' && !hasPremiumAccess) {
       setUpgradeModalOpen(true)
       return
     }
@@ -112,11 +115,11 @@ export function StrategyEditor({
 
     onUpdate?.({
       llm_config: {
+        ...configData?.llm_config,
         provider,
         model,
         use_platform_keys: true,
-        use_own_key: false,
-        ...configData?.llm_config
+        use_own_key: false
       }
     })
   }
@@ -136,7 +139,7 @@ export function StrategyEditor({
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
             {['5m', '15m', '1h', '4h'].map((freq) => {
               const isPremium = freq === '5m' || freq === '15m'
-              const hasAccess = !isPremium || canAccess('premium_llms')
+              const hasAccess = !isPremium || hasPremiumAccess
               const isLocked = isPremium && !hasAccess
 
               return (
@@ -331,7 +334,7 @@ export function StrategyEditor({
             </button>
 
             {/* Frontier Models - Conditional based on subscription */}
-            {!canAccess('premium_llms') ? (
+            {!hasPremiumAccess ? (
               // Free users: Locked "Frontier Reasoning Models" card
               <button
                 onClick={() => setUpgradeModalOpen(true)}
