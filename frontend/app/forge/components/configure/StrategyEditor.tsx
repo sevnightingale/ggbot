@@ -88,26 +88,26 @@ export function StrategyEditor({
 
   // Handle LLM provider change
   const handleProviderChange = (provider: string) => {
-    // Check if user has access to premium LLMs
-    if (provider === 'openai' && !canAccess('premium_llms')) {
+    // Check if user has access to premium LLMs (frontier reasoning models)
+    if (provider !== 'default' && !canAccess('premium_llms')) {
       setUpgradeModalOpen(true)
       return
     }
 
     // Set appropriate model for each provider
+    // Default uses basic non-reasoning model
+    // Pro providers use best reasoning models
     let model
     if (provider === 'openai') {
-      model = 'gpt-5'
-    } else if (provider === 'default') {
-      model = 'default'
+      model = 'gpt-5'  // Frontier reasoning
     } else if (provider === 'deepseek') {
-      model = 'deepseek-reasoner'
+      model = 'deepseek-reasoner'  // Frontier reasoning
     } else if (provider === 'anthropic') {
-      model = 'claude-opus-4-1-20250805'
+      model = 'claude-opus-4-1-20250805'  // Frontier reasoning
     } else if (provider === 'xai') {
-      model = 'grok-4-fast-non-reasoning'
+      model = 'grok-4-fast-reasoning'  // Frontier reasoning
     } else {
-      model = 'deepseek-reasoner' // fallback
+      model = 'default'  // Basic intelligence (grok-4-fast-non-reasoning)
     }
 
     onUpdate?.({
@@ -310,158 +310,136 @@ export function StrategyEditor({
 
         <div className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {(configData?.llm_config?.use_own_key ? [
-              // Show all providers when using personal keys
-              {
-                id: 'default',
-                name: 'Default LLM',
-                description: 'Platform recommended model (Grok 4 Fast)',
-                recommended: true
-              },
-              {
-                id: 'openai',
-                name: 'OpenAI GPT-5',
-                description: 'Latest OpenAI model with advanced reasoning',
-                premium: false // Available with personal keys
-              },
-              {
-                id: 'deepseek',
-                name: 'DeepSeek R1',
-                description: 'Advanced reasoning model for complex strategies',
-                premium: false
-              },
-              {
-                id: 'anthropic',
-                name: 'Claude Opus',
-                description: 'Anthropic\'s most capable model',
-                premium: false
-              },
-              {
-                id: 'xai',
-                name: 'Grok 4 Fast',
-                description: 'XAI\'s fast reasoning model',
-                premium: false
-              }
-            ] : [
-              // Show limited options when using platform keys
-              {
-                id: 'default',
-                name: 'Default LLM',
-                description: 'Our recommended AI model optimized for trading performance',
-                recommended: true
-              },
-              {
-                id: 'openai',
-                name: 'OpenAI GPT-5',
-                description: 'Premium model for advanced analysis',
-                premium: true
-              }
-            ]).map((provider) => {
-              const isPremium = provider.premium
-              const hasAccess = !isPremium || canAccess('premium_llms')
-              const isLocked = isPremium && !hasAccess
+            {/* Default Model - Always visible */}
+            <button
+              onClick={() => handleProviderChange('default')}
+              className={`p-4 rounded-xl border text-left transition-all ${
+                llmProvider === 'default'
+                  ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                  : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+              }`}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="font-medium">Default Model</div>
+                <span className="text-xs px-2 py-1 rounded-full bg-[var(--profit-color)]/20 text-[var(--profit-color)]">
+                  Free
+                </span>
+              </div>
+              <div className="text-xs text-[var(--text-muted)]">
+                Basic intelligence for standard trading strategies
+              </div>
+            </button>
 
-              return (
-                <button
-                  key={provider.id}
-                  onClick={() => handleProviderChange(provider.id)}
-                  className={`p-4 rounded-xl border text-left transition-all relative ${
-                    llmProvider === provider.id
-                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                      : isLocked
-                        ? 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 hover:opacity-80'
-                        : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                  }`}
+            {/* Frontier Models - Conditional based on subscription */}
+            {!canAccess('premium_llms') ? (
+              // Free users: Locked "Frontier Reasoning Models" card
+              <button
+                onClick={() => setUpgradeModalOpen(true)}
+                className="p-4 rounded-xl border text-left transition-all bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 hover:opacity-80"
               >
                 <div className="flex items-center justify-between mb-2">
                   <div className="font-medium flex items-center gap-2">
-                    {provider.name}
-                    {isLocked && <Crown className="h-3 w-3" />}
+                    Frontier Reasoning Models
+                    <Crown className="h-3 w-3" />
                   </div>
-                  {provider.recommended && (
-                    <span className="text-xs px-2 py-1 rounded-full bg-[var(--profit-color)]/20 text-[var(--profit-color)]">
-                      Recommended
-                    </span>
-                  )}
                 </div>
                 <div className="text-xs text-[var(--text-muted)]">
-                  {provider.description}
+                  Advanced AI models with enhanced reasoning capabilities
                 </div>
               </button>
-              )
-            })}
+            ) : (
+              // Pro users: Individual provider cards
+              <>
+                <button
+                  onClick={() => handleProviderChange('openai')}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    llmProvider === 'openai'
+                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium flex items-center gap-2">
+                      ChatGPT / OpenAI
+                      <Crown className="h-3 w-3 text-amber-500" />
+                    </div>
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    GPT-5 with advanced reasoning
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleProviderChange('anthropic')}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    llmProvider === 'anthropic'
+                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium flex items-center gap-2">
+                      Claude / Anthropic
+                      <Crown className="h-3 w-3 text-amber-500" />
+                    </div>
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Claude Opus 4 with deep analysis
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleProviderChange('xai')}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    llmProvider === 'xai'
+                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium flex items-center gap-2">
+                      Grok / XAI
+                      <Crown className="h-3 w-3 text-amber-500" />
+                    </div>
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Grok 4 Fast with reasoning
+                  </div>
+                </button>
+
+                <button
+                  onClick={() => handleProviderChange('deepseek')}
+                  className={`p-4 rounded-xl border text-left transition-all ${
+                    llmProvider === 'deepseek'
+                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="font-medium flex items-center gap-2">
+                      DeepSeek
+                      <Crown className="h-3 w-3 text-amber-500" />
+                    </div>
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    DeepSeek R1 reasoner
+                  </div>
+                </button>
+              </>
+            )}
           </div>
 
-          {/* API Key Configuration */}
-          <div className="space-y-3">
-            <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-              <div className="text-sm text-[var(--text-muted)]">
-                Current: <span className="text-[var(--text-primary)] font-medium">
-                  {llmProvider === 'default' ? 'Default LLM' :
-                 llmProvider === 'openai' ? 'OpenAI GPT-5' :
-                 llmProvider === 'deepseek' ? 'DeepSeek R1' :
-                 llmProvider === 'anthropic' ? 'Claude Opus' :
-                 llmProvider === 'xai' ? 'Grok 4 Fast' : 'Default LLM'}
-                </span> • {configData?.llm_config?.use_own_key ? 'Using personal API keys' : 'Using platform keys'}
-              </div>
+          {/* Current Selection */}
+          <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
+            <div className="text-sm text-[var(--text-muted)]">
+              Current: <span className="text-[var(--text-primary)] font-medium">
+                {llmProvider === 'default' ? 'Default Model (basic intelligence)' :
+                 llmProvider === 'openai' ? 'ChatGPT / OpenAI' :
+                 llmProvider === 'deepseek' ? 'DeepSeek' :
+                 llmProvider === 'anthropic' ? 'Claude / Anthropic' :
+                 llmProvider === 'xai' ? 'Grok / XAI' : 'Default Model'}
+              </span>
             </div>
-
-            {/* API Key Toggle */}
-            <div className="flex items-center justify-between p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
-              <div>
-                <div className="text-sm font-medium text-[var(--text-primary)]">
-                  Use Personal API Keys
-                </div>
-                <div className="text-xs text-[var(--text-muted)]">
-                  Use your own API keys instead of platform keys
-                </div>
-              </div>
-              <label className="relative inline-flex items-center cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={configData?.llm_config?.use_own_key || false}
-                  onChange={(e) => {
-                    onUpdate?.({
-                      llm_config: {
-                        provider: 'default',
-                        model: 'default',
-                        ...configData?.llm_config,
-                        use_own_key: e.target.checked,
-                        use_platform_keys: !e.target.checked
-                      }
-                    })
-                  }}
-                  className="sr-only"
-                />
-                <div className={`w-11 h-6 rounded-full transition-colors ${
-                  configData?.llm_config?.use_own_key
-                    ? 'bg-[var(--agent-decision)]'
-                    : 'bg-[var(--border)]'
-                }`}>
-                  <div className={`w-5 h-5 bg-white rounded-full transition-transform duration-200 ease-in-out ${
-                    configData?.llm_config?.use_own_key ? 'translate-x-5' : 'translate-x-0'
-                  } mt-0.5 ml-0.5`}></div>
-                </div>
-              </label>
-            </div>
-
-            {/* Show API Key Manager if using personal keys */}
-            {configData?.llm_config?.use_own_key && (
-              <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
-                <div className="text-sm text-[var(--text-primary)] mb-3">
-                  Personal API Keys Required
-                </div>
-                <div className="text-xs text-[var(--text-muted)] mb-3">
-                  Add your API keys in Settings → API Keys to use personal credentials.
-                </div>
-                <button
-                  onClick={() => window.open('/settings/api-keys', '_blank')}
-                  className="text-xs text-[var(--agent-decision)] hover:underline"
-                >
-                  Manage API Keys →
-                </button>
-              </div>
-            )}
           </div>
         </div>
       </div>

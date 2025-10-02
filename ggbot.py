@@ -2600,7 +2600,7 @@ async def create_portal_session(
     try:
         session = stripe.billing_portal.Session.create(
             customer=customer_id,
-            return_url=f"{os.environ['FRONTEND_URL']}/settings",
+            return_url=f"{os.environ['FRONTEND_URL']}/forge",
         )
 
         logger.bind(user_id=str(current_user.user_id)).info(
