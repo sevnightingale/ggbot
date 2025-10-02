@@ -15,8 +15,8 @@ interface Account {
   updated_at: string
   // Enhanced portfolio analytics from SSE
   unrealized_pnl?: number
-  daily_pnl?: number
-  portfolio_return_pct?: number
+  current_pnl?: number  // Aggregate unrealized P&L of open positions
+  portfolio_return_pct?: number  // Total P&L as % of initial balance
   total_balance?: number
   win_rate?: number
   avg_win?: number
@@ -37,7 +37,7 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
   const [isAnimating, setIsAnimating] = useState(false)
   const [displayValues, setDisplayValues] = useState<{
     portfolioReturn: string
-    dailyPnl: string
+    currentPnl: string
     winRate: string
     totalTrades: string
   } | null>(null)
@@ -48,13 +48,13 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
 
     // Calculate new values
     const portfolioReturnPct = account.portfolio_return_pct || 0
-    const dailyPnl = account.daily_pnl || 0
+    const currentPnl = account.current_pnl || 0
     const winRate = account.win_rate || 0
     const totalTrades = account.total_trades || 0
 
     const newValues = {
       portfolioReturn: `${portfolioReturnPct >= 0 ? '+' : ''}${portfolioReturnPct.toFixed(2)}%`,
-      dailyPnl: `${dailyPnl >= 0 ? '+' : ''}$${Math.abs(dailyPnl).toFixed(2)}`,
+      currentPnl: `${currentPnl >= 0 ? '+' : ''}$${Math.abs(currentPnl).toFixed(2)}`,
       winRate: `${winRate.toFixed(0)}%`,
       totalTrades: `${totalTrades} ${totalTrades === 1 ? 'trade' : 'trades'}`
     }
@@ -86,13 +86,13 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
 
   // Use current values or fallback to calculated values
   const portfolioReturnPct = account.portfolio_return_pct || 0
-  const dailyPnl = account.daily_pnl || 0
+  const currentPnl = account.current_pnl || 0
   const winRate = account.win_rate || 0
   const totalTrades = account.total_trades || 0
 
   const currentValues = displayValues || {
     portfolioReturn: `${portfolioReturnPct >= 0 ? '+' : ''}${portfolioReturnPct.toFixed(2)}%`,
-    dailyPnl: `${dailyPnl >= 0 ? '+' : ''}$${Math.abs(dailyPnl).toFixed(2)}`,
+    currentPnl: `${currentPnl >= 0 ? '+' : ''}$${Math.abs(currentPnl).toFixed(2)}`,
     winRate: `${winRate.toFixed(0)}%`,
     totalTrades: `${totalTrades} ${totalTrades === 1 ? 'trade' : 'trades'}`
   }
@@ -108,11 +108,11 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
         isAnimating={isAnimating}
       />
 
-      {/* KPI 2: Daily P&L */}
+      {/* KPI 2: Current P&L */}
       <KPICard
-        label="Daily P&L"
-        value={currentValues.dailyPnl}
-        delta={dailyPnl}
+        label="Current P&L"
+        value={currentValues.currentPnl}
+        delta={currentPnl}
         isPercentage={false}
         isAnimating={isAnimating}
       />

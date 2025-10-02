@@ -221,8 +221,8 @@ async def _enhance_accounts_with_portfolio_data(accounts: List[Dict[str, Any]]) 
             # Add portfolio analytics fields
             enhanced_account.update({
                 'unrealized_pnl': portfolio.unrealized_pnl,
-                'daily_pnl': portfolio.daily_pnl,
-                'portfolio_return_pct': portfolio.portfolio_return_pct,
+                'current_pnl': portfolio.current_pnl,  # Aggregate unrealized P&L of open positions
+                'portfolio_return_pct': portfolio.portfolio_return_pct,  # Total P&L as % of initial balance
                 'total_balance': portfolio.total_balance,
                 'available_balance': portfolio.available_balance,
                 'position_value': portfolio.position_value,

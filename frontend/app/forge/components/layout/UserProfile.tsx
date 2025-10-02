@@ -175,14 +175,14 @@ export function UserProfile({}: UserProfileProps) {
               <MenuButton icon={LogOut} label="Log out" onClick={handleLogout} />
             </div>
           </div>
-
-          {/* Upgrade Modal */}
-          <UpgradeModal
-            open={upgradeModalOpen}
-            onOpenChange={setUpgradeModalOpen}
-          />
         </>
       )}
+
+      {/* Upgrade Modal - outside isOpen conditional so it can open when dropdown closes */}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+      />
     </div>
   )
 }

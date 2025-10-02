@@ -73,7 +73,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="max-w-4xl">
         <DialogHeader>
           <div className="flex items-center gap-2 mb-2">
             <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
@@ -87,7 +87,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         </DialogHeader>
 
         {/* Billing Period Toggle */}
-        <div className="flex items-center justify-center gap-2 my-6">
+        <div className="flex items-center justify-center gap-2 my-4">
           <button
             onClick={() => setBillingPeriod('monthly')}
             className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -116,7 +116,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         </div>
 
         {/* Pricing Display */}
-        <div className="text-center mb-6 p-6 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
+        <div className="text-center mb-4 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
           <div className="flex items-baseline justify-center gap-2">
             <span className="text-4xl font-bold text-[var(--text-primary)]">
               ${pricing[billingPeriod].price}
@@ -130,13 +130,13 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
               {pricing.annual.savings} • Just $23.25/month
             </p>
           )}
-          <p className="text-sm text-[var(--text-secondary)] mt-3">
+          <p className="text-sm text-[var(--text-secondary)] mt-2">
             ✨ 14-day free trial • Cancel anytime
           </p>
         </div>
 
-        {/* Features List */}
-        <div className="space-y-4 mb-6">
+        {/* Features List - 2 column grid */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
           {features.map((feature, index) => (
             <div key={index} className="flex gap-3 items-start">
               <div className="text-2xl mt-0.5">{feature.icon}</div>
@@ -154,7 +154,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         </div>
 
         {/* Coupon Code Input */}
-        <div className="mb-6">
+        <div className="mb-4">
           <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
             Have a coupon code? (Optional)
           </label>
@@ -162,17 +162,17 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             type="text"
             value={couponCode}
             onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-            placeholder="FIRST100"
-            className="w-full px-4 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-amber-500"
+            placeholder="EARLY50"
+            className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
           <p className="text-xs text-[var(--text-tertiary)] mt-1">
-            First 100 users get 50% off for 6 months with code FIRST100
+            Early adopters get 50% off for 6 months with code EARLY50
           </p>
         </div>
 
         {/* Error Message */}
         {error && (
-          <div className="mb-4 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
+          <div className="mb-3 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
             <p className="text-sm text-[var(--loss-color)]">{error}</p>
           </div>
         )}

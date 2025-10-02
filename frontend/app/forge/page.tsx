@@ -64,7 +64,7 @@ function ForgeApp() {
     updated_at: string
     // Enhanced portfolio analytics from SSE
     unrealized_pnl?: number
-    daily_pnl?: number
+    current_pnl?: number  // Aggregate unrealized P&L of open positions
     portfolio_return_pct?: number
     total_balance?: number
     win_rate?: number

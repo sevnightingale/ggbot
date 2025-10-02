@@ -42,12 +42,12 @@ class PortfolioSummary:
     config_id: str
     total_balance: float
     available_balance: float
-    total_pnl: float
+    total_pnl: float  # Total realized + unrealized P&L (dollar amount)
     unrealized_pnl: float
     open_positions: int
     position_value: float
-    portfolio_return_pct: float
-    daily_pnl: float
+    portfolio_return_pct: float  # Total P&L as percentage of initial balance
+    current_pnl: float  # Sum of unrealized P&L from currently open positions
     win_rate: float
     avg_win: float
     avg_loss: float
@@ -215,25 +215,18 @@ class PositionManager:
                     avg_loss = sum(losses) / len(losses) if losses else 0
                     largest_win = max(wins) if wins else 0
                     largest_loss = min(losses) if losses else 0
-                    
-                    # Calculate daily P&L (last 24 hours)
-                    yesterday = datetime.now(timezone.utc) - timedelta(days=1)
-                    cur.execute("""
-                        SELECT COALESCE(SUM(realized_pnl), 0) as daily_pnl
-                        FROM paper_trades 
-                        WHERE config_id = %s AND status = 'closed' AND closed_at >= %s
-                    """, (config_id, yesterday))
-                    
-                    daily_pnl_result = cur.fetchone()
-                    daily_pnl = float(daily_pnl_result["daily_pnl"]) if daily_pnl_result else 0
-                    
+
+                    # Calculate current P&L (unrealized P&L from open positions)
+                    # This shows aggregate P&L of active trades
+                    current_pnl = total_unrealized_pnl
+
                     # Portfolio metrics
                     total_balance = float(account["current_balance"]) + total_position_value
                     available_balance = float(account["current_balance"])
                     total_pnl = float(account["total_pnl"]) + total_unrealized_pnl
                     initial_balance = float(account["initial_balance"])
-                    # Fix: Portfolio return should be based on total value change, not P&L tracking
-                    portfolio_return_pct = ((total_balance - initial_balance) / initial_balance) * 100
+                    # Portfolio return = total P&L as percentage of initial balance
+                    portfolio_return_pct = (total_pnl / initial_balance) * 100 if initial_balance > 0 else 0
                     
                     return PortfolioSummary(
                         config_id=config_id,
@@ -244,7 +237,7 @@ class PositionManager:
                         open_positions=len(open_positions),
                         position_value=total_position_value,
                         portfolio_return_pct=portfolio_return_pct,
-                        daily_pnl=daily_pnl,
+                        current_pnl=current_pnl,
                         win_rate=win_rate,
                         avg_win=avg_win,
                         avg_loss=avg_loss,
