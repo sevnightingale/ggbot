@@ -59,6 +59,7 @@
 |---------|--------|-----|--------|---------|
 | ggbot | 🟢 Online | 0% | ~165MB | V2 Orchestrator API server with integrated scheduler & telegram publishing |
 | signal-listener | 🟢 Online | 0% | ~63MB | External signal processing service (ggShot integration) |
+| x-bot | 🟢 Online | 0% | ~7MB | X (Twitter) bot for @ggbots_ai - automated platform status tweets and engagement |
 | pm2-logrotate | 🟢 Online | 0% | ~57MB | Automated log rotation and compression (10MB rotation, 5 files max) |
 
 ### Infrastructure Services
@@ -94,6 +95,7 @@
 - **Multi-exchange Hummingbot integration** with automatic fallback (5 exchanges)
 - **$10,000 isolated accounts** per configuration
 - **✅ 3-second position monitoring** ACTIVE (batch SQL updates for efficiency)
+- **Liquidation system** - automatic position liquidation when losses exceed margin
 - **Confidence-based position sizing**
 - **Enhanced reliability** - eliminates single exchange failure points
 
@@ -194,6 +196,7 @@ df -h
 
 ### **Multi-Timeframe Architecture** (Complete)
 - **7 timeframes**: 5m, 15m, 30m, 1h, 4h, 1d, 1w extraction
+- **Parallel extraction**: asyncio.gather for simultaneous timeframe fetching (~30-60s vs 2min sequential)
 - **Rich LLM context** across all timeframes for decision making
 - **Database storage** with separate rows per timeframe
 
@@ -234,7 +237,7 @@ df -h
 |---------|-----------|----------|
 | **Active Bots** | 1 bot | 10 bots |
 | **Analysis Frequency** | 1 hour minimum | 5 minutes minimum |
-| **AI Models** | Basic models | Frontier reasoning models |
+| **AI Models** | Default Model (basic intelligence) | Frontier Reasoning Models (GPT-5, Claude Opus 4, Grok 4, DeepSeek R1) |
 | **Telegram Publishing** | ❌ | ✅ |
 | **Priority Support** | ❌ | ✅ |
 
@@ -329,4 +332,40 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **UX Enhancement**: Errors block save, warnings allow save with notification
 - **Component**: ValidationMessage with AlertCircle/AlertTriangle icons
 
-*Last major update: Stripe subscription system + trading validation (2025-10-01)*
+### 🚀 LLM & Extraction Performance Upgrades (Complete - 2025-10-03)
+**LLM Provider Optimizations**:
+- **GPT-5 Responses API Migration**: Full integration with reasoning effort controls, CoT passing, and verbosity settings
+- **PRO Model Settings**: 200s timeout + max tokens (OpenAI/Anthropic: 16384, DeepSeek: 8192, XAI: 16384) for quality reasoning
+- **Universal System Prompts**: All 4 providers support 3 modes (standard, ggshot, trade_management)
+- **Frontend Redesign**: Free users see "Default Model" + locked "Frontier Reasoning Models"; Pro users get 4 individual providers
+
+**Extraction Performance**:
+- **Parallel Timeframes**: asyncio.gather for simultaneous extraction (~60s saved)
+- **Balanced Timeout**: 10s per exchange (reliability under load vs 2s aggressive timeout)
+- **Result**: ~30-60s extraction vs 2 min sequential processing
+
+**Bug Fixes**:
+- GPT-5 response parsing (handles dict with 'output' + direct list formats)
+- Pandas dtype warnings (MFI volume conversion)
+- Numpy.bool_ serialization errors
+- Frontend LLM selection spread order bug
+
+*Last major update: LLM provider upgrades + extraction parallelization (2025-10-03)*
+
+### 📉 Liquidation System (Complete - 2025-10-04)
+**Paper Trading Engine Realism**:
+- **Liquidation Price Calculation**: Automatically calculated on trade open based on margin and leverage
+- **Automatic Liquidation**: Positions auto-close when price hits liquidation level (checked first, highest priority)
+- **Database Schema**: Added `liquidation_price` column to paper_trades table
+- **Realistic Simulation**: High leverage positions now liquidate correctly (e.g., 10x leverage liquidates at ~10% adverse move)
+- **Priority Order**: Liquidation → Stop Loss → Take Profit (matches real exchange behavior)
+
+### 🐦 X Bot Service (Complete - 2025-10-04)
+**Automated X (Twitter) Bot for @ggbots_ai**:
+- **Separate PM2 Service**: Independent x-bot process with APScheduler (isolates social media from trading operations)
+- **Platform Status Tweets**: Daily automated tweets at 9:00 AM UTC with real-time platform metrics (active bots, users, trades, symbols tracked, open positions)
+- **Database Integration**: Queries configurations and paper_trades tables for live platform statistics
+- **Free Tier Strategy**: ~90 reads/month + ~240 writes/month (well within 100 read/500 write limits)
+- **Architecture**: Tweepy v4 wrapper with error handling, separate schedulers directory for extensibility
+- **Files**: `x_bot/bot.py` (main service), `x_bot/utils/x_client.py` (API wrapper), `x_bot/schedulers/platform_status.py` (daily tweet logic)
+- **Future Expansion**: Ready for trade announcements, weekly summaries, targeted account replies (documented in X_BOT.md)

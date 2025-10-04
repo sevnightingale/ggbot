@@ -782,7 +782,9 @@ class TechnicalIndicators:
 
     def calculate_mfi(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
         """Calculate Money Flow Index."""
-        mfi_series = ta.mfi(df['high'], df['low'], df['close'], df['volume'], length=length)
+        # Convert volume to float to avoid pandas dtype incompatibility warning
+        volume = df['volume'].astype(float)
+        mfi_series = ta.mfi(df['high'], df['low'], df['close'], volume, length=length)
         if mfi_series is None or mfi_series.empty:
             raise ValueError("MFI calculation failed")
 

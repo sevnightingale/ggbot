@@ -65,7 +65,13 @@ class ExtractionEngineV2:
         storage = " + ".join(storage_parts)
         
         self._log.info(f"Initialized ExtractionEngineV2 with {mode} preprocessing, {storage} storage")
-    
+
+    async def cleanup(self):
+        """Cleanup resources when engine is destroyed or no longer needed."""
+        if self.data_client:
+            await self.data_client.disconnect()
+            self._log.info("ExtractionEngineV2 cleanup completed")
+
     async def extract_for_symbol(
         self,
         symbol: str,
@@ -102,8 +108,9 @@ class ExtractionEngineV2:
 
         try:
             # Step 1: Fetch OHLCV data from Hummingbot with multi-exchange fallback
-            async with self.data_client:
-                df = await self.data_client.get_candles_with_fallback(symbol, timeframe, actual_limit)
+            # Use ensure_connected() instead of context manager to avoid race conditions in parallel execution
+            await self.data_client.ensure_connected()
+            df = await self.data_client.get_candles_with_fallback(symbol, timeframe, actual_limit)
             
             if df.empty:
                 raise ValueError(f"No data received for {symbol}")
@@ -345,9 +352,9 @@ class ExtractionEngineV2:
         
         # Test 1: Data client connection
         try:
-            async with self.data_client:
-                connection_test = await self.data_client.test_connection()
-                test_results["data_client"] = connection_test
+            await self.data_client.ensure_connected()
+            connection_test = await self.data_client.test_connection()
+            test_results["data_client"] = connection_test
         except Exception as e:
             test_results["data_client"] = {"status": "error", "error": str(e)}
         

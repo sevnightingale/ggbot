@@ -178,6 +178,32 @@ class SupabasePaperTradingService:
     def _calculate_fees(self, size_usd: float) -> float:
         """Calculate trading fees"""
         return size_usd * self.taker_fee
+
+    def _calculate_liquidation_price(self, entry_price: float, side: str, margin_used: float, position_size_usd: float) -> float:
+        """
+        Calculate liquidation price based on margin and position size.
+
+        Args:
+            entry_price: Entry price of the position
+            side: Trade side ('long' or 'short')
+            margin_used: Total margin reserved (includes fees)
+            position_size_usd: Total position size in USD
+
+        Returns:
+            Liquidation price
+        """
+        # Calculate the margin ratio (how much of position is margin)
+        margin_ratio = margin_used / position_size_usd
+
+        # For LONG: liquidation when price drops by margin_ratio
+        # For SHORT: liquidation when price rises by margin_ratio
+        if side == "long":
+            liquidation_price = entry_price * (1 - margin_ratio)
+        else:  # short
+            liquidation_price = entry_price * (1 + margin_ratio)
+
+        logger.debug(f"Calculated liquidation price for {side}: ${liquidation_price:.2f} (entry: ${entry_price:.2f}, margin ratio: {margin_ratio:.2%})")
+        return liquidation_price
     
     async def execute_trade_intent(self, intent: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -273,6 +299,14 @@ class SupabasePaperTradingService:
             # Total margin to reserve (margin + fees)
             margin_with_fees = margin_required + fees
 
+            # Calculate liquidation price based on margin and leverage
+            liquidation_price = self._calculate_liquidation_price(
+                entry_price=entry_price,
+                side=action,
+                margin_used=margin_with_fees,
+                position_size_usd=position_size_usd
+            )
+
             # Reserve balance for the trade (margin + fees, not full position size)
             trade_cost = Money(amount=Decimal(str(margin_with_fees)), currency="USD")
             try:
@@ -312,6 +346,7 @@ class SupabasePaperTradingService:
                     'status': 'open',
                     'stop_loss': stop_loss,
                     'take_profit': take_profit,
+                    'liquidation_price': liquidation_price,
                     'confidence_score': confidence
                     # Note: reasoning field not in schema, will track separately if needed
                 }
@@ -697,9 +732,9 @@ class SupabasePaperTradingService:
         try:
             # Get ALL open positions (batch optimization)
             if config_id:
-                response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit").eq('config_id', config_id).eq('status', 'open').execute()
+                response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('config_id', config_id).eq('status', 'open').execute()
             else:
-                response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit").eq('status', 'open').execute()
+                response = self.supabase.table('paper_trades').select("trade_id, symbol, side, entry_price, size_usd, stop_loss, take_profit, liquidation_price").eq('status', 'open').execute()
 
             positions = response.data
             if not positions:
@@ -736,10 +771,15 @@ class SupabasePaperTradingService:
                 else:  # short
                     unrealized_pnl = (entry_price - current_price) * size_contracts * leverage
 
-                # Check for stop loss/take profit triggers
+                # Check for liquidation/stop loss/take profit triggers
+                # CRITICAL: Check liquidation FIRST - it overrides SL/TP in real trading
                 should_close = None
-                if pos["stop_loss"] and ((side == "long" and current_price <= pos["stop_loss"]) or
-                                        (side == "short" and current_price >= pos["stop_loss"])):
+                if pos.get("liquidation_price") and ((side == "long" and current_price <= pos["liquidation_price"]) or
+                                                     (side == "short" and current_price >= pos["liquidation_price"])):
+                    should_close = "liquidation"
+                    logger.warning(f"⚠️ LIQUIDATION triggered for {symbol} {side} position: price ${current_price:.2f} hit liquidation ${pos['liquidation_price']:.2f}")
+                elif pos["stop_loss"] and ((side == "long" and current_price <= pos["stop_loss"]) or
+                                          (side == "short" and current_price >= pos["stop_loss"])):
                     should_close = "stop_loss"
                 elif pos["take_profit"] and ((side == "long" and current_price >= pos["take_profit"]) or
                                             (side == "short" and current_price <= pos["take_profit"])):

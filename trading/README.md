@@ -17,6 +17,7 @@ The paper trading engine provides realistic trading simulation using real-time m
 4. **Manual Position Close**: Users can manually close positions via API and frontend button
 5. **Multi-Exchange Fallback**: Automatic failover across 5 exchanges for market data reliability
 6. **Position Monitoring**: Real-time 3-second price updates with batch SQL optimization (99% reduction in API calls)
+7. **Liquidation System**: Automatic position liquidation when losses exceed margin (realistic leveraged trading)
 
 **Earlier Updates (September 2025):**
 1. **Fixed Money Class**: Now properly handles negative amounts for trading losses (critical bug fix)
@@ -229,6 +230,13 @@ Automated real-time position management running as background task.
 
 **Automatic Execution:**
 ```python
+# Liquidation Triggers (checked first - highest priority)
+if side == "long" and current_price <= liquidation_price:
+    await close_position(trade_id, "liquidation", current_price)
+
+if side == "short" and current_price >= liquidation_price:
+    await close_position(trade_id, "liquidation", current_price)
+
 # Stop Loss Triggers
 if side == "long" and current_price <= stop_loss:
     await close_position(trade_id, "stop_loss", current_price)
@@ -236,7 +244,7 @@ if side == "long" and current_price <= stop_loss:
 if side == "short" and current_price >= stop_loss:
     await close_position(trade_id, "stop_loss", current_price)
 
-# Take Profit Triggers  
+# Take Profit Triggers
 if side == "long" and current_price >= take_profit:
     await close_position(trade_id, "take_profit", current_price)
 
@@ -424,7 +432,7 @@ updated_count = await service.update_position_prices()  # Updates all open posit
 
 **Features**:
 - Real-time P&L updates with correct leverage multiplier
-- Automatic SL/TP execution
+- Automatic liquidation/SL/TP execution
 - Batch SQL optimization for reliability
 - Multi-exchange price fallback
 
@@ -452,6 +460,7 @@ The paper trading engine provides **professional-grade simulation** with real ma
 - ✅ **Manual Control**: Users can close positions anytime via frontend button
 - ✅ **Reliable Monitoring**: 3-second updates with batch SQL (99% reduction in API calls)
 - ✅ **Multi-Exchange**: Automatic failover across 5 exchanges for market data
+- ✅ **Liquidation System**: Realistic position liquidation when losses exceed margin (critical for high leverage)
 
 ### Upcoming: Database Reset
 All paper accounts will be reset to $10,000 as part of the V2.0 launch to ensure accurate simulation with the corrected leverage calculations. Bots with custom strategies will remain active; default strategy bots will be deactivated for user reconfiguration.
