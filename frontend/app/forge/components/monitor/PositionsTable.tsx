@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import { TrendingUp, TrendingDown, X } from 'lucide-react'
+import { apiClient } from '@/lib/api'
 
 interface Position {
   trade_id: string
@@ -79,23 +80,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     try {
       setClosingPositions(prev => ({ ...prev, [tradeId]: true }))
 
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_API_URL}/api/v2/bot/${selectedConfigId}/positions/${tradeId}/close`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${localStorage.getItem('sb-access-token')}`
-          }
-        }
-      )
-
-      if (!response.ok) {
-        const error = await response.json()
-        throw new Error(error.detail || 'Failed to close position')
-      }
-
-      const result = await response.json()
+      const result = await apiClient.closePosition(selectedConfigId, tradeId)
       console.log('Position closed:', result)
 
       // Notify parent component to refresh data

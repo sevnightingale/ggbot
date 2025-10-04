@@ -238,6 +238,10 @@ app = FastAPI(
     lifespan=lifespan
 )
 
+# Include API routers
+from api.paper_trading import router as paper_trading_router
+app.include_router(paper_trading_router)
+
 
 class GGBotOrchestrator:
     """Main orchestrator class coordinating all V2 modules with full integration."""

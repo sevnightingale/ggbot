@@ -270,6 +270,19 @@ export class ApiClient {
     return await response.json()
   }
 
+  async closePosition(configId: string, tradeId: string): Promise<{ status: string; trade_id: string; close_price: number; realized_pnl: number; message: string }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/bot/${configId}/positions/${tradeId}/close`, {
+      method: 'POST'
+    })
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to close position: ${error}`)
+    }
+
+    return await response.json()
+  }
+
   // Data Sources Management  
   async getDataSourcesWithPoints(): Promise<DataSource[]> {
     console.log('🔍 API Call: getDataSourcesWithPoints to', `${this.baseUrl}/api/v2/data-sources-with-points`)
