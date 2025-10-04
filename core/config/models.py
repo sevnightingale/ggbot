@@ -216,26 +216,34 @@ class BotConfig(BaseModel):
     def get_position_size(self, confidence: float, balance: float) -> float:
         """
         Calculate position size based on configuration and current parameters.
-        
+
+        Position sizing settings represent MARGIN (risk), which is then multiplied
+        by leverage to get the actual position size.
+
         Args:
             confidence: AI confidence score (0.0 to 1.0)
             balance: Current account balance in USD
-            
+
         Returns:
-            Position size in USD
+            Position size in USD (margin × leverage)
         """
         sizing = self.trading.position_sizing
-        
+        leverage = self.trading.leverage
+
+        # Calculate margin based on sizing method
         if sizing.method == PositionSizingMethod.FIXED_USD:
-            return sizing.fixed_amount_usd or 100.0
+            margin = sizing.fixed_amount_usd or 100.0
         elif sizing.method == PositionSizingMethod.ACCOUNT_PERCENTAGE:
-            return balance * ((sizing.account_percent or 5.0) / 100.0)
+            margin = balance * ((sizing.account_percent or 5.0) / 100.0)
         elif sizing.method == PositionSizingMethod.CONFIDENCE_BASED:
             max_pct = (sizing.max_position_percent or 10.0) / 100.0
-            return confidence * max_pct * balance
+            margin = confidence * max_pct * balance
         else:
             # Fallback to current behavior
-            return confidence * 0.10 * balance
+            margin = confidence * 0.10 * balance
+
+        # Position size = margin × leverage
+        return margin * leverage
 
     def get_default_stop_loss_price(self, entry_price: float, side: str) -> Optional[float]:
         """

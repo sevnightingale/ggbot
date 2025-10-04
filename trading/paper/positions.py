@@ -103,11 +103,11 @@ class PositionManager:
                     # Calculate size in contracts from USD size
                     size_contracts = size_usd / entry_price
 
-                    # Apply leverage multiplier to P&L
+                    # Calculate P&L (size_usd is already the full leveraged position)
                     if trade["side"] == "long":
-                        unrealized_pnl = (current_price - entry_price) * size_contracts * leverage
+                        unrealized_pnl = (current_price - entry_price) * size_contracts
                     else:  # short
-                        unrealized_pnl = (entry_price - current_price) * size_contracts * leverage
+                        unrealized_pnl = (entry_price - current_price) * size_contracts
                     
                     unrealized_pnl_pct = (unrealized_pnl / size_usd) * 100
                     
@@ -191,11 +191,11 @@ class PositionManager:
                                 # Calculate size in contracts from USD size
                                 size_contracts = size_usd / entry_price
 
-                                # Apply leverage multiplier to P&L
+                                # Calculate P&L (size_usd is already the full leveraged position)
                                 if pos["side"] == "long":
-                                    pnl = (current_price - entry_price) * size_contracts * leverage
+                                    pnl = (current_price - entry_price) * size_contracts
                                 else:
-                                    pnl = (entry_price - current_price) * size_contracts * leverage
+                                    pnl = (entry_price - current_price) * size_contracts
 
                                 total_unrealized_pnl += pnl
                                 total_position_value += current_price * size_contracts

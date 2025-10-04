@@ -117,17 +117,25 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
         {/* Pricing Display */}
         <div className="text-center mb-4 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
-          <div className="flex items-baseline justify-center gap-2">
-            <span className="text-4xl font-bold text-[var(--text-primary)]">
-              ${pricing[billingPeriod].price}
-            </span>
-            <span className="text-[var(--text-secondary)]">
-              / {pricing[billingPeriod].period}
-            </span>
+          <div className="flex flex-col items-center gap-1">
+            <div className="flex items-baseline justify-center gap-2">
+              <span className="text-2xl font-medium text-[var(--text-muted)] line-through">
+                ${pricing[billingPeriod].price}
+              </span>
+              <span className="text-4xl font-bold text-[var(--profit-color)]">
+                ${pricing[billingPeriod].price / 2}
+              </span>
+              <span className="text-[var(--text-secondary)]">
+                / {pricing[billingPeriod].period}
+              </span>
+            </div>
+            <p className="text-sm text-[var(--profit-color)] font-medium">
+              🎉 50% off for first 100 customers!
+            </p>
           </div>
           {billingPeriod === 'annual' && (
-            <p className="text-sm text-[var(--profit-color)] mt-2 font-medium">
-              {pricing.annual.savings} • Just $23.25/month
+            <p className="text-sm text-[var(--text-secondary)] mt-2">
+              Just $11.63/month when billed annually
             </p>
           )}
           <p className="text-sm text-[var(--text-secondary)] mt-2">
@@ -162,11 +170,11 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             type="text"
             value={couponCode}
             onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-            placeholder="EARLY50"
+            placeholder="FIRST100"
             className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-amber-500"
           />
           <p className="text-xs text-[var(--text-tertiary)] mt-1">
-            Early adopters get 50% off for 6 months with code EARLY50
+            First 100 customers get 50% off for 6 months with code FIRST100
           </p>
         </div>
 
