@@ -91,29 +91,39 @@ class SupabasePaperTradingService:
     def _calculate_position_size(self, config: BotConfig, confidence: float, account_balance: Union[float, Decimal]) -> float:
         """
         Calculate position size based on configuration, confidence score, and account balance.
-        
+
+        Position sizing settings represent margin/risk, which is multiplied by leverage
+        to get the final position size.
+
         Args:
             config: Bot configuration with position sizing settings
             confidence: Confidence score from Decision Module (0.0-1.0)
             account_balance: Current account balance (float or Decimal)
-            
+
         Returns:
-            Position size in USD
+            Position size in USD (already includes leverage)
         """
         # Convert Decimal to float for calculations
         balance = float(account_balance) if isinstance(account_balance, Decimal) else account_balance
-        
-        # Use config-based position sizing
+
+        # Get position size (margin × leverage) from config
         position_size = config.get_position_size(confidence, balance)
-        
+        leverage = config.trading.leverage
+
+        # Calculate the margin required for this position
+        margin_required = position_size / leverage
+
+        # Cap margin at 95% of balance (keep 5% buffer for fees)
+        max_margin = balance * 0.95
+        if margin_required > max_margin:
+            margin_required = max_margin
+            position_size = margin_required * leverage
+
         # Minimum position size of $10
         position_size = max(position_size, 10.0)
-        
-        # Don't exceed available balance
-        position_size = min(position_size, balance * 0.95)  # Keep 5% buffer
-        
+
         sizing_method = config.trading.position_sizing.method.value
-        logger.debug(f"Position sizing ({sizing_method}): confidence={confidence:.3f}, balance=${balance:,}, size=${position_size:.2f}")
+        logger.debug(f"Position sizing ({sizing_method}): confidence={confidence:.3f}, balance=${balance:,}, margin=${margin_required:.2f}, size=${position_size:.2f}, leverage={leverage}x")
         return position_size
     
     async def _check_position_limits(self, config: BotConfig, config_id: str, user_id: str) -> tuple[bool, Optional[str]]:
@@ -450,11 +460,11 @@ class SupabasePaperTradingService:
             # Calculate size in contracts from USD size
             size_contracts = size_usd / entry_price
 
-            # Apply leverage multiplier to P&L
+            # Calculate P&L (size_usd is already the full leveraged position)
             if side == "long":
-                pnl = (close_price - entry_price) * size_contracts * leverage
+                pnl = (close_price - entry_price) * size_contracts
             else:  # short
-                pnl = (entry_price - close_price) * size_contracts * leverage
+                pnl = (entry_price - close_price) * size_contracts
             
             # Calculate close fees
             close_size_usd = close_price * size_contracts
@@ -765,11 +775,11 @@ class SupabasePaperTradingService:
                 # Calculate size in contracts
                 size_contracts = size_usd / entry_price
 
-                # Apply leverage multiplier to P&L calculation
+                # Calculate P&L (size_usd is already the full leveraged position)
                 if side == "long":
-                    unrealized_pnl = (current_price - entry_price) * size_contracts * leverage
+                    unrealized_pnl = (current_price - entry_price) * size_contracts
                 else:  # short
-                    unrealized_pnl = (entry_price - current_price) * size_contracts * leverage
+                    unrealized_pnl = (entry_price - current_price) * size_contracts
 
                 # Check for liquidation/stop loss/take profit triggers
                 # CRITICAL: Check liquidation FIRST - it overrides SL/TP in real trading
