@@ -129,11 +129,13 @@ class SignalOrchestrationRequest(BaseModel):
 def serialize_numpy_types(obj):
     """Recursively convert numpy types and Decimal to Python native types."""
     from decimal import Decimal
-    
+
     if isinstance(obj, (np.integer)):
         return int(obj)
     elif isinstance(obj, (np.floating)):
         return float(obj)
+    elif isinstance(obj, (np.bool_)):
+        return bool(obj)
     elif isinstance(obj, (np.ndarray)):
         return obj.tolist()
     elif isinstance(obj, Decimal):
@@ -696,13 +698,11 @@ class GGBotOrchestrator:
         try:
             symbol = override_symbol or config.selected_pair or "BTC/USDT"
 
-            timeframe_results = {}
-            successful_extractions = 0
-            
-            for timeframe in timeframes:
-                self._log.info(f"Extracting {len(indicators)} indicators for {symbol} ({timeframe})")
+            # Extract all timeframes in parallel for speed
+            self._log.info(f"Extracting {len(indicators)} indicators for {symbol} across {len(timeframes)} timeframes in parallel")
 
-                result = await extraction_engine.extract_for_symbol(
+            tasks = [
+                extraction_engine.extract_for_symbol(
                     symbol=symbol,
                     indicators=indicators,
                     timeframe=timeframe,
@@ -710,9 +710,18 @@ class GGBotOrchestrator:
                     connector="kucoin",
                     config_id=config.config_id
                 )
-                
+                for timeframe in timeframes
+            ]
+
+            results = await asyncio.gather(*tasks)
+
+            # Map results back to timeframes
+            timeframe_results = {}
+            successful_extractions = 0
+
+            for timeframe, result in zip(timeframes, results):
                 timeframe_results[timeframe] = result
-                
+
                 if result.get("status") == "success":
                     successful_extractions += 1
                     self._log.info(f"✅ V2 Extraction completed for {symbol} ({timeframe})")
@@ -815,7 +824,24 @@ class GGBotOrchestrator:
             
             action = decision_result.get("action", "wait")
             confidence = decision_result.get("confidence", 0.0)
-            
+
+            # For signal_validation configs: gate trades with confidence threshold
+            # For autonomous_trading configs: trust the bot's decision (no confidence gating)
+            if config.config_type == "signal_validation":
+                if config.telegram_integration and config.telegram_integration.get("publisher"):
+                    publisher_config = config.telegram_integration.get("publisher", {})
+                    threshold = publisher_config.get("confidence_threshold", 0.7)
+                    if confidence < threshold:
+                        self._log.info(
+                            f"Signal rejected: confidence {confidence:.2f} below threshold {threshold:.2f}"
+                        )
+                        return {
+                            "status": "skipped",
+                            "reason": f"Signal confidence {confidence:.2f} below threshold {threshold:.2f}",
+                            "action": action,
+                            "confidence": confidence
+                        }
+
             if action in ["wait", "no_action", "hold"]:
                 return {
                     "status": "skipped",
@@ -888,7 +914,7 @@ class GGBotOrchestrator:
                     position = open_positions[0]
                     trade_result = await self.paper_trading.close_position(
                         position['trade_id'],
-                        reason="ai_decision"
+                        reason="position_management"
                     )
                     
                     self._log.info(f"V2 Position closed: {trade_result.get('status')} for {symbol}")

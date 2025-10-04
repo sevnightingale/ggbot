@@ -197,8 +197,7 @@ class DeepSeekProvider(LLMProvider):
             # Standard/default system prompt
             return (
                 "You are an expert cryptocurrency trader analyzing market data and making trading decisions. "
-                "Provide clear, reasoned responses about trading actions. "
-                "Format your response with clear sections for Decision, Confidence, and Reasoning."
+                "Provide clear, reasoned responses about trading actions."
             )
     
     async def health_check(self) -> bool:

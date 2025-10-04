@@ -61,7 +61,7 @@ class HummingbotDataClient:
     async def connect(self):
         """Establish connection to Hummingbot API."""
         if not self.session:
-            timeout = aiohttp.ClientTimeout(total=5)
+            timeout = aiohttp.ClientTimeout(total=10)  # Balanced timeout for reliability under load
             self.session = aiohttp.ClientSession(
                 headers=self.headers,
                 timeout=timeout
@@ -74,6 +74,11 @@ class HummingbotDataClient:
             await self.session.close()
             self.session = None
             self._log.info("Disconnected from Hummingbot API")
+
+    async def ensure_connected(self):
+        """Ensure connection is established (idempotent)."""
+        if not self.session:
+            await self.connect()
     
     async def get_candles(
         self, 
@@ -117,11 +122,18 @@ class HummingbotDataClient:
                     raise Exception(f"Hummingbot API error {response.status}: {error_text}")
                 
                 data = await response.json()
-                
+
+                # Handle error responses that are dicts (API returns errors with status 200 sometimes)
+                if isinstance(data, dict):
+                    if "error" in data:
+                        raise Exception(f"API error: {data['error']}")
+                    else:
+                        raise Exception(f"Expected list of candles, got dict: {data}")
+
                 # API returns list of dicts: [{'timestamp': 1756843200.0, 'open': 110805.6, ...}, ...]
                 if not isinstance(data, list):
                     raise Exception(f"Expected list of candles, got: {type(data)}")
-                
+
                 if not data:
                     raise Exception("No candle data returned")
                 
@@ -136,9 +148,11 @@ class HummingbotDataClient:
                 
                 self._log.info(f"✅ Retrieved {len(df)} candles for {symbol}")
                 return df
-                
+
         except Exception as e:
-            self._log.error(f"Error fetching candles for {symbol}: {str(e)}")
+            # Handle empty error messages from aiohttp exceptions
+            error_msg = str(e) or repr(e) or type(e).__name__
+            self._log.error(f"Error fetching candles for {symbol}: {error_msg}")
             raise
 
     async def get_candles_with_fallback(

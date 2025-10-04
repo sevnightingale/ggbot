@@ -61,6 +61,40 @@ module.exports = {
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
+    },
+    // X (Twitter) bot service for @ggbots_ai
+    {
+      name: 'x-bot',
+      script: '/home/sev/ggbot/x_bot/bot.py',
+      interpreter: '/home/sev/ggbot/.venv/bin/python',
+      cwd: '/home/sev/ggbot',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        X_BOT_ENABLED: 'true',
+        X_API_KEY: process.env.X_API_KEY,
+        X_API_SECRET: process.env.X_API_SECRET,
+        X_ACCESS_TOKEN: process.env.X_ACCESS_TOKEN,
+        X_ACCESS_SECRET: process.env.X_ACCESS_SECRET,
+        X_BEARER_TOKEN: process.env.X_BEARER_TOKEN,
+        X_BOT_USERNAME: process.env.X_BOT_USERNAME,
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
+      },
+      error_file: '/home/sev/ggbot/logs/x-bot-error.log',
+      out_file: '/home/sev/ggbot/logs/x-bot-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      log_type: 'json',
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 4000
     }
     // Uncomment when ready to add more services
     /*

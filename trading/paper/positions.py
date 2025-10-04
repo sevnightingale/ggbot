@@ -161,24 +161,27 @@ class PositionManager:
                     account = cur.fetchone()
                     if not account:
                         raise ValueError(f"No paper account found for config {config_id}")
-                    
+
+                    # Get last reset timestamp for filtering trades
+                    last_reset_at = account.get("last_reset_at")
+
                     # Get open positions
                     cur.execute("""
-                        SELECT * FROM paper_trades 
+                        SELECT * FROM paper_trades
                         WHERE config_id = %s AND status = 'open'
                     """, (config_id,))
-                    
+
                     open_positions = cur.fetchall()
-                    
+
                     # Calculate unrealized P&L for open positions
                     total_unrealized_pnl = 0.0
                     total_position_value = 0.0
-                    
+
                     if open_positions:
                         # Get current prices for all symbols
                         symbols = list(set(pos["symbol"] for pos in open_positions))
                         prices = await self.market_data.get_multiple_prices(symbols)
-                        
+
                         for pos in open_positions:
                             if pos["symbol"] in prices:
                                 current_price = prices[pos["symbol"]].mid
@@ -196,13 +199,21 @@ class PositionManager:
 
                                 total_unrealized_pnl += pnl
                                 total_position_value += current_price * size_contracts
-                    
-                    # Get closed trades for analytics
-                    cur.execute("""
-                        SELECT realized_pnl, closed_at FROM paper_trades 
-                        WHERE config_id = %s AND status = 'closed'
-                        ORDER BY closed_at DESC
-                    """, (config_id,))
+
+                    # Get closed trades for analytics (only since last reset)
+                    if last_reset_at:
+                        cur.execute("""
+                            SELECT realized_pnl, closed_at FROM paper_trades
+                            WHERE config_id = %s AND status = 'closed' AND closed_at > %s
+                            ORDER BY closed_at DESC
+                        """, (config_id, last_reset_at))
+                    else:
+                        # No reset yet, get all closed trades
+                        cur.execute("""
+                            SELECT realized_pnl, closed_at FROM paper_trades
+                            WHERE config_id = %s AND status = 'closed'
+                            ORDER BY closed_at DESC
+                        """, (config_id,))
                     
                     closed_trades = cur.fetchall()
                     

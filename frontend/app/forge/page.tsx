@@ -955,6 +955,11 @@ function ForgeApp() {
                     {/* PositionsTable - Active trades (full width) */}
                     <PositionsTable
                       positions={positions}
+                      selectedConfigId={selectedConfigId}
+                      onPositionClosed={() => {
+                        // SSE will automatically refresh positions, but log the event
+                        console.log('Position closed, waiting for SSE update...')
+                      }}
                     />
                   </div>
                 ) : (

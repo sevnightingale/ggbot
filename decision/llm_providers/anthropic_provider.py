@@ -42,7 +42,7 @@ class AnthropicProvider(LLMProvider):
         """
         super().__init__(api_key, model, **kwargs)
         self.base_url = kwargs.get('base_url', 'https://api.anthropic.com/v1')
-        self.timeout = kwargs.get('timeout', 120)  # Standard timeout for analysis
+        self.timeout = kwargs.get('timeout', 200)  # Extended for quality reasoning
         self.max_retries = kwargs.get('max_retries', 3)
         self.anthropic_version = kwargs.get('anthropic_version', '2023-06-01')
 
@@ -95,7 +95,7 @@ class AnthropicProvider(LLMProvider):
             "messages": messages,
             "system": system_prompt,
             "temperature": temperature,
-            "max_tokens": 8192,
+            "max_tokens": 16384,  # Maximum for quality reasoning
             "stream": False
         }
 
@@ -205,8 +205,7 @@ class AnthropicProvider(LLMProvider):
             # Standard/default system prompt
             return (
                 "You are an expert cryptocurrency trader analyzing market data and making trading decisions. "
-                "Provide clear, reasoned responses about trading actions. "
-                "Format your response with clear sections for Decision, Confidence, and Reasoning."
+                "Provide clear, reasoned responses about trading actions."
             )
 
     async def health_check(self) -> bool:
