@@ -10,6 +10,7 @@ from typing import Dict, List, Any
 from datetime import datetime, timedelta
 from fastapi import APIRouter, HTTPException, Depends
 from dotenv import load_dotenv
+import psycopg2.extras
 
 from core.common.logger import logger
 from trading.paper.supabase_service import SupabasePaperTradingService
