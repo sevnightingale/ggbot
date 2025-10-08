@@ -426,7 +426,7 @@ def _calculate_trade_statistics(trades: List[Dict[str, Any]], account_summary: D
 def _format_time_duration(delta: timedelta) -> str:
     """Format timedelta as human-readable string."""
     total_minutes = int(delta.total_seconds() // 60)
-    
+
     if total_minutes < 60:
         return f"{total_minutes}m"
     elif total_minutes < 1440:  # Less than 24 hours
@@ -437,3 +437,201 @@ def _format_time_duration(delta: timedelta) -> str:
         days = total_minutes // 1440
         hours = (total_minutes % 1440) // 60
         return f"{days}d {hours}h" if hours > 0 else f"{days}d"
+
+
+@router.get("/{config_id}/trade-history-with-decisions")
+async def get_trade_history_with_decisions(
+    config_id: str,
+    limit: int = 50,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Get closed trade history with decision data joined.
+    Respects account reset filtering - only returns trades after last reset.
+
+    Returns:
+        - trades: List of closed trades with decision confidence and reasoning
+        - total_count: Number of trades returned
+    """
+    try:
+        from core.common.db import get_db_connection
+
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                # Query closed trades with decision data, filtering by last_reset_at
+                query = """
+                    SELECT
+                        pt.trade_id,
+                        pt.symbol,
+                        pt.side,
+                        pt.entry_price,
+                        pt.size_usd,
+                        pt.leverage,
+                        pt.realized_pnl,
+                        pt.close_reason,
+                        pt.opened_at,
+                        pt.closed_at,
+                        pt.confidence_score,
+                        d.decision_id,
+                        d.action,
+                        d.confidence as decision_confidence,
+                        d.reasoning
+                    FROM paper_trades pt
+                    LEFT JOIN decisions d ON pt.decision_id = d.decision_id
+                    LEFT JOIN paper_accounts pa ON pt.config_id = pa.config_id
+                    WHERE pt.config_id = %s
+                      AND pt.user_id = %s
+                      AND pt.status = 'closed'
+                      AND pt.closed_at > COALESCE(pa.last_reset_at, '1970-01-01'::timestamptz)
+                    ORDER BY pt.closed_at DESC
+                    LIMIT %s
+                """
+
+                cur.execute(query, (config_id, current_user.user_id, limit))
+                trades = cur.fetchall()
+
+                # Format trades for frontend
+                formatted_trades = []
+                for trade in trades:
+                    formatted_trades.append({
+                        "trade_id": trade["trade_id"],
+                        "symbol": trade["symbol"],
+                        "side": trade["side"],
+                        "entry_price": float(trade["entry_price"]),
+                        "size_usd": float(trade["size_usd"]),
+                        "leverage": int(trade["leverage"]),
+                        "realized_pnl": float(trade["realized_pnl"]) if trade["realized_pnl"] is not None else 0.0,
+                        "close_reason": trade["close_reason"],
+                        "opened_at": trade["opened_at"].isoformat() if trade["opened_at"] else None,
+                        "closed_at": trade["closed_at"].isoformat() if trade["closed_at"] else None,
+                        "confidence_score": float(trade["confidence_score"]) if trade["confidence_score"] is not None else None,
+                        "decision_id": trade["decision_id"],
+                        "action": trade["action"],
+                        "decision_confidence": float(trade["decision_confidence"]) if trade["decision_confidence"] is not None else None,
+                        "reasoning": trade["reasoning"]
+                    })
+
+                return {
+                    "status": "success",
+                    "config_id": config_id,
+                    "trades": formatted_trades,
+                    "total_count": len(formatted_trades)
+                }
+
+    except Exception as e:
+        logger.error(f"Failed to get trade history with decisions for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get trade history: {str(e)}")
+
+
+@router.get("/{config_id}/confidence-analysis")
+async def get_confidence_analysis(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Get confidence distribution analysis for winning vs losing trades.
+    Returns confidence buckets: 5-35, 35-45, 45-55, 55-65, 65-95
+
+    Returns:
+        - confidence_distribution: Win/loss counts for each confidence bucket
+        - summary_stats: Average confidence for wins vs losses
+    """
+    try:
+        from core.common.db import get_db_connection
+
+        with get_db_connection() as conn:
+            with conn.cursor(cursor_factory=psycopg2.extras.RealDictCursor) as cur:
+                # Query closed trades with confidence scores, filtering by last_reset_at
+                query = """
+                    SELECT
+                        pt.trade_id,
+                        pt.realized_pnl,
+                        pt.confidence_score,
+                        CASE
+                            WHEN pt.confidence_score < 0.35 THEN '5-35'
+                            WHEN pt.confidence_score < 0.45 THEN '35-45'
+                            WHEN pt.confidence_score < 0.55 THEN '45-55'
+                            WHEN pt.confidence_score < 0.65 THEN '55-65'
+                            ELSE '65-95'
+                        END as confidence_bucket,
+                        CASE
+                            WHEN pt.realized_pnl > 0 THEN 'win'
+                            ELSE 'loss'
+                        END as outcome
+                    FROM paper_trades pt
+                    LEFT JOIN paper_accounts pa ON pt.config_id = pa.config_id
+                    WHERE pt.config_id = %s
+                      AND pt.user_id = %s
+                      AND pt.status = 'closed'
+                      AND pt.confidence_score IS NOT NULL
+                      AND pt.closed_at > COALESCE(pa.last_reset_at, '1970-01-01'::timestamptz)
+                """
+
+                cur.execute(query, (config_id, current_user.user_id))
+                trades = cur.fetchall()
+
+                if not trades:
+                    # No trades yet - return empty distribution
+                    return {
+                        "status": "success",
+                        "config_id": config_id,
+                        "confidence_distribution": {
+                            "5-35": {"wins": 0, "losses": 0},
+                            "35-45": {"wins": 0, "losses": 0},
+                            "45-55": {"wins": 0, "losses": 0},
+                            "55-65": {"wins": 0, "losses": 0},
+                            "65-95": {"wins": 0, "losses": 0}
+                        },
+                        "summary_stats": {
+                            "avg_confidence_wins": 0.0,
+                            "avg_confidence_losses": 0.0,
+                            "total_wins": 0,
+                            "total_losses": 0
+                        }
+                    }
+
+                # Initialize buckets
+                buckets = {
+                    "5-35": {"wins": 0, "losses": 0},
+                    "35-45": {"wins": 0, "losses": 0},
+                    "45-55": {"wins": 0, "losses": 0},
+                    "55-65": {"wins": 0, "losses": 0},
+                    "65-95": {"wins": 0, "losses": 0}
+                }
+
+                # Track confidence scores for averaging
+                win_confidences = []
+                loss_confidences = []
+
+                # Aggregate data
+                for trade in trades:
+                    bucket = trade["confidence_bucket"]
+                    outcome = trade["outcome"]
+                    confidence = float(trade["confidence_score"])
+
+                    if outcome == "win":
+                        buckets[bucket]["wins"] += 1
+                        win_confidences.append(confidence)
+                    else:
+                        buckets[bucket]["losses"] += 1
+                        loss_confidences.append(confidence)
+
+                # Calculate averages
+                avg_win_confidence = sum(win_confidences) / len(win_confidences) if win_confidences else 0.0
+                avg_loss_confidence = sum(loss_confidences) / len(loss_confidences) if loss_confidences else 0.0
+
+                return {
+                    "status": "success",
+                    "config_id": config_id,
+                    "confidence_distribution": buckets,
+                    "summary_stats": {
+                        "avg_confidence_wins": round(avg_win_confidence * 100, 1),  # Convert to percentage
+                        "avg_confidence_losses": round(avg_loss_confidence * 100, 1),  # Convert to percentage
+                        "total_wins": len(win_confidences),
+                        "total_losses": len(loss_confidences)
+                    }
+                }
+
+    except Exception as e:
+        logger.error(f"Failed to get confidence analysis for {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get confidence analysis: {str(e)}")

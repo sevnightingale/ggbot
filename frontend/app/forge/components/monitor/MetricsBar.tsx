@@ -30,9 +30,10 @@ interface MetricsBarProps {
   account?: Account | null
   positions?: Array<{ trade_id: string; symbol: string; side: string }> // For open positions count
   className?: string
+  onTotalTradesClick?: () => void
 }
 
-export function MetricsBar({ account, className = '' }: MetricsBarProps) {
+export function MetricsBar({ account, className = '', onTotalTradesClick }: MetricsBarProps) {
   // Track SSE updates for slide animations
   const [isAnimating, setIsAnimating] = useState(false)
   const [displayValues, setDisplayValues] = useState<{
@@ -126,13 +127,15 @@ export function MetricsBar({ account, className = '' }: MetricsBarProps) {
         isAnimating={isAnimating}
       />
 
-      {/* KPI 4: Total Trades */}
+      {/* KPI 4: Total Trades - Clickable */}
       <KPICard
         label="Total Trades"
         value={currentValues.totalTrades}
         delta={null} // No trend indicator for trade count
         isPercentage={false}
         isAnimating={isAnimating}
+        onClick={onTotalTradesClick}
+        isClickable={!!onTotalTradesClick}
       />
     </div>
   )
@@ -144,9 +147,11 @@ interface KPICardProps {
   delta?: number | null
   isPercentage: boolean
   isAnimating: boolean
+  onClick?: () => void
+  isClickable?: boolean
 }
 
-function KPICard({ label, value, delta, isPercentage, isAnimating }: KPICardProps) {
+function KPICard({ label, value, delta, isPercentage, isAnimating, onClick, isClickable = false }: KPICardProps) {
   const hasPositiveDelta = (delta ?? 0) >= 0
   const showTrend = delta !== null && delta !== undefined
 
@@ -165,7 +170,12 @@ function KPICard({ label, value, delta, isPercentage, isAnimating }: KPICardProp
     : 'text-[var(--text-primary)]'
 
   return (
-    <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
+    <div
+      className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 ${
+        isClickable ? 'cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors' : ''
+      }`}
+      onClick={onClick}
+    >
       <div className="text-xs text-[var(--text-muted)]">{label}</div>
       <div className="relative overflow-hidden h-7 mt-1">
         <div

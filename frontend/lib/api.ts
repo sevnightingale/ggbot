@@ -533,6 +533,71 @@ export class ApiClient {
       throw err
     }
   }
+
+  // Trade History with Decisions
+  async getTradeHistoryWithDecisions(configId: string, limit: number = 50): Promise<{
+    status: string
+    config_id: string
+    trades: Array<{
+      trade_id: string
+      symbol: string
+      side: string
+      entry_price: number
+      size_usd: number
+      leverage: number
+      realized_pnl: number
+      close_reason: string
+      opened_at: string | null
+      closed_at: string | null
+      confidence_score: number | null
+      decision_id: string | null
+      action: string | null
+      decision_confidence: number | null
+      reasoning: string | null
+    }>
+    total_count: number
+  }> {
+    const response = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/bot/${configId}/trade-history-with-decisions?limit=${limit}`
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to get trade history: ${error}`)
+    }
+
+    return await response.json()
+  }
+
+  // Confidence Analysis
+  async getConfidenceAnalysis(configId: string): Promise<{
+    status: string
+    config_id: string
+    confidence_distribution: {
+      '5-35': { wins: number; losses: number }
+      '35-45': { wins: number; losses: number }
+      '45-55': { wins: number; losses: number }
+      '55-65': { wins: number; losses: number }
+      '65-95': { wins: number; losses: number }
+    }
+    summary_stats: {
+      avg_confidence_wins: number
+      avg_confidence_losses: number
+      total_wins: number
+      total_losses: number
+    }
+  }> {
+    const response = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/bot/${configId}/confidence-analysis`
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to get confidence analysis: ${error}`)
+    }
+
+    return await response.json()
+  }
 }
 
 export const apiClient = new ApiClient()
