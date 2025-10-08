@@ -14,6 +14,7 @@ import { ActivationBar } from './components/monitor/ActivationBar'
 import { MetricsBar } from './components/monitor/MetricsBar'
 import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
+import { TradeHistoryModal } from './components/monitor/TradeHistoryModal'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
 
 interface Position {
@@ -79,6 +80,7 @@ function ForgeApp() {
   const [isManualTriggering, setIsManualTriggering] = useState(false)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
+  const [isTradeHistoryModalOpen, setIsTradeHistoryModalOpen] = useState(false)
 
   // Use ref to track selectedConfigId for SSE filtering without causing reconnections
   const selectedConfigIdRef = useRef(selectedConfigId)
@@ -949,6 +951,7 @@ function ForgeApp() {
                       <MetricsBar
                         account={selectedAccount}
                         positions={positions}
+                        onTotalTradesClick={() => setIsTradeHistoryModalOpen(true)}
                       />
                     </div>
 
@@ -1002,6 +1005,17 @@ function ForgeApp() {
         onDelete={handleDeleteBot}
         isBotAction={isBotAction}
       />
+
+      {/* Trade History Modal */}
+      {selectedBot && selectedAccount && (
+        <TradeHistoryModal
+          configId={selectedBot.config_id}
+          isOpen={isTradeHistoryModalOpen}
+          onClose={() => setIsTradeHistoryModalOpen(false)}
+          totalTrades={selectedAccount.total_trades || 0}
+          winRate={selectedAccount.win_rate || 0}
+        />
+      )}
     </div>
   )
 }
