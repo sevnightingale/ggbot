@@ -88,6 +88,7 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 - **Position tracking** via database queries with real-time P&L
 - **Performance analytics** with comprehensive trade lifecycle tracking
 - **Health checks** via API endpoints and WebSocket status broadcasts
+- **Email notifications** via Resend integration (welcome emails, trade alerts ready)
 
 **⚙️ [Configuration Management](core/config/)**
 - **JSON blob configuration system** with template-based setup

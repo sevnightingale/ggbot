@@ -369,3 +369,14 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Architecture**: Tweepy v4 wrapper with error handling, separate schedulers directory for extensibility
 - **Files**: `x_bot/bot.py` (main service), `x_bot/utils/x_client.py` (API wrapper), `x_bot/schedulers/platform_status.py` (daily tweet logic)
 - **Future Expansion**: Ready for trade announcements, weekly summaries, targeted account replies (documented in X_BOT.md)
+
+### 📧 Resend Email Integration (Phase 1 Complete - 2025-10-11)
+**Automated Email System for User Communication**:
+- **Service Module**: `core/services/resend_service.py` with full Resend API integration
+- **Contact Management**: Automated sync of Supabase users to Resend audience (189/261 users synced)
+- **Email Templates**: Professional responsive templates in `core/email_templates/` (welcome, trade alerts, signal alerts, generic notifications)
+- **Active Features**: Welcome emails automatically sent on new user signup via `user_service.py`
+- **User Sync**: Bulk sync script `scripts/sync_resend_contacts.py` for migrating existing users
+- **Rate Limiting**: Handles Resend's 2 req/sec limit with graceful error handling
+- **Future Integration**: Trade notification and signal alert templates ready, awaiting integration into trading/decision pipelines
+- **Documentation**: Complete setup and usage guide in `DOCS/RESEND.md`
