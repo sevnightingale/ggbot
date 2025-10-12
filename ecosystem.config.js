@@ -22,11 +22,10 @@ module.exports = {
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
         DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY
       },
-      error_file: '/home/sev/ggbot/logs/ggbot-error.log',
-      out_file: '/home/sev/ggbot/logs/ggbot-out.log',
+      error_file: '/dev/null',
+      out_file: '/dev/null',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      log_type: 'json',
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
@@ -53,11 +52,10 @@ module.exports = {
         SUPABASE_URL: process.env.SUPABASE_URL,
         SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
       },
-      error_file: '/home/sev/ggbot/logs/signal-listener-error.log',
-      out_file: '/home/sev/ggbot/logs/signal-listener-out.log',
+      error_file: '/dev/null',
+      out_file: '/dev/null',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      log_type: 'json',
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000
@@ -87,11 +85,63 @@ module.exports = {
         SUPABASE_URL: process.env.SUPABASE_URL,
         SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
       },
-      error_file: '/home/sev/ggbot/logs/x-bot-error.log',
-      out_file: '/home/sev/ggbot/logs/x-bot-out.log',
+      error_file: '/dev/null',
+      out_file: '/dev/null',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
-      log_type: 'json',
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 4000
+    },
+    // Error monitoring service
+    {
+      name: 'error-alerts',
+      script: '/home/sev/ggbot/core/monitoring/error_alert_service.py',
+      interpreter: '/home/sev/ggbot/.venv/bin/python',
+      cwd: '/home/sev/ggbot',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '200M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        GG_FILTER_TOKEN: process.env.GG_FILTER_TOKEN,
+        ERROR_ALERT_CHANNEL_ID: process.env.ERROR_ALERT_CHANNEL_ID,
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY
+      },
+      error_file: '/dev/null',
+      out_file: '/dev/null',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 4000
+    },
+    // WebSocket Market Data Service - Real-time candle streaming
+    {
+      name: 'market-data-ws',
+      script: '/home/sev/ggbot/core/services/websocket_market_data_service.py',
+      interpreter: '/home/sev/ggbot/.venv/bin/python',
+      cwd: '/home/sev/ggbot',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        REDIS_URL: process.env.REDIS_URL,
+        DATABASE_URL: process.env.DATABASE_URL
+      },
+      error_file: '/dev/null',
+      out_file: '/dev/null',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
       min_uptime: '30s',
       max_restarts: 20,
       restart_delay: 4000

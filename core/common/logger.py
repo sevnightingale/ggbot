@@ -18,8 +18,8 @@ logger.add(
 
 logger.add(
     "logs/ggbot.log",
-    rotation="10 MB",
-    retention="7 days",    # Add 7-day retention for main logs
+    rotation="5 MB",
+    retention="7 days",
     level=LOG_LEVEL,
     compression="zip",
     format="{time:YYYY-MM-DD HH:mm:ss} | "

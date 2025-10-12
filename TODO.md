@@ -1,85 +1,5 @@
 # TODO.md - ggbots Implementation Plan
 
-**Status**: ✅ **Core V2 + Monetization Complete!** - Scheduler, signal flow, multi-timeframe extraction, SSE updates all working. Stripe subscription system fully integrated ($29/mo Pro Plan with 14-day trial). Trading validation implemented. Focus now on remaining trading features and mobile polish.
-
-## 🔧 **HIGH PRIORITY - Trading System Completeness**
-
-**Timeline**: 2-3 days - Core trading functionality verification and enhancement
-
-- [x] **Manual Position Management** ✅ COMPLETE
-  - [x] Add "Close Position" button to active trades in PositionsTable
-  - [x] Implement API endpoint: `POST /api/v2/bot/{config_id}/positions/{trade_id}/close`
-  - [x] Update paper trading service to handle manual position closure
-  - [x] Test manual close functionality with real-time SSE updates
-
-- [ ] **Stop Loss / Take Profit Verification**
-  - [ ] Check if SL/TP values are being read from configuration properly
-  - [ ] Verify trade monitoring triggers TP/SL execution automatically
-  - [ ] Test automated position closing at profit/loss targets
-  - [ ] Ensure SL/TP levels display correctly in positions table
-
-- [x] **Trading Settings Validation** ✅ COMPLETE
-  - [x] Frontend validation with real-time error/warning feedback
-  - [x] Leverage (1-100, warning >20x), Stop Loss (1-50%), Take Profit (1-500%)
-  - [x] Position sizing (0.1-100%, warning >50%), Max positions (1-50, warning >10)
-  - [x] Red borders for errors (blocking), yellow borders for warnings (non-blocking)
-  - [ ] Test position sizing calculations match configuration
-  - [ ] Validate risk management parameters are enforced
-  - [ ] Implement open position limits per user/bot configuration
-
-- [x] **Volume Analysis Fixes** ✅ COMPLETE
-  - [x] Debug volume analysis broken in technical indicators
-  - [x] Fix volume data not appearing in decision prompts
-  - [x] Test volume-based signal validation
-  - [x] Verify volume metrics in market analysis formatting
-
-## 🚀 **HIGH PRIORITY - Self-Service Account Reset Feature**
-
-**Timeline**: 1-2 days - User-controlled paper account resets
-**Status**: Default bot cleanup complete (92 bots deactivated, 83 users affected)
-
-- [x] **Default Bot Cleanup** ✅ COMPLETE (2025-10-01)
-  - [x] Deactivated 92 active default strategy bots (pattern: "RSI 1hr below 50%enter long%")
-  - [x] Verified 22 custom strategy bots remain active
-  - [x] No forced account resets - V2.0 leverage fixes work with existing accounts
-
-- [ ] **Reset Trading Account Button**
-  - [ ] Add "Reset Account" option to bot 3-dot dropdown menu (alongside Rename/Delete)
-  - [ ] Implement backend endpoint: `POST /api/v2/bot/{config_id}/reset-account`
-  - [ ] Reset logic: Close all open positions, reset balance to $10k, clear trade history, preserve bot config
-  - [ ] Add confirmation modal: "This will close all positions and reset your account to $10,000. This cannot be undone."
-  - [ ] Test reset functionality with active positions and historical trades
-  - [ ] Add success toast notification after reset completes
-
-- [ ] **User Communication**
-  - [ ] Email encouraging users to try reset feature for clean V2.0 accounting
-  - [ ] Optional: Add banner promoting account reset for fresh start with leverage fixes
-  - [ ] Monitor user feedback channels (Telegram community, support tickets)
-
-## 🔧 **HIGH PRIORITY - User Settings & API Key Management**
-
-**Timeline**: 1-2 days - Critical for user onboarding and self-service
-
-- [ ] **Complete User Settings Page**
-  - [ ] Finish API key management interface for LLM credentials
-  - [ ] Add secure credential storage using Supabase Vault
-  - [ ] Implement credential validation and testing functionality
-  - [ ] Add interface for managing multiple API keys per provider
-
-- [ ] **LLM Provider Management**
-  - [ ] Support OpenAI, DeepSeek, Anwhythropic, and XAI credential management
-  - [ ] Add credential naming and organization features
-  - [ ] Implement credential usage tracking and validation
-  - [ ] Test credential encryption/decryption flow
-
-- [ ] **Subscription & Profile Management**
-  - [x] Display current subscription tier and status (Pro/Free badges in UserProfile)
-  - [x] Add subscription upgrade interface (UpgradeModal with Stripe Checkout)
-  - [x] Add subscription management interface (Stripe Customer Portal)
-  - [ ] Implement downgrade workflow (cancellation flow)
-  - [ ] Implement user profile settings (Telegram integration, preferences)
-  - [ ] Add account settings and preferences management
-
 ## 🎨 **HIGH PRIORITY - User Experience Polish**
 
 **Timeline**: 1-2 days - Polish user-facing features and messaging
@@ -131,6 +51,47 @@
   - [ ] Implement premium gating for advanced data sources
   - [ ] Update decision prompts to incorporate new data types
   - [ ] Test multi-data-source decision making workflows
+
+## 🔧 **MEDIUM - Trading System Completeness**
+
+**Timeline**: 2-3 days - Core trading functionality verification and enhancement
+
+- [ ] **Stop Loss / Take Profit Verification**
+  - [ ] Check if SL/TP values are being read from configuration properly
+  - [ ] Verify trade monitoring triggers TP/SL execution automatically
+  - [ ] Test automated position closing at profit/loss targets
+  - [ ] Ensure SL/TP levels display correctly in positions table
+
+- [ ] **Risk Management Enforcement**
+  - [ ] Validate risk management parameters are enforced
+  - [ ] Implement open position limits per user/bot configuration
+
+- [ ] **User Communication (Account Reset)**
+  - [ ] Email encouraging users to try reset feature for clean V2.0 accounting
+  - [ ] Optional: Add banner promoting account reset for fresh start with leverage fixes
+  - [ ] Monitor user feedback channels (Telegram community, support tickets)
+
+## 🔧 **HEDIUM PRIORITY - User Settings & API Key Management**
+
+**Timeline**: 1-2 days - Critical for user onboarding and self-service
+
+- [ ] **Complete User Settings Page**
+  - [ ] Finish API key management interface for LLM credentials
+  - [ ] Add secure credential storage using Supabase Vault
+  - [ ] Implement credential validation and testing functionality
+  - [ ] Add interface for managing multiple API keys per provider
+
+- [ ] **LLM Provider Management**
+  - [ ] Support OpenAI, DeepSeek, Anwhythropic, and XAI credential management
+  - [ ] Add credential naming and organization features
+  - [ ] Implement credential usage tracking and validation
+  - [ ] Test credential encryption/decryption flow
+
+- [ ] **Subscription & Profile Management**
+  - [ ] Implement downgrade workflow (cancellation flow)
+  - [ ] Implement user profile settings (Telegram integration, preferences)
+  - [ ] Add account settings and preferences management
+
 
 ## 🔧 **MEDIUM PRIORITY - System Robustness**
 
@@ -222,6 +183,62 @@
 **Current Focus**: ✅ Monetization DONE → User onboarding (settings) → Trading completeness → Major platform enhancement (market data expansion)
 
 ## ✅ **RECENTLY COMPLETED**
+
+### **2025-10-04: Trading System Fixes + Liquidation**
+
+**Manual Position Management** ✅ COMPLETE
+- ✅ Added "Close Position" button to active trades in PositionsTable
+- ✅ Implemented API endpoint: `POST /api/v2/bot/{config_id}/positions/{trade_id}/close`
+- ✅ Updated paper trading service to handle manual position closure
+- ✅ Tested manual close functionality with real-time SSE updates
+- ✅ Fixed 401 auth errors by using apiClient instead of direct fetch
+- ✅ Included paper trading router in ggbot.py to expose endpoint
+
+**Trading Settings Validation & Position Sizing** ✅ COMPLETE
+- ✅ Frontend validation with real-time error/warning feedback
+- ✅ Leverage (1-100, warning >20x), Stop Loss (1-50%), Take Profit (1-500%)
+- ✅ Position sizing (0.1-100%, warning >50%), Max positions (1-50, warning >10)
+- ✅ Red borders for errors (blocking), yellow borders for warnings (non-blocking)
+- ✅ **Position sizing FIXED**: Settings now represent MARGIN (risk), multiplied by leverage for position size
+- ✅ **P&L calculation FIXED**: Removed double leverage multiplier (was showing 10x too high)
+- ✅ Tested position sizing calculations match configuration
+
+**Volume Analysis Fixes** ✅ COMPLETE
+- ✅ Debugged volume analysis broken in technical indicators
+- ✅ Fixed volume data not appearing in decision prompts
+- ✅ Tested volume-based signal validation
+- ✅ Verified volume metrics in market analysis formatting
+
+**Liquidation System** ✅ COMPLETE (NEW)
+- ✅ Automatic position liquidation when losses exceed margin (realistic leverage behavior)
+- ✅ Liquidation price calculated on trade open based on margin and leverage
+- ✅ Priority order: Liquidation → Stop Loss → Take Profit (matches real exchanges)
+- ✅ Database schema updated with liquidation_price column
+- ✅ Monitoring system checks liquidation before SL/TP
+
+**Self-Service Account Reset Feature** ✅ COMPLETE
+- ✅ Default bot cleanup (92 bots deactivated, 83 users affected)
+- ✅ Verified 22 custom strategy bots remain active
+- ✅ Added "Reset Account" option to bot 3-dot dropdown menu
+- ✅ Implemented backend endpoint: `POST /api/v2/bot/{config_id}/reset-account`
+- ✅ Reset logic: Close all positions, reset balance to $10k, clear stats, preserve bot config
+- ✅ Added confirmation modal with clear warning messaging
+- ✅ Tested reset functionality with active positions and historical trades
+- ✅ **Metrics filtering by last_reset_at**: Win rate and stats only show post-reset trades
+
+**Extraction Connection Stability** ✅ COMPLETE
+- ✅ Fixed session race conditions in parallel timeframe extraction
+- ✅ Removed problematic context manager usage causing "Session is closed" errors
+- ✅ Added ensure_connected() method for shared session across parallel tasks
+- ✅ Improved error message handling for empty aiohttp exceptions
+- ✅ Fixed dict error response handling in get_candles method
+
+**Subscription Management UI** ✅ COMPLETE
+- ✅ Display current subscription tier and status (Pro/Free badges in UserProfile)
+- ✅ Add subscription upgrade interface (UpgradeModal with Stripe Checkout)
+- ✅ Add subscription management interface (Stripe Customer Portal)
+- ✅ **Upgrade modal update**: Changed to FIRST100 coupon with strikethrough pricing ($29 → $14.50)
+- ✅ 50% off promotion for first 100 customers clearly displayed
 
 ### **2025-10-01: Stripe Monetization + Trading Validation**
 - ✅ **Complete Stripe Integration**: Pro Plan ($29/mo, $279/year) with 14-day free trial

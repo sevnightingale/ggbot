@@ -57,6 +57,22 @@ class UserService:
                 conn.commit()
             
             self._log.info(f"Created new user profile for {user_id}")
+
+            # Send welcome email and sync to Resend (async, don't block on failure)
+            try:
+                from core.services.resend_service import resend_service
+
+                # Sync user to Resend audience
+                resend_service.sync_user_to_resend(user_id, email)
+
+                # Send welcome email
+                resend_service.send_welcome_email(email)
+
+                self._log.info(f"Sent welcome email to {email}")
+            except Exception as email_error:
+                # Don't fail user creation if email fails
+                self._log.warning(f"Failed to send welcome email to {email}: {email_error}")
+
             return profile
             
         except Exception as e:
