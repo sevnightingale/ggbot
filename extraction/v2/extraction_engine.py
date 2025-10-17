@@ -14,7 +14,8 @@ from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
 from core.config.config_main import get_configuration
 
-from .data_client import HummingbotDataClient
+from .data_client import HummingbotDataClient  # Legacy (can be removed after validation)
+from .universal_data_client import UniversalDataClient
 from .indicators import TechnicalIndicators
 from .file_storage import FileStorage
 from .supabase_storage import SupabaseStorage
@@ -42,9 +43,9 @@ class ExtractionEngineV2:
         self.user_id = user_id
         self.use_database_storage = use_database_storage
         self.use_file_storage = use_file_storage
-        
-        # Core components
-        self.data_client = HummingbotDataClient()
+
+        # Core components - Using Universal Data Layer
+        self.data_client = UniversalDataClient()  # Drop-in replacement for HummingbotDataClient
         self.indicators = TechnicalIndicators(use_advanced_preprocessing=use_advanced_preprocessing)
         
         # Configurable storage system

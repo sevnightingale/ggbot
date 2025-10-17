@@ -1,0 +1,91 @@
+name: ohlcv
+category: market_data
+description: "OHLCV candlestick data with technical indicators from WebSocket streams"
+
+query_params:
+  symbol:
+    type: string
+    required: true
+    description: "Trading pair (e.g., BTC/USDT, ETH/USDT)"
+
+  timeframe:
+    type: string
+    required: true
+    description: "Candle timeframe"
+    enum: ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+
+  limit:
+    type: integer
+    default: 200
+    min: 1
+    max: 500
+    description: "Number of candles to retrieve"
+
+  indicators:
+    type: array
+    default: []
+    description: "Technical indicators to calculate (optional)"
+
+sources:
+  - adapter: RedisWebSocketAdapter
+    priority: 1
+    cost: 0.0
+    rate_limit: null
+    required_env: []
+
+  - adapter: BinanceRestAdapter
+    priority: 2
+    cost: 0.0
+    rate_limit: 1200
+    required_env: []
+
+cache:
+  backend: redis
+  ttl: 3600
+  key_pattern: "candles:{symbol}:{timeframe}:200"
+
+response_schema:
+  type: object
+  properties:
+    timestamp:
+      type: array
+      description: "Timestamps for each candle"
+    open:
+      type: array
+      description: "Opening prices"
+    high:
+      type: array
+      description: "High prices"
+    low:
+      type: array
+      description: "Low prices"
+    close:
+      type: array
+      description: "Closing prices"
+    volume:
+      type: array
+      description: "Trading volumes"
+
+agent_format:
+  summary_template: "Retrieved {limit} {timeframe} candles for {symbol}"
+  insights:
+    - "Latest close price: ${close[-1]:.2f}"
+    - "24h price range: ${low.min():.2f} - ${high.max():.2f}"
+
+data_quality:
+  latency_target_ms: 100
+  freshness_target_seconds: 3600
+  confidence_scoring: true
+
+examples:
+  - query:
+      symbol: "BTC/USDT"
+      timeframe: "1h"
+      limit: 200
+    description: "Get 200 hourly candles for Bitcoin"
+
+  - query:
+      symbol: "ETH/USDT"
+      timeframe: "15m"
+      limit: 100
+    description: "Get 100 15-minute candles for Ethereum"

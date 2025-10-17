@@ -103,12 +103,12 @@ class MarketDataAdapter:
     async def _call_hummingbot_api(self, method: str, endpoint: str, data: Optional[Dict] = None) -> Dict[str, Any]:
         """Make authenticated API call to Hummingbot"""
         url = f"{self.hummingbot_url}{endpoint}"
-        
+
         try:
-            timeout = aiohttp.ClientTimeout(total=10)
+            timeout = aiohttp.ClientTimeout(total=45)  # Increased timeout for high concurrent load
             # Create BasicAuth explicitly with proper credentials
             auth = aiohttp.BasicAuth(self.username, self.password)
-            
+
             async with aiohttp.ClientSession(timeout=timeout) as session:
                 if method.upper() == "POST":
                     async with session.post(url, json=data, auth=auth) as response:
@@ -118,12 +118,14 @@ class MarketDataAdapter:
                     async with session.get(url, auth=auth) as response:
                         response.raise_for_status()
                         return await response.json()
-                        
+
         except aiohttp.ClientError as e:
-            logger.error(f"Hummingbot API call failed: {method} {endpoint} - {e}")
+            error_msg = str(e) or repr(e) or type(e).__name__
+            logger.error(f"Hummingbot API call failed: {method} {endpoint} - {error_msg}")
             raise
         except Exception as e:
-            logger.error(f"Unexpected error calling Hummingbot API: {e}")
+            error_msg = str(e) or repr(e) or type(e).__name__
+            logger.error(f"Unexpected error calling Hummingbot API: {error_msg}")
             raise
     
     async def get_current_price(self, symbol: str) -> MarketPrice:
@@ -183,7 +185,8 @@ class MarketDataAdapter:
             return market_price
             
         except Exception as e:
-            logger.error(f"Failed to get price for {symbol}: {e}")
+            error_msg = str(e) or repr(e) or type(e).__name__
+            logger.error(f"Failed to get price for {symbol}: {error_msg}")
             raise
 
     async def get_current_price_with_fallback(self, symbol: str) -> MarketPrice:
@@ -377,7 +380,8 @@ class MarketDataAdapter:
                         logger.warning(f"No price data returned for {symbol} ({hb_symbol})")
                         
             except Exception as e:
-                logger.error(f"Failed to fetch multiple prices: {e}")
+                error_msg = str(e) or repr(e) or type(e).__name__
+                logger.error(f"Failed to fetch multiple prices: {error_msg}")
                 # Continue with what we have
         
         return results
