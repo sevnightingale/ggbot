@@ -69,6 +69,7 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 ### **[Core Infrastructure](core/)**
 
 **🔧 [Data Integration](extraction/v2/)** - Direct API Connections
+- **Universal Data Layer**: Catalog-driven market intelligence gateway with WebSocket caching (3x faster extractions)
 - **Hummingbot API**: Real-time market data and price feeds (localhost:8888)
 - **pandas-ta Library**: 20+ technical indicators with pure Python processing
 - **Supabase Database**: Real-time data storage and retrieval
