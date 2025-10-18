@@ -61,7 +61,7 @@ class HummingbotDataClient:
     async def connect(self):
         """Establish connection to Hummingbot API."""
         if not self.session:
-            timeout = aiohttp.ClientTimeout(total=20)  # Increased timeout for concurrent bot load
+            timeout = aiohttp.ClientTimeout(total=45)  # Increased timeout for high concurrent bot load
             self.session = aiohttp.ClientSession(
                 headers=self.headers,
                 timeout=timeout
