@@ -692,11 +692,11 @@ Take Profit: {take_profit_text}
     
     def _format_multi_timeframe_data(self, market_data: Dict[str, Any]) -> str:
         """
-        Format multi-timeframe market data using SUMMARY-ONLY approach.
+        Format multi-timeframe market data using SUMMARY + SELECTIVE CRITICAL FIELDS.
 
-        Token optimization: Uses only the 'summary' field from each indicator,
-        which contains comprehensive human-readable analysis from preprocessors.
-        Reduces token usage by ~95% (67k -> ~3.5k tokens) while preserving
+        Token optimization: Uses summary field as primary line, then adds only
+        critical fields (patterns, SR levels, breakouts) when present and significant.
+        Reduces token usage by ~93% (67k -> ~5k tokens) while preserving
         all critical trading insights.
         """
         formatted = []
@@ -711,7 +711,7 @@ Take Profit: {take_profit_text}
         formatted.append(f"Timeframes: {', '.join(market_data.get('timeframes_available', []))}")
         formatted.append("")
 
-        # Format each timeframe's data - SUMMARY ONLY
+        # Format each timeframe's data - SUMMARY + CRITICAL FIELDS
         for timeframe, tf_data in timeframes.items():
             formatted.append(f"=== {timeframe.upper()} ===")
 
@@ -744,6 +744,12 @@ Take Profit: {take_profit_text}
                     # Skip indicators without usable data
                     continue
 
+                # SECONDARY: Add critical fields when present and significant
+                critical_info = self._extract_critical_fields(indicator_name, indicator_data)
+                if critical_info:
+                    for info_line in critical_info:
+                        formatted.append(f"    {info_line}")
+
             formatted.append("")
 
         # Add data freshness info
@@ -758,6 +764,90 @@ Take Profit: {take_profit_text}
         formatted.append(f"Data Age: {age_str}")
 
         return "\n".join(formatted)
+
+    def _extract_critical_fields(self, indicator_name: str, indicator_data: Dict[str, Any]) -> list:
+        """
+        Extract critical fields that aren't in summary but matter for trading.
+
+        Returns list of formatted strings to append after summary.
+        """
+        critical = []
+
+        # 1. PATTERNS (divergences, crossovers, hooks, reversals)
+        if "patterns" in indicator_data:
+            patterns = indicator_data["patterns"]
+            if isinstance(patterns, dict):
+                pattern_names = []
+                for pattern_key, pattern_value in patterns.items():
+                    # Include if pattern exists and has meaningful data
+                    if pattern_value:
+                        if isinstance(pattern_value, dict):
+                            # Complex pattern with details
+                            if pattern_value.get("type"):
+                                pattern_names.append(pattern_value["type"])
+                            elif "description" in pattern_value:
+                                pattern_names.append(pattern_key)
+                        else:
+                            # Simple boolean pattern
+                            pattern_names.append(pattern_key)
+
+                if pattern_names:
+                    critical.append(f"Patterns: {', '.join(pattern_names)}")
+
+        # 2. DIVERGENCE (if not already in patterns)
+        if "divergence" in indicator_data:
+            divergence = indicator_data["divergence"]
+            if divergence and isinstance(divergence, dict):
+                div_type = divergence.get("type", "divergence")
+                critical.append(f"Divergence: {div_type}")
+
+        # 3. SUPPORT/RESISTANCE effectiveness (for channel/band indicators)
+        if indicator_name in ['dc', 'donchian', 'ema', 'sma', 'keltner', 'bbands']:
+            # Support Resistance field
+            if "support_resistance" in indicator_data:
+                sr = indicator_data["support_resistance"]
+                if isinstance(sr, dict):
+                    # Check for significant bounces
+                    upper = sr.get("upper", {})
+                    lower = sr.get("lower", {})
+                    if isinstance(upper, dict) and upper.get("bounces", 0) >= 3:
+                        critical.append(f"Upper resistance: {upper['bounces']:.0f} bounces")
+                    if isinstance(lower, dict) and lower.get("bounces", 0) >= 3:
+                        critical.append(f"Lower support: {lower['bounces']:.0f} bounces")
+
+        # 4. BREAKOUT SETUP (for volatility indicators)
+        if indicator_name in ['atr', 'bbw', 'bbwidth']:
+            if "breakout" in indicator_data:
+                breakout = indicator_data["breakout"]
+                if isinstance(breakout, dict):
+                    if breakout.get("breakout_setup") or breakout.get("squeeze_detected"):
+                        potential = breakout.get("expansion_potential", "unknown")
+                        critical.append(f"Breakout: {potential} potential")
+
+        # 5. CROSSOVERS (recent only - within 3 periods)
+        if "crossover" in indicator_data or "crossovers" in indicator_data:
+            crossover_data = indicator_data.get("crossover") or indicator_data.get("crossovers")
+            if isinstance(crossover_data, dict):
+                latest = crossover_data.get("latest_crossover")
+                if latest and isinstance(latest, dict):
+                    periods_ago = latest.get("periods_ago", 99)
+                    if periods_ago <= 3:
+                        cross_type = latest.get("type", "crossover")
+                        critical.append(f"Crossover: {cross_type} {periods_ago}p ago")
+
+        # 6. EXTREME STREAKS (for oscillators in overbought/oversold zones)
+        if indicator_name in ['rsi', 'cci', 'stochastic', 'williams_r', 'mfi']:
+            # Check for extended overbought/oversold streaks
+            levels = indicator_data.get("levels", {})
+            if isinstance(levels, dict):
+                for zone in ["overbought", "oversold"]:
+                    zone_data = levels.get(zone, {})
+                    if isinstance(zone_data, dict):
+                        streak = zone_data.get("streak_length", 0)
+                        if streak >= 5:  # Extended streak
+                            critical.append(f"{zone.title()}: {streak}p streak")
+
+        return critical
     
     def _format_legacy_market_data(self, market_data: Dict[str, Any]) -> str:
         """Format legacy single-timeframe market data."""
