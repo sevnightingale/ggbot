@@ -189,9 +189,13 @@ async def lifespan(app: FastAPI):
         logger.info("✅ LLM service initialized")
 
 
-        # Start APScheduler
-        scheduler.start()
-        logger.info("✅ APScheduler started")
+        # Start APScheduler (if enabled)
+        enable_scheduler = os.getenv("ENABLE_SCHEDULER", "true").lower() == "true"
+        if enable_scheduler:
+            scheduler.start()
+            logger.info("✅ APScheduler started")
+        else:
+            logger.info("⏸️  APScheduler disabled (ENABLE_SCHEDULER=false)")
         
         # Start monitoring service (positions only - no WebSocket spam!)
         from core.monitoring.service import MonitoringService
@@ -1424,15 +1428,33 @@ async def delete_config(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Delete a configuration."""
+    """Delete a configuration and clean up associated scheduler jobs."""
+    # Clean up all scheduler jobs for this config before deleting from database
+    removed_jobs = []
+    all_jobs = scheduler.get_jobs()
+    job_prefix = f"bot:{current_user.user_id}:{config_id}:"
+
+    for job in all_jobs:
+        if job.id.startswith(job_prefix):
+            try:
+                scheduler.remove_job(job.id)
+                removed_jobs.append(job.id)
+                logger.info(f"Removed scheduler job {job.id} for deleted config")
+            except Exception as e:
+                logger.warning(f"Failed to remove job {job.id}: {e}")
+
+    # Delete config from database
     success = await config_service.delete_config(config_id, current_user.user_id)
-    
+
     if not success:
         raise HTTPException(status_code=404, detail="Configuration not found")
-    
+
+    logger.info(f"Deleted config {config_id} and removed {len(removed_jobs)} scheduler jobs")
+
     return {
         "status": "success",
-        "message": "Configuration deleted successfully"
+        "message": "Configuration deleted successfully",
+        "removed_jobs": len(removed_jobs)
     }
 
 
