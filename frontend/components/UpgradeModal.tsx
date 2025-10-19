@@ -18,7 +18,6 @@ interface UpgradeModalProps {
 
 export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
   const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
-  const [couponCode, setCouponCode] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -57,8 +56,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
       // Call backend to create Stripe checkout session
       const { checkout_url } = await apiClient.createCheckoutSession({
-        plan: billingPeriod,
-        coupon: couponCode || undefined
+        plan: billingPeriod
       })
 
       // Redirect to Stripe checkout
@@ -73,9 +71,9 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl">
+      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
         <DialogHeader>
-          <div className="flex items-center gap-2 mb-2">
+          <div className="flex items-center gap-2 mb-1">
             <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
               <Sparkles className="h-5 w-5 text-[var(--text-primary)]" />
             </div>
@@ -87,7 +85,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         </DialogHeader>
 
         {/* Billing Period Toggle */}
-        <div className="flex items-center justify-center gap-2 my-4">
+        <div className="flex items-center justify-center gap-2 my-3">
           <button
             onClick={() => setBillingPeriod('monthly')}
             className={`px-6 py-2 rounded-lg font-medium transition-all ${
@@ -116,71 +114,49 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         </div>
 
         {/* Pricing Display */}
-        <div className="text-center mb-4 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
-          <div className="flex flex-col items-center gap-1">
-            <div className="flex items-baseline justify-center gap-2">
-              <span className="text-2xl font-medium text-[var(--text-muted)] line-through">
-                ${pricing[billingPeriod].price}
-              </span>
-              <span className="text-4xl font-bold text-[var(--profit-color)]">
-                ${pricing[billingPeriod].price / 2}
-              </span>
-              <span className="text-[var(--text-secondary)]">
-                / {pricing[billingPeriod].period}
-              </span>
-            </div>
-            <p className="text-sm text-[var(--profit-color)] font-medium">
-              🎉 50% off for first 100 customers!
-            </p>
+        <div className="text-center mb-3 p-3 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
+          <div className="flex items-baseline justify-center gap-2 mb-1">
+            <span className="text-xl font-medium text-[var(--text-muted)] line-through">
+              ${pricing[billingPeriod].price}
+            </span>
+            <span className="text-3xl font-bold text-[var(--profit-color)]">
+              ${pricing[billingPeriod].price / 2}
+            </span>
+            <span className="text-[var(--text-secondary)]">
+              / {pricing[billingPeriod].period}
+            </span>
           </div>
+          <p className="text-sm text-[var(--profit-color)] font-medium">
+            🎉 50% off for first 100 customers!
+          </p>
           {billingPeriod === 'annual' && (
-            <p className="text-sm text-[var(--text-secondary)] mt-2">
+            <p className="text-xs text-[var(--text-secondary)] mt-1">
               Just $11.63/month when billed annually
             </p>
           )}
-          <p className="text-sm text-[var(--text-secondary)] mt-2">
-            ✨ 14-day free trial • Cancel anytime
-          </p>
         </div>
 
         {/* Features List - 2 column grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
           {features.map((feature, index) => (
-            <div key={index} className="flex gap-3 items-start">
-              <div className="text-2xl mt-0.5">{feature.icon}</div>
+            <div key={index} className="flex gap-2 items-start">
+              <div className="text-xl mt-0.5">{feature.icon}</div>
               <div className="flex-1">
-                <h4 className="font-medium text-[var(--text-primary)] mb-1">
+                <h4 className="font-medium text-[var(--text-primary)] text-sm mb-0.5">
                   {feature.title}
                 </h4>
-                <p className="text-sm text-[var(--text-secondary)]">
+                <p className="text-xs text-[var(--text-secondary)]">
                   {feature.description}
                 </p>
               </div>
-              <Check className="text-[var(--profit-color)] flex-shrink-0 mt-1" size={20} />
+              <Check className="text-[var(--profit-color)] flex-shrink-0 mt-0.5" size={18} />
             </div>
           ))}
         </div>
 
-        {/* Coupon Code Input */}
-        <div className="mb-4">
-          <label className="block text-sm font-medium text-[var(--text-primary)] mb-2">
-            Have a coupon code? (Optional)
-          </label>
-          <input
-            type="text"
-            value={couponCode}
-            onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
-            placeholder="FIRST100"
-            className="w-full px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-amber-500"
-          />
-          <p className="text-xs text-[var(--text-tertiary)] mt-1">
-            First 100 customers get 50% off for 6 months with code FIRST100
-          </p>
-        </div>
-
         {/* Error Message */}
         {error && (
-          <div className="mb-3 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
+          <div className="mb-3 p-2 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
             <p className="text-sm text-[var(--loss-color)]">{error}</p>
           </div>
         )}
@@ -203,9 +179,15 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
           )}
         </button>
 
-        <p className="text-center text-xs text-[var(--text-tertiary)] mt-4">
-          No credit card required for trial • Secure payment by Stripe
-        </p>
+        {/* Coupon Note & Footer */}
+        <div className="text-center mt-3 space-y-1">
+          <p className="text-xs text-[var(--text-secondary)]">
+            💡 Use code <span className="font-semibold text-[var(--profit-color)]">FIRST100</span> at checkout for 50% off
+          </p>
+          <p className="text-xs text-[var(--text-tertiary)]">
+            14-day free trial • No credit card required • Secure payment by Stripe
+          </p>
+        </div>
       </DialogContent>
     </Dialog>
   )

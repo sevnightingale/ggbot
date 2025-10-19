@@ -330,10 +330,10 @@ python scripts/test_resend.py
 
 ### Email Sender Domain
 
-The default sender is `noreply@ggbots.ai`. You must:
-1. Verify this domain in Resend
-2. Configure DNS records (SPF, DKIM, DMARC)
-3. Or use a verified sender email
+The default sender is `noreply@message.ggbots.ai`. The domain `message.ggbots.ai` must be:
+1. Verified in Resend
+2. Configured with DNS records (SPF, DKIM, DMARC)
+3. Or use a different verified sender email
 
 If using a different domain, update in `resend_service.py`:
 
