@@ -382,7 +382,7 @@ class ResendService:
         to: str,
         subject: str,
         html: str,
-        from_email: str = "noreply@ggbots.ai"
+        from_email: str = "noreply@message.ggbots.ai"
     ) -> bool:
         """
         Send an email via Resend.

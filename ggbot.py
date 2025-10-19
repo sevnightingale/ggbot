@@ -2697,13 +2697,8 @@ async def handle_checkout_completed(session):
     customer_id = session['customer']
     subscription_id = session['subscription']
 
-    # Get subscription details to find trial end date
-    subscription = stripe.Subscription.retrieve(subscription_id)
-    trial_end = None
-    if subscription.trial_end:
-        from datetime import datetime
-        trial_end = datetime.fromtimestamp(subscription.trial_end)
-
+    # For ongoing subscriptions, subscription_expires_at should be NULL
+    # Only set expiration date when subscription is cancelled
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
@@ -2712,10 +2707,10 @@ async def handle_checkout_completed(session):
                     subscription_status = 'active',
                     stripe_customer_id = %s,
                     stripe_subscription_id = %s,
-                    subscription_expires_at = %s,
+                    subscription_expires_at = NULL,
                     updated_at = NOW()
                 WHERE user_id = %s
-            """, (customer_id, subscription_id, trial_end, user_id))
+            """, (customer_id, subscription_id, user_id))
             conn.commit()
 
     logger.bind(user_id=user_id).info(
