@@ -57,10 +57,10 @@ Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchan
 ### Module Structure
 - **`ggbot.py`** - Main V2 orchestrator with APScheduler and WebSocket
 - **`extraction/v2/`** - Pure Python technical analysis using pandas-ta
-- **`decision/engine_v2.py`** - GPT-5 reasoning with user customization  
+- **`decision/engine_v2.py`** - GPT-5 reasoning with user customization
 - **`trading/paper/`** - Supabase paper trading with position management
 - **`core/`** - Config system, database connections, scheduler utils
-- **`frontend/dashboard-v2/`** - Real-time React dashboard
+- **`frontend/`** - Next.js application with real-time SSE updates
 - **`tests/`** - Comprehensive test suite with end-to-end validation
 
 ## Development Guidelines

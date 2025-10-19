@@ -79,7 +79,22 @@ class UniversalSymbolStandardizer:
     def from_hummingbot(self, hummingbot_symbol: str) -> Optional[str]:
         """Convert Hummingbot format to platform format (same for now)"""
         return self.normalize(hummingbot_symbol, "hummingbot", "platform")
-    
+
+    def to_symphony(self, platform_symbol: str) -> Optional[str]:
+        """Convert platform format (BTC-USDT) to Symphony format (BTC)"""
+        return self.normalize(platform_symbol, "platform", "symphony")
+
+    def from_symphony(self, symphony_symbol: str) -> Optional[str]:
+        """Convert Symphony format (BTC) to platform format (BTC-USDT)"""
+        return self.normalize(symphony_symbol, "symphony", "platform")
+
+    def is_symphony_compatible(self, symbol: str, format_type: str = "platform") -> bool:
+        """Check if symbol is compatible with Symphony.io live trading"""
+        symbol_data = self.get_all_formats(symbol, format_type)
+        if not symbol_data:
+            return False
+        return symbol_data.get("symphony_compatible", False)
+
     def is_supported(self, symbol: str, format_type: str = "platform") -> bool:
         """Check if symbol is supported in given format"""
         symbol_key = find_symbol_by_format(symbol, format_type)
@@ -137,9 +152,11 @@ class UniversalSymbolStandardizer:
         return {
             "total_symbols": len(SYMBOL_REGISTRY),
             "ggshot_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("ggshot")]),
-            "ccxt_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("ccxt")]), 
+            "ccxt_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("ccxt")]),
             "hummingbot_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("hummingbot")]),
-            "platform_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("platform")])
+            "platform_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("platform")]),
+            "symphony_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("symphony")]),
+            "symphony_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("symphony_compatible")])
         }
     
     def validate_symbol(self, symbol: str, format_type: str = "platform", strict: bool = True) -> Dict[str, Union[bool, str, None]]:

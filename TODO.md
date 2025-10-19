@@ -1,8 +1,98 @@
 # TODO.md - ggbots Implementation Plan
 
-## 🎨 **HIGH PRIORITY - User Experience Polish**
+## 🚀 **HIGH PRIORITY - Symphony.io Live Trading Integration**
 
-**Timeline**: 1-2 days - Polish user-facing features and messaging
+- [x] **Symbol System Extension**
+  - [x] Extend `core/symbols/registry.py` with Symphony format support
+  - [x] Add `"symphony": "BTC"` field to 100 compatible symbols
+  - [x] Add `"symphony_compatible": true/false` boolean to all symbols
+  - [x] Add `to_symphony()` and `from_symphony()` methods to standardizer
+  - [x] Add `is_symphony_compatible()` check method
+
+- [ ] **Premium Feature Configuration**
+  - [ ] Add 'live_trading' to permissions system (`frontend/lib/permissions.tsx`)
+  - [ ] Implement `can_use_live_trading()` permission check in backend
+  - [ ] Add Symphony to premium features list
+
+- [ ] **Settings Modal & Account Connection**
+  - [ ] Create `SettingsModal.tsx` component with Symphony section
+  - [ ] Add Symphony API key input field with validation
+  - [ ] Add smart account address input (with tooltip: "Used for future balance features")
+  - [ ] Implement connection status UI (connected/disconnected states)
+  - [ ] Add Settings menu item to UserProfile dropdown
+  - [ ] Create Symphony connection status endpoint
+
+- [ ] **Database Schema Changes**
+  - [ ] Extend `users` table: Add `symphony_vault_id` and `symphony_smart_account` columns
+  - [ ] Extend `configurations` table: Add `symphony_agent_id` and `trading_mode` columns
+  - [ ] Create `live_trades` table (minimal schema: batch_id, config_id, decision_id, timestamps)
+  - [ ] Add idempotency constraint: `UNIQUE(decision_id)`
+  - [ ] Create single index on `config_id` for main query pattern
+
+- [ ] **Vault Integration**
+  - [ ] Extend `VaultManager` with `store_symphony_credential()` method
+  - [ ] Add `get_symphony_credential()` method for retrieving API keys
+  - [ ] Add `delete_symphony_credential()` method for cleanup
+  - [ ] Test vault encryption/decryption flow with Symphony credentials
+
+- [ ] **Symphony Service Implementation**
+  - [ ] Create `trading/live/symphony_service.py` with thin wrapper class
+  - [ ] Implement `execute_trade_intent()` with 3-second settlement wait
+  - [ ] Add idempotency check before Symphony API calls
+  - [ ] Implement symbol conversion using UniversalSymbolStandardizer
+  - [ ] Add `/agent/batch-open` integration with proper field mapping
+  - [ ] Implement `close_position()` method with `/agent/batch-close`
+  - [ ] Implement `get_open_positions()` with field mapping (asset→symbol, isLong→side)
+  - [ ] Add error handling for Symphony API rejections
+
+- [ ] **Orchestrator Integration**
+  - [ ] Add Symphony service to ggbot.py imports and initialization
+  - [ ] Modify `_run_trading_v2()` to route based on `trading_mode`
+  - [ ] Implement trading router (paper vs live mode switch)
+  - [ ] Add position management integration for live mode
+  - [ ] Pass open positions to decision engine for position_management mode
+
+- [ ] **API Endpoints**
+  - [ ] Create `POST /api/v2/symphony/setup` (store credentials, validate API key)
+  - [ ] Create `GET /api/v2/symphony/status` (check connection status)
+  - [ ] Create `GET /api/v2/positions/live/{config_id}` (query Symphony positions)
+  - [ ] Create `POST /api/v2/positions/live/{batch_id}/close` (close position)
+  - [ ] Create `POST /api/v2/config/duplicate-as-live` (duplicate paper bot as live)
+
+- [ ] **Frontend - Duplicate as Live Flow**
+  - [ ] Add "Create Live Version" button to BotManagementMenu (paper bots only)
+  - [ ] Implement premium permission check before showing button
+  - [ ] Check Symphony connection status before allowing live bot creation
+  - [ ] Create "Create Live Version" modal with Symphony agent ID input
+  - [ ] Add warning messaging: "This bot will use real capital"
+  - [ ] Implement `handleCreateLiveVersion()` function
+  - [ ] Auto-suggest bot name: "{Original Name} (Live)"
+
+- [ ] **Frontend - Dashboard Updates**
+  - [ ] Add 🔴 LIVE badge to bot display for live trading bots
+  - [ ] Update PositionsTable to handle live positions (query different endpoint)
+  - [ ] Implement position data loading based on trading_mode
+  - [ ] Add confirmation dialog for closing live positions
+  - [ ] Update close position handler to route to correct endpoint (paper vs live)
+
+- [ ] **Testing & Validation**
+  - [ ] Test Symphony account setup flow (API key + smart account)
+  - [ ] Test paper bot duplication to live bot
+  - [ ] Verify live position opening (check Symphony portal + ggbots dashboard)
+  - [ ] Test manual position closing in live mode
+  - [ ] Test symbol compatibility validation (100 supported symbols)
+  - [ ] Test idempotency (retry on timeout doesn't create duplicate trades)
+  - [ ] Test error handling (invalid API key, insufficient balance, unsupported symbol)
+  - [ ] Verify live_trades table linkage (batch_id → decision_id traceability)
+
+- [ ] **Documentation**
+  - [ ] Create user guide: "How to Enable Live Trading"
+  - [ ] Document Symphony account setup steps
+  - [ ] Document "Create Live Version" workflow
+  - [ ] Add API endpoint documentation with curl examples
+  - [ ] Document symbol compatibility (100 vs 141 symbols)
+
+## 🎨 **HIGH PRIORITY - User Experience Polish**
 
 - [ ] **Improve Status Messaging**
   - [ ] Change 'next run...' to 'waiting for next candle close...' in frontend
