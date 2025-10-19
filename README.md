@@ -107,7 +107,6 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 ### **[Frontend Platform](frontend/)**
 
 **Professional Next.js application** featuring:
-- **Forge Architecture**: Clean rebuild with elegant local state patterns (see `FORGE.md`)
 - **Multi-bot management** with `selectedConfigId` switching and intuitive interfaces
 - **Real-time performance tracking** with SSE streams and countdown timers
 - **Direct API integration** using `BotConfiguration` types without transformation layers

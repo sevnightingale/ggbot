@@ -61,7 +61,12 @@
 | market-data-ws | 🟢 Online | 0% | ~140MB | Real-time WebSocket market data cache (100 symbols × 7 timeframes = 700 datasets) |
 | signal-listener | 🟢 Online | 0% | ~62MB | External signal processing service (ggShot integration) |
 | x-bot | 🟢 Online | 0% | ~41MB | X (Twitter) bot for @ggbots_ai - automated platform status tweets and engagement |
-| pm2-logrotate | 🟢 Online | 0% | ~57MB | Automated log rotation and compression (10MB rotation, 5 files max) |
+| error-alerts | 🟢 Online | 0% | ~20MB | Error monitoring and Telegram alert service |
+
+### PM2 Modules
+| Module | Status | Purpose |
+|--------|--------|---------|
+| pm2-logrotate | ✅ Installed | Automated log rotation and compression (10MB rotation, 5 files max) |
 
 ### Infrastructure Services
 | Service | Status | Port | Purpose |
@@ -192,7 +197,6 @@ df -h
 
 ### **Signal Validation** (Complete)
 - **Files**: `signals/listener_service.py`, `signals/publishing_service.py`, `decision/prompts/signal_validation.py`
-- **Templates**: `core/config/template_signal_validation.json`
 - **Publishing**: Integrated into ggbot.py orchestrator (signal-publisher PM2 service discontinued)
 
 ### **Multi-Timeframe Architecture** (Complete)
