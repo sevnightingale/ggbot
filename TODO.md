@@ -24,49 +24,6 @@
   - [ ] Show summary stats at top: win count, loss count, win rate
   - [ ] Optional: Click individual trade to expand details (entry/exit prices, duration, confidence)
 
-## 🚀 **MAJOR PROJECT - Universal Data Layer**
-
-**Timeline**: 2-4 weeks - Catalog-driven market intelligence platform for AI agents
-
-**Documentation**: See `DOCS/UNIVERSAL_DATA.md` for complete architecture
-
-### **Phase 1: Foundation & OHLCV Migration** ✅ COMPLETE (Week 1)
-
-- [x] **Core Framework**
-  - [x] Implement type system (QueryParams, AdapterResponse, CatalogEntry, etc.)
-  - [x] Implement DataCatalog with YAML loading and validation
-  - [x] Implement CacheManager with Redis backend
-  - [x] Implement ResponseFormatter (RAW/ANALYSIS/LLM modes)
-  - [x] Implement DataAdapter abstract base class
-  - [x] Implement MarketIntelligence gateway with routing/fallback
-
-- [x] **OHLCV Data Source**
-  - [x] Create OHLCV catalog YAML with full schema
-  - [x] Implement RedisWebSocketAdapter (reads from market-data-ws cache)
-  - [x] Implement BinanceRestAdapter (fallback for uncached symbols)
-  - [x] Write integration tests (4/4 passing)
-
-### **Phase 2: ExtractionEngine Migration** ✅ COMPLETE (Week 2)
-
-- [x] **Adapter Pattern Implementation**
-  - [x] Created UniversalDataClient as drop-in replacement for HummingbotDataClient
-  - [x] Migrated ExtractionEngine to use UniversalDataClient (2 lines changed)
-  - [x] 100% backward compatibility - same interface, same return types
-  - [x] Zero breaking changes to DecisionEngine or downstream systems
-
-- [x] **Testing & Validation**
-  - [x] All 3 Preprocessor integration tests passing (OHLCV → indicators → analysis)
-  - [x] ExtractionEngine migration test passing (connection, extraction, indicators)
-  - [x] Validated DataFrame format compatibility with pandas-ta
-  - [x] Confirmed indicator calculations (RSI, MACD, BBands) work correctly
-  - [x] Performance: 1-5ms (cached) vs 2-3s (REST polling) - 3x improvement
-
-- [ ] **Production Deployment** (Next)
-  - [ ] Deploy to production (restart PM2 ggbot service)
-  - [ ] Monitor first few extractions for any issues
-  - [ ] Validate cache hit rates in production (target: >90%)
-  - [ ] Compare extraction performance before/after
-
 ### **Phase 3: Agent SDK Integration** (Week 3)
 
 - [ ] **Tool Generation**
@@ -239,17 +196,6 @@
 
 ---
 
-## 🎯 **COMPLETION TIMELINE**
-
-**~~IMMEDIATE (Days 1-3)~~**: ✅ **COMPLETE** - Monetization & Business Model (Stripe integration, paid tiers, premium gating)
-**Days 1-2 (NEW IMMEDIATE)**: User Settings & API Key Management (critical for user onboarding)
-**Days 3-4**: Trading system completeness (manual close, SL/TP verification, volume fixes)
-**Days 5-6**: User experience polish (status messaging, optional market data display)
-**Week 2**: System robustness (error handling, Node.js upgrade, code quality)
-**Weeks 3-6**: Market Data Expansion (major project - user research → integration → flagship bot)
-**Week 7+**: Mobile responsive design and comprehensive testing
-
-**Current Focus**: ✅ Monetization DONE → User onboarding (settings) → Trading completeness → Major platform enhancement (market data expansion)
 
 ## ✅ **RECENTLY COMPLETED**
 
@@ -332,10 +278,3 @@
 - ✅ Configuration save/load cycle working
 - ✅ Paper trading accounts and metrics display
 
-## 🎯 **SUCCESS METRICS**
-
-**Technical Completeness**: All core trading features working (manual close, SL/TP, leverage)
-**User Experience**: Intuitive interface with clear status messaging and settings management
-**System Reliability**: Error handling, monitoring, and robust performance under load
-**Mobile Ready**: Responsive design supporting mobile trading workflows
-**Production Ready**: Comprehensive testing, monitoring, and deployment automation
