@@ -36,12 +36,19 @@ class WebSocketMarketDataService:
     3. Storage: Maintain 200-candle rolling windows in Redis
     """
 
-    # Top symbols to track (start with 20 for testing, expand later)
+    # 100 overlapping symbols (ggbots + Symphony compatible)
+    # Expanded from 20 → 100 for comprehensive market coverage
     SYMBOLS = [
-        'BTCUSDT', 'ETHUSDT', 'SOLUSDT', 'BNBUSDT', 'XRPUSDT',
-        'ADAUSDT', 'DOGEUSDT', 'AVAXUSDT', 'DOTUSDT', 'MATICUSDT',
-        'LINKUSDT', 'UNIUSDT', 'ATOMUSDT', 'LTCUSDT', 'ETCUSDT',
-        'FILUSDT', 'NEARUSDT', 'APTUSDT', 'ARBUSDT', 'OPUSDT'
+        '1INCHUSDT', 'AAVEUSDT', 'ADAUSDT', 'ALGOUSDT', 'ALICEUSDT', 'ALTUSDT', 'ANKRUSDT', 'APEUSDT', 'API3USDT', 'APTUSDT',
+        'ARUSDT', 'ARBUSDT', 'ARKMUSDT', 'ASTRUSDT', 'ATOMUSDT', 'AUCTIONUSDT', 'AVAXUSDT', 'BATUSDT', 'BCHUSDT', 'BNBUSDT',
+        'BOMEUSDT', 'BTCUSDT', 'CAKEUSDT', 'CFXUSDT', 'COMPUSDT', 'DASHUSDT', 'DOGEUSDT', 'DOTUSDT', 'DYDXUSDT', 'EGLDUSDT',
+        'ENAUSDT', 'ENSUSDT', 'ETCUSDT', 'ETHUSDT', 'ETHFIUSDT', 'FETUSDT', 'FILUSDT', 'FLOWUSDT', 'GALAUSDT', 'GMTUSDT',
+        'GMXUSDT', 'GRTUSDT', 'HBARUSDT', 'ICPUSDT', 'INJUSDT', 'IOTXUSDT', 'JASMYUSDT', 'JTOUSDT', 'JUPUSDT', 'KSMUSDT',
+        'LDOUSDT', 'LINKUSDT', 'LRCUSDT', 'LTCUSDT', 'MAGICUSDT', 'MANAUSDT', 'MASKUSDT', 'NEARUSDT', 'NEOUSDT', 'NMRUSDT',
+        'NOTUSDT', 'NTRNUSDT', 'ONDOUSDT', 'OPUSDT', 'ORDIUSDT', 'PENDLEUSDT', 'PEOPLEUSDT', 'PYTHUSDT', 'QTUMUSDT', 'RAREUSDT',
+        'RENDERUSDT', 'ROSEUSDT', 'RSRUSDT', 'RVNUSDT', 'SUSDT', 'SANDUSDT', 'SEIUSDT', 'SKLUSDT', 'SNXUSDT', 'SOLUSDT',
+        'STORJUSDT', 'STRKUSDT', 'STXUSDT', 'TAOUSDT', 'THETAUSDT', 'TIAUSDT', 'TRBUSDT', 'TRXUSDT', 'TURBOUSDT', 'TWTUSDT',
+        'VETUSDT', 'WUSDT', 'WIFUSDT', 'WLDUSDT', 'WOOUSDT', 'XRPUSDT', 'YFIUSDT', 'ZILUSDT', 'ZROUSDT', 'ZRXUSDT'
     ]
 
     # Timeframes to track (all 7 used by scheduler)

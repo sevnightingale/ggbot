@@ -679,8 +679,6 @@ Currently, we support the following assets for agentic trading:
 - IWM
 - DIA
 
----
-
 # ggbots Platform Integration
 
 ## Overview

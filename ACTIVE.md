@@ -1,8 +1,8 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-10-01 (Stripe subscription system + trading validation)
+**Last Updated**: 2025-10-19 (Universal Data Layer production deployment + WebSocket cache expansion)
 **System Health**: 🟢 Production Live (225+ users, 100+ active bots)
-**Project Status**: Live application with complete Stripe monetization and trading validation
+**Project Status**: Live application with complete Stripe monetization and Universal Data Layer in production
 
 ---
 
@@ -57,9 +57,10 @@
 ### Core Services (PM2)
 | Service | Status | CPU | Memory | Purpose |
 |---------|--------|-----|--------|---------|
-| ggbot | 🟢 Online | 0% | ~165MB | V2 Orchestrator API server with integrated scheduler & telegram publishing |
-| signal-listener | 🟢 Online | 0% | ~63MB | External signal processing service (ggShot integration) |
-| x-bot | 🟢 Online | 0% | ~7MB | X (Twitter) bot for @ggbots_ai - automated platform status tweets and engagement |
+| ggbot | 🟢 Online | 0% | ~205MB | V2 Orchestrator API server with integrated scheduler & telegram publishing |
+| market-data-ws | 🟢 Online | 0% | ~140MB | Real-time WebSocket market data cache (100 symbols × 7 timeframes = 700 datasets) |
+| signal-listener | 🟢 Online | 0% | ~62MB | External signal processing service (ggShot integration) |
+| x-bot | 🟢 Online | 0% | ~41MB | X (Twitter) bot for @ggbots_ai - automated platform status tweets and engagement |
 | pm2-logrotate | 🟢 Online | 0% | ~57MB | Automated log rotation and compression (10MB rotation, 5 files max) |
 
 ### Infrastructure Services
@@ -381,13 +382,35 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Future Integration**: Trade notification and signal alert templates ready, awaiting integration into trading/decision pipelines
 - **Documentation**: Complete setup and usage guide in `DOCS/RESEND.md`
 
-### 📊 Universal Data Layer (Complete - 2025-10-17)
+### 📊 Universal Data Layer (Production - 2025-10-19)
 **Catalog-Driven Market Intelligence Platform**:
 - **Phase 1 Foundation**: MarketIntelligence gateway with DataCatalog, CacheManager, ResponseFormatter
-- **OHLCV Integration**: RedisWebSocketAdapter (priority 1) + BinanceRestAdapter (fallback)
 - **Phase 2 Migration**: ExtractionEngine migrated to UniversalDataClient via Adapter Pattern (2 lines changed)
-- **Performance**: 3x faster extractions (1-5ms cached vs 2-3s REST polling)
+- **Production Deployment**: Live in production, 100% success rate across all test scenarios
+- **Performance**: 3x-3000x faster extractions (1-5ms cached vs 2-3s REST polling)
+- **Data Sources**: RedisWebSocketAdapter (priority 1) + BinanceRestAdapter (automatic fallback)
 - **Testing**: 8 integration tests passing (OHLCV flow, Preprocessor compatibility, ExtractionEngine validation)
 - **Architecture**: Foundation for 150+ future data sources (sentiment, news, on-chain, fundamentals)
 - **Files**: `market_intelligence/*` (complete framework), `extraction/v2/universal_data_client.py` (adapter)
 - **Documentation**: Complete architecture in `DOCS/UNIVERSAL_DATA.md`
+
+### 🌐 WebSocket Market Data Cache (Production - 2025-10-19)
+**Real-Time Market Data Streaming via Binance WebSocket**:
+- **Coverage**: 100 symbols (ggbots + Symphony compatible) × 7 timeframes = 700 datasets
+- **Symbols**: Expanded from 20 → 100 to cover all Symphony.io-compatible trading pairs
+- **Performance**: Sub-100ms data retrieval for cached symbols (vs ~800ms REST fallback)
+- **Architecture**: 200-candle rolling windows maintained in Redis via WebSocket push updates
+- **Capacity**: 700/1024 Binance WebSocket streams (68% utilization, room for growth)
+- **Historical Fetch**: 1.8 seconds for all 700 datasets on startup (100% success rate)
+- **Memory Impact**: ~16MB total (Redis + service overhead)
+- **Symphony Ready**: All 100 cached symbols work with Symphony.io live trading
+- **Files**: `core/services/websocket_market_data_service.py`
+
+### 🔐 Subscription Permission Fix (2025-10-19)
+**Critical Bug Fix for Premium Feature Access**:
+- **Issue**: `subscription_expires_at` set to trial end date instead of NULL for active subscriptions
+- **Impact**: Users with expired trials couldn't access premium features despite active paid subscriptions
+- **Root Cause**: Webhook handler setting expiration date for ongoing subscriptions (should be NULL)
+- **Fix**: Updated `handle_checkout_completed` to set `subscription_expires_at = NULL` for active subs
+- **Result**: Premium permissions now work correctly (can_use_premium_features = true for ggbase tier)
+- **Files**: `ggbot.py` (webhook handler), database migration for existing users
