@@ -9,7 +9,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog'
-import { apiClient, BotConfiguration } from '@/lib/api'
+import { BotConfiguration } from '@/lib/api'
 
 interface DuplicateAsLiveModalProps {
   open: boolean
@@ -106,7 +106,7 @@ export function DuplicateAsLiveModal({
         throw new Error(data.detail || 'Failed to create live bot')
       }
 
-      const result = await response.json()
+      await response.json()
 
       // Success!
       onSuccess?.()
