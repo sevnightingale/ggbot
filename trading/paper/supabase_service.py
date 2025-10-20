@@ -23,7 +23,8 @@ from core.config import config_repo, BotConfig, PositionSizingMethod
 from core.domain.models.account import Account
 from core.domain.models.value_objects import Money, Symbol
 from core.domain.repositories.supabase_account_repository import supabase_account_repo
-from .market_data import MarketDataAdapter, MarketPrice
+from .types import MarketPrice
+from .live_price_service import LivePriceService
 
 # Load environment variables
 load_dotenv()
@@ -58,12 +59,12 @@ class SupabasePaperTradingService:
     def __init__(self):
         self.supabase_url = os.getenv("SUPABASE_URL")
         self.supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
-        
+
         if not self.supabase_url or not self.supabase_key:
             raise ValueError("Missing SUPABASE_URL or SUPABASE_SERVICE_KEY environment variables")
-        
+
         self.supabase: Client = create_client(self.supabase_url, self.supabase_key)
-        self.market_data = MarketDataAdapter()
+        self.price_service = LivePriceService()
         self.symbol_standardizer = UniversalSymbolStandardizer()
         self.account_repo = supabase_account_repo
         self.error_limiter = ErrorRateLimiter(interval_seconds=60)  # Rate limit errors to once per minute
@@ -279,7 +280,7 @@ class SupabasePaperTradingService:
             
             # Get current market price
             try:
-                market_price = await self.market_data.get_current_price(symbol)
+                market_price = await self.price_service.get_current_price(symbol)
                 entry_price = market_price.mid
             except Exception as e:
                 logger.error(f"Failed to get market price for {symbol}: {e}")
@@ -448,7 +449,7 @@ class SupabasePaperTradingService:
             
             # Get current price if not provided
             if close_price is None:
-                market_price = await self.market_data.get_current_price(trade["symbol"])
+                market_price = await self.price_service.get_current_price(trade["symbol"])
                 close_price = market_price.mid
             
             # Calculate P&L
@@ -752,7 +753,7 @@ class SupabasePaperTradingService:
 
             # Get unique symbols for batch price fetch
             symbols = list(set(pos["symbol"] for pos in positions))
-            prices = await self.market_data.get_multiple_prices(symbols)
+            prices = await self.price_service.get_multiple_prices(symbols)
 
             batch_updates = []
             positions_to_close = []
@@ -854,7 +855,7 @@ class SupabasePaperTradingService:
         
         try:
             # Check market data adapter
-            md_health = await self.market_data.health_check()
+            md_health = await self.price_service.health_check()
             health["market_data"] = md_health["status"]
             if md_health["errors"]:
                 health["errors"].extend(md_health["errors"])

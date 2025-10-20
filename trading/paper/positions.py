@@ -14,7 +14,7 @@ from psycopg2.extras import RealDictCursor
 
 from core.common.db import get_db_connection
 from core.common.logger import logger
-from .market_data import MarketDataAdapter
+from .live_price_service import LivePriceService
 
 
 @dataclass
@@ -64,7 +64,7 @@ class PositionManager:
     """
     
     def __init__(self):
-        self.market_data = MarketDataAdapter()
+        self.price_service = LivePriceService()
     
     def _get_db_connection(self):
         """Get database connection using unified connection manager"""
@@ -93,7 +93,7 @@ class PositionManager:
                         return None
                     
                     # Get current price
-                    market_price = await self.market_data.get_current_price(trade["symbol"])
+                    market_price = await self.price_service.get_current_price(trade["symbol"])
                     current_price = market_price.mid
                     
                     # Calculate metrics
@@ -180,7 +180,7 @@ class PositionManager:
                     if open_positions:
                         # Get current prices for all symbols
                         symbols = list(set(pos["symbol"] for pos in open_positions))
-                        prices = await self.market_data.get_multiple_prices(symbols)
+                        prices = await self.price_service.get_multiple_prices(symbols)
 
                         for pos in open_positions:
                             if pos["symbol"] in prices:

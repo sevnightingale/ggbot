@@ -393,13 +393,13 @@ class DecisionEngineV2:
     
     async def _get_current_price(self, symbol: str) -> Decimal:
         """
-        Get current market price using multi-exchange fallback for maximum reliability.
+        Get current market price using live WebSocket-cached data.
         """
         try:
-            from trading.paper.market_data import MarketDataAdapter
+            from trading.paper.live_price_service import LivePriceService
 
-            adapter = MarketDataAdapter()
-            market_price = await adapter.get_current_price_with_fallback(symbol)
+            price_service = LivePriceService()
+            market_price = await price_service.get_current_price(symbol)
 
             # Use mid price (average of bid/ask)
             price = Decimal(str(market_price.mid))
@@ -410,14 +410,14 @@ class DecisionEngineV2:
                 price=float(price),
                 bid=market_price.bid,
                 ask=market_price.ask
-            ).debug("Retrieved current price with multi-exchange fallback")
+            ).debug("Retrieved current price from live WebSocket data")
 
             return price
 
         except Exception as e:
-            logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to get current price from all exchanges: {e}")
+            logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to get current price: {e}")
             # No more dangerous mock fallback - let the error propagate for proper handling
-            raise MarketDataError(f"Unable to get current price for {symbol} from any exchange: {e}")
+            raise MarketDataError(f"Unable to get current price for {symbol}: {e}")
     
     async def _build_signal_validation_prompt(
         self, 

@@ -31,6 +31,8 @@ class BotConfigV2:
         llm_config: Optional[Dict[str, Any]] = None,
         telegram_integration: Optional[Dict[str, Any]] = None,
         state: str = "inactive",
+        trading_mode: str = "paper",
+        symphony_agent_id: Optional[str] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -46,6 +48,8 @@ class BotConfigV2:
         self.llm_config = llm_config or {"provider": "default", "use_platform_keys": True, "use_own_key": False}
         self.telegram_integration = telegram_integration or {}
         self.state = state
+        self.trading_mode = trading_mode
+        self.symphony_agent_id = symphony_agent_id
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -57,6 +61,8 @@ class BotConfigV2:
             "config_name": self.config_name,
             "config_type": self.config_type,
             "state": self.state,
+            "trading_mode": self.trading_mode,
+            "symphony_agent_id": self.symphony_agent_id,
             "config_data": {
                 "schema_version": self.schema_version,
                 "selected_pair": self.selected_pair,
@@ -101,6 +107,8 @@ class BotConfigV2:
             llm_config=data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
             telegram_integration=data.get("telegram_integration", {}),
             state=data.get("state", "inactive"),
+            trading_mode=data.get("trading_mode", "paper"),
+            symphony_agent_id=data.get("symphony_agent_id"),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -230,17 +238,19 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_data, created_at, updated_at, config_type
+                        SELECT config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
-                    
+
                     result = cur.fetchone()
                     if not result:
                         return None
-                    
+
                     config_data = json.loads(result[0]) if isinstance(result[0], str) else result[0]
                     db_config_type = result[3] or "autonomous_trading"  # Use config_type from database
+                    trading_mode = result[4] or "paper"
+                    symphony_agent_id = result[5]
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -258,6 +268,8 @@ class ConfigService:
                             "schema_version": inner_config.get("schema_version", "2.1"),
                             "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                             "telegram_integration": inner_config.get("telegram_integration", {}),
+                            "trading_mode": trading_mode,
+                            "symphony_agent_id": symphony_agent_id,
                             "created_at": result[1].isoformat() if result[1] else None,
                             "updated_at": result[2].isoformat() if result[2] else None
                         }
@@ -268,13 +280,15 @@ class ConfigService:
                             flattened_config["config_id"] = config_id
                         if "user_id" not in flattened_config:
                             flattened_config["user_id"] = user_id
-                        # Always use database config_type
+                        # Always use database config_type and Symphony fields
                         flattened_config["config_type"] = db_config_type
+                        flattened_config["trading_mode"] = trading_mode
+                        flattened_config["symphony_agent_id"] = symphony_agent_id
                         if "created_at" not in flattened_config and result[1]:
                             flattened_config["created_at"] = result[1].isoformat()
                         if "updated_at" not in flattened_config and result[2]:
                             flattened_config["updated_at"] = result[2].isoformat()
-                    
+
                     return BotConfigV2.from_dict(flattened_config)
                     
         except Exception as e:
@@ -297,18 +311,19 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type
+                        SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type,
+                               trading_mode, symphony_agent_id
                         FROM configurations
                         WHERE user_id = %s
                         ORDER BY created_at DESC
                     """, (user_id,))
-                    
+
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type = row
-                        
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id = row
+
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
-                        
+
                         # Extract config_data structure and flatten for from_dict
                         if "config_data" in config_data:
                             # New nested structure - extract the inner config_data
@@ -326,6 +341,8 @@ class ConfigService:
                                 "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                                 "telegram_integration": inner_config.get("telegram_integration", {}),
                                 "state": state or "inactive",
+                                "trading_mode": trading_mode or "paper",
+                                "symphony_agent_id": symphony_agent_id,
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -338,11 +355,13 @@ class ConfigService:
                                 flattened_config["config_name"] = config_name
                             flattened_config["state"] = state or "inactive"
                             flattened_config["config_type"] = db_config_type or "autonomous_trading"
+                            flattened_config["trading_mode"] = trading_mode or "paper"
+                            flattened_config["symphony_agent_id"] = symphony_agent_id
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:
                                 flattened_config["updated_at"] = updated_at.isoformat()
-                        
+
                         configs.append(BotConfigV2.from_dict(flattened_config))
             
             self._log.info(f"Listed {len(configs)} configs for user {user_id}")

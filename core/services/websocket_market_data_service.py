@@ -86,6 +86,7 @@ class WebSocketMarketDataService:
         # Stats
         self.candles_received = 0
         self.candles_stored = 0
+        self.live_candles_stored = 0
         self.errors = 0
 
     async def start(self):
@@ -243,12 +244,6 @@ class WebSocketMarketDataService:
 
             kline = data['k']
 
-            # Only process closed candles (complete)
-            if not kline['x']:  # x = is candle closed
-                return
-
-            self.candles_received += 1
-
             # Extract candle data
             symbol = kline['s']  # BTCUSDT
             timeframe = kline['i']  # 1h
@@ -264,6 +259,14 @@ class WebSocketMarketDataService:
 
             # Convert symbol to slash format
             symbol_slash = f"{symbol[:-4]}/{symbol[-4:]}"  # BTCUSDT -> BTC/USDT
+
+            # Store live candle for current price (updates every ~1 second)
+            if not kline['x']:  # x = is candle closed (False = live/current candle)
+                await self._store_live_candle(symbol_slash, timeframe, candle)
+                return
+
+            # Closed candle - store in 200-candle window
+            self.candles_received += 1
 
             # Update rolling 200-candle window
             await self._update_candle_window(symbol_slash, timeframe, candle)
@@ -309,6 +312,41 @@ class WebSocketMarketDataService:
         except Exception as e:
             self._log.error(f"Failed to update candle window for {symbol} {timeframe}: {e}")
             raise
+
+    async def _store_live_candle(self, symbol: str, timeframe: str, candle: Dict[str, Any]):
+        """
+        Store the current (unclosed) candle for live price data.
+
+        This provides real-time price updates (~1 second granularity) by storing
+        the current candle as it updates. The 'close' price represents the most
+        recent trade price.
+
+        Args:
+            symbol: Trading pair in slash format (e.g., BTC/USDT)
+            timeframe: Candle timeframe (e.g., 1h, 5m)
+            candle: Current candle data dict
+        """
+        try:
+            # Store one live candle per symbol (timeframe-agnostic for simplicity)
+            # We use the 5m timeframe as it updates most frequently
+            if timeframe == '5m':
+                key = f"price:live:{symbol}"
+
+                await self.redis_client.setex(
+                    key,
+                    60,  # 60 second TTL (refreshed on every update)
+                    pickle.dumps(candle)
+                )
+
+                self.live_candles_stored += 1
+
+                # Log every 100 live candles to see activity
+                if self.live_candles_stored % 100 == 0:
+                    self._log.info(f"📍 Live candles: {self.live_candles_stored} stored")
+
+        except Exception as e:
+            self._log.error(f"Failed to store live candle for {symbol}: {e}")
+            # Don't raise - this is a nice-to-have feature, don't break the main flow
 
     async def _cleanup(self):
         """Clean up connections."""
