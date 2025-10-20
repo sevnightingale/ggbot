@@ -212,6 +212,163 @@ class VaultManager:
             logger.bind(user_id=user_id).error(f"Failed to delete credential: {e}")
             return False
 
+    @staticmethod
+    async def store_symphony_credential(
+        user_id: str,
+        api_key: str,
+        smart_account: str
+    ) -> bool:
+        """
+        Store Symphony API key in Vault and smart account in user_profiles.
+
+        Args:
+            user_id: UUID of the user
+            api_key: Symphony API key to encrypt and store
+            smart_account: Symphony smart account address (0x...)
+
+        Returns:
+            True if stored successfully, False otherwise
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Create unique vault secret name for Symphony credential
+                    vault_secret_name = f"symphony_{user_id}".replace("-", "_")
+
+                    # Store API key in Vault (returns vault secret ID)
+                    cur.execute(
+                        "SELECT vault.create_secret(%s, %s) as secret_id;",
+                        (vault_secret_name, api_key)
+                    )
+                    vault_secret_id = cur.fetchone()[0]
+
+                    # Update user_profiles with vault reference and smart account
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET symphony_vault_id = %s,
+                            symphony_smart_account = %s,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                    """, (vault_secret_id, smart_account, user_id))
+
+                    if cur.rowcount == 0:
+                        logger.bind(user_id=user_id).error("User profile not found")
+                        return False
+
+                    conn.commit()
+
+                    logger.bind(user_id=user_id).info(
+                        "Stored Symphony credentials securely"
+                    )
+                    return True
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to store Symphony credential: {e}")
+            return False
+
+    @staticmethod
+    async def get_symphony_credential(user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve Symphony API key from Vault.
+
+        Args:
+            user_id: UUID of the user
+
+        Returns:
+            Dict with 'api_key' and 'smart_account', or None if not found
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Get vault secret ID and smart account from user_profiles
+                    cur.execute("""
+                        SELECT symphony_vault_id, symphony_smart_account
+                        FROM user_profiles
+                        WHERE user_id = %s;
+                    """, (user_id,))
+
+                    result = cur.fetchone()
+                    if not result or not result[0]:
+                        return None
+
+                    vault_secret_id, smart_account = result
+
+                    # Retrieve decrypted API key from Vault
+                    cur.execute("""
+                        SELECT decrypted_secret
+                        FROM vault.decrypted_secrets
+                        WHERE id = %s;
+                    """, (vault_secret_id,))
+
+                    vault_result = cur.fetchone()
+                    if not vault_result:
+                        logger.bind(user_id=user_id).error(
+                            "Vault secret not found for Symphony credential"
+                        )
+                        return None
+
+                    api_key = vault_result[0]
+                    return {
+                        'api_key': api_key,
+                        'smart_account': smart_account
+                    }
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to retrieve Symphony credential: {e}")
+            return None
+
+    @staticmethod
+    async def delete_symphony_credential(user_id: str) -> bool:
+        """
+        Delete Symphony credentials and disable live trading for all user's bots.
+
+        Sets symphony_vault_id = NULL and updates all configurations to paper mode.
+        This ensures no live trading can occur without valid credentials.
+
+        Args:
+            user_id: UUID of the user
+
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Clear Symphony credentials from user_profiles
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET symphony_vault_id = NULL,
+                            symphony_smart_account = NULL,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                    """, (user_id,))
+
+                    if cur.rowcount == 0:
+                        logger.bind(user_id=user_id).warning("User profile not found")
+                        return False
+
+                    # Disable live trading on all user's bots
+                    cur.execute("""
+                        UPDATE configurations
+                        SET trading_mode = 'paper',
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                        AND trading_mode = 'live'
+                    """, (user_id,))
+
+                    disabled_bots = cur.rowcount
+
+                    conn.commit()
+
+                    logger.bind(user_id=user_id).info(
+                        f"Deleted Symphony credentials and disabled {disabled_bots} live bot(s)"
+                    )
+                    return True
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to delete Symphony credential: {e}")
+            return False
+
 
 # Convenience functions for common operations
 async def store_credential(user_id: str, name: str, provider: str, api_key: str) -> Optional[str]:
@@ -229,3 +386,15 @@ async def list_credentials(user_id: str) -> list[Dict[str, Any]]:
 async def delete_credential(user_id: str, name: str) -> bool:
     """Delete a user credential. Convenience wrapper."""
     return await VaultManager.delete_user_credential(user_id, name)
+
+async def store_symphony_credential(user_id: str, api_key: str, smart_account: str) -> bool:
+    """Store Symphony credential. Convenience wrapper."""
+    return await VaultManager.store_symphony_credential(user_id, api_key, smart_account)
+
+async def get_symphony_credential(user_id: str) -> Optional[Dict[str, Any]]:
+    """Get Symphony credential. Convenience wrapper."""
+    return await VaultManager.get_symphony_credential(user_id)
+
+async def delete_symphony_credential(user_id: str) -> bool:
+    """Delete Symphony credential. Convenience wrapper."""
+    return await VaultManager.delete_symphony_credential(user_id)

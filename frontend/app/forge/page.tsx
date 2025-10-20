@@ -16,6 +16,7 @@ import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
 import { TradeHistoryModal } from './components/monitor/TradeHistoryModal'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
+import { DuplicateAsLiveModal } from '@/components/DuplicateAsLiveModal'
 
 interface Position {
   trade_id: string
@@ -81,6 +82,8 @@ function ForgeApp() {
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
   const [isTradeHistoryModalOpen, setIsTradeHistoryModalOpen] = useState(false)
+  const [duplicateAsLiveModalOpen, setDuplicateAsLiveModalOpen] = useState(false)
+  const [sourceBotForLive, setSourceBotForLive] = useState<BotConfiguration | null>(null)
 
   // Use ref to track selectedConfigId for SSE filtering without causing reconnections
   const selectedConfigIdRef = useRef(selectedConfigId)
@@ -789,6 +792,21 @@ function ForgeApp() {
     }
   }
 
+  // Handler function for duplicating bot as live
+  const handleDuplicateAsLive = (configId: string) => {
+    const sourceBot = allBots.find(bot => bot.config_id === configId)
+    if (sourceBot) {
+      setSourceBotForLive(sourceBot)
+      setDuplicateAsLiveModalOpen(true)
+    }
+  }
+
+  // Handler for when live bot is successfully created
+  const handleLiveBotCreated = async () => {
+    // Refresh bot list to show new live bot
+    await loadBots()
+  }
+
   // Handler function for deleting bot
   const handleDeleteBot = async (configId: string) => {
     setIsBotAction(true)
@@ -907,6 +925,7 @@ function ForgeApp() {
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
+            onDuplicateAsLive={handleDuplicateAsLive}
             onDelete={handleDeleteBot}
             onResetAccount={handleResetAccount}
             isBotAction={isBotAction}
@@ -1016,6 +1035,14 @@ function ForgeApp() {
           winRate={selectedAccount.win_rate || 0}
         />
       )}
+
+      {/* Duplicate as Live Modal */}
+      <DuplicateAsLiveModal
+        open={duplicateAsLiveModalOpen}
+        onOpenChange={setDuplicateAsLiveModalOpen}
+        sourceBot={sourceBotForLive}
+        onSuccess={handleLiveBotCreated}
+      />
     </div>
   )
 }

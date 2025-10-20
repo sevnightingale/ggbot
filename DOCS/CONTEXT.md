@@ -89,3 +89,8 @@ Ok one thing though is that I'd like to keep the symphony api keys encrypted in 
 Perfect, you nailed it, option A for sure. 
 
 Please write a new plan, call it SYMPHONY_PLAN.md, I just renamed the existing one to SYMPHONY_PLAN_ARCHIVE.md so you can just create a new file again with the original name SYMPHONY_PLAN.md. 
+
+> hang on, how is our SSE going to be affected? right now we have the metrics and
+  active trades and stuff and all that gets populated via SSE and refreshed every
+  3s.Did we consider this already? for live trading_mode configs are we switching the
+  queries? how's this going to work?

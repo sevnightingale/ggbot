@@ -95,6 +95,7 @@ logger = base_logger
 from extraction.v2.extraction_engine import ExtractionEngineV2
 from decision.engine_v2 import DecisionEngineV2
 from trading.paper.supabase_service import SupabasePaperTradingService
+from trading.live.symphony_service import SymphonyLiveTradingService
 from signals.publishing_service import publish_signal_to_telegram
 from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
 class ConfigCreateRequest(BaseModel):
@@ -254,8 +255,9 @@ class GGBotOrchestrator:
         self.config_service = config_service
         self.llm_service = llm_service
         self.paper_trading = SupabasePaperTradingService()
+        self.symphony_trading = SymphonyLiveTradingService()
         self._log = logger.bind(component="orchestrator")
-        
+
         self._extraction_engines = {}
         self._decision_engines = {}
     
@@ -893,41 +895,68 @@ class GGBotOrchestrator:
                 "reasoning": decision_result.get("reasoning", "V2 Decision Engine decision")
             }
             
+            # Determine trading mode (paper vs live)
+            trading_mode = getattr(config, 'trading_mode', 'paper')
+            is_live = trading_mode == 'live'
+
             if trading_action == "close":
                 try:
                     from core.common.db import get_db_connection
                     open_positions = []
-                    with get_db_connection() as conn:
-                        with conn.cursor() as cur:
-                            cur.execute("""
-                                SELECT trade_id, symbol, side FROM paper_trades 
-                                WHERE config_id = %s AND symbol = %s AND status = 'open'
-                                ORDER BY opened_at DESC LIMIT 1
-                            """, (config.config_id, symbol))
-                            result = cur.fetchone()
-                            if result:
-                                open_positions.append({
-                                    'trade_id': result[0],
-                                    'symbol': result[1], 
-                                    'side': result[2]
-                                })
-                    
+
+                    if is_live:
+                        # Live trading: Query live_trades for batch_id
+                        with get_db_connection() as conn:
+                            with conn.cursor() as cur:
+                                cur.execute("""
+                                    SELECT batch_id FROM live_trades
+                                    WHERE config_id = %s AND closed_at IS NULL
+                                    ORDER BY created_at DESC LIMIT 1
+                                """, (config.config_id,))
+                                result = cur.fetchone()
+                                if result:
+                                    open_positions.append({'batch_id': result[0]})
+                    else:
+                        # Paper trading: Query paper_trades for trade_id
+                        with get_db_connection() as conn:
+                            with conn.cursor() as cur:
+                                cur.execute("""
+                                    SELECT trade_id, symbol, side FROM paper_trades
+                                    WHERE config_id = %s AND symbol = %s AND status = 'open'
+                                    ORDER BY opened_at DESC LIMIT 1
+                                """, (config.config_id, symbol))
+                                result = cur.fetchone()
+                                if result:
+                                    open_positions.append({
+                                        'trade_id': result[0],
+                                        'symbol': result[1],
+                                        'side': result[2]
+                                    })
+
                     if not open_positions:
                         return {
                             "status": "skipped",
                             "reason": f"No open positions to close for {symbol}",
                             "action": "close"
                         }
-                    
+
                     position = open_positions[0]
-                    trade_result = await self.paper_trading.close_position(
-                        position['trade_id'],
-                        reason="position_management"
-                    )
-                    
-                    self._log.info(f"V2 Position closed: {trade_result.get('status')} for {symbol}")
+
+                    # Route to appropriate service
+                    if is_live:
+                        trade_result = await self.symphony_trading.close_position(
+                            position['batch_id'],
+                            reason="position_management"
+                        )
+                    else:
+                        trade_result = await self.paper_trading.close_position(
+                            position['trade_id'],
+                            reason="position_management"
+                        )
+
+                    self._log.info(f"V2 Position closed: {trade_result.get('status')} for {symbol} (mode={trading_mode})")
                     return trade_result
-                    
+
                 except Exception as e:
                     self._log.error(f"Failed to close position for {symbol}: {e}")
                     return {
@@ -935,9 +964,14 @@ class GGBotOrchestrator:
                         "error": f"Failed to close position: {str(e)}"
                     }
             else:
-                trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
-                
-                self._log.info(f"V2 Trading completed: {trade_result.get('status')} for {symbol}")
+                # Route based on trading mode
+                if is_live:
+                    trade_result = await self.symphony_trading.execute_trade_intent(trading_intent)
+                    self._log.info(f"V2 Symphony live trade completed: {trade_result.get('status')} for {symbol}")
+                else:
+                    trade_result = await self.paper_trading.execute_trade_intent(trading_intent)
+                    self._log.info(f"V2 Paper trade completed: {trade_result.get('status')} for {symbol}")
+
                 return trade_result
             
         except Exception as e:
@@ -1688,6 +1722,7 @@ async def get_user_profile(
             "requires_own_llm_keys": profile.requires_own_llm_keys,
             "can_publish_telegram_signals": profile.can_publish_telegram_signals,
             "can_use_signal_validation": profile.can_use_signal_validation,
+            "can_use_live_trading": profile.can_use_live_trading,
             "paid_data_points": profile.paid_data_points
         }
     }
@@ -1919,6 +1954,338 @@ async def delete_llm_credential(
     except Exception as e:
         logger.error(f"Failed to delete LLM credential: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to delete credential: {str(e)}")
+
+
+# Symphony Live Trading Endpoints
+@app.post("/api/v2/symphony/setup")
+async def setup_symphony_account(
+    request: Dict[str, str],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Store Symphony API credentials for live trading.
+
+    Request body:
+        - api_key: Symphony API key (starts with 'sk_')
+        - smart_account: Ethereum address (0x...)
+    """
+    try:
+        api_key = request.get("api_key", "").strip()
+        smart_account = request.get("smart_account", "").strip()
+
+        # Validate API key format
+        if not api_key or not api_key.startswith("sk_"):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid API key format. Should start with 'sk_'"
+            )
+
+        # Validate smart account format
+        import re
+        if not re.match(r"^0x[a-fA-F0-9]{40}$", smart_account):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid smart account address. Should be a valid Ethereum address (0x...)"
+            )
+
+        # Store credentials in Vault
+        from core.auth.vault_utils import VaultManager
+        success = await VaultManager.store_symphony_credential(
+            user_id=current_user.user_id,
+            api_key=api_key,
+            smart_account=smart_account
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to store Symphony credentials"
+            )
+
+        logger.bind(user_id=current_user.user_id).info("Symphony account connected successfully")
+
+        return {
+            "status": "success",
+            "message": "Symphony account connected successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to setup Symphony account: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to setup Symphony account: {str(e)}"
+        )
+
+
+@app.get("/api/v2/symphony/status")
+async def get_symphony_status(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Check if user has Symphony account connected."""
+    try:
+        from core.auth.vault_utils import VaultManager
+
+        credentials = await VaultManager.get_symphony_credential(current_user.user_id)
+
+        if credentials:
+            return {
+                "connected": True,
+                "smart_account": credentials.get("smart_account")
+            }
+        else:
+            return {
+                "connected": False,
+                "smart_account": None
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to check Symphony status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check Symphony status: {str(e)}"
+        )
+
+
+@app.post("/api/v2/symphony/disconnect")
+async def disconnect_symphony_account(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Disconnect Symphony account and disable all live trading bots.
+
+    This will:
+    - Remove Symphony credentials from Vault
+    - Set all user's live bots to paper mode
+    """
+    try:
+        from core.auth.vault_utils import VaultManager
+
+        success = await VaultManager.delete_symphony_credential(current_user.user_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to disconnect Symphony account"
+            )
+
+        logger.bind(user_id=current_user.user_id).info("Symphony account disconnected")
+
+        return {
+            "status": "success",
+            "message": "Symphony account disconnected. All live bots have been disabled."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to disconnect Symphony account: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to disconnect Symphony account: {str(e)}"
+        )
+
+
+@app.get("/api/v2/positions/live/{config_id}")
+async def get_live_positions(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get open live positions for a bot configuration from Symphony."""
+    try:
+        # Verify user owns this config
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Check if it's a live trading bot
+        if getattr(config, 'trading_mode', 'paper') != 'live':
+            return {
+                "positions": [],
+                "message": "Not a live trading bot"
+            }
+
+        # Get positions from Symphony service
+        positions = await orchestrator.symphony_trading.get_open_positions(config_id)
+
+        return {
+            "positions": positions,
+            "count": len(positions)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get live positions: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get live positions: {str(e)}"
+        )
+
+
+@app.post("/api/v2/positions/live/{batch_id}/close")
+async def close_live_position(
+    batch_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Close a live position by batch_id."""
+    try:
+        # Verify user owns this position
+        from core.common.db import get_db_connection
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT lt.config_id
+                    FROM live_trades lt
+                    JOIN configurations c ON lt.config_id = c.config_id
+                    WHERE lt.batch_id = %s AND c.user_id = %s AND lt.closed_at IS NULL
+                """, (batch_id, current_user.user_id))
+
+                result = cur.fetchone()
+                if not result:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Position not found or already closed"
+                    )
+
+        # Close position via Symphony service
+        close_result = await orchestrator.symphony_trading.close_position(
+            batch_id=batch_id,
+            reason="manual"
+        )
+
+        if close_result.get("status") != "success":
+            raise HTTPException(
+                status_code=500,
+                detail=close_result.get("reason", "Failed to close position")
+            )
+
+        return close_result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to close live position: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to close live position: {str(e)}"
+        )
+
+
+@app.post("/api/v2/config/duplicate-as-live")
+async def duplicate_config_as_live(
+    request: Dict[str, Any],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Duplicate a paper trading bot as a live trading bot.
+
+    Request body:
+        - source_config_id: UUID of paper bot to duplicate
+        - live_bot_name: Name for the new live bot
+        - symphony_agent_id: Symphony agent ID for live trading
+    """
+    try:
+        source_config_id = request.get("source_config_id")
+        live_bot_name = request.get("live_bot_name")
+        symphony_agent_id = request.get("symphony_agent_id")
+
+        if not source_config_id or not live_bot_name or not symphony_agent_id:
+            raise HTTPException(
+                status_code=400,
+                detail="Missing required fields: source_config_id, live_bot_name, symphony_agent_id"
+            )
+
+        # Load source configuration
+        source_config = await config_service.get_config(source_config_id, current_user.user_id)
+        if not source_config:
+            raise HTTPException(status_code=404, detail="Source configuration not found")
+
+        # Check if source is paper trading
+        if getattr(source_config, 'trading_mode', 'paper') == 'live':
+            raise HTTPException(
+                status_code=400,
+                detail="Source bot is already a live trading bot. Can only duplicate paper bots."
+            )
+
+        # Check if user has Symphony connected
+        from core.auth.vault_utils import VaultManager
+        credentials = await VaultManager.get_symphony_credential(current_user.user_id)
+        if not credentials:
+            raise HTTPException(
+                status_code=400,
+                detail="Symphony account not connected. Please connect in Settings first."
+            )
+
+        # Check if symbol is Symphony-compatible
+        from core.symbols import UniversalSymbolStandardizer
+        standardizer = UniversalSymbolStandardizer()
+        if not standardizer.is_symphony_compatible(source_config.selected_pair):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Symbol {source_config.selected_pair} is not compatible with Symphony live trading"
+            )
+
+        # Create new config with live trading mode
+        from core.common.db import get_db_connection
+        import uuid
+        import json
+
+        new_config_id = str(uuid.uuid4())
+
+        # Get source config data as dict
+        config_data = {
+            "extraction": source_config.extraction if hasattr(source_config, 'extraction') else {},
+            "decision": source_config.decision if hasattr(source_config, 'decision') else {},
+            "trading": source_config.trading.model_dump() if hasattr(source_config, 'trading') else {},
+            "llm_config": source_config.llm_config if hasattr(source_config, 'llm_config') else {},
+            "telegram_integration": source_config.telegram_integration if hasattr(source_config, 'telegram_integration') else None,
+            "selected_pair": source_config.selected_pair,
+            "schema_version": "2.1"
+        }
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO configurations
+                    (config_id, user_id, config_type, config_name, config_data, state,
+                     symphony_agent_id, trading_mode, created_at, updated_at)
+                    VALUES (%s, %s, %s, %s, %s, 'inactive', %s, 'live', NOW(), NOW())
+                    RETURNING config_id
+                """, (
+                    new_config_id,
+                    current_user.user_id,
+                    source_config.config_type,
+                    live_bot_name,
+                    json.dumps(config_data),
+                    symphony_agent_id
+                ))
+                conn.commit()
+
+        logger.bind(
+            user_id=current_user.user_id,
+            source_config_id=source_config_id,
+            new_config_id=new_config_id
+        ).info(f"Duplicated paper bot as live bot: {live_bot_name}")
+
+        return {
+            "status": "success",
+            "config_id": new_config_id,
+            "config_name": live_bot_name,
+            "trading_mode": "live",
+            "message": f"Live trading bot '{live_bot_name}' created successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to duplicate config as live: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to duplicate config as live: {str(e)}"
+        )
 
 
 # Bot Data Endpoints for Dashboard
@@ -2680,6 +3047,7 @@ async def get_current_user_profile(
         "subscription_status": profile.subscription_status.value,
         "can_use_premium_features": profile.can_use_premium_features,
         "can_publish_telegram_signals": profile.can_publish_telegram_signals,
+        "can_use_live_trading": profile.can_use_live_trading,
         "has_stripe_integration": profile.has_stripe_integration,
         "subscription_expires_at": profile.subscription_expires_at.isoformat() if profile.subscription_expires_at else None
     }

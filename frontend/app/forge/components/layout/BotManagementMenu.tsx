@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { BotConfiguration } from '@/lib/api'
+import { usePermissions } from '@/lib/permissions'
 
 interface BotManagementMenuProps {
   bot: BotConfiguration
@@ -9,6 +10,7 @@ interface BotManagementMenuProps {
   onDuplicate: (configId: string) => void
   onDelete: (configId: string) => void
   onResetAccount?: (configId: string) => void
+  onDuplicateAsLive?: (configId: string) => void
   isBotAction: boolean
   hasUnsavedChanges?: boolean
 }
@@ -19,9 +21,11 @@ export function BotManagementMenu({
   onDuplicate,
   onDelete,
   onResetAccount,
+  onDuplicateAsLive,
   isBotAction,
   hasUnsavedChanges = false
 }: BotManagementMenuProps) {
+  const { canAccess } = usePermissions()
   const [isOpen, setIsOpen] = useState(false)
   const [isRenamingLocal, setIsRenamingLocal] = useState(false)
   const [newName, setNewName] = useState(bot.config_name)
@@ -29,6 +33,9 @@ export function BotManagementMenu({
   const [showResetConfirm, setShowResetConfirm] = useState(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  const isPaperBot = !bot.trading_mode || bot.trading_mode === 'paper'
+  const canUseLiveTrading = canAccess('live_trading')
 
   // Cancel rename function
   const handleRenameCancel = useCallback(() => {
@@ -233,6 +240,24 @@ export function BotManagementMenu({
             >
               Duplicate
             </button>
+            {isPaperBot && onDuplicateAsLive && (
+              <button
+                onClick={() => {
+                  if (canUseLiveTrading) {
+                    onDuplicateAsLive(bot.config_id)
+                    setIsOpen(false)
+                  } else {
+                    // TODO: Show upgrade modal
+                    alert('Live trading requires Pro Plan')
+                    setIsOpen(false)
+                  }
+                }}
+                disabled={isBotAction}
+                className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+              >
+                🔴 Duplicate as Live
+              </button>
+            )}
             {onResetAccount && (
               <button
                 onClick={handleResetClick}

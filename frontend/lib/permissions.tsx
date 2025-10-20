@@ -11,6 +11,7 @@ interface UserProfile {
   requires_own_llm_keys: boolean
   can_publish_telegram_signals: boolean
   can_use_signal_validation: boolean
+  can_use_live_trading: boolean
   paid_data_points: string[]
 }
 
@@ -73,6 +74,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
           requires_own_llm_keys: true,
           can_publish_telegram_signals: false,
           can_use_signal_validation: false,
+          can_use_live_trading: false,
           paid_data_points: []
         })
       } finally {
@@ -110,6 +112,9 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
       case 'signal_validation_mode':
         return userProfile.can_use_signal_validation
+
+      case 'live_trading':
+        return userProfile.can_use_live_trading
 
       default:
         return true // Allow access to basic features by default

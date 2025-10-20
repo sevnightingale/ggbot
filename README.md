@@ -37,12 +37,13 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 - **Risk-aware decisions**: Confidence scoring and position sizing algorithms
 
 **⚡ [Trading Agent](trading/)** - Precision Execution Engine
-- **Paper Trading Engine** - Professional-grade simulation with real Hummingbot market data
+- **Paper Trading Engine** - Professional-grade simulation with real market data
+- **Live Trading Engine** - Symphony.io integration for real-money execution (100 compatible symbols)
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
 - **Real-time monitoring** - 7-second price updates with automatic TP/SL execution
 - **Confidence-based sizing** - Position size = confidence × max position (10% of balance)
 - **Risk enforcement** with portfolio limits, exposure tracking, and emergency controls
-- **Multi-exchange support** with advanced order types (live trading expansion planned)
+- **Multi-exchange support** with advanced order types via Symphony.io
 
 ## Platform Infrastructure
 
@@ -70,7 +71,7 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 **🔧 [Data Integration](extraction/v2/)** - Direct API Connections
 - **Universal Data Layer**: Catalog-driven market intelligence gateway with WebSocket caching (3x faster extractions)
-- **Hummingbot API**: Real-time market data and price feeds (localhost:8888)
+- **Live Price Feeds**: Real-time prices via Binance WebSocket (sub-millisecond access, ~1s updates)
 - **pandas-ta Library**: 20+ technical indicators with pure Python processing
 - **Supabase Database**: Real-time data storage and retrieval
 
@@ -81,8 +82,8 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 - **Real-time WebSocket updates** with countdown timers and execution status
 
 **🎯 [Symbol Standardization](core/symbols/)** - Universal Trading Pair Management
-- **141 trading pairs** with comprehensive format support across all systems
-- **Multi-format conversion**: ggShot (`BTCUSDT`) ↔ CCXT (`BTC/USDT`) ↔ Hummingbot (`BTC-USDT`)
+- **141 trading pairs** with comprehensive format support across all systems (100 Symphony-compatible for live trading)
+- **Multi-format conversion**: ggShot (`BTCUSDT`) ↔ CCXT (`BTC/USDT`) ↔ Symphony (`BTC`)
 - **Validation and suggestions** for format errors and unsupported symbols
 
 **📊 Monitoring & Observability**

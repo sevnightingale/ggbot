@@ -14,13 +14,12 @@ module.exports = {
         NODE_ENV: 'production',
         PYTHONPATH: '/home/sev/ggbot',
         DEVELOPMENT_MODE: 'false',
-        HBOT_USERNAME: process.env.HBOT_USERNAME,
-        HBOT_PASSWORD: process.env.HBOT_PASSWORD,
         DATABASE_URL: process.env.DATABASE_URL,
         SUPABASE_URL: process.env.SUPABASE_URL,
         SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
         OPENAI_API_KEY: process.env.OPENAI_API_KEY,
-        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY
+        DEEPSEEK_API_KEY: process.env.DEEPSEEK_API_KEY,
+        REDIS_URL: process.env.REDIS_URL
       },
       error_file: '/dev/null',
       out_file: '/dev/null',

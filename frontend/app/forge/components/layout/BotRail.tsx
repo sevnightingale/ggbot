@@ -28,6 +28,7 @@ interface BotRailProps {
   isCreatingNew?: boolean
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
+  onDuplicateAsLive?: (configId: string) => void
   onDelete?: (configId: string) => void
   onResetAccount?: (configId: string) => void
   isBotAction?: boolean
@@ -43,6 +44,7 @@ export function BotRail({
   isCreatingNew = false,
   onRename,
   onDuplicate,
+  onDuplicateAsLive,
   onDelete,
   onResetAccount,
   isBotAction = false,
@@ -107,6 +109,7 @@ export function BotRail({
                 onClick={() => onSelect(bot.config_id)}
                 onRename={onRename}
                 onDuplicate={onDuplicate}
+                onDuplicateAsLive={onDuplicateAsLive}
                 onDelete={onDelete}
                 onResetAccount={onResetAccount}
                 isBotAction={isBotAction}
@@ -132,6 +135,7 @@ interface BotRowProps {
   onClick: () => void
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
+  onDuplicateAsLive?: (configId: string) => void
   onDelete?: (configId: string) => void
   onResetAccount?: (configId: string) => void
   isBotAction: boolean
@@ -144,6 +148,7 @@ function BotRow({
   onClick,
   onRename,
   onDuplicate,
+  onDuplicateAsLive,
   onDelete,
   onResetAccount,
   isBotAction
@@ -155,6 +160,7 @@ function BotRow({
   const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
   const balance = account?.current_balance ?? 10000
   const balanceText = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  const isLive = bot.trading_mode === 'live'
 
   return (
     <div
@@ -173,11 +179,12 @@ function BotRow({
             </div>
             <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
           </div>
-          {(onRename || onDuplicate || onDelete || onResetAccount) && (
+          {(onRename || onDuplicate || onDuplicateAsLive || onDelete || onResetAccount) && (
             <BotManagementMenu
               bot={bot}
               onRename={onRename || (() => {})}
               onDuplicate={onDuplicate || (() => {})}
+              onDuplicateAsLive={onDuplicateAsLive}
               onDelete={onDelete || (() => {})}
               onResetAccount={onResetAccount}
               isBotAction={isBotAction}
@@ -190,9 +197,15 @@ function BotRow({
           <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
             {configType === 'Signal validation' ? 'Signal' : 'Auto'}
           </span>
-          <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
-            {balanceText}
-          </span>
+          {isLive ? (
+            <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-xs font-semibold text-red-500">
+              LIVE TRADING
+            </span>
+          ) : (
+            <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
+              {balanceText}
+            </span>
+          )}
         </div>
 
         {/* Frequency */}

@@ -98,11 +98,58 @@ from trading.paper.supabase_service import SupabasePaperTradingService
 service = SupabasePaperTradingService()
 ```
 
+### Permission System Pattern
+
+**CRITICAL**: Premium feature permissions use @property methods on UserProfile, NOT standalone functions.
+
+#### Backend Pattern (core/domain/user_profile.py)
+```python
+@property
+def can_use_live_trading(self) -> bool:
+    """Check if user can use Symphony live trading."""
+    return self.can_use_premium_features
+```
+
+#### Usage in API Endpoints (ggbot.py)
+```python
+# Load profile
+profile = await user_service.get_profile(user_id)
+
+# Check permission directly on profile object
+if profile.can_use_live_trading:
+    # Execute premium feature
+```
+
+#### Exposing to Frontend (/me endpoint)
+```python
+# In /api/v2/me endpoint response
+{
+    "can_use_premium_features": profile.can_use_premium_features,
+    "can_publish_telegram_signals": profile.can_publish_telegram_signals,
+    "can_use_signal_validation": profile.can_use_signal_validation,
+    "can_use_live_trading": profile.can_use_live_trading  # Add new permissions here
+}
+```
+
+#### Frontend Integration (frontend/lib/permissions.tsx)
+```typescript
+// 1. Add to UserProfile interface
+interface UserProfile {
+  can_use_live_trading: boolean  // New permission
+}
+
+// 2. Add to canAccess switch
+case 'live_trading':
+  return userProfile.can_use_live_trading
+```
+
+**DO NOT create standalone permission functions** - always use @property methods on UserProfile class.
+
 ### V2 Data Flow Pattern
 ```python
 # V2 orchestrator sequential execution pattern
 extraction_result = await self._run_extraction_v2(...)
-decision_result = await self._run_decision_v2(config, extraction_result)  
+decision_result = await self._run_decision_v2(config, extraction_result)
 trading_result = await self._run_trading_v2(config, decision_result)
 ```
 
