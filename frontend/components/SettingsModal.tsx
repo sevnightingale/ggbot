@@ -268,7 +268,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         >
                           Symphony portal
                         </a>
-                        {' '}under "My Agents"
+                        {' '}under My Agents
                       </p>
                       <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
                         💡 Used for future balance display features. Not required for trading.
