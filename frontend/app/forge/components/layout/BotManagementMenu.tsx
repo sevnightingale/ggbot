@@ -228,7 +228,7 @@ export function BotManagementMenu({
               className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
               title={hasUnsavedChanges ? "Finish editing configuration first" : undefined}
             >
-              Rename
+              ✏️ Rename
             </button>
             <button
               onClick={() => {
@@ -238,7 +238,7 @@ export function BotManagementMenu({
               disabled={isBotAction}
               className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Duplicate
+              📋 Duplicate
             </button>
             {isPaperBot && onDuplicateAsLive && (
               <button
@@ -262,9 +262,9 @@ export function BotManagementMenu({
               <button
                 onClick={handleResetClick}
                 disabled={isBotAction}
-                className="w-full px-3 py-2 text-left text-xs text-amber-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                Reset Account
+                🔄 Reset Account
               </button>
             )}
             <hr className="my-1 border-[var(--border)]" />

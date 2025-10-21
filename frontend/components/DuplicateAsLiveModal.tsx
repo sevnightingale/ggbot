@@ -43,9 +43,19 @@ export function DuplicateAsLiveModal({
   const checkSymphonyConnection = async () => {
     try {
       setChecking(true)
+
+      // Get auth token properly
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setChecking(false)
+        return
+      }
+
       const response = await fetch('/api/v2/symphony/status', {
         headers: {
-          'Authorization': `Bearer ${(await import('@/lib/supabase')).createClient().auth.getSession().then(s => s.data.session?.access_token)}`
+          'Authorization': `Bearer ${session.access_token}`
         }
       })
 
@@ -88,11 +98,21 @@ export function DuplicateAsLiveModal({
       setLoading(true)
       setError(null)
 
+      // Get auth token properly
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setError('Authentication required. Please log in again.')
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/v2/config/duplicate-as-live', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await import('@/lib/supabase')).createClient().auth.getSession().then(s => s.data.session?.access_token)}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           source_config_id: sourceBot.config_id,
