@@ -2239,7 +2239,7 @@ async def duplicate_config_as_live(
         config_data = {
             "extraction": source_config.extraction if hasattr(source_config, 'extraction') else {},
             "decision": source_config.decision if hasattr(source_config, 'decision') else {},
-            "trading": source_config.trading.model_dump() if hasattr(source_config, 'trading') else {},
+            "trading": source_config.trading if hasattr(source_config, 'trading') else {},
             "llm_config": source_config.llm_config if hasattr(source_config, 'llm_config') else {},
             "telegram_integration": source_config.telegram_integration if hasattr(source_config, 'telegram_integration') else None,
             "selected_pair": source_config.selected_pair,
