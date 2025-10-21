@@ -15,6 +15,7 @@ This replaces polling-based approaches with push-based streaming for:
 import asyncio
 import os
 import pickle
+import time
 from datetime import datetime
 from typing import List, Dict, Any
 from binance import AsyncClient, BinanceSocketManager
@@ -194,14 +195,18 @@ class WebSocketMarketDataService:
             raise
 
     async def _start_websocket_streams(self):
-        """Start WebSocket streams for all symbols/timeframes."""
+        """
+        Start WebSocket streams with automatic reconnection and health monitoring.
+
+        Features:
+        - Automatic reconnection on disconnect
+        - Exponential backoff retry logic
+        - Connection health monitoring
+        - Silence detection (reconnect if no messages for 2 minutes)
+        """
         self._log.info(f"🌐 Starting WebSocket streams for {len(self.SYMBOLS)} symbols × {len(self.TIMEFRAMES)} timeframes...")
 
-        # Create socket manager
-        self.socket_manager = BinanceSocketManager(self.binance_client)
-
-        # Build stream names
-        # Format: btcusdt@kline_1h
+        # Build stream names (do this once, reuse on reconnect)
         streams = []
         for symbol in self.SYMBOLS:
             for timeframe in self.TIMEFRAMES:
@@ -210,26 +215,96 @@ class WebSocketMarketDataService:
                     stream_name = f"{symbol.lower()}@kline_{binance_tf}"
                     streams.append(stream_name)
 
-        self._log.info(f"📡 Subscribing to {len(streams)} streams...")
+        self._log.info(f"📡 Will subscribe to {len(streams)} streams...")
 
-        # Start multiplex socket
-        multiplex_socket = self.socket_manager.multiplex_socket(streams)
+        # Connection retry configuration
+        retry_count = 0
+        max_retries = 100  # Essentially unlimited retries
+        base_delay = 1
+        max_delay = 300  # Max 5 minutes between retries
 
-        async with multiplex_socket as stream:
-            self._log.info("✅ WebSocket streams active - receiving real-time data")
+        # Health monitoring configuration
+        silence_threshold = 120  # Reconnect if no messages for 2 minutes
+        recv_timeout = 30  # Timeout for individual recv() calls
 
-            while True:
-                try:
-                    msg = await stream.recv()
-                    await self._handle_kline_message(msg)
+        # Outer reconnection loop
+        while retry_count < max_retries:
+            try:
+                self._log.info(f"🔌 Connecting to Binance WebSocket (attempt {retry_count + 1})...")
 
-                except Exception as e:
-                    self._log.error(f"Error processing message: {e}")
-                    self.errors += 1
+                # Create socket manager (fresh connection)
+                self.socket_manager = BinanceSocketManager(self.binance_client)
+                multiplex_socket = self.socket_manager.multiplex_socket(streams)
 
-                    # Log stats every 100 errors
-                    if self.errors % 100 == 0:
-                        self._log.warning(f"Stats: {self.candles_received} received, {self.candles_stored} stored, {self.errors} errors")
+                last_message_time = time.time()
+                connection_start_time = time.time()
+
+                async with multiplex_socket as stream:
+                    self._log.info("✅ WebSocket streams active - receiving real-time data")
+
+                    # Refetch historical candles after reconnection to rebuild cache
+                    if retry_count > 0:  # Only on reconnection, not first connection
+                        self._log.info("🔄 Refetching historical candles after reconnection...")
+                        await self._fetch_historical_candles()
+                        self._log.info("✅ Historical candles refetched - cache rebuilt")
+
+                    retry_count = 0  # Reset retry count on successful connection
+
+                    # Inner message processing loop
+                    while True:
+                        try:
+                            # Receive with timeout to prevent infinite blocking
+                            msg = await asyncio.wait_for(stream.recv(), timeout=recv_timeout)
+                            last_message_time = time.time()
+                            await self._handle_kline_message(msg)
+
+                        except asyncio.TimeoutError:
+                            # No message received within timeout - check for prolonged silence
+                            silence_duration = time.time() - last_message_time
+                            connection_uptime = time.time() - connection_start_time
+
+                            if silence_duration > silence_threshold:
+                                # No messages for too long - connection likely dead
+                                self._log.error(
+                                    f"⚠️ Connection silent for {silence_duration:.0f}s "
+                                    f"(uptime: {connection_uptime/60:.1f}min) - reconnecting"
+                                )
+                                break  # Exit inner loop to reconnect
+
+                            # Still within threshold - just log debug message
+                            if silence_duration > 60:  # Log if silent for > 1 minute
+                                self._log.warning(
+                                    f"No messages for {silence_duration:.0f}s "
+                                    f"(threshold: {silence_threshold}s)"
+                                )
+
+                        except Exception as e:
+                            # Error processing message - log but continue
+                            self._log.error(f"Error processing message: {e}")
+                            self.errors += 1
+
+                            # Log stats every 100 errors
+                            if self.errors % 100 == 0:
+                                self._log.warning(
+                                    f"Stats: {self.candles_received} received, "
+                                    f"{self.candles_stored} stored, {self.errors} errors"
+                                )
+
+            except Exception as e:
+                # Connection failed or inner loop exited - reconnect
+                retry_count += 1
+                delay = min(base_delay * (2 ** retry_count), max_delay)
+
+                self._log.error(
+                    f"❌ WebSocket connection failed: {e} "
+                    f"(retry {retry_count}/{max_retries} in {delay}s)"
+                )
+
+                await asyncio.sleep(delay)
+                continue
+
+        # If we get here, we've exceeded max retries
+        raise Exception(f"WebSocket service failed after {max_retries} reconnection attempts")
 
     async def _handle_kline_message(self, msg: Dict[str, Any]):
         """Handle incoming kline (candle) message from WebSocket."""

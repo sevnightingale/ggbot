@@ -44,9 +44,10 @@ class LivePriceService:
 
     async def get_current_price(self, symbol: str) -> MarketPrice:
         """
-        Get current price for a symbol from candle data.
+        Get current price for a symbol from live WebSocket candle data.
 
-        First tries live candle (if available), then falls back to latest closed candle.
+        Uses live candles stored by the WebSocket service at price:live:{symbol}.
+        If not available, raises an exception.
 
         Args:
             symbol: Trading pair in internal format (e.g., 'BTC/USDT')
@@ -55,38 +56,23 @@ class LivePriceService:
             MarketPrice with bid, ask, last, and mid prices
 
         Raises:
-            Exception: If no price data available
+            Exception: If no live price data available
         """
         try:
             client = await self._get_redis_client()
 
-            # Try live candle first
+            # Get live candle
             live_key = f"price:live:{symbol}"
             data = await client.get(live_key)
 
-            # Fallback to latest closed candle from 5m window
             if not data:
-                candle_key = f"candles:{symbol}:5m:200"
-                data = await client.get(candle_key)
+                raise Exception(
+                    f"No live price data for {symbol}. "
+                    f"WebSocket service may not be running or symbol not in coverage list (100 symbols)."
+                )
 
-                if not data:
-                    raise Exception(
-                        f"No price data for {symbol}. "
-                        f"Ensure WebSocket service is running and symbol is in coverage list."
-                    )
-
-                # Unpickle and get latest candle
-                candles = pickle.loads(data)
-                if not candles:
-                    raise Exception(f"Empty candle data for {symbol}")
-
-                candle = candles[-1]  # Latest closed candle
-                self._log.debug(f"Using latest closed candle for {symbol}")
-            else:
-                # Using live candle
-                candle = pickle.loads(data)
-                self._log.debug(f"Using live candle for {symbol}")
-
+            # Unpickle live candle
+            candle = pickle.loads(data)
             price = float(candle['close'])
 
             # Simulate realistic bid/ask spread (0.05% typical for major pairs)
@@ -102,7 +88,7 @@ class LivePriceService:
                 timestamp=time.time()
             )
 
-            self._log.debug(f"Price for {symbol}: ${market_price.mid:.2f}")
+            self._log.debug(f"Live price for {symbol}: ${market_price.mid:.2f}")
             return market_price
 
         except Exception as e:
