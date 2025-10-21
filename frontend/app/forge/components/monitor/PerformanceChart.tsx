@@ -169,13 +169,13 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
               Your equity curve will appear here after your first trade
             </div>
           </div>
-          <CornerBadges
-            currentBalance={account?.current_balance || 10000}
-            portfolioReturnPct={0}
-            totalTrades={0}
-            winRate={0}
-          />
         </div>
+        <MetricsStrip
+          currentBalance={account?.current_balance || 10000}
+          portfolioReturnPct={0}
+          totalTrades={0}
+          winRate={0}
+        />
       </div>
     )
   }
@@ -260,15 +260,15 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
             </Scatter>
           </LineChart>
         </ResponsiveContainer>
-
-        {/* Corner Badges - positioned relative to chart container */}
-        <CornerBadges
-          currentBalance={currentBalance}
-          portfolioReturnPct={portfolioReturnPct}
-          totalTrades={totalTrades}
-          winRate={winRate}
-        />
       </div>
+
+      {/* Metrics Strip Below Chart */}
+      <MetricsStrip
+        currentBalance={currentBalance}
+        portfolioReturnPct={portfolioReturnPct}
+        totalTrades={totalTrades}
+        winRate={winRate}
+      />
 
       {/* Trade Detail Popover */}
       {selectedTrade && (
@@ -278,29 +278,32 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
   )
 }
 
-// Corner Badges Component
-interface CornerBadgesProps {
+// Metrics Strip Component
+interface MetricsStripProps {
   currentBalance: number
   portfolioReturnPct: number
   totalTrades: number
   winRate: number
 }
 
-function CornerBadges({ currentBalance, portfolioReturnPct, totalTrades, winRate }: CornerBadgesProps) {
+function MetricsStrip({ currentBalance, portfolioReturnPct, totalTrades, winRate }: MetricsStripProps) {
   return (
-    <>
-      {/* Top Left: Current Balance */}
-      <div className="absolute top-2 left-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
-        <div className="text-xs text-[var(--text-muted)]">Balance</div>
+    <div className="mt-4 flex items-center justify-around border-t border-[var(--border)] pt-4">
+      {/* Balance */}
+      <div className="text-center">
+        <div className="text-xs text-[var(--text-muted)] mb-1">Balance</div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">
           ${currentBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
         </div>
       </div>
 
-      {/* Top Right: Portfolio Return */}
-      <div className="absolute top-2 right-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
-        <div className="text-xs text-[var(--text-muted)]">Return</div>
-        <div className={`text-sm font-semibold flex items-center gap-1 ${
+      {/* Divider */}
+      <div className="h-8 w-px bg-[var(--border)]" />
+
+      {/* Return */}
+      <div className="text-center">
+        <div className="text-xs text-[var(--text-muted)] mb-1">Return</div>
+        <div className={`text-sm font-semibold flex items-center gap-1 justify-center ${
           portfolioReturnPct >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
         }`}>
           {portfolioReturnPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
@@ -308,18 +311,24 @@ function CornerBadges({ currentBalance, portfolioReturnPct, totalTrades, winRate
         </div>
       </div>
 
-      {/* Bottom Left: Total Trades */}
-      <div className="absolute bottom-2 left-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
-        <div className="text-xs text-[var(--text-muted)]">Trades</div>
+      {/* Divider */}
+      <div className="h-8 w-px bg-[var(--border)]" />
+
+      {/* Trades */}
+      <div className="text-center">
+        <div className="text-xs text-[var(--text-muted)] mb-1">Trades</div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">{totalTrades}</div>
       </div>
 
-      {/* Bottom Right: Win Rate */}
-      <div className="absolute bottom-2 right-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
-        <div className="text-xs text-[var(--text-muted)]">Win Rate</div>
+      {/* Divider */}
+      <div className="h-8 w-px bg-[var(--border)]" />
+
+      {/* Win Rate */}
+      <div className="text-center">
+        <div className="text-xs text-[var(--text-muted)] mb-1">Win Rate</div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">{winRate.toFixed(0)}%</div>
       </div>
-    </>
+    </div>
   )
 }
 
