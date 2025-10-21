@@ -2222,7 +2222,7 @@ async def duplicate_config_as_live(
         # Check if symbol is Symphony-compatible
         from core.symbols import UniversalSymbolStandardizer
         standardizer = UniversalSymbolStandardizer()
-        if not standardizer.is_symphony_compatible(source_config.selected_pair):
+        if not standardizer.is_symphony_compatible(source_config.selected_pair, "ccxt"):
             raise HTTPException(
                 status_code=400,
                 detail=f"Symbol {source_config.selected_pair} is not compatible with Symphony live trading"
