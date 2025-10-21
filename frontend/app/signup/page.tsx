@@ -12,6 +12,15 @@ function SignupForm() {
   const searchParams = useSearchParams()
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
 
+  // Dynamically construct callback URL based on current hostname
+  const getCallbackUrl = () => {
+    if (typeof window !== 'undefined') {
+      const { protocol, host } = window.location
+      return `${protocol}//${host}/auth/callback`
+    }
+    return `${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.ggbots.ai'}/auth/callback`
+  }
+
   // Check for error messages from auth callback
   useEffect(() => {
     const error = searchParams?.get('error')
@@ -127,7 +136,7 @@ function SignupForm() {
             providers={['google']}
             view="sign_up"
             showLinks={true}
-            redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.ggbots.ai'}/auth/callback`}
+            redirectTo={getCallbackUrl()}
           />
         </div>
 
