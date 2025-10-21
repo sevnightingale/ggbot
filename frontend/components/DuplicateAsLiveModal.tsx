@@ -122,7 +122,8 @@ export function DuplicateAsLiveModal({
       })
 
       if (!response.ok) {
-        const data = await response.json()
+        const data = await response.json().catch(() => ({ detail: 'Failed to create live bot' }))
+        console.error('Backend error response:', data)
         throw new Error(data.detail || 'Failed to create live bot')
       }
 
