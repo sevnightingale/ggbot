@@ -1,6 +1,7 @@
 'use client'
 
 import { X } from 'lucide-react'
+import Image from 'next/image'
 
 export default function PersonalStory() {
   return (
@@ -25,9 +26,11 @@ export default function PersonalStory() {
               {/* Profile photo on right */}
               <div className="flex-shrink-0 flex flex-col items-center">
                 <div className="w-24 h-24 rounded-full border-2 border-bone-200/20 overflow-hidden">
-                  <img
+                  <Image
                     src="/pfp.jpg"
                     alt="Sev - Founder of ggbots"
+                    width={96}
+                    height={96}
                     className="w-full h-full object-cover"
                   />
                 </div>

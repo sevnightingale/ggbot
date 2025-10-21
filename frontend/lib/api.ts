@@ -140,6 +140,7 @@ export interface UserProfile {
   requires_own_llm_keys: boolean
   can_publish_telegram_signals: boolean
   can_use_signal_validation: boolean
+  can_use_live_trading: boolean
   paid_data_points: string[]
 }
 

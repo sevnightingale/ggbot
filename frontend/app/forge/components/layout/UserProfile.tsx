@@ -114,10 +114,12 @@ export function UserProfile({}: UserProfileProps) {
         title="User profile and settings"
       >
         {getAvatarUrl() ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={getAvatarUrl()}
             alt={getDisplayName()}
             className="h-full w-full object-cover"
+            // Using img instead of Image for Supabase auth avatars - avoids need for domain config
           />
         ) : (
           <User className="h-4 w-4 text-[var(--text-primary)]" />
