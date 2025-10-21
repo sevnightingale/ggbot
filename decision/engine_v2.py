@@ -1148,46 +1148,99 @@ Take Profit: {take_profit_text}
     async def _get_active_position(self, symbol: str, config_id: str) -> Optional[Dict]:
         """
         Check for active position for this symbol and config.
-        
+        Checks both paper and live trades based on config's trading_mode.
+
         Args:
             symbol: Trading symbol to check
             config_id: Configuration ID for position isolation
-            
+
         Returns:
             Position data dict if active position exists, None otherwise
         """
         try:
+            # Determine trading mode from config
+            trading_mode = getattr(self.config, 'trading_mode', 'paper')
+
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Query for open position with entry decision context
-                    cur.execute("""
-                        SELECT 
-                            pt.trade_id,
-                            pt.symbol,
-                            pt.side,
-                            pt.entry_price,
-                            pt.current_price,
-                            pt.size_usd,
-                            pt.unrealized_pnl,
-                            pt.opened_at,
-                            pt.stop_loss,
-                            pt.take_profit,
-                            pt.confidence_score,
-                            d.reasoning as entry_reasoning,
-                            d.confidence as entry_confidence,
-                            d.decision_data as entry_decision_data
-                        FROM paper_trades pt
-                        LEFT JOIN decisions d ON pt.decision_id = d.decision_id
-                        WHERE pt.config_id = %s 
-                          AND pt.symbol = %s 
-                          AND pt.status = 'open'
-                        ORDER BY pt.opened_at DESC
-                        LIMIT 1
-                    """, (config_id, symbol))
-                    
-                    row = cur.fetchone()
-                    if not row:
-                        return None
+                    if trading_mode == 'live':
+                        # Check live_trades table for open positions
+                        cur.execute("""
+                            SELECT
+                                lt.batch_id,
+                                lt.config_id,
+                                lt.decision_id,
+                                lt.created_at,
+                                d.reasoning as entry_reasoning,
+                                d.confidence as entry_confidence,
+                                d.decision_data as entry_decision_data
+                            FROM live_trades lt
+                            LEFT JOIN decisions d ON lt.decision_id = d.decision_id
+                            WHERE lt.config_id = %s
+                              AND lt.closed_at IS NULL
+                            ORDER BY lt.created_at DESC
+                            LIMIT 1
+                        """, (config_id,))
+
+                        row = cur.fetchone()
+                        if not row:
+                            return None
+
+                        # For live trades, return basic info to trigger position management
+                        # Symphony API can provide real-time position details later
+                        position_data = {
+                            'batch_id': row[0],
+                            'symbol': symbol,  # Use symbol from decision context
+                            'side': 'long',  # Assume long for now (can enhance with Symphony API)
+                            'entry_price': 0.0,  # Placeholder - Symphony API has real values
+                            'current_price': 0.0,  # Will be fetched from market data
+                            'size_usd': 0.0,  # Placeholder - Symphony API has real values
+                            'unrealized_pnl': 0.0,  # Placeholder - Symphony API has real values
+                            'stop_loss': None,
+                            'take_profit': None,
+                            'confidence_score': float(row[5]) if row[5] else 0.0,
+                            'entry_reasoning': row[4] if row[4] else 'No reasoning available',
+                            'entry_confidence': float(row[5]) if row[5] else 0.0,
+                            'entry_decision_data': row[6] if row[6] else {},
+                            'opened_at': row[3],
+                            'is_live': True
+                        }
+
+                        logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                            f"Found active LIVE position: batch_id={position_data['batch_id']}"
+                        )
+
+                        return position_data
+                    else:
+                        # Paper trading: Query paper_trades for open position with entry decision context
+                        cur.execute("""
+                            SELECT
+                                pt.trade_id,
+                                pt.symbol,
+                                pt.side,
+                                pt.entry_price,
+                                pt.current_price,
+                                pt.size_usd,
+                                pt.unrealized_pnl,
+                                pt.opened_at,
+                                pt.stop_loss,
+                                pt.take_profit,
+                                pt.confidence_score,
+                                d.reasoning as entry_reasoning,
+                                d.confidence as entry_confidence,
+                                d.decision_data as entry_decision_data
+                            FROM paper_trades pt
+                            LEFT JOIN decisions d ON pt.decision_id = d.decision_id
+                            WHERE pt.config_id = %s
+                              AND pt.symbol = %s
+                              AND pt.status = 'open'
+                            ORDER BY pt.opened_at DESC
+                            LIMIT 1
+                        """, (config_id, symbol))
+
+                        row = cur.fetchone()
+                        if not row:
+                            return None
                     
                     # Convert to dict with position details
                     position_data = {

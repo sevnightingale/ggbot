@@ -170,13 +170,13 @@ def get_bot_status_message(bot_state: str, execution_status: Optional[Dict[str, 
     # Fallback based on phase
     phase = execution_status.get('phase', '')
     phase_messages = {
-        'extracting': 'Gathering technical indicators and market data...',
-        'deciding': 'AI decision engine evaluating trading opportunities...',
-        'trading': 'Processing trade execution and risk management...',
-        'completed': 'Cycle completed',
+        'extracting': 'Gathering market data and indicators...',
+        'deciding': 'Analyzing market conditions for trading opportunities...',
+        'trading': 'Processing trade...',
+        'completed': 'Analysis complete',
         'error': 'Error occurred'
     }
-    
+
     return phase_messages.get(phase, 'Processing...')
 
 

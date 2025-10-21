@@ -103,6 +103,10 @@ class SymphonyLiveTradingService:
 
             api_key = credentials['api_key']
 
+            # Debug: Log API key format (first 8 chars for security)
+            key_preview = api_key[:8] if api_key and len(api_key) >= 8 else "INVALID"
+            self._log.info(f"Retrieved Symphony API key: {key_preview}... (length: {len(api_key) if api_key else 0})")
+
             # Step 3: Load configuration to get Symphony agent ID
             from core.services.config_service import config_service
             config = await config_service.get_config(config_id, user_id)
@@ -122,6 +126,8 @@ class SymphonyLiveTradingService:
                     "batch_id": None
                 }
 
+            self._log.info(f"Using Symphony agent ID: {symphony_agent_id}")
+
             # Step 4: Convert symbol to Symphony format
             if not self.standardizer.is_symphony_compatible(symbol, "ccxt"):
                 return {
@@ -130,13 +136,13 @@ class SymphonyLiveTradingService:
                     "batch_id": None
                 }
 
-            symphony_symbol = self.standardizer.to_symphony(symbol, "ccxt")
+            symphony_symbol = self.standardizer.normalize(symbol, "ccxt", "symphony")
 
             # Step 5: Calculate weight (position size %) from config
             weight = self._calculate_weight(config, confidence)
 
             # Step 6: Get leverage from config
-            leverage = config.trading.leverage if config.trading else 1
+            leverage = config.trading.get("leverage", 1) if config.trading else 1
             # Ensure min leverage for Symphony (1.1x minimum)
             leverage = max(leverage, 1.1)
 
@@ -383,12 +389,13 @@ class SymphonyLiveTradingService:
         - CONFIDENCE_BASED: confidence * max_position_percent
         - FIXED_USD: Not supported for live trading (returns default 10%)
         """
-        sizing = config.trading.position_sizing
+        sizing = config.trading.get("position_sizing", {})
+        method = sizing.get("method", "ACCOUNT_PERCENTAGE")
 
-        if sizing.method == PositionSizingMethod.ACCOUNT_PERCENTAGE:
-            weight = sizing.account_percent or 10.0
-        elif sizing.method == PositionSizingMethod.CONFIDENCE_BASED:
-            max_pct = sizing.max_position_percent or 10.0
+        if method == PositionSizingMethod.ACCOUNT_PERCENTAGE or method == "ACCOUNT_PERCENTAGE":
+            weight = sizing.get("account_percent", 10.0)
+        elif method == PositionSizingMethod.CONFIDENCE_BASED or method == "CONFIDENCE_BASED":
+            max_pct = sizing.get("max_position_percent", 10.0)
             weight = confidence * max_pct
         else:
             # FIXED_USD not supported for Symphony (needs percentage)
@@ -398,7 +405,7 @@ class SymphonyLiveTradingService:
         # Clamp to 0.1-100 range
         weight = max(0.1, min(weight, 100.0))
 
-        self._log.info(f"Calculated weight: {weight:.1f}% (method={sizing.method}, confidence={confidence:.3f})")
+        self._log.info(f"Calculated weight: {weight:.1f}% (method={method}, confidence={confidence:.3f})")
         return weight
 
     async def _save_live_trade_record(

@@ -358,11 +358,13 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 **Production Resilience Improvements** (2025-10-21):
 - **Automatic Reconnection**: Exponential backoff (1s → 300s max) with up to 100 retry attempts
 - **Connection Health Monitoring**: 30s recv() timeout prevents infinite blocking
-- **Silence Detection**: Auto-reconnects if no messages received for 2 minutes
+- **Proactive Reconnection**: Automatic reconnect every 15 minutes (prevents Binance disconnects before they happen)
+- **Faster Silence Detection**: 60s threshold (was 120s) - reconnects before live price TTL expires
+- **Seamless Reconnection**: Historical candles refetched on every reconnect (1-2s, prevents indicator errors)
 - **Connection Lifecycle Logging**: Detailed logging of connections, disconnects, and uptime
 - **PM2 Logging Fix**: Logs now go to `logs/market-data-ws-*.log` (was `/dev/null`)
 - **Increased Resilience**: max_restarts 20 → 50 for production reliability
-- **Result**: System now bulletproof against WebSocket disconnections, network failures, and Binance timeouts
+- **Result**: Zero-downtime operation with proactive prevention, no price data errors, no indicator calculation failures
 
 ### 📉 Liquidation System (Complete - 2025-10-04)
 **Paper Trading Engine Realism**:

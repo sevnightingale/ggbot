@@ -180,7 +180,7 @@ class WebSocketMarketDataService:
 
             # Store in Redis with slash format for consistency
             symbol_slash = f"{symbol[:-4]}/{symbol[-4:]}"  # BTCUSDT -> BTC/USDT
-            key = f"candles:{symbol_slash}:{timeframe}:200"
+            key = f"ws:candles:{symbol_slash}:{timeframe}:200"  # ws: prefix to avoid collision
 
             await self.redis_client.setex(
                 key,
@@ -224,8 +224,9 @@ class WebSocketMarketDataService:
         max_delay = 300  # Max 5 minutes between retries
 
         # Health monitoring configuration
-        silence_threshold = 120  # Reconnect if no messages for 2 minutes
+        silence_threshold = 60  # Reconnect if no messages for 60 seconds
         recv_timeout = 30  # Timeout for individual recv() calls
+        proactive_reconnect_interval = 900  # Proactive reconnect every 15 minutes (900s)
 
         # Outer reconnection loop
         while retry_count < max_retries:
@@ -263,6 +264,15 @@ class WebSocketMarketDataService:
                             silence_duration = time.time() - last_message_time
                             connection_uptime = time.time() - connection_start_time
 
+                            # Proactive reconnect: Refresh connection every 15 minutes
+                            if connection_uptime > proactive_reconnect_interval:
+                                self._log.info(
+                                    f"🔄 Proactive reconnect after {connection_uptime/60:.1f}min "
+                                    f"(prevents Binance disconnect) - reconnecting"
+                                )
+                                break  # Exit inner loop to reconnect
+
+                            # Reactive reconnect: Connection is silent/dead
                             if silence_duration > silence_threshold:
                                 # No messages for too long - connection likely dead
                                 self._log.error(
@@ -272,7 +282,7 @@ class WebSocketMarketDataService:
                                 break  # Exit inner loop to reconnect
 
                             # Still within threshold - just log debug message
-                            if silence_duration > 60:  # Log if silent for > 1 minute
+                            if silence_duration > 30:  # Log if silent for > 30 seconds
                                 self._log.warning(
                                     f"No messages for {silence_duration:.0f}s "
                                     f"(threshold: {silence_threshold}s)"
@@ -359,7 +369,7 @@ class WebSocketMarketDataService:
     async def _update_candle_window(self, symbol: str, timeframe: str, new_candle: Dict[str, Any]):
         """Update 200-candle rolling window in Redis."""
         try:
-            key = f"candles:{symbol}:{timeframe}:200"
+            key = f"ws:candles:{symbol}:{timeframe}:200"  # ws: prefix to avoid collision with extraction cache
 
             # Get existing candles
             existing_data = await self.redis_client.get(key)

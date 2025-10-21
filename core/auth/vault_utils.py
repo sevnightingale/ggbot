@@ -236,9 +236,10 @@ class VaultManager:
                     vault_secret_name = f"symphony_{user_id}".replace("-", "_")
 
                     # Store API key in Vault (returns vault secret ID)
+                    # vault.create_secret(secret, name, ...) - secret comes first!
                     cur.execute(
                         "SELECT vault.create_secret(%s, %s) as secret_id;",
-                        (vault_secret_name, api_key)
+                        (api_key, vault_secret_name)
                     )
                     vault_secret_id = cur.fetchone()[0]
 

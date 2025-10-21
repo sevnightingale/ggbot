@@ -61,8 +61,8 @@ class RedisWebSocketAdapter(DataAdapter):
         timeframe = params.timeframe
         limit = params.get('limit', 200)
 
-        # Build Redis key (matches WebSocket service key pattern)
-        cache_key = f"candles:{symbol}:{timeframe}:200"
+        # Build Redis key (matches WebSocket service key pattern with ws: prefix)
+        cache_key = f"ws:candles:{symbol}:{timeframe}:200"
 
         self._log.info(f"Fetching OHLCV from Redis: {cache_key}")
 

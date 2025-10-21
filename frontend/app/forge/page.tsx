@@ -11,7 +11,8 @@ import { TabNavigation } from './components/layout/TabNavigation'
 import { MobileNav } from './components/layout/MobileNav'
 import { EmptyState } from './components/shared/EmptyState'
 import { ActivationBar } from './components/monitor/ActivationBar'
-import { MetricsBar } from './components/monitor/MetricsBar'
+// import { MetricsBar } from './components/monitor/MetricsBar' // Replaced with PerformanceChart
+import { PerformanceChart } from './components/monitor/PerformanceChart'
 import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
 import { TradeHistoryModal } from './components/monitor/TradeHistoryModal'
@@ -435,13 +436,23 @@ function ForgeApp() {
 
       const minutes = Math.floor(diff / 60000)
       const seconds = Math.floor((diff % 60000) / 1000)
-      setCountdown(`Next run: ${minutes}m ${seconds}s`)
+
+      // Get timeframe from bot config for better context
+      const timeframe = selectedBot?.config_data?.decision?.analysis_frequency
+      const timeframeLabel = timeframe === 'signal_driven' ? '' :
+        timeframe ? ` ${timeframe} candle close` : ''
+
+      if (timeframeLabel) {
+        setCountdown(`Waiting for${timeframeLabel} in ${minutes}m ${seconds}s`)
+      } else {
+        setCountdown(`Next run in ${minutes}m ${seconds}s`)
+      }
     }
 
     updateCountdown()
     const interval = setInterval(updateCountdown, 1000)
     return () => clearInterval(interval)
-  }, [nextRun])
+  }, [nextRun, selectedBot])
 
   // Page visibility retry - retry failed loads when user returns to page
   useEffect(() => {
@@ -1068,19 +1079,26 @@ function ForgeApp() {
               {selectedBot ? (
                 activeTab === 'monitor' ? (
                   <div className="space-y-4">
-                    {/* Top Row: DecisionFeed + MetricsBar side-by-side */}
+                    {/* Top Row: DecisionFeed + PerformanceChart side-by-side */}
                     <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                       {/* DecisionFeed - Decision carousel */}
                       <DecisionFeed
                         decisions={decisions}
                       />
 
-                      {/* MetricsBar - Professional KPI grid (2x2) */}
+                      {/* PerformanceChart - Equity curve with trade markers */}
+                      <PerformanceChart
+                        account={selectedAccount}
+                        configId={selectedConfigId ?? ''}
+                      />
+
+                      {/* Old MetricsBar - Keeping code for reference
                       <MetricsBar
                         account={selectedAccount}
                         positions={positions}
                         onTotalTradesClick={() => setIsTradeHistoryModalOpen(true)}
                       />
+                      */}
                     </div>
 
                     {/* PositionsTable - Active trades (full width) */}

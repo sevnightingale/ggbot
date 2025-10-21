@@ -324,35 +324,44 @@ class GGBotOrchestrator:
             timeframes = self._extract_timeframes_from_config(extraction_config)
 
             from core.sse import set_execution_phase
-            await set_execution_phase(config_id, "extracting", f"Extracting {len(requested_indicators)} indicators for {config.selected_pair}...")
-            
+            await set_execution_phase(config_id, "extracting", f"Gathering market data for {config.selected_pair}...")
+
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id, requested_indicators, timeframes
             )
-            
-            if DEMO_MODE:
-                await asyncio.sleep(7)
 
-            await set_execution_phase(config_id, "deciding", "AI decision engine analyzing market data across multiple timeframes...")
-            
+            # UX delay: Give extraction phase time to display
+            await asyncio.sleep(3)
+
+            await set_execution_phase(config_id, "deciding", "Analyzing market conditions for trading opportunities...")
+
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result
             )
-            
-            if DEMO_MODE:
-                await asyncio.sleep(3)
+
+            # UX delay: Give decision phase time to display (longest phase for AI reasoning)
+            await asyncio.sleep(7)
 
             action = decision_result.get('action', 'wait')
             if action in ['wait', 'no_action', 'hold']:
-                message = f"Holding position - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
+                message = "No trading opportunity found - waiting for better setup..."
+            elif action == 'long':
+                message = "Opening long position..."
+            elif action == 'short':
+                message = "Opening short position..."
+            elif action == 'close':
+                message = "Closing position..."
             else:
-                message = f"Executing {action} decision..."
-            
+                message = f"Executing trade..."
+
             await set_execution_phase(config_id, "trading", message)
-            
+
             trading_result = await self._run_trading_v2(
                 config, user_id, decision_result
             )
+
+            # UX delay: Give trading phase time to display
+            await asyncio.sleep(3)
             
             if self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(
@@ -418,7 +427,7 @@ class GGBotOrchestrator:
             extraction_engine = await self._get_extraction_engine(user_id)
 
             from core.sse import set_execution_phase
-            await set_execution_phase(config_id, "extracting", f"Extracting indicators for {symbol}...")
+            await set_execution_phase(config_id, "extracting", f"Gathering market data for {symbol} signal...")
 
             extraction_result = await self._run_extraction_v2(
                 extraction_engine, config, user_id,
@@ -426,23 +435,32 @@ class GGBotOrchestrator:
                 override_symbol=symbol
             )
 
-            await set_execution_phase(config_id, "deciding", "AI decision engine analyzing signal context...")
+            # UX delay: Give extraction phase time to display
+            await asyncio.sleep(3)
+
+            await set_execution_phase(config_id, "deciding", "Analyzing signal against current market conditions...")
 
             decision_result = await self._run_decision_v2(
                 config_id, config, extraction_result, signal_data
             )
-            
+
+            # UX delay: Give decision phase time to display (longest phase for AI reasoning)
+            await asyncio.sleep(7)
+
             action = decision_result.get('action', 'wait')
             if action in ['wait', 'no_action', 'hold']:
-                message = f"Signal rejected - {action} decision with confidence {decision_result.get('confidence', 0):.2f}"
+                message = "Signal rejected - conditions not favorable..."
             else:
-                message = f"Signal validated - executing {action} decision..."
-            
+                message = f"Signal validated - executing {action} position..."
+
             await set_execution_phase(config_id, "trading", message)
-            
+
             trading_result = await self._run_trading_v2(
                 config, user_id, decision_result
             )
+
+            # UX delay: Give trading phase time to display
+            await asyncio.sleep(3)
             
             if self._should_publish_signal(config, decision_result):
                 await self._trigger_signal_publishing(

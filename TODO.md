@@ -1,8 +1,8 @@
 # TODO.md - ggbots Implementation Plan
 
-## ✅ **COMPLETE - Symphony.io Live Trading Integration** (Days 0-6 Complete - 2025-01-19)
+## 🟡 **IN PROGRESS - Symphony.io Live Trading Integration** (Days 0-6 Complete - 2025-01-19)
 
-**Status**: Backend & Frontend production-ready. Ready for end-to-end testing.
+**Status**: Backend & Frontend production-ready. Initial testing successful - trade queries and metrics need updates.
 
 - [x] **Symbol System Extension**
   - [x] Extend `core/symbols/registry.py` with Symphony format support
@@ -82,15 +82,24 @@
   - [x] Trading mode locked per config (no mixing)
   - [x] Close position routing handled in orchestrator (paper vs live)
 
-- [ ] **Testing & Validation**
-  - [ ] Test Symphony account setup flow (API key + smart account)
-  - [ ] Test paper bot duplication to live bot
-  - [ ] Verify live position opening (check Symphony portal + ggbots dashboard)
+- [x] **Testing & Validation** (Initial tests complete - 2025-01-21)
+  - [x] Test Symphony account setup flow (API key + smart account)
+  - [x] Test paper bot duplication to live bot
+  - [x] Verify live position opening (check Symphony portal + ggbots dashboard)
   - [ ] Test manual position closing in live mode
   - [ ] Test symbol compatibility validation (100 supported symbols)
   - [ ] Test idempotency (retry on timeout doesn't create duplicate trades)
   - [ ] Test error handling (invalid API key, insufficient balance, unsupported symbol)
   - [ ] Verify live_trades table linkage (batch_id → decision_id traceability)
+
+- [ ] **Live Trading System Polish** (Current Focus - 2025-01-21)
+  - [ ] Update trade query endpoints to support live_trades table
+  - [ ] Fix metrics calculations to include live trades
+  - [ ] Ensure positions display correctly for live bots
+  - [ ] Update dashboard stats to aggregate paper + live trades
+  - [ ] Test P&L calculations with live trade data
+  - [ ] Verify close reason tracking in live_trades
+  - [ ] Update PositionsTable to handle live trading data format
 
 - [ ] **Documentation**
   - [ ] Create user guide: "How to Enable Live Trading"

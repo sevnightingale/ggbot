@@ -107,10 +107,26 @@ interface PipelineTickerProps {
 
 function PipelineTicker({ executionStatus, isActive }: PipelineTickerProps) {
   const stages = [
-    { key: 'extraction', label: 'Extraction' },
-    { key: 'decision', label: 'Decision' },
-    { key: 'trading', label: 'Trading' },
-    { key: 'idle', label: 'Idle' }
+    {
+      key: 'extraction',
+      label: 'Extraction',
+      tooltip: 'Gathering market data, prices, and technical indicators for analysis'
+    },
+    {
+      key: 'decision',
+      label: 'Decision',
+      tooltip: 'AI analyzing market conditions and determining optimal trading actions'
+    },
+    {
+      key: 'trading',
+      label: 'Trading',
+      tooltip: 'Executing trades and managing positions based on AI decisions'
+    },
+    {
+      key: 'idle',
+      label: 'Idle',
+      tooltip: 'Waiting for next scheduled analysis cycle'
+    }
   ]
 
   return (
@@ -122,11 +138,14 @@ function PipelineTicker({ executionStatus, isActive }: PipelineTickerProps) {
 
         return (
           <div className={`flex items-center ${isIdleStage ? 'hidden md:flex' : ''}`} key={stage.key}>
-            <div className={`flex items-center gap-1 rounded-full px-2 py-1 transition-colors ${
-              isCurrentStage
-                ? 'bg-[var(--bg-tertiary)] border border-[var(--border)]'
-                : 'bg-[var(--bg-primary)] border border-[var(--border)] opacity-60'
-            }`}>
+            <div
+              className={`flex items-center gap-1 rounded-full px-2 py-1 transition-colors cursor-help ${
+                isCurrentStage
+                  ? 'bg-[var(--bg-tertiary)] border border-[var(--border)]'
+                  : 'bg-[var(--bg-primary)] border border-[var(--border)] opacity-60'
+              }`}
+              title={stage.tooltip}
+            >
               {isCurrentStage ? (
                 <Activity
                   className="h-3.5 w-3.5"
