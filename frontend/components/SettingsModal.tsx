@@ -43,9 +43,19 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const checkSymphonyStatus = async () => {
     try {
       setLoading(true)
+
+      // Get auth token properly
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setLoading(false)
+        return
+      }
+
       const response = await fetch('/api/v2/symphony/status', {
         headers: {
-          'Authorization': `Bearer ${(await import('@/lib/supabase')).createClient().auth.getSession().then(s => s.data.session?.access_token)}`
+          'Authorization': `Bearer ${session.access_token}`
         }
       })
 
@@ -92,11 +102,21 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     }
 
     try {
+      // Get auth token properly
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setError('Authentication required. Please log in again.')
+        setConnecting(false)
+        return
+      }
+
       const response = await fetch('/api/v2/symphony/setup', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${(await import('@/lib/supabase')).createClient().auth.getSession().then(s => s.data.session?.access_token)}`
+          'Authorization': `Bearer ${session.access_token}`
         },
         body: JSON.stringify({
           api_key: apiKey.trim(),
@@ -128,10 +148,19 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     }
 
     try {
+      // Get auth token properly
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setError('Authentication required. Please log in again.')
+        return
+      }
+
       const response = await fetch('/api/v2/symphony/disconnect', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${(await import('@/lib/supabase')).createClient().auth.getSession().then(s => s.data.session?.access_token)}`
+          'Authorization': `Bearer ${session.access_token}`
         }
       })
 
