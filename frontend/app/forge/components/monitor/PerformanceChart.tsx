@@ -161,18 +161,20 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
     return (
       <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Performance Chart</h3>
-        <div className="text-center py-16">
-          <div className="text-[var(--text-muted)] mb-2">📊 No trading history yet</div>
-          <div className="text-sm text-[var(--text-muted)]">
-            Your equity curve will appear here after your first trade
+        <div className="relative" style={{ height: 300 }}>
+          <div className="text-center py-16">
+            <div className="text-[var(--text-muted)] mb-2">📊 No trading history yet</div>
+            <div className="text-sm text-[var(--text-muted)]">
+              Your equity curve will appear here after your first trade
+            </div>
           </div>
+          <CornerBadges
+            currentBalance={account?.current_balance || 10000}
+            portfolioReturnPct={0}
+            totalTrades={0}
+            winRate={0}
+          />
         </div>
-        <CornerBadges
-          currentBalance={account?.current_balance || 10000}
-          portfolioReturnPct={0}
-          totalTrades={0}
-          winRate={0}
-        />
       </div>
     )
   }
@@ -257,15 +259,15 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
             </Scatter>
           </LineChart>
         </ResponsiveContainer>
-      </div>
 
-      {/* Corner Badges */}
-      <CornerBadges
-        currentBalance={currentBalance}
-        portfolioReturnPct={portfolioReturnPct}
-        totalTrades={totalTrades}
-        winRate={winRate}
-      />
+        {/* Corner Badges - positioned relative to chart container */}
+        <CornerBadges
+          currentBalance={currentBalance}
+          portfolioReturnPct={portfolioReturnPct}
+          totalTrades={totalTrades}
+          winRate={winRate}
+        />
+      </div>
 
       {/* Trade Detail Popover */}
       {selectedTrade && (
@@ -287,7 +289,7 @@ function CornerBadges({ currentBalance, portfolioReturnPct, totalTrades, winRate
   return (
     <>
       {/* Top Left: Current Balance */}
-      <div className="absolute top-6 left-6 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
+      <div className="absolute top-2 left-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
         <div className="text-xs text-[var(--text-muted)]">Balance</div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">
           ${currentBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
@@ -295,7 +297,7 @@ function CornerBadges({ currentBalance, portfolioReturnPct, totalTrades, winRate
       </div>
 
       {/* Top Right: Portfolio Return */}
-      <div className="absolute top-6 right-6 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
+      <div className="absolute top-2 right-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
         <div className="text-xs text-[var(--text-muted)]">Return</div>
         <div className={`text-sm font-semibold flex items-center gap-1 ${
           portfolioReturnPct >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
@@ -306,13 +308,13 @@ function CornerBadges({ currentBalance, portfolioReturnPct, totalTrades, winRate
       </div>
 
       {/* Bottom Left: Total Trades */}
-      <div className="absolute bottom-6 left-6 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
+      <div className="absolute bottom-2 left-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
         <div className="text-xs text-[var(--text-muted)]">Trades</div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">{totalTrades}</div>
       </div>
 
       {/* Bottom Right: Win Rate */}
-      <div className="absolute bottom-6 right-6 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
+      <div className="absolute bottom-2 right-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-1.5 shadow-sm">
         <div className="text-xs text-[var(--text-muted)]">Win Rate</div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">{winRate.toFixed(0)}%</div>
       </div>
