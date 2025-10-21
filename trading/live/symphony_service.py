@@ -123,14 +123,14 @@ class SymphonyLiveTradingService:
                 }
 
             # Step 4: Convert symbol to Symphony format
-            if not self.standardizer.is_symphony_compatible(symbol):
+            if not self.standardizer.is_symphony_compatible(symbol, "ccxt"):
                 return {
                     "status": "rejected",
                     "reason": f"Symbol {symbol} not compatible with Symphony",
                     "batch_id": None
                 }
 
-            symphony_symbol = self.standardizer.to_symphony(symbol)
+            symphony_symbol = self.standardizer.to_symphony(symbol, "ccxt")
 
             # Step 5: Calculate weight (position size %) from config
             weight = self._calculate_weight(config, confidence)
