@@ -804,7 +804,7 @@ function ForgeApp() {
   // Handler for when live bot is successfully created
   const handleLiveBotCreated = async () => {
     // Refresh bot list to show new live bot
-    await loadBots()
+    await refreshBotList()
   }
 
   // Handler function for deleting bot
