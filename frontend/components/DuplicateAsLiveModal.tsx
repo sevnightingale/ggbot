@@ -248,8 +248,8 @@ export function DuplicateAsLiveModal({
               type="text"
               value={symphonyAgentId}
               onChange={(e) => setSymphonyAgentId(e.target.value)}
-              placeholder="22b35152-f3a5-4b21-8a0f-04691c155e33"
-              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-red-500/50 font-mono text-sm"
+              placeholder="00000000-0000-0000-0000-000000000000"
+              className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-500/50 font-mono text-sm"
               disabled={loading}
             />
             <p className="text-xs text-[var(--text-secondary)] mt-1.5">
