@@ -344,8 +344,8 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 
 *Last major update: LLM provider upgrades + extraction parallelization (2025-10-03)*
 
-### 🚀 Hummingbot-API Deprecation (Complete - 2025-10-20)
-**Replaced Hummingbot API with WebSocket live prices**:
+### 🚀 Hummingbot-API Deprecation + Resilience (Complete - 2025-10-21)
+**Replaced Hummingbot API with bulletproof WebSocket live prices**:
 - **Removed Infrastructure**: Hummingbot API (port 8888), PostgreSQL (5433), EMQX broker (1883+)
 - **New Implementation**: LivePriceService using WebSocket live candle data from market-data-ws
 - **Performance**: Sub-millisecond Redis access vs 800ms+ REST API calls
@@ -354,6 +354,15 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Architecture**: Live candles stored at `price:live:{symbol}` in Redis, updated every ~1s
 - **Files Archived**: `archive/hummingbot/` (market_data.py, data_client.py, HBOT_API.md)
 - **Migration**: Paper trading, decision engine, and position monitoring now use LivePriceService
+
+**Production Resilience Improvements** (2025-10-21):
+- **Automatic Reconnection**: Exponential backoff (1s → 300s max) with up to 100 retry attempts
+- **Connection Health Monitoring**: 30s recv() timeout prevents infinite blocking
+- **Silence Detection**: Auto-reconnects if no messages received for 2 minutes
+- **Connection Lifecycle Logging**: Detailed logging of connections, disconnects, and uptime
+- **PM2 Logging Fix**: Logs now go to `logs/market-data-ws-*.log` (was `/dev/null`)
+- **Increased Resilience**: max_restarts 20 → 50 for production reliability
+- **Result**: System now bulletproof against WebSocket disconnections, network failures, and Binance timeouts
 
 ### 📉 Liquidation System (Complete - 2025-10-04)
 **Paper Trading Engine Realism**:
@@ -424,9 +433,18 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Symphony Service**: Thin wrapper (`trading/live/symphony_service.py`) - 3 core methods (execute, close, query)
 - **Orchestrator Routing**: Smart routing between paper/live based on `trading_mode` (locked per bot)
 - **API Endpoints**: 6 endpoints for setup, status, disconnect, positions, close, and duplicate-as-live
-- **Frontend UX**: Settings modal for Symphony connection, "Duplicate as Live" flow, LIVE badge distinction
+- **Frontend UX**: Settings modal for Symphony connection, "Deploy Live Version" flow, LIVE badge distinction
 - **Position Sizing**: Leverages existing account_percentage & confidence_based (Symphony requires %)
 - **Symbol Compatibility**: 100 out of 141 symbols ready for live trading
 - **Weight Calculation**: Automatic conversion using existing position sizing logic
 - **Security**: API keys encrypted in Vault, ownership verification on all operations
 - **Files**: Database migration, `symphony_service.py`, `DuplicateAsLiveModal.tsx`, 6 API endpoints, BotConfigV2 model updates
+
+### 🛡️ Frontend Reliability & Error Recovery (Complete - 2025-01-21)
+**Production Resilience for Symphony Integration**:
+- **API Client Retry Logic**: Exponential backoff (1s, 2s, 4s) with 3 retry attempts on network failures
+- **SSE Auto-Reconnection**: Automatic reconnection with exponential backoff (5s → 60s) for real-time updates
+- **Error State UI**: Visual feedback banners for load failures and connection status
+- **Page Visibility Retry**: Automatic retry when user returns to tab after errors
+- **Symphony Auth Fix**: Fixed 401 Unauthorized in Settings modal (proper session token handling)
+- **Result**: Frontend now resilient to network issues, no manual refresh required
