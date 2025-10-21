@@ -22,15 +22,15 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 **🔍 [Extraction Agent](extraction/)** - Market Intelligence Gathering
 - **V2 System**: 21 advanced preprocessors with pandas-ta integration (12x performance improvement)
-- **Multi-exchange fallback**: Automatic failover across 5 exchanges (kucoin→binance→okx→gate_io→ascend_ex)
-- **Direct Hummingbot API**: Real-time market data without MCP overhead
+- **Universal Data Layer**: Catalog-driven market intelligence with WebSocket-first architecture (3x-3000x faster)
+- **Real-time WebSocket cache**: Binance WebSocket streaming 100 symbols × 7 timeframes
 - **Technical indicators**: Pure Python pandas-ta integration (RSI, MACD, 20+ professional indicators)
 - **Multi-timeframe analysis**: 5m, 15m, 30m, 1h, 4h, 1d with consolidated data
 - **Supabase database storage**: Real-time updates with orchestrator integration
 
 **🧠 [Decision Agent](decision/)** - AI-Powered Trading Intelligence
 - **GPT-5 Integration**: High-effort reasoning via OpenAI Responses API
-- **Multi-exchange price feeds**: Real-time pricing with automatic exchange fallback
+- **Real-time price feeds**: Live WebSocket prices (sub-millisecond access, ~1s freshness)
 - **Template-based prompts**: Opportunity analysis, signal validation, position management
 - **Multi-mode operation**: New trade discovery + Active trade management
 - **User customization**: Natural language strategy definition with config integration
@@ -141,12 +141,12 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 ### Enterprise-Grade Execution
 
 **🏛️ [Paper Trading Engine](trading/)** (Production Ready)
-- **$34B+ proven Hummingbot API** with multi-exchange fallback (5 exchanges)
-- **Professional simulation** - Real prices, realistic spreads, accurate fees (0.06% taker)
+- **Real-time WebSocket prices** from Binance (sub-millisecond Redis access, ~1s updates)
+- **Professional simulation** - Live prices, realistic spreads, accurate fees (0.06% taker)
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
-- **Automated risk management** - 7-second monitoring with auto TP/SL execution
+- **Automated risk management** - 3-second monitoring with auto TP/SL execution
 - **Complete audit trail** - Full trade lifecycle tracking and performance analytics
-- **Multi-exchange connectivity** and live trading (Phase 2-3 planned)
+- **Live trading** - Symphony.io integration for real-money execution (100 compatible symbols)
 
 **🛡️ [Risk Management](trading/)**
 - **Position sizing algorithms** based on AI confidence scoring
@@ -192,13 +192,12 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 - **[core/config/README.md](core/config/README.md)** - System configuration and templates
 - **[database/README.md](database/README.md)** - Database schema and migrations
-- **[hummingbot/README.md](hummingbot/README.md)** - Hummingbot integration setup (Phase 1 complete)
+- **[archive/hummingbot/](archive/hummingbot/)** - Deprecated Hummingbot integration (replaced by WebSocket live prices)
 
 ### Planned Updates & Roadmap
 
 - **[DOCS/CONFIG.md](DOCS/CONFIG.md)** - Config component V2 integration roadmap (Phase 8)
 - **[DOCS/TODO.md](DOCS/TODO.md)** - V2 architecture progress tracking (Phase 7 complete)
-- **[DOCS/TRADING_UPDATE.md](DOCS/TRADING_UPDATE.md)** - Hummingbot integration roadmap (Phases 2-3)
 - **[DOCS/FUTURE.md](DOCS/FUTURE.md)** - Comprehensive platform scaling and feature roadmap
 
 ## Platform Capabilities
