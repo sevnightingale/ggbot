@@ -220,7 +220,7 @@ export function BotManagementMenu({
       </button>
 
       {isOpen && (
-        <div className="absolute right-0 top-6 z-50 min-w-32 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
+        <div className="absolute right-0 top-6 z-50 min-w-44 rounded-lg border border-[var(--border)] bg-[var(--bg-secondary)] shadow-lg">
           <div className="py-1">
             <button
               onClick={handleRename}
@@ -253,9 +253,9 @@ export function BotManagementMenu({
                   }
                 }}
                 disabled={isBotAction}
-                className="w-full px-3 py-2 text-left text-xs text-red-500 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                🔴 Duplicate as Live
+                ⚡ Deploy Live Version
               </button>
             )}
             {onResetAccount && (
