@@ -13,6 +13,7 @@ import { ValidationMessage } from '@/components/ValidationMessage'
 interface TradeSettingsProps {
   configData?: ConfigData
   configId?: string
+  tradingMode?: 'paper' | 'live'
   onUpdate?: (updates: Partial<ConfigData>) => void
   onValidationChange?: (hasErrors: boolean) => void
   className?: string
@@ -21,10 +22,12 @@ interface TradeSettingsProps {
 export function TradeSettings({
   configData,
   configId,
+  tradingMode = 'paper',
   onUpdate,
   onValidationChange,
   className = ''
 }: TradeSettingsProps) {
+  const isLiveBot = tradingMode === 'live'
   const { canAccess } = usePermissions()
   const [session, setSession] = useState<{ access_token?: string } | null>(null)
 
@@ -129,12 +132,17 @@ export function TradeSettings({
             <label className="block text-sm font-medium text-[var(--text-muted)] mb-3">
               Sizing Method
             </label>
+            {isLiveBot && (
+              <p className="text-xs text-amber-600 dark:text-amber-400 mb-3">
+                Live trading requires percentage-based position sizing for Symphony compatibility.
+              </p>
+            )}
             <div className="grid grid-cols-1 gap-3">
               {[
                 { id: 'fixed_usd', name: 'Fixed USD Amount', desc: 'Use same dollar amount per trade' },
                 { id: 'account_percentage', name: 'Account Percentage', desc: 'Use percentage of total balance' },
                 { id: 'confidence_based', name: 'Confidence-Based', desc: 'Scale position size based on AI confidence (recommended)' }
-              ].map((method) => (
+              ].filter(method => !isLiveBot || method.id !== 'fixed_usd').map((method) => (
                 <button
                   key={method.id}
                   onClick={() => updateTradingConfig({

@@ -50,28 +50,28 @@ export function TradeHistoryModal({ configId, isOpen, onClose, totalTrades, winR
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    if (isOpen && configId) {
-      loadData()
+    if (!isOpen || !configId) return
+
+    const loadData = async () => {
+      setLoading(true)
+      try {
+        const [historyData, confidenceData] = await Promise.all([
+          apiClient.getTradeHistoryWithDecisions(configId, 50),
+          apiClient.getConfidenceAnalysis(configId)
+        ])
+
+        setTrades(historyData.trades)
+        setDistribution(confidenceData.confidence_distribution)
+        setSummaryStats(confidenceData.summary_stats)
+      } catch (error) {
+        console.error('Failed to load trade history:', error)
+      } finally {
+        setLoading(false)
+      }
     }
+
+    loadData()
   }, [isOpen, configId])
-
-  const loadData = async () => {
-    setLoading(true)
-    try {
-      const [historyData, confidenceData] = await Promise.all([
-        apiClient.getTradeHistoryWithDecisions(configId, 50),
-        apiClient.getConfidenceAnalysis(configId)
-      ])
-
-      setTrades(historyData.trades)
-      setDistribution(confidenceData.confidence_distribution)
-      setSummaryStats(confidenceData.summary_stats)
-    } catch (error) {
-      console.error('Failed to load trade history:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   if (!isOpen) return null
 

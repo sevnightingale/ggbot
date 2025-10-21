@@ -14,7 +14,6 @@ from core.common.logger import logger
 from core.common.config import DEFAULT_USER_ID
 from core.config.config_main import get_configuration
 
-from .data_client import HummingbotDataClient  # Legacy (can be removed after validation)
 from .universal_data_client import UniversalDataClient
 from .indicators import TechnicalIndicators
 from .file_storage import FileStorage

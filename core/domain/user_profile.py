@@ -117,7 +117,12 @@ class UserProfile:
     def can_use_signal_validation(self) -> bool:
         """Check if user can use signal validation mode."""
         return self.can_use_premium_features
-    
+
+    @property
+    def can_use_live_trading(self) -> bool:
+        """Check if user can use Symphony live trading."""
+        return self.can_use_premium_features
+
     def has_data_point_access(self, data_point_name: str) -> bool:
         """Check if user has access to specific premium data point."""
         return data_point_name in self.paid_data_points

@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-10-19 (Universal Data Layer production deployment + WebSocket cache expansion)
+**Last Updated**: 2025-10-20 (Hummingbot-API deprecated, replaced with WebSocket live prices)
 **System Health**: 🟢 Production Live (225+ users, 100+ active bots)
 **Project Status**: Live application with complete Stripe monetization and Universal Data Layer in production
 
@@ -70,12 +70,9 @@
 
 ### Infrastructure Services
 | Service | Status | Port | Purpose |
-|---------|--------|------|---------| 
+|---------|--------|------|---------|
 | Supabase PostgreSQL | 🟢 Online | Remote | Main application database (managed) |
-| PostgreSQL (hummingbot) | 🟢 Online | 5433 | Hummingbot API database (Docker) |
-| Hummingbot API | 🟢 Online | 8888 | Trade execution and market data (Docker) |
-| EMQX Message Broker | 🟢 Online | 1883+ | Real-time bot communication (Docker) |
-| Redis | 🟢 Online | 6379 | Scheduler idempotency and caching |
+| Redis | 🟢 Online | 6379 | WebSocket cache, live prices, scheduler idempotency |
 
 ---
 
@@ -98,12 +95,12 @@
 - **Complete V2 integration** using standard extraction → decision → trading flow
 
 ### **Paper Trading Engine**
-- **Multi-exchange Hummingbot integration** with automatic fallback (5 exchanges)
+- **Live WebSocket prices** from Binance (sub-millisecond Redis access, ~1s freshness)
 - **$10,000 isolated accounts** per configuration
 - **✅ 3-second position monitoring** ACTIVE (batch SQL updates for efficiency)
 - **Liquidation system** - automatic position liquidation when losses exceed margin
 - **Confidence-based position sizing**
-- **Enhanced reliability** - eliminates single exchange failure points
+- **Real-time updates** - position P&L calculated with live streaming prices
 
 ---
 
@@ -111,30 +108,19 @@
 
 ### Application Ports
 | Port | Service | Protocol | Access | Purpose |
-|------|---------|----------|--------|---------| 
+|------|---------|----------|--------|---------|
 | **8000** | V2 Orchestrator (ggbot.py) | HTTP | Public | Complete V2 API server with E2E pipeline |
 | **8080** | code-server | HTTP | Public | VSCode in browser (development environment) |
 
 ### Database Ports
 | Port | Service | Access | Purpose |
-|------|---------|--------|---------| 
+|------|---------|--------|---------|
 | **Remote** | Supabase PostgreSQL | HTTPS/SSL | Main application database (managed) |
-| **5433** | PostgreSQL (hummingbot) | Docker only | Hummingbot API database |
-
-### Hummingbot Integration Ports (Active)
-| Port | Service | Status | Purpose |
-|------|---------|--------|------------|
-| **8888** | hummingbot-api | 🟢 **ACTIVE** | HTTP API server (Docker container) |
-| **1883** | EMQX Message Broker | 🟢 **ACTIVE** | MQTT communication |
-| **8081** | EMQX Management | 🟢 **ACTIVE** | HTTP management API |
-| **8083, 8084** | EMQX WebSocket | 🟢 **ACTIVE** | MQTT over WebSocket |
-| **8883** | EMQX SSL | 🟢 **ACTIVE** | MQTT over SSL |
-| **18083** | EMQX Dashboard | 🟢 **ACTIVE** | Web management interface |
-| **61613** | EMQX STOMP | 🟢 **ACTIVE** | Web-STOMP gateway |
+| **6379** | Redis | Localhost | WebSocket cache, live prices, scheduler idempotency |
 
 ### System Ports
 | Port | Service | Access | Purpose |
-|------|---------|--------|---------| 
+|------|---------|--------|---------|
 | **22** | SSH | Public | Remote access |
 | **80** | HTTP | Public | Web server |
 | **443** | HTTPS | Public | Secure web server |
@@ -243,6 +229,7 @@ df -h
 | **Active Bots** | 1 bot | 10 bots |
 | **Analysis Frequency** | 1 hour minimum | 5 minutes minimum |
 | **AI Models** | Default Model (basic intelligence) | Frontier Reasoning Models (GPT-5, Claude Opus 4, Grok 4, DeepSeek R1) |
+| **Live Trading** | ❌ | ✅ (Symphony.io integration) |
 | **Telegram Publishing** | ❌ | ✅ |
 | **Priority Support** | ❌ | ✅ |
 
@@ -357,6 +344,17 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 
 *Last major update: LLM provider upgrades + extraction parallelization (2025-10-03)*
 
+### 🚀 Hummingbot-API Deprecation (Complete - 2025-10-20)
+**Replaced Hummingbot API with WebSocket live prices**:
+- **Removed Infrastructure**: Hummingbot API (port 8888), PostgreSQL (5433), EMQX broker (1883+)
+- **New Implementation**: LivePriceService using WebSocket live candle data from market-data-ws
+- **Performance**: Sub-millisecond Redis access vs 800ms+ REST API calls
+- **Freshness**: ~1 second updates vs 30 second cache
+- **Resource Savings**: Freed 200MB+ RAM from 3 Docker containers
+- **Architecture**: Live candles stored at `price:live:{symbol}` in Redis, updated every ~1s
+- **Files Archived**: `archive/hummingbot/` (market_data.py, data_client.py, HBOT_API.md)
+- **Migration**: Paper trading, decision engine, and position monitoring now use LivePriceService
+
 ### 📉 Liquidation System (Complete - 2025-10-04)
 **Paper Trading Engine Realism**:
 - **Liquidation Price Calculation**: Automatically calculated on trade open based on margin and leverage
@@ -418,3 +416,17 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Fix**: Updated `handle_checkout_completed` to set `subscription_expires_at = NULL` for active subs
 - **Result**: Premium permissions now work correctly (can_use_premium_features = true for ggbase tier)
 - **Files**: `ggbot.py` (webhook handler), database migration for existing users
+
+### 🎯 Symphony Live Trading Integration (Complete - 2025-01-19)
+**Production-Ready Live Trading via Symphony.io**:
+- **Database Schema**: Extended `user_profiles`, `configurations`, and new `live_trades` table with idempotency protection
+- **Vault Integration**: Encrypted Symphony API key storage with credential management endpoints
+- **Symphony Service**: Thin wrapper (`trading/live/symphony_service.py`) - 3 core methods (execute, close, query)
+- **Orchestrator Routing**: Smart routing between paper/live based on `trading_mode` (locked per bot)
+- **API Endpoints**: 6 endpoints for setup, status, disconnect, positions, close, and duplicate-as-live
+- **Frontend UX**: Settings modal for Symphony connection, "Duplicate as Live" flow, LIVE badge distinction
+- **Position Sizing**: Leverages existing account_percentage & confidence_based (Symphony requires %)
+- **Symbol Compatibility**: 100 out of 141 symbols ready for live trading
+- **Weight Calculation**: Automatic conversion using existing position sizing logic
+- **Security**: API keys encrypted in Vault, ownership verification on all operations
+- **Files**: Database migration, `symphony_service.py`, `DuplicateAsLiveModal.tsx`, 6 API endpoints, BotConfigV2 model updates

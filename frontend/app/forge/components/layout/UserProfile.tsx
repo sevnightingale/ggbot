@@ -1,11 +1,12 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { User, LogOut, Crown, CreditCard } from 'lucide-react'
+import { User, LogOut, Crown, CreditCard, Settings } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { SettingsModal } from '@/components/SettingsModal'
 import { apiClient } from '@/lib/api'
 
 interface UserProfileProps {
@@ -27,6 +28,7 @@ export function UserProfile({}: UserProfileProps) {
   const [userData, setUserData] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
   const { hasSubscription } = usePermissions()
@@ -112,10 +114,12 @@ export function UserProfile({}: UserProfileProps) {
         title="User profile and settings"
       >
         {getAvatarUrl() ? (
+          // eslint-disable-next-line @next/next/no-img-element
           <img
             src={getAvatarUrl()}
             alt={getDisplayName()}
             className="h-full w-full object-cover"
+            // Using img instead of Image for Supabase auth avatars - avoids need for domain config
           />
         ) : (
           <User className="h-4 w-4 text-[var(--text-primary)]" />
@@ -155,6 +159,14 @@ export function UserProfile({}: UserProfileProps) {
 
             {/* Menu Items */}
             <div className="space-y-1">
+              <MenuButton
+                icon={Settings}
+                label="Settings"
+                onClick={() => {
+                  setIsOpen(false)
+                  setSettingsOpen(true)
+                }}
+              />
               {isPro ? (
                 <MenuButton
                   icon={CreditCard}
@@ -182,6 +194,12 @@ export function UserProfile({}: UserProfileProps) {
       <UpgradeModal
         open={upgradeModalOpen}
         onOpenChange={setUpgradeModalOpen}
+      />
+
+      {/* Settings Modal */}
+      <SettingsModal
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
       />
     </div>
   )

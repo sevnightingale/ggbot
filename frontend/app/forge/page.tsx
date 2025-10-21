@@ -16,6 +16,7 @@ import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
 import { TradeHistoryModal } from './components/monitor/TradeHistoryModal'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
+import { DuplicateAsLiveModal } from '@/components/DuplicateAsLiveModal'
 
 interface Position {
   trade_id: string
@@ -43,6 +44,8 @@ interface Decision {
 function ForgeApp() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [sseConnected, setSseConnected] = useState(false)
 
   // Permission loading - always call hook, but only use when user exists
   const { loading: permissionsLoading } = usePermissions()
@@ -81,6 +84,8 @@ function ForgeApp() {
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
   const [isTradeHistoryModalOpen, setIsTradeHistoryModalOpen] = useState(false)
+  const [duplicateAsLiveModalOpen, setDuplicateAsLiveModalOpen] = useState(false)
+  const [sourceBotForLive, setSourceBotForLive] = useState<BotConfiguration | null>(null)
 
   // Use ref to track selectedConfigId for SSE filtering without causing reconnections
   const selectedConfigIdRef = useRef(selectedConfigId)
@@ -232,7 +237,8 @@ function ForgeApp() {
     if (!user) return
 
     const loadOrCreateBot = async () => {
-      
+      setLoadError(null)
+
       try {
         // Get user's existing bots using proper API client
         const configs = await apiClient.listConfigs()
@@ -241,6 +247,7 @@ function ForgeApp() {
           // Load all configs and select first one
           setAllBots(configs)
           setSelectedConfigId(configs[0].config_id)
+          setLoadError(null)
         } else {
           // Create default bot
           console.log('🔨 No bots found, creating default bot')
@@ -252,6 +259,7 @@ function ForgeApp() {
             console.log('✅ Bot creation verified:', verifyBot.config_id)
             setAllBots([newBot])
             setSelectedConfigId(newBot.config_id)
+            setLoadError(null)
           } catch (verifyError) {
             console.error('❌ Bot creation verification failed:', verifyError)
             // Try to refresh the list in case there's a timing issue
@@ -259,8 +267,10 @@ function ForgeApp() {
             if (refreshedConfigs.length > 0) {
               setAllBots(refreshedConfigs)
               setSelectedConfigId(refreshedConfigs[0].config_id)
+              setLoadError(null)
             } else {
               console.error('❌ No bots found after creation attempt')
+              setLoadError('Failed to create default bot. Please refresh the page.')
             }
           }
         }
@@ -273,28 +283,40 @@ function ForgeApp() {
           console.error('Failed to fetch data sources:', dataSourceError)
           // Continue without data sources - MarketDataSelector will show empty state
         }
-        
+
       } catch (error) {
         console.error('❌ Failed to load/create bot:', error)
+        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+        setLoadError(`Failed to load bots: ${errorMessage}`)
       }
     }
 
     loadOrCreateBot()
   }, [user])
 
-  // Real-time SSE connection for status updates
+  // Real-time SSE connection for status updates with auto-reconnect
   useEffect(() => {
     if (!user) return
 
+    let stream: EventSource | null = null
+    let reconnectAttempt = 0
+    let reconnectTimeout: NodeJS.Timeout | null = null
+    let isCleanedUp = false
+
     const connectSSE = async () => {
+      if (isCleanedUp) return
+
       try {
         const token = await getAuthToken()
         if (!token) return
 
         const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-        const stream = new EventSource(`${apiUrl}/api/dashboard-stream?token=${encodeURIComponent(token)}`)
+        stream = new EventSource(`${apiUrl}/api/dashboard-stream?token=${encodeURIComponent(token)}`)
 
         stream.onopen = () => {
+          console.log('✅ SSE connected')
+          reconnectAttempt = 0 // Reset on successful connection
+          setSseConnected(true)
         }
 
         stream.addEventListener('dashboard', (event) => {
@@ -343,7 +365,6 @@ function ForgeApp() {
             // Update accounts data
             if (data.accounts) {
               setAccounts(data.accounts)
-            } else {
             }
 
           } catch (error) {
@@ -353,10 +374,32 @@ function ForgeApp() {
 
         stream.onerror = (error) => {
           console.error('❌ SSE connection error:', error)
+          stream?.close()
+          setSseConnected(false)
+
+          if (isCleanedUp) return
+
+          // Exponential backoff: 5s, 10s, 30s, 60s (max)
+          const delays = [5000, 10000, 30000, 60000]
+          const delay = delays[Math.min(reconnectAttempt, delays.length - 1)]
+
+          reconnectAttempt++
+          console.log(`🔄 SSE reconnecting in ${delay / 1000}s (attempt ${reconnectAttempt})...`)
+
+          reconnectTimeout = setTimeout(() => {
+            connectSSE()
+          }, delay)
         }
 
       } catch (error) {
         console.error('❌ Failed to connect SSE:', error)
+
+        if (isCleanedUp) return
+
+        // Retry after 5 seconds on connection failure
+        reconnectTimeout = setTimeout(() => {
+          connectSSE()
+        }, 5000)
       }
     }
 
@@ -365,6 +408,11 @@ function ForgeApp() {
     // Cleanup function
     return () => {
       console.log('🛑 Cleaning up SSE connection')
+      isCleanedUp = true
+      stream?.close()
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout)
+      }
     }
   }, [user]) // Only reconnect when user changes, not when switching bots
 
@@ -394,6 +442,39 @@ function ForgeApp() {
     const interval = setInterval(updateCountdown, 1000)
     return () => clearInterval(interval)
   }, [nextRun])
+
+  // Page visibility retry - retry failed loads when user returns to page
+  useEffect(() => {
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        console.log('👁️ Page became visible')
+
+        // Retry loading if there was an error and no bots loaded
+        if (loadError || (user && allBots.length === 0)) {
+          console.log('🔄 Retrying failed load...')
+          setLoadError(null)
+
+          try {
+            const configs = await apiClient.listConfigs()
+            if (configs.length > 0) {
+              setAllBots(configs)
+              if (!selectedConfigId) {
+                setSelectedConfigId(configs[0].config_id)
+              }
+              setLoadError(null)
+            }
+          } catch (error) {
+            console.error('❌ Retry failed:', error)
+            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+            setLoadError(`Failed to load bots: ${errorMessage}`)
+          }
+        }
+      }
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
+  }, [loadError, user, allBots.length, selectedConfigId])
 
   // Handle selectedConfigId changes while in editing mode (programmatic bot switches)
   useEffect(() => {
@@ -789,6 +870,21 @@ function ForgeApp() {
     }
   }
 
+  // Handler function for duplicating bot as live
+  const handleDuplicateAsLive = (configId: string) => {
+    const sourceBot = allBots.find(bot => bot.config_id === configId)
+    if (sourceBot) {
+      setSourceBotForLive(sourceBot)
+      setDuplicateAsLiveModalOpen(true)
+    }
+  }
+
+  // Handler for when live bot is successfully created
+  const handleLiveBotCreated = async () => {
+    // Refresh bot list to show new live bot
+    await refreshBotList()
+  }
+
   // Handler function for deleting bot
   const handleDeleteBot = async (configId: string) => {
     setIsBotAction(true)
@@ -895,6 +991,37 @@ function ForgeApp() {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <Header />
 
+      {/* Error Banner */}
+      {loadError && (
+        <div className="max-w-7xl mx-auto px-4 pt-4">
+          <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-4 flex items-start gap-3">
+            <div className="flex-shrink-0 mt-0.5">
+              <svg className="h-5 w-5 text-red-600 dark:text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-sm font-medium text-red-800 dark:text-red-200">Failed to load</h3>
+              <p className="mt-1 text-sm text-red-700 dark:text-red-300">{loadError}</p>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* SSE Connection Status - only show when disconnected */}
+      {!sseConnected && !loadError && (
+        <div className="max-w-7xl mx-auto px-4 pt-4">
+          <div className="bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 rounded-lg p-3 flex items-center gap-3">
+            <div className="flex-shrink-0">
+              <svg className="h-4 w-4 text-amber-600 dark:text-amber-400 animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
+            <p className="text-sm text-amber-700 dark:text-amber-300">Connecting to real-time updates...</p>
+          </div>
+        </div>
+      )}
+
         {/* 12-column grid container */}
         <div className="grid max-w-7xl grid-cols-12 gap-4 px-4 py-4 min-h-[calc(100vh-64px)]">
           {/* Bot Rail */}
@@ -907,6 +1034,7 @@ function ForgeApp() {
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
+            onDuplicateAsLive={handleDuplicateAsLive}
             onDelete={handleDeleteBot}
             onResetAccount={handleResetAccount}
             isBotAction={isBotAction}
@@ -1016,6 +1144,14 @@ function ForgeApp() {
           winRate={selectedAccount.win_rate || 0}
         />
       )}
+
+      {/* Duplicate as Live Modal */}
+      <DuplicateAsLiveModal
+        open={duplicateAsLiveModalOpen}
+        onOpenChange={setDuplicateAsLiveModalOpen}
+        sourceBot={sourceBotForLive}
+        onSuccess={handleLiveBotCreated}
+      />
     </div>
   )
 }
