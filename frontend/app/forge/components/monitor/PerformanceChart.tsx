@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Scatter, ReferenceLine } from 'recharts'
+import { ComposedChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Scatter, ReferenceLine } from 'recharts'
 import { TrendingUp, TrendingDown } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 
@@ -208,7 +208,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
       {/* Chart */}
       <div className="relative" style={{ height: 300 }}>
         <ResponsiveContainer width="100%" height="100%">
-          <LineChart data={equityCurve} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
+          <ComposedChart margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.3} />
             <XAxis
               dataKey="timestamp"
@@ -235,6 +235,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
               opacity={0.5}
             />
             <Line
+              data={equityCurve}
               type="monotone"
               dataKey="balance"
               stroke={portfolioReturnPct >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}
@@ -244,21 +245,26 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
             />
             <Scatter
               data={tradeMarkers}
+              dataKey="balance"
               fill="var(--profit-color)"
-              onClick={(data: TradeMarker) => setSelectedTrade(data)}
-            >
-              {tradeMarkers.map((entry, index) => (
-                <circle
-                  key={index}
-                  cx={0}
-                  cy={0}
-                  r={6}
-                  fill={entry.realized_pnl >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}
-                  className="cursor-pointer hover:opacity-80 transition-opacity"
-                />
-              ))}
-            </Scatter>
-          </LineChart>
+              shape={(props: unknown) => {
+                const { cx, cy, payload } = props as { cx?: number; cy?: number; payload?: TradeMarker }
+                if (!cx || !cy || !payload) return <></>
+
+                return (
+                  <circle
+                    cx={cx}
+                    cy={cy}
+                    r={6}
+                    fill={payload.realized_pnl >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}
+                    className="cursor-pointer hover:opacity-80 transition-opacity"
+                    onClick={() => setSelectedTrade(payload)}
+                    style={{ cursor: 'pointer' }}
+                  />
+                )
+              }}
+            />
+          </ComposedChart>
         </ResponsiveContainer>
       </div>
 
