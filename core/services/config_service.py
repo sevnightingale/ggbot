@@ -411,6 +411,8 @@ class ConfigService:
                 schema_version=config_data.get("schema_version", existing_config.schema_version),
                 llm_config=config_data.get("llm_config", existing_config.llm_config),
                 telegram_integration=config_data.get("telegram_integration", existing_config.telegram_integration),
+                trading_mode=existing_config.trading_mode,  # Preserve trading mode (paper vs live)
+                symphony_agent_id=existing_config.symphony_agent_id,  # Preserve Symphony agent ID
                 created_at=existing_config.created_at,
                 updated_at=datetime.now()
             )
