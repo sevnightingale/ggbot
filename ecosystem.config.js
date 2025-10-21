@@ -137,13 +137,13 @@ module.exports = {
         REDIS_URL: process.env.REDIS_URL,
         DATABASE_URL: process.env.DATABASE_URL
       },
-      error_file: '/dev/null',
-      out_file: '/dev/null',
+      error_file: 'logs/market-data-ws-error.log',
+      out_file: 'logs/market-data-ws-out.log',
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,
       min_uptime: '30s',
-      max_restarts: 20,
-      restart_delay: 4000
+      max_restarts: 50,  // Increased from 20 for resilience
+      restart_delay: 5000  // Increased to 5s for backoff
     }
     // Uncomment when ready to add more services
     /*
