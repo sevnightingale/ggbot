@@ -170,15 +170,56 @@ export class ApiClient {
     return user.id
   }
 
-  async authenticatedFetch(url: string, options: RequestInit = {}) {
-    const headers = await this.getAuthHeaders()
-    
-    return fetch(url, {
-      ...options,
-      headers: {
-        ...headers,
-        ...options.headers
+  /**
+   * Retry logic with exponential backoff
+   * Retries up to 3 times with delays: 1s, 2s, 4s
+   */
+  private async retryWithBackoff<T>(
+    fn: () => Promise<T>,
+    maxRetries = 3,
+    initialDelay = 1000
+  ): Promise<T> {
+    let lastError: Error | null = null
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        return await fn()
+      } catch (error) {
+        lastError = error as Error
+
+        // Don't retry on auth errors (4xx)
+        if (error instanceof Error && error.message.includes('Not authenticated')) {
+          throw error
+        }
+
+        // Don't retry on the last attempt
+        if (attempt === maxRetries) {
+          break
+        }
+
+        // Calculate delay with exponential backoff
+        const delay = initialDelay * Math.pow(2, attempt)
+        console.log(`🔄 Retry attempt ${attempt + 1}/${maxRetries} after ${delay}ms...`)
+        await new Promise(resolve => setTimeout(resolve, delay))
       }
+    }
+
+    throw lastError || new Error('Max retries exceeded')
+  }
+
+  async authenticatedFetch(url: string, options: RequestInit = {}) {
+    return this.retryWithBackoff(async () => {
+      const headers = await this.getAuthHeaders()
+
+      const response = await fetch(url, {
+        ...options,
+        headers: {
+          ...headers,
+          ...options.headers
+        }
+      })
+
+      return response
     })
   }
 
