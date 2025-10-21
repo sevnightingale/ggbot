@@ -90,7 +90,8 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
     }
 
     loadData()
-  }, [configId, account])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [configId])  // Only reload when config changes, not on every SSE account update (prevents jitter)
 
   // Calculate equity curve from trades
   const calculateEquityCurve = (trades: Trade[], currentBalance: number) => {
