@@ -127,7 +127,7 @@ function LoginForm() {
             providers={['google']}
             view="sign_in"
             showLinks={true}
-            redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.ggbots.ai'}/auth/callback`}
+            redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || (process.env.NEXT_PUBLIC_VERCEL_URL ? `https://${process.env.NEXT_PUBLIC_VERCEL_URL}` : 'https://app.ggbots.ai')}/auth/callback`}
           />
         </div>
 
