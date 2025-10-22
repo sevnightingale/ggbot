@@ -553,9 +553,14 @@ class DecisionEngineV2:
         unrealized_pnl = position_data['unrealized_pnl']
         size_usd = position_data['size_usd']
         side = position_data['side']
-        
-        # Calculate percentage gain/loss
-        if side == 'buy':
+
+        # Calculate percentage gain/loss (with safety check for division by zero)
+        if entry_price == 0 or entry_price is None:
+            logger.bind(position=position_data.get('batch_id') or position_data.get('trade_id')).error(
+                f"Invalid entry_price ({entry_price}) in position data. Cannot calculate P&L percentage."
+            )
+            pnl_percentage = 0.0  # Safe fallback
+        elif side == 'buy' or side == 'long':
             pnl_percentage = ((float(current_price) - entry_price) / entry_price) * 100
         else:  # sell/short
             pnl_percentage = ((entry_price - float(current_price)) / entry_price) * 100
@@ -1186,31 +1191,50 @@ Take Profit: {take_profit_text}
                         if not row:
                             return None
 
-                        # For live trades, return basic info to trigger position management
-                        # Symphony API can provide real-time position details later
-                        position_data = {
-                            'batch_id': row[0],
-                            'symbol': symbol,  # Use symbol from decision context
-                            'side': 'long',  # Assume long for now (can enhance with Symphony API)
-                            'entry_price': 0.0,  # Placeholder - Symphony API has real values
-                            'current_price': 0.0,  # Will be fetched from market data
-                            'size_usd': 0.0,  # Placeholder - Symphony API has real values
-                            'unrealized_pnl': 0.0,  # Placeholder - Symphony API has real values
-                            'stop_loss': None,
-                            'take_profit': None,
-                            'confidence_score': float(row[5]) if row[5] else 0.0,
-                            'entry_reasoning': row[4] if row[4] else 'No reasoning available',
-                            'entry_confidence': float(row[5]) if row[5] else 0.0,
-                            'entry_decision_data': row[6] if row[6] else {},
-                            'opened_at': row[3],
-                            'is_live': True
-                        }
+                        batch_id = row[0]
 
-                        logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                            f"Found active LIVE position: batch_id={position_data['batch_id']}"
-                        )
+                        # For live trades, fetch REAL position data from Symphony API
+                        try:
+                            from trading.live.symphony_service import SymphonyLiveTradingService
+                            symphony_service = SymphonyLiveTradingService()
 
-                        return position_data
+                            # Get all open positions for this config
+                            live_positions = await symphony_service.get_open_positions(config_id, self.user_id)
+
+                            # Find the specific position by batch_id
+                            matching_position = None
+                            for pos in live_positions:
+                                if pos.get('batch_id') == batch_id:
+                                    matching_position = pos
+                                    break
+
+                            if matching_position:
+                                # Enrich with decision context from our database
+                                matching_position['entry_reasoning'] = row[4] if row[4] else 'No reasoning available'
+                                matching_position['entry_confidence'] = float(row[5]) if row[5] else 0.0
+                                matching_position['entry_decision_data'] = row[6] if row[6] else {}
+                                matching_position['is_live'] = True
+
+                                logger.bind(config_id=self.config_id, user_id=self.user_id).info(
+                                    f"Found active LIVE position from Symphony: batch_id={batch_id}, "
+                                    f"entry_price=${matching_position.get('entry_price', 0):.2f}"
+                                )
+
+                                return matching_position
+                            else:
+                                # Position exists in our DB but not in Symphony (possibly closed externally)
+                                logger.bind(config_id=self.config_id, user_id=self.user_id).warning(
+                                    f"Live position batch_id={batch_id} found in database but not in Symphony API. "
+                                    f"Position may have been closed externally."
+                                )
+                                return None
+
+                        except Exception as e:
+                            logger.bind(config_id=self.config_id, user_id=self.user_id).error(
+                                f"Failed to fetch live position from Symphony: {e}"
+                            )
+                            # Don't crash - return None and bot will analyze new opportunities instead
+                            return None
                     else:
                         # Paper trading: Query paper_trades for open position with entry decision context
                         cur.execute("""

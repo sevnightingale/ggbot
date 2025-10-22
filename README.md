@@ -173,12 +173,21 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 ## Getting Started
 
+### For New Claude Code Instances
+
+**👉 Start here**: Read **[GO.md](GO.md)** for the standard onboarding procedure. This will guide you through:
+- Reading core documentation in the right order
+- Providing a current status assessment
+- Identifying what to work on from the TODO list
+- Maintaining documentation as you work
+
 ### Understanding the System
 
 1. **Read [DOCS/OVERVIEW.md](DOCS/OVERVIEW.md)** for conceptual foundation
-2. **Check [DOCS/ACTIVE.md](DOCS/ACTIVE.md)** for current deployment status and live operations
-3. **Explore [DOCS/FLOW.md](DOCS/FLOW.md)** for end-to-end process flow
-4. **Review individual module READMEs** for component-specific details
+2. **Check [ACTIVE.md](ACTIVE.md)** for current deployment status and live operations
+3. **Review [CHANGELOG.md](CHANGELOG.md)** for complete feature history and improvements
+4. **Explore [DOCS/FLOW.md](DOCS/FLOW.md)** for end-to-end process flow
+5. **Review individual module READMEs** for component-specific details
 
 ### Module Deep Dives
 
@@ -196,8 +205,9 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 ### Planned Updates & Roadmap
 
+- **[TODO.md](TODO.md)** - Current development tasks and roadmap
+- **[CHANGELOG.md](CHANGELOG.md)** - Complete history of features, fixes, and improvements
 - **[DOCS/CONFIG.md](DOCS/CONFIG.md)** - Config component V2 integration roadmap (Phase 8)
-- **[DOCS/TODO.md](DOCS/TODO.md)** - V2 architecture progress tracking (Phase 7 complete)
 - **[DOCS/FUTURE.md](DOCS/FUTURE.md)** - Comprehensive platform scaling and feature roadmap
 
 ## Platform Capabilities
