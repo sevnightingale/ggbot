@@ -450,3 +450,25 @@ telegram group invite link: https://t.me/+ndI762EkfcszZTUx
 - **Page Visibility Retry**: Automatic retry when user returns to tab after errors
 - **Symphony Auth Fix**: Fixed 401 Unauthorized in Settings modal (proper session token handling)
 - **Result**: Frontend now resilient to network issues, no manual refresh required
+
+### 🎨 UX Polish & Performance Chart (Complete - 2025-01-22)
+**User Experience Quick Wins**:
+- **Status Messaging**: User-friendly pipeline messages ("Gathering market data..." vs "Extracting 12 indicators...")
+- **Countdown Context**: "Waiting for 1h candle close in 3m 45s" vs "Next run: 3m 45s"
+- **Pipeline Tooltips**: Explanatory tooltips on Extraction/Decision/Trading stages
+- **Animation Delays**: 3s/7s/3s delays for smooth pipeline flow visibility
+
+**PerformanceChart Component** (Replaces MetricsBar):
+- **Equity Curve Visualization**: Line chart showing account balance over time with trade markers
+- **Interactive Trade Dots**: Click dots for full trade details (green = wins, red = losses)
+- **Metrics Strip**: Clean horizontal strip below chart (Balance | Return | Trades | Win Rate)
+- **Recharts Integration**: Professional charting with last 50 trades, no SSE jitter
+- **Files**: `PerformanceChart.tsx`, updates to `page.tsx`
+
+### 🔒 ggShot Access Control Fix (Critical - 2025-01-22)
+**Security Vulnerability Patched**:
+- **Issue**: Users without ggShot subscription could enable ggShot signals
+- **Root Cause #1**: Permission check used `can_use_signal_validation` instead of `paid_data_points.includes('ggshot')`
+- **Root Cause #2**: Toggle button disable logic allowed enabling if already enabled
+- **Fix**: Updated `permissions.tsx` to check `paid_data_points` array directly
+- **Result**: ggShot only accessible with manual database grant to `user_profiles.paid_data_points`
