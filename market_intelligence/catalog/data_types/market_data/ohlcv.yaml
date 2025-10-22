@@ -42,7 +42,7 @@ sources:
 cache:
   backend: redis
   ttl: 3600
-  key_pattern: "ws:candles:{symbol}:{timeframe}:200"
+  key_pattern: "mi:candles:{symbol}:{timeframe}:200"
 
 response_schema:
   type: object

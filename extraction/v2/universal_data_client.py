@@ -6,6 +6,7 @@ the MarketIntelligence gateway under the hood, enabling WebSocket caching
 and multi-source fallback.
 """
 
+import asyncio
 import pandas as pd
 from typing import Dict, List, Any
 
@@ -87,15 +88,18 @@ class UniversalDataClient:
         self._log.info(f"Fetching {limit} {timeframe} candles for {symbol} via MarketIntelligence")
 
         try:
-            # Query OHLCV data using MarketIntelligence gateway
-            response = await self.intelligence.query(
-                data_type='ohlcv',
-                params={
-                    'symbol': symbol,
-                    'timeframe': timeframe,
-                    'limit': limit
-                },
-                format=QueryFormat.RAW  # Raw format returns DataFrame directly
+            # Shield the query from cancellation to prevent partial data corruption
+            # This ensures the query completes even if the parent task is cancelled
+            response = await asyncio.shield(
+                self.intelligence.query(
+                    data_type='ohlcv',
+                    params={
+                        'symbol': symbol,
+                        'timeframe': timeframe,
+                        'limit': limit
+                    },
+                    format=QueryFormat.RAW  # Raw format returns DataFrame directly
+                )
             )
 
             # Extract DataFrame from response
@@ -110,6 +114,15 @@ class UniversalDataClient:
             )
 
             return df
+
+        except asyncio.CancelledError:
+            # Handle cancellation gracefully - log and return empty DataFrame
+            # This prevents cascading failures when scheduler times out
+            self._log.warning(
+                f"⚠️ Data fetch cancelled for {symbol} {timeframe} - returning empty DataFrame. "
+                f"This may indicate orchestrator timeout or scheduler misfire."
+            )
+            return pd.DataFrame(columns=['timestamp', 'open', 'high', 'low', 'close', 'volume'])
 
         except Exception as e:
             self._log.error(f"Failed to fetch candles for {symbol}: {e}")

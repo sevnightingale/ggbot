@@ -24,7 +24,34 @@ class BasePreprocessor:
     def __init__(self):
         """Initialize base preprocessor with logging."""
         self._log = logger.bind(component="preprocessor_base")
-    
+
+    # ==================================================================================
+    # TYPE CONVERSION UTILITIES
+    # ==================================================================================
+
+    def _to_python_type(self, value: Any) -> Any:
+        """
+        Convert numpy types to Python native types for JSON serialization.
+
+        This prevents Pydantic serialization errors when returning analysis results.
+        """
+        if isinstance(value, (np.integer, np.int64, np.int32, np.int16, np.int8)):
+            return int(value)
+        elif isinstance(value, (np.floating, np.float64, np.float32, np.float16)):
+            return float(value)
+        elif isinstance(value, np.bool_):
+            return bool(value)
+        elif isinstance(value, np.ndarray):
+            return value.tolist()
+        elif pd.isna(value):
+            return None
+        elif isinstance(value, dict):
+            return {k: self._to_python_type(v) for k, v in value.items()}
+        elif isinstance(value, (list, tuple)):
+            return [self._to_python_type(item) for item in value]
+        else:
+            return value
+
     # ==================================================================================
     # MATHEMATICAL UTILITIES
     # ==================================================================================
@@ -33,15 +60,15 @@ class BasePreprocessor:
         """Calculate velocity (rate of change) over specified periods."""
         if len(values) < periods + 1:
             return 0.0
-        
+
         # Drop NaN values for calculation
         clean_values = values.dropna()
         if len(clean_values) < periods + 1:
             return 0.0
-        
+
         current = clean_values.iloc[-1]
         previous = clean_values.iloc[-(periods + 1)]
-        return (current - previous) / periods
+        return float((current - previous) / periods)  # Ensure Python native float
     
     def _calculate_acceleration(self, values: pd.Series, periods: int = 6) -> float:
         """Calculate acceleration (change in velocity)."""
@@ -49,11 +76,11 @@ class BasePreprocessor:
         clean_values = values.dropna()
         if len(clean_values) < periods + 3:
             return 0.0
-        
+
         recent_velocity = self._calculate_velocity(clean_values.iloc[-3:], 2)
         past_velocity = self._calculate_velocity(clean_values.iloc[-(periods+3):-(periods)], 2)
-        
-        return recent_velocity - past_velocity
+
+        return float(recent_velocity - past_velocity)  # Ensure Python native float
     
     def _analyze_trend(self, values: pd.Series, periods: List[int] = [5, 10, 20]) -> Dict[str, Any]:
         """Sophisticated trend analysis using multiple timeframes."""
@@ -87,12 +114,13 @@ class BasePreprocessor:
             trend_consistency = 1 - np.std(list(trends.values())) / (np.mean(np.abs(list(trends.values()))) + 0.001)
             reliability = max(0, min(1, trend_consistency))
 
-            return {
+            result = {
                 "direction": direction,
                 "strength": strength,
                 "reliability": reliability,
                 "trends_by_period": trends
             }
+            return self._to_python_type(result)  # Ensure all values are Python native types
 
         return {"direction": "unknown", "strength": 0, "reliability": 0}
     
@@ -339,13 +367,13 @@ class BasePreprocessor:
         clean = values.dropna()
         if len(clean) == 0:
             return 0.0
-        
+
         lookback = min(lookback, len(clean))
         recent_values = clean.iloc[-lookback:]
         current = recent_values.iloc[-1]
-        
+
         rank = (recent_values < current).sum() / len(recent_values) * 100
-        return rank
+        return float(rank)  # Ensure Python native float type for serialization
     
     def _interpret_position_rank(self, rank: float) -> str:
         """Interpret position rank percentile."""

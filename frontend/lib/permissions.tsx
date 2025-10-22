@@ -91,8 +91,10 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
     switch (feature) {
       case 'signals':
-      case 'ggshot':
         return userProfile.can_use_signal_validation
+
+      case 'ggshot':
+        return userProfile.paid_data_points.includes('ggshot')
 
       case 'telegram_publishing':
         return userProfile.can_publish_telegram_signals

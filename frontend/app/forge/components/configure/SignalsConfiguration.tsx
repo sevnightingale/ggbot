@@ -131,13 +131,10 @@ export function SignalsConfiguration({
               </div>
               <button
                 onClick={() => toggleGgShot(!isGgShotEnabled)}
-                disabled={!isGgShotSubscribed && !isGgShotEnabled}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   isGgShotEnabled
                     ? 'bg-emerald-500'
-                    : !isGgShotSubscribed
-                      ? 'bg-[var(--border)] opacity-50 cursor-not-allowed'
-                      : 'bg-[var(--border)]'
+                    : 'bg-[var(--border)]'
                 }`}
               >
                 <span
@@ -230,26 +227,24 @@ export function SignalsConfiguration({
               </div>
             </div>
 
-            {/* Enable/Disable Toggle - even when not subscribed */}
+            {/* Enable/Disable Toggle - disabled for non-subscribed users */}
             <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
               <div>
                 <div className="font-medium text-[var(--text-primary)]">Enable ggShot Signals</div>
                 <div className="text-sm text-[var(--text-muted)]">
                   {isGgShotEnabled
-                    ? 'ggShot signals are enabled in your bot configuration'
-                    : 'Enable ggShot signals in your bot configuration'
+                    ? 'ggShot signals are enabled - subscribe to ggShot to use this feature'
+                    : 'Subscribe to ggShot to enable premium signals'
                   }
                 </div>
               </div>
               <button
                 onClick={() => toggleGgShot(!isGgShotEnabled)}
-                disabled={!isGgShotSubscribed && !isGgShotEnabled}
+                disabled={!isGgShotSubscribed}
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   isGgShotEnabled
-                    ? 'bg-emerald-500'
-                    : !isGgShotSubscribed
-                      ? 'bg-[var(--border)] opacity-50 cursor-not-allowed'
-                      : 'bg-[var(--border)]'
+                    ? 'bg-amber-500'
+                    : 'bg-[var(--border)] opacity-50 cursor-not-allowed'
                 }`}
               >
                 <span

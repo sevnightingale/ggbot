@@ -128,23 +128,43 @@ class SignalOrchestrationRequest(BaseModel):
 
 
 def serialize_numpy_types(obj):
-    """Recursively convert numpy types and Decimal to Python native types."""
-    from decimal import Decimal
+    """
+    Recursively convert numpy types, pandas types, and Decimal to Python native types.
 
-    if isinstance(obj, (np.integer)):
+    This is a belt-and-suspenders approach to ensure ALL numpy/pandas types are
+    converted before Pydantic serialization, preventing serialization errors.
+    """
+    from decimal import Decimal
+    import pandas as pd
+
+    # Handle numpy integer types
+    if isinstance(obj, (np.integer, np.int64, np.int32, np.int16, np.int8)):
         return int(obj)
-    elif isinstance(obj, (np.floating)):
+    # Handle numpy float types
+    elif isinstance(obj, (np.floating, np.float64, np.float32, np.float16)):
         return float(obj)
-    elif isinstance(obj, (np.bool_)):
+    # Handle numpy boolean types (CRITICAL: This prevents PydanticSerializationError)
+    elif isinstance(obj, np.bool_):
         return bool(obj)
-    elif isinstance(obj, (np.ndarray)):
+    # Handle numpy arrays
+    elif isinstance(obj, np.ndarray):
         return obj.tolist()
+    # Handle pandas NA/NaT values
+    elif pd.isna(obj):
+        return None
+    # Handle Decimal types
     elif isinstance(obj, Decimal):
         return float(obj)
+    # Recursively handle dictionaries
     elif isinstance(obj, dict):
         return {key: serialize_numpy_types(value) for key, value in obj.items()}
+    # Recursively handle lists
     elif isinstance(obj, list):
         return [serialize_numpy_types(item) for item in obj]
+    # Recursively handle tuples (convert to list)
+    elif isinstance(obj, tuple):
+        return [serialize_numpy_types(item) for item in obj]
+    # Return all other types as-is
     else:
         return obj
 

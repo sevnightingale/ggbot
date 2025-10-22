@@ -131,7 +131,9 @@ class BinanceRestAdapter(DataAdapter):
         except AdapterError:
             raise
         except Exception as e:
-            raise AdapterError(f"Failed to fetch from Binance REST API: {e}")
+            error_msg = str(e) if str(e) else repr(e)
+            self._log.error(f"Binance REST API error for {symbol}: {type(e).__name__}: {error_msg}")
+            raise AdapterError(f"Failed to fetch from Binance REST API: {type(e).__name__}: {error_msg}")
 
     def _suggest_related_queries(self, symbol: str, timeframe: str) -> list:
         """Suggest related queries."""
