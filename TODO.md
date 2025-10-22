@@ -253,6 +253,85 @@
   - [ ] Add proper TypeScript types for signal_data structures
   - [ ] Implement defensive action mapping with unknown value logging
 
+## 📊 **MEDIUM-LOW PRIORITY - Trade Timeline Feature**
+
+**Timeline**: 9-12 days - Complete trade lifecycle visualization and analytics foundation
+
+**See**: [DOCS/TRADE_TIMELINE.md](DOCS/TRADE_TIMELINE.md) for complete design specification
+
+### Overview
+Comprehensive trade lifecycle view showing Market Data → Entry Decision → Trade Management → Exit Decision, enabling transparency and advanced analytics.
+
+### Phase 1: Database Schema (2-3 days)
+- [ ] Add `exit_decision_id` to `paper_trades` table
+- [ ] Add `exit_decision_id` to `live_trades` table
+- [ ] Add `trade_id` to `decisions` table (reverse lookup)
+- [ ] Add `trade_type` ('paper'/'live') to `decisions` table
+- [ ] Create indexes for performance
+- [ ] Write and test migration scripts
+- [ ] Deploy schema changes to production
+
+### Phase 2: Backend Integration (3-4 days)
+- [ ] Update Decision Engine V2
+  - [ ] Add `active_trade` parameter to `make_decision()`
+  - [ ] Implement `_link_decision_to_trade()` method
+  - [ ] Link "wait" decisions to active trades
+- [ ] Update Paper Trading Engine
+  - [ ] Link opening decision to trade on entry
+  - [ ] Store exit_decision_id on close
+  - [ ] Update `execute_trade()` method
+  - [ ] Update `close_position()` method
+- [ ] Update Live Trading Engine (Symphony)
+  - [ ] Link opening decision to live_trades
+  - [ ] Store exit_decision_id on Symphony close
+  - [ ] Update Symphony service methods
+- [ ] Update Orchestrator (ggbot.py)
+  - [ ] Pass active_trade context to decision engine
+  - [ ] Pass exit_decision_id when closing positions
+  - [ ] Implement `_get_active_trade()` helper
+
+### Phase 3: API Endpoints (1 day)
+- [ ] Create `GET /api/v2/trade/{trade_id}/timeline` endpoint
+  - [ ] Support both paper and live trades
+  - [ ] Verify ownership/permissions
+  - [ ] Return entry decision, monitoring decisions, exit decision
+  - [ ] Parse and return formatted market data
+- [ ] Update API client (frontend/lib/api.ts)
+  - [ ] Add `getTradeTimeline(tradeId, tradeType)` method
+
+### Phase 4: Frontend Component (2-3 days)
+- [ ] Create `TradeTimelineModal.tsx` component
+  - [ ] 4-section timeline UI (Market Data, Entry, Management, Exit)
+  - [ ] Expandable/collapsible sections
+  - [ ] Loading and error states
+  - [ ] Mobile responsive design
+- [ ] Add Timeline triggers to existing components
+  - [ ] "View Timeline" in TradeDetailPopover
+  - [ ] Timeline icon in PerformanceChart trade dots
+  - [ ] Timeline button in DecisionFeed cards
+  - [ ] Timeline option in Trade History Modal
+- [ ] Market data formatting component
+  - [ ] Parse multi-timeframe data from prompt
+  - [ ] Format indicators for readability
+  - [ ] Highlight critical signals
+
+### Phase 5: Testing & Polish (2 days)
+- [ ] Test with existing trades (NULL exit_decision_id handling)
+- [ ] Test with new trades (verify full linking)
+- [ ] Test paper and live trades separately
+- [ ] Verify monitoring decisions link correctly
+- [ ] Test Timeline modal on mobile
+- [ ] Add fallback queries for old trades without links
+
+### Future Analytics Capabilities
+- [ ] Win/loss pattern analysis by market conditions
+- [ ] Confidence calibration analysis
+- [ ] Indicator effectiveness correlation
+- [ ] Monitoring frequency vs outcomes
+- [ ] Multi-timeframe analysis effectiveness
+
+---
+
 ## 📱 **MEDIUM PRIORITY - Mobile & Frontend Polish**
 
 **Timeline**: 2-3 days - Complete mobile experience and component improvements
