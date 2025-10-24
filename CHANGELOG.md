@@ -6,6 +6,65 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
+## 2025-10-24 - Hybrid Price Service & Symbol Coverage Fix
+
+**Status Check Script for Internal Monitoring**:
+- **New Tool**: `scripts/status_check.py` for comprehensive platform metrics
+- **Metrics Collected**: User counts (256 total, 5 Pro), bot stats (376 total, 57 active), trading activity, open positions, top symbols, decision activity
+- **Usage Modes**: Full report, auto-update ACTIVE.md (`--update`), quiet mode for monitoring (`--quiet`)
+- **Comparison to X-Bot**: More comprehensive than daily tweets - includes win rates, account balances, decision activity, system health
+- **Files**: `scripts/status_check.py`, `scripts/README_STATUS_CHECK.md`
+
+**Hybrid Price Service - All 142 Symbols Supported** (CRITICAL):
+- **Issue**: Symbol coverage mismatch - 142 symbols in registry vs 100 in WebSocket cache
+- **Impact**: Users creating bots for non-cached symbols (e.g., SUI/USDT) experienced price lookup failures
+- **Root Cause Analysis**: code-scout identified 42 symbols missing from WebSocket cache (ACHUSDT, ALPHAUSDT, AXSUSDT, etc.)
+- **Solution**: Hybrid price architecture - WebSocket-first (100 symbols, <1ms) + REST fallback (42 symbols, ~100ms, 5s cache)
+- **Architecture**: `HybridPriceService` with intelligent tiering for different use cases
+- **Rate Limit Safety**: Built-in monitoring (1,200 weight/min Binance limit), circuit breaker at 80%/90%, exponential throttling
+- **Performance**: 5-second REST cache reduces calls from 20/min to ~4/min per position (80% reduction)
+- **Capacity**: Safe for 10+ concurrent non-cached positions (~80 weight/min = 6.6% of limit)
+
+**Symbol Registry Enhancement**:
+- **New Field**: `websocket_cached: True/False` added to all 142 symbols
+- **Helper Functions**: `is_websocket_cached()`, `get_websocket_cached_count()`
+- **Validation**: 100 symbols marked as cached (WebSocket real-time), 42 as non-cached (REST fallback)
+- **Files**: `core/symbols/registry.py`
+
+**Bot Creation Validation**:
+- **Restriction**: Autonomous bots limited to 100 WebSocket-cached symbols only
+- **Endpoints**: Validation added to `POST /api/v2/config` (create) and `PUT /api/v2/config/{id}` (update)
+- **Error Message**: Clear user feedback - "Symbol {X} requires real-time price data. Choose from 100 available symbols."
+- **Rationale**: Ensures fast position monitoring (3s cycles) without REST API latency/rate limits
+- **Files**: `ggbot.py` (bot creation/update endpoints)
+
+**ggShot Signal Validation - Full 142 Symbol Support**:
+- **Use Case**: ggShot can send signals for any of 142 symbols
+- **Implementation**: Signal validation + paper trading use hybrid service (REST fallback for non-cached)
+- **Frequency**: Low-frequency (10-20 signals/hour) makes REST API safe despite rate limits
+- **Result**: All ggShot signals process successfully regardless of symbol
+
+**Bug Fixes**:
+- **Python Boolean Syntax**: Fixed `true`/`false` (JavaScript) → `True`/`False` (Python) in registry
+- **LivePriceService**: Removed orphaned `_get_redis_client()` reference in `get_multiple_prices()`
+- **Service Stability**: Fixed crash loop (79 restarts) caused by syntax error
+
+**Files Modified**:
+- `core/symbols/registry.py` (added `websocket_cached` field + validation functions)
+- `trading/paper/hybrid_price_service.py` (NEW - hybrid price fetching with caching + rate limit monitoring)
+- `trading/paper/live_price_service.py` (updated to delegate to hybrid service)
+- `ggbot.py` (added bot creation/update validation)
+- `scripts/status_check.py` (NEW - platform metrics tool)
+
+**Production Impact**:
+- ✅ All 142 symbols now work for ggShot signal validation
+- ✅ All 142 symbols work for paper trading with position monitoring
+- ✅ Autonomous bots validated to use only 100 WebSocket symbols (prevents errors)
+- ✅ Rate limit safety guaranteed with 5s caching + monitoring
+- ✅ Service stable after fixing Python boolean syntax bug
+
+---
+
 ## 2025-01-22 - Live Trading Position Management Fix & Market Data Reliability
 
 **Critical Bug Fix - Division by Zero in Live Trading** (BLOCKING):

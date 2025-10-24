@@ -1360,6 +1360,23 @@ async def create_config(
     request_data = request.dict(exclude={"config_name"})
     config_type = request_data.pop("config_type", "autonomous_trading")
 
+    # Validate symbol has real-time price data (WebSocket cached)
+    # This is required for autonomous trading bots to function properly
+    selected_pair = request_data.get("selected_pair")
+    if selected_pair:
+        from core.symbols.registry import is_websocket_cached, get_websocket_cached_count
+
+        if not is_websocket_cached(selected_pair, format_type="ccxt"):
+            cached_count = get_websocket_cached_count()
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Symbol {selected_pair} requires real-time price data for trading. "
+                    f"Please choose from {cached_count} available symbols with WebSocket price feeds. "
+                    f"This ensures fast position monitoring and reliable trade execution."
+                )
+            )
+
     # Add config_type back to config_data for BotConfigV2 constructor
     request_data["config_type"] = config_type
 
@@ -1433,11 +1450,27 @@ async def update_config(
     update_data = {k: v for k, v in request.dict().items() if v is not None}
     config_name = update_data.pop("config_name", None)
     config_type = update_data.pop("config_type", None)
-    
+
+    # Validate symbol has real-time price data if changing selected_pair
+    selected_pair = update_data.get("selected_pair")
+    if selected_pair:
+        from core.symbols.registry import is_websocket_cached, get_websocket_cached_count
+
+        if not is_websocket_cached(selected_pair, format_type="ccxt"):
+            cached_count = get_websocket_cached_count()
+            raise HTTPException(
+                status_code=400,
+                detail=(
+                    f"Symbol {selected_pair} requires real-time price data for trading. "
+                    f"Please choose from {cached_count} available symbols with WebSocket price feeds. "
+                    f"This ensures fast position monitoring and reliable trade execution."
+                )
+            )
+
     # Check if this is an active bot before update
     current_state = await config_service.get_bot_state(config_id, current_user.user_id)
     was_active = current_state == 'active'
-    
+
     # Get old config to compare timeframes
     old_config = await config_service.get_config(config_id, current_user.user_id)
     old_timeframe = extract_timeframe_from_config(old_config.to_jsonb()) if old_config else None

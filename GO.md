@@ -8,7 +8,24 @@
 
 When a user says "read GO.md" or similar, follow this procedure:
 
-### Step 1: Read Core Documentation (in order)
+### Step 1: Run Status Check Script
+
+Get fresh, accurate platform metrics before diving into documentation:
+
+```bash
+source .venv/bin/activate && python scripts/status_check.py
+```
+
+This will show you:
+- Current user count and subscription breakdown
+- Active bot count and trading mode split
+- Recent trading activity (24h/7d/30d)
+- Open positions and system health
+- Top trading symbols and decision activity
+
+Use these **real-time numbers** in your assessment instead of relying on potentially outdated documentation.
+
+### Step 2: Read Core Documentation (in order)
 
 Read these four files to understand the project:
 
@@ -17,7 +34,7 @@ Read these four files to understand the project:
 3. **TODO.md** - Current tasks and development roadmap
 4. **CHANGELOG.md** - Complete history of features and improvements
 
-### Step 2: Provide Brief Assessment
+### Step 3: Provide Brief Assessment
 
 After reading all four files, provide a **brief assessment** (1-2 paragraphs) covering:
 
@@ -28,7 +45,9 @@ After reading all four files, provide a **brief assessment** (1-2 paragraphs) co
 
 Keep it concise - this is a "state of the union" snapshot, not a detailed report.
 
-### Step 3: Ask What To Work On
+**Important**: Use the real-time metrics from Step 1's status check in your assessment, not the numbers in the documentation (which may be outdated).
+
+### Step 4: Ask What To Work On
 
 Present the current priorities from TODO.md and ask:
 
@@ -80,8 +99,8 @@ When a significant feature/fix is done:
 
 If the user mentions deployment, new user counts, or system changes:
 
-- **Update ACTIVE.md header**: "Last Updated" date and system status
-- **Update user counts**: "225+ users, 100+ bots" if numbers change significantly
+- **Run status check script**: `python scripts/status_check.py --update` to auto-update ACTIVE.md header
+- **Update user counts**: Use real numbers from status check (not guesses)
 - **Update service status**: PM2 services, infrastructure, background tasks
 
 ---
@@ -100,8 +119,8 @@ If the user mentions deployment, new user counts, or system changes:
 
 **Project Type**: Autonomous AI trading platform (ggbots.ai)
 **Architecture**: Three-agent pipeline (Extraction → Decision → Trading)
-**Production**: Live with 225+ users, 100+ active bots
-**Current Phase**: Symphony live trading integration + UX polish
+**Production**: Live with 256+ users, 57+ active bots (run status check for latest)
+**Current Phase**: Symphony live trading polish + UX improvements
 
 **Key Technologies**:
 - Backend: Python, FastAPI, APScheduler, PostgreSQL (Supabase), Redis

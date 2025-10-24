@@ -1,8 +1,12 @@
 """
 Live Price Service
 
-Provides real-time cryptocurrency prices from WebSocket-cached data.
-Replaces Hummingbot API dependency with direct Redis access to live candle data.
+Provides real-time cryptocurrency prices with intelligent fallback:
+1. WebSocket cache (100 symbols, <1ms, no rate limits) - PRIMARY
+2. Binance REST API with caching (42 symbols, ~100ms, rate limited) - FALLBACK
+
+This enables all 142 symbols for ggShot signal validation and paper trading
+while maintaining performance and rate limit safety.
 """
 
 import os
@@ -14,40 +18,30 @@ from dotenv import load_dotenv
 
 from core.common.logger import logger
 from .types import MarketPrice
+from .hybrid_price_service import HybridPriceService
 
 load_dotenv()
 
 
 class LivePriceService:
     """
-    Real-time price service using WebSocket-cached live candles.
+    Real-time price service with WebSocket-first, REST-fallback architecture.
 
-    This service accesses the same Redis cache populated by the WebSocket
-    market data service (market-data-ws PM2 process). Live candles are updated
-    every ~1 second as trades happen on Binance.
+    Delegates to HybridPriceService for intelligent price fetching across
+    all 142 supported symbols.
     """
 
     def __init__(self):
-        self.redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-        self.redis_client: Optional[redis.Redis] = None
+        self.hybrid_service = HybridPriceService()
         self._log = logger.bind(component="live_price_service")
-
-    async def _get_redis_client(self) -> redis.Redis:
-        """Get or create Redis client."""
-        if not self.redis_client:
-            self.redis_client = redis.from_url(
-                self.redis_url,
-                decode_responses=False  # Handle binary data (pickled)
-            )
-            await self.redis_client.ping()
-        return self.redis_client
 
     async def get_current_price(self, symbol: str) -> MarketPrice:
         """
-        Get current price for a symbol from live WebSocket candle data.
+        Get current price with WebSocket-first, REST-fallback strategy.
 
-        Uses live candles stored by the WebSocket service at price:live:{symbol}.
-        If not available, raises an exception.
+        Supports all 142 symbols:
+        - 100 symbols via WebSocket cache (<1ms, real-time)
+        - 42 symbols via REST API with caching (~100ms, 5s cache TTL)
 
         Args:
             symbol: Trading pair in internal format (e.g., 'BTC/USDT')
@@ -56,49 +50,15 @@ class LivePriceService:
             MarketPrice with bid, ask, last, and mid prices
 
         Raises:
-            Exception: If no live price data available
+            Exception: If price cannot be retrieved
         """
-        try:
-            client = await self._get_redis_client()
-
-            # Get live candle
-            live_key = f"price:live:{symbol}"
-            data = await client.get(live_key)
-
-            if not data:
-                raise Exception(
-                    f"No live price data for {symbol}. "
-                    f"WebSocket service may not be running or symbol not in coverage list (100 symbols)."
-                )
-
-            # Unpickle live candle
-            candle = pickle.loads(data)
-            price = float(candle['close'])
-
-            # Simulate realistic bid/ask spread (0.05% typical for major pairs)
-            spread_pct = 0.0005
-            spread_amount = price * spread_pct
-
-            market_price = MarketPrice(
-                symbol=symbol,
-                bid=price - spread_amount,
-                ask=price + spread_amount,
-                last=price,
-                mid=price,  # Will be calculated as (bid + ask) / 2 in __post_init__
-                timestamp=time.time()
-            )
-
-            self._log.debug(f"Live price for {symbol}: ${market_price.mid:.2f}")
-            return market_price
-
-        except Exception as e:
-            error_msg = str(e) or repr(e) or type(e).__name__
-            self._log.error(f"Failed to get price for {symbol}: {error_msg}")
-            raise
+        return await self.hybrid_service.get_current_price(symbol)
 
     async def get_multiple_prices(self, symbols: List[str]) -> Dict[str, MarketPrice]:
         """
         Get current prices for multiple symbols efficiently.
+
+        Uses hybrid approach (WebSocket + REST fallback) for each symbol.
 
         Args:
             symbols: List of symbols in internal format
@@ -108,26 +68,16 @@ class LivePriceService:
         """
         results = {}
 
-        try:
-            client = await self._get_redis_client()
+        for symbol in symbols:
+            try:
+                price = await self.get_current_price(symbol)
+                results[symbol] = price
+            except Exception as e:
+                self._log.warning(f"Failed to get price for {symbol}: {e}")
+                continue
 
-            # Try to fetch all prices (live first, then fallback to candles)
-            for symbol in symbols:
-                try:
-                    price = await self.get_current_price(symbol)
-                    results[symbol] = price
-                except Exception as e:
-                    self._log.warning(f"Failed to get price for {symbol}: {e}")
-                    continue
-
-            self._log.debug(f"Fetched {len(results)}/{len(symbols)} prices")
-            return results
-
-        except Exception as e:
-            error_msg = str(e) or repr(e) or type(e).__name__
-            self._log.error(f"Failed to fetch multiple prices: {error_msg}")
-            # Return what we have so far
-            return results
+        self._log.debug(f"Fetched {len(results)}/{len(symbols)} prices")
+        return results
 
     async def health_check(self) -> Dict[str, any]:
         """
@@ -139,37 +89,29 @@ class LivePriceService:
         health_status = {
             "service": "live_price_service",
             "status": "unknown",
-            "redis": "unknown",
+            "rate_limit": "unknown",
             "errors": []
         }
 
         try:
-            # Test Redis connection
-            client = await self._get_redis_client()
-            await client.ping()
-            health_status["redis"] = "healthy"
+            # Test price fetching with BTC/USDT (WebSocket cached)
+            await self.get_current_price("BTC/USDT")
+            health_status["status"] = "healthy"
 
-            # Test price fetching with BTC/USDT (should always be available)
-            try:
-                await self.get_current_price("BTC/USDT")
-                health_status["status"] = "healthy"
-            except Exception as e:
-                health_status["status"] = "degraded"
-                health_status["errors"].append(f"Price fetch test failed: {str(e)}")
+            # Get rate limit status
+            rate_status = await self.hybrid_service.get_rate_limit_status()
+            health_status["rate_limit"] = rate_status
 
         except Exception as e:
-            health_status["redis"] = "failed"
             health_status["status"] = "failed"
-            health_status["errors"].append(f"Redis connectivity failed: {str(e)}")
+            health_status["errors"].append(f"Price fetch test failed: {str(e)}")
 
         return health_status
 
     async def close(self):
-        """Close Redis connection."""
-        if self.redis_client:
-            await self.redis_client.close()
-            self.redis_client = None
-            self._log.info("Live price service closed")
+        """Close connections."""
+        await self.hybrid_service.close()
+        self._log.info("Live price service closed")
 
 
 # Convenience functions for quick usage
