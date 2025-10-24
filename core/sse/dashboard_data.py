@@ -22,11 +22,11 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
 
     Combines:
     - Bot configurations (non-archived)
-    - Open positions with current P&L
+    - Open positions with current P&L (paper and live)
     - Recent decisions (5 per bot, last 2 hours)
     - Account summaries enhanced with portfolio analytics
 
-    Enhanced with runtime data from scheduler and Redis execution status.
+    Enhanced with runtime data from scheduler, Redis execution status, and Symphony API.
 
     Args:
         user_id: User UUID string
@@ -43,10 +43,24 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
             for bot in db_data['bots']:
                 _enhance_bot_with_runtime_data(bot)
 
-        # Enhance accounts with portfolio analytics (async operation)
+        # Enrich live positions and accounts from Symphony
+        if db_data.get('bots'):
+            positions, accounts = await _enrich_live_positions_and_accounts(
+                db_data['bots'],
+                db_data.get('positions', []),
+                db_data.get('accounts', [])
+            )
+            db_data['positions'] = positions
+            db_data['accounts'] = accounts
+
+        # Enhance paper accounts with portfolio analytics
+        # (Live accounts already enriched with Symphony data)
         if db_data.get('accounts'):
-            enhanced_accounts = await _enhance_accounts_with_portfolio_data(db_data['accounts'])
-            db_data['accounts'] = enhanced_accounts
+            paper_accounts = [a for a in db_data['accounts'] if a.get('source') == 'paper']
+            live_accounts = [a for a in db_data['accounts'] if a.get('source') == 'live']
+
+            enhanced_paper = await _enhance_accounts_with_portfolio_data(paper_accounts)
+            db_data['accounts'] = enhanced_paper + live_accounts
 
         return db_data
 
@@ -70,18 +84,30 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     query = """
     WITH bot_configs AS (
         SELECT c.config_id, c.user_id, c.config_name, c.state, c.config_data,
+               c.trading_mode, c.symphony_agent_id,
                c.created_at, c.updated_at
         FROM configurations c
         WHERE c.user_id = %s AND c.state != 'archived'
     ),
     open_positions AS (
-        SELECT pt.config_id, pt.trade_id, pt.symbol, pt.side, pt.size_usd,
+        -- Paper trading positions
+        SELECT pt.config_id, pt.trade_id AS position_id, pt.symbol, pt.side, pt.size_usd,
                pt.entry_price, pt.current_price, pt.unrealized_pnl, pt.opened_at,
-               pt.stop_loss, pt.take_profit, pt.leverage
+               pt.stop_loss, pt.take_profit, pt.leverage, 'paper' AS source
         FROM paper_trades pt
         INNER JOIN bot_configs bc ON pt.config_id = bc.config_id
-        WHERE pt.status = 'open'
-        ORDER BY pt.opened_at DESC
+        WHERE pt.status = 'open' AND (bc.trading_mode IS NULL OR bc.trading_mode = 'paper')
+
+        UNION ALL
+
+        -- Live trading positions (batch_ids only - details fetched from Symphony)
+        SELECT lt.config_id, lt.batch_id AS position_id, NULL AS symbol, NULL AS side, NULL AS size_usd,
+               NULL AS entry_price, NULL AS current_price, NULL AS unrealized_pnl, lt.created_at AS opened_at,
+               NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'live' AS source
+        FROM live_trades lt
+        INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
+        WHERE lt.closed_at IS NULL AND bc.trading_mode = 'live'
+        ORDER BY opened_at DESC
     ),
     recent_decisions AS (
         SELECT * FROM (
@@ -97,11 +123,13 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         WHERE rn <= 5  -- 5 most recent decisions per bot (no time filter)
     ),
     account_summaries AS (
-        SELECT pa.config_id, pa.account_id, pa.current_balance, pa.total_pnl, 
+        SELECT pa.config_id, pa.account_id, pa.current_balance, pa.total_pnl,
                pa.total_trades, pa.win_trades, pa.loss_trades, pa.open_positions,
-               pa.updated_at
+               pa.updated_at, 'paper' AS source
         FROM paper_accounts pa
         INNER JOIN bot_configs bc ON pa.config_id = bc.config_id
+        WHERE bc.trading_mode IS NULL OR bc.trading_mode = 'paper'
+        -- Note: Live accounts will be fetched via Symphony API
     )
     SELECT json_build_object(
         'bots', COALESCE((SELECT json_agg(
@@ -111,6 +139,8 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                 'config_name', bc.config_name,
                 'config_type', 'autonomous_trading',
                 'state', bc.state,
+                'trading_mode', bc.trading_mode,
+                'symphony_agent_id', bc.symphony_agent_id,
                 'config_data', json_build_object(
                     'schema_version', bc.config_data->>'schema_version',
                     'config_type', bc.config_data->>'config_type',
@@ -242,6 +272,96 @@ async def _enhance_accounts_with_portfolio_data(accounts: List[Dict[str, Any]]) 
             enhanced_accounts.append(account)
 
     return enhanced_accounts
+
+
+async def _enrich_live_positions_and_accounts(
+    bots: List[Dict[str, Any]],
+    positions: List[Dict[str, Any]],
+    accounts: List[Dict[str, Any]]
+) -> tuple:
+    """
+    Fetch Symphony data for live bots and merge with SSE response.
+
+    Args:
+        bots: List of bot configurations
+        positions: List of positions from database (may include live batch_ids)
+        accounts: List of accounts from database (paper only)
+
+    Returns:
+        tuple: (enriched_positions, enriched_accounts)
+    """
+    from trading.live.symphony_service import SymphonyLiveTradingService
+
+    symphony = SymphonyLiveTradingService()
+
+    # Filter for live bots only
+    live_bots = [b for b in bots if b.get('trading_mode') == 'live']
+    if not live_bots:
+        return positions, accounts
+
+    enriched_positions = list(positions)
+    enriched_accounts = list(accounts)
+
+    # Fetch Symphony data for each live bot (in parallel)
+    tasks = []
+    for bot in live_bots:
+        config_id = bot['config_id']
+        tasks.append(symphony.get_account_metrics(config_id))
+        tasks.append(symphony.get_open_positions(config_id))
+
+    try:
+        # Gather all results, catching exceptions
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        # Process results (account metrics and positions alternate)
+        for i, bot in enumerate(live_bots):
+            config_id = bot['config_id']
+
+            # Extract account metrics (even indices: 0, 2, 4, ...)
+            account_result = results[i * 2]
+            if isinstance(account_result, dict) and not isinstance(account_result, Exception):
+                enriched_accounts.append({
+                    **account_result,
+                    'source': 'live',
+                    'account_id': f"symphony_{config_id}"  # Synthetic ID for consistency
+                })
+            elif isinstance(account_result, Exception):
+                logger.warning(f"Failed to fetch Symphony account for {config_id}: {account_result}")
+
+            # Extract positions (odd indices: 1, 3, 5, ...)
+            positions_result = results[i * 2 + 1]
+            if isinstance(positions_result, list):
+                # Remove placeholder live positions from DB (they have NULL fields)
+                enriched_positions = [
+                    p for p in enriched_positions
+                    if not (p.get('config_id') == config_id and p.get('source') == 'live')
+                ]
+
+                # Add enriched Symphony positions
+                for pos in positions_result:
+                    enriched_positions.append({
+                        'config_id': config_id,
+                        'position_id': pos.get('batch_id'),
+                        'symbol': pos.get('symbol'),
+                        'side': pos.get('side'),
+                        'size_usd': pos.get('size_usd'),
+                        'entry_price': pos.get('entry_price'),
+                        'current_price': pos.get('current_price'),
+                        'unrealized_pnl': pos.get('unrealized_pnl'),
+                        'opened_at': pos.get('opened_at'),
+                        'stop_loss': pos.get('stop_loss'),
+                        'take_profit': pos.get('take_profit'),
+                        'leverage': pos.get('leverage'),
+                        'source': 'live'
+                    })
+            elif isinstance(positions_result, Exception):
+                logger.warning(f"Failed to fetch Symphony positions for {config_id}: {positions_result}")
+
+    except Exception as e:
+        logger.error(f"Failed to enrich live positions and accounts: {e}")
+        # Return original data on error
+
+    return enriched_positions, enriched_accounts
 
 
 def _extract_timeframe_from_config(config_data: Dict[str, Any]) -> str:

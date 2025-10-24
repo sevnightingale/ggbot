@@ -5,7 +5,8 @@ import { TrendingUp, TrendingDown, X } from 'lucide-react'
 import { apiClient } from '@/lib/api'
 
 interface Position {
-  trade_id: string
+  trade_id?: string
+  position_id?: string  // Unified ID field (trade_id for paper, batch_id for live)
   symbol: string
   side: string
   size_usd: number
@@ -17,6 +18,7 @@ interface Position {
   stop_loss?: number
   take_profit?: number
   leverage: number
+  source?: 'paper' | 'live'  // Track position source
 }
 
 interface PositionsTableProps {
@@ -66,22 +68,41 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     return `${sign}${change.toFixed(2)}%`
   }
 
-  // Handle closing a position
-  const handleClosePosition = async (tradeId: string) => {
+  // Handle closing a position (paper or live)
+  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' = 'paper') => {
     if (!selectedConfigId) {
       console.error('No config ID selected')
       return
     }
 
-    if (closingPositions[tradeId]) {
+    if (closingPositions[positionId]) {
       return // Already closing
     }
 
     try {
-      setClosingPositions(prev => ({ ...prev, [tradeId]: true }))
+      setClosingPositions(prev => ({ ...prev, [positionId]: true }))
 
-      const result = await apiClient.closePosition(selectedConfigId, tradeId)
-      console.log('Position closed:', result)
+      if (source === 'live') {
+        // Close live position via Symphony
+        const headers = await apiClient.getAuthHeaders()
+        const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+        const response = await fetch(`${baseUrl}/api/v2/positions/live/${positionId}/close`, {
+          method: 'POST',
+          headers
+        })
+
+        if (!response.ok) {
+          const error = await response.text()
+          throw new Error(`Failed to close live position: ${error}`)
+        }
+
+        const result = await response.json()
+        console.log('Live position closed:', result)
+      } else {
+        // Close paper position (existing logic)
+        const result = await apiClient.closePosition(selectedConfigId, positionId)
+        console.log('Paper position closed:', result)
+      }
 
       // Notify parent component to refresh data
       if (onPositionClosed) {
@@ -91,7 +112,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
       console.error('Error closing position:', error)
       alert(`Failed to close position: ${error instanceof Error ? error.message : 'Unknown error'}`)
     } finally {
-      setClosingPositions(prev => ({ ...prev, [tradeId]: false }))
+      setClosingPositions(prev => ({ ...prev, [positionId]: false }))
     }
   }
 
@@ -103,20 +124,21 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     const newDisplayPrices: Record<string, { current: string; pnl: string; percentage: string }> = {}
 
     positions.forEach(position => {
+      const positionId = position.position_id || position.trade_id || 'unknown'
       const currentPrice = position.current_price
 
       // Format new values
-      newDisplayPrices[position.trade_id] = {
+      newDisplayPrices[positionId] = {
         current: formatPrice(currentPrice),
         pnl: formatPnL(position.unrealized_pnl),
         percentage: formatPercentage(position.entry_price, currentPrice)
       }
 
       // Always trigger animation on SSE update (like MetricsBar)
-      newAnimations[position.trade_id] = true
+      newAnimations[positionId] = true
 
       // Update prev price for potential future use
-      prevPricesRef.current[position.trade_id] = currentPrice
+      prevPricesRef.current[positionId] = currentPrice
     })
 
     // Start animations for all positions
@@ -210,8 +232,11 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
               </tr>
             </thead>
             <tbody>
-              {positions.map((position) => (
-                <tr key={position.trade_id} className="border-b border-[var(--border)] last:border-b-0">
+              {positions.map((position) => {
+                const positionId = position.position_id || position.trade_id || 'unknown'
+                const positionSource = position.source || 'paper'
+                return (
+                <tr key={positionId} className="border-b border-[var(--border)] last:border-b-0">
                   <td className="py-3 px-2 text-sm text-[var(--text-primary)] font-medium">
                     {position.symbol}
                   </td>
@@ -240,8 +265,8 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                       </div>
                       <div className="text-sm text-[var(--text-primary)] font-medium">
                         <AnimatedValue
-                          value={displayPrices[position.trade_id]?.current || formatPrice(position.current_price)}
-                          isAnimating={animatingPrices[position.trade_id] || false}
+                          value={displayPrices[positionId]?.current || formatPrice(position.current_price)}
+                          isAnimating={animatingPrices[positionId] || false}
                         />
                       </div>
                     </div>
@@ -251,14 +276,14 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                     <div className="space-y-0.5">
                       <div className="text-sm">
                         <AnimatedValue
-                          value={displayPrices[position.trade_id]?.pnl || formatPnL(position.unrealized_pnl)}
-                          isAnimating={animatingPrices[position.trade_id] || false}
+                          value={displayPrices[positionId]?.pnl || formatPnL(position.unrealized_pnl)}
+                          isAnimating={animatingPrices[positionId] || false}
                         />
                       </div>
                       <div className="text-xs">
                         <AnimatedValue
-                          value={displayPrices[position.trade_id]?.percentage || formatPercentage(position.entry_price, position.current_price)}
-                          isAnimating={animatingPrices[position.trade_id] || false}
+                          value={displayPrices[positionId]?.percentage || formatPercentage(position.entry_price, position.current_price)}
+                          isAnimating={animatingPrices[positionId] || false}
                         />
                       </div>
                     </div>
@@ -281,17 +306,18 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                   </td>
                   <td className="py-3 px-2 text-right">
                     <button
-                      onClick={() => handleClosePosition(position.trade_id)}
-                      disabled={closingPositions[position.trade_id]}
+                      onClick={() => handleClosePosition(positionId, positionSource)}
+                      disabled={closingPositions[positionId]}
                       className="inline-flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-[var(--loss-color)] hover:bg-red-500/10 border border-[var(--loss-color)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                       title="Close position"
                     >
                       <X className="h-3 w-3" />
-                      {closingPositions[position.trade_id] ? 'Closing...' : 'Close'}
+                      {closingPositions[positionId] ? 'Closing...' : 'Close'}
                     </button>
                   </td>
                 </tr>
-              ))}
+              )
+              })}
             </tbody>
           </table>
         </div>
@@ -299,8 +325,11 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
 
       {/* Mobile Cards */}
       <div className="md:hidden space-y-3">
-        {positions.map((position) => (
-          <div key={position.trade_id} className="border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-primary)]">
+        {positions.map((position) => {
+          const positionId = position.position_id || position.trade_id || 'unknown'
+          const positionSource = position.source || 'paper'
+          return (
+          <div key={positionId} className="border border-[var(--border)] rounded-xl p-4 bg-[var(--bg-primary)]">
             {/* Header */}
             <div className="flex items-center justify-between mb-3">
               <div className="flex items-center gap-2">
@@ -378,15 +407,16 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
 
             {/* Close Button */}
             <button
-              onClick={() => handleClosePosition(position.trade_id)}
-              disabled={closingPositions[position.trade_id]}
+              onClick={() => handleClosePosition(positionId, positionSource)}
+              disabled={closingPositions[positionId]}
               className="mt-3 w-full inline-flex items-center justify-center gap-2 px-4 py-2 text-sm font-medium text-[var(--loss-color)] hover:bg-red-500/10 border border-[var(--loss-color)] rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <X className="h-4 w-4" />
-              {closingPositions[position.trade_id] ? 'Closing Position...' : 'Close Position'}
+              {closingPositions[positionId] ? 'Closing Position...' : 'Close Position'}
             </button>
           </div>
-        ))}
+        )
+        })}
       </div>
     </div>
   )

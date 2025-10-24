@@ -54,6 +54,9 @@
 - `GET /api/v2/positions/live/{config_id}` - Query Symphony positions
 - `POST /api/v2/positions/live/{batch_id}/close` - Close live position
 - `POST /api/v2/config/duplicate-as-live` - Duplicate paper bot as live bot
+- `GET /api/v2/account/live/{config_id}` - Account metrics from Symphony
+- `GET /api/v2/trades/live/{config_id}` - Trade history from Symphony
+- `GET /api/dashboard-stream` - SSE stream with unified paper + live data
 
 ---
 
@@ -113,6 +116,8 @@
 - **Smart routing** - paper vs live mode per bot configuration
 - **Idempotency protection** - prevents duplicate trades on retry
 - **Position management** - open, close, and query live positions
+- **Dashboard integration** - SSE stream enriches live data from Symphony API
+- **Unified UX** - PerformanceChart and PositionsTable support both modes
 - **Premium feature** - ggbase subscription required
 
 ---

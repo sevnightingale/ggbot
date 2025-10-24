@@ -2245,6 +2245,93 @@ async def close_live_position(
         )
 
 
+@app.get("/api/v2/account/live/{config_id}")
+async def get_live_account_metrics(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get account metrics for live trading bot from Symphony."""
+    try:
+        # Verify user owns this config
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Check if it's a live trading bot
+        if getattr(config, 'trading_mode', 'paper') != 'live':
+            raise HTTPException(
+                status_code=400,
+                detail="Not a live trading bot"
+            )
+
+        # Get metrics from Symphony service
+        metrics = await orchestrator.symphony_trading.get_account_metrics(config_id)
+
+        if not metrics:
+            # Return default empty metrics
+            return {
+                'config_id': config_id,
+                'current_balance': 10000.0,
+                'total_pnl': 0,
+                'total_trades': 0,
+                'win_trades': 0,
+                'loss_trades': 0,
+                'win_rate': 0,
+                'open_positions': 0,
+                'portfolio_return_pct': 0,
+                'updated_at': datetime.now().isoformat()
+            }
+
+        return metrics
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get live account metrics: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get live account metrics: {str(e)}"
+        )
+
+
+@app.get("/api/v2/trades/live/{config_id}")
+async def get_live_trade_history(
+    config_id: str,
+    limit: int = 50,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get closed trade history for live trading bot from Symphony."""
+    try:
+        # Verify user owns this config
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Check if it's a live trading bot
+        if getattr(config, 'trading_mode', 'paper') != 'live':
+            raise HTTPException(
+                status_code=400,
+                detail="Not a live trading bot"
+            )
+
+        # Get trade history from Symphony service
+        trades = await orchestrator.symphony_trading.get_trade_history(config_id, limit)
+
+        return {
+            'trades': trades,
+            'count': len(trades)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get live trade history: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get live trade history: {str(e)}"
+        )
+
+
 @app.post("/api/v2/config/duplicate-as-live")
 async def duplicate_config_as_live(
     request: Dict[str, Any],

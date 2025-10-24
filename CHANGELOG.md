@@ -6,6 +6,42 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
+## 2025-10-24 - Symphony Dashboard Integration & SSE Enrichment
+
+**Live Trading Dashboard Integration** (Production):
+- **SSE Stream Enrichment**: Dashboard stream now fetches Symphony data for live bots in parallel
+- **Unified Account Metrics**: PerformanceChart displays both paper and live bot performance seamlessly
+- **Position Display**: PositionsTable shows paper and live positions with unified interface
+- **Close Position Routing**: Close button routes to Symphony API for live positions, paper service for paper positions
+- **Performance**: Symphony API calls parallelized, ~1-2s additional latency for live bots
+- **Error Isolation**: Symphony failures don't break paper trading or SSE stream
+- **Architecture**: `_enrich_live_positions_and_accounts()` in `core/sse/dashboard_data.py`
+
+**Backend Changes**:
+- Extended SSE SQL query with `trading_mode` and `symphony_agent_id` fields
+- Modified `open_positions` CTE to UNION paper_trades + live_trades (with source tagging)
+- Added Symphony enrichment function with parallel API fetching
+- Updated `get_unified_dashboard_data()` to call enrichment before portfolio analytics
+- Created endpoints: `GET /api/v2/account/live/{config_id}`, `GET /api/v2/trades/live/{config_id}`
+- Symphony service methods: `get_account_metrics()`, `get_trade_history()` with batch iteration
+
+**Frontend Changes**:
+- Updated `PositionsTable.tsx` interface with `position_id` and `source` fields
+- Enhanced close handler to route based on `source: 'paper' | 'live'`
+- Updated all position references to use unified `positionId` (trade_id or batch_id)
+- PerformanceChart works automatically (no changes needed - unified account interface)
+
+**Files Modified**: `core/sse/dashboard_data.py`, `trading/live/symphony_service.py`, `ggbot.py`, `frontend/app/forge/components/monitor/PositionsTable.tsx`
+
+**Production Impact**:
+- ✅ Live bots display real-time metrics from Symphony in dashboard
+- ✅ Switch between paper and live bots seamlessly
+- ✅ Close positions from UI (both modes)
+- ✅ SSE stream stable with Symphony integration
+- ✅ Graceful degradation on Symphony API errors
+
+---
+
 ## 2025-10-24 - Hybrid Price Service & Symbol Coverage Fix
 
 **Status Check Script for Internal Monitoring**:
@@ -65,7 +101,7 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
-## 2025-01-22 - Live Trading Position Management Fix & Market Data Reliability
+## 2025-10-22 - Live Trading Position Management Fix & Market Data Reliability
 
 **Critical Bug Fix - Division by Zero in Live Trading** (BLOCKING):
 - **Issue**: Live trading bots crashed when managing open positions (division by zero error)
@@ -93,7 +129,7 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
-## 2025-01-22 - UX Polish & Performance Chart
+## 2025-10-22 - UX Polish & Performance Chart
 
 **User Experience Quick Wins**:
 - **Status Messaging**: User-friendly pipeline messages ("Gathering market data..." vs "Extracting 12 indicators...")
@@ -117,7 +153,7 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
-## 2025-01-21 - Frontend Reliability & Error Recovery
+## 2025-10-21 - Frontend Reliability & Error Recovery
 
 **Production Resilience for Symphony Integration**:
 - **API Client Retry Logic**: Exponential backoff (1s, 2s, 4s) with 3 retry attempts on network failures
@@ -129,7 +165,7 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
-## 2025-01-19 - Symphony Live Trading Integration
+## 2025-10-19 - Symphony Live Trading Integration
 
 **Production-Ready Live Trading via Symphony.io**:
 

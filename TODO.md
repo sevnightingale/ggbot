@@ -92,14 +92,15 @@
   - [ ] Test error handling (invalid API key, insufficient balance, unsupported symbol)
   - [ ] Verify live_trades table linkage (batch_id → decision_id traceability)
 
-- [ ] **Live Trading System Polish** (Current Focus - 2025-01-21)
-  - [ ] Update trade query endpoints to support live_trades table
-  - [ ] Fix metrics calculations to include live trades
-  - [ ] Ensure positions display correctly for live bots
-  - [ ] Update dashboard stats to aggregate paper + live trades
+- [x] **Live Trading System Polish** (Complete - 2025-10-24)
+  - [x] Update trade query endpoints to support live_trades table
+  - [x] Fix metrics calculations to include live trades (SSE enrichment)
+  - [x] Ensure positions display correctly for live bots
+  - [x] Update dashboard stats to aggregate paper + live trades
+  - [x] Update PositionsTable to handle live trading data format
+  - [x] Integrate Symphony data into SSE dashboard stream
   - [ ] Test P&L calculations with live trade data
   - [ ] Verify close reason tracking in live_trades
-  - [ ] Update PositionsTable to handle live trading data format
 
 - [ ] **Documentation**
   - [ ] Create user guide: "How to Enable Live Trading"

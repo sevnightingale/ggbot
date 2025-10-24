@@ -22,6 +22,7 @@ import asyncio
 import aiohttp
 from typing import Dict, Any, List, Optional
 from decimal import Decimal
+from datetime import datetime
 
 from core.common.logger import logger
 from core.common.db import get_db_connection
@@ -361,6 +362,182 @@ class SymphonyLiveTradingService:
             self._log.error(f"Failed to get Symphony positions: {e}")
             return []
 
+    async def get_account_metrics(self, config_id: str) -> Dict[str, Any]:
+        """
+        Get account metrics for live trading bot from Symphony.
+
+        Returns metrics in same format as paper trading for dashboard compatibility.
+
+        Args:
+            config_id: Bot configuration ID
+
+        Returns:
+            Dict with account metrics (balance, P&L, win rate, etc.)
+        """
+        try:
+            # Get user_id and symphony_agent_id from database
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT user_id, symphony_agent_id
+                        FROM configurations
+                        WHERE config_id = %s
+                    """, (config_id,))
+                    result = cur.fetchone()
+
+                    if not result:
+                        self._log.error(f"Configuration not found: {config_id}")
+                        return {}
+
+                    user_id, symphony_agent_id = result
+
+            # Get Symphony credentials
+            credentials = await VaultManager.get_symphony_credential(user_id)
+            if not credentials:
+                self._log.error(f"No Symphony credentials for user {user_id}")
+                return {}
+
+            api_key = credentials['api_key']
+
+            # Query all batches
+            batches = await self._get_symphony_batches(api_key, symphony_agent_id)
+
+            # Get closed batches and their positions
+            closed_positions = []
+            open_positions_count = 0
+
+            for batch in batches:
+                batch_data = await self._get_batch_positions(api_key, batch['batchId'])
+                positions = batch_data.get('positions', [])
+
+                for pos in positions:
+                    # Filter out failed trades (entryPrice = 0)
+                    if pos.get('entryPrice', 0) > 0:
+                        if batch['status'] == 'CLOSED':
+                            closed_positions.append(pos)
+                        elif batch['status'] == 'OPEN':
+                            open_positions_count += 1
+
+            # Calculate metrics
+            total_trades = len(closed_positions)
+            total_pnl = sum(pos.get('pnlUSD', 0) for pos in closed_positions)
+
+            # Calculate win/loss
+            wins = [p for p in closed_positions if p.get('pnlUSD', 0) > 0]
+            losses = [p for p in closed_positions if p.get('pnlUSD', 0) < 0]
+            win_count = len(wins)
+            loss_count = len(losses)
+            win_rate = (win_count / total_trades * 100) if total_trades > 0 else 0
+
+            # Calculate current balance (need to get initial capital somehow)
+            # For now, calculate from total P&L assuming $10k start
+            initial_balance = 10000.0
+            current_balance = initial_balance + total_pnl
+            portfolio_return_pct = (total_pnl / initial_balance * 100) if initial_balance > 0 else 0
+
+            self._log.info(f"Symphony metrics: {total_trades} trades, {win_rate:.1f}% win rate, ${total_pnl:.2f} P&L")
+
+            return {
+                'config_id': config_id,
+                'current_balance': current_balance,
+                'total_pnl': total_pnl,
+                'total_trades': total_trades,
+                'win_trades': win_count,
+                'loss_trades': loss_count,
+                'win_rate': win_rate,
+                'open_positions': open_positions_count,
+                'portfolio_return_pct': portfolio_return_pct,
+                'updated_at': datetime.now().isoformat()
+            }
+
+        except Exception as e:
+            self._log.error(f"Failed to get Symphony account metrics: {e}")
+            return {}
+
+    async def get_trade_history(self, config_id: str, limit: int = 50) -> List[Dict[str, Any]]:
+        """
+        Get closed trade history from Symphony.
+
+        Returns trades in same format as paper trading for dashboard compatibility.
+
+        Args:
+            config_id: Bot configuration ID
+            limit: Max number of trades to return
+
+        Returns:
+            List of trade dicts
+        """
+        try:
+            # Get user_id and symphony_agent_id from database
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT user_id, symphony_agent_id
+                        FROM configurations
+                        WHERE config_id = %s
+                    """, (config_id,))
+                    result = cur.fetchone()
+
+                    if not result:
+                        self._log.error(f"Configuration not found: {config_id}")
+                        return []
+
+                    user_id, symphony_agent_id = result
+
+            # Get Symphony credentials
+            credentials = await VaultManager.get_symphony_credential(user_id)
+            if not credentials:
+                self._log.error(f"No Symphony credentials for user {user_id}")
+                return []
+
+            api_key = credentials['api_key']
+
+            # Query all batches
+            batches = await self._get_symphony_batches(api_key, symphony_agent_id)
+
+            # Get closed batches only
+            closed_batches = [b for b in batches if b['status'] == 'CLOSED']
+
+            # Get positions for each closed batch
+            trades = []
+            for batch in closed_batches[:limit]:  # Limit number of batches queried
+                batch_data = await self._get_batch_positions(api_key, batch['batchId'])
+                positions = batch_data.get('positions', [])
+
+                for pos in positions:
+                    # Filter out failed trades
+                    if pos.get('entryPrice', 0) == 0:
+                        continue
+
+                    # Map to frontend Trade format
+                    trades.append({
+                        'trade_id': batch['batchId'],
+                        'symbol': self.standardizer.from_symphony(pos.get('asset', 'BTC')),
+                        'side': 'long' if pos.get('isLong') else 'short',
+                        'entry_price': pos.get('entryPrice', 0),
+                        'size_usd': pos.get('positionSize', 0),
+                        'leverage': pos.get('leverage', 1),
+                        'realized_pnl': pos.get('pnlUSD', 0),
+                        'close_reason': 'symphony_close',  # Symphony doesn't track reason
+                        'opened_at': pos.get('createdTimestamp'),
+                        'closed_at': pos.get('lastUpdatedTimestamp'),
+                        'confidence_score': None,  # Not available
+                        'decision_id': None,  # Could join with live_trades table
+                        'action': 'long' if pos.get('isLong') else 'short',
+                        'decision_confidence': None,
+                        'reasoning': None
+                    })
+
+            # Sort by closed time (most recent first)
+            trades.sort(key=lambda t: t['closed_at'] or '', reverse=True)
+
+            self._log.info(f"Retrieved {len(trades)} closed trades from Symphony")
+            return trades[:limit]
+
+        except Exception as e:
+            self._log.error(f"Failed to get Symphony trade history: {e}")
+            return []
+
     # =========================================================================
     # Private Helper Methods
     # =========================================================================
@@ -561,3 +738,73 @@ class SymphonyLiveTradingService:
         except Exception as e:
             self._log.error(f"Symphony positions request failed: {e}")
             return []
+
+    async def _get_symphony_batches(
+        self,
+        api_key: str,
+        agent_id: str
+    ) -> List[Dict[str, Any]]:
+        """
+        Query Symphony API for all batches (trade history).
+
+        Returns list of batch dicts with status, timestamp, etc.
+        """
+        url = f"{self.base_url}/agent/batches"
+
+        headers = {
+            "x-api-key": api_key
+        }
+
+        params = {
+            "agentId": agent_id
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, headers=headers, timeout=self.timeout) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        batches = data.get('batches', [])
+                        self._log.info(f"Retrieved {len(batches)} batches from Symphony")
+                        return batches
+                    else:
+                        error_text = await response.text()
+                        self._log.error(f"Symphony batches error {response.status}: {error_text}")
+                        return []
+        except Exception as e:
+            self._log.error(f"Symphony batches request failed: {e}")
+            return []
+
+    async def _get_batch_positions(
+        self,
+        api_key: str,
+        batch_id: str
+    ) -> Dict[str, Any]:
+        """
+        Query Symphony API for positions in a specific batch.
+
+        Returns dict with positions and orders arrays.
+        """
+        url = f"{self.base_url}/agent/batch-positions"
+
+        headers = {
+            "x-api-key": api_key
+        }
+
+        params = {
+            "batchId": batch_id
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, params=params, headers=headers, timeout=self.timeout) as response:
+                    if response.status == 200:
+                        data = await response.json()
+                        return data
+                    else:
+                        error_text = await response.text()
+                        self._log.error(f"Symphony batch-positions error {response.status}: {error_text}")
+                        return {}
+        except Exception as e:
+            self._log.error(f"Symphony batch-positions request failed: {e}")
+            return {}
