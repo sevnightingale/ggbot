@@ -344,8 +344,8 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
               </div>
               <div className={`text-sm font-semibold ${getPnLColor(position.unrealized_pnl)}`}>
                 <AnimatedValue
-                  value={displayPrices[position.trade_id]?.percentage || formatPercentage(position.entry_price, position.current_price)}
-                  isAnimating={animatingPrices[position.trade_id] || false}
+                  value={displayPrices[positionId]?.percentage || formatPercentage(position.entry_price, position.current_price)}
+                  isAnimating={animatingPrices[positionId] || false}
                 />
               </div>
             </div>
@@ -372,8 +372,8 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                 <span className="text-[var(--text-secondary)]">
                   {formatPrice(position.entry_price)} →
                   <AnimatedValue
-                    value={displayPrices[position.trade_id]?.current || formatPrice(position.current_price)}
-                    isAnimating={animatingPrices[position.trade_id] || false}
+                    value={displayPrices[positionId]?.current || formatPrice(position.current_price)}
+                    isAnimating={animatingPrices[positionId] || false}
                     className="inline-block ml-1"
                   />
                 </span>
@@ -383,8 +383,8 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                 <span className="text-[var(--text-muted)]">P&L:</span>
                 <span className={`font-medium ${getPnLColor(position.unrealized_pnl)}`}>
                   <AnimatedValue
-                    value={displayPrices[position.trade_id]?.pnl || formatPnL(position.unrealized_pnl)}
-                    isAnimating={animatingPrices[position.trade_id] || false}
+                    value={displayPrices[positionId]?.pnl || formatPnL(position.unrealized_pnl)}
+                    isAnimating={animatingPrices[positionId] || false}
                   />
                 </span>
               </div>
