@@ -295,8 +295,24 @@ class SymphonyLiveTradingService:
         """
         try:
             # Step 1: Get batch_ids for open positions from live_trades
+            # and user_id/symphony_agent_id from configurations
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    # Get config details
+                    cur.execute("""
+                        SELECT user_id, symphony_agent_id
+                        FROM configurations
+                        WHERE config_id = %s
+                    """, (config_id,))
+                    config_result = cur.fetchone()
+
+                    if not config_result:
+                        self._log.error(f"Configuration not found: {config_id}")
+                        return []
+
+                    user_id, symphony_agent_id = config_result
+
+                    # Get open trades
                     cur.execute("""
                         SELECT batch_id, created_at
                         FROM live_trades
@@ -309,17 +325,7 @@ class SymphonyLiveTradingService:
             if not open_trades:
                 return []
 
-            # Step 2: Load config to get user_id and symphony_agent_id
-            from core.services.config_service import config_service
-            config = await config_service.get_config(config_id)
-            if not config:
-                self._log.error(f"Configuration not found: {config_id}")
-                return []
-
-            user_id = config.user_id
-            symphony_agent_id = config.symphony_agent_id
-
-            # Step 3: Get Symphony credentials
+            # Step 2: Get Symphony credentials
             credentials = await VaultManager.get_symphony_credential(user_id)
             if not credentials:
                 self._log.error(f"No Symphony credentials for user {user_id}")
@@ -327,7 +333,7 @@ class SymphonyLiveTradingService:
 
             api_key = credentials['api_key']
 
-            # Step 4: Query Symphony for all positions
+            # Step 3: Query Symphony for all positions
             symphony_positions = await self._get_symphony_positions(
                 api_key=api_key,
                 agent_id=symphony_agent_id
@@ -336,7 +342,7 @@ class SymphonyLiveTradingService:
             if not symphony_positions:
                 return []
 
-            # Step 5: Map Symphony positions to our format
+            # Step 4: Map Symphony positions to our format
             # Symphony returns: {asset, isLong, entryPrice, currentPrice, pnlUSD, ...}
             # We need: {symbol, side, entry_price, current_price, unrealized_pnl, ...}
             positions = []

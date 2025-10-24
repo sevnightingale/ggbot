@@ -91,7 +91,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     ),
     open_positions AS (
         -- Paper trading positions
-        SELECT pt.config_id, pt.trade_id AS position_id, pt.symbol, pt.side, pt.size_usd,
+        SELECT pt.config_id, pt.trade_id::text AS position_id, pt.symbol, pt.side, pt.size_usd,
                pt.entry_price, pt.current_price, pt.unrealized_pnl, pt.opened_at,
                pt.stop_loss, pt.take_profit, pt.leverage, 'paper' AS source
         FROM paper_trades pt
@@ -101,7 +101,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         UNION ALL
 
         -- Live trading positions (batch_ids only - details fetched from Symphony)
-        SELECT lt.config_id, lt.batch_id AS position_id, NULL AS symbol, NULL AS side, NULL AS size_usd,
+        SELECT lt.config_id, lt.batch_id::text AS position_id, NULL AS symbol, NULL AS side, NULL AS size_usd,
                NULL AS entry_price, NULL AS current_price, NULL AS unrealized_pnl, lt.created_at AS opened_at,
                NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'live' AS source
         FROM live_trades lt
