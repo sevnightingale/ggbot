@@ -26,7 +26,7 @@ interface Trade {
 interface Account {
   config_id: string
   account_id: string
-  current_balance: number
+  current_balance: number | null
   total_pnl: number
   total_trades: number
   win_trades: number
@@ -35,7 +35,7 @@ interface Account {
   updated_at: string
   unrealized_pnl?: number
   current_pnl?: number
-  portfolio_return_pct?: number
+  portfolio_return_pct?: number | null
   total_balance?: number
   win_rate?: number
   avg_win?: number
@@ -43,6 +43,7 @@ interface Account {
   largest_win?: number
   largest_loss?: number
   sharpe_ratio?: number
+  source?: 'paper' | 'live'
 }
 
 interface EquityPoint {
@@ -79,7 +80,11 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
         setTrades(historyData.trades)
 
         // Calculate equity curve
-        const { curve, markers } = calculateEquityCurve(historyData.trades, account?.current_balance || 10000)
+        // For live trading: Build cumulative P&L from $0 (no balance tracking)
+        // For paper trading: Calculate from current balance
+        const isLive = account?.source === 'live'
+        const balance = isLive ? null : (account?.current_balance ?? 10000)
+        const { curve, markers } = calculateEquityCurve(historyData.trades, balance, isLive)
         setEquityCurve(curve)
         setTradeMarkers(markers)
       } catch (error) {
@@ -94,7 +99,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
   }, [configId])  // Only reload when config changes, not on every SSE account update (prevents jitter)
 
   // Calculate equity curve from trades
-  const calculateEquityCurve = (trades: Trade[], currentBalance: number) => {
+  const calculateEquityCurve = (trades: Trade[], currentBalance: number | null, isLive: boolean = false) => {
     if (trades.length === 0) {
       return { curve: [], markers: [] }
     }
@@ -106,9 +111,16 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
       return timeA - timeB
     })
 
-    // Calculate starting balance by working backwards from current balance
-    const totalPnL = sortedTrades.reduce((sum, trade) => sum + trade.realized_pnl, 0)
-    const startingBalance = currentBalance - totalPnL
+    // Calculate starting balance
+    let startingBalance: number
+    if (isLive || currentBalance === null) {
+      // Live trading: Start from $0 and show cumulative P&L
+      startingBalance = 0
+    } else {
+      // Paper trading: Work backwards from current balance
+      const totalPnL = sortedTrades.reduce((sum, trade) => sum + trade.realized_pnl, 0)
+      startingBalance = currentBalance - totalPnL
+    }
 
     const curve: EquityPoint[] = []
     const markers: TradeMarker[] = []
@@ -159,6 +171,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
 
   // Empty state
   if (!loading && trades.length === 0) {
+    const isLive = account?.source === 'live'
     return (
       <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Performance Chart</h3>
@@ -166,15 +179,16 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
           <div className="text-center py-16">
             <div className="text-[var(--text-muted)] mb-2">📊 No trading history yet</div>
             <div className="text-sm text-[var(--text-muted)]">
-              Your equity curve will appear here after your first trade
+              Your {isLive ? 'cumulative P&L' : 'equity curve'} will appear here after your first trade
             </div>
           </div>
         </div>
         <MetricsStrip
-          currentBalance={account?.current_balance || 10000}
-          portfolioReturnPct={0}
+          currentBalance={isLive ? null : (account?.current_balance ?? 10000)}
+          portfolioReturnPct={isLive ? null : (account?.portfolio_return_pct ?? 0)}
           totalTrades={0}
           winRate={0}
+          isLive={isLive}
         />
       </div>
     )
@@ -192,16 +206,17 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
     )
   }
 
-  const currentBalance = account?.current_balance || 10000
-  const portfolioReturnPct = account?.portfolio_return_pct || 0
-  const totalTrades = account?.total_trades || 0
-  const winRate = account?.win_rate || 0
-  const startingBalance = equityCurve[0]?.balance || 10000
+  const isLive = account?.source === 'live'
+  const currentBalance = isLive ? null : (account?.current_balance ?? 10000)
+  const portfolioReturnPct = isLive ? null : (account?.portfolio_return_pct ?? 0)
+  const totalTrades = account?.total_trades ?? 0
+  const winRate = account?.win_rate ?? 0
+  const startingBalance = equityCurve[0]?.balance ?? (isLive ? 0 : 10000)
 
   return (
     <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 relative ${className}`}>
       <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-        Performance Chart
+        {isLive ? 'Cumulative P&L' : 'Performance Chart'}
         <span className="text-xs text-[var(--text-muted)] ml-2 font-normal">(Last {trades.length} Trades)</span>
       </h3>
 
@@ -238,7 +253,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
               data={equityCurve}
               type="monotone"
               dataKey="balance"
-              stroke={portfolioReturnPct >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}
+              stroke={(portfolioReturnPct ?? 0) >= 0 ? 'var(--profit-color)' : 'var(--loss-color)'}
               strokeWidth={2}
               dot={false}
               isAnimationActive={true}
@@ -274,6 +289,7 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
         portfolioReturnPct={portfolioReturnPct}
         totalTrades={totalTrades}
         winRate={winRate}
+        isLive={isLive}
       />
 
       {/* Trade Detail Popover */}
@@ -286,20 +302,27 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
 
 // Metrics Strip Component
 interface MetricsStripProps {
-  currentBalance: number
-  portfolioReturnPct: number
+  currentBalance: number | null
+  portfolioReturnPct: number | null
   totalTrades: number
   winRate: number
+  isLive?: boolean
 }
 
-function MetricsStrip({ currentBalance, portfolioReturnPct, totalTrades, winRate }: MetricsStripProps) {
+function MetricsStrip({ currentBalance, portfolioReturnPct, totalTrades, winRate, isLive = false }: MetricsStripProps) {
   return (
     <div className="mt-4 flex items-center justify-around border-t border-[var(--border)] pt-4">
-      {/* Balance */}
+      {/* Balance or P&L */}
       <div className="text-center">
-        <div className="text-xs text-[var(--text-muted)] mb-1">Balance</div>
+        <div className="text-xs text-[var(--text-muted)] mb-1">
+          {isLive ? 'Balance' : 'Balance'}
+        </div>
         <div className="text-sm font-semibold text-[var(--text-primary)]">
-          ${currentBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+          {currentBalance === null ? (
+            <span className="text-[var(--text-muted)]">Track on Symphony</span>
+          ) : (
+            `$${currentBalance.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
+          )}
         </div>
       </div>
 
@@ -310,10 +333,17 @@ function MetricsStrip({ currentBalance, portfolioReturnPct, totalTrades, winRate
       <div className="text-center">
         <div className="text-xs text-[var(--text-muted)] mb-1">Return</div>
         <div className={`text-sm font-semibold flex items-center gap-1 justify-center ${
+          portfolioReturnPct === null ? 'text-[var(--text-muted)]' :
           portfolioReturnPct >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
         }`}>
-          {portfolioReturnPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-          {portfolioReturnPct >= 0 ? '+' : ''}{portfolioReturnPct.toFixed(2)}%
+          {portfolioReturnPct === null ? (
+            'N/A'
+          ) : (
+            <>
+              {portfolioReturnPct >= 0 ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+              {portfolioReturnPct >= 0 ? '+' : ''}{portfolioReturnPct.toFixed(2)}%
+            </>
+          )}
         </div>
       </div>
 
