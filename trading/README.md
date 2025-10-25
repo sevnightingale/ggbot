@@ -1,10 +1,23 @@
-# Paper Trading Engine
+# Trading Engine
 
-**Supabase-Integrated Paper Trading System with Dashboard Integration**
+**Paper & Live Trading with Dashboard Integration**
 
-The paper trading engine provides realistic trading simulation using real-time market data from Hummingbot API while implementing our own execution and portfolio management logic via Supabase. Each strategy (config_id) gets an isolated $10,000 paper trading account with professional-grade risk management and real-time dashboard integration.
+The ggbots trading engine supports both paper trading (simulation) and live trading (real money) modes:
+
+- **Paper Trading**: Realistic simulation using real-time market data with $10,000 isolated accounts and automated risk management
+- **Live Trading**: Production trading via Symphony.io API integration with real-money execution
+
+Both modes share the same decision engine, configuration system, and dashboard interface for seamless switching between simulation and live trading.
 
 ## Recent Updates (October 2025)
+
+**Live Trading Launch (October 2025):**
+1. **Symphony.io Integration**: Production-ready live trading with encrypted credential storage
+2. **Unified Dashboard**: SSE stream enriched with Symphony data (positions, metrics, trade history)
+3. **Smart Routing**: Automatic paper vs live mode routing based on `trading_mode` configuration
+4. **Default SL/TP**: Config-based stop loss and take profit applied if decision doesn't provide them
+5. **Position Management**: Real-time position tracking with accurate size, age, and SL/TP display
+6. **Close Positions**: Manual position closing from dashboard for both paper and live modes
 
 **Major architectural update**: The paper trading system has been migrated from direct PostgreSQL to Supabase integration with full dashboard connectivity and real-time data display.
 
@@ -28,6 +41,7 @@ The paper trading engine provides realistic trading simulation using real-time m
 
 ## Architecture Overview
 
+### Paper Trading Flow
 ```
 Decision Module → Supabase Paper Trading Service → Hummingbot Market Data → Supabase DB
                           ↓                              ↓                     ↓
@@ -37,6 +51,246 @@ Decision Module → Supabase Paper Trading Service → Hummingbot Market Data �
                           ↓                              ↓                     ↓
               Dashboard API Endpoints ← REST API ← Background Monitor → Real-time UI
 ```
+
+### Live Trading Flow
+```
+Decision Module → Symphony Trading Service → Symphony.io API → live_trades DB
+                          ↓                          ↓                  ↓
+                  Apply Config Defaults      Real Execution      Batch ID Tracking
+                          ↓                          ↓                  ↓
+                  Weight + Leverage          Position Open       Decision Linkage
+                          ↓                          ↓                  ↓
+              Dashboard SSE Stream ← Enrich with Symphony Data → Real-time UI
+```
+
+---
+
+## Live Trading with Symphony.io
+
+**Production-ready live trading** via Symphony.io API integration. Symphony is a non-custodial trading platform that executes trades on behalf of users using smart contracts.
+
+### Key Features
+
+- **Non-Custodial**: Users maintain control of funds via Symphony smart accounts
+- **Real-Money Execution**: Trades execute on actual exchanges (Binance, OKX, etc.)
+- **Encrypted Storage**: API credentials stored in Supabase Vault
+- **Smart Routing**: Bot config `trading_mode: 'live'` automatically routes to Symphony
+- **Unified Interface**: Same dashboard, same decision engine as paper trading
+- **Position Tracking**: Real-time position data fetched from Symphony API
+- **Default Risk Management**: SL/TP from config applied if decision doesn't provide them
+
+### Symphony Integration Architecture
+
+**Service Layer** (`trading/live/symphony_service.py`):
+```python
+from trading.live.symphony_service import SymphonyLiveTradingService
+
+# Initialize service
+symphony = SymphonyLiveTradingService()
+
+# Execute trade intent (same format as paper trading)
+result = await symphony.execute_trade_intent({
+    "config_id": "uuid",
+    "user_id": "uuid",
+    "symbol": "BTC/USDT",
+    "action": "long",
+    "confidence": 0.75,
+    "stop_loss_price": 108000,  # Optional - config defaults applied if not provided
+    "take_profit_price": 115000
+})
+# Returns: {"status": "success", "batch_id": "symphony-batch-uuid"}
+```
+
+**What Gets Applied from Config:**
+1. **Position Sizing**: `config.trading.position_sizing` (ACCOUNT_PERCENTAGE or CONFIDENCE_BASED)
+2. **Leverage**: `config.trading.leverage` (min 1.1x for Symphony)
+3. **Default SL**: `config.trading.risk_management.default_stop_loss_percent` (if not in decision)
+4. **Default TP**: `config.trading.risk_management.default_take_profit_percent` (if not in decision)
+
+**Execution Flow:**
+1. Decision Module generates intent with confidence score
+2. Symphony service fetches market price for SL/TP calculations
+3. Config defaults applied if decision doesn't provide SL/TP
+4. Weight calculated from confidence + config sizing strategy
+5. Symphony API called with: symbol, action (LONG/SHORT), weight %, leverage, SL, TP
+6. Trade settles (3-second wait) then batch_id saved to `live_trades` table
+7. SSE dashboard stream enriches with Symphony position data
+
+### Database Schema
+
+**live_trades Table** (Lightweight Audit Trail):
+```sql
+CREATE TABLE live_trades (
+    batch_id VARCHAR PRIMARY KEY,          -- Symphony's batch ID
+    config_id UUID NOT NULL,               -- Which bot executed this
+    decision_id UUID,                      -- Links to decisions table
+    created_at TIMESTAMP NOT NULL,         -- When we opened it
+    closed_at TIMESTAMP                    -- When we closed it (NULL if open)
+);
+```
+
+**Design Philosophy**: Store only the linkage between our system and Symphony. Symphony is the source of truth for all position details (price, size, P&L, SL/TP, etc.). We query Symphony API in real-time for display.
+
+### API Endpoints
+
+**Trading Execution**:
+- `POST /api/v2/bot/{config_id}/execute` - Execute trade (routes to Symphony if `trading_mode='live'`)
+
+**Position Management**:
+- `GET /api/v2/positions/live/{config_id}` - Get open positions from Symphony
+- `POST /api/v2/positions/live/{batch_id}/close` - Close position via Symphony API
+
+**Metrics & Analytics**:
+- `GET /api/v2/account/live/{config_id}` - Account metrics from Symphony batches
+- `GET /api/v2/trades/live/{config_id}` - Closed trade history from Symphony
+
+**Dashboard Integration**:
+- `GET /api/dashboard-stream` - SSE stream enriched with Symphony data for live bots
+
+### Symphony Data Enrichment
+
+The SSE dashboard stream automatically enriches live bot data:
+
+**For Live Positions** (`core/sse/dashboard_data.py`):
+```python
+# Database returns placeholder with batch_id
+# Symphony API queried for full position details:
+{
+    "position_id": "batch-uuid",
+    "symbol": "BTC-USDT",
+    "side": "short",
+    "size_usd": 10.43,              # From Symphony positionSize
+    "entry_price": 111480.45,       # From Symphony entryPrice
+    "current_price": 111565.50,     # From Symphony currentPrice
+    "unrealized_pnl": -0.008,       # From Symphony pnlUSD
+    "opened_at": "2025-10-25T10:30:58.809Z",  # Symphony createdTimestamp
+    "stop_loss": 115000.00,         # From Symphony slPrice (if set)
+    "take_profit": 108000.00,       # From Symphony tpPrice (if set)
+    "leverage": 1.1,                # From Symphony leverage
+    "source": "live"                # Tags for frontend routing
+}
+```
+
+**For Account Metrics**:
+- Queries `/agent/positions` for open positions count
+- Queries `/agent/batches` for closed trade history
+- Calculates win/loss, total P&L from batch results
+- **Note**: Balance not available (users track on Symphony dashboard)
+
+### Symbol Compatibility
+
+**100 of 141 symbols** compatible with Symphony:
+- **Compatible**: BTC, ETH, SOL, LINK, DOGE, AVAX, UNI, etc. (major pairs)
+- **Not Compatible**: Some smaller altcoins
+- Symphony compatibility checked before trade execution
+- See `core/symbols/registry.py` for full compatibility mapping
+
+### Configuration Setup
+
+**1. Bot Configuration** (`configurations` table):
+```json
+{
+    "trading_mode": "live",                    // Routes to Symphony
+    "symphony_agent_id": "symphony-uuid",      // User's Symphony agent
+    "trading": {
+        "leverage": 1.5,
+        "position_sizing": {
+            "method": "CONFIDENCE_BASED",
+            "max_position_percent": 10.0
+        },
+        "risk_management": {
+            "default_stop_loss_percent": 2.0,   // Applied if decision doesn't provide
+            "default_take_profit_percent": 5.0
+        }
+    }
+}
+```
+
+**2. User Credentials** (Supabase Vault):
+```python
+# Stored encrypted in vault.secrets table
+{
+    "user_id": "uuid",
+    "api_key": "sk_live_...",           // Symphony API key
+    "smart_account": "0x..."            // Symphony smart account address
+}
+```
+
+### Frontend Integration
+
+**Smart Routing** (`PerformanceChart.tsx`, `PositionsTable.tsx`):
+```typescript
+// Detects live vs paper mode from account.source
+const isLive = account?.source === 'live'
+
+// Routes to correct endpoint
+if (isLive) {
+    const trades = await apiClient.getLiveTradeHistory(configId)
+} else {
+    const trades = await apiClient.getTradeHistoryWithDecisions(configId)
+}
+
+// Close position routing
+const handleClose = async (positionId: string, source: 'paper' | 'live') => {
+    if (source === 'live') {
+        await fetch(`/api/v2/positions/live/${positionId}/close`, { method: 'POST' })
+    } else {
+        await apiClient.closePosition(configId, positionId)
+    }
+}
+```
+
+**Display Differences**:
+- **Balance**: Shows "Track on Symphony" (not available from API)
+- **Return %**: Shows "N/A" (can't calculate without balance)
+- **Chart Title**: "Cumulative P&L" (instead of "Performance Chart")
+- **Chart Y-axis**: Starts from $0, shows cumulative P&L from trades
+
+### Testing & Validation
+
+**Test Symphony Integration**:
+```bash
+# Test Symphony credentials
+python scripts/test_symphony_metrics.py --user-id <uuid> --config-id <uuid>
+
+# Expected output:
+# ✅ Retrieved 0 open positions from Symphony
+# ✅ Retrieved 5 batches from Symphony
+# ✅ Symphony metrics: 1 trades, 0.0% win rate, $-0.00 P&L
+```
+
+**Test Live Trading Flow**:
+```bash
+# 1. Ensure bot is configured with trading_mode='live' and symphony_agent_id
+# 2. Run bot's decision cycle
+# 3. Decision generates intent → Symphony service executes
+# 4. Check live_trades table for batch_id
+# 5. Dashboard should show position in real-time
+```
+
+### Production Considerations
+
+**Credential Security**:
+- ✅ Encrypted storage via Supabase Vault
+- ✅ Never logged or exposed in API responses
+- ✅ User-specific isolation (users can only access their own credentials)
+
+**Error Handling**:
+- Symphony API failures return graceful errors to decision engine
+- Failed trades don't break bot execution
+- Dashboard SSE continues working if Symphony temporarily unavailable
+
+**Rate Limits**:
+- Symphony position queries cached in SSE (5-second intervals)
+- Trade execution has 3-second settlement wait
+- No aggressive polling - data fetched only when needed
+
+**Cost Considerations**:
+- Symphony charges transaction fees on live trades
+- Users responsible for maintaining Symphony account balance
+- No additional ggbots fees for live trading feature
+
+---
 
 ## Core Components
 
