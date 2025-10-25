@@ -405,24 +405,28 @@ class SymphonyLiveTradingService:
 
             api_key = credentials['api_key']
 
-            # Query all batches
+            # Get actual open positions count from /agent/positions
+            current_positions = await self._get_symphony_positions(api_key, symphony_agent_id)
+            open_positions_count = len(current_positions)
+
+            # Query all batches for closed trade history
             batches = await self._get_symphony_batches(api_key, symphony_agent_id)
 
-            # Get closed batches and their positions
+            # Get closed positions from batches
             closed_positions = []
-            open_positions_count = 0
 
             for batch in batches:
+                # Only process CLOSED batches for trade history
+                if batch['status'] != 'CLOSED':
+                    continue
+
                 batch_data = await self._get_batch_positions(api_key, batch['batchId'])
                 positions = batch_data.get('positions', [])
 
                 for pos in positions:
                     # Filter out failed trades (entryPrice = 0)
                     if pos.get('entryPrice', 0) > 0:
-                        if batch['status'] == 'CLOSED':
-                            closed_positions.append(pos)
-                        elif batch['status'] == 'OPEN':
-                            open_positions_count += 1
+                        closed_positions.append(pos)
 
             # Calculate metrics
             total_trades = len(closed_positions)
@@ -435,24 +439,20 @@ class SymphonyLiveTradingService:
             loss_count = len(losses)
             win_rate = (win_count / total_trades * 100) if total_trades > 0 else 0
 
-            # Calculate current balance (need to get initial capital somehow)
-            # For now, calculate from total P&L assuming $10k start
-            initial_balance = 10000.0
-            current_balance = initial_balance + total_pnl
-            portfolio_return_pct = (total_pnl / initial_balance * 100) if initial_balance > 0 else 0
-
+            # Symphony API does not provide account balance
+            # Users must track balance on Symphony dashboard
             self._log.info(f"Symphony metrics: {total_trades} trades, {win_rate:.1f}% win rate, ${total_pnl:.2f} P&L")
 
             return {
                 'config_id': config_id,
-                'current_balance': current_balance,
+                'current_balance': None,  # Not available from Symphony
                 'total_pnl': total_pnl,
                 'total_trades': total_trades,
                 'win_trades': win_count,
                 'loss_trades': loss_count,
                 'win_rate': win_rate,
                 'open_positions': open_positions_count,
-                'portfolio_return_pct': portfolio_return_pct,
+                'portfolio_return_pct': None,  # Can't calculate without balance
                 'updated_at': datetime.now().isoformat()
             }
 
@@ -734,9 +734,16 @@ class SymphonyLiveTradingService:
                 async with session.get(url, params=params, headers=headers, timeout=self.timeout) as response:
                     if response.status == 200:
                         data = await response.json()
-                        positions = data.get('positions', [])
-                        self._log.info(f"Retrieved {len(positions)} open positions from Symphony")
-                        return positions
+                        all_positions = data.get('positions', [])
+
+                        # Filter to only truly open positions (exclude "Closed" status)
+                        open_positions = [
+                            p for p in all_positions
+                            if p.get('status', '').lower() != 'closed' and p.get('entryPrice', 0) > 0
+                        ]
+
+                        self._log.info(f"Retrieved {len(open_positions)} open positions from Symphony ({len(all_positions)} total including closed)")
+                        return open_positions
                     else:
                         error_text = await response.text()
                         self._log.error(f"Symphony positions error {response.status}: {error_text}")
