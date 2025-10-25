@@ -76,15 +76,35 @@ export function PerformanceChart({ account, configId, className = '' }: Performa
     const loadData = async () => {
       setLoading(true)
       try {
-        const historyData = await apiClient.getTradeHistoryWithDecisions(configId, 50)
-        setTrades(historyData.trades)
+        const isLive = account?.source === 'live'
+
+        // Load trade history from appropriate endpoint
+        let trades: Trade[]
+        if (isLive) {
+          // Live trading: Get trades from Symphony via /api/v2/trades/live/{config_id}
+          const liveData = await apiClient.getLiveTradeHistory(configId, 50)
+          // Map live trades to Trade interface (no decision data from Symphony)
+          trades = liveData.trades.map(t => ({
+            ...t,
+            confidence_score: null,
+            decision_id: null,
+            action: null,
+            decision_confidence: null,
+            reasoning: null
+          }))
+        } else {
+          // Paper trading: Get trades with decisions from paper endpoint
+          const historyData = await apiClient.getTradeHistoryWithDecisions(configId, 50)
+          trades = historyData.trades
+        }
+
+        setTrades(trades)
 
         // Calculate equity curve
         // For live trading: Build cumulative P&L from $0 (no balance tracking)
         // For paper trading: Calculate from current balance
-        const isLive = account?.source === 'live'
         const balance = isLive ? null : (account?.current_balance ?? 10000)
-        const { curve, markers } = calculateEquityCurve(historyData.trades, balance, isLive)
+        const { curve, markers } = calculateEquityCurve(trades, balance, isLive)
         setEquityCurve(curve)
         setTradeMarkers(markers)
       } catch (error) {

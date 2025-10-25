@@ -613,6 +613,34 @@ export class ApiClient {
     return await response.json()
   }
 
+  // Live Trade History (from Symphony)
+  async getLiveTradeHistory(configId: string, limit: number = 50): Promise<{
+    trades: Array<{
+      trade_id: string
+      symbol: string
+      side: string
+      entry_price: number
+      size_usd: number
+      leverage: number
+      realized_pnl: number
+      close_reason: string
+      opened_at: string | null
+      closed_at: string | null
+    }>
+    count: number
+  }> {
+    const response = await this.authenticatedFetch(
+      `${this.baseUrl}/api/v2/trades/live/${configId}?limit=${limit}`
+    )
+
+    if (!response.ok) {
+      const error = await response.text()
+      throw new Error(`Failed to get live trade history: ${error}`)
+    }
+
+    return await response.json()
+  }
+
   // Confidence Analysis
   async getConfidenceAnalysis(configId: string): Promise<{
     status: string
