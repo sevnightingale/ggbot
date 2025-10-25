@@ -147,6 +147,30 @@ class SymphonyLiveTradingService:
             # Ensure min leverage for Symphony (1.1x minimum)
             leverage = max(leverage, 1.1)
 
+            # Step 6.5: Get market price and apply default SL/TP from config
+            try:
+                from trading.paper.live_price_service import LivePriceService
+                price_service = LivePriceService()
+                market_price = await price_service.get_current_price(symbol)
+                entry_price = market_price.mid
+
+                # Apply default SL/TP if not provided in decision
+                if not stop_loss and config.trading.risk_management.default_stop_loss_percent:
+                    default_sl = config.get_default_stop_loss_price(entry_price, action)
+                    if default_sl:
+                        stop_loss = default_sl
+                        self._log.info(f"Applied default stop loss: ${stop_loss:.2f}")
+
+                if not take_profit and config.trading.risk_management.default_take_profit_percent:
+                    default_tp = config.get_default_take_profit_price(entry_price, action)
+                    if default_tp:
+                        take_profit = default_tp
+                        self._log.info(f"Applied default take profit: ${take_profit:.2f}")
+
+            except Exception as e:
+                self._log.warning(f"Failed to apply default SL/TP: {e}")
+                # Continue without defaults if price fetch fails
+
             # Step 7: Call Symphony API to open position
             batch_id = await self._open_symphony_position(
                 api_key=api_key,
