@@ -357,9 +357,11 @@ class SymphonyLiveTradingService:
                         'entry_price': symphony_pos.get('entryPrice', 0),
                         'current_price': symphony_pos.get('currentPrice', 0),
                         'unrealized_pnl': symphony_pos.get('pnlUSD', 0),
-                        'opened_at': created_at,
-                        'size_usd': symphony_pos.get('sizeUSD', 0),
-                        'leverage': symphony_pos.get('leverage', 1)
+                        'opened_at': symphony_pos.get('createdTimestamp'),  # Use Symphony's timestamp, not our DB
+                        'size_usd': symphony_pos.get('positionSize', 0),  # Symphony uses positionSize not sizeUSD
+                        'leverage': symphony_pos.get('leverage', 1),
+                        'stop_loss': symphony_pos.get('slPrice', 0) if symphony_pos.get('slPrice', 0) > 0 else None,
+                        'take_profit': symphony_pos.get('tpPrice', 0) if symphony_pos.get('tpPrice', 0) > 0 else None
                     })
 
             return positions
