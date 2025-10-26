@@ -6,6 +6,44 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
+## 2025-10-25 - Symphony Live Trading Bug Fixes & Polish
+
+**Critical Bug Fixes**:
+- **SQL Type Mismatch**: Cast `trade_id::text` and `batch_id::text` for UNION compatibility (fixed "cannot match uuid and varchar" error)
+- **ConfigService Error**: Replace ConfigService call with direct DB query in `get_open_positions()` (fixed missing user_id parameter)
+- **Position Size $0**: Changed `sizeUSD` to `positionSize` field (Symphony API actual field name)
+- **Trade Age Wrong**: Use Symphony's `createdTimestamp` instead of DB `created_at` (accurate position age)
+- **Missing SL/TP**: Map Symphony's `slPrice` and `tpPrice` fields (now displays configured levels)
+
+**Frontend Fixes**:
+- **PerformanceChart for Live**: Balance shows "Track on Symphony", Return shows "N/A", chart titled "Cumulative P&L"
+- **Trade History Routing**: Frontend now calls `/api/v2/trades/live/{config_id}` for live bots instead of paper endpoint
+- **Type Safety**: Updated Account interface with nullable `current_balance` and `portfolio_return_pct`, added `source` field
+- **Mobile Display**: Fixed TypeScript error using `positionId` instead of undefined `trade_id` in mobile cards
+
+**New Features**:
+- **Default SL/TP for Live**: Config `default_stop_loss_percent` and `default_take_profit_percent` now applied to live trades if decision doesn't provide them
+- **Market Price Fetch**: Live trading now fetches market price before execution to calculate default SL/TP levels
+- **Graceful Fallback**: If price fetch fails, continues without defaults (logs warning)
+
+**Documentation**:
+- **Trading README**: Comprehensive update with Symphony integration architecture, API endpoints, configuration, frontend routing, testing procedures
+- **Added Live Trading Section**: ~250 lines covering service layer, database schema, SSE enrichment, symbol compatibility, production considerations
+
+**Files Modified**:
+- Backend: `trading/live/symphony_service.py`, `core/sse/dashboard_data.py`
+- Frontend: `app/forge/components/monitor/PerformanceChart.tsx`, `lib/api.ts`
+- Docs: `trading/README.md`
+
+**Production Impact**:
+- ✅ Position display accurate (correct size, age, SL/TP)
+- ✅ No phantom open positions (closed positions filtered)
+- ✅ Trade history visible on dashboard
+- ✅ Cumulative P&L chart working for live bots
+- ✅ Risk management via config defaults
+
+---
+
 ## 2025-10-24 - Symphony Dashboard Integration & SSE Enrichment
 
 **Live Trading Dashboard Integration** (Production):

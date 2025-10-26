@@ -114,6 +114,7 @@
 - **100 compatible symbols** out of 141 total supported trading pairs
 - **Encrypted credential storage** using Supabase Vault
 - **Smart routing** - paper vs live mode per bot configuration
+- **Default risk management** - SL/TP from config applied if decision doesn't provide them
 - **Idempotency protection** - prevents duplicate trades on retry
 - **Position management** - open, close, and query live positions
 - **Dashboard integration** - SSE stream enriches live data from Symphony API
