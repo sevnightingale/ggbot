@@ -231,12 +231,14 @@ class SymphonyLiveTradingService:
         try:
             self._log.info(f"Closing Symphony position: batch_id={batch_id}, reason={reason}")
 
-            # Step 1: Get config_id and user_id from live_trades
+            # Step 1: Get config_id, user_id, and symphony_agent_id from database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_id FROM live_trades
-                        WHERE batch_id = %s AND closed_at IS NULL
+                        SELECT lt.config_id, c.user_id, c.symphony_agent_id
+                        FROM live_trades lt
+                        JOIN configurations c ON lt.config_id = c.config_id
+                        WHERE lt.batch_id = %s AND lt.closed_at IS NULL
                     """, (batch_id,))
                     result = cur.fetchone()
 
@@ -246,19 +248,14 @@ class SymphonyLiveTradingService:
                             "reason": f"Position not found or already closed: {batch_id}"
                         }
 
-                    config_id = result[0]
+                    config_id, user_id, symphony_agent_id = result
 
-            # Step 2: Load config to get user_id and symphony_agent_id
-            from core.services.config_service import config_service
-            config = await config_service.get_config(config_id)
-            if not config:
+            # Step 2: Validate Symphony agent ID exists
+            if not symphony_agent_id:
                 return {
                     "status": "failed",
-                    "reason": f"Configuration not found: {config_id}"
+                    "reason": f"No Symphony agent ID found for config {config_id}"
                 }
-
-            user_id = config.user_id
-            symphony_agent_id = config.symphony_agent_id
 
             # Step 3: Get Symphony credentials
             credentials = await VaultManager.get_symphony_credential(user_id)

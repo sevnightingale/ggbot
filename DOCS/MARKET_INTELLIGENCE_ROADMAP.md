@@ -8,12 +8,27 @@
 
 ## Executive Summary
 
-**Current Coverage**: 7/156 data points (~4.5%)
-- ✅ OHLCV multi-timeframe
-- ✅ Technical indicators (RSI, MACD, Bollinger, 20+ via pandas-ta)
-- ✅ Market structure (support/resistance, trend detection)
-- ✅ Volume analysis
-- ✅ Momentum oscillators
+**Current System Status**:
+- ✅ **Database Infrastructure**: `data_sources` and `data_points` tables deployed and operational
+- ✅ **UI Complete**: MarketDataSelector component with tabs, search, premium gates
+- ✅ **Backend API**: `/api/v2/data-sources-with-points` serving from database
+- ✅ **Domain Models**: DataSource, DataPoint, DataSourceWithPoints classes
+- ✅ **Config Storage**: `config_data` JSONB in configurations table stores user selections
+- ✅ **Universal Data Layer**: Gateway, adapters, catalog system ready for extension
+
+**Current Data Coverage**: 22/156 data points (14%)
+
+**Populated Data Sources**:
+1. ✅ **Technical Analysis** (21 data points) - RSI, MACD, Bollinger, ADX, Stochastic, Williams %R, CCI, MFI, ROC, Aroon, Vortex, TRIX, Parabolic SAR, EMA, SMA, Keltner Channels, Donchian, ATR, BB Width, OBV, VWAP
+2. ✅ **Signals in Group Chats** (1 data point) - ggShot premium signals
+3. ⏳ **Fundamental Analysis** - Coming soon (tab exists, no data points)
+4. ⏳ **Sentiment & Trends** - Coming soon (tab exists, no data points)
+5. ⏳ **News & Regulations** - Coming soon (tab exists, no data points)
+6. ⏳ **On-Chain Analytics** - Coming soon (tab exists, no data points)
+
+**Core Platform Data** (separate from data_sources system):
+- ✅ OHLCV multi-timeframe (WebSocket + Binance REST)
+- ✅ Market structure analysis (7 timeframes: 5m, 15m, 30m, 1h, 4h, 1d, 1w)
 
 **Critical Gaps**: 5 categories blocking major trading edge
 1. **Crypto On-Chain Intelligence** (8 data points) - Whale behavior, exchange flows, funding rates
@@ -24,22 +39,154 @@
 
 ---
 
+## Data Acquisition Strategy
+
+We will use **three methods** to acquire market intelligence data, chosen based on cost, ease of implementation, and data availability:
+
+### **Method 1: Direct API Integration** (Preferred for free/easy sources)
+
+**When to use**: Free or low-cost APIs with good documentation and no authentication barriers.
+
+**How it works**:
+1. Create adapter in `market_intelligence/adapters/` (e.g., `BinanceFundingAdapter`)
+2. Create catalog YAML in `market_intelligence/catalog/data_types/`
+3. Insert into `data_sources` and `data_points` database tables
+4. Automatically appears in frontend UI
+
+**Examples**:
+- Binance Funding Rates API (free, no auth)
+- FRED Macro Data API (free, simple API key)
+- DefiLlama TVL API (free, no auth)
+- CoinGecko Price API (free tier generous)
+
+**Effort**: Low (30min - 2hrs per source)
+
+---
+
+### **Method 2: Grok Web Search** (For data on the web without APIs)
+
+**When to use**: Data is publicly available on websites but no clean API exists, or APIs are rate-limited/expensive.
+
+**How it works**:
+1. Use Grok API with web search tool enabled
+2. Prompt Grok to search web and extract structured data
+3. Parse Grok's response into standardized format
+4. Cache results in Redis (longer TTL since web scraping is slower)
+
+**Examples**:
+- VIX index current value (if CBOE API blocked)
+- Crypto fear/greed index
+- Whale alert notifications from websites
+- News headlines from aggregator sites
+- Social sentiment scores from public dashboards
+
+**Effort**: Medium (1-3hrs per source, need to test Grok tool use)
+
+**Advantages**:
+- No API keys needed
+- Works for any data visible on public web
+- Grok handles parsing and extraction
+- One adapter works for many sources
+
+**Limitations**:
+- Slower than direct APIs (2-5s per query)
+- Higher cost (Grok API usage)
+- Less reliable (web structure changes)
+
+---
+
+### **Method 3: Browser-Use Automation** (For paywalled/gated sources)
+
+**When to use**: High-value data behind login walls, paywalls, or CAPTCHAs.
+
+**How it works**:
+1. Store credentials in Supabase Vault (encrypted)
+2. Launch headless browser session with Browser-Use
+3. AI navigates to login page, fills credentials
+4. AI navigates to data page, extracts via vision + scraping
+5. Returns structured data
+
+**Examples**:
+- Nansen whale tracking (requires $100/mo subscription)
+- Glassnode premium metrics
+- TradingView premium indicators
+- Discord/Telegram group signals (private channels)
+
+**Effort**: High (4-8hrs per source, credentials management)
+
+**Advantages**:
+- Access to premium data without enterprise APIs
+- One subscription shared across all users
+- AI handles complex navigation
+
+**Limitations**:
+- Slowest method (10-30s per query)
+- Requires credential storage
+- Risk of account bans if detected
+- Most maintenance overhead
+
+---
+
+### **Decision Matrix: Which Method to Use**
+
+| Source | Free? | Has API? | Behind Login? | **Method** | Priority |
+|--------|-------|----------|---------------|------------|----------|
+| Binance Funding Rates | ✅ Yes | ✅ Yes | ❌ No | **Direct API** | Phase 1 |
+| FRED Macro Data | ✅ Yes | ✅ Yes | ❌ No | **Direct API** | Phase 1 |
+| VIX Index | ✅ Yes | ❌ No | ❌ No | **Grok Search** | Phase 1 |
+| CryptoPanic News | ✅ Yes (tier) | ✅ Yes | ❌ No | **Direct API** | Phase 1 |
+| Coinglass Liquidations | ✅ Yes | ⚠️ Unofficial | ❌ No | **Grok Search** | Phase 1 |
+| Nansen Whale Tracking | ❌ No ($100/mo) | ❌ No | ✅ Yes | **Browser-Use** | Phase 2 |
+| Twitter Sentiment | ⚠️ Limited | ✅ Yes | ⚠️ Partial | **Direct API** → Grok | Phase 3 |
+| Reddit Sentiment | ✅ Yes | ✅ Yes | ❌ No | **Direct API** | Phase 3 |
+
+**Phase 1 Strategy**: Use 60% Direct API, 40% Grok Search. Avoid Browser-Use until proven valuable.
+
+---
+
 ## Priority Framework
 
-### Tier 0: What We Have ✅ (7 data points)
+### Tier 0: What We Have ✅ (22 data points)
 
-| Category | Data Points | Status | Source |
-|----------|-------------|--------|--------|
-| Price/Volume/Technicals | OHLCV multi-timeframe | ✅ Implemented | WebSocket + Binance REST |
-| Price/Volume/Technicals | Market Structure (HH/HL/LH/LL) | ✅ Implemented | Derived from OHLCV |
-| Price/Volume/Technicals | Momentum (RSI/MACD/ROC) | ✅ Implemented | pandas-ta library |
-| Price/Volume/Technicals | Volatility (ATR/Bollinger) | ✅ Implemented | pandas-ta library |
-| Price/Volume/Technicals | Volume Profile / VWAP | ✅ Implemented | pandas-ta library |
-| Price/Volume/Technicals | Breadth Divergences (RS vs Index) | ✅ Implemented | Multi-symbol analysis |
-| Technical Indicators | 20+ additional indicators | ✅ Implemented | pandas-ta library |
+**Infrastructure (Complete)**:
+- ✅ `data_sources` table with 6 categories (2 populated, 4 empty)
+- ✅ `data_points` table with 22 indicators
+- ✅ Frontend UI: MarketDataSelector + SignalsConfiguration components
+- ✅ Backend API: `/api/v2/data-sources-with-points`
+- ✅ User config storage: `config_data` JSONB
+- ✅ Universal Data Layer: Gateway + adapter system
 
-**Strength**: Excellent technical foundation
-**Weakness**: Zero context, narrative, or "why" behind moves
+**Data Source 1: Technical Analysis** (21 data points) - ✅ **Fully Populated**
+
+| Category | Indicators | Status |
+|----------|-----------|--------|
+| Momentum (10) | RSI, MACD, Stochastic, Williams %R, CCI, MFI, ROC, Aroon, Vortex, TRIX | ✅ Live |
+| Trend (4) | ADX, Parabolic SAR, EMA, SMA | ✅ Live |
+| Volatility (5) | Bollinger Bands, Keltner Channels, Donchian, ATR, BB Width | ✅ Live |
+| Volume (2) | OBV, VWAP | ✅ Live |
+
+**Data Source 2: Signals in Group Chats** (1 data point) - ✅ **Fully Populated**
+
+| Signal | Status | Premium |
+|--------|--------|---------|
+| ggShot | ✅ Live | 💎 Yes |
+
+**Data Source 3-6: Empty Shells** (0 data points) - ⏳ **Coming Soon**
+
+| Source | Status | UI Tab |
+|--------|--------|---------|
+| Fundamental Analysis | ⏳ Planned | ✅ Exists |
+| Sentiment & Trends on Social Media | ⏳ Planned | ✅ Exists |
+| News & Regulatory Actions | ⏳ Planned | ✅ Exists |
+| On-Chain Analytics | ⏳ Planned | ✅ Exists |
+
+**Core Platform Data** (not in data_sources system):
+- ✅ OHLCV multi-timeframe via Universal Data Layer
+- ✅ WebSocket cache (100 symbols × 7 timeframes)
+- ✅ Binance REST fallback
+
+**Strength**: Excellent technical foundation + infrastructure ready for expansion
+**Weakness**: Zero context, narrative, or "why" behind moves (no sentiment, on-chain, macro, news)
 
 ---
 
@@ -220,25 +367,73 @@
 
 ### 🚀 **Phase 1: Free Quick Wins (Week 1-2)** - $0/month
 
-**7 data points, ~6-8 hours work**
+**7 data points across 3 new data sources, ~8-12 hours work**
 
-1. ✅ **Funding Rates** (Binance/Bybit API) - 30min
-2. ✅ **Liquidation Levels** (Coinglass API) - 1hr
-3. ✅ **VIX** (CBOE public data) - 15min
-4. ✅ **Macro Indicators** (FRED API: CPI, NFP, DXY, Yields) - 2hrs
-5. ✅ **Stablecoin Supply** (DefiLlama API) - 30min
-6. ✅ **TVL & Cross-Chain Flows** (DefiLlama) - 1hr
-7. ✅ **Real-time News Headlines** (CryptoPanic free tier) - 1hr
+**Implementation Steps Per Data Point**:
+1. Create Universal Data Layer adapter (or use GrokSearchAdapter)
+2. Create catalog YAML for data type
+3. Insert row into `data_sources` table (if new category)
+4. Insert row(s) into `data_points` table
+5. Test adapter fetch
+6. **UI automatically updates** (no frontend work needed)
+
+---
+
+**New Data Source: Crypto Derivatives** (2 data points)
+
+| # | Data Point | Method | Effort | Database Work |
+|---|-----------|--------|--------|---------------|
+| 1 | **BTC Funding Rate** | Direct API | 1hr | Insert: 1 source + 1 point |
+| 2 | **ETH Funding Rate** | Direct API | 20min | Insert: 1 point (reuse source) |
+
+**Adapter**: `BinanceFundingAdapter` → `market_intelligence/adapters/crypto_derivatives/binance_funding.py`
+**Catalog**: `market_intelligence/catalog/data_types/derivatives/funding_rate.yaml`
+**API**: `https://fapi.binance.com/fapi/v1/premiumIndex`
+
+---
+
+**New Data Source: Macro Context** (4 data points)
+
+| # | Data Point | Method | Effort | Database Work |
+|---|-----------|--------|--------|---------------|
+| 3 | **VIX Index** | Grok Search | 1hr | Insert: 1 source + 1 point |
+| 4 | **DXY (Dollar Index)** | Direct API (FRED) | 30min | Insert: 1 point |
+| 5 | **CPI (Inflation)** | Direct API (FRED) | 30min | Insert: 1 point |
+| 6 | **NFP (Jobs Report)** | Direct API (FRED) | 30min | Insert: 1 point |
+
+**Adapter Option A**: `FredApiAdapter` for #4-6 (requires free API key)
+**Adapter Option B**: `GrokSearchAdapter` for all 4 (no API keys)
+**Catalog**: `market_intelligence/catalog/data_types/macro/` (4 YAML files)
+
+---
+
+**Expand Existing: On-Chain Analytics** (1 data point)
+
+| # | Data Point | Method | Effort | Database Work |
+|---|-----------|--------|--------|---------------|
+| 7 | **BTC TVL on DeFi** | Direct API | 1hr | Insert: 1 point (source exists) |
+
+**Adapter**: `DefiLlamaAdapter` → `market_intelligence/adapters/onchain/defillama.py`
+**Catalog**: `market_intelligence/catalog/data_types/onchain/tvl.yaml`
+**API**: `https://api.llama.fi/v2/chains`
+
+---
+
+**Total Phase 1 Work**:
+- 3 new adapters (BinanceFunding, Grok/FRED, DefiLlama)
+- 7 catalog YAML files
+- 3 INSERT into data_sources
+- 7 INSERT into data_points
+- **0 frontend changes** (UI auto-populates from database)
 
 **Impact**: Decision agent now has:
 - Leverage positioning context (funding rates)
-- Macro regime awareness (VIX, DXY, Fed policy)
-- Catalyst awareness (news)
-- Capital flow visibility (TVL, stablecoins)
+- Macro regime awareness (VIX, DXY, inflation, jobs)
+- Capital flow visibility (DeFi TVL)
 
 **Cost**: $0
-**Time**: 6-8 hours
-**Trading Edge**: +30-40% (avoids overleveraged setups, catches macro regime shifts, aware of catalysts)
+**Time**: 8-12 hours
+**Trading Edge**: +30-40% (avoids overleveraged setups, catches macro regime shifts)
 
 ---
 
@@ -300,13 +495,15 @@
 
 | Phase | Data Points | Cost | Time | Edge Gain | Cumulative Edge |
 |-------|-------------|------|------|-----------|-----------------|
-| **Current** | 7 | $0 | - | Baseline | 100% |
-| **Phase 1** | +7 (14 total) | $0/mo | 6-8hrs | +30-40% | 130-140% |
-| **Phase 2** | +5 (19 total) | $100-500/mo | 10-12hrs | +20-30% | 156-182% |
-| **Phase 3** | +3 (22 total) | $100-500/mo | 12-16hrs | +15-25% | 179-228% |
-| **Phase 4** | +7 (29 total) | $200-1000/mo | 20-25hrs | +10-20% | 197-274% |
+| **Current** | 22 | $0 | - | Baseline | 100% |
+| **Phase 1** | +7 (29 total) | $0/mo | 8-12hrs | +30-40% | 130-140% |
+| **Phase 2** | +5 (34 total) | $100-500/mo | 10-12hrs | +20-30% | 156-182% |
+| **Phase 3** | +3 (37 total) | $100-500/mo | 12-16hrs | +15-25% | 179-228% |
+| **Phase 4** | +7 (44 total) | $200-1000/mo | 20-25hrs | +10-20% | 197-274% |
 
-**Realistic 6-Month Target**: 29/156 data points (18.6%), 2-3x trading edge improvement
+**Realistic 6-Month Target**: 44/156 data points (28%), 2-3x trading edge improvement
+
+**Key Insight**: We already have infrastructure + 22 data points. Phase 1 adds context (macro, funding, on-chain), not more technicals.
 
 ---
 
@@ -333,33 +530,70 @@
 
 ### **Week 1 Sprint: The "Context Upgrade"**
 
-**Goal**: Give AI decision engine macro + leverage context in 8 hours
+**Goal**: Add 7 contextual data points to AI decision engine in 8-12 hours
 
-**Implementation Order**:
-1. **Funding Rates** - 30 min (Binance API)
-2. **VIX** - 15 min (CBOE data)
-3. **DXY** - 15 min (FRED API)
-4. **CryptoPanic News** - 1 hr (free tier API)
-5. **DefiLlama TVL** - 30 min (API)
-6. **Stablecoin Dominance** - 30 min (CoinGecko API)
-7. **Liquidation Levels** - 1 hr (Coinglass API)
-8. **Macro Indicators** (CPI, NFP, Yields) - 2 hrs (FRED batch)
+**Day 1-2: Setup (2-3 hours)**
+- Test Grok API with web search tool
+- Set up FRED API key (free, 30 seconds)
+- Create GrokSearchAdapter base class
+- Create FredApiAdapter base class
+
+**Day 3-4: Implementation (6-9 hours)**
+
+| Order | Data Point | Adapter | Catalog | Database | Test |
+|-------|-----------|---------|---------|----------|------|
+| 1 | BTC Funding Rate | BinanceFunding | funding_rate.yaml | INSERT 1+1 | 15min |
+| 2 | ETH Funding Rate | (reuse) | (reuse) | INSERT 1 | 10min |
+| 3 | VIX Index | GrokSearch | vix.yaml | INSERT 1+1 | 30min |
+| 4 | DXY Dollar Index | FredApi | dxy.yaml | INSERT 1 | 20min |
+| 5 | CPI Inflation | FredApi | cpi.yaml | INSERT 1 | 20min |
+| 6 | NFP Jobs Report | FredApi | nfp.yaml | INSERT 1 | 20min |
+| 7 | BTC DeFi TVL | DefiLlama | tvl.yaml | INSERT 1+1 | 30min |
+
+**Database Seeding Script**:
+```sql
+-- Create new data sources
+INSERT INTO data_sources (name, display_name, description, requires_premium) VALUES
+('crypto_derivatives', 'Crypto Derivatives', 'Perpetual futures funding rates and leverage metrics', false),
+('macro_context', 'Macro Context', 'Macroeconomic indicators (VIX, DXY, CPI, NFP)', false);
+
+-- Create data points
+INSERT INTO data_points (source_id, name, display_name, description, config_values) VALUES
+((SELECT source_id FROM data_sources WHERE name='crypto_derivatives'),
+ 'btc_funding_rate', 'BTC Funding Rate', 'Binance perpetual funding rate for BTC/USDT',
+ ARRAY['funding_rate_btc']),
+
+((SELECT source_id FROM data_sources WHERE name='crypto_derivatives'),
+ 'eth_funding_rate', 'ETH Funding Rate', 'Binance perpetual funding rate for ETH/USDT',
+ ARRAY['funding_rate_eth']);
+
+-- (repeat for macro indicators and TVL)
+```
 
 **Decision Engine Prompt Enhancement**:
-```
-Current Analysis:
-- Technical: {indicators}
-- Market Structure: {support/resistance}
+```python
+# In decision/prompts/opportunity_analysis.py
 
-NEW Context Layer:
-- Leverage: Funding rate {funding_rate}%, OI {oi_trend}
-- Macro Regime: VIX {vix}, DXY {dxy_trend}, Fed Policy {policy_stance}
-- Catalysts: Recent news: {top_3_headlines}
-- Capital Flows: Stablecoin supply {supply_trend}, TVL {tvl_trend}
-- Microstructure: Liquidations clustered at {liq_levels}
+CONTEXT_SECTION = """
+## Market Context
 
-REASONING: [How does context change the technical setup?]
+### Derivatives Positioning
+- BTC Funding Rate: {btc_funding_rate}% ({funding_interpretation})
+- ETH Funding Rate: {eth_funding_rate}%
+
+### Macro Environment
+- VIX (Fear Index): {vix} ({risk_regime})
+- DXY (Dollar Strength): {dxy} ({crypto_impact})
+- CPI (Inflation): {cpi}%
+- NFP (Jobs): {nfp}
+
+### On-Chain Flows
+- BTC DeFi TVL: ${tvl_btc}B ({flow_trend})
+
+REASONING: How does this context affect the technical setup?
 ```
+
+**Result**: UI automatically shows 3 new data source tabs with 7 toggleable data points. Users configure per bot.
 
 ---
 
@@ -374,6 +608,14 @@ REASONING: [How does context change the technical setup?]
 
 ---
 
-**Last Updated**: 2025-01-25
-**Status**: Draft for review
+**Last Updated**: 2025-01-25 (Revised with actual system state)
+**Status**: Ready for Phase 1 implementation
 **Owner**: Market Intelligence Expansion Project
+
+**Key Changes in This Revision**:
+- ✅ Updated to reflect 22 existing data points (not 7)
+- ✅ Added 3-method acquisition strategy (Direct API, Grok Search, Browser-Use)
+- ✅ Clarified existing infrastructure (database tables, UI, API all operational)
+- ✅ Revised Phase 1 to be database-driven (no frontend work needed)
+- ✅ Updated effort estimates to include database seeding steps
+- ✅ Added decision matrix for choosing acquisition method

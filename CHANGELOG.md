@@ -6,6 +6,51 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
+## 2025-10-26 - ggShot Signals Universal Data Layer Integration
+
+**ggShot Signals for Autonomous Trading** (Market Intelligence Expansion):
+- **Historical Backfill**: 878 signals from last 60 days stored in `market_data` table (130 symbols, 4 timeframes: 30m, 1h, 4h, 5m)
+- **Real-Time Storage**: Listener service now stores every new ggShot signal alongside existing signal validation routing (backwards compatible)
+- **Universal Data Layer**: Catalog-driven integration with auto-generated agent tools, API endpoints, CLI commands
+- **Multi-Timeframe Query**: Adapter queries latest signal per timeframe using `DISTINCT ON` (e.g., BTC/USDT returns 1h, 30m, 4h, 5m signals)
+- **Confidence Scoring**: Age-based confidence (1.0 for <1hr, 0.9 for <1day, 0.7 for <3days, 0.5 for older)
+
+**Autonomous Trading Integration**:
+- **Extraction Phase**: Queries ggShot signals after technical indicator extraction (lines 794-830 in `ggbot.py`)
+- **Decision Engine**: Receives ggshot signals alongside technical analysis, formats for LLM with directional bias summary
+- **Decision Prompt**: Added "GGSHOT PREMIUM SIGNALS" section to opportunity analysis template
+- **Permission Gating**: Only users with `'ggshot'` in `paid_data_points` array receive signals (security fix)
+- **Architecture**: Dual-mode system - push-based for signal validation (real-time), pull-based for autonomous trading (scheduled)
+
+**Data Flow**:
+```
+Signal Validation (Push):    Telegram → Listener → Store + Route → Validate → Trade
+Autonomous Trading (Pull):   Schedule → Extraction → Query Signals + Technicals → Decision → Trade
+```
+
+**Files Created**:
+- `market_intelligence/catalog/data_types/signals/ggshot.yaml` - Catalog definition with query params, caching, agent format
+- `market_intelligence/adapters/signals/ggshot_adapter.py` - Adapter querying latest signal per timeframe
+- `scripts/backfill_ggshot_signals.py` - Historical signal backfill script
+- `scripts/test_ggshot_adapter.py` - Standalone adapter testing
+- `DOCS/GGSHOT_SIGNALS_INTEGRATION.md` - Complete integration documentation
+
+**Files Modified**:
+- `signals/listener_service.py` - Added signal storage to market_data (lines 139-174)
+- `ggbot.py` - Added ggshot query in extraction (794-830), pass signals to decision (868-875)
+- `decision/engine_v2.py` - Added ggshot_signals parameter, formatting method (905-953), prompt building (471-472)
+- `decision/prompts/opportunity_analysis.py` - Added ggshot_signals section to template
+
+**Production Impact**:
+- ✅ 878 historical signals queryable for autonomous bots
+- ✅ Real-time signals stored automatically (listener backwards compatible)
+- ✅ Permission gating enforced (`paid_data_points` check)
+- ✅ LLM receives ggShot signals + technical indicators + volume analysis
+- ✅ Auto-generated MCP tools for AI agents
+- ✅ Graceful degradation (signals optional, empty dict if no access)
+
+---
+
 ## 2025-10-25 - Symphony Live Trading Bug Fixes & Polish
 
 **Critical Bug Fixes**:

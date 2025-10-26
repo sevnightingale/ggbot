@@ -451,6 +451,8 @@ CREATE TABLE public.configurations (
   created_at timestamp with time zone NOT NULL DEFAULT now(),
   updated_at timestamp with time zone NOT NULL DEFAULT now(),
   state text NOT NULL DEFAULT 'inactive'::text CHECK (state = ANY (ARRAY['active'::text, 'inactive'::text])),
+  symphony_agent_id character varying,
+  trading_mode character varying DEFAULT 'paper'::character varying CHECK (trading_mode::text = ANY (ARRAY['paper'::character varying, 'live'::character varying]::text[])),
   CONSTRAINT configurations_pkey PRIMARY KEY (config_id),
   CONSTRAINT configurations_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );
@@ -498,6 +500,16 @@ CREATE TABLE public.decisions (
   CONSTRAINT decisions_user_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id),
   CONSTRAINT decisions_config_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id),
   CONSTRAINT decisions_parent_fkey FOREIGN KEY (parent_decision_id) REFERENCES public.decisions(decision_id)
+);
+CREATE TABLE public.live_trades (
+  batch_id character varying NOT NULL,
+  config_id uuid NOT NULL,
+  decision_id uuid UNIQUE,
+  created_at timestamp without time zone NOT NULL DEFAULT now(),
+  closed_at timestamp without time zone,
+  CONSTRAINT live_trades_pkey PRIMARY KEY (batch_id),
+  CONSTRAINT live_trades_config_id_fkey FOREIGN KEY (config_id) REFERENCES public.configurations(config_id),
+  CONSTRAINT live_trades_decision_id_fkey FOREIGN KEY (decision_id) REFERENCES public.decisions(decision_id)
 );
 CREATE TABLE public.logs (
   log_id integer NOT NULL DEFAULT nextval('logs_log_id_seq'::regclass),
@@ -623,6 +635,8 @@ CREATE TABLE public.user_profiles (
   created_at timestamp with time zone DEFAULT now(),
   updated_at timestamp with time zone DEFAULT now(),
   paid_data_points ARRAY DEFAULT ARRAY[]::text[],
+  symphony_vault_id uuid,
+  symphony_smart_account character varying,
   CONSTRAINT user_profiles_pkey PRIMARY KEY (user_id),
   CONSTRAINT user_profiles_user_id_fkey FOREIGN KEY (user_id) REFERENCES auth.users(id)
 );

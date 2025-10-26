@@ -1,114 +1,221 @@
 # TODO.md - ggbots Implementation Plan
 
-## ✅ **COMPLETE - Symphony.io Live Trading Integration** (Days 0-6 Complete - 2025-01-19, Polish Complete - 2025-10-25)
 
-**Status**: Backend & Frontend production-ready and fully tested. Dashboard integration complete with bug fixes deployed.
+## 🤖 **HIGH PRIORITY - Autonomous Trading Agent**
 
-- [x] **Symbol System Extension**
-  - [x] Extend `core/symbols/registry.py` with Symphony format support
-  - [x] Add `"symphony": "BTC"` field to 100 compatible symbols
-  - [x] Add `"symphony_compatible": true/false` boolean to all symbols
-  - [x] Add `to_symphony()` and `from_symphony()` methods to standardizer
-  - [x] Add `is_symphony_compatible()` check method
+**Timeline**: 1-2 weeks - Enable fully autonomous AI trading agents using Claude Agent SDK
 
-- [x] **Premium Feature Configuration** (Day 1 Complete - 2025-01-19)
-  - [x] Add 'live_trading' to permissions system (`frontend/lib/permissions.tsx`)
-  - [x] Implement `can_use_live_trading()` permission check in backend (`core/domain/user_profile.py`)
-  - [x] Expose permission in `/api/v2/me` and `/api/v2/profile/me` endpoints
-  - [x] Document permission pattern in CLAUDE.md
+**See**: [DOCS/AGENT.md](DOCS/AGENT.md) for complete architecture and design decisions
 
-- [x] **Settings Modal & Account Connection** (Day 1 Complete - 2025-01-19)
-  - [x] Create `SettingsModal.tsx` component with Symphony section
-  - [x] Add Symphony API key input field with format validation
-  - [x] Add smart account address input (with tooltip: "Used for future balance features")
-  - [x] Implement connection status UI (connected/disconnected states)
-  - [x] Add Settings menu item to UserProfile dropdown (top position)
-  - [ ] Create Symphony connection status endpoint (Day 4 - Backend APIs)
+**Vision**: Transform ggbots from bot platform (scheduled execution) to agent infrastructure (autonomous AI decision-making)
 
-- [x] **Database Schema Changes** (Day 2 Complete - 2025-01-19)
-  - [x] Extend `user_profiles` table: Add `symphony_vault_id` and `symphony_smart_account` columns
-  - [x] Extend `configurations` table: Add `symphony_agent_id` and `trading_mode` columns
-  - [x] Create `live_trades` table (minimal schema: batch_id, config_id, decision_id, timestamps)
-  - [x] Add idempotency constraint: `UNIQUE(decision_id)`
-  - [x] Create indexes on `config_id` and open positions (2 indexes)
-  - [x] Verify migration in production database
+**Architecture**: Agent IS the orchestrator + decision engine, using extraction/trading services as tools
 
-- [x] **Vault Integration** (Day 2 Complete - 2025-01-19)
-  - [x] Extend `VaultManager` with `store_symphony_credential()` method
-  - [x] Add `get_symphony_credential()` method for retrieving API keys
-  - [x] Add `delete_symphony_credential()` method for cleanup (also disables live bots)
-  - [x] Add convenience wrapper functions for Symphony credentials
-  - [ ] Test vault encryption/decryption flow with Symphony credentials (Day 4 - API endpoints)
+### **Phase 1: Foundation & MCP Server** (3-4 days)
 
-- [x] **Symphony Service Implementation** (Day 3 Complete - 2025-01-19)
-  - [x] Create `trading/live/symphony_service.py` with thin wrapper class
-  - [x] Implement `execute_trade_intent()` with 3-second settlement wait
-  - [x] Add idempotency check before Symphony API calls (decision_id uniqueness)
-  - [x] Implement symbol conversion using UniversalSymbolStandardizer
-  - [x] Add `/agent/batch-open` integration with proper field mapping
-  - [x] Implement `close_position()` method with `/agent/batch-close`
-  - [x] Implement `get_open_positions()` with field mapping (asset→symbol, isLong→side)
-  - [x] Add error handling for Symphony API rejections
-  - [x] Implement weight calculation using existing position sizing logic (account_percent & confidence_based)
+**Goal**: Build MCP server with 6 core tools, test individual tool functionality
 
-- [x] **Orchestrator Integration** (Day 3 Complete - 2025-01-19)
-  - [x] Add Symphony service to ggbot.py imports and initialization
-  - [x] Modify `_run_trading_v2()` to route based on `trading_mode`
-  - [x] Implement trading router (paper vs live mode switch)
-  - [x] Add position management integration for live mode (close position routing)
-  - [x] Query live_trades vs paper_trades based on trading_mode
+- [ ] **Project Setup**
+  - [ ] Create `agent/` directory structure
+  - [ ] Set up Claude Agent SDK dependencies
+  - [ ] Create `.mcp.json` configuration file
+  - [ ] Set up environment variables (AGENT_CONFIG_ID, AGENT_USER_ID, AUTH_TOKEN)
 
-- [x] **API Endpoints** (Day 4 Complete - 2025-01-19)
-  - [x] Create `POST /api/v2/symphony/setup` (store credentials with format validation)
-  - [x] Create `GET /api/v2/symphony/status` (check connection status)
-  - [x] Create `POST /api/v2/symphony/disconnect` (remove credentials & disable live bots)
-  - [x] Create `GET /api/v2/positions/live/{config_id}` (query Symphony positions)
-  - [x] Create `POST /api/v2/positions/live/{batch_id}/close` (close live position with ownership check)
-  - [x] Create `POST /api/v2/config/duplicate-as-live` (duplicate paper bot with validation)
+- [ ] **Missing Backend Endpoint**
+  - [ ] Add `POST /api/v2/positions/paper/{trade_id}/close` endpoint
+  - [ ] Test paper position closing via API
+  - [ ] Verify response format matches live trading close endpoint
 
-- [x] **Frontend - Duplicate as Live Flow** (Days 5-6 Complete - 2025-01-19)
-  - [x] Add "Duplicate as Live" button to BotManagementMenu (paper bots only)
-  - [x] Implement premium permission check with upgrade prompt
-  - [x] Check Symphony connection status before allowing live bot creation
-  - [x] Create DuplicateAsLiveModal with Symphony agent ID input + validation
-  - [x] Add warning messaging: "Live trading uses real money"
-  - [x] Implement complete wiring (page.tsx → BotRail → BotManagementMenu)
-  - [x] Auto-suggest bot name: "{Original Name} (Live)"
-  - [x] Disable FIXED_USD position sizing for live bots (Symphony requires %)
+- [ ] **Config Management** (`agent/config_manager.py`)
+  - [ ] Implement `create_agent_config(user_id, strategy)` → creates config_type="agent"
+  - [ ] Implement `update_agent_config(updates)` → PATCH config dynamically
+  - [ ] Implement `get_agent_config()` → load current config state
+  - [ ] Test config CRUD operations via API
 
-- [x] **Frontend - Dashboard Updates** (Days 5-6 Complete - 2025-01-19)
-  - [x] Add "LIVE TRADING" badge to bot cards (replaces balance display)
-  - [x] Positions already isolated per bot (no dashboard changes needed)
-  - [x] Trading mode locked per config (no mixing)
-  - [x] Close position routing handled in orchestrator (paper vs live)
+- [ ] **Service Client** (`agent/service_client.py`)
+  - [ ] Implement `get_current_price(symbol)` wrapper
+  - [ ] Implement `call_extraction_service(config)` wrapper
+  - [ ] Implement `call_trading_service(intent)` wrapper
+  - [ ] Implement `query_positions()` DB query wrapper
+  - [ ] Implement `query_account()` DB query wrapper
+  - [ ] Test all service wrappers with real config_id
 
-- [x] **Testing & Validation** (Complete - 2025-10-25)
-  - [x] Test Symphony account setup flow (API key + smart account)
-  - [x] Test paper bot duplication to live bot
-  - [x] Verify live position opening (check Symphony portal + ggbots dashboard)
-  - [x] Test manual position closing in live mode (works from dashboard UI)
-  - [x] Test symbol compatibility validation (100 supported symbols)
-  - [x] Verify position display accuracy (size, age, SL/TP all correct)
-  - [x] Test trade history display (cumulative P&L chart working)
-  - [x] Verify live_trades table linkage (batch_id → decision_id traceability)
-  - [x] Test default SL/TP application from config
+- [ ] **MCP Server Tools** (`agent/mcp_server.py`)
+  - [ ] Tool 1: `query_market_data` (update config → call extraction)
+  - [ ] Tool 2: `execute_trade` (create intent → call trading service)
+  - [ ] Tool 3: `get_positions` (query open trades from DB)
+  - [ ] Tool 4: `close_position` (call paper trading close endpoint)
+  - [ ] Tool 5: `get_account_status` (query account metrics)
+  - [ ] Tool 6: `wait_for` (log wait reason, return next check time)
+  - [ ] Create `ggbots_trading_server` with all 6 tools
+  - [ ] Test each tool individually with mock agent config
 
-- [x] **Live Trading System Polish** (Complete - 2025-10-24)
-  - [x] Update trade query endpoints to support live_trades table
-  - [x] Fix metrics calculations to include live trades (SSE enrichment)
-  - [x] Ensure positions display correctly for live bots
-  - [x] Update dashboard stats to aggregate paper + live trades
-  - [x] Update PositionsTable to handle live trading data format
-  - [x] Integrate Symphony data into SSE dashboard stream
-  - [ ] Test P&L calculations with live trade data
-  - [ ] Verify close reason tracking in live_trades
+### **Phase 2: Agent Runner & Integration** (2-3 days)
+
+**Goal**: Build agent loop, test autonomous operation, verify full integration
+
+- [ ] **Agent Runner** (`agent/run_agent.py`)
+  - [ ] Implement `run_trading_agent(user_id, strategy)` main loop
+  - [ ] Configure Claude Agent SDK with MCP server
+  - [ ] Set allowed_tools list (all 6 tools)
+  - [ ] Build system prompt with strategy context
+  - [ ] Implement agent message streaming and logging
+  - [ ] Add error handling and graceful shutdown
+
+- [ ] **Integration Testing**
+  - [ ] Create test agent config (paper trading, $10K balance)
+  - [ ] Test: Agent queries market data → receives formatted analysis
+  - [ ] Test: Agent executes trade → trade appears in database
+  - [ ] Test: Agent checks positions → sees open trades
+  - [ ] Test: Agent closes position → position marked closed
+  - [ ] Test: Agent checks account → sees balance/P&L
+  - [ ] Verify all decisions logged with `created_by = 'agent'`
+
+- [ ] **Autonomous Operation Test**
+  - [ ] Run agent for 1 hour with simple strategy
+  - [ ] Verify agent makes decisions autonomously
+  - [ ] Verify agent controls its own timing (wait_for works)
+  - [ ] Check database audit trail (decisions, trades, config updates)
+  - [ ] Monitor agent reasoning quality
+
+### **Phase 3: Dashboard & Multi-Agent Support** (2-3 days)
+
+**Goal**: Show agents in UI, support multiple concurrent agents
+
+- [ ] **Database & Backend**
+  - [ ] Verify `config_type = 'agent'` filtering works
+  - [ ] Test multiple agent configs for same user
+  - [ ] Ensure paper accounts isolated per agent config_id
+  - [ ] Test agent metrics endpoints (`/api/v2/bot/{config_id}/metrics`)
+
+- [ ] **Frontend Integration**
+  - [ ] Filter configs by type: bots vs agents
+  - [ ] Create "My Agents" section in dashboard
+  - [ ] Show agent status (Active, Current Focus, Open Positions)
+  - [ ] Display agent current config state ("Analyzing BTC with RSI, Sentiment")
+  - [ ] Show agent performance metrics (same as bots)
+  - [ ] Add "Create Agent" flow (strategy input → agent creation)
+
+- [ ] **Multi-Agent Testing**
+  - [ ] Run 2 agents simultaneously with different strategies
+  - [ ] Verify configs don't interfere (isolated state)
+  - [ ] Verify paper accounts isolated (separate balances)
+  - [ ] Check dashboard shows both agents correctly
+  - [ ] Test stopping one agent while other continues
+
+### **Phase 4: Production Deployment & Monitoring** (1-2 days)
+
+**Goal**: Deploy to production, monitor initial agent performance
+
+- [ ] **Deployment**
+  - [ ] Deploy agent code to production server
+  - [ ] Set up agent service (PM2 or systemd)
+  - [ ] Configure production environment variables
+  - [ ] Test agent startup/shutdown procedures
+
+- [ ] **Monitoring & Logging**
+  - [ ] Add agent-specific logging (agent_id, strategy, decisions)
+  - [ ] Monitor agent API call volume
+  - [ ] Track agent decision quality metrics
+  - [ ] Set up alerts for agent errors/failures
 
 - [ ] **Documentation**
-  - [ ] Create user guide: "How to Enable Live Trading"
-  - [ ] Document Symphony account setup steps
-  - [ ] Document "Create Live Version" workflow
-  - [ ] Add API endpoint documentation with curl examples
-  - [ ] Document symbol compatibility (100 vs 141 symbols)
+  - [ ] Write agent usage guide (`agent/README.md`)
+  - [ ] Document strategy creation patterns
+  - [ ] Create example strategies (conservative, aggressive, macro)
+  - [ ] Document debugging procedures
+
+### **Future Enhancements** (Post-Launch)
+
+- [ ] **Agent Learning**
+  - [ ] Track strategy performance (win rate by strategy type)
+  - [ ] Recommend strategy adjustments based on performance
+  - [ ] Strategy template library
+
+- [ ] **User Interaction**
+  - [ ] Mid-trade chat interface ("Why did you enter here?")
+  - [ ] Strategy refinement via conversation
+  - [ ] Real-time reasoning display in dashboard
+
+- [ ] **Multi-Agent Coordination**
+  - [ ] Shared context between agents
+  - [ ] Position correlation awareness
+  - [ ] Portfolio-level risk management
+
+---
+
+## 🧠 **HIGH PRIORITY - Market Intelligence Expansion**
+
+**Timeline**: 4-6 weeks - Add contextual data to improve AI decision quality
+
+**See**: [DOCS/MARKET_INTELLIGENCE_ROADMAP.md](DOCS/MARKET_INTELLIGENCE_ROADMAP.md) for complete roadmap
+
+**Current State**:
+- ✅ Infrastructure complete (data_sources/data_points tables, UI, API)
+- ✅ 2/6 data sources populated (Technical Analysis: 21 indicators, ggShot signals: 1)
+- ⏳ 4/6 data sources empty (On-Chain, Sentiment, News, Macro)
+- **Gap**: Zero context beyond technicals - no macro, sentiment, on-chain, or news awareness
+
+### **Phase 1: Free Quick Wins** (Week 1-2) - $0/month
+
+**Goal**: Add 7 contextual data points via 3 acquisition methods (Direct API, Grok Search, Browser-Use)
+
+**New Data Source: Crypto Derivatives** (2 points)
+- [ ] Create `BinanceFundingAdapter` for perpetual funding rates
+- [ ] Create catalog YAML: `funding_rate.yaml`
+- [ ] Seed database: INSERT 1 data_source + 2 data_points (BTC, ETH)
+- [ ] Test: Fetch BTC/ETH funding rates from Binance API
+
+**New Data Source: Macro Context** (4 points)
+- [ ] Create `GrokSearchAdapter` OR `FredApiAdapter` base class
+- [ ] Create catalog YAMLs: `vix.yaml`, `dxy.yaml`, `cpi.yaml`, `nfp.yaml`
+- [ ] Seed database: INSERT 1 data_source + 4 data_points
+- [ ] Test Grok API with web search tool for VIX scraping
+- [ ] Test FRED API key setup and data fetch
+
+**Expand Data Source: On-Chain Analytics** (1 point)
+- [ ] Create `DefiLlamaAdapter` for DeFi TVL metrics
+- [ ] Create catalog YAML: `tvl.yaml`
+- [ ] Seed database: INSERT 1 data_point (BTC DeFi TVL)
+- [ ] Test: Fetch TVL from DefiLlama API
+
+**Decision Engine Integration**
+- [ ] Update `decision/prompts/opportunity_analysis.py` with context section
+- [ ] Modify `decision/engine_v2.py` to fetch enabled data sources from config
+- [ ] Add market intelligence formatting for LLM prompts
+- [ ] Test end-to-end: User enables funding rates → Decision agent sees data
+
+**Expected Impact**: +30-40% trading edge (avoid overleveraged setups, macro-aware decisions)
+
+---
+
+### **Phase 2: Premium On-Chain** (Week 3-4) - $100-500/month
+
+- [ ] Whale wallet tracking (Nansen via Browser-Use OR Arkham API)
+- [ ] Exchange reserves & flows (Glassnode/CryptoQuant)
+- [ ] Active addresses & network health (on-chain explorers)
+- [ ] Token unlocks calendar (TokenUnlocks.app)
+- [ ] Dev activity metrics (GitHub API)
+
+---
+
+### **Phase 3: Sentiment & Social** (Week 5-6) - $100-500/month
+
+- [ ] Twitter/X sentiment analysis (Twitter API + NLP)
+- [ ] Reddit crypto sentiment (Reddit API + NLP)
+- [ ] Narrative velocity tracking (topic modeling)
+
+---
+
+### **Phase 4: Advanced Intelligence** (Week 7-10) - $200-1000/month
+
+- [ ] Order book liquidity heatmaps (Coinalyze)
+- [ ] CEX/DEX market share tracking
+- [ ] Institutional flows (BTC ETF data)
+- [ ] App/exchange traffic (SimilarWeb)
+- [ ] L2 gas fees & bridge flows
+
+---
 
 ## 🎨 **HIGH PRIORITY - User Experience Polish**
 

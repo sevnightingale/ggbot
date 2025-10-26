@@ -67,13 +67,15 @@ Present the current priorities from TODO.md and ask:
 
 As you work with the user, **maintain documentation discipline**:
 
-### TodoWrite Usage (CRITICAL)
+### TODO.md Maintenance (CRITICAL)
 
-- **Use TodoWrite tool for ANY multi-step task** (3+ steps or non-trivial complexity)
-- **Mark todos as in_progress** BEFORE starting work on them
-- **Mark todos as completed** IMMEDIATELY after finishing (don't batch completions)
-- **Add new todos** when discovering additional work during implementation
-- **Exactly ONE todo in_progress** at any time (not less, not more)
+As you work on tasks, **keep TODO.md updated in real-time**:
+
+- **Check off items** `[ ]` → `[x]` IMMEDIATELY when completed (don't batch)
+- **Add new items** when discovering additional work during implementation
+- **Move completed sections** to CHANGELOG.md when an entire feature/phase is done
+- **Update status indicators** (🟡 IN PROGRESS, 🔴 HIGH PRIORITY, etc.) as priorities shift
+- **Keep it current**: TODO.md should always reflect actual work state
 
 ### When Work is Completed
 
@@ -105,13 +107,27 @@ If the user mentions deployment, new user counts, or system changes:
 
 ---
 
+## ⚠️ Common Pitfalls
+
+**Database Schema**:
+- ❌ DON'T propose new tables without checking ACTIVE.md database section first
+- ❌ DON'T assume you need a new table for new data types
+- ✅ DO check if `market_data` table can handle it (see Database Architecture Philosophy in ACTIVE.md)
+- ✅ DO follow existing `data_sources` + `data_points` metadata pattern
+
+**Architecture Patterns**:
+- ❌ DON'T reinvent existing patterns - ask user first if unsure
+- ✅ DO check ACTIVE.md for existing system architecture before proposing solutions
+
+---
+
 ## 💡 Development Workflow Reminders
 
 - **Always activate virtual environment**: `cd /home/sev/ggbot && source .venv/bin/activate`
 - **Never hardcode credentials**: Use .env variables only
 - **Check before running tests**: Always confirm with user before test execution
 - **Frontend deployment**: Changes deploy via git push to Vercel (no localhost for user testing)
-- **Use TodoWrite proactively**: Break down complex tasks, track progress visibly
+- **Update TODO.md as you work**: Check off items immediately, keep it current with actual progress
 
 ---
 

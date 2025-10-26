@@ -70,19 +70,128 @@ class SignalSource(ABC):
 
 class GGShotSignalSource(SignalSource):
     """ggShot Telegram signal source implementation."""
-    
+
     def __init__(self):
         super().__init__('ggshot')
         self.api_id = int(os.getenv('TG_API_ID'))
         self.api_hash = os.getenv('TG_API_HASH')
         self.channel_name = os.getenv('GGSHOT_CHANNEL', 'GGShot_Bot')
         self.client: Optional[any] = None
-        
+
         # Import ggShot parser
         sys.path.insert(0, os.path.join(PROJECT_DIR, 'ggshot'))
         from ggshot_parser import GGShotParser
         self.parser = GGShotParser()
-        
+
+        # Database storage setup
+        self._system_user_id = None
+        self._signals_source_id = None
+
+    def _get_system_user_id(self) -> str:
+        """Get system user ID for storing universal signals."""
+        if self._system_user_id:
+            return self._system_user_id
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Try to find system user
+                cur.execute("""
+                    SELECT user_id FROM user_profiles
+                    WHERE user_id IN (
+                        SELECT id FROM auth.users WHERE email = 'system@ggbots.ai'
+                    )
+                    LIMIT 1
+                """)
+                result = cur.fetchone()
+                if result:
+                    self._system_user_id = str(result[0])
+                    return self._system_user_id
+
+                # Fallback: use first user
+                cur.execute("""
+                    SELECT user_id FROM user_profiles
+                    ORDER BY created_at ASC
+                    LIMIT 1
+                """)
+                result = cur.fetchone()
+                if result:
+                    self._system_user_id = str(result[0])
+                    self.logger.warning(f"Using first user as system user for signals: {self._system_user_id}")
+                    return self._system_user_id
+
+                raise ValueError("No users found in database - cannot store signals")
+
+    def _get_signals_source_id(self) -> str:
+        """Get UUID of 'signals_group_chats' data source."""
+        if self._signals_source_id:
+            return self._signals_source_id
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT source_id FROM data_sources
+                    WHERE name = 'signals_group_chats'
+                """)
+                result = cur.fetchone()
+                if not result:
+                    raise ValueError("signals_group_chats data source not found in database")
+                self._signals_source_id = str(result[0])
+                return self._signals_source_id
+
+    def _store_signal_in_db(self, signal_data: Dict[str, Any], message_date: datetime) -> bool:
+        """Store parsed signal in market_data table."""
+        try:
+            # Get IDs (cached after first call)
+            system_user_id = self._get_system_user_id()
+            signals_source_id = self._get_signals_source_id()
+
+            # Build data_points JSONB
+            data_points = {
+                "ggshot_signal": {
+                    "direction": signal_data['direction'],
+                    "entry_zone": signal_data['entry_zone'],
+                    "stop_loss": signal_data['stop_loss'],
+                    "take_profit": signal_data['target_1'],
+                    "targets": signal_data['targets'],
+                    "confidence": signal_data.get('strategy_accuracy', 0) / 100.0 if signal_data.get('strategy_accuracy') else None,
+                    "strategy_accuracy": signal_data.get('strategy_accuracy'),
+                    "trend_line": signal_data.get('trend_line')
+                }
+            }
+
+            # Build raw_data JSONB
+            raw_data = {
+                "telegram_message": signal_data.get('raw_message', ''),
+                "parsed_at": signal_data.get('parsed_at'),
+                "source": "telegram",
+                "message_date": message_date.isoformat()
+            }
+
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO market_data (
+                            user_id, symbol, timeframe, config_id, data_source,
+                            data_points, raw_data, updated_at
+                        ) VALUES (
+                            %s, %s, %s, NULL, %s, %s, %s, %s
+                        )
+                    """, (
+                        system_user_id,
+                        signal_data['symbol'],
+                        signal_data['timeframe'],
+                        signals_source_id,
+                        json.dumps(data_points),
+                        json.dumps(raw_data),
+                        message_date
+                    ))
+                    conn.commit()
+                    return True
+
+        except Exception as e:
+            self.logger.error(f"Error storing signal in database: {e}")
+            return False
+
     async def initialize(self) -> bool:
         """Initialize Telegram client and test connection."""
         try:
@@ -122,7 +231,7 @@ class GGShotSignalSource(SignalSource):
             @self.client.on(NewMessage(chats=channel))
             async def handle_message(event):
                 try:
-                    await self._process_message(event.message.message, signal_handler)
+                    await self._process_message(event.message, signal_handler)
                 except Exception as e:
                     self.logger.error(f"Error processing ggShot message: {e}")
             
@@ -136,18 +245,25 @@ class GGShotSignalSource(SignalSource):
             self.logger.error(f"ggShot listener error: {e}")
             raise
     
-    async def _process_message(self, message_text: str, signal_handler: Callable[[SignalData], None]) -> None:
+    async def _process_message(self, message, signal_handler: Callable[[SignalData], None]) -> None:
         """Process incoming Telegram message."""
+        message_text = message.message if hasattr(message, 'message') else message
         if not message_text:
             return
-        
+
         # Parse using existing ggShot parser
         signal_data = self.parser.parse_signal(message_text)
-        
+
         if not signal_data:
             self.logger.debug("Message is not a valid ggShot signal")
             return
-        
+
+        # Store signal in database for autonomous trading use
+        message_date = message.date if hasattr(message, 'date') else datetime.now(timezone.utc)
+        stored = self._store_signal_in_db(signal_data, message_date)
+        if stored:
+            self.logger.info(f"Stored signal in DB: {signal_data['symbol']} {signal_data['direction']} ({signal_data['timeframe']})")
+
         # Convert to standardized SignalData format
         standardized_signal = SignalData(
             source='ggshot',
@@ -167,10 +283,10 @@ class GGShotSignalSource(SignalSource):
             },
             timestamp=datetime.now(timezone.utc)
         )
-        
+
         self.logger.info(f"Parsed ggShot signal: {standardized_signal.symbol} {standardized_signal.direction}")
-        
-        # Call the signal handler
+
+        # Call the signal handler (for signal validation routing)
         await signal_handler(standardized_signal)
     
     async def shutdown(self) -> None:

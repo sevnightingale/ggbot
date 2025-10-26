@@ -98,10 +98,12 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
 
         const result = await response.json()
         console.log('Live position closed:', result)
+        alert('✅ Live position closed successfully!')
       } else {
         // Close paper position (existing logic)
         const result = await apiClient.closePosition(selectedConfigId, positionId)
         console.log('Paper position closed:', result)
+        alert('✅ Position closed successfully!')
       }
 
       // Notify parent component to refresh data

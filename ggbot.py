@@ -787,10 +787,48 @@ class GGBotOrchestrator:
                     "indicators": indicators
                 }
             }
-            
+
             if successful_extractions == 0:
                 overall_result["error"] = "All timeframe extractions failed"
-            
+
+            # Query ggShot signals for additional market context (with permission check)
+            try:
+                from core.services.user_service import UserService
+
+                # Check if user has permission to access ggshot signals
+                user_service = UserService()
+                profile = await user_service.get_profile(user_id)
+
+                if profile and profile.paid_data_points and 'ggshot' in profile.paid_data_points:
+                    # User has paid access to ggshot signals
+                    from market_intelligence.adapters.signals.ggshot_adapter import GGShotAdapter
+                    from market_intelligence.types import QueryParams
+
+                    ggshot_adapter = GGShotAdapter()
+                    params = QueryParams(params={'symbol': symbol, 'include_raw': False})
+                    ggshot_response = await ggshot_adapter.fetch(params)
+
+                    if ggshot_response.data and ggshot_response.data.get('signals'):
+                        overall_result["ggshot_signals"] = ggshot_response.data['signals']
+                        overall_result["ggshot_metadata"] = ggshot_response.data.get('metadata', {})
+                        overall_result["ggshot_confidence"] = ggshot_response.confidence
+
+                        timeframes_found = list(ggshot_response.data['signals'].keys())
+                        self._log.info(f"✅ Fetched ggShot signals for {symbol}: {len(timeframes_found)} timeframes ({', '.join(timeframes_found)})")
+                    else:
+                        self._log.info(f"No ggShot signals found for {symbol}")
+                        overall_result["ggshot_signals"] = {}
+
+                    await ggshot_adapter.close()
+                else:
+                    # User does not have access to ggshot signals
+                    self._log.debug(f"User {user_id} does not have access to ggshot signals (paid_data_points: {profile.paid_data_points if profile else 'no profile'})")
+                    overall_result["ggshot_signals"] = {}
+
+            except Exception as e:
+                self._log.warning(f"Failed to fetch ggShot signals (non-critical): {e}")
+                overall_result["ggshot_signals"] = {}
+
             self._log.info(f"V2 Multi-timeframe extraction completed: {successful_extractions}/{len(timeframes)} successful")
             return overall_result
             
@@ -838,10 +876,14 @@ class GGBotOrchestrator:
 
             if not symbol:
                 raise ValueError("No symbol specified for decision")
-            
+
+            # Extract ggshot signals from extraction result if available
+            ggshot_signals = extraction_result.get('ggshot_signals', {})
+
             decision_result = await decision_engine.make_decision(
                 symbol=symbol,
-                signal_data=signal_data
+                signal_data=signal_data,
+                ggshot_signals=ggshot_signals
             )
             
             self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")

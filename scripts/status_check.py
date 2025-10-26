@@ -58,11 +58,11 @@ def get_platform_stats():
             # Trading mode breakdown
             cur.execute("""
                 SELECT
-                    config_data->>'trading_mode' as mode,
+                    trading_mode as mode,
                     COUNT(*) as count
                 FROM configurations
                 WHERE state = 'active'
-                GROUP BY mode
+                GROUP BY trading_mode
             """)
             mode_data = cur.fetchall()
             stats['active_paper_bots'] = 0

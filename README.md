@@ -25,6 +25,7 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 - **Universal Data Layer**: Catalog-driven market intelligence with WebSocket-first architecture (3x-3000x faster)
 - **Real-time WebSocket cache**: Binance WebSocket streaming 100 symbols × 7 timeframes
 - **Technical indicators**: Pure Python pandas-ta integration (RSI, MACD, 20+ professional indicators)
+- **ggShot Signals**: Premium signal context for autonomous trading (permission-gated via paid_data_points)
 - **Multi-timeframe analysis**: 5m, 15m, 30m, 1h, 4h, 1d with consolidated data
 - **Supabase database storage**: Real-time updates with orchestrator integration
 
@@ -118,12 +119,13 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 ### Live Production Systems
 
-**🎯 [ggShot Signal Validation](signals/)** - V2 Production Signal Processing
-- **Signal validation mode** integrated into V2 decision engine
+**🎯 [ggShot Signal Integration](signals/)** - Dual-Mode Signal Processing
+- **Signal validation mode**: Real-time push-based validation with Telegram publishing
+- **Autonomous trading mode**: Pull-based signal context alongside technical indicators
 - **Service-to-service authentication** with secure signal routing
 - **AI confidence evaluation** of external trading signals with strategy alignment
-- **Real-time Telegram integration** with publishing capabilities
-- **Premium business model** with subscription-based access
+- **Multi-timeframe signals**: Latest signal per timeframe (30m, 1h, 4h, 5m)
+- **Premium business model** with subscription-based access (paid_data_points gating)
 - **V2 orchestrator integration** using extraction → decision → trading pipeline
 
 **🤖 [Autonomous Scheduling](core/scheduler/)** - Production Bot Management

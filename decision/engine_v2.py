@@ -153,23 +153,28 @@ class DecisionEngineV2:
             logger.bind(config_id=self.config_id, user_id=self.user_id).error(f"Failed to initialize LLM provider: {e}")
             raise ConfigurationError(f"Failed to initialize LLM provider: {e}")
     
-    async def make_decision(self, symbol: Optional[str] = None, 
-                          signal_data: Optional[Dict] = None) -> Dict[str, Any]:
+    async def make_decision(self, symbol: Optional[str] = None,
+                          signal_data: Optional[Dict] = None,
+                          ggshot_signals: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Main entry point for decision making.
-        
+
         Routes to appropriate decision type based on config_type and current state.
-        
+
         Args:
             symbol: Trading symbol (required for signal validation, optional for autonomous)
             signal_data: External signal data (for signal validation mode)
-            
+            ggshot_signals: ggShot signals from extraction (optional market context)
+
         Returns:
             Decision intent ready for trading module
         """
+        # Store ggshot signals for use in prompt building
+        self.ggshot_signals = ggshot_signals or {}
+
         if not self.config:
             await self.initialize()
-        
+
         try:
             # Route based on config type and signal data presence
             config_type = self.config.config_type
@@ -455,20 +460,24 @@ class DecisionEngineV2:
                                                 current_price: Decimal,
                                                 volume_analysis: str) -> str:
         """Build opportunity analysis prompt from template."""
-        
+
         market_context = self._format_market_data_for_llm(market_data)
         # NO FALLBACK - fail explicitly if config is missing required data
         user_prompt = self.config.decision.get('user_prompt') if isinstance(self.config.decision, dict) else getattr(self.config.decision, 'user_prompt', None)
         if not user_prompt:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
         user_strategy = user_prompt
-        
+
+        # Format ggshot signals if available
+        ggshot_context = self._format_ggshot_signals_for_llm() if hasattr(self, 'ggshot_signals') and self.ggshot_signals else None
+
         return build_opportunity_analysis_prompt(
             symbol=symbol,
             current_price=f"${current_price:,.2f}",
             market_data=market_context,
             volume_analysis=volume_analysis,
-            user_strategy=user_strategy
+            user_strategy=user_strategy,
+            ggshot_signals=ggshot_context
         )
     
     async def _handle_position_management(self, symbol: str, position_data: Dict) -> Dict[str, Any]:
@@ -892,7 +901,57 @@ Take Profit: {take_profit_text}
 - Stop Loss: {signal_data.get('stop_loss', 'N/A')}
 - Take Profit: {signal_data.get('take_profit', 'N/A')}
 """
-    
+
+    def _format_ggshot_signals_for_llm(self) -> str:
+        """Format ggshot signals for LLM consumption in autonomous trading mode."""
+        if not self.ggshot_signals:
+            return None
+
+        formatted = []
+
+        # Count directional bias
+        directions = {'LONG': 0, 'SHORT': 0}
+        total_confidence = 0
+        signal_count = 0
+
+        for timeframe, signal in self.ggshot_signals.items():
+            direction = signal.get('direction')
+            if direction in directions:
+                directions[direction] += 1
+
+            confidence = signal.get('strategy_accuracy')
+            if confidence:
+                total_confidence += confidence
+                signal_count += 1
+
+            # Format each signal
+            entry_zone = signal.get('entry_zone', {})
+            formatted.append(f"[{timeframe.upper()}]")
+            formatted.append(f"  Direction: {direction}")
+            formatted.append(f"  Entry: ${entry_zone.get('low', 0):,.2f} - ${entry_zone.get('high', 0):,.2f} (mid: ${entry_zone.get('mid', 0):,.2f})")
+            formatted.append(f"  Stop Loss: ${signal.get('stop_loss', 0):,.2f}")
+            formatted.append(f"  Take Profit: ${signal.get('take_profit', 0):,.2f}")
+
+            if confidence:
+                formatted.append(f"  Confidence: {confidence}%")
+
+            # Show targets
+            targets = signal.get('targets', [])
+            if targets and len(targets) > 1:
+                target_prices = [f"${t['price']:,.2f}" for t in targets[:3]]  # Show first 3 targets
+                formatted.append(f"  Targets: {', '.join(target_prices)}")
+
+            formatted.append("")
+
+        # Add directional summary
+        avg_confidence = total_confidence / signal_count if signal_count > 0 else 0
+        formatted.insert(0, f"Timeframes: {len(self.ggshot_signals)} signals ({', '.join(sorted(self.ggshot_signals.keys()))})")
+        formatted.insert(1, f"Directional Bias: {directions['LONG']} LONG vs {directions['SHORT']} SHORT")
+        formatted.insert(2, f"Average Confidence: {avg_confidence:.0f}%")
+        formatted.insert(3, "")
+
+        return "\n".join(formatted)
+
     async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> str:
         """Call LLM API using configured provider."""
         if not self.llm_provider:
@@ -1199,7 +1258,7 @@ Take Profit: {take_profit_text}
                             symphony_service = SymphonyLiveTradingService()
 
                             # Get all open positions for this config
-                            live_positions = await symphony_service.get_open_positions(config_id, self.user_id)
+                            live_positions = await symphony_service.get_open_positions(config_id)
 
                             # Find the specific position by batch_id
                             matching_position = None

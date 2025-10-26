@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-10-22 (Automated status check)
-**System Health**: 🟢 Production Live (256+ users, 57+ active bots)
+**Last Updated**: 2025-10-26 (Automated status check)
+**System Health**: 🟢 Production Live (257 users, 59 active bots)
 **Project Status**: Live application with complete Stripe monetization and Symphony live trading
 
 ---
@@ -84,6 +84,91 @@
 
 ---
 
+## 🗄️ Database Schema
+
+### **Database Architecture Philosophy**
+
+**Universal Data Layer Pattern**:
+- `market_data` table stores ALL market intelligence (technical indicators, signals, news, sentiment)
+- `data_sources` + `data_points` = metadata registry defining what's available
+- **Do NOT create new tables for new data types** - extend existing architecture
+- See `database/schema.md` for complete schema documentation
+
+**Example**: ggShot signals stored in `market_data` with `data_source='signals_group_chats'`
+
+---
+
+### Core Tables (13 total)
+| Table | Purpose |
+|-------|---------|
+| **user_profiles** | User accounts, subscription tier (free/ggbase), Stripe integration, Telegram settings |
+| **user_llm_credentials** | Encrypted LLM API keys via Supabase Vault (OpenAI, DeepSeek, Anthropic, XAI) |
+| **configurations** | Bot configs with `config_data` JSONB (symbol, timeframe, strategy, data sources) |
+| **bot_telegram_channels** | Per-bot Telegram signal publishing configuration |
+| **data_sources** | Market intelligence categories (6 total: Technical Analysis, Signals, Fundamental, Sentiment, News, On-Chain) |
+| **data_points** | Specific indicators/signals within sources (22 total: 21 technical + 1 ggShot signal) |
+| **decisions** | AI decision audit trail (action, confidence, reasoning, market_data snapshot) |
+| **paper_accounts** | Isolated $10K paper trading accounts per config |
+| **paper_trades** | Paper trade execution records (entry, exit, P&L, confidence) |
+| **paper_orders** | Paper order fills (market/limit orders, fees) |
+| **live_trades** | Symphony live trade batch tracking (links decision_id to Symphony batch_id) |
+| **stripe_webhooks** | Stripe event log for subscription management (idempotent processing) |
+| **logs** | System logging (module, level, message, user context) |
+
+**Key Architecture Notes**:
+- `data_sources` + `data_points`: Infrastructure complete, 2 sources populated (Technical Analysis, ggShot), 4 empty shells ready for expansion
+- `config_data` JSONB stores user selections: `extraction.selected_data_sources[source_name].data_points[]`
+- All tables use Row Level Security (RLS) for multi-user isolation
+
+---
+
+## 🎨 Frontend Components (Forge)
+
+### Configuration & Setup (`configure/`)
+| Component | Purpose |
+|-----------|---------|
+| **MarketDataSelector** | Data sources/indicators selection UI with category tabs, search, premium gates |
+| **SignalsConfiguration** | ggShot signals toggle, confidence threshold, processing mode settings |
+| **StrategyEditor** | Custom strategy prompt editor with AI model selection |
+| **TradeSettings** | Trading parameters (leverage, SL/TP, position sizing) |
+| **ConfigTabs** | Tab navigation for configuration wizard steps |
+| **ConfigureLayout** | Main configuration page layout wrapper |
+| **SaveConfigBar** | Sticky save bar with validation status |
+
+### Monitoring & Analytics (`monitor/`)
+| Component | Purpose |
+|-----------|---------|
+| **PerformanceChart** | Cumulative P&L chart with paper/live mode support |
+| **PositionsTable** | Open positions table with real-time P&L, manual close buttons |
+| **DecisionFeed** | Live decision stream (ENTER/EXIT/WAIT) with reasoning |
+| **MetricsBar** | Top-level metrics (total P&L, win rate, open positions) |
+| **ActivationBar** | Bot activation controls with schedule display |
+| **TradeHistoryModal** | Historical trades modal (last 50 trades, filters) |
+
+### Layout & Navigation (`layout/`)
+| Component | Purpose |
+|-----------|---------|
+| **BotRail** | Left sidebar with bot list, create button, settings |
+| **BotManagementMenu** | Dropdown menu for duplicate/delete/settings actions |
+| **Header** | Top header with branding, nav links, user profile |
+| **TabNavigation** | Main tab navigation (Configure, Monitor, Settings) |
+| **MobileNav** | Mobile-responsive navigation drawer |
+| **UserProfile** | User profile dropdown with subscription badge, billing portal |
+
+### Shared Utilities (`shared/`)
+| Component | Purpose |
+|-----------|---------|
+| **LoadingSkeleton** | Loading state skeletons for async content |
+| **EmptyState** | Empty state placeholders with CTAs |
+| **ThemeToggle** | Dark/light mode toggle |
+
+**Key Frontend Notes**:
+- All components read from `/api/v2/data-sources-with-points` to populate UI dynamically
+- Premium features gated via `usePermissions()` hook checking user profile
+- Real-time updates via WebSocket (`/ws/bot-status/{user_id}`) and SSE (`/api/dashboard-stream`)
+
+---
+
 ## ✅ Production-Ready Features
 
 ### **Autonomous Scheduler System**
@@ -93,10 +178,12 @@
 - **Real-time rescheduling** when users change bot configurations
 - **Startup reconciliation** automatically restores active bots
 
-### **Signal Validation System**
-- **Generic framework** supporting multiple signal sources (ggShot implemented)
+### **Signal Validation & Intelligence System**
+- **Dual-mode architecture**: Signal validation (push-based) + Autonomous trading context (pull-based)
+- **ggShot integration**: 878 historical signals + real-time storage in market_data table
 - **AI confidence evaluation** of external signals using user strategies
-- **Premium gating** through ggBase subscription tier
+- **Multi-timeframe signals**: Latest signal per timeframe for autonomous decision context
+- **Premium gating** through ggBase subscription tier (paid_data_points enforcement)
 - **Service-to-service authentication** with dedicated `/api/v2/signal-validation` endpoint
 - **Telegram publishing** to user-specified channels with APPROVED/REJECTED status
 - **Complete V2 integration** using standard extraction → decision → trading flow
