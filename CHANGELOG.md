@@ -6,6 +6,186 @@ Complete history of features, fixes, and improvements to the ggbots autonomous t
 
 ---
 
+## 2025-10-28 - Autonomous Agent Phase 3: Foundation (Runner Implementation)
+
+**Agent Runner** (`agent/run_agent.py` - 370 lines):
+- TradingAgent class with ClaudeSDKClient streaming mode (two async tasks: agent loop + user interrupts)
+- Single system prompt with mode/strategy context injection
+- Redis queues: `agent:{config_id}:messages` and `:responses` (production-ready)
+- CLI entry point: argparse with `--config-id` and `--mode` flags
+
+**MCP Tools**: Added `request_autonomous_mode` tool (10 tools total) for mode switching
+
+**SDK Integration**: `receive_messages()` for agent loop, `client.interrupt()` + `receive_response()` for user messages, auto-compaction detection
+
+**Files**: Modified `agent/run_agent.py`, `agent/mcp_server.py`, `DOCS/AGENT.md` (added Phase 3 & 4 implementation plan)
+
+**Next**: chat.py CLI, mode switch completion, end-to-end testing
+
+---
+
+## 2025-10-28 - Market Intelligence Phase 1: PRODUCTION DEPLOYED 🚀
+
+**8 New Grok-Powered Data Sources LIVE** (32 total data points):
+- Macro Economics (4): VIX, DXY, CPI, NFP | On-Chain Analytics (2): BTC TVL, whale activity
+- Sentiment & Social (1): Twitter sentiment | News & Regulatory (1): Crypto news
+- All data points FREE tier, seeded via `scripts/seed_grok_intelligence.sql`
+
+**4 Critical Bug Fixes**:
+1. Gateway adapter routing - Fixed module path resolution for `agentic` category
+2. ggShot adapter - Updated data source name `signals_group_chats` → `trading_signals`
+3. Cache key KeyError - Added `name` to format context in `CatalogEntry.build_cache_key()`
+4. Redis protobuf serialization - Converted citations/tool_calls to native Python types
+
+**Performance & Features**:
+- **Parallel Query Execution**: `asyncio.gather()` implementation - 160s → 30s (5.3x speedup!)
+- **Custom Cache TTL**: Per-data-point optimization (10min to 24hrs) saves ~60% vs uniform TTL
+- **Agent Dynamic Queries**: `data_points_override` parameter enables agent queries without config modification
+- **Production Validated**: Real bot config completed in ~30s with comprehensive AI reasoning across all 8 sources
+
+**Cost Economics**: $195/month platform cost = $0.76/user (257 users), scales to $0.20/user at 1000 users
+
+**Documentation**: Consolidated market intelligence architecture into `market_intelligence/README.md` (1150+ lines)
+
+**Files**: Modified 6 (orchestrator, gateway, catalog_mapping, types, grok_agentic, ggshot_adapter) | Created 3 (seed script, test suite, docs)
+
+**Status**: ✅ **PHASE 1 COMPLETE** - All 8 Grok-powered sources live, production tested, cost validated
+
+---
+
+## 2025-10-27 - Autonomous Agent Phase 2: MCP Server & Trade Observations
+
+**Agent MCP Server Implementation** (Phase 2 Complete):
+- **Database**: Migrated from `agent_memory` to `trade_observations` table (post-trade reflection model: 13 columns, 8 indexes, RLS enabled)
+- **API Endpoints**: Added 2 new endpoints in `api/agent.py` - `POST /agent/trade-observations`, `POST /agent/trade-observations/query`
+- **Service Client**: Updated `agent/service_client.py` with observation methods (record, query), HTTP retry logic
+- **MCP Server**: Implemented `agent/mcp_server.py` (671 lines) with 9 tools using Claude Agent SDK
+  - Tools: query_market_data, execute_trade, get_positions, get_account_status, close_position, update_strategy, wait_for, record_trade_observation, query_trade_observations
+  - Module-level AgentContext for single-agent testing
+  - Tools return helpful error messages (not exceptions)
+- **Tested**: MCP server instantiation verified with 9 registered tools
+
+**Trade Observations Model**:
+- Structured post-trade learning (what worked/failed, predictive data points, decision review)
+- Queryable by symbol, observation_type (win/loss), importance threshold
+- NOT auto-injected after compaction - agent retrieves dynamically when needed
+
+**Files Created/Modified**:
+- `database/migrations/agent_trade_observations.sql` - Migration script
+- `agent/mcp_server.py` - 9 MCP tools (671 lines)
+- `agent/service_client.py` - Updated with observation methods
+- `api/agent.py` - Added 2 observation endpoints
+
+**Next**: Phase 3 - Agent Runner (conversation mode + autonomous mode)
+
+---
+
+## 2025-10-27 - Intelligence Orchestrator + GrokAgenticAdapter (Game-Changer!)
+
+**Intelligence Orchestrator Implementation** (Phase 1 Complete):
+- **Core Module**: `market_intelligence/orchestrator.py` (260 lines) - config-driven routing layer that reads user config and queries gateway
+- **Catalog Mapping**: `market_intelligence/catalog_mapping.py` (180 lines) - hardcoded mapping dict for data_point → catalog data_type translation
+- **Integration**: Modified `ggbot.py` (+30 lines) to call orchestrator after technical indicators, passes `market_intelligence` to decision engine
+- **Decision Engine**: Added 6 formatting methods (`_format_derivatives_data`, `_format_macro_data`, `_format_onchain_data`, `_format_sentiment_data`, `_format_news_data`, `_format_market_intelligence_for_llm`)
+- **Prompts**: Updated `opportunity_analysis.py` to include Market Intelligence section in LLM prompts
+- **Tests**: `tests/test_orchestrator.py` - 16/16 unit tests passing (config parsing, permissions, mapping, full integration)
+
+**GrokAgenticAdapter** - Universal Market Intelligence via XAI's Agentic API:
+- **Revolutionary Approach**: ONE adapter handles 8+ data sources via Grok's autonomous AI (web search, X search, code execution)
+- **Adapter**: `market_intelligence/adapters/agentic/grok_agentic.py` (500+ lines) with 8 prompt templates for different query types
+- **Query Types**: VIX index, DXY index, CPI inflation, NFP jobs, Twitter sentiment, crypto news, BTC TVL, whale activity
+- **Streaming Support**: Real-time tool call observability, citation tracking, cost estimation
+- **Tested Live**: VIX query successful - 5 tool calls (web_search, browse_page), 18s response time, $0.0072 cost, 7 citations
+- **Cost Analysis**: $0.005-0.015 per query, with 80% cache hit rate = $160-240/month platform cost, $0.16-0.24/user/month at 1000 users
+
+**Catalog Mapping - 8 New Data Points Ready**:
+- **Macro Economics**: VIX (volatility), DXY (dollar strength), CPI (inflation), NFP (jobs) - all via Grok
+- **On-Chain**: BTC TVL, whale activity - via Grok
+- **Sentiment**: Twitter sentiment - via Grok X search + NLP
+- **News**: Crypto news headlines - via Grok web + X search
+
+**Architecture Benefits**:
+- ✅ Scalability: Adding 150 data points requires 0 code changes to orchestrator/ggbot.py, just add mapping entries
+- ✅ Shared Cache: Cost per user DECREASES as platform grows (cache is per-symbol, not per-user)
+- ✅ Economies of Scale: At 10,000 users, cost = $0.01-0.05/user/month
+- ✅ Autonomous Intelligence: Grok interprets and structures data (not just raw API responses)
+- ✅ Citations: Full transparency with source URLs for all Grok queries
+
+**Files Created**:
+- `market_intelligence/orchestrator.py` - Main orchestration logic
+- `market_intelligence/catalog_mapping.py` - Data point → catalog mapping
+- `market_intelligence/adapters/agentic/grok_agentic.py` - Universal Grok adapter
+- `market_intelligence/catalog/data_types/agentic/grok_agentic.yaml` - Catalog definition
+- `tests/test_orchestrator.py` - Comprehensive unit tests (16 tests)
+- `scripts/test_grok_intelligence.py` - End-to-end Grok testing script
+- `DOCS/ORCHESTRATOR_TESTING.md` - Testing & validation guide
+- `market_intelligence/README.md` - Complete architecture documentation
+
+**Files Modified**:
+- `ggbot.py` - Added orchestrator call in `_run_extraction_v2()`, passes market_intelligence to decision engine
+- `decision/engine_v2.py` - Added `market_intelligence` parameter, 6 formatting methods, prompt integration
+- `decision/prompts/opportunity_analysis.py` - Added Market Intelligence section to prompt template
+- `README.md` - Added Intelligence Orchestrator to Core Infrastructure, added market_intelligence/ to Module Deep Dives
+- `ACTIVE.md` - Updated Current Development Focus with orchestrator completion, added orchestrator to Database Architecture Philosophy
+
+**Production Impact**:
+- ✅ 24 → 32 data points ready (8 new Grok-powered sources mapped, awaiting database seeding)
+- ✅ Cost-effective at scale: $160-240/month platform cost serves unlimited users
+- ✅ Orchestrator proven: 16/16 tests passing, funding rates ready for integration
+- ✅ Grok validated: VIX query successful, autonomous research working perfectly
+- ⏳ Next: Database seeding for 8 new data points, then production deployment
+
+**Key Insight**: Grok's agentic API is a game-changer - instead of building 50+ individual adapters, ONE universal adapter handles everything accessible via web/X search!
+
+---
+
+## 2025-10-26 - Market Intelligence: 7 Categories + Funding Rates + Orchestrator Design
+
+**Database Reorganization (7 Categories)**:
+- **Renamed Sources**: `crypto_derivatives` → `derivatives_leverage`, `signals_group_chats` → `trading_signals`, `fundamental_analysis` → `macro_economics`, `sentiment_trends` → `sentiment_social`
+- **Consolidated**: Deleted `influencer_kol` (merged into `sentiment_social`), reduced from 8 → 7 top-level categories
+- **7 Final Categories**: Technical Analysis (21pts), Trading Signals (1pt), On-Chain Analytics (0pts), Derivatives & Leverage (2pts), Sentiment & Social (0pts), News & Regulatory (0pts), Macro Economics (0pts)
+- **24 Total Data Points**: 21 technical indicators + 1 ggShot signal + 2 funding rates (BTC/ETH)
+
+**Funding Rates Implementation** (Phase 1 Proof of Concept):
+- **Adapter**: `BinanceFundingAdapter` with 7-level interpretation logic (extreme/high/slight long/short leverage, neutral)
+- **Catalog**: `funding_rate.yaml` with 1-hour cache TTL, query params (symbol, include_mark_price)
+- **Database**: Seeded `derivatives_leverage` data source with BTC/ETH funding rate data points (free, enabled)
+- **Tested Live**: BTC funding 0.0026% (neutral), ETH funding 0.0063% (neutral) - both minimal risk
+- **Output**: JSON with funding_rate_pct, interpretation (level, risk, trading_implication, color), next_funding_time
+
+**Intelligence Orchestrator Design** (Planning Phase):
+- **Problem**: Current hardcoded pattern doesn't scale to 150 data points (ggbot.py would become 10,000-line monolith)
+- **Solution**: Hybrid approach - keep technical indicators old way (don't break existing bots), route everything else through new orchestrator
+- **Architecture**: Config-driven data fetching - read `selected_data_sources` from config, query gateway automatically, aggregate results by category
+- **Document**: `DOCS/INTELLIGENCE_ORCHESTRATOR.md` (500+ lines) - complete design spec, implementation plan, testing strategy
+- **Implementation Plan**: Phase 1 (build orchestrator), Phase 2 (migrate ggShot), Phase 3 (integrate funding rates), Phase 4 (add 5 macro/on-chain points)
+
+**Documentation Updates**:
+- **schema.md**: Updated data sources section with 7 categories, 24 total data points breakdown
+- **ACTIVE.md**: Added 7-category structure with icons, status, premium flags
+- **TODO.md**: Marked funding rates complete, added orchestrator implementation tasks
+
+**Files Created**:
+- `market_intelligence/adapters/derivatives/binance_funding.py` - Funding rate adapter with interpretation
+- `market_intelligence/catalog/data_types/derivatives/funding_rate.yaml` - Catalog definition
+- `scripts/seed_funding_rates.py` - Database seeding script
+- `scripts/test_funding_adapter.py` - Standalone testing script
+- `DOCS/INTELLIGENCE_ORCHESTRATOR.md` - Comprehensive design document
+
+**Files Modified**:
+- `database/schema.md` - Updated data sources/points sections
+- `ACTIVE.md` - Added 7-category breakdown
+- `TODO.md` - Updated market intelligence section with orchestrator tasks
+
+**Production Impact**:
+- ✅ 7 clean categories ready to scale to 150 data points
+- ✅ Funding rates adapter working (not yet integrated into decision engine)
+- ⏳ Orchestrator implementation required before data flows to decision engine
+- ⏳ Frontend showing new categories correctly
+
+---
+
 ## 2025-10-26 - ggShot Signals Universal Data Layer Integration
 
 **ggShot Signals for Autonomous Trading** (Market Intelligence Expansion):

@@ -2,6 +2,8 @@
 
 **Pure Python Technical Analysis System with Supabase Integration**
 
+> **📘 Complete Market Intelligence Architecture**: This document focuses on technical indicator extraction implementation details. For the complete market intelligence system architecture (orchestrator, gateway, catalog, all data sources), see **[`../market_intelligence/README.md`](../market_intelligence/README.md)**.
+
 ---
 
 ## 📋 Overview

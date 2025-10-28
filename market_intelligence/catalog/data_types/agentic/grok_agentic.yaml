@@ -1,0 +1,32 @@
+name: grok_agentic
+category: agentic
+description: Universal market intelligence via Grok's autonomous agentic API (web search, X search, code execution)
+
+query_params:
+  query_type:
+    type: string
+    required: true
+    description: |
+      Type of intelligence to gather. Options:
+      - vix_index: VIX volatility index
+      - dxy_index: US Dollar strength index
+      - cpi_inflation: Latest CPI inflation data
+      - nfp_jobs: Latest jobs report
+      - twitter_sentiment: Twitter/X sentiment analysis (requires symbol)
+      - crypto_news: Recent crypto news headlines (requires symbol)
+      - btc_tvl: Bitcoin Total Value Locked in DeFi
+      - whale_activity: Whale transaction analysis (requires symbol)
+
+  symbol:
+    type: string
+    required: false
+    description: Cryptocurrency symbol (e.g., BTC, ETH) - required for symbol-specific queries
+
+sources:
+  - adapter: GrokAgenticAdapter
+    priority: 1
+    cost: variable  # $0.05-0.15 per query
+
+cache:
+  backend: redis
+  ttl: 3600  # 1 hour default (can be overridden per data type)

@@ -155,7 +155,8 @@ class DecisionEngineV2:
     
     async def make_decision(self, symbol: Optional[str] = None,
                           signal_data: Optional[Dict] = None,
-                          ggshot_signals: Optional[Dict] = None) -> Dict[str, Any]:
+                          ggshot_signals: Optional[Dict] = None,
+                          market_intelligence: Optional[Dict] = None) -> Dict[str, Any]:
         """
         Main entry point for decision making.
 
@@ -165,12 +166,14 @@ class DecisionEngineV2:
             symbol: Trading symbol (required for signal validation, optional for autonomous)
             signal_data: External signal data (for signal validation mode)
             ggshot_signals: ggShot signals from extraction (optional market context)
+            market_intelligence: Market intelligence data from orchestrator (funding rates, macro, etc.)
 
         Returns:
             Decision intent ready for trading module
         """
-        # Store ggshot signals for use in prompt building
+        # Store ggshot signals and market intelligence for use in prompt building
         self.ggshot_signals = ggshot_signals or {}
+        self.market_intelligence = market_intelligence or {}
 
         if not self.config:
             await self.initialize()
@@ -471,13 +474,17 @@ class DecisionEngineV2:
         # Format ggshot signals if available
         ggshot_context = self._format_ggshot_signals_for_llm() if hasattr(self, 'ggshot_signals') and self.ggshot_signals else None
 
+        # Format market intelligence if available
+        market_intel_context = self._format_market_intelligence_for_llm() if hasattr(self, 'market_intelligence') and self.market_intelligence else None
+
         return build_opportunity_analysis_prompt(
             symbol=symbol,
             current_price=f"${current_price:,.2f}",
             market_data=market_context,
             volume_analysis=volume_analysis,
             user_strategy=user_strategy,
-            ggshot_signals=ggshot_context
+            ggshot_signals=ggshot_context,
+            market_intelligence=market_intel_context
         )
     
     async def _handle_position_management(self, symbol: str, position_data: Dict) -> Dict[str, Any]:
@@ -951,6 +958,158 @@ Take Profit: {take_profit_text}
         formatted.insert(3, "")
 
         return "\n".join(formatted)
+
+    def _format_market_intelligence_for_llm(self) -> Optional[str]:
+        """
+        Format market intelligence data for LLM consumption.
+
+        Handles derivatives, macro economics, on-chain, sentiment, and news data.
+        Returns formatted sections for each category present in market_intelligence.
+        """
+        if not self.market_intelligence:
+            return None
+
+        sections = []
+
+        # Format Derivatives & Leverage (funding rates, liquidations, OI)
+        if 'derivatives_leverage' in self.market_intelligence:
+            derivatives_section = self._format_derivatives_data(
+                self.market_intelligence['derivatives_leverage']
+            )
+            if derivatives_section:
+                sections.append(derivatives_section)
+
+        # Format Macro Economics (VIX, DXY, CPI, NFP, etc.)
+        if 'macro_economics' in self.market_intelligence:
+            macro_section = self._format_macro_data(
+                self.market_intelligence['macro_economics']
+            )
+            if macro_section:
+                sections.append(macro_section)
+
+        # Format On-Chain Analytics (whale activity, TVL, etc.)
+        if 'onchain_analytics' in self.market_intelligence:
+            onchain_section = self._format_onchain_data(
+                self.market_intelligence['onchain_analytics']
+            )
+            if onchain_section:
+                sections.append(onchain_section)
+
+        # Format Sentiment & Social (Twitter, Reddit, narratives)
+        if 'sentiment_social' in self.market_intelligence:
+            sentiment_section = self._format_sentiment_data(
+                self.market_intelligence['sentiment_social']
+            )
+            if sentiment_section:
+                sections.append(sentiment_section)
+
+        # Format News & Regulatory (headlines, catalysts)
+        if 'news_regulatory' in self.market_intelligence:
+            news_section = self._format_news_data(
+                self.market_intelligence['news_regulatory']
+            )
+            if news_section:
+                sections.append(news_section)
+
+        return "\n\n".join(sections) if sections else None
+
+    def _format_derivatives_data(self, derivatives: Dict[str, Any]) -> str:
+        """
+        Format derivatives & leverage data for LLM prompt.
+
+        Includes funding rates, liquidations, open interest, and microstructure data.
+        """
+        lines = ["## DERIVATIVES & LEVERAGE", ""]
+
+        # Format funding rates
+        for point_name, data in derivatives.items():
+            if 'funding_rate' in point_name:
+                # Extract symbol from point name (btc_funding_rate -> BTC)
+                symbol = point_name.replace('_funding_rate', '').upper()
+
+                funding_pct = data.get('funding_rate_pct', 0)
+                interp = data.get('interpretation', {})
+
+                lines.append(f"**{symbol} Funding Rate**: {funding_pct:.4f}% ({interp.get('level', 'unknown').title()})")
+                lines.append(f"  - Risk Level: {interp.get('risk', 'unknown').title()}")
+                lines.append(f"  - Interpretation: {interp.get('interpretation', 'No interpretation available')}")
+                lines.append(f"  - Trading Implication: {interp.get('trading_implication', 'No implication data')}")
+
+                next_funding = data.get('next_funding_time')
+                if next_funding:
+                    lines.append(f"  - Next Funding: {next_funding}")
+                lines.append("")
+
+        return "\n".join(lines)
+
+    def _format_macro_data(self, macro: Dict[str, Any]) -> str:
+        """Format macro economic data for LLM prompt."""
+        lines = ["## MACRO ECONOMICS", ""]
+
+        for point_name, data in macro.items():
+            # Format based on data type
+            if isinstance(data, dict):
+                value = data.get('value', 'N/A')
+                interpretation = data.get('interpretation', '')
+                signal = data.get('signal', '')
+
+                lines.append(f"**{point_name.upper().replace('_', ' ')}**: {value}")
+                if interpretation:
+                    lines.append(f"  - {interpretation}")
+                if signal:
+                    lines.append(f"  - Signal: {signal}")
+                lines.append("")
+
+        return "\n".join(lines)
+
+    def _format_onchain_data(self, onchain: Dict[str, Any]) -> str:
+        """Format on-chain analytics for LLM prompt."""
+        lines = ["## ON-CHAIN ANALYTICS", ""]
+
+        for point_name, data in onchain.items():
+            if isinstance(data, dict):
+                lines.append(f"**{point_name.upper().replace('_', ' ')}**:")
+                for key, value in data.items():
+                    if key not in ['metadata', 'raw_data']:
+                        lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
+                lines.append("")
+
+        return "\n".join(lines)
+
+    def _format_sentiment_data(self, sentiment: Dict[str, Any]) -> str:
+        """Format sentiment & social data for LLM prompt."""
+        lines = ["## SENTIMENT & SOCIAL", ""]
+
+        for point_name, data in sentiment.items():
+            if isinstance(data, dict):
+                lines.append(f"**{point_name.upper().replace('_', ' ')}**:")
+                for key, value in data.items():
+                    if key not in ['metadata', 'raw_data']:
+                        lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
+                lines.append("")
+
+        return "\n".join(lines)
+
+    def _format_news_data(self, news: Dict[str, Any]) -> str:
+        """Format news & regulatory data for LLM prompt."""
+        lines = ["## NEWS & REGULATORY", ""]
+
+        for point_name, data in news.items():
+            if isinstance(data, dict):
+                lines.append(f"**{point_name.upper().replace('_', ' ')}**:")
+
+                # Handle news headlines
+                if 'headlines' in data:
+                    lines.append("  Recent Headlines:")
+                    for headline in data['headlines'][:5]:  # Show top 5
+                        lines.append(f"    - {headline}")
+                else:
+                    for key, value in data.items():
+                        if key not in ['metadata', 'raw_data']:
+                            lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
+                lines.append("")
+
+        return "\n".join(lines)
 
     async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> str:
         """Call LLM API using configured provider."""

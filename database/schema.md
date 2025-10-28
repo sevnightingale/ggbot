@@ -118,14 +118,16 @@ Available extraction data sources with premium gating
 **RLS**: Authenticated users can read enabled sources  
 **Indexes**: enabled
 
-**Current Data Sources**:
-- 🟢 🆓 Technical Analysis - Core technical indicators
-- 🟢 💎 Signals in Group Chats - ggShot premium signals  
-- 🔴 💎 Fundamental Analysis - (Future premium feature)
-- 🔴 💎 Sentiment & Trends on Social Media - (Future premium)
-- 🔴 💎 Influencer/Key Opinion Leaders - (Future premium)
-- 🔴 💎 News & Regulatory Actions - (Future premium)
-- 🔴 💎 On-Chain Analytics - (Future premium)
+**Current Data Sources (7 Categories)**:
+1. 🟢 🆓 **Technical Analysis** - Core technical indicators (21 data points)
+2. 🟢 💎 **Trading Signals** - ggShot + future signal sources (1 data point)
+3. 🔴 🆓 **On-Chain Analytics** - Blockchain data, whale activity, network metrics (coming soon)
+4. 🟢 🆓 **Derivatives & Leverage** - Funding rates, liquidations, OI, market microstructure (2 data points)
+5. 🔴 💎 **Sentiment & Social** - Twitter/X, Reddit, narratives, influencer tracking (coming soon)
+6. 🔴 💎 **News & Regulatory** - Headlines, regulatory events, catalysts (coming soon)
+7. 🔴 💎 **Macro Economics** - VIX, DXY, inflation, employment, Fed policy, yields (coming soon)
+
+**Note**: 🟢 = Active/Populated, 🔴 = Planned/Empty, 🆓 = Free, 💎 = Premium
 
 #### `data_points`
 Specific indicators/signals within each data source with configuration values
@@ -148,14 +150,32 @@ Specific indicators/signals within each data source with configuration values
 **RLS**: All users can read enabled data points  
 **Indexes**: (source_id, enabled, sort_order), (requires_premium, enabled)
 
-**Current Data Points**:
-- **Technical Analysis (21 total)**:
-  - **Momentum (10)**: RSI, MACD, Stochastic, Williams %R, CCI, MFI, ROC, Aroon, Vortex, TRIX
-  - **Trend (4)**: ADX, Parabolic SAR, EMA, SMA  
-  - **Volatility (5)**: Bollinger Bands, Keltner Channels, Donchian, ATR, BB Width
-  - **Volume (2)**: OBV, VWAP
-- **Signals in Group Chats (1 total)**:
-  - **ggShot**: Premium AI-filtered trading signals (requires premium)
+**Current Data Points (24 Total Across 7 Categories)**:
+
+1. **Technical Analysis** (21 points - FREE):
+   - **Momentum (10)**: RSI, MACD, Stochastic, Williams %R, CCI, MFI, ROC, Aroon, Vortex, TRIX
+   - **Trend (4)**: ADX, Parabolic SAR, EMA, SMA
+   - **Volatility (5)**: Bollinger Bands, Keltner Channels, Donchian, ATR, BB Width
+   - **Volume (2)**: OBV, VWAP
+
+2. **Trading Signals** (1 point - PREMIUM):
+   - **ggShot**: AI-filtered trading signals with multi-timeframe analysis
+
+3. **Derivatives & Leverage** (2 points - FREE):
+   - **BTC Funding Rate**: Binance perpetual futures funding rate
+   - **ETH Funding Rate**: Binance perpetual futures funding rate
+
+4. **On-Chain Analytics** (0 points - COMING SOON):
+   - Planned: Exchange flows, whale wallets, TVL, token unlocks, dev activity
+
+5. **Sentiment & Social** (0 points - COMING SOON):
+   - Planned: Twitter/X sentiment, Reddit analysis, narrative velocity, influencer tracking
+
+6. **News & Regulatory** (0 points - COMING SOON):
+   - Planned: Real-time headlines, regulatory announcements, catalyst events
+
+7. **Macro Economics** (0 points - COMING SOON):
+   - Planned: VIX, DXY, CPI, NFP, Fed policy, yield curves, intermarket correlations
 
 ---
 

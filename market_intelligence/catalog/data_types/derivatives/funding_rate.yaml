@@ -1,0 +1,119 @@
+name: funding_rate
+category: derivatives
+description: Perpetual futures funding rates showing long/short leverage positioning
+
+query_params:
+  symbol:
+    type: string
+    required: true
+    description: Trading pair symbol (e.g., BTC/USDT)
+    example: BTC/USDT
+
+  include_mark_price:
+    type: boolean
+    required: false
+    default: false
+    description: Include mark price and index price data
+
+sources:
+  - adapter: binance_funding
+    priority: 1
+    required_env: []
+    cost: free
+    rate_limit: 1200  # Binance weight limit per minute
+    notes: Public Binance Futures API endpoint
+
+cache:
+  backend: redis
+  ttl: 3600  # 1 hour - funding rates update every 8 hours, so aggressive caching is safe
+  key_pattern: "funding_rate:{symbol}"
+
+response_schema:
+  type: object
+  description: Funding rate data with interpretation
+  properties:
+    symbol:
+      type: string
+      description: Trading pair symbol
+    funding_rate:
+      type: number
+      description: Current funding rate as decimal
+      example: 0.0001
+    funding_rate_pct:
+      type: number
+      description: Current funding rate as percentage
+      example: 0.01
+    next_funding_time:
+      type: string
+      format: date-time
+      description: Next funding rate update timestamp
+    interpretation:
+      type: object
+      properties:
+        level:
+          type: string
+          enum: [extreme_long_leverage, high_long_leverage, slight_long_bias, neutral, slight_short_bias, high_short_leverage, extreme_short_leverage]
+        risk:
+          type: string
+          enum: [minimal, low, medium, high]
+        interpretation:
+          type: string
+          description: Human-readable funding rate description
+        trading_implication:
+          type: string
+          description: Trading strategy implications
+        color:
+          type: string
+          enum: [green, yellow, orange, red]
+    mark_price:
+      type: number
+      nullable: true
+      description: Current mark price (if requested)
+    index_price:
+      type: number
+      nullable: true
+      description: Current index price (if requested)
+    fetched_at:
+      type: string
+      format: date-time
+
+agent_format:
+  summary: |
+    Funding Rate for {symbol}:
+    - Rate: {funding_rate_pct:.3f}%
+    - Status: {interpretation.level}
+    - Risk Level: {interpretation.risk}
+    - Next Update: {next_funding_time}
+
+  insights: |
+    Market Positioning Analysis:
+
+    {interpretation.interpretation}
+
+    Trading Implication:
+    {interpretation.trading_implication}
+
+    {% if interpretation.risk == 'high' %}
+    ⚠️ WARNING: Extreme leverage detected - high liquidation risk
+    {% elif interpretation.risk == 'medium' %}
+    ⚠️ CAUTION: Crowded positioning - monitor for reversals
+    {% else %}
+    ✓ Normal funding conditions
+    {% endif %}
+
+examples:
+  - description: Get BTC funding rate with basic info
+    params:
+      symbol: BTC/USDT
+    expected_fields: [funding_rate, funding_rate_pct, interpretation]
+
+  - description: Get ETH funding rate with mark price
+    params:
+      symbol: ETH/USDT
+      include_mark_price: true
+    expected_fields: [funding_rate, mark_price, index_price]
+
+data_quality:
+  latency_target: 200ms
+  freshness_target: 1h  # Updates every 8h on Binance
+  confidence_threshold: 0.9

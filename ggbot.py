@@ -265,7 +265,9 @@ app = FastAPI(
 
 # Include API routers
 from api.paper_trading import router as paper_trading_router
+from api.agent import router as agent_router
 app.include_router(paper_trading_router)
+app.include_router(agent_router)
 
 
 class GGBotOrchestrator:
@@ -829,6 +831,34 @@ class GGBotOrchestrator:
                 self._log.warning(f"Failed to fetch ggShot signals (non-critical): {e}")
                 overall_result["ggshot_signals"] = {}
 
+            # Fetch market intelligence via orchestrator (funding rates, macro, etc.)
+            # This uses the Universal Data Layer to fetch non-technical data sources
+            # based on config.extraction.selected_data_sources
+            try:
+                from market_intelligence.orchestrator import fetch_market_intelligence
+
+                market_intel = await fetch_market_intelligence(
+                    config=config,
+                    user_id=user_id,
+                    symbol=symbol
+                )
+
+                if market_intel:
+                    overall_result["market_intelligence"] = market_intel
+                    total_points = sum(len(category) for category in market_intel.values())
+                    categories = list(market_intel.keys())
+                    self._log.info(
+                        f"✅ Market intelligence: {total_points} data points from "
+                        f"{len(categories)} categories ({', '.join(categories)})"
+                    )
+                else:
+                    overall_result["market_intelligence"] = {}
+                    self._log.debug("No market intelligence sources enabled in config")
+
+            except Exception as e:
+                self._log.warning(f"Failed to fetch market intelligence (non-critical): {e}")
+                overall_result["market_intelligence"] = {}
+
             self._log.info(f"V2 Multi-timeframe extraction completed: {successful_extractions}/{len(timeframes)} successful")
             return overall_result
             
@@ -877,13 +907,15 @@ class GGBotOrchestrator:
             if not symbol:
                 raise ValueError("No symbol specified for decision")
 
-            # Extract ggshot signals from extraction result if available
+            # Extract ggshot signals and market intelligence from extraction result if available
             ggshot_signals = extraction_result.get('ggshot_signals', {})
+            market_intelligence = extraction_result.get('market_intelligence', {})
 
             decision_result = await decision_engine.make_decision(
                 symbol=symbol,
                 signal_data=signal_data,
-                ggshot_signals=ggshot_signals
+                ggshot_signals=ggshot_signals,
+                market_intelligence=market_intelligence
             )
             
             self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")

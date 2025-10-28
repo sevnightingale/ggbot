@@ -230,7 +230,9 @@ class CatalogEntry:
 
     def build_cache_key(self, params: Dict[str, Any]) -> str:
         """Build cache key from template and parameters."""
-        return self.cache.key_pattern.format(**params)
+        # Include catalog entry name in format context for key_pattern templates
+        format_context = {'name': self.name, **params}
+        return self.cache.key_pattern.format(**format_context)
 
     def format_for_agent(self, response: AdapterResponse, query_params: Dict[str, Any] = None) -> Dict[str, Any]:
         """Format adapter response for agent consumption using template."""

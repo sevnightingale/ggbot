@@ -72,6 +72,7 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 **🔧 [Data Integration](extraction/v2/)** - Direct API Connections
 - **Universal Data Layer**: Catalog-driven market intelligence gateway with WebSocket caching (3x faster extractions)
+- **Intelligence Orchestrator**: Config-driven data routing for 150+ data sources without code bloat
 - **Live Price Feeds**: Real-time prices via Binance WebSocket (sub-millisecond access, ~1s updates)
 - **pandas-ta Library**: 20+ technical indicators with pure Python processing
 - **Supabase Database**: Real-time data storage and retrieval
@@ -193,8 +194,9 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 ### Module Deep Dives
 
-- **[extraction/README.md](extraction/README.md)** - Market data gathering and processing
-- **[decision/README.md](decision/README.md)** - AI reasoning and strategy execution  
+- **[extraction/v2/README.md](extraction/v2/README.md)** - Technical indicator extraction (21 preprocessors, V2 pure Python system)
+- **[market_intelligence/README.md](market_intelligence/README.md)** - **Complete market intelligence architecture** (orchestrator, gateway, catalog, 32 data sources)
+- **[decision/README.md](decision/README.md)** - AI reasoning and strategy execution
 - **[trading/README.md](trading/README.md)** - Trade execution and position management
 - **[frontend/README.md](frontend/README.md)** - User interface and platform management
 - **[core/](core/)** - Shared infrastructure and utilities

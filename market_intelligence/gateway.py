@@ -59,7 +59,8 @@ class MarketIntelligence:
         self,
         data_type: str,
         params: Dict[str, Any],
-        format: QueryFormat = QueryFormat.RAW
+        format: QueryFormat = QueryFormat.RAW,
+        cache_ttl_override: Optional[int] = None
     ) -> MarketDataResponse:
         """
         Universal query interface for market intelligence.
@@ -68,6 +69,7 @@ class MarketIntelligence:
             data_type: Type of data (ohlcv, sentiment, news, onchain, etc.)
             params: Query parameters (varies by data_type)
             format: Output format (RAW, ANALYSIS, or LLM)
+            cache_ttl_override: Optional TTL override in seconds (bypasses catalog default)
 
         Returns:
             MarketDataResponse with requested data
@@ -93,11 +95,22 @@ class MarketIntelligence:
         except ValueError as e:
             raise DataSourceError(f"Invalid parameters for {data_type}: {e}")
 
+        # Apply cache TTL override if provided
+        cache_config = catalog_entry.cache
+        if cache_ttl_override is not None:
+            from market_intelligence.types import CacheConfig
+            cache_config = CacheConfig(
+                backend=catalog_entry.cache.backend,
+                ttl=cache_ttl_override,  # Override TTL
+                key_pattern=catalog_entry.cache.key_pattern
+            )
+            self._log.debug(f"Cache TTL override: {cache_ttl_override}s (default: {catalog_entry.cache.ttl}s)")
+
         # Build cache key
         cache_key = catalog_entry.build_cache_key(validated_params)
 
         # Check cache
-        cached_data = await self.cache_manager.get(cache_key, catalog_entry.cache)
+        cached_data = await self.cache_manager.get(cache_key, cache_config)
         if cached_data:
             latency_ms = (time.time() - start_time) * 1000
             self._log.info(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
@@ -158,8 +171,8 @@ class MarketIntelligence:
                 self._log.info(f"Fetching {data_type} from {source_config.adapter}")
                 adapter_response = await adapter.fetch(query_params_obj)
 
-                # Cache the result
-                await self.cache_manager.set(cache_key, adapter_response, catalog_entry.cache)
+                # Cache the result (use cache_config which may have TTL override)
+                await self.cache_manager.set(cache_key, adapter_response, cache_config)
 
                 # Calculate total latency
                 latency_ms = (time.time() - start_time) * 1000
@@ -260,6 +273,10 @@ class MarketIntelligence:
             category = 'fundamentals'
         elif 'fred' in snake_case or 'bls' in snake_case or 'treasury' in snake_case:
             category = 'macro'
+        elif 'grok' in snake_case or 'agentic' in snake_case:
+            category = 'agentic'
+        elif 'ggshot' in snake_case or 'signals' in snake_case:
+            category = 'signals'
         else:
             # Default to market_data
             category = 'market_data'

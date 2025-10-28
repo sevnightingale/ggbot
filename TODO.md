@@ -9,138 +9,173 @@
 
 **Vision**: Transform ggbots from bot platform (scheduled execution) to agent infrastructure (autonomous AI decision-making)
 
-**Architecture**: Agent IS the orchestrator + decision engine, using extraction/trading services as tools
+**Key Features**:
+- **Two-phase system**: Conversation Mode → Autonomous Mode
+- **Two personalities**: Guided (user-defined strategy) vs Experimental (agent-evolving strategy)
+- **Minimal DB changes**: 1 field + 1 table
+- **7 tools**: Market data, trading, positions, account, wait, update_strategy, record_learning
+- **Context-based compaction**: Auto-reload at 150k tokens
+- **Single agent per user** (initially)
 
-### **Phase 1: Foundation & MCP Server** (3-4 days)
+### **Phase 1: Database & Foundation** (1 day)
 
-**Goal**: Build MCP server with 6 core tools, test individual tool functionality
+**Goal**: Database schema changes, project setup
 
-- [ ] **Project Setup**
-  - [ ] Create `agent/` directory structure
-  - [ ] Set up Claude Agent SDK dependencies
-  - [ ] Create `.mcp.json` configuration file
-  - [ ] Set up environment variables (AGENT_CONFIG_ID, AGENT_USER_ID, AUTH_TOKEN)
+**Architecture Decision**: Agent runs as **separate microservice** with isolated venv to avoid dependency conflicts.
+- Agent uses `.venv-agent/` (isolated dependencies)
+- Main ggbot uses `.venv/` (unchanged)
+- Communication: HTTP API + direct DB/Redis access
+- Deployment: PM2 process with interpreter path to `.venv-agent/bin/python`
 
-- [ ] **Missing Backend Endpoint**
-  - [ ] Add `POST /api/v2/positions/paper/{trade_id}/close` endpoint
-  - [ ] Test paper position closing via API
-  - [ ] Verify response format matches live trading close endpoint
+- [x] **Database Changes**
+  - [x] Add `created_by TEXT DEFAULT 'decision_engine_v2'` column to `decisions` table
+  - [x] Create `agent_memory` table (id, config_id, user_id, memory_type, content, importance, created_at)
+  - [x] Migration executed successfully in Supabase
+  - [x] Verified paper close endpoint exists: `POST /api/v2/paper/{config_id}/positions/{trade_id}/close`
 
-- [ ] **Config Management** (`agent/config_manager.py`)
-  - [ ] Implement `create_agent_config(user_id, strategy)` → creates config_type="agent"
-  - [ ] Implement `update_agent_config(updates)` → PATCH config dynamically
-  - [ ] Implement `get_agent_config()` → load current config state
-  - [ ] Test config CRUD operations via API
+- [x] **Project Setup**
+  - [x] Create `agent/` directory structure (5 stub files)
+  - [x] Create `requirements-agent.txt` with isolated dependencies
+  - [x] Create `scripts/setup_agent_venv.sh` for venv setup
+  - [x] Update `.env.example` with agent configuration
+  - [x] Redis already running (verified in ACTIVE.md)
+  - [x] Run `./scripts/setup_agent_venv.sh` to create agent venv
+  - [x] Test agent venv installation (Claude Agent SDK imported successfully)
+  - [x] Configure `.env` with ANTHROPIC_API_KEY and AGENT_WHITELIST_USER_ID
+  - [x] Add `.venv-agent/` to `.gitignore`
 
-- [ ] **Service Client** (`agent/service_client.py`)
-  - [ ] Implement `get_current_price(symbol)` wrapper
-  - [ ] Implement `call_extraction_service(config)` wrapper
-  - [ ] Implement `call_trading_service(intent)` wrapper
-  - [ ] Implement `query_positions()` DB query wrapper
-  - [ ] Implement `query_account()` DB query wrapper
-  - [ ] Test all service wrappers with real config_id
+**Phase 1 Status**: ✅ **COMPLETE**
 
-- [ ] **MCP Server Tools** (`agent/mcp_server.py`)
-  - [ ] Tool 1: `query_market_data` (update config → call extraction)
-  - [ ] Tool 2: `execute_trade` (create intent → call trading service)
-  - [ ] Tool 3: `get_positions` (query open trades from DB)
-  - [ ] Tool 4: `close_position` (call paper trading close endpoint)
-  - [ ] Tool 5: `get_account_status` (query account metrics)
-  - [ ] Tool 6: `wait_for` (log wait reason, return next check time)
-  - [ ] Create `ggbots_trading_server` with all 6 tools
-  - [ ] Test each tool individually with mock agent config
+### **Phase 2: MCP Server & Tools** (2-3 days)
 
-### **Phase 2: Agent Runner & Integration** (2-3 days)
+**Goal**: Build 9 MCP tools, implement trade observations model
 
-**Goal**: Build agent loop, test autonomous operation, verify full integration
+- [x] **Database Migration**
+  - [x] Replace `agent_memory` with `trade_observations` table (post-trade reflection model)
+  - [x] Migration executed in Supabase, verified with 13 columns, 8 indexes, RLS enabled
 
-- [ ] **Agent Runner** (`agent/run_agent.py`)
-  - [ ] Implement `run_trading_agent(user_id, strategy)` main loop
-  - [ ] Configure Claude Agent SDK with MCP server
-  - [ ] Set allowed_tools list (all 6 tools)
-  - [ ] Build system prompt with strategy context
-  - [ ] Implement agent message streaming and logging
-  - [ ] Add error handling and graceful shutdown
+- [x] **API Endpoints** (`api/agent.py`)
+  - [x] 7 existing endpoints + 2 new: `POST /agent/trade-observations`, `POST /agent/trade-observations/query`
 
-- [ ] **Integration Testing**
-  - [ ] Create test agent config (paper trading, $10K balance)
-  - [ ] Test: Agent queries market data → receives formatted analysis
-  - [ ] Test: Agent executes trade → trade appears in database
-  - [ ] Test: Agent checks positions → sees open trades
-  - [ ] Test: Agent closes position → position marked closed
-  - [ ] Test: Agent checks account → sees balance/P&L
-  - [ ] Verify all decisions logged with `created_by = 'agent'`
+- [x] **Service Client** (`agent/service_client.py`)
+  - [x] HTTP client with retry logic for all 9 endpoints (market data, trading, positions, account, strategy, observations)
 
-- [ ] **Autonomous Operation Test**
-  - [ ] Run agent for 1 hour with simple strategy
-  - [ ] Verify agent makes decisions autonomously
-  - [ ] Verify agent controls its own timing (wait_for works)
-  - [ ] Check database audit trail (decisions, trades, config updates)
-  - [ ] Monitor agent reasoning quality
+- [x] **MCP Server Tools** (`agent/mcp_server.py`)
+  - [x] 9 tools implemented: query_market_data, execute_trade, get_positions, get_account_status, close_position, update_strategy, wait_for, record_trade_observation, query_trade_observations
+  - [x] Module-level AgentContext for single-agent testing
+  - [x] MCP server tested and verified (9 tools registered)
 
-### **Phase 3: Dashboard & Multi-Agent Support** (2-3 days)
+**Phase 2 Status**: ✅ **COMPLETE**
 
-**Goal**: Show agents in UI, support multiple concurrent agents
+### **Phase 3: Agent Runner** (2-3 days) - 🔄 **IN PROGRESS**
 
-- [ ] **Database & Backend**
-  - [ ] Verify `config_type = 'agent'` filtering works
-  - [ ] Test multiple agent configs for same user
-  - [ ] Ensure paper accounts isolated per agent config_id
-  - [ ] Test agent metrics endpoints (`/api/v2/bot/{config_id}/metrics`)
+**Goal**: Build conversation + autonomous modes, test end-to-end
+
+- [x] **TradingAgent Class** (`agent/run_agent.py`)
+  - [x] Initialize ClaudeSDKClient with MCP server
+  - [x] Implement streaming mode with two async tasks (agent loop + user interrupts)
+  - [x] Build single system prompt with mode/strategy context injection
+  - [x] Redis queue integration (messages and responses)
+  - [ ] Complete mode switching logic (detect flag, handle user confirmation "1"/"2")
+  - [ ] Compaction context injection (deferred to Phase 4 - SDK auto-compacts at 95%)
+
+- [x] **Message Queue Integration**
+  - [x] Redis queue for user → agent messages: `agent:{config_id}:messages`
+  - [x] Redis queue for agent → user responses: `agent:{config_id}:responses`
+  - [x] User message interrupt handling with client.interrupt()
+
+- [x] **MCP Tools**
+  - [x] Added `request_autonomous_mode` tool (10 tools total)
+
+- [ ] **Model Configuration**
+  - [x] Model selected: `claude-haiku-4-5-20251001` for testing ($1/$5 per MTok)
+  - [ ] Test token usage and performance with Haiku
+  - [ ] Note: Upgrade to `claude-sonnet-4-5-20250929` for production ($3/$15 per MTok)
+
+- [ ] **CLI Testing Interface**
+  - [ ] Create `agent/chat.py` - Redis-based CLI for testing agent interaction
+
+- [ ] **End-to-End Testing**
+  - [ ] Test: Conversation mode → strategy confirmation → autonomous mode switch
+  - [ ] Test: Guided mode agent executes user-defined strategy
+  - [ ] Test: Experimental mode agent updates its own strategy
+  - [ ] Test: Agent runs for 1+ hours autonomously with wait_for
+  - [ ] Test: Compaction triggers (SDK auto-compacts at 95%)
+  - [ ] Verify all decisions logged with `created_by='agent'`
+  - [ ] Verify trade_observations records created
+
+### **Phase 4: Frontend & User Experience** (2-3 days)
+
+**Goal**: Agent creation UI, dashboard integration
+
+- [ ] **Backend API Endpoints**
+  - [ ] `POST /api/v2/agent/create` - start conversation mode
+  - [ ] `POST /api/v2/agent/{config_id}/message` - send message to agent
+  - [ ] `GET /api/v2/agent/{config_id}/status` - get mode, strategy version, performance
+  - [ ] `POST /api/v2/agent/{config_id}/stop` - gracefully stop agent
+  - [ ] Filter agent configs: `GET /api/v2/config?config_type=agent`
 
 - [ ] **Frontend Integration**
-  - [ ] Filter configs by type: bots vs agents
-  - [ ] Create "My Agents" section in dashboard
-  - [ ] Show agent status (Active, Current Focus, Open Positions)
-  - [ ] Display agent current config state ("Analyzing BTC with RSI, Sentiment")
-  - [ ] Show agent performance metrics (same as bots)
-  - [ ] Add "Create Agent" flow (strategy input → agent creation)
+  - [ ] "Create Agent" flow - conversation UI
+  - [ ] Agent status display (mode, strategy version, P&L)
+  - [ ] Chat interface for conversation mode
+  - [ ] Message agent while autonomous (status checks)
+  - [ ] Strategy evolution timeline (for experimental mode)
+  - [ ] Show learnings from agent_memory table
+  - [ ] "My Agents" vs "My Bots" sections
 
-- [ ] **Multi-Agent Testing**
-  - [ ] Run 2 agents simultaneously with different strategies
-  - [ ] Verify configs don't interfere (isolated state)
-  - [ ] Verify paper accounts isolated (separate balances)
-  - [ ] Check dashboard shows both agents correctly
-  - [ ] Test stopping one agent while other continues
+- [ ] **Testing**
+  - [ ] Create guided mode agent via UI
+  - [ ] Create experimental mode agent via UI
+  - [ ] Send messages to autonomous agent
+  - [ ] View strategy evolution for experimental agent
+  - [ ] Stop/restart agent
 
-### **Phase 4: Production Deployment & Monitoring** (1-2 days)
+### **Phase 5: Production Deployment** (1-2 days)
 
-**Goal**: Deploy to production, monitor initial agent performance
+**Goal**: Deploy, monitor, document
 
 - [ ] **Deployment**
-  - [ ] Deploy agent code to production server
-  - [ ] Set up agent service (PM2 or systemd)
+  - [ ] Deploy agent code to production
+  - [ ] Set up PM2 service for agents (one per user initially)
   - [ ] Configure production environment variables
-  - [ ] Test agent startup/shutdown procedures
+  - [ ] Set up Redis for message queue
+  - [ ] Test agent startup/shutdown/restart
 
-- [ ] **Monitoring & Logging**
-  - [ ] Add agent-specific logging (agent_id, strategy, decisions)
-  - [ ] Monitor agent API call volume
-  - [ ] Track agent decision quality metrics
-  - [ ] Set up alerts for agent errors/failures
+- [ ] **Monitoring**
+  - [ ] Agent-specific logging (mode, tokens, strategy version)
+  - [ ] Track tool call frequency
+  - [ ] Monitor compaction events
+  - [ ] Alert on agent failures/errors
+  - [ ] Track strategy performance by mode (guided vs experimental)
 
 - [ ] **Documentation**
-  - [ ] Write agent usage guide (`agent/README.md`)
-  - [ ] Document strategy creation patterns
-  - [ ] Create example strategies (conservative, aggressive, macro)
-  - [ ] Document debugging procedures
+  - [ ] Agent usage guide (`agent/README.md`)
+  - [ ] Example strategies (conservative, aggressive, experimental)
+  - [ ] Troubleshooting guide
+  - [ ] API documentation for agent endpoints
 
 ### **Future Enhancements** (Post-Launch)
 
-- [ ] **Agent Learning**
-  - [ ] Track strategy performance (win rate by strategy type)
-  - [ ] Recommend strategy adjustments based on performance
-  - [ ] Strategy template library
+- [ ] **Multi-Agent Support**
+  - [ ] Multiple agents per user
+  - [ ] Agent coordination and position awareness
+  - [ ] Portfolio-level risk management
 
-- [ ] **User Interaction**
-  - [ ] Mid-trade chat interface ("Why did you enter here?")
-  - [ ] Strategy refinement via conversation
+- [ ] **Enhanced Learning**
+  - [ ] Automatic learning promotion (agent_memory → config_data)
+  - [ ] Learning importance auto-scoring
+  - [ ] Strategy template library from successful experimental agents
+
+- [ ] **Advanced Interaction**
+  - [ ] Mid-trade explanations ("Why did you enter here?")
+  - [ ] Strategy refinement via conversation while autonomous
   - [ ] Real-time reasoning display in dashboard
 
-- [ ] **Multi-Agent Coordination**
-  - [ ] Shared context between agents
-  - [ ] Position correlation awareness
-  - [ ] Portfolio-level risk management
+- [ ] **Model Flexibility**
+  - [ ] Per-agent model selection (Haiku for budget, Sonnet for premium, Opus for specialized)
+  - [ ] Cost tracking per agent
+  - [ ] Model performance comparison dashboard
 
 ---
 
@@ -152,38 +187,53 @@
 
 **Current State**:
 - ✅ Infrastructure complete (data_sources/data_points tables, UI, API)
-- ✅ 2/6 data sources populated (Technical Analysis: 21 indicators, ggShot signals: 1)
-- ⏳ 4/6 data sources empty (On-Chain, Sentiment, News, Macro)
-- **Gap**: Zero context beyond technicals - no macro, sentiment, on-chain, or news awareness
+- ✅ 7 categories finalized (Technical Analysis, Trading Signals, On-Chain, Derivatives & Leverage, Sentiment & Social, News & Regulatory, Macro Economics)
+- ✅ 7/7 data sources populated (Technical Analysis: 21, Trading Signals: 1, Derivatives & Leverage: 2, Macro: 4, On-Chain: 2, Sentiment: 1, News: 1 = **32 total**)
+- ✅ Intelligence Orchestrator **PRODUCTION READY** (`market_intelligence/orchestrator.py`) - parallel query execution, custom TTL per data point
+- ✅ **GrokAgenticAdapter PRODUCTION DEPLOYED** - ONE universal adapter handles 8 data sources via XAI's agentic API (web search, X search, code execution)
+- ✅ 8 new Grok data points **LIVE IN PRODUCTION** (VIX, DXY, CPI, NFP, BTC TVL, whale activity, Twitter sentiment, crypto news) - all FREE tier
+- ✅ Decision engine integration complete (formatting methods, prompt updates, real bot tested)
+- ✅ Tested production: All 8 data points working, parallel execution ~30s, comprehensive AI reasoning
+- ✅ **PHASE 1 COMPLETE** - $195/month platform cost ($0.76/user/month at 257 users, $0.20/user at 1000 users)
 
-### **Phase 1: Free Quick Wins** (Week 1-2) - $0/month
+### **Phase 1: Grok-Powered Intelligence** (COMPLETE - Ready for Production) - $160-240/month platform cost
 
 **Goal**: Add 7 contextual data points via 3 acquisition methods (Direct API, Grok Search, Browser-Use)
 
-**New Data Source: Crypto Derivatives** (2 points)
-- [ ] Create `BinanceFundingAdapter` for perpetual funding rates
-- [ ] Create catalog YAML: `funding_rate.yaml`
-- [ ] Seed database: INSERT 1 data_source + 2 data_points (BTC, ETH)
-- [ ] Test: Fetch BTC/ETH funding rates from Binance API
+**New Data Source: Derivatives & Leverage** (2 points) - ✅ COMPLETE
+- [x] Create `BinanceFundingAdapter` for perpetual funding rates
+- [x] Create catalog YAML: `funding_rate.yaml`
+- [x] Seed database: INSERT 1 data_source + 2 data_points (BTC, ETH)
+- [x] Test: Fetch BTC/ETH funding rates from Binance API (tested live: BTC 0.0026%, ETH 0.0063%)
 
-**New Data Source: Macro Context** (4 points)
-- [ ] Create `GrokSearchAdapter` OR `FredApiAdapter` base class
-- [ ] Create catalog YAMLs: `vix.yaml`, `dxy.yaml`, `cpi.yaml`, `nfp.yaml`
-- [ ] Seed database: INSERT 1 data_source + 4 data_points
-- [ ] Test Grok API with web search tool for VIX scraping
-- [ ] Test FRED API key setup and data fetch
+**New Data Sources via GrokAgenticAdapter** (8 points) - ✅ **PRODUCTION DEPLOYED**
+- [x] Create `GrokAgenticAdapter` - universal adapter with 8 prompt templates (VIX, DXY, CPI, NFP, Twitter, news, TVL, whales)
+- [x] Create catalog YAML: `grok_agentic.yaml` with query_type parameter support
+- [x] Update `catalog_mapping.py` with 8 new entries + custom cache TTL per data point (10min to 24hrs)
+- [x] Test all 8 query types - ✅ SUCCESS (total cost $0.11, all queries working)
+- [x] Install xai-sdk (v1.3.1) - supports agentic tool calling with streaming
+- [x] **Seed database**: INSERT 4 data_sources + 8 data_points (all FREE tier)
+- [x] Fix gateway adapter routing for `agentic` category
+- [x] Fix ggShot adapter data source name (`signals_group_chats` → `trading_signals`)
+- [x] Fix cache key KeyError (missing `name` in format context)
+- [x] Fix Redis protobuf serialization (citations + tool_calls conversion)
 
-**Expand Data Source: On-Chain Analytics** (1 point)
-- [ ] Create `DefiLlamaAdapter` for DeFi TVL metrics
-- [ ] Create catalog YAML: `tvl.yaml`
-- [ ] Seed database: INSERT 1 data_point (BTC DeFi TVL)
-- [ ] Test: Fetch TVL from DefiLlama API
+**Intelligence Orchestrator Implementation** - ✅ **PRODUCTION DEPLOYED**
+- [x] Build `IntelligenceOrchestrator` class (market_intelligence/orchestrator.py) - 260 lines, config-driven routing
+- [x] Implement config parsing (read selected_data_sources from config) - `_parse_config_sources()`
+- [x] Create data_point → catalog mapping logic (catalog_mapping.py) - hardcoded dict, 12 entries (2 funding + 8 Grok + 2 signals)
+- [x] Add funding rates to orchestrator routing - ✅ Working via mapping
+- [x] Add `data_points_override` parameter for agent dynamic queries
+- [x] Implement parallel query execution - ✅ 5.3x speedup (160s → 30s)
+- [x] Update `ggbot.py` to call orchestrator - ✅ Hybrid approach (technicals via old way, market intel via orchestrator)
+- [x] Write comprehensive tests - 16/16 unit tests passing (tests/test_orchestrator.py)
+- [ ] Migrate ggShot to use orchestrator (FUTURE - keep hardcoded for now, low risk approach)
 
-**Decision Engine Integration**
-- [ ] Update `decision/prompts/opportunity_analysis.py` with context section
-- [ ] Modify `decision/engine_v2.py` to fetch enabled data sources from config
-- [ ] Add market intelligence formatting for LLM prompts
-- [ ] Test end-to-end: User enables funding rates → Decision agent sees data
+**Decision Engine Integration** - ✅ **PRODUCTION DEPLOYED**
+- [x] Add market intelligence formatting methods to decision engine - 6 methods (_format_derivatives_data, _format_macro_data, etc.)
+- [x] Update prompts to include market intelligence section - opportunity_analysis.py updated
+- [x] Add `market_intelligence` parameter to make_decision() - ✅ Flows from extraction → decision
+- [x] Test end-to-end with real bot - ✅ Comprehensive AI reasoning with all 8 data points
 
 **Expected Impact**: +30-40% trading edge (avoid overleveraged setups, macro-aware decisions)
 

@@ -31,7 +31,7 @@ class GGShotAdapter(DataAdapter):
         self._signals_source_id = None
 
     def _get_signals_source_id(self) -> str:
-        """Get UUID of 'signals_group_chats' data source."""
+        """Get UUID of 'trading_signals' data source."""
         if self._signals_source_id:
             return self._signals_source_id
 
@@ -39,11 +39,11 @@ class GGShotAdapter(DataAdapter):
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT source_id FROM data_sources
-                    WHERE name = 'signals_group_chats'
+                    WHERE name = 'trading_signals'
                 """)
                 result = cur.fetchone()
                 if not result:
-                    raise AdapterError("signals_group_chats data source not found in database")
+                    raise AdapterError("trading_signals data source not found in database. Make sure signals are seeded.")
                 self._signals_source_id = str(result[0])
                 return self._signals_source_id
 

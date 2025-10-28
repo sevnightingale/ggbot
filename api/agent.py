@@ -1,0 +1,605 @@
+"""
+Agent API Endpoints
+
+Provides thin API wrappers for autonomous trading agents to orchestrate trading operations.
+Agents control the trading flow by calling individual components (extraction, execution, etc.)
+
+Architecture:
+- Agent orchestrates via these endpoints (doesn't call main orchestrator)
+- Endpoints are thin wrappers around existing services
+- No config pollution - dynamic params are in-memory only
+- Works with both paper and live trading
+"""
+
+import os
+import json
+from typing import Dict, List, Any, Optional
+from datetime import datetime
+from fastapi import APIRouter, HTTPException, Depends, Body
+from pydantic import BaseModel
+from dotenv import load_dotenv
+
+from core.common.logger import logger
+from core.auth.supabase_auth import get_current_user_v2, AuthenticatedUser
+from core.config.config_main import get_configuration
+from core.common.db import get_db_connection
+from trading.paper.supabase_service import SupabasePaperTradingService
+from extraction.v2.extraction_engine import ExtractionEngineV2
+
+# Load environment variables
+load_dotenv()
+
+router = APIRouter(prefix="/api/v2/agent", tags=["agent"])
+
+
+# ============================================================================
+# REQUEST/RESPONSE MODELS
+# ============================================================================
+
+class QueryMarketDataRequest(BaseModel):
+    """Request for querying market data (technical + intelligence)"""
+    config_id: str
+    symbol: str
+    indicators: Optional[List[str]] = None  # Technical indicators override
+    data_sources: Optional[Dict[str, List[str]]] = None  # Market intelligence override
+    timeframe: str = "1h"
+
+
+class ExecuteTradeRequest(BaseModel):
+    """Request for executing a trade directly"""
+    config_id: str
+    symbol: str
+    side: str  # "long" or "short"
+    confidence: float = 0.7
+    stop_loss_price: Optional[float] = None
+    take_profit_price: Optional[float] = None
+    decision_id: Optional[str] = None
+
+
+class UpdateStrategyRequest(BaseModel):
+    """Request for updating agent strategy"""
+    strategy_content: str
+    updated_by: str = "agent"  # "agent" or "user"
+
+
+class RecordTradeObservationRequest(BaseModel):
+    """Request for recording post-trade reflection"""
+    trade_id: str
+    observation_type: str  # "win_analysis" or "loss_analysis"
+    what_went_well: Optional[str] = None
+    what_went_wrong: Optional[str] = None
+    predictive_data_points: Optional[Dict[str, str]] = None  # {"vix": "low volatility helped"}
+    decision_review: Optional[str] = None
+    importance: int = 5  # 1-10
+
+
+class QueryTradeObservationsRequest(BaseModel):
+    """Request for querying trade observations"""
+    config_id: str
+    symbol: Optional[str] = None
+    observation_type: Optional[str] = None  # "win_analysis" or "loss_analysis"
+    min_importance: Optional[int] = None
+    limit: int = 10
+
+
+# ============================================================================
+# 1. QUERY MARKET DATA (Unified: Technical + Intelligence)
+# ============================================================================
+
+@router.post("/query-market-data")
+async def query_market_data(
+    request: QueryMarketDataRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Query market data with optional dynamic overrides.
+
+    If no indicators/data_sources provided, uses config defaults.
+    Dynamic params are in-memory only (config not modified).
+
+    Examples:
+    - Technical only: {"symbol": "BTCUSDT", "indicators": ["RSI"]}
+    - Intelligence only: {"symbol": "BTCUSDT", "data_sources": {"macro_economics": ["vix"]}}
+    - Both: Provide both indicators and data_sources
+    - Config defaults: Just provide symbol (no overrides)
+    """
+    try:
+        config = get_configuration(current_user.user_id, request.config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        result = {}
+
+        # Query technical indicators
+        if request.indicators or not request.data_sources:
+            extraction_engine = ExtractionEngineV2(user_id=current_user.user_id)
+
+            # Use override or config defaults
+            indicators = request.indicators or config.get('extraction', {}).get('indicators', ['RSI'])
+
+            tech_result = await extraction_engine.extract_for_symbol(
+                symbol=request.symbol,
+                indicators=indicators,
+                timeframe=request.timeframe,
+                config_id=request.config_id
+            )
+            result['technicals'] = tech_result
+
+        # Query market intelligence (assumes orchestrator modification by other session)
+        if request.data_sources or not request.indicators:
+            try:
+                from market_intelligence.orchestrator import fetch_market_intelligence
+
+                intel_result = await fetch_market_intelligence(
+                    config=config,
+                    user_id=current_user.user_id,
+                    symbol=request.symbol,
+                    data_points_override=request.data_sources  # Dynamic override
+                )
+                result['market_intelligence'] = intel_result
+            except ImportError:
+                logger.warning("Market intelligence orchestrator not available yet")
+                result['market_intelligence'] = {"status": "not_available"}
+            except TypeError as e:
+                # Orchestrator doesn't support data_points_override yet
+                logger.warning(f"Orchestrator modification pending: {e}")
+                result['market_intelligence'] = {"status": "pending_modification"}
+
+        return {
+            "status": "success",
+            "data": result,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Market data query failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 2. EXECUTE TRADE (Direct execution, agent already decided)
+# ============================================================================
+
+@router.post("/execute-trade")
+async def execute_trade(
+    request: ExecuteTradeRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Execute trade directly (agent has already made the decision).
+    No extraction or decision logic - just execute the trade.
+    """
+    try:
+        # Verify config exists
+        config = get_configuration(current_user.user_id, request.config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Build trade intent
+        intent = {
+            "config_id": request.config_id,
+            "user_id": current_user.user_id,
+            "symbol": request.symbol,
+            "action": request.side,  # "long" or "short"
+            "confidence": request.confidence,
+            "stop_loss_price": request.stop_loss_price,
+            "take_profit_price": request.take_profit_price,
+            "decision_id": request.decision_id
+        }
+
+        # Execute via paper trading service
+        # TODO: Add live trading support when config.trading_mode == "live"
+        paper_trading = SupabasePaperTradingService()
+        result = await paper_trading.execute_trade_intent(intent)
+
+        logger.info(
+            f"Agent executed trade: {request.symbol} {request.side}",
+            user_id=current_user.user_id,
+            config_id=request.config_id
+        )
+
+        return {
+            "status": "success",
+            "trade": result,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Trade execution failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 3. GET POSITIONS (Works for paper and live)
+# ============================================================================
+
+@router.get("/positions/{config_id}")
+async def get_positions(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Get open positions for config (paper or live).
+    """
+    try:
+        config = get_configuration(current_user.user_id, config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        trading_mode = config.get('trading_mode', 'paper')
+
+        if trading_mode == 'paper':
+            paper_trading = SupabasePaperTradingService()
+            positions = await paper_trading.get_open_positions(config_id, current_user.user_id)
+        else:
+            # TODO: Live trading positions via Symphony
+            raise HTTPException(status_code=501, detail="Live trading positions not implemented yet")
+
+        return {
+            "status": "success",
+            "positions": positions,
+            "trading_mode": trading_mode,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Get positions failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 4. GET ACCOUNT STATUS
+# ============================================================================
+
+@router.get("/account/{config_id}")
+async def get_account_status(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Get account summary with performance metrics.
+    """
+    try:
+        config = get_configuration(current_user.user_id, config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        trading_mode = config.get('trading_mode', 'paper')
+
+        if trading_mode == 'paper':
+            paper_trading = SupabasePaperTradingService()
+            account = await paper_trading.get_account_summary(config_id)
+        else:
+            # TODO: Live account via Symphony
+            raise HTTPException(status_code=501, detail="Live account status not implemented yet")
+
+        return {
+            "status": "success",
+            "account": account,
+            "trading_mode": trading_mode,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Get account failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 5. CLOSE POSITION
+# ============================================================================
+
+@router.post("/positions/{trade_id}/close")
+async def close_position(
+    trade_id: str,
+    config_id: str = Body(..., embed=True),
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Close an open position.
+    """
+    try:
+        config = get_configuration(current_user.user_id, config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        trading_mode = config.get('trading_mode', 'paper')
+
+        if trading_mode == 'paper':
+            paper_trading = SupabasePaperTradingService()
+            result = await paper_trading.close_position(
+                trade_id=trade_id,
+                config_id=config_id,
+                user_id=current_user.user_id
+            )
+        else:
+            # TODO: Close live position via Symphony
+            raise HTTPException(status_code=501, detail="Live position closing not implemented yet")
+
+        logger.info(
+            f"Agent closed position: {trade_id}",
+            user_id=current_user.user_id,
+            config_id=config_id
+        )
+
+        return {
+            "status": "success",
+            "result": result,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Close position failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 6. UPDATE STRATEGY (Agent modifies its own strategy)
+# ============================================================================
+
+@router.patch("/config/{config_id}/strategy")
+async def update_strategy(
+    config_id: str,
+    request: UpdateStrategyRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Update agent strategy in config.
+
+    Only allowed if autonomously_editable=true OR updated_by="user".
+    Increments version number and logs performance.
+    """
+    try:
+        config = get_configuration(current_user.user_id, config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Check if agent is allowed to modify strategy
+        agent_strategy = config.get('config_data', {}).get('agent_strategy', {})
+        autonomously_editable = agent_strategy.get('autonomously_editable', False)
+
+        if not autonomously_editable and request.updated_by == "agent":
+            raise HTTPException(
+                status_code=403,
+                detail="Agent cannot modify strategy (autonomously_editable=false)"
+            )
+
+        # Update strategy with version increment
+        current_version = agent_strategy.get('version', 0)
+        new_strategy = {
+            "content": request.strategy_content,
+            "autonomously_editable": autonomously_editable,
+            "version": current_version + 1,
+            "last_updated_at": datetime.utcnow().isoformat(),
+            "last_updated_by": request.updated_by,
+            "performance_log": agent_strategy.get('performance_log', [])
+        }
+
+        # Update config in database
+        config['config_data']['agent_strategy'] = new_strategy
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE configurations
+                    SET config_data = %s,
+                        updated_at = NOW()
+                    WHERE config_id = %s AND user_id = %s
+                """, (json.dumps(config['config_data']), config_id, current_user.user_id))
+                conn.commit()
+
+        logger.info(
+            f"Agent strategy updated (v{new_strategy['version']})",
+            user_id=current_user.user_id,
+            config_id=config_id,
+            updated_by=request.updated_by
+        )
+
+        return {
+            "status": "success",
+            "strategy": new_strategy,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Update strategy failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 7. RECORD TRADE OBSERVATION (Post-trade reflection)
+# ============================================================================
+
+@router.post("/trade-observations")
+async def record_trade_observation(
+    request: RecordTradeObservationRequest,
+    config_id: str = Body(..., embed=True),
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Record post-trade reflection (what worked, what didn't, which data points were predictive).
+
+    Agent calls this after closing a position to reflect on the trade outcome.
+    """
+    try:
+        # Validate observation type
+        valid_types = ["win_analysis", "loss_analysis"]
+        if request.observation_type not in valid_types:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid observation_type. Must be one of: {valid_types}"
+            )
+
+        # Validate importance
+        if not 1 <= request.importance <= 10:
+            raise HTTPException(
+                status_code=400,
+                detail="Importance must be between 1 and 10"
+            )
+
+        # Get trade details for context
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Verify trade exists and belongs to user
+                cur.execute("""
+                    SELECT symbol, realized_pnl,
+                           EXTRACT(EPOCH FROM (closed_at - opened_at))/60 as duration_minutes
+                    FROM paper_trades
+                    WHERE trade_id = %s AND user_id = %s
+                """, (request.trade_id, current_user.user_id))
+
+                trade = cur.fetchone()
+                if not trade:
+                    raise HTTPException(status_code=404, detail="Trade not found")
+
+                symbol, pnl, duration = trade
+
+                # Insert observation
+                cur.execute("""
+                    INSERT INTO trade_observations
+                        (config_id, user_id, trade_id, observation_type,
+                         what_went_well, what_went_wrong, predictive_data_points,
+                         decision_review, trade_pnl, trade_duration_minutes, importance)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                    RETURNING observation_id, created_at
+                """, (
+                    config_id,
+                    current_user.user_id,
+                    request.trade_id,
+                    request.observation_type,
+                    request.what_went_well,
+                    request.what_went_wrong,
+                    json.dumps(request.predictive_data_points) if request.predictive_data_points else None,
+                    request.decision_review,
+                    pnl,
+                    int(duration) if duration else None,
+                    request.importance
+                ))
+                result = cur.fetchone()
+                conn.commit()
+
+        logger.info(
+            f"Trade observation recorded: {request.observation_type}",
+            user_id=current_user.user_id,
+            config_id=config_id,
+            trade_id=request.trade_id,
+            importance=request.importance
+        )
+
+        return {
+            "status": "success",
+            "observation_id": str(result[0]),
+            "created_at": result[1].isoformat(),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Record trade observation failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 8. QUERY TRADE OBSERVATIONS (Search past learnings)
+# ============================================================================
+
+@router.post("/trade-observations/query")
+async def query_trade_observations(
+    request: QueryTradeObservationsRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Query trade observations for learning and strategy refinement.
+
+    Agent can search past observations to learn from previous trades.
+    User + agent can review patterns together to improve strategy.
+    """
+    try:
+        # Build dynamic query
+        query = """
+            SELECT
+                o.observation_id,
+                o.trade_id,
+                o.observation_type,
+                o.what_went_well,
+                o.what_went_wrong,
+                o.predictive_data_points,
+                o.decision_review,
+                o.trade_pnl,
+                o.trade_duration_minutes,
+                o.importance,
+                o.created_at,
+                t.symbol,
+                t.side,
+                t.entry_price,
+                t.exit_price
+            FROM trade_observations o
+            JOIN paper_trades t ON o.trade_id = t.trade_id
+            WHERE o.config_id = %s AND o.user_id = %s
+        """
+        params = [request.config_id, current_user.user_id]
+
+        # Add optional filters
+        if request.symbol:
+            query += " AND t.symbol = %s"
+            params.append(request.symbol)
+
+        if request.observation_type:
+            query += " AND o.observation_type = %s"
+            params.append(request.observation_type)
+
+        if request.min_importance:
+            query += " AND o.importance >= %s"
+            params.append(request.min_importance)
+
+        # Order by importance and recency
+        query += " ORDER BY o.importance DESC, o.created_at DESC LIMIT %s"
+        params.append(request.limit)
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(query, params)
+                rows = cur.fetchall()
+
+        # Format results
+        observations = []
+        for row in rows:
+            observations.append({
+                "observation_id": str(row[0]),
+                "trade_id": str(row[1]),
+                "observation_type": row[2],
+                "what_went_well": row[3],
+                "what_went_wrong": row[4],
+                "predictive_data_points": row[5],
+                "decision_review": row[6],
+                "trade_pnl": float(row[7]) if row[7] else None,
+                "trade_duration_minutes": row[8],
+                "importance": row[9],
+                "created_at": row[10].isoformat(),
+                "symbol": row[11],
+                "side": row[12],
+                "entry_price": float(row[13]) if row[13] else None,
+                "exit_price": float(row[14]) if row[14] else None
+            })
+
+        logger.info(
+            f"Queried {len(observations)} trade observations",
+            user_id=current_user.user_id,
+            config_id=request.config_id
+        )
+
+        return {
+            "status": "success",
+            "observations": observations,
+            "count": len(observations),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Query trade observations failed: {e}", user_id=current_user.user_id)
+        raise HTTPException(status_code=500, detail=str(e))

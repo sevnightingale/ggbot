@@ -11,7 +11,8 @@ def build_opportunity_analysis_prompt(
     market_data: str,
     volume_analysis: str,
     user_strategy: str,
-    ggshot_signals: str = None
+    ggshot_signals: str = None,
+    market_intelligence: str = None
 ) -> str:
     """Build opportunity analysis prompt with hardcoded structure."""
 
@@ -27,6 +28,18 @@ ggShot is a premium signal provider with proven accuracy. Here are the latest gg
 NOTE: ggShot signals provide additional context but should be validated against your own technical analysis. Consider directional agreement/disagreement across timeframes and how it aligns with your strategy.
 """
 
+    # Build market intelligence section if available
+    market_intel_section = ""
+    if market_intelligence and market_intelligence.strip():
+        market_intel_section = f"""
+## MARKET INTELLIGENCE
+Additional market context beyond technical indicators:
+
+{market_intelligence}
+
+NOTE: This supplemental data provides context about market conditions (funding rates, macro environment, on-chain activity, sentiment, news). Consider how these factors may impact your technical setup and strategy execution.
+"""
+
     return f"""You are an expert cryptocurrency trader analyzing market opportunities. Your job is to identify potential trading opportunities based on current market conditions and your configured trading strategy.
 
 ## MARKET DATA ANALYSIS
@@ -38,7 +51,7 @@ Here is comprehensive technical analysis across all 7 timeframes (5m, 15m, 30m, 
 Current volume analysis for trade confirmation:
 
 {volume_analysis}
-{ggshot_section}
+{ggshot_section}{market_intel_section}
 ## YOUR TRADING STRATEGY
 {user_strategy}
 

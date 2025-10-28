@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-10-26 (Automated status check)
+**Last Updated**: 2025-10-27 (Agent Phase 2 complete)
 **System Health**: 🟢 Production Live (257 users, 59 active bots)
 **Project Status**: Live application with complete Stripe monetization and Symphony live trading
 
@@ -9,11 +9,12 @@
 ## 🎯 Current Development Focus
 
 **Primary Objectives**:
+- **Autonomous Trading Agent**: 🔄 Phase 2 COMPLETE (MCP server + 9 tools), Phase 3 in progress (Agent runner)
+- **Market Intelligence Expansion**: ✅ **PHASE 1 PRODUCTION DEPLOYED!** - 8 new Grok-powered data sources LIVE (VIX, DXY, CPI, NFP, BTC TVL, whale activity, Twitter sentiment, crypto news)
 - **Live Trading Polish**: Symphony integration refinement (trade queries, metrics, position display)
-- **User Experience**: Status messaging improvements, mobile responsiveness, API key management
-- **System Reliability**: Error handling, monitoring, comprehensive testing
 
-**Architecture Status**: V2 implementation complete, Symphony live trading operational
+**Architecture Status**: V2 orchestrator complete, Intelligence Orchestrator **production deployed** with parallel query execution, GrokAgenticAdapter operational, Symphony live trading operational, Agent MCP server implemented with trade observations model
+
 
 ---
 
@@ -91,10 +92,12 @@
 **Universal Data Layer Pattern**:
 - `market_data` table stores ALL market intelligence (technical indicators, signals, news, sentiment)
 - `data_sources` + `data_points` = metadata registry defining what's available
+- **Intelligence Orchestrator**: Config-driven routing queries gateway based on `config.extraction.selected_data_sources`
 - **Do NOT create new tables for new data types** - extend existing architecture
-- See `database/schema.md` for complete schema documentation
+- See `database/schema.md` for complete schema documentation and `market_intelligence/README.md` for orchestrator details
 
 **Example**: ggShot signals stored in `market_data` with `data_source='signals_group_chats'`
+**Orchestrator**: Reads config → maps data points to catalog → queries MarketIntelligence gateway → returns aggregated results
 
 ---
 
@@ -105,8 +108,8 @@
 | **user_llm_credentials** | Encrypted LLM API keys via Supabase Vault (OpenAI, DeepSeek, Anthropic, XAI) |
 | **configurations** | Bot configs with `config_data` JSONB (symbol, timeframe, strategy, data sources) |
 | **bot_telegram_channels** | Per-bot Telegram signal publishing configuration |
-| **data_sources** | Market intelligence categories (6 total: Technical Analysis, Signals, Fundamental, Sentiment, News, On-Chain) |
-| **data_points** | Specific indicators/signals within sources (22 total: 21 technical + 1 ggShot signal) |
+| **data_sources** | Market intelligence categories (7 total: Technical Analysis, Trading Signals, On-Chain Analytics, Derivatives & Leverage, Sentiment & Social, News & Regulatory, Macro Economics) |
+| **data_points** | Specific indicators/signals within sources (24 total: 21 technical, 1 ggShot signal, 2 funding rates) |
 | **decisions** | AI decision audit trail (action, confidence, reasoning, market_data snapshot) |
 | **paper_accounts** | Isolated $10K paper trading accounts per config |
 | **paper_trades** | Paper trade execution records (entry, exit, P&L, confidence) |
@@ -116,9 +119,22 @@
 | **logs** | System logging (module, level, message, user context) |
 
 **Key Architecture Notes**:
-- `data_sources` + `data_points`: Infrastructure complete, 2 sources populated (Technical Analysis, ggShot), 4 empty shells ready for expansion
+- `data_sources` + `data_points`: Infrastructure complete, 3 sources populated (Technical Analysis, Trading Signals, Derivatives & Leverage), 4 planned categories ready for expansion
 - `config_data` JSONB stores user selections: `extraction.selected_data_sources[source_name].data_points[]`
 - All tables use Row Level Security (RLS) for multi-user isolation
+
+**7 Market Intelligence Categories** (32 data points **LIVE IN PRODUCTION**):
+1. **Technical Analysis** 🆓 (21 indicators) - Momentum, trend, volatility, volume analysis
+2. **Trading Signals** 💎 (1 source: ggShot) - AI-filtered signals from expert sources (third-party subscription)
+3. **On-Chain Analytics** 🆓 (2 live: BTC TVL, whale activity) - Grok-powered via web search, ~$0.015/query
+4. **Derivatives & Leverage** 🆓 (2 rates: BTC/ETH funding) - Binance API, real-time, FREE
+5. **Sentiment & Social** 🆓 (1 live: Twitter sentiment) - Grok-powered via X search + NLP, ~$0.06/query
+6. **News & Regulatory** 🆓 (1 live: crypto news) - Grok-powered via web + X search, ~$0.015/query
+7. **Macro Economics** 🆓 (4 live: VIX, DXY, CPI, NFP) - Grok-powered via web search, ~$0.0015-0.009/query
+
+**GrokAgenticAdapter**: Universal intelligence via XAI's agentic API - handles all 8 Grok data sources with ONE adapter!
+**Cost Economics**: ~$195/month platform cost = $0.76/user/month (257 users), scales to $0.20/user at 1000 users
+**Performance**: Parallel query execution (~30s for all 8 data points), custom cache TTL per data point (10min to 24hrs)
 
 ---
 
