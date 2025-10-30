@@ -2,4 +2,7 @@
 
 from .ggshot_adapter import GGShotAdapter
 
-__all__ = ['GGShotAdapter']
+# Create instance for dynamic loading by gateway
+ggshot_adapter = GGShotAdapter()
+
+__all__ = ['GGShotAdapter', 'ggshot_adapter']

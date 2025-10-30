@@ -179,3 +179,13 @@ nuances are accessible in a single document? Let's discuss.
   - Dive into extraction/v2/README.md → learn technical indicator details
   - Check ACTIVE.md → see current production status
   - Reference catalog YAMLs → see exact schemas
+
+
+API_BASE_URL=http://localhost:8000 python agent/run_agent.py \
+--config-id=d13d5536-2498-4f27-b2bc-e4f98958e1d8 \
+--mode=strategy_definition
+
+python agent/chat.py --config-id=d13d5536-2498-4f27-b2bc-e4f98958e1d8
+
+
+API_BASE_URL=http://localhost:8000 python agent/run_agent.py --config-id=d13d5536-2498-4f27-b2bc-e4f98958e1d8 --mode=strategy_definition

@@ -14,6 +14,7 @@ from typing import Dict, Any, Optional, List
 from core.common.logger import logger
 from core.common.db import get_db_connection
 from core.services.user_service import UserService
+from core.symbols.standardizer import UniversalSymbolStandardizer
 from market_intelligence.gateway import MarketIntelligence
 from market_intelligence.types import QueryFormat, DataSourceError
 
@@ -37,7 +38,8 @@ async def fetch_market_intelligence(
     Args:
         config: BotConfigV2 with config.extraction.selected_data_sources
         user_id: User ID for permission checks
-        symbol: Trading pair (e.g., 'BTC/USDT')
+        symbol: Trading pair in any format (BTCUSDT, BTC-USDT, or BTC/USDT)
+                Automatically normalized to CCXT format (BTC/USDT) for data queries
         data_points_override: Optional override for dynamic queries (bypasses config).
                              Format: {'macro_economics': ['vix', 'dxy'], ...}
 
@@ -67,6 +69,30 @@ async def fetch_market_intelligence(
         )
     """
     _log = logger.bind(component="intelligence_orchestrator", user_id=user_id)
+
+    # Normalize symbol format to CCXT standard (BTC/USDT)
+    # Handles multiple input formats: BTCUSDT (ggshot), BTC-USDT (platform), BTC/USDT (ccxt)
+    standardizer = UniversalSymbolStandardizer()
+    normalized_symbol = symbol
+
+    # Try normalizing from common formats to CCXT
+    if '/' not in symbol and '-' not in symbol:
+        # Likely ggshot format (BTCUSDT) - try normalizing
+        ccxt_symbol = standardizer.normalize(symbol, "ggshot", "ccxt")
+        if ccxt_symbol:
+            normalized_symbol = ccxt_symbol
+            _log.debug(f"Normalized symbol: {symbol} → {normalized_symbol} (ggshot→ccxt)")
+    elif '-' in symbol:
+        # Platform format (BTC-USDT) - convert to CCXT
+        ccxt_symbol = standardizer.normalize(symbol, "platform", "ccxt")
+        if ccxt_symbol:
+            normalized_symbol = ccxt_symbol
+            _log.debug(f"Normalized symbol: {symbol} → {normalized_symbol} (platform→ccxt)")
+    else:
+        # Already in CCXT format (BTC/USDT) or unknown format
+        _log.debug(f"Symbol already in CCXT format or unknown: {symbol}")
+
+    symbol = normalized_symbol  # Use normalized symbol for all queries
 
     # Get selected data sources (override takes precedence)
     if data_points_override:

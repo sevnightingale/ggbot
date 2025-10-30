@@ -55,17 +55,23 @@ async def get_service_user(request: Request):
     auth_header = request.headers.get('authorization', '')
     service_header = request.headers.get('x-service-auth', '')
 
-    if not auth_header.startswith('Bearer ') or service_header != 'signal-listener':
+    # Allow multiple trusted services
+    allowed_services = ['signal-listener', 'agent-runner']
+
+    if not auth_header.startswith('Bearer ') or service_header not in allowed_services:
         raise HTTPException(status_code=401, detail="Service authentication required")
 
+    # Rate limiting per service
     now = time.time()
-    calls = service_calls['signal-listener']
-    service_calls['signal-listener'] = [t for t in calls if now - t < 60]
+    calls = service_calls[service_header]
+    service_calls[service_header] = [t for t in calls if now - t < 60]
 
-    if len(service_calls['signal-listener']) >= 120:
+    # Different rate limits per service (agent-runner needs higher limit)
+    rate_limit = 600 if service_header == 'agent-runner' else 120  # 10 req/sec vs 2 req/sec
+    if len(service_calls[service_header]) >= rate_limit:
         raise HTTPException(status_code=429, detail="Service rate limit exceeded")
 
-    service_calls['signal-listener'].append(now)
+    service_calls[service_header].append(now)
 
     token = auth_header.split(' ')[1]
     service_key = os.getenv('SUPABASE_SERVICE_KEY')
@@ -73,7 +79,7 @@ async def get_service_user(request: Request):
     if not service_key or token != service_key:
         raise HTTPException(status_code=401, detail="Invalid service token")
 
-    return ServiceUser(service_name='signal-listener')
+    return ServiceUser(service_name=service_header)
 
 async def get_mock_user_for_dev():
     """Mock user for development."""

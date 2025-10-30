@@ -146,17 +146,32 @@ STRATEGY UPDATES:
 - If AUTONOMOUSLY_EDITABLE=true: Can update strategy based on learnings
 - If AUTONOMOUSLY_EDITABLE=false: Must request user approval for changes
 
+MARKET DATA STRATEGY:
+- Use query_market_data tool to access technical indicators, macro data, sentiment, and signals
+- The tool will show you all available categories and data points
+- Query strategically - combine 2-3 data sources for context (e.g., RSI + funding rates + sentiment)
+- Each query costs credits, so plan your checks instead of constant monitoring
+- Technical indicators are fastest (free), macro/sentiment data may take longer (API calls)
+
+CRITICAL: Use EXACT data point names from tool documentation:
+- "twitter_sentiment" NOT "twitter" or "sentiment"
+- "ggshot" NOT "ggshot_signals"
+- "btc_funding_rate" NOT "funding_rate"
+DO NOT abbreviate or modify data point names - they must match exactly.
+
 Be disciplined, patient, and cost-conscious.
         """
 
-        return {
-            "type": "append",
-            "preset": "claude_code",
-            "append": prompt
-        }
+        return prompt  # Return plain string, not dict
 
     async def run(self):
-        """Main agent loop with two async tasks"""
+        """
+        Main agent entry point.
+
+        Routes to appropriate mode:
+        - strategy_definition: Interactive chat to build strategy
+        - autonomous: 24/7 trading with no user interaction
+        """
         try:
             # Create MCP server
             mcp_server = create_mcp_server()
@@ -167,6 +182,7 @@ Be disciplined, patient, and cost-conscious.
                 mcp_servers={"trading": mcp_server},
                 allowed_tools=[
                     "mcp__trading__query_market_data",
+                    "mcp__trading__get_current_price",  # NEW: Lightweight price check
                     "mcp__trading__execute_trade",
                     "mcp__trading__get_positions",
                     "mcp__trading__get_account_status",
@@ -177,34 +193,24 @@ Be disciplined, patient, and cost-conscious.
                     "mcp__trading__query_trade_observations",
                     "mcp__trading__request_autonomous_mode"
                 ],
+                disallowed_tools=[
+                    "Task", "Bash", "Read", "Write", "Edit", "Glob", "Grep",
+                    "WebFetch", "WebSearch", "SlashCommand", "Skill", "TodoWrite",
+                    "ExitPlanMode", "NotebookEdit", "BashOutput", "KillShell",
+                    "AskUserQuestion", "ListMcpResourcesTool", "ReadMcpResourceTool"
+                ],
                 system_prompt=self._build_system_prompt(),
                 max_turns=100
             )
 
-            # Start client and run tasks
+            # Start client and route to appropriate mode
             async with ClaudeSDKClient(options=options) as client:
                 logger.info(f"Agent started in {self.mode} mode")
 
-                # Initial prompt based on mode
                 if self.mode == "strategy_definition":
-                    await client.query("Hello! I'm ready to help you build your trading strategy. What are your goals?")
+                    await self._run_strategy_definition(client)
                 else:  # autonomous
-                    await client.query(f"""
-Starting autonomous trading mode.
-
-Strategy: {self.config.get('config_data', {}).get('agent_strategy', {}).get('content', 'Undefined')}
-
-Begin the autonomous loop:
-1. Check current positions and account
-2. Analyze market conditions
-3. Execute trades or wait based on strategy
-                    """)
-
-                # Run two parallel tasks
-                agent_task = asyncio.create_task(self._process_agent_loop(client))
-                interrupt_task = asyncio.create_task(self._handle_user_messages(client))
-
-                await asyncio.gather(agent_task, interrupt_task)
+                    await self._run_autonomous(client)
 
         except Exception as e:
             logger.error(f"Agent error: {e}")
@@ -215,94 +221,254 @@ Begin the autonomous loop:
             if self.redis_client:
                 await self.redis_client.aclose()
 
-    async def _process_agent_loop(self, client: ClaudeSDKClient):
+    async def _run_strategy_definition(self, client: ClaudeSDKClient):
         """
-        Task 1: Process agent's messages in autonomous loop
+        Strategy Definition Mode: Interactive conversation to build strategy.
 
-        Uses receive_messages() which streams indefinitely.
-        Agent uses tools, sleeps via wait_for(), trades forever.
+        Pattern:
+        1. Agent greets user
+        2. User sends messages via Redis queue
+        3. Agent responds via query/receive_response pattern
+        4. When ready, agent calls request_autonomous_mode tool
+        5. User confirms → save strategy, exit
         """
-        try:
-            async for message in client.receive_messages():
-                if isinstance(message, AssistantMessage):
-                    for block in message.content:
-                        if isinstance(block, TextBlock):
-                            # Log agent's thinking
-                            logger.info(f"Agent: {block.text}")
+        logger.info("Starting strategy definition mode")
 
-                            # Push to Redis for user visibility
+        # Initial greeting
+        await client.query("Hello! I'm ready to help you build your trading strategy. What are your goals?")
+
+        # Process initial greeting
+        async for message in client.receive_response():
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        logger.info(f"Agent: {block.text}")
+                        await self.redis_client.rpush(
+                            f"agent:{self.config_id}:responses",
+                            json.dumps({
+                                "type": "agent_message",
+                                "text": block.text,
+                                "timestamp": datetime.utcnow().isoformat()
+                            })
+                        )
+
+        # Main conversation loop
+        logger.info("Waiting for user messages...")
+        while True:
+            # Block until user sends message
+            message_data = await self.redis_client.blpop(
+                f"agent:{self.config_id}:messages",
+                timeout=0  # Block indefinitely
+            )
+
+            if message_data:
+                _, user_message_bytes = message_data
+                user_message_json = json.loads(user_message_bytes.decode('utf-8'))
+                user_text = user_message_json.get("text", "")
+
+                logger.info(f"User: {user_text}")
+
+                # Send to agent
+                await client.query(user_text)
+
+                # Collect response
+                async for message in client.receive_response():
+                    if isinstance(message, AssistantMessage):
+                        for block in message.content:
+                            if isinstance(block, TextBlock):
+                                logger.info(f"Agent: {block.text}")
+                                await self.redis_client.rpush(
+                                    f"agent:{self.config_id}:responses",
+                                    json.dumps({
+                                        "type": "agent_message",
+                                        "text": block.text,
+                                        "timestamp": datetime.utcnow().isoformat()
+                                    })
+                                )
+
+                # Check if mode switch was requested (would be in Redis flag)
+                mode_switch_pending = await self.redis_client.get(
+                    f"agent:{self.config_id}:mode_switch_pending"
+                )
+                if mode_switch_pending:
+                    logger.info("Mode switch requested - waiting for user confirmation")
+
+                    # Wait for user's confirmation (1 or 2)
+                    confirmation_data = await self.redis_client.blpop(
+                        f"agent:{self.config_id}:messages",
+                        timeout=0  # Block indefinitely
+                    )
+
+                    if confirmation_data:
+                        _, confirmation_bytes = confirmation_data
+                        confirmation_json = json.loads(confirmation_bytes.decode('utf-8'))
+                        user_choice = confirmation_json.get("text", "").strip()
+
+                        if user_choice == "1":
+                            # CONFIRM - Save strategy and exit
+                            logger.info("User confirmed autonomous mode - saving strategy")
+
+                            # Retrieve strategy from Redis
+                            pending_strategy = await self.redis_client.get(
+                                f"agent:{self.config_id}:pending_strategy"
+                            )
+
+                            if pending_strategy:
+                                strategy_text = pending_strategy.decode('utf-8')
+
+                                # Save to database
+                                await self._save_strategy(strategy_text)
+
+                                # Send confirmation message
+                                await self.redis_client.rpush(
+                                    f"agent:{self.config_id}:responses",
+                                    json.dumps({
+                                        "type": "agent_message",
+                                        "text": "✅ Strategy saved! Exiting strategy definition mode.\n\nTo start autonomous trading, restart with:\npython agent/run_agent.py --config-id={} --mode=autonomous".format(self.config_id),
+                                        "timestamp": datetime.utcnow().isoformat()
+                                    })
+                                )
+
+                                # Clean up Redis
+                                await self.redis_client.delete(
+                                    f"agent:{self.config_id}:mode_switch_pending",
+                                    f"agent:{self.config_id}:pending_strategy"
+                                )
+
+                                logger.info("Strategy saved successfully - exiting")
+                                break
+                            else:
+                                logger.error("No pending strategy found in Redis")
+
+                        elif user_choice == "2":
+                            # REVISE - Clear flag and continue conversation
+                            logger.info("User chose to revise strategy - continuing conversation")
+
+                            # Clear flags
+                            await self.redis_client.delete(
+                                f"agent:{self.config_id}:mode_switch_pending",
+                                f"agent:{self.config_id}:pending_strategy"
+                            )
+
+                            # Send to agent
+                            await client.query("The user wants to revise the strategy. Let's continue refining it.")
+
+                            # Collect response
+                            async for message in client.receive_response():
+                                if isinstance(message, AssistantMessage):
+                                    for block in message.content:
+                                        if isinstance(block, TextBlock):
+                                            logger.info(f"Agent: {block.text}")
+                                            await self.redis_client.rpush(
+                                                f"agent:{self.config_id}:responses",
+                                                json.dumps({
+                                                    "type": "agent_message",
+                                                    "text": block.text,
+                                                    "timestamp": datetime.utcnow().isoformat()
+                                                })
+                                            )
+                        else:
+                            # Invalid choice - ask again
+                            logger.warning(f"Invalid confirmation choice: {user_choice}")
                             await self.redis_client.rpush(
                                 f"agent:{self.config_id}:responses",
                                 json.dumps({
                                     "type": "agent_message",
-                                    "text": block.text,
+                                    "text": "Please reply with '1' to CONFIRM or '2' to REVISE the strategy.",
                                     "timestamp": datetime.utcnow().isoformat()
                                 })
                             )
 
-                # Check for compaction
-                if hasattr(message, 'type') and message.get('type') == 'system':
-                    if message.get('subtype') == 'compact_boundary':
-                        logger.info("Compaction occurred")
-                        # Phase 4: Will inject fresh context here
-
-        except Exception as e:
-            logger.error(f"Agent loop error: {e}")
-
-    async def _handle_user_messages(self, client: ClaudeSDKClient):
-        """
-        Task 2: Poll Redis queue and interrupt agent when user sends messages
-
-        Allows user to send messages at any time.
-        Agent responds immediately by interrupting current execution.
-        """
+    async def _save_strategy(self, strategy_content: str):
+        """Save strategy to database config_data.agent_strategy"""
         try:
-            while True:
-                # Poll Redis queue with 1 second timeout
-                message_data = await self.redis_client.blpop(
-                    f"agent:{self.config_id}:messages",
-                    timeout=1
-                )
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Get current config_data
+                    cur.execute("""
+                        SELECT config_data FROM configurations
+                        WHERE config_id = %s AND user_id = %s
+                    """, (self.config_id, self.user_id))
 
-                if message_data:
-                    _, user_message_bytes = message_data
-                    user_message = user_message_bytes.decode('utf-8')
+                    row = cur.fetchone()
+                    if not row:
+                        logger.error("Config not found for saving strategy")
+                        return
 
-                    logger.info(f"User interrupt: {user_message}")
+                    config_data = row[0] or {}
 
-                    # Interrupt agent's current execution
-                    await client.interrupt()
+                    # Update agent_strategy
+                    config_data['agent_strategy'] = {
+                        "content": strategy_content,
+                        "autonomously_editable": False,  # Default to guided mode
+                        "version": 1,
+                        "last_updated_at": datetime.utcnow().isoformat(),
+                        "last_updated_by": "user",
+                        "performance_log": []
+                    }
 
-                    # Send user's message
-                    await client.query(user_message)
+                    # Save back to database
+                    cur.execute("""
+                        UPDATE configurations
+                        SET config_data = %s, updated_at = NOW()
+                        WHERE config_id = %s AND user_id = %s
+                    """, (json.dumps(config_data), self.config_id, self.user_id))
 
-                    # Collect response using receive_response()
-                    # (stops at ResultMessage, unlike receive_messages())
-                    response_parts = []
-                    async for message in client.receive_response():
-                        if isinstance(message, AssistantMessage):
-                            for block in message.content:
-                                if isinstance(block, TextBlock):
-                                    response_parts.append(block.text)
-
-                    # Push full response to Redis
-                    full_response = "\n".join(response_parts)
-                    await self.redis_client.rpush(
-                        f"agent:{self.config_id}:responses",
-                        json.dumps({
-                            "type": "user_response",
-                            "text": full_response,
-                            "timestamp": datetime.utcnow().isoformat()
-                        })
-                    )
-
-                    logger.info("User message processed")
-
-                # Small sleep to prevent tight loop
-                await asyncio.sleep(0.1)
+                    conn.commit()
+                    logger.info(f"Strategy saved to config {self.config_id}")
 
         except Exception as e:
-            logger.error(f"User message handler error: {e}")
+            logger.error(f"Failed to save strategy: {e}")
+            raise
+
+    async def _run_autonomous(self, client: ClaudeSDKClient):
+        """
+        Autonomous Mode: 24/7 trading with NO user interaction.
+
+        Pattern:
+        1. Agent starts with strategy loaded
+        2. Uses receive_messages() indefinitely
+        3. Agent uses tools (query_market_data, execute_trade, wait_for, etc.)
+        4. All actions logged to database
+        5. To stop: User kills process (Ctrl+C or PM2 stop)
+        6. To chat: User restarts in strategy_definition mode
+        """
+        logger.info("Starting autonomous trading mode")
+
+        strategy = self.config.get('config_data', {}).get('agent_strategy', {}).get('content', 'Undefined')
+        logger.info(f"Strategy: {strategy}")
+
+        # Initial prompt to start autonomous loop
+        await client.query(f"""
+You are now in autonomous trading mode.
+
+Your strategy:
+{strategy}
+
+Begin autonomous execution:
+1. Check your current account status and positions
+2. Analyze market data for your trading pair
+3. Execute your strategy (trade, close, or wait)
+4. Use wait_for() to control timing - be patient
+5. Record trade observations after closing positions
+6. Repeat forever
+
+Start now.
+""")
+
+        # Process indefinitely
+        async for message in client.receive_messages():
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        # Log all agent activity
+                        logger.info(f"Agent: {block.text}")
+
+            # Check for compaction
+            if hasattr(message, 'type') and getattr(message, 'type', None) == 'system':
+                if hasattr(message, 'subtype') and getattr(message, 'subtype', None) == 'compact_boundary':
+                    logger.info("Context compaction occurred")
+                    # Phase 4: Inject fresh trading context here
 
 
 async def main():

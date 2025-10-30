@@ -24,19 +24,26 @@ class GGBotAPIClient:
 
     def __init__(self, user_id: str):
         """
-        Initialize API client.
+        Initialize API client with service-to-service authentication.
 
         Args:
-            user_id: User ID for authentication (X-User-ID header)
+            user_id: User ID for API calls (passed as query param)
         """
         self.base_url = os.getenv("API_BASE_URL", "https://ggbots-api.nightingale.business")
         self.user_id = user_id
-        self.timeout = httpx.Timeout(30.0, connect=10.0)
+        self.timeout = httpx.Timeout(100.0, connect=10.0)  # Increased to 100s for slow Grok queries
+
+        # Service authentication (like signal-listener)
+        service_key = os.getenv("SUPABASE_SERVICE_KEY")
+        if not service_key:
+            raise ValueError("SUPABASE_SERVICE_KEY environment variable required for agent authentication")
+
         self.client = httpx.AsyncClient(
             base_url=self.base_url,
             timeout=self.timeout,
             headers={
-                "X-User-ID": user_id,
+                "Authorization": f"Bearer {service_key}",
+                "X-Service-Auth": "agent-runner",
                 "Content-Type": "application/json"
             }
         )
@@ -72,7 +79,9 @@ class GGBotAPIClient:
 
         for attempt in range(max_retries):
             try:
+                logger.debug(f"Request: {method} {endpoint}, kwargs: {kwargs}")
                 response = await self.client.request(method, endpoint, **kwargs)
+                logger.debug(f"Response URL: {response.url}")
                 response.raise_for_status()
                 return response
 
@@ -134,7 +143,25 @@ class GGBotAPIClient:
         response = await self._retry_request(
             "POST",
             "/api/v2/agent/query-market-data",
+            params={"user_id": self.user_id},
             json=payload
+        )
+        return response.json()
+
+    async def get_current_price(self, symbol: str) -> Dict[str, Any]:
+        """
+        Get current price for a symbol (lightweight, fast).
+
+        Args:
+            symbol: Trading symbol (e.g., "BTCUSDT")
+
+        Returns:
+            Current price response with symbol, price, volume, and change
+        """
+        response = await self._retry_request(
+            "GET",
+            f"/api/v2/agent/current-price/{symbol}",
+            params={"user_id": self.user_id}
         )
         return response.json()
 
@@ -183,6 +210,7 @@ class GGBotAPIClient:
         response = await self._retry_request(
             "POST",
             "/api/v2/agent/execute-trade",
+            params={"user_id": self.user_id},
             json=payload
         )
         return response.json()
@@ -199,7 +227,8 @@ class GGBotAPIClient:
         """
         response = await self._retry_request(
             "GET",
-            f"/api/v2/agent/positions/{config_id}"
+            f"/api/v2/agent/positions/{config_id}",
+            params={"user_id": self.user_id}
         )
         return response.json()
 
@@ -215,7 +244,8 @@ class GGBotAPIClient:
         """
         response = await self._retry_request(
             "GET",
-            f"/api/v2/agent/account/{config_id}"
+            f"/api/v2/agent/account/{config_id}",
+            params={"user_id": self.user_id}
         )
         return response.json()
 
@@ -237,6 +267,7 @@ class GGBotAPIClient:
         response = await self._retry_request(
             "POST",
             f"/api/v2/agent/positions/{trade_id}/close",
+            params={"user_id": self.user_id},
             json={"config_id": config_id}
         )
         return response.json()
@@ -270,6 +301,7 @@ class GGBotAPIClient:
         response = await self._retry_request(
             "PATCH",
             f"/api/v2/agent/config/{config_id}/strategy",
+            params={"user_id": self.user_id},
             json=payload
         )
         return response.json()
@@ -319,6 +351,7 @@ class GGBotAPIClient:
         response = await self._retry_request(
             "POST",
             "/api/v2/agent/trade-observations",
+            params={"user_id": self.user_id},
             json=payload
         )
         return response.json()
@@ -355,6 +388,7 @@ class GGBotAPIClient:
         response = await self._retry_request(
             "POST",
             "/api/v2/agent/trade-observations/query",
+            params={"user_id": self.user_id},
             json=payload
         )
         return response.json()

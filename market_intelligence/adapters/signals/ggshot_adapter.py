@@ -198,3 +198,7 @@ class GGShotAdapter(DataAdapter):
         except Exception as e:
             self._log.error(f"Error fetching ggShot signals for {symbol}: {e}")
             raise AdapterError(f"Failed to fetch ggShot signals: {str(e)}")
+
+
+# Module-level alias for dynamic loading by gateway (must match catalog YAML adapter name)
+ggshot_adapter = GGShotAdapter

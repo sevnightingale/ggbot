@@ -59,34 +59,89 @@ def set_agent_context(config_id: str, user_id: str, api_client: GGBotAPIClient):
 
 @tool(
     "query_market_data",
-    "Get market data for trading decisions. Params: symbol (required), data_point_names (optional list), timeframe (optional, default '1h')",
-    {"symbol": str, "data_point_names": list, "timeframe": str}
+    "Query market data across 7 categories. Symbol can be 'BTC', 'BTCUSDT', 'BTC/USDT' - all work. Indicators are case-insensitive. Params: symbol (required), categories (dict mapping category to data point list), timeframe (optional, default '1h')",
+    {"symbol": str, "categories": dict, "timeframe": str}
 )
 async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Query market data with optional dynamic overrides.
+    Query market data with category-based structure.
 
-    NOTE: Currently passes data_point_names as 'indicators' to API.
-    Future: Will map data points to proper categories (technical vs intelligence sources).
+    The tool is forgiving with inputs:
+    - Symbol: "BTC", "BTCUSDT", or "BTC/USDT" all work
+    - Indicators: "rsi", "RSI", "Rsi" all work (case-insensitive)
+    - Data point names: Use exact names shown below
+
+    Categories:
+    - technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
+    - macro_economics: vix, dxy, cpi, nfp
+    - sentiment_social: twitter_sentiment (use exact name "twitter_sentiment", NOT "twitter" or "sentiment")
+    - derivatives_leverage: btc_funding_rate, eth_funding_rate
+    - on_chain_analytics: btc_tvl, whale_activity
+    - news_regulatory: crypto_news
+    - trading_signals: ggshot (PREMIUM - use exact name "ggshot", NOT "ggshot_signals")
+
+    Examples:
+        # Simple query - symbol formats are flexible
+        query_market_data({
+            "symbol": "BTC",  # or "BTCUSDT" or "BTC/USDT"
+            "categories": {"technical_analysis": ["RSI"]}  # case-insensitive
+        })
+
+        # Multiple data sources
+        query_market_data({
+            "symbol": "BTC",
+            "categories": {
+                "technical_analysis": ["RSI", "MACD"],
+                "trading_signals": ["ggshot"],
+                "sentiment_social": ["twitter_sentiment"]
+            }
+        })
+
+    Note: Use exact data point names (ggshot, twitter_sentiment, btc_funding_rate)
     """
     try:
         symbol = args["symbol"]
-        data_point_names = args.get("data_point_names")
+        categories_raw = args.get("categories", {})
         timeframe = args.get("timeframe", "1h")
 
-        # TODO: Map data_point_names to indicators vs. data_sources categories
-        # For now, treat all as indicators (works for technical indicators)
+        # Handle JSON string if SDK serializes the dict
+        if isinstance(categories_raw, str):
+            categories = json.loads(categories_raw)
+        else:
+            categories = categories_raw
+
+        # Separate technical indicators from intelligence sources
+        technical_indicators = categories.get("technical_analysis", [])
+        intelligence_sources = {k: v for k, v in categories.items() if k != "technical_analysis"}
+
+        # Call API with proper structure
         result = await agent_context.api_client.query_market_data(
             config_id=agent_context.config_id,
             symbol=symbol,
-            indicators=data_point_names,
+            indicators=technical_indicators if technical_indicators else None,
+            data_sources=intelligence_sources if intelligence_sources else None,
             timeframe=timeframe
         )
+
+        # Format response for agent
+        response_parts = []
+
+        if result.get('data', {}).get('technicals'):
+            tech_data = result['data']['technicals']
+            response_parts.append(f"📊 Technical Indicators ({timeframe}):")
+            response_parts.append(json.dumps(tech_data, indent=2))
+
+        if result.get('data', {}).get('market_intelligence'):
+            intel_data = result['data']['market_intelligence']
+            response_parts.append(f"\n🌐 Market Intelligence:")
+            response_parts.append(json.dumps(intel_data, indent=2))
+
+        formatted_response = "\n".join(response_parts) if response_parts else "No data available"
 
         return {
             "content": [{
                 "type": "text",
-                "text": f"Market Data for {symbol} ({timeframe}):\n\n{json.dumps(result['data'], indent=2)}"
+                "text": f"Market Data for {symbol}:\n\n{formatted_response}"
             }]
         }
 
@@ -96,6 +151,66 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
             "content": [{
                 "type": "text",
                 "text": f"❌ Failed to query market data: {str(e)}"
+            }]
+        }
+
+
+# ============================================================================
+# TOOL 1B: GET CURRENT PRICE (Lightweight price check)
+# ============================================================================
+
+@tool(
+    "get_current_price",
+    "Get current price for a symbol (FAST - uses WebSocket cache, sub-millisecond). Use this before executing trades to check the current market price. Params: symbol (required)",
+    {"symbol": str}
+)
+async def get_current_price(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Get current price without indicators.
+
+    Lightweight tool for quick price checks before trading.
+    Uses WebSocket cache for 100 symbols (sub-ms response), falls back to REST API.
+    Returns current price, bid/ask spread, and data source.
+    """
+    try:
+        symbol = args["symbol"]
+
+        result = await agent_context.api_client.get_current_price(symbol=symbol)
+
+        if result.get("status") == "success":
+            price = result.get("current_price", 0)
+            bid = result.get("bid", 0)
+            ask = result.get("ask", 0)
+            spread = result.get("spread_percent", 0)
+            source = result.get("source", "unknown")
+
+            source_emoji = "⚡" if source == "websocket_cache" else "🌐"
+
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"💰 Current Price for {symbol} {source_emoji}\n\n"
+                            f"Mid Price: ${price:,.2f}\n"
+                            f"Bid: ${bid:,.2f}\n"
+                            f"Ask: ${ask:,.2f}\n"
+                            f"Spread: {spread:.3f}%\n"
+                            f"Source: {source.replace('_', ' ').title()}"
+                }]
+            }
+        else:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"⚠️ Could not fetch price for {symbol}"
+                }]
+            }
+
+    except Exception as e:
+        logger.error(f"get_current_price failed: {e}")
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"❌ Failed to get current price: {str(e)}"
             }]
         }
 
@@ -454,7 +569,14 @@ async def record_trade_observation(args: Dict[str, Any]) -> Dict[str, Any]:
         observation_type = args["observation_type"]
         what_went_well = args.get("what_went_well")
         what_went_wrong = args.get("what_went_wrong")
-        predictive_data_points = args.get("predictive_data_points")
+
+        # Handle JSON string if SDK serializes the dict
+        predictive_data_points_raw = args.get("predictive_data_points")
+        if isinstance(predictive_data_points_raw, str):
+            predictive_data_points = json.loads(predictive_data_points_raw)
+        else:
+            predictive_data_points = predictive_data_points_raw
+
         decision_review = args.get("decision_review")
         importance = args.get("importance", 5)
 
@@ -590,17 +712,18 @@ async def request_autonomous_mode(args: Dict[str, Any]) -> Dict[str, Any]:
     Request mode switch from strategy_definition to autonomous.
 
     Agent calls this when strategy is complete and ready for execution.
-    Sets Redis flag that run_agent.py will detect and wait for user confirmation.
+    Sets Redis flag + stores strategy that run_agent.py will detect and wait for user confirmation.
     """
     try:
         strategy_summary = args["strategy_summary"]
         config_id = agent_context.config_id
 
-        # Connect to Redis and set pending flag
+        # Connect to Redis and set pending flag + strategy
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         redis_client = await redis.from_url(redis_url)
 
         await redis_client.set(f"agent:{config_id}:mode_switch_pending", "true")
+        await redis_client.set(f"agent:{config_id}:pending_strategy", strategy_summary)
         await redis_client.aclose()
 
         logger.info(f"Mode switch requested for config {config_id}")
@@ -640,12 +763,12 @@ Waiting for your confirmation...
 
 def create_mcp_server():
     """
-    Create MCP server with 10 tools for autonomous trading agent.
+    Create MCP server with 11 tools for autonomous trading agent.
 
     Returns:
         MCP server instance to be used with Claude Agent SDK
     """
-    logger.info("Creating MCP server with 10 trading tools")
+    logger.info("Creating MCP server with 11 trading tools")
 
     # Create server with all tools
     server = create_sdk_mcp_server(
@@ -653,6 +776,7 @@ def create_mcp_server():
         version="1.0.0",
         tools=[
             query_market_data,
+            get_current_price,  # NEW: Lightweight price check
             execute_trade,
             get_positions,
             get_account_status,
@@ -665,7 +789,7 @@ def create_mcp_server():
         ]
     )
 
-    logger.info("MCP server created successfully with 10 tools")
+    logger.info("MCP server created successfully with 11 tools")
     return server
 
 

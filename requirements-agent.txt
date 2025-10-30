@@ -31,3 +31,6 @@ orjson==3.10.16
 
 # Date/time utilities
 python-dateutil==2.9.0.post0
+
+# Async console for chat interface
+aioconsole==0.8.2

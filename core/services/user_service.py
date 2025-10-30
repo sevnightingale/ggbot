@@ -82,49 +82,67 @@ class UserService:
     
     async def get_profile(self, user_id: str) -> Optional[UserProfile]:
         """
-        Get user profile by ID.
-        
+        Get user profile by ID with retry logic for SSL errors.
+
         Args:
             user_id: User ID
-            
+
         Returns:
             UserProfile instance if found, None otherwise
         """
-        try:
-            with get_db_connection() as conn:
-                with conn.cursor() as cur:
-                    cur.execute("""
-                        SELECT subscription_tier, subscription_status, subscription_expires_at,
-                               stripe_customer_id, stripe_subscription_id,
-                               telegram_user_id, telegram_username, telegram_chat_id,
-                               monthly_signal_count, paid_data_points, created_at, updated_at
-                        FROM user_profiles
-                        WHERE user_id = %s
-                    """, (user_id,))
-                    
-                    result = cur.fetchone()
-                    if not result:
-                        return None
-                    
-                    return UserProfile(
-                        user_id=user_id,
-                        subscription_tier=SubscriptionTier(result[0]),
-                        subscription_status=SubscriptionStatus(result[1]),
-                        subscription_expires_at=result[2],
-                        stripe_customer_id=result[3],
-                        stripe_subscription_id=result[4],
-                        telegram_user_id=result[5],
-                        telegram_username=result[6],
-                        telegram_chat_id=result[7],
-                        monthly_signal_count=result[8] or 0,
-                        paid_data_points=result[9] or [],
-                        created_at=result[10],
-                        updated_at=result[11]
-                    )
-                    
-        except Exception as e:
-            self._log.error(f"Failed to get profile for {user_id}: {e}")
-            return None
+        import time
+
+        # Retry up to 3 times for SSL errors
+        max_retries = 3
+        retry_delay = 0.1  # 100ms between retries
+
+        for attempt in range(max_retries):
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT subscription_tier, subscription_status, subscription_expires_at,
+                                   stripe_customer_id, stripe_subscription_id,
+                                   telegram_user_id, telegram_username, telegram_chat_id,
+                                   monthly_signal_count, paid_data_points, created_at, updated_at
+                            FROM user_profiles
+                            WHERE user_id = %s
+                        """, (user_id,))
+
+                        result = cur.fetchone()
+                        if not result:
+                            return None
+
+                        return UserProfile(
+                            user_id=user_id,
+                            subscription_tier=SubscriptionTier(result[0]),
+                            subscription_status=SubscriptionStatus(result[1]),
+                            subscription_expires_at=result[2],
+                            stripe_customer_id=result[3],
+                            stripe_subscription_id=result[4],
+                            telegram_user_id=result[5],
+                            telegram_username=result[6],
+                            telegram_chat_id=result[7],
+                            monthly_signal_count=result[8] or 0,
+                            paid_data_points=result[9] or [],
+                            created_at=result[10],
+                            updated_at=result[11]
+                        )
+
+            except Exception as e:
+                # Check if it's an SSL error
+                error_msg = str(e)
+                is_ssl_error = 'SSL' in error_msg or 'connection' in error_msg.lower()
+
+                if is_ssl_error and attempt < max_retries - 1:
+                    self._log.warning(f"SSL error on attempt {attempt + 1}/{max_retries} for {user_id}, retrying...")
+                    time.sleep(retry_delay)
+                    continue
+                else:
+                    self._log.error(f"Failed to get profile for {user_id}: {e}")
+                    return None
+
+        return None
     
     async def update_profile(self, profile: UserProfile) -> bool:
         """

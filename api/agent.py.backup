@@ -17,14 +17,14 @@ import time
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Header, Query, Body
+from fastapi import APIRouter, HTTPException, Depends, Body, Request
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from core.common.logger import logger
+from core.auth.supabase_auth import get_current_user_v2, AuthenticatedUser
 from core.config.config_main import get_configuration
 from core.common.db import get_db_connection
-from core.symbols.standardizer import UniversalSymbolStandardizer
 from trading.paper.supabase_service import SupabasePaperTradingService
 from extraction.v2.extraction_engine import ExtractionEngineV2
 
@@ -33,39 +33,79 @@ load_dotenv()
 
 router = APIRouter(prefix="/api/v2/agent", tags=["agent"])
 
+# Service authentication for agent endpoints
+service_calls_agent = defaultdict(list)
 
-# ============================================================================
-# SIMPLIFIED SERVICE AUTHENTICATION
-# ============================================================================
+class ServiceUser:
+    """Represents an authenticated service."""
+    def __init__(self, service_name: str):
+        self.service_name = service_name
 
-def validate_agent_service_auth(
-    authorization: Optional[str],
-    x_service_auth: Optional[str]
-) -> None:
+async def get_service_or_user_auth(request: Request) -> str:
     """
-    Simple synchronous service authentication for agent endpoints.
-    Raises HTTPException if validation fails.
+    Allow either JWT user authentication OR service authentication for agent endpoints.
+    Returns user_id from either auth method.
     """
-    # Check service header
-    if x_service_auth != 'agent-runner':
-        logger.error(f"Invalid service header: {x_service_auth}")
-        raise HTTPException(status_code=401, detail="Invalid service authentication")
+    # Try service auth first
+    auth_header = request.headers.get('authorization', '')
+    service_header = request.headers.get('x-service-auth', '')
 
-    # Check authorization header
-    if not authorization or not authorization.startswith('Bearer '):
-        logger.error("Missing or invalid authorization header")
-        raise HTTPException(status_code=401, detail="Missing authorization token")
+    if service_header == 'agent-runner' and auth_header.startswith('Bearer '):
+        # Service authentication
+        token = auth_header.split(' ')[1]
+        service_key = os.getenv('SUPABASE_SERVICE_KEY')
 
-    # Validate service key
-    token = authorization.replace('Bearer ', '')
-    service_key = os.getenv('SUPABASE_SERVICE_KEY')
+        logger.debug(f"Agent auth - token length: {len(token)}, service_key length: {len(service_key) if service_key else 0}")
+        logger.debug(f"Agent auth - token starts: {token[:20]}..., service_key starts: {service_key[:20] if service_key else 'None'}...")
 
-    if not service_key or token != service_key:
-        logger.error("Service token mismatch")
-        raise HTTPException(status_code=401, detail="Invalid service token")
+        if not service_key or token != service_key:
+            logger.error(f"Service token mismatch - token==key: {token == service_key if service_key else False}")
+            raise HTTPException(status_code=401, detail="Invalid service token")
 
-    # Success - no return value needed
-    logger.debug("Agent service authenticated successfully")
+        # Rate limiting for agent service
+        now = time.time()
+        calls = service_calls_agent['agent-runner']
+        service_calls_agent['agent-runner'] = [t for t in calls if now - t < 60]
+
+        if len(service_calls_agent['agent-runner']) >= 600:  # 10 req/sec
+            raise HTTPException(status_code=429, detail="Service rate limit exceeded")
+
+        service_calls_agent['agent-runner'].append(now)
+
+        # For service auth, user_id must be in query params or request body
+        user_id = request.query_params.get('user_id')
+        if not user_id:
+            raise HTTPException(status_code=400, detail="user_id query parameter required for service auth")
+
+        logger.bind(user_id=user_id).debug("Agent endpoint authenticated via service auth")
+        return user_id
+
+    else:
+        # JWT user authentication (fallback)
+        from core.auth.supabase_auth import security, verify_jwt_token
+        from fastapi.security import HTTPAuthorizationCredentials
+
+        try:
+            if not auth_header.startswith('Bearer '):
+                raise HTTPException(status_code=401, detail="Authentication required")
+
+            token = auth_header.split(' ')[1]
+            claims = verify_jwt_token(token)
+
+            if not claims:
+                raise HTTPException(status_code=401, detail="Invalid token")
+
+            user_id = claims.get("sub")
+            if not user_id:
+                raise HTTPException(status_code=401, detail="Invalid token: missing user ID")
+
+            logger.bind(user_id=user_id).debug("Agent endpoint authenticated via JWT")
+            return user_id
+
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=401, detail=f"Authentication failed: {str(e)}")
 
 
 # ============================================================================
@@ -100,7 +140,6 @@ class UpdateStrategyRequest(BaseModel):
 
 class RecordTradeObservationRequest(BaseModel):
     """Request for recording post-trade reflection"""
-    config_id: str
     trade_id: str
     observation_type: str  # "win_analysis" or "loss_analysis"
     what_went_well: Optional[str] = None
@@ -126,9 +165,8 @@ class QueryTradeObservationsRequest(BaseModel):
 @router.post("/query-market-data")
 async def query_market_data(
     request_body: QueryMarketDataRequest,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    http_request: Request,
+    user_id: str = Depends(get_service_or_user_auth)
 ) -> Dict[str, Any]:
     """
     Query market data with optional dynamic overrides.
@@ -142,32 +180,10 @@ async def query_market_data(
     - Both: Provide both indicators and data_sources
     - Config defaults: Just provide symbol (no overrides)
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
         config = get_configuration(user_id=user_id, config_id=request_body.config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
-
-        # Normalize symbol using UniversalSymbolStandardizer
-        standardizer = UniversalSymbolStandardizer()
-        symbol = request_body.symbol
-
-        # Try to normalize to platform format (handles BTC -> BTCUSDT, etc.)
-        if symbol:
-            # Detect format and normalize to platform standard
-            if '/' in symbol:
-                # Already in CCXT format like "BTC/USDT"
-                normalized = standardizer.normalize(symbol, "ccxt", "platform")
-            elif 'USDT' in symbol or 'USD' in symbol:
-                # Already has pair like "BTCUSDT"
-                normalized = symbol
-            else:
-                # Simple symbol like "BTC" - assume USDT pair
-                normalized = f"{symbol.upper()}-USDT"
-
-            symbol = normalized
-            logger.debug(f"Normalized symbol: {request_body.symbol} -> {symbol}")
 
         result = {}
 
@@ -178,11 +194,8 @@ async def query_market_data(
             # Use override or config defaults
             indicators = request_body.indicators or config.get('extraction', {}).get('indicators', ['RSI'])
 
-            # Normalize indicator names to UPPERCASE
-            indicators = [ind.upper() for ind in indicators]
-
             tech_result = await extraction_engine.extract_for_symbol(
-                symbol=symbol,  # Use normalized symbol
+                symbol=request_body.symbol,
                 indicators=indicators,
                 timeframe=request_body.timeframe,
                 config_id=request_body.config_id
@@ -219,7 +232,7 @@ async def query_market_data(
                 intel_result = await fetch_market_intelligence(
                     config=config,
                     user_id=user_id,
-                    symbol=symbol,  # Use normalized symbol
+                    symbol=request_body.symbol,
                     data_points_override=request_body.data_sources  # Dynamic override
                 )
                 result['market_intelligence'] = intel_result
@@ -243,94 +256,28 @@ async def query_market_data(
 
 
 # ============================================================================
-# 1B. GET CURRENT PRICE (Lightweight price check)
-# ============================================================================
-
-@router.get("/current-price/{symbol}")
-async def get_current_price(
-    symbol: str,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
-) -> Dict[str, Any]:
-    """
-    Get current price for a symbol (lightweight, fast).
-
-    Uses WebSocket cache for 100 symbols (sub-ms), falls back to REST API.
-    Returns just the current price without indicators - useful for quick
-    price checks before executing trades.
-
-    Example: GET /api/v2/agent/current-price/BTCUSDT
-    """
-    validate_agent_service_auth(authorization, x_service_auth)
-
-    try:
-        from trading.paper.hybrid_price_service import HybridPriceService
-
-        # Convert BTCUSDT -> BTC/USDT if needed
-        if '/' not in symbol and symbol.endswith('USDT'):
-            base = symbol[:-4]  # Remove 'USDT'
-            internal_symbol = f"{base}/USDT"
-        else:
-            internal_symbol = symbol
-
-        # Get price from hybrid service (WebSocket first, REST fallback)
-        price_service = HybridPriceService()
-        try:
-            market_price = await price_service.get_current_price(internal_symbol)
-
-            return {
-                "status": "success",
-                "symbol": symbol,
-                "current_price": market_price.mid,
-                "bid": market_price.bid,
-                "ask": market_price.ask,
-                "spread_percent": ((market_price.ask - market_price.bid) / market_price.mid) * 100,
-                "timestamp": datetime.utcnow().isoformat(),
-                "source": "websocket_cache" if price_service.stats["websocket_hits"] > 0 else "binance_rest"
-            }
-
-        finally:
-            # Cleanup
-            if price_service.redis_client:
-                await price_service.redis_client.aclose()
-            if price_service.binance_client:
-                await price_service.binance_client.close_connection()
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to get current price for {symbol}: {e}", user_id=user_id)
-        raise HTTPException(status_code=500, detail=str(e))
-
-
-# ============================================================================
 # 2. EXECUTE TRADE (Direct execution, agent already decided)
 # ============================================================================
 
 @router.post("/execute-trade")
 async def execute_trade(
     request: ExecuteTradeRequest,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
     Execute trade directly (agent has already made the decision).
     No extraction or decision logic - just execute the trade.
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
         # Verify config exists
-        config = get_configuration(user_id=user_id, config_id=request.config_id)
+        config = get_configuration(current_user.user_id, request.config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
         # Build trade intent
         intent = {
             "config_id": request.config_id,
-            "user_id": user_id,
+            "user_id": current_user.user_id,
             "symbol": request.symbol,
             "action": request.side,  # "long" or "short"
             "confidence": request.confidence,
@@ -346,7 +293,7 @@ async def execute_trade(
 
         logger.info(
             f"Agent executed trade: {request.symbol} {request.side}",
-            user_id=user_id,
+            user_id=current_user.user_id,
             config_id=request.config_id
         )
 
@@ -357,7 +304,7 @@ async def execute_trade(
         }
 
     except Exception as e:
-        logger.error(f"Trade execution failed: {e}", user_id=user_id)
+        logger.error(f"Trade execution failed: {e}", user_id=current_user.user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -368,17 +315,13 @@ async def execute_trade(
 @router.get("/positions/{config_id}")
 async def get_positions(
     config_id: str,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
     Get open positions for config (paper or live).
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
-        config = get_configuration(user_id=user_id, config_id=config_id)
+        config = get_configuration(current_user.user_id, config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
@@ -386,7 +329,7 @@ async def get_positions(
 
         if trading_mode == 'paper':
             paper_trading = SupabasePaperTradingService()
-            positions = await paper_trading.get_open_positions(config_id)
+            positions = await paper_trading.get_open_positions(config_id, current_user.user_id)
         else:
             # TODO: Live trading positions via Symphony
             raise HTTPException(status_code=501, detail="Live trading positions not implemented yet")
@@ -399,7 +342,7 @@ async def get_positions(
         }
 
     except Exception as e:
-        logger.error(f"Get positions failed: {e}", user_id=user_id)
+        logger.error(f"Get positions failed: {e}", user_id=current_user.user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -410,17 +353,13 @@ async def get_positions(
 @router.get("/account/{config_id}")
 async def get_account_status(
     config_id: str,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
     Get account summary with performance metrics.
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
-        config = get_configuration(user_id=user_id, config_id=config_id)
+        config = get_configuration(current_user.user_id, config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
@@ -441,7 +380,7 @@ async def get_account_status(
         }
 
     except Exception as e:
-        logger.error(f"Get account failed: {e}", user_id=user_id)
+        logger.error(f"Get account failed: {e}", user_id=current_user.user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -453,17 +392,13 @@ async def get_account_status(
 async def close_position(
     trade_id: str,
     config_id: str = Body(..., embed=True),
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
     Close an open position.
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
-        config = get_configuration(user_id=user_id, config_id=config_id)
+        config = get_configuration(current_user.user_id, config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
@@ -471,14 +406,18 @@ async def close_position(
 
         if trading_mode == 'paper':
             paper_trading = SupabasePaperTradingService()
-            result = await paper_trading.close_position(trade_id=trade_id)
+            result = await paper_trading.close_position(
+                trade_id=trade_id,
+                config_id=config_id,
+                user_id=current_user.user_id
+            )
         else:
             # TODO: Close live position via Symphony
             raise HTTPException(status_code=501, detail="Live position closing not implemented yet")
 
         logger.info(
             f"Agent closed position: {trade_id}",
-            user_id=user_id,
+            user_id=current_user.user_id,
             config_id=config_id
         )
 
@@ -489,7 +428,7 @@ async def close_position(
         }
 
     except Exception as e:
-        logger.error(f"Close position failed: {e}", user_id=user_id)
+        logger.error(f"Close position failed: {e}", user_id=current_user.user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -501,9 +440,7 @@ async def close_position(
 async def update_strategy(
     config_id: str,
     request: UpdateStrategyRequest,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
     Update agent strategy in config.
@@ -511,10 +448,8 @@ async def update_strategy(
     Only allowed if autonomously_editable=true OR updated_by="user".
     Increments version number and logs performance.
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
-        config = get_configuration(user_id=user_id, config_id=config_id)
+        config = get_configuration(current_user.user_id, config_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
@@ -549,12 +484,12 @@ async def update_strategy(
                     SET config_data = %s,
                         updated_at = NOW()
                     WHERE config_id = %s AND user_id = %s
-                """, (json.dumps(config['config_data']), config_id, user_id))
+                """, (json.dumps(config['config_data']), config_id, current_user.user_id))
                 conn.commit()
 
         logger.info(
             f"Agent strategy updated (v{new_strategy['version']})",
-            user_id=user_id,
+            user_id=current_user.user_id,
             config_id=config_id,
             updated_by=request.updated_by
         )
@@ -568,7 +503,7 @@ async def update_strategy(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Update strategy failed: {e}", user_id=user_id)
+        logger.error(f"Update strategy failed: {e}", user_id=current_user.user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -579,17 +514,14 @@ async def update_strategy(
 @router.post("/trade-observations")
 async def record_trade_observation(
     request: RecordTradeObservationRequest,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    config_id: str = Body(..., embed=True),
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
     Record post-trade reflection (what worked, what didn't, which data points were predictive).
 
     Agent calls this after closing a position to reflect on the trade outcome.
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
         # Validate observation type
         valid_types = ["win_analysis", "loss_analysis"]
@@ -615,7 +547,7 @@ async def record_trade_observation(
                            EXTRACT(EPOCH FROM (closed_at - opened_at))/60 as duration_minutes
                     FROM paper_trades
                     WHERE trade_id = %s AND user_id = %s
-                """, (request.trade_id, user_id))
+                """, (request.trade_id, current_user.user_id))
 
                 trade = cur.fetchone()
                 if not trade:
@@ -632,8 +564,8 @@ async def record_trade_observation(
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING observation_id, created_at
                 """, (
-                    request.config_id,
-                    user_id,
+                    config_id,
+                    current_user.user_id,
                     request.trade_id,
                     request.observation_type,
                     request.what_went_well,
@@ -649,8 +581,8 @@ async def record_trade_observation(
 
         logger.info(
             f"Trade observation recorded: {request.observation_type}",
-            user_id=user_id,
-            config_id=request.config_id,
+            user_id=current_user.user_id,
+            config_id=config_id,
             trade_id=request.trade_id,
             importance=request.importance
         )
@@ -665,7 +597,7 @@ async def record_trade_observation(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Record trade observation failed: {e}", user_id=user_id)
+        logger.error(f"Record trade observation failed: {e}", user_id=current_user.user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 
@@ -676,9 +608,7 @@ async def record_trade_observation(
 @router.post("/trade-observations/query")
 async def query_trade_observations(
     request: QueryTradeObservationsRequest,
-    user_id: str = Query(...),
-    authorization: str = Header(None),
-    x_service_auth: str = Header(None, alias="x-service-auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
     Query trade observations for learning and strategy refinement.
@@ -686,8 +616,6 @@ async def query_trade_observations(
     Agent can search past observations to learn from previous trades.
     User + agent can review patterns together to improve strategy.
     """
-    validate_agent_service_auth(authorization, x_service_auth)
-
     try:
         # Build dynamic query
         query = """
@@ -706,12 +634,12 @@ async def query_trade_observations(
                 t.symbol,
                 t.side,
                 t.entry_price,
-                t.current_price
+                t.exit_price
             FROM trade_observations o
             JOIN paper_trades t ON o.trade_id = t.trade_id
             WHERE o.config_id = %s AND o.user_id = %s
         """
-        params = [request.config_id, user_id]
+        params = [request.config_id, current_user.user_id]
 
         # Add optional filters
         if request.symbol:
@@ -753,12 +681,12 @@ async def query_trade_observations(
                 "symbol": row[11],
                 "side": row[12],
                 "entry_price": float(row[13]) if row[13] else None,
-                "current_price": float(row[14]) if row[14] else None
+                "exit_price": float(row[14]) if row[14] else None
             })
 
         logger.info(
             f"Queried {len(observations)} trade observations",
-            user_id=user_id,
+            user_id=current_user.user_id,
             config_id=request.config_id
         )
 
@@ -772,5 +700,5 @@ async def query_trade_observations(
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"Query trade observations failed: {e}", user_id=user_id)
+        logger.error(f"Query trade observations failed: {e}", user_id=current_user.user_id)
         raise HTTPException(status_code=500, detail=str(e))
