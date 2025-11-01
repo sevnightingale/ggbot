@@ -45,6 +45,19 @@ export interface ExecutionConfig {
   authentication: string
 }
 
+// Config type discriminator
+export type ConfigType = 'autonomous_trading' | 'signal_validation' | 'agent'
+
+// Agent strategy configuration
+export interface AgentStrategy {
+  content: string
+  autonomously_editable: boolean
+  version: number
+  last_updated_at: string
+  last_updated_by: 'user' | 'agent'
+  performance_log: Array<Record<string, unknown>>
+}
+
 // Unified config interface matching backend response
 export interface UnifiedConfig {
   config_id: string
@@ -52,9 +65,10 @@ export interface UnifiedConfig {
   config_type: string
   user_id: string
   config_data: {
-    extraction: ExtractionConfig
-    decision: DecisionConfig
+    extraction?: ExtractionConfig       // Optional for agent configs
+    decision?: DecisionConfig           // Optional for agent configs
     trading: TradingConfig
+    agent_strategy?: AgentStrategy      // Only for agent configs
   }
   state: 'active' | 'inactive'  // New database field for scheduler state
   created_at: string

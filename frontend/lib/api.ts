@@ -6,9 +6,9 @@ import { createClient } from '@/lib/supabase'
 
 export interface ConfigData {
   schema_version: string
-  config_type?: string  // 'autonomous_trading' | 'signal_validation'
+  config_type?: string  // 'autonomous_trading' | 'signal_validation' | 'agent'
   selected_pair: string
-  extraction: {
+  extraction?: {  // Optional for agent configs
     selected_data_sources: {
       technical_analysis?: {
         data_points: string[]  // Indicator names like ["RSI", "MACD"]
@@ -40,18 +40,26 @@ export interface ConfigData {
       }
     }
   }
-  decision: {
+  decision?: {  // Optional for agent and signal_validation configs
     analysis_frequency: string | null  // null for signal_validation mode
     system_prompt?: string
     user_prompt?: string
   }
-  llm_config: {
+  llm_config?: {  // Optional for agent and signal_validation configs
     provider: string  // 'default' | 'openai' | 'deepseek' | 'anthropic' | 'xai'
     model?: string    // Model name for the provider
     use_platform_keys: boolean
     use_own_key: boolean
     // API keys are NOT stored here - they go to user_llm_credentials table via Vault
     // We only store references to credentials when use_own_key is true
+  }
+  agent_strategy?: {  // Only for agent configs
+    content: string
+    autonomously_editable: boolean
+    version: number
+    last_updated_at: string
+    last_updated_by: 'user' | 'agent'
+    performance_log: Array<Record<string, unknown>>
   }
   trading: {
     execution_mode: string

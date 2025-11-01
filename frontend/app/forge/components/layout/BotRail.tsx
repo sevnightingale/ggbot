@@ -155,7 +155,10 @@ function BotRow({
 }: BotRowProps) {
   // Get bot metadata
   const isSignalDriven = bot.config_data.decision?.analysis_frequency === 'signal_driven'
-  const configType = bot.config_type === 'signal_validation' ? 'Signal validation' : 'Autonomous trading'
+  const configType =
+    bot.config_type === 'signal_validation' ? 'Signal validation' :
+    bot.config_type === 'agent' ? 'Agent strategy' :
+    'Autonomous trading'
   const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
   const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
   const balance = account?.current_balance ?? 10000
@@ -195,7 +198,7 @@ function BotRow({
         {/* Metadata badges */}
         <div className="flex flex-wrap gap-1 mb-2">
           <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
-            {configType === 'Signal validation' ? 'Signal' : 'Auto'}
+            {configType === 'Signal validation' ? 'Signal' : configType === 'Agent strategy' ? 'Agent' : 'Auto'}
           </span>
           {isLive ? (
             <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-xs font-semibold text-red-500">

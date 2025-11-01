@@ -131,7 +131,7 @@ function ForgeApp() {
 
       // Enter editing mode - load selected bot config into editing state
       setIsEditingConfig(true)
-      setEditingConfigData(JSON.parse(JSON.stringify(selectedBot.config_data)))
+      setEditingConfigData(selectedBot.config_data ? JSON.parse(JSON.stringify(selectedBot.config_data)) : null)
       setEditingTableFields({
         config_name: selectedBot.config_name,
         config_type: selectedBot.config_type
@@ -649,16 +649,16 @@ function ForgeApp() {
         return {
           ...prev,
           ...configUpdates,
-          // Handle nested objects specifically
+          // Handle nested objects specifically with guards for optional fields
           ...(configUpdates.extraction && {
             extraction: {
-              ...prev.extraction,
+              ...(prev.extraction || {}),  // Guard: fallback to empty object
               ...configUpdates.extraction
             }
           }),
           ...(configUpdates.decision && {
             decision: {
-              ...prev.decision,
+              ...(prev.decision || {}),  // Guard: fallback to empty object
               ...configUpdates.decision
             }
           }),
@@ -670,7 +670,7 @@ function ForgeApp() {
           }),
           ...(configUpdates.llm_config && {
             llm_config: {
-              ...prev.llm_config,
+              ...(prev.llm_config || {}),  // Guard: fallback to empty object
               ...configUpdates.llm_config
             }
           }),
@@ -678,6 +678,12 @@ function ForgeApp() {
             telegram_integration: {
               ...prev.telegram_integration,
               ...configUpdates.telegram_integration
+            }
+          }),
+          ...(configUpdates.agent_strategy && {
+            agent_strategy: {
+              ...(prev.agent_strategy || {}),  // Guard: handle agent configs
+              ...configUpdates.agent_strategy
             }
           })
         } as ConfigData

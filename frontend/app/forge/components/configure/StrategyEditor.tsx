@@ -58,6 +58,7 @@ export function StrategyEditor({
 
     onUpdate?.({
       decision: {
+        ...(configData?.decision || {}),  // Guard: fallback to empty object
         analysis_frequency: freq,
         system_prompt: configData?.decision?.system_prompt,
         user_prompt: configData?.decision?.user_prompt
@@ -74,6 +75,7 @@ export function StrategyEditor({
 
     onUpdate?.({
       decision: {
+        ...(configData?.decision || {}),  // Guard: fallback to empty object
         analysis_frequency: configData?.decision?.analysis_frequency ?? null,
         system_prompt: configData?.decision?.system_prompt,
         user_prompt: value
@@ -115,7 +117,7 @@ export function StrategyEditor({
 
     onUpdate?.({
       llm_config: {
-        ...configData?.llm_config,
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false }),  // Guard with defaults
         provider,
         model,
         use_platform_keys: true,

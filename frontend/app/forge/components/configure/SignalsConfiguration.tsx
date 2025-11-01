@@ -70,7 +70,7 @@ export function SignalsConfiguration({
 
     const update: Partial<ConfigData> = {
       extraction: {
-        ...configData?.extraction,
+        ...(configData?.extraction || {}),  // Guard: fallback to empty object
         selected_data_sources: {
           ...currentConfig,
           signals_group_chats: updatedDataPoints.length > 0 ? {

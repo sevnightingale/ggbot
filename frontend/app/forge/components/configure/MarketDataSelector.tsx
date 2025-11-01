@@ -108,7 +108,7 @@ export function MarketDataSelector({
     // Create update object
     const update: Partial<ConfigData> = {
       extraction: {
-        ...configData?.extraction,
+        ...(configData?.extraction || {}),  // Guard: fallback to empty object
         selected_data_sources: {
           ...currentConfig,
           [category]: updatedDataPoints.length > 0 ? {
