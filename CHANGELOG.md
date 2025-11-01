@@ -1,990 +1,263 @@
 # CHANGELOG - ggbots Platform
 
-Complete history of features, fixes, and improvements to the ggbots autonomous trading platform.
-
-**Note**: This file contains historical records only. For current status, see `ACTIVE.md`. For upcoming work, see `TODO.md`. For new Claude Code instances, start with `GO.md`.
+Complete history of features, fixes, and improvements. For current status see ACTIVE.md, upcoming work see TODO.md.
 
 ---
 
-## 2025-10-30 (Evening) - Agent Tool #11 + Symbol Normalization Fix
-
-**New Tool: `get_current_price`** - Fast price checks via WebSocket cache
-- Added lightweight price tool for pre-trade checks (sub-millisecond via WebSocket, fallback to REST)
-- Includes bid/ask spread and source indication
-- Prevents bad SL/TP placement from unknown prices
-- Files: `api/agent.py`, `agent/service_client.py`, `agent/mcp_server.py`
-
-**Symbol Normalization Fix** - ggshot signals now work with all symbol formats
-- **Root cause**: Agent sends `BTCUSDT`, database stores `BTC/USDT` → no match
-- **Solution**: Added Universal Symbol Standardizer to market intelligence orchestrator
-- Handles all formats: BTCUSDT (ggshot) → BTC/USDT (ccxt) → BTC-USDT (platform)
-- Universal fix for ALL callers (agent, ggbot.py, CLI tools)
-- File: `market_intelligence/orchestrator.py`
-
-**Agent Status**: 11 tools operational, ready for strategy definition → autonomous testing
-
----
-
-## 2025-10-30 - Agent Phase 3 Complete: All Tools Operational ✅
-
-**Status**: Phase 3 COMPLETE - Agent ready for autonomous trading
-
-### Auth Deadlock Resolution 🎯
-
-**Problem Solved**: Resolved FastAPI event loop deadlock that was blocking all agent tools after first API call.
-
-**Root Cause**: Complex `Depends(get_service_or_user_auth)` async dependency with Request object injection was causing resource leak/blocking.
-
-**Solution**: Simplified service authentication
-- Replaced `Depends()` dependency injection with simple synchronous `validate_agent_service_auth()` function
-- Direct header validation (`authorization`, `x_service_auth`) with `Header()` and `Query()` parameters
-- Removed async auth chain and dual JWT/service logic complexity
-- All 8 agent endpoints updated and tested
-
-### Tool Fixes - 9/9 Operational ✅
-
-**Position Management** (was 500 errors):
-- Fixed `get_positions`: Removed extra `user_id` argument (paper service only takes `config_id`)
-- Fixed `close_position`: Removed `config_id` and `user_id` args (paper service only takes `trade_id`)
-
-**Trade Observations** (was 500/422 errors):
-- Fixed `query_trade_observations`: Changed SQL query from `t.exit_price` to `t.current_price` (correct column name)
-- Fixed `record_trade_observation`: Added `config_id` to `RecordTradeObservationRequest` model, removed duplicate `Body()` parameter
-
-**Tool Sandboxing**:
-- Added `disallowed_tools` parameter to `ClaudeAgentOptions`
-- Explicitly blocks all Claude Code built-in tools (Bash, Read, Write, Edit, Glob, Grep, WebFetch, etc.)
-- Agent restricted to 10 trading tools only (production-safe)
-
-### Final Tool Status
-
-All 9 tools tested and operational:
-1. ✅ `query_market_data` - 32 data points across 7 categories
-2. ✅ `execute_trade` - Opens positions with SL/TP
-3. ✅ `get_positions` - Returns all open positions
-4. ✅ `close_position` - Closes trades with realized P&L
-5. ✅ `get_account_status` - Account balance & performance
-6. ✅ `wait_for` - Agent timing control (up to 24h)
-7. ✅ `update_strategy` - Strategy modification (when enabled)
-8. ✅ `record_trade_observation` - Post-trade reflection
-9. ✅ `query_trade_observations` - Search past learnings
-
-Plus: `request_autonomous_mode` for mode switching
-
-### Files Modified This Session
-
-- `api/agent.py` - Simplified auth (8 endpoints), fixed method signatures, SQL columns, request bodies
-- `agent/run_agent.py` - Added `disallowed_tools` for sandboxing
-- `TODO.md` - Marked Phase 3 complete
-- `CHANGELOG.md` - This entry
-
-### What's Ready
-
-**Agent is production-ready for autonomous trading:**
-- All tools working without deadlock
-- Service authentication stable
-- Agent sandboxed to trading-only operations
-- Ready for strategy definition → autonomous mode testing
-
-### Next Steps
-
-1. Test full conversation → autonomous mode flow
-2. Run agent autonomously for 1+ hour with real trades
-3. Monitor token usage/costs with Haiku model
-4. Build Phase 4: Frontend integration
-
----
-
-## 2025-10-29 (Session 2) - Agent Authentication & Tool Testing 🟡
-
-**Status**: 60% complete - Core working, blocked by ggbot deadlock issue
-
-### What Was Accomplished
-
-**Tool Testing**:
-- ✅ Successfully tested `query_market_data` - Agent retrieved BTC RSI with 48.67 reading
-- ✅ Verified `wait_for` and `request_autonomous_mode` tools working
-- ❌ All other trading tools timeout due to ggbot deadlock
-
-**Service Authentication Implementation**:
-- ✅ Added `agent-runner` to `get_service_user()` in ggbot.py (600 req/min limit)
-- ✅ Updated all 8 agent API endpoints with `get_service_or_user_auth()` dual auth
-- ✅ Service client sends proper headers: `Authorization: Bearer {SERVICE_KEY}` + `X-Service-Auth: agent-runner`
-- ✅ All endpoints send `user_id` as query parameter for service auth
-- ❌ Authentication layer causes deadlock after first request
-
-**Bug Fixes**:
-- ✅ Fixed dict parameter parsing in MCP tools (JSON string handling)
-- ✅ Fixed `get_configuration()` positional argument bug (used keyword args)
-- ✅ Added JSON serialization for numpy/pandas objects in API responses
-- ✅ Fixed Python syntax errors from sed bulk replacements
-- ✅ Rewrote `agent/service_client.py` cleanly with all params
-
-**Chat CLI Enhancement**:
-- ✅ Rewrote `chat.py` with concurrent tasks for real-time response display
-- ✅ Uses `aioconsole.ainput()` for non-blocking input
-- ✅ No more waiting for next message to see agent response
-
-**Documentation**:
-- ✅ Created `AGENT.md` - Comprehensive Phase 3 progress documentation
-- ✅ Updated `TODO.md` - Marked Phase 3 as 60% complete with blocker details
-
-### Critical Issue - ggbot Deadlock 🚨
-
-**Problem**: After handling first agent API call successfully, all subsequent requests hang for 30s and timeout.
-
-**Evidence**:
-1. Fresh ggbot restart → curl test works perfectly
-2. Agent calls `query_market_data` → works perfectly
-3. Agent calls any other endpoint → hangs indefinitely
-4. No logs showing request even reached handler
-5. Curl test also hangs after agent uses it once
-
-**Suspected Cause**: `get_service_or_user_auth()` FastAPI dependency causing resource leak or event loop blocking.
-
-**Impact**: All trading tools unusable after first tool call.
-
-**Next Steps**:
-- Option A: Simplify auth - remove dual auth complexity, use simple header check
-- Option B: Async profiler to find blocking call
-- Option C: Revert to JWT-only for agents
-
-### Files Modified This Session
-
-- `agent/service_client.py` - Complete rewrite with proper auth and params
-- `agent/chat.py` - Concurrent tasks rewrite
-- `agent/mcp_server.py` - Dict parameter parsing fixes
-- `api/agent.py` - Added dual auth, JSON serialization, fixed config calls
-- `ggbot.py` - Added agent-runner to service auth
-- `AGENT.md` - Created comprehensive documentation
-- `TODO.md` - Updated Phase 3 status
-
----
-
-## 2025-10-29 (Session 1) - Autonomous Agent Phase 3: Working Implementation ✅
-
-**Architecture Pivot - Simplified Design**:
-- ❌ Removed dual-task complexity (was causing SDK conflicts)
-- ✅ Strategy definition: Clean query/response loop with user via Redis
-- ✅ Autonomous mode: Pure receive_messages() - no user interaction
-- ✅ Separate processes for separate modes (restart to switch)
-
-**Strategy Definition Mode** (interactive):
-- User and agent chat via Redis queues
-- Agent calls `request_autonomous_mode` tool when ready
-- User confirms "1" → saves strategy to database, exits
-- User revises "2" → continues conversation
-- Simple, follows SDK patterns perfectly
-
-**Autonomous Mode** (24/7 trading):
-- Loads strategy from database
-- Uses `receive_messages()` indefinitely
-- Agent queries data, trades, sleeps via wait_for()
-- No user interaction (restart in strategy_definition to modify)
-
-**Testing**: Strategy definition mode verified working end-to-end with chat.py CLI
-
-**Files**: Rewrote `agent/run_agent.py` (simplified from dual-task to mode routing), updated `agent/mcp_server.py` (stores strategy in Redis)
-
-**Next**: Test full strategy → autonomous flow, test autonomous mode trading
-
----
-
-## 2025-10-28 - Autonomous Agent Phase 3: Complete Infrastructure
-
-**Agent Runner** (`agent/run_agent.py` - 370 lines):
-- TradingAgent class with ClaudeSDKClient streaming mode (two async tasks: agent loop + user interrupts)
-- Single system prompt with mode/strategy context injection
-- Added 32 data points documentation (7 categories) to system prompt for agent guidance
-- Redis queues: `agent:{config_id}:messages` and `:responses` (production-ready)
-- CLI entry point: argparse with `--config-id` and `--mode` flags
-
-**MCP Tools** (10 total):
-- Added `request_autonomous_mode` tool for mode switching
-- Updated `query_market_data` tool to use proper category-based structure (7 categories, 32 data points)
-- Aligned with market intelligence orchestrator architecture
-
-**API Endpoints** (`api/agent.py`):
-- Verified all 8 endpoints exist and registered (created in previous session)
-- Confirmed orchestrator supports `data_points_override` for dynamic agent queries
-- Endpoints: query-market-data, execute-trade, positions, account, close, strategy, trade-observations, query-observations
-
-**CLI Testing Interface** (`agent/chat.py` - 106 lines):
-- Redis-based chat CLI for two-terminal testing
-- Blocking `blpop` with 30s timeout for agent responses
-- Handles mode confirmation ("1"/"2") and graceful exit
-
-**SDK Integration**: `receive_messages()` for agent loop, `client.interrupt()` + `receive_response()` for user messages, auto-compaction at 95%
-
-**Files**: Modified `agent/run_agent.py`, `agent/mcp_server.py`, created `agent/chat.py`, verified `api/agent.py`
-
-**Next**: Mode switch completion, end-to-end testing
-
----
-
-## 2025-10-28 - Market Intelligence Phase 1: PRODUCTION DEPLOYED 🚀
-
-**8 New Grok-Powered Data Sources LIVE** (32 total data points):
-- Macro Economics (4): VIX, DXY, CPI, NFP | On-Chain Analytics (2): BTC TVL, whale activity
-- Sentiment & Social (1): Twitter sentiment | News & Regulatory (1): Crypto news
-- All data points FREE tier, seeded via `scripts/seed_grok_intelligence.sql`
-
-**4 Critical Bug Fixes**:
-1. Gateway adapter routing - Fixed module path resolution for `agentic` category
-2. ggShot adapter - Updated data source name `signals_group_chats` → `trading_signals`
-3. Cache key KeyError - Added `name` to format context in `CatalogEntry.build_cache_key()`
-4. Redis protobuf serialization - Converted citations/tool_calls to native Python types
-
-**Performance & Features**:
-- **Parallel Query Execution**: `asyncio.gather()` implementation - 160s → 30s (5.3x speedup!)
-- **Custom Cache TTL**: Per-data-point optimization (10min to 24hrs) saves ~60% vs uniform TTL
-- **Agent Dynamic Queries**: `data_points_override` parameter enables agent queries without config modification
-- **Production Validated**: Real bot config completed in ~30s with comprehensive AI reasoning across all 8 sources
-
-**Cost Economics**: $195/month platform cost = $0.76/user (257 users), scales to $0.20/user at 1000 users
-
-**Documentation**: Consolidated market intelligence architecture into `market_intelligence/README.md` (1150+ lines)
-
-**Files**: Modified 6 (orchestrator, gateway, catalog_mapping, types, grok_agentic, ggshot_adapter) | Created 3 (seed script, test suite, docs)
-
-**Status**: ✅ **PHASE 1 COMPLETE** - All 8 Grok-powered sources live, production tested, cost validated
-
----
-
-## 2025-10-27 - Autonomous Agent Phase 2: MCP Server & Trade Observations
-
-**Agent MCP Server Implementation** (Phase 2 Complete):
-- **Database**: Migrated from `agent_memory` to `trade_observations` table (post-trade reflection model: 13 columns, 8 indexes, RLS enabled)
-- **API Endpoints**: Added 2 new endpoints in `api/agent.py` - `POST /agent/trade-observations`, `POST /agent/trade-observations/query`
-- **Service Client**: Updated `agent/service_client.py` with observation methods (record, query), HTTP retry logic
-- **MCP Server**: Implemented `agent/mcp_server.py` (671 lines) with 9 tools using Claude Agent SDK
-  - Tools: query_market_data, execute_trade, get_positions, get_account_status, close_position, update_strategy, wait_for, record_trade_observation, query_trade_observations
-  - Module-level AgentContext for single-agent testing
-  - Tools return helpful error messages (not exceptions)
-- **Tested**: MCP server instantiation verified with 9 registered tools
-
-**Trade Observations Model**:
-- Structured post-trade learning (what worked/failed, predictive data points, decision review)
-- Queryable by symbol, observation_type (win/loss), importance threshold
-- NOT auto-injected after compaction - agent retrieves dynamically when needed
-
-**Files Created/Modified**:
-- `database/migrations/agent_trade_observations.sql` - Migration script
-- `agent/mcp_server.py` - 9 MCP tools (671 lines)
-- `agent/service_client.py` - Updated with observation methods
-- `api/agent.py` - Added 2 observation endpoints
-
-**Next**: Phase 3 - Agent Runner (conversation mode + autonomous mode)
-
----
-
-## 2025-10-27 - Intelligence Orchestrator + GrokAgenticAdapter (Game-Changer!)
-
-**Intelligence Orchestrator Implementation** (Phase 1 Complete):
-- **Core Module**: `market_intelligence/orchestrator.py` (260 lines) - config-driven routing layer that reads user config and queries gateway
-- **Catalog Mapping**: `market_intelligence/catalog_mapping.py` (180 lines) - hardcoded mapping dict for data_point → catalog data_type translation
-- **Integration**: Modified `ggbot.py` (+30 lines) to call orchestrator after technical indicators, passes `market_intelligence` to decision engine
-- **Decision Engine**: Added 6 formatting methods (`_format_derivatives_data`, `_format_macro_data`, `_format_onchain_data`, `_format_sentiment_data`, `_format_news_data`, `_format_market_intelligence_for_llm`)
-- **Prompts**: Updated `opportunity_analysis.py` to include Market Intelligence section in LLM prompts
-- **Tests**: `tests/test_orchestrator.py` - 16/16 unit tests passing (config parsing, permissions, mapping, full integration)
-
-**GrokAgenticAdapter** - Universal Market Intelligence via XAI's Agentic API:
-- **Revolutionary Approach**: ONE adapter handles 8+ data sources via Grok's autonomous AI (web search, X search, code execution)
-- **Adapter**: `market_intelligence/adapters/agentic/grok_agentic.py` (500+ lines) with 8 prompt templates for different query types
-- **Query Types**: VIX index, DXY index, CPI inflation, NFP jobs, Twitter sentiment, crypto news, BTC TVL, whale activity
-- **Streaming Support**: Real-time tool call observability, citation tracking, cost estimation
-- **Tested Live**: VIX query successful - 5 tool calls (web_search, browse_page), 18s response time, $0.0072 cost, 7 citations
-- **Cost Analysis**: $0.005-0.015 per query, with 80% cache hit rate = $160-240/month platform cost, $0.16-0.24/user/month at 1000 users
-
-**Catalog Mapping - 8 New Data Points Ready**:
-- **Macro Economics**: VIX (volatility), DXY (dollar strength), CPI (inflation), NFP (jobs) - all via Grok
-- **On-Chain**: BTC TVL, whale activity - via Grok
-- **Sentiment**: Twitter sentiment - via Grok X search + NLP
-- **News**: Crypto news headlines - via Grok web + X search
-
-**Architecture Benefits**:
-- ✅ Scalability: Adding 150 data points requires 0 code changes to orchestrator/ggbot.py, just add mapping entries
-- ✅ Shared Cache: Cost per user DECREASES as platform grows (cache is per-symbol, not per-user)
-- ✅ Economies of Scale: At 10,000 users, cost = $0.01-0.05/user/month
-- ✅ Autonomous Intelligence: Grok interprets and structures data (not just raw API responses)
-- ✅ Citations: Full transparency with source URLs for all Grok queries
-
-**Files Created**:
-- `market_intelligence/orchestrator.py` - Main orchestration logic
-- `market_intelligence/catalog_mapping.py` - Data point → catalog mapping
-- `market_intelligence/adapters/agentic/grok_agentic.py` - Universal Grok adapter
-- `market_intelligence/catalog/data_types/agentic/grok_agentic.yaml` - Catalog definition
-- `tests/test_orchestrator.py` - Comprehensive unit tests (16 tests)
-- `scripts/test_grok_intelligence.py` - End-to-end Grok testing script
-- `DOCS/ORCHESTRATOR_TESTING.md` - Testing & validation guide
-- `market_intelligence/README.md` - Complete architecture documentation
-
-**Files Modified**:
-- `ggbot.py` - Added orchestrator call in `_run_extraction_v2()`, passes market_intelligence to decision engine
-- `decision/engine_v2.py` - Added `market_intelligence` parameter, 6 formatting methods, prompt integration
-- `decision/prompts/opportunity_analysis.py` - Added Market Intelligence section to prompt template
-- `README.md` - Added Intelligence Orchestrator to Core Infrastructure, added market_intelligence/ to Module Deep Dives
-- `ACTIVE.md` - Updated Current Development Focus with orchestrator completion, added orchestrator to Database Architecture Philosophy
-
-**Production Impact**:
-- ✅ 24 → 32 data points ready (8 new Grok-powered sources mapped, awaiting database seeding)
-- ✅ Cost-effective at scale: $160-240/month platform cost serves unlimited users
-- ✅ Orchestrator proven: 16/16 tests passing, funding rates ready for integration
-- ✅ Grok validated: VIX query successful, autonomous research working perfectly
-- ⏳ Next: Database seeding for 8 new data points, then production deployment
-
-**Key Insight**: Grok's agentic API is a game-changer - instead of building 50+ individual adapters, ONE universal adapter handles everything accessible via web/X search!
-
----
-
-## 2025-10-26 - Market Intelligence: 7 Categories + Funding Rates + Orchestrator Design
-
-**Database Reorganization (7 Categories)**:
-- **Renamed Sources**: `crypto_derivatives` → `derivatives_leverage`, `signals_group_chats` → `trading_signals`, `fundamental_analysis` → `macro_economics`, `sentiment_trends` → `sentiment_social`
-- **Consolidated**: Deleted `influencer_kol` (merged into `sentiment_social`), reduced from 8 → 7 top-level categories
-- **7 Final Categories**: Technical Analysis (21pts), Trading Signals (1pt), On-Chain Analytics (0pts), Derivatives & Leverage (2pts), Sentiment & Social (0pts), News & Regulatory (0pts), Macro Economics (0pts)
-- **24 Total Data Points**: 21 technical indicators + 1 ggShot signal + 2 funding rates (BTC/ETH)
-
-**Funding Rates Implementation** (Phase 1 Proof of Concept):
-- **Adapter**: `BinanceFundingAdapter` with 7-level interpretation logic (extreme/high/slight long/short leverage, neutral)
-- **Catalog**: `funding_rate.yaml` with 1-hour cache TTL, query params (symbol, include_mark_price)
-- **Database**: Seeded `derivatives_leverage` data source with BTC/ETH funding rate data points (free, enabled)
-- **Tested Live**: BTC funding 0.0026% (neutral), ETH funding 0.0063% (neutral) - both minimal risk
-- **Output**: JSON with funding_rate_pct, interpretation (level, risk, trading_implication, color), next_funding_time
-
-**Intelligence Orchestrator Design** (Planning Phase):
-- **Problem**: Current hardcoded pattern doesn't scale to 150 data points (ggbot.py would become 10,000-line monolith)
-- **Solution**: Hybrid approach - keep technical indicators old way (don't break existing bots), route everything else through new orchestrator
-- **Architecture**: Config-driven data fetching - read `selected_data_sources` from config, query gateway automatically, aggregate results by category
-- **Document**: `DOCS/INTELLIGENCE_ORCHESTRATOR.md` (500+ lines) - complete design spec, implementation plan, testing strategy
-- **Implementation Plan**: Phase 1 (build orchestrator), Phase 2 (migrate ggShot), Phase 3 (integrate funding rates), Phase 4 (add 5 macro/on-chain points)
-
-**Documentation Updates**:
-- **schema.md**: Updated data sources section with 7 categories, 24 total data points breakdown
-- **ACTIVE.md**: Added 7-category structure with icons, status, premium flags
-- **TODO.md**: Marked funding rates complete, added orchestrator implementation tasks
-
-**Files Created**:
-- `market_intelligence/adapters/derivatives/binance_funding.py` - Funding rate adapter with interpretation
-- `market_intelligence/catalog/data_types/derivatives/funding_rate.yaml` - Catalog definition
-- `scripts/seed_funding_rates.py` - Database seeding script
-- `scripts/test_funding_adapter.py` - Standalone testing script
-- `DOCS/INTELLIGENCE_ORCHESTRATOR.md` - Comprehensive design document
-
-**Files Modified**:
-- `database/schema.md` - Updated data sources/points sections
-- `ACTIVE.md` - Added 7-category breakdown
-- `TODO.md` - Updated market intelligence section with orchestrator tasks
-
-**Production Impact**:
-- ✅ 7 clean categories ready to scale to 150 data points
-- ✅ Funding rates adapter working (not yet integrated into decision engine)
-- ⏳ Orchestrator implementation required before data flows to decision engine
-- ⏳ Frontend showing new categories correctly
-
----
-
-## 2025-10-26 - ggShot Signals Universal Data Layer Integration
-
-**ggShot Signals for Autonomous Trading** (Market Intelligence Expansion):
-- **Historical Backfill**: 878 signals from last 60 days stored in `market_data` table (130 symbols, 4 timeframes: 30m, 1h, 4h, 5m)
-- **Real-Time Storage**: Listener service now stores every new ggShot signal alongside existing signal validation routing (backwards compatible)
-- **Universal Data Layer**: Catalog-driven integration with auto-generated agent tools, API endpoints, CLI commands
-- **Multi-Timeframe Query**: Adapter queries latest signal per timeframe using `DISTINCT ON` (e.g., BTC/USDT returns 1h, 30m, 4h, 5m signals)
-- **Confidence Scoring**: Age-based confidence (1.0 for <1hr, 0.9 for <1day, 0.7 for <3days, 0.5 for older)
-
-**Autonomous Trading Integration**:
-- **Extraction Phase**: Queries ggShot signals after technical indicator extraction (lines 794-830 in `ggbot.py`)
-- **Decision Engine**: Receives ggshot signals alongside technical analysis, formats for LLM with directional bias summary
-- **Decision Prompt**: Added "GGSHOT PREMIUM SIGNALS" section to opportunity analysis template
-- **Permission Gating**: Only users with `'ggshot'` in `paid_data_points` array receive signals (security fix)
-- **Architecture**: Dual-mode system - push-based for signal validation (real-time), pull-based for autonomous trading (scheduled)
-
-**Data Flow**:
-```
-Signal Validation (Push):    Telegram → Listener → Store + Route → Validate → Trade
-Autonomous Trading (Pull):   Schedule → Extraction → Query Signals + Technicals → Decision → Trade
-```
-
-**Files Created**:
-- `market_intelligence/catalog/data_types/signals/ggshot.yaml` - Catalog definition with query params, caching, agent format
-- `market_intelligence/adapters/signals/ggshot_adapter.py` - Adapter querying latest signal per timeframe
-- `scripts/backfill_ggshot_signals.py` - Historical signal backfill script
-- `scripts/test_ggshot_adapter.py` - Standalone adapter testing
-- `DOCS/GGSHOT_SIGNALS_INTEGRATION.md` - Complete integration documentation
-
-**Files Modified**:
-- `signals/listener_service.py` - Added signal storage to market_data (lines 139-174)
-- `ggbot.py` - Added ggshot query in extraction (794-830), pass signals to decision (868-875)
-- `decision/engine_v2.py` - Added ggshot_signals parameter, formatting method (905-953), prompt building (471-472)
-- `decision/prompts/opportunity_analysis.py` - Added ggshot_signals section to template
-
-**Production Impact**:
-- ✅ 878 historical signals queryable for autonomous bots
-- ✅ Real-time signals stored automatically (listener backwards compatible)
-- ✅ Permission gating enforced (`paid_data_points` check)
-- ✅ LLM receives ggShot signals + technical indicators + volume analysis
-- ✅ Auto-generated MCP tools for AI agents
-- ✅ Graceful degradation (signals optional, empty dict if no access)
-
----
-
-## 2025-10-25 - Symphony Live Trading Bug Fixes & Polish
-
-**Critical Bug Fixes**:
-- **SQL Type Mismatch**: Cast `trade_id::text` and `batch_id::text` for UNION compatibility (fixed "cannot match uuid and varchar" error)
-- **ConfigService Error**: Replace ConfigService call with direct DB query in `get_open_positions()` (fixed missing user_id parameter)
-- **Position Size $0**: Changed `sizeUSD` to `positionSize` field (Symphony API actual field name)
-- **Trade Age Wrong**: Use Symphony's `createdTimestamp` instead of DB `created_at` (accurate position age)
-- **Missing SL/TP**: Map Symphony's `slPrice` and `tpPrice` fields (now displays configured levels)
-
-**Frontend Fixes**:
-- **PerformanceChart for Live**: Balance shows "Track on Symphony", Return shows "N/A", chart titled "Cumulative P&L"
-- **Trade History Routing**: Frontend now calls `/api/v2/trades/live/{config_id}` for live bots instead of paper endpoint
-- **Type Safety**: Updated Account interface with nullable `current_balance` and `portfolio_return_pct`, added `source` field
-- **Mobile Display**: Fixed TypeScript error using `positionId` instead of undefined `trade_id` in mobile cards
-
-**New Features**:
-- **Default SL/TP for Live**: Config `default_stop_loss_percent` and `default_take_profit_percent` now applied to live trades if decision doesn't provide them
-- **Market Price Fetch**: Live trading now fetches market price before execution to calculate default SL/TP levels
-- **Graceful Fallback**: If price fetch fails, continues without defaults (logs warning)
-
-**Documentation**:
-- **Trading README**: Comprehensive update with Symphony integration architecture, API endpoints, configuration, frontend routing, testing procedures
-- **Added Live Trading Section**: ~250 lines covering service layer, database schema, SSE enrichment, symbol compatibility, production considerations
-
-**Files Modified**:
-- Backend: `trading/live/symphony_service.py`, `core/sse/dashboard_data.py`
-- Frontend: `app/forge/components/monitor/PerformanceChart.tsx`, `lib/api.ts`
-- Docs: `trading/README.md`
-
-**Production Impact**:
-- ✅ Position display accurate (correct size, age, SL/TP)
-- ✅ No phantom open positions (closed positions filtered)
-- ✅ Trade history visible on dashboard
-- ✅ Cumulative P&L chart working for live bots
-- ✅ Risk management via config defaults
-
----
-
-## 2025-10-24 - Symphony Dashboard Integration & SSE Enrichment
-
-**Live Trading Dashboard Integration** (Production):
-- **SSE Stream Enrichment**: Dashboard stream now fetches Symphony data for live bots in parallel
-- **Unified Account Metrics**: PerformanceChart displays both paper and live bot performance seamlessly
-- **Position Display**: PositionsTable shows paper and live positions with unified interface
-- **Close Position Routing**: Close button routes to Symphony API for live positions, paper service for paper positions
-- **Performance**: Symphony API calls parallelized, ~1-2s additional latency for live bots
-- **Error Isolation**: Symphony failures don't break paper trading or SSE stream
-- **Architecture**: `_enrich_live_positions_and_accounts()` in `core/sse/dashboard_data.py`
-
-**Backend Changes**:
-- Extended SSE SQL query with `trading_mode` and `symphony_agent_id` fields
-- Modified `open_positions` CTE to UNION paper_trades + live_trades (with source tagging)
-- Added Symphony enrichment function with parallel API fetching
-- Updated `get_unified_dashboard_data()` to call enrichment before portfolio analytics
-- Created endpoints: `GET /api/v2/account/live/{config_id}`, `GET /api/v2/trades/live/{config_id}`
-- Symphony service methods: `get_account_metrics()`, `get_trade_history()` with batch iteration
-
-**Frontend Changes**:
-- Updated `PositionsTable.tsx` interface with `position_id` and `source` fields
-- Enhanced close handler to route based on `source: 'paper' | 'live'`
-- Updated all position references to use unified `positionId` (trade_id or batch_id)
-- PerformanceChart works automatically (no changes needed - unified account interface)
-
-**Files Modified**: `core/sse/dashboard_data.py`, `trading/live/symphony_service.py`, `ggbot.py`, `frontend/app/forge/components/monitor/PositionsTable.tsx`
-
-**Production Impact**:
-- ✅ Live bots display real-time metrics from Symphony in dashboard
-- ✅ Switch between paper and live bots seamlessly
-- ✅ Close positions from UI (both modes)
-- ✅ SSE stream stable with Symphony integration
-- ✅ Graceful degradation on Symphony API errors
-
----
-
-## 2025-10-24 - Hybrid Price Service & Symbol Coverage Fix
-
-**Status Check Script for Internal Monitoring**:
-- **New Tool**: `scripts/status_check.py` for comprehensive platform metrics
-- **Metrics Collected**: User counts (256 total, 5 Pro), bot stats (376 total, 57 active), trading activity, open positions, top symbols, decision activity
-- **Usage Modes**: Full report, auto-update ACTIVE.md (`--update`), quiet mode for monitoring (`--quiet`)
-- **Comparison to X-Bot**: More comprehensive than daily tweets - includes win rates, account balances, decision activity, system health
-- **Files**: `scripts/status_check.py`, `scripts/README_STATUS_CHECK.md`
-
-**Hybrid Price Service - All 142 Symbols Supported** (CRITICAL):
-- **Issue**: Symbol coverage mismatch - 142 symbols in registry vs 100 in WebSocket cache
-- **Impact**: Users creating bots for non-cached symbols (e.g., SUI/USDT) experienced price lookup failures
-- **Root Cause Analysis**: code-scout identified 42 symbols missing from WebSocket cache (ACHUSDT, ALPHAUSDT, AXSUSDT, etc.)
-- **Solution**: Hybrid price architecture - WebSocket-first (100 symbols, <1ms) + REST fallback (42 symbols, ~100ms, 5s cache)
-- **Architecture**: `HybridPriceService` with intelligent tiering for different use cases
-- **Rate Limit Safety**: Built-in monitoring (1,200 weight/min Binance limit), circuit breaker at 80%/90%, exponential throttling
-- **Performance**: 5-second REST cache reduces calls from 20/min to ~4/min per position (80% reduction)
-- **Capacity**: Safe for 10+ concurrent non-cached positions (~80 weight/min = 6.6% of limit)
-
-**Symbol Registry Enhancement**:
-- **New Field**: `websocket_cached: True/False` added to all 142 symbols
-- **Helper Functions**: `is_websocket_cached()`, `get_websocket_cached_count()`
-- **Validation**: 100 symbols marked as cached (WebSocket real-time), 42 as non-cached (REST fallback)
-- **Files**: `core/symbols/registry.py`
-
-**Bot Creation Validation**:
-- **Restriction**: Autonomous bots limited to 100 WebSocket-cached symbols only
-- **Endpoints**: Validation added to `POST /api/v2/config` (create) and `PUT /api/v2/config/{id}` (update)
-- **Error Message**: Clear user feedback - "Symbol {X} requires real-time price data. Choose from 100 available symbols."
-- **Rationale**: Ensures fast position monitoring (3s cycles) without REST API latency/rate limits
-- **Files**: `ggbot.py` (bot creation/update endpoints)
-
-**ggShot Signal Validation - Full 142 Symbol Support**:
-- **Use Case**: ggShot can send signals for any of 142 symbols
-- **Implementation**: Signal validation + paper trading use hybrid service (REST fallback for non-cached)
-- **Frequency**: Low-frequency (10-20 signals/hour) makes REST API safe despite rate limits
-- **Result**: All ggShot signals process successfully regardless of symbol
-
-**Bug Fixes**:
-- **Python Boolean Syntax**: Fixed `true`/`false` (JavaScript) → `True`/`False` (Python) in registry
-- **LivePriceService**: Removed orphaned `_get_redis_client()` reference in `get_multiple_prices()`
-- **Service Stability**: Fixed crash loop (79 restarts) caused by syntax error
-
-**Files Modified**:
-- `core/symbols/registry.py` (added `websocket_cached` field + validation functions)
-- `trading/paper/hybrid_price_service.py` (NEW - hybrid price fetching with caching + rate limit monitoring)
-- `trading/paper/live_price_service.py` (updated to delegate to hybrid service)
-- `ggbot.py` (added bot creation/update validation)
-- `scripts/status_check.py` (NEW - platform metrics tool)
-
-**Production Impact**:
-- ✅ All 142 symbols now work for ggShot signal validation
-- ✅ All 142 symbols work for paper trading with position monitoring
-- ✅ Autonomous bots validated to use only 100 WebSocket symbols (prevents errors)
-- ✅ Rate limit safety guaranteed with 5s caching + monitoring
-- ✅ Service stable after fixing Python boolean syntax bug
-
----
-
-## 2025-10-22 - Live Trading Position Management Fix & Market Data Reliability
-
-**Critical Bug Fix - Division by Zero in Live Trading** (BLOCKING):
-- **Issue**: Live trading bots crashed when managing open positions (division by zero error)
-- **Root Cause**: `_get_active_position()` returned placeholder data with `entry_price = 0.0` instead of fetching real position data from Symphony API
-- **Impact**: "Opus 92 (Live)" bot with 3 open positions unable to perform position management
-- **Fix #1**: Integrated Symphony API calls into `decision/engine_v2.py:_get_active_position()` to fetch real position data (entry_price, current_price, unrealized_pnl, side)
-- **Fix #2**: Added safety check in `_format_position_data_for_llm()` to prevent division by zero with graceful fallback
-- **Features Added**: Position matching by batch_id, orphan detection (position in DB but not Symphony), comprehensive error handling
-- **Result**: Live trading position management now functional with real Symphony data
-
-**Market Data Pipeline Fixes**:
-- **Redis Key Collision**: Fixed namespace collision between WebSocket service (`ws:candles:*`) and MarketIntelligence cache (`mi:candles:*`)
-- **Missing Import**: Added `import asyncio` to `universal_data_client.py` for cancellation shielding
-- **Error Messages**: Enhanced Binance REST adapter to show exception type and details instead of empty error strings
-- **Cache Cleanup**: Deleted 416 corrupted Redis keys, rebuilt 700 clean WebSocket candle datasets
-- **AsyncIO Cancellation**: Added `asyncio.shield()` to protect market data queries from orchestrator timeouts
-
-**Type Serialization Fixes**:
-- **numpy.bool_ Errors**: Added `_to_python_type()` helper to base preprocessor for recursive numpy type conversion
-- **Pydantic Compatibility**: Enhanced `serialize_numpy_types()` to handle numpy.bool_, pandas NA, and tuples
-- **Conversion Points**: Force float conversion in `_calculate_velocity()`, `_calculate_acceleration()`, `_calculate_position_rank()`
-- **Result**: Signal validation endpoint no longer crashes on numpy type serialization
-
-**Files Modified**: `decision/engine_v2.py`, `extraction/v2/preprocessors/base.py`, `extraction/v2/universal_data_client.py`, `market_intelligence/catalog/data_types/market_data/ohlcv.yaml`, `market_intelligence/adapters/market_data/redis_websocket.py`, `market_intelligence/adapters/market_data/binance_rest.py`, `ggbot.py`
-
----
-
-## 2025-10-22 - UX Polish & Performance Chart
-
-**User Experience Quick Wins**:
-- **Status Messaging**: User-friendly pipeline messages ("Gathering market data..." vs "Extracting 12 indicators...")
-- **Countdown Context**: "Waiting for 1h candle close in 3m 45s" vs "Next run: 3m 45s"
-- **Pipeline Tooltips**: Explanatory tooltips on Extraction/Decision/Trading stages
-- **Animation Delays**: 3s/7s/3s delays for smooth pipeline flow visibility
-
-**PerformanceChart Component** (Replaces MetricsBar):
-- **Equity Curve Visualization**: Line chart showing account balance over time with trade markers
-- **Interactive Trade Dots**: Click dots for full trade details (green = wins, red = losses)
-- **Metrics Strip**: Clean horizontal strip below chart (Balance | Return | Trades | Win Rate)
-- **Recharts Integration**: Professional charting with last 50 trades, no SSE jitter
-- **Files**: `PerformanceChart.tsx`, updates to `page.tsx`
-
-**Security Fix - ggShot Access Control** (CRITICAL):
-- **Issue**: Users without ggShot subscription could enable ggShot signals
-- **Root Cause #1**: Permission check used `can_use_signal_validation` instead of `paid_data_points.includes('ggshot')`
-- **Root Cause #2**: Toggle button disable logic allowed enabling if already enabled
-- **Fix**: Updated `permissions.tsx` to check `paid_data_points` array directly
-- **Result**: ggShot only accessible with manual database grant to `user_profiles.paid_data_points`
-
----
+## 2025-11-01 - Documentation Cleanup
+- **ggShot Parser Migration**: Moved `ggshot/ggshot_parser.py` → `signals/ggshot_parser.py`, updated imports (listener_service.py, ggbot.py, scripts)
+- **Archive ggshot/**: Moved entire legacy directory to `archive/ggshot/`
+- **API Docs**: Added 19 missing endpoints to ACTIVE.md (config CRUD, user mgmt, bot metrics, Stripe)
+- **Hummingbot Cleanup**: Updated all docs reflecting Oct 2025 migration complete (README diagram, TODO tasks, code docstrings)
+- **Timing Fix**: Corrected 7-second → 3-second position monitoring across docs
+
+## 2025-01-30 - Activity Timeline Viewer (Competition Demo)
+- **Canvas Timeline**: `/view/[config_id]` - 850-line Canvas component, 60fps, 6.17kB bundle
+- **Features**: Drag pan, zoom (1h/4h/1d/1w/All), activity grouping, 3-rail stacking, pulsing "now" indicator
+- **Mock Data**: 3-day history, 260 activities, currently demo-only (API integration pending)
+- **Files**: `ActivityTimelineViewer.tsx`, `app/view/[config_id]/page.tsx`
+- **Bug Fix**: Added missing `config_type`/`telegram_integration` fields to default bot creation (forge/page.tsx)
+
+## 2025-10-30 (Evening) - Agent Tool #11 + Symbol Fix
+- **Tool**: `get_current_price` - Sub-ms WebSocket lookup with REST fallback
+- **Symbol Normalization**: Added Universal Symbol Standardizer to orchestrator, fixes BTCUSDT→BTC/USDT mismatch
+- **Files**: api/agent.py, agent/service_client.py, agent/mcp_server.py, market_intelligence/orchestrator.py
+
+## 2025-10-30 - Agent Phase 3 Complete
+- **Auth Deadlock**: Fixed FastAPI event loop blocking, replaced `Depends()` with sync `validate_agent_service_auth()`
+- **Tools Fixed**: get_positions (removed extra user_id), close_position (removed config_id), query_trade_observations (exit_price→current_price)
+- **Tool Sandboxing**: Added `disallowed_tools` - blocks all Claude Code built-ins, restricts to 10 trading tools
+- **Status**: 11 tools operational, agent ready for autonomous trading
+- **Files**: api/agent.py (8 endpoints), agent/run_agent.py, agent/mcp_server.py
+
+## 2025-10-29 (Session 2) - Agent Auth & Testing
+- **Service Auth**: Added agent-runner to service whitelist (600 req/min)
+- **Tool Testing**: query_market_data working, others timeout due to deadlock
+- **Bug Fixes**: Dict param parsing, get_configuration() kwargs, JSON serialization for numpy/pandas
+- **Chat CLI**: Rewrote with concurrent tasks + aioconsole for real-time display
+- **Docs**: Created AGENT.md, updated TODO.md with Phase 3 blocker details
+
+## 2025-10-29 (Session 1) - Agent Simplified Architecture
+- **Pivot**: Removed dual-task complexity, separate processes for strategy_definition vs autonomous modes
+- **Strategy Mode**: Clean query/response via Redis, `request_autonomous_mode` tool for switch
+- **Autonomous Mode**: Pure `receive_messages()` loop, no user interaction
+- **Testing**: Strategy definition verified end-to-end with chat.py CLI
+- **Files**: agent/run_agent.py (rewrite), agent/mcp_server.py (strategy storage)
+
+## 2025-10-28 - Agent Phase 3 Complete Infrastructure
+- **TradingAgent**: ClaudeSDKClient streaming, mode/strategy context injection, 32 data points in system prompt
+- **Redis Queues**: `agent:{config_id}:messages`, `:responses`
+- **MCP Tools**: 10 tools (added request_autonomous_mode, updated query_market_data for 7 categories)
+- **CLI**: chat.py (106 lines) - Redis-based testing interface with blocking blpop
+- **Files**: agent/run_agent.py (370 lines), agent/mcp_server.py, agent/chat.py
+
+## 2025-10-28 - Market Intelligence Phase 1 PRODUCTION
+- **8 Grok Sources LIVE**: VIX, DXY, CPI, NFP, BTC TVL, whale activity, Twitter sentiment, crypto news
+- **Cost**: $195/month platform ($0.76/user at 257 users, $0.20/user at 1000)
+- **Bug Fixes**: Gateway adapter routing (agentic category), ggShot name (signals_group_chats→trading_signals), cache key KeyError, Redis protobuf serialization
+- **Performance**: Parallel execution 160s→30s (5.3x speedup)
+- **Orchestrator**: Config-driven routing, custom cache TTL per data point, data_points_override for agents
+- **Decision Integration**: 6 formatting methods, prompt updates, real bot tested (~30s with comprehensive AI reasoning)
+- **Files**: orchestrator.py (260 lines), catalog_mapping.py (180 lines), grok_agentic.py (500+ lines), seed_grok_intelligence.sql
+
+## 2025-10-27 - Agent Phase 2: MCP Server & Trade Observations
+- **DB**: Migrated agent_memory→trade_observations (post-trade reflection: 13 cols, 8 indexes, RLS)
+- **API**: Added 2 endpoints (POST /agent/trade-observations, /query)
+- **Service Client**: Updated with observation methods + HTTP retry
+- **MCP Server**: 9 tools implemented (agent/mcp_server.py, 671 lines), module-level AgentContext
+- **Tools**: query_market_data, execute_trade, get_positions, get_account_status, close_position, update_strategy, wait_for, record/query_trade_observations
+- **Files**: database/migrations/agent_trade_observations.sql, agent/mcp_server.py, agent/service_client.py, api/agent.py
+
+## 2025-10-27 - Intelligence Orchestrator + GrokAgenticAdapter
+- **Orchestrator**: market_intelligence/orchestrator.py (260 lines) - config-driven routing
+- **Catalog Mapping**: catalog_mapping.py (180 lines) - data_point→catalog translation
+- **GrokAgenticAdapter**: ONE adapter handles 8+ sources via XAI agentic API (web search, X search, code execution)
+- **Query Types**: VIX, DXY, CPI, NFP, Twitter sentiment, crypto news, BTC TVL, whale activity
+- **Testing**: VIX live query successful - 5 tool calls, 18s, $0.0072, 7 citations
+- **Integration**: ggbot.py calls orchestrator post-technicals, passes market_intelligence to decision engine
+- **Decision Engine**: Added 6 formatting methods, updated opportunity_analysis.py prompt
+- **Tests**: 16/16 unit tests passing (tests/test_orchestrator.py)
+- **Files**: orchestrator.py, catalog_mapping.py, adapters/agentic/grok_agentic.py, catalog/data_types/agentic/grok_agentic.yaml
+
+## 2025-10-26 - Market Intelligence 7 Categories + Funding Rates
+- **Reorganization**: Renamed sources (crypto_derivatives→derivatives_leverage, signals_group_chats→trading_signals, etc.), consolidated from 8→7 categories
+- **7 Categories**: Technical Analysis (21pts), Trading Signals (1pt), On-Chain (0pts), Derivatives & Leverage (2pts), Sentiment & Social (0pts), News (0pts), Macro Economics (0pts)
+- **Total**: 24 data points (21 technical + 1 ggshot + 2 funding rates)
+- **Funding Rates**: BinanceFundingAdapter with 7-level interpretation (extreme/high/slight long/short, neutral)
+- **Testing**: BTC 0.0026% (neutral), ETH 0.0063% (neutral) - live queries working
+- **Orchestrator Design**: DOCS/INTELLIGENCE_ORCHESTRATOR.md (500+ lines) - hybrid approach design spec
+- **Files**: adapters/derivatives/binance_funding.py, catalog/data_types/derivatives/funding_rate.yaml, scripts/seed_funding_rates.py
+
+## 2025-10-26 - ggShot Signals Universal Data Layer
+- **Historical Backfill**: 878 signals last 60 days (130 symbols, 4 timeframes)
+- **Real-Time Storage**: Listener stores every new signal alongside validation (backwards compatible)
+- **Multi-Timeframe Query**: DISTINCT ON queries latest per timeframe
+- **Confidence Scoring**: Age-based (1.0 <1hr, 0.9 <1day, 0.7 <3days, 0.5 older)
+- **Autonomous Integration**: Extraction queries ggshot post-technicals (ggbot.py:794-830), decision formats for LLM, prompt updated
+- **Permission Gating**: `'ggshot' in paid_data_points` check enforced
+- **Dual Mode**: Push (validation) + Pull (autonomous)
+- **Files**: catalog/data_types/signals/ggshot.yaml, adapters/signals/ggshot_adapter.py, scripts/backfill_ggshot_signals.py
+
+## 2025-10-25 - Symphony Live Trading Bug Fixes
+- **SQL Fix**: Cast trade_id::text, batch_id::text for UNION compatibility
+- **ConfigService Fix**: Direct DB query in get_open_positions() (missing user_id param)
+- **Position Size**: Changed sizeUSD→positionSize (actual Symphony API field)
+- **Trade Age**: Use Symphony createdTimestamp vs DB created_at
+- **SL/TP**: Map Symphony slPrice/tpPrice fields
+- **Frontend**: PerformanceChart for live (balance "Track on Symphony", return "N/A", chart "Cumulative P&L"), trade history routing, type safety fixes
+- **Features**: Default SL/TP for live trades, market price fetch pre-execution, graceful fallback
+- **Docs**: trading/README.md updated (Symphony integration architecture, 250 lines)
+- **Files**: trading/live/symphony_service.py, core/sse/dashboard_data.py, frontend/app/forge/components/monitor/
+
+## 2025-10-24 - Symphony Dashboard Integration & SSE
+- **SSE Enrichment**: Dashboard stream fetches Symphony data for live bots in parallel (~1-2s latency)
+- **Unified Display**: PerformanceChart + PositionsTable show paper/live seamlessly
+- **Close Position Routing**: Routes to Symphony API (live) or paper service (paper) based on source
+- **Error Isolation**: Symphony failures don't break paper trading/SSE
+- **Backend**: Extended SSE SQL (trading_mode, symphony_agent_id), UNION open_positions (paper+live), parallel API fetching
+- **Endpoints**: GET /api/v2/account/live/{config_id}, /trades/live/{config_id}
+- **Frontend**: Updated PositionsTable interface (position_id, source), enhanced close handler
+- **Files**: core/sse/dashboard_data.py, trading/live/symphony_service.py, ggbot.py, PositionsTable.tsx
+
+## 2025-10-24 - Hybrid Price Service & Symbol Coverage
+- **Status Check Script**: scripts/status_check.py - comprehensive metrics, auto-update ACTIVE.md (--update), quiet mode (--quiet)
+- **Hybrid Price**: 142 symbols supported - WebSocket-first (100 symbols <1ms) + REST fallback (42 symbols ~100ms, 5s cache)
+- **Rate Limit Safety**: Built-in monitoring (1200 weight/min limit), circuit breaker at 80%/90%, exponential throttling
+- **Capacity**: Safe for 10+ concurrent non-cached positions (~80 weight/min = 6.6% limit)
+- **Symbol Registry**: Added websocket_cached field to all 142 symbols, helper functions is_websocket_cached(), get_websocket_cached_count()
+- **Bot Validation**: Autonomous bots restricted to 100 WebSocket symbols (POST /api/v2/config validation)
+- **ggShot Support**: All 142 symbols work for signal validation (low frequency = safe with REST)
+- **Bug Fixes**: Python boolean syntax (true→True), removed orphaned _get_redis_client(), fixed 79 restart crash loop
+- **Files**: core/symbols/registry.py, trading/paper/hybrid_price_service.py, trading/paper/live_price_service.py, ggbot.py, scripts/status_check.py
+
+## 2025-10-22 - Live Trading Position Management Fix
+- **Critical Bug**: Division by zero crash with live bots managing open positions
+- **Root Cause**: _get_active_position() returned placeholder data (entry_price=0.0) vs fetching from Symphony API
+- **Fixes**: Integrated Symphony API calls into decision/engine_v2.py:_get_active_position(), safety check in _format_position_data_for_llm()
+- **Features**: Position matching by batch_id, orphan detection, comprehensive error handling
+- **Market Data**: Fixed Redis key collision (ws:candles vs mi:candles), added asyncio.shield() for cancellation protection
+- **Type Serialization**: Added _to_python_type() for recursive numpy conversion, enhanced serialize_numpy_types() for numpy.bool_/pandas NA/tuples
+- **Files**: decision/engine_v2.py, extraction/v2/preprocessors/base.py, extraction/v2/universal_data_client.py, market_intelligence/adapters/
+
+## 2025-10-22 - UX Polish & PerformanceChart
+- **Status Messaging**: User-friendly pipeline messages ("Gathering market data..." vs technical), countdown context ("Waiting for 1h candle close in 3m 45s")
+- **PerformanceChart**: Equity curve line chart with trade dots, click for details (green=wins, red=losses), metrics strip (Balance|Return|Trades|Win Rate), Recharts, last 50 trades
+- **Security Fix**: ggShot access control - check paid_data_points.includes('ggshot') vs can_use_signal_validation, fixed toggle disable logic
+- **Files**: PerformanceChart.tsx, permissions.tsx
 
 ## 2025-10-21 - Frontend Reliability & Error Recovery
-
-**Production Resilience for Symphony Integration**:
-- **API Client Retry Logic**: Exponential backoff (1s, 2s, 4s) with 3 retry attempts on network failures
-- **SSE Auto-Reconnection**: Automatic reconnection with exponential backoff (5s → 60s) for real-time updates
-- **Error State UI**: Visual feedback banners for load failures and connection status
-- **Page Visibility Retry**: Automatic retry when user returns to tab after errors
-- **Symphony Auth Fix**: Fixed 401 Unauthorized in Settings modal (proper session token handling)
-- **Result**: Frontend now resilient to network issues, no manual refresh required
-
----
+- **API Client**: Exponential backoff retry (1s/2s/4s, 3 attempts)
+- **SSE**: Auto-reconnection with backoff (5s→60s)
+- **Error UI**: Visual feedback banners, page visibility retry
+- **Symphony Auth**: Fixed 401 in Settings modal (proper session token)
+- **Files**: frontend/lib/api.ts, components
 
 ## 2025-10-19 - Symphony Live Trading Integration
+- **Database**: Extended user_profiles, configurations, new live_trades table (UNIQUE decision_id idempotency)
+- **Vault**: Encrypted API key storage (store/get/delete methods)
+- **Symphony Service**: trading/live/symphony_service.py - 3 methods (execute, close, query), idempotency check, symbol conversion, weight calculation, 3s settlement wait
+- **Orchestrator Routing**: Smart paper/live routing based on trading_mode (locked per bot)
+- **API**: 6 endpoints (setup, status, disconnect, positions, close, duplicate-as-live)
+- **Frontend**: Settings modal (API key + smart account), "Deploy Live Version" flow, LIVE badge, premium check, disabled FIXED_USD sizing
+- **Symbol Compatibility**: 100/141 symbols ready, to_symphony()/from_symphony()/is_symphony_compatible()
+- **Files**: trading/live/symphony_service.py, ggbot.py, frontend/app/forge/components/
 
-**Production-Ready Live Trading via Symphony.io**:
+## 2025-10-21 - Hummingbot Deprecation & WebSocket Migration
+- **Removed**: Hummingbot API (8888), PostgreSQL (5433), EMQX (1883+) - freed 200MB+ RAM
+- **New**: LivePriceService using WebSocket candles from market-data-ws
+- **Performance**: Sub-ms Redis access vs 800ms+ REST, ~1s updates vs 30s cache
+- **Architecture**: Live candles at price:live:{symbol}, updated ~1s
+- **Archived**: archive/hummingbot/ (market_data.py, data_client.py, HBOT_API.md)
+- **Migration**: Paper trading, decision engine, position monitoring all use LivePriceService
+- **Resilience**: Exponential backoff (1s→300s, 100 retries), 30s recv() timeout, proactive 15min reconnect, 60s silence detection, historical refetch on reconnect, PM2 logs to logs/market-data-ws-*.log, max_restarts 20→50
+- **Files**: trading/paper/live_price_service.py, core/services/websocket_market_data_service.py
 
-**Database Schema**:
-- Extended `user_profiles`, `configurations`, and new `live_trades` table with idempotency protection
-- Added `symphony_vault_id`, `symphony_smart_account`, `symphony_agent_id`, `trading_mode` columns
-- Idempotency constraint: `UNIQUE(decision_id)` prevents duplicate trades
-- Indexes on `config_id` and open positions
+## 2025-10-19 - Universal Data Layer & WebSocket Cache
+- **Universal Data**: MarketIntelligence gateway with DataCatalog, CacheManager, ResponseFormatter
+- **Migration**: ExtractionEngine→UniversalDataClient via Adapter Pattern (2 lines changed)
+- **Production**: 100% success, 3x-3000x faster (1-5ms cached vs 2-3s REST)
+- **Sources**: RedisWebSocketAdapter (priority 1) + BinanceRestAdapter (fallback)
+- **Testing**: 8 integration tests passing
+- **Files**: market_intelligence/* (complete framework), extraction/v2/universal_data_client.py
+- **WebSocket Cache**: 100 symbols × 7 timeframes = 700 datasets, sub-100ms retrieval, 200-candle windows, 700/1024 Binance streams (68%), 1.8s historical fetch, ~16MB memory
+- **Subscription Fix**: Set subscription_expires_at=NULL for active subs (was trial end date), fixes premium permissions
+- **Files**: core/services/websocket_market_data_service.py, ggbot.py (webhook handler)
 
-**Vault Integration**:
-- Encrypted Symphony API key storage with credential management endpoints
-- `store_symphony_credential()`, `get_symphony_credential()`, `delete_symphony_credential()` methods
-- Automatic live bot disabling on credential removal
+## 2025-10-11 - Resend Email Integration
+- **Service**: core/services/resend_service.py - Resend API integration
+- **Contact Sync**: 189/261 users synced to Resend audience
+- **Templates**: core/email_templates/ (welcome, trade alerts, signal alerts, generic)
+- **Active**: Welcome emails on signup via user_service.py
+- **Sync Script**: scripts/sync_resend_contacts.py (handles 2 req/sec limit)
+- **Docs**: DOCS/RESEND.md
 
-**Symphony Service**:
-- Thin wrapper (`trading/live/symphony_service.py`) - 3 core methods (execute, close, query)
-- Idempotency check before Symphony API calls (decision_id uniqueness)
-- Symbol conversion using UniversalSymbolStandardizer
-- Weight calculation using existing position sizing logic (account_percent & confidence_based)
-- 3-second settlement wait after trade execution
+## 2025-10-04 - Trading System Fixes
+- **Manual Close**: Added "Close Position" button, POST /api/v2/bot/{config_id}/positions/{trade_id}/close, fixed 401 auth (apiClient), included paper router in ggbot.py
+- **Trade Settings Validation**: Frontend real-time errors/warnings, 6 fields (leverage 1-100 warn>20, SL 1-50%, TP 1-500%, position size 0.1-100% warn>50%, fixed amount max balance, max positions 1-50 warn>10)
+- **Position Sizing**: FIXED - settings represent MARGIN (risk), multiplied by leverage for position size
+- **P&L**: FIXED - removed double leverage multiplier (was 10x too high)
+- **Volume Analysis**: Fixed not appearing in prompts
+- **Liquidation**: Auto liquidation when losses exceed margin, liquidation_price on open, priority: Liquidation→SL→TP
+- **Account Reset**: Default bot cleanup (92 deactivated, 83 users), preserved 22 custom, added "Reset Account" to dropdown, POST /api/v2/bot/{config_id}/reset-account, confirmation modal, metrics filtered by last_reset_at
+- **Extraction Stability**: Fixed session race conditions in parallel extraction, removed context manager causing "Session is closed", added ensure_connected(), improved error handling
+- **Subscription UI**: Pro/Free badges in UserProfile, upgrade modal with FIRST100 coupon ($29→$14.50), 50% strikethrough pricing
+- **X Bot**: Separate PM2 service, daily 9AM UTC tweets, platform metrics (bots/users/trades/symbols/positions), Tweepy v4, ~90 reads/240 writes per month (within limits)
+- **Files**: frontend/components/PositionsTable.tsx, trading/paper/supabase_service.py, extraction/v2/data_client.py, x_bot/
 
-**Orchestrator Routing**:
-- Smart routing between paper/live based on `trading_mode` (locked per bot)
-- Position management integration for live mode (close position routing)
-- Query live_trades vs paper_trades based on trading_mode
-
-**API Endpoints** (6 total):
-- `POST /api/v2/symphony/setup` - Store credentials with format validation
-- `GET /api/v2/symphony/status` - Check connection status
-- `POST /api/v2/symphony/disconnect` - Remove credentials & disable live bots
-- `GET /api/v2/positions/live/{config_id}` - Query Symphony positions
-- `POST /api/v2/positions/live/{batch_id}/close` - Close live position with ownership check
-- `POST /api/v2/config/duplicate-as-live` - Duplicate paper bot with validation
-
-**Frontend UX**:
-- Settings modal for Symphony connection (API key + smart account inputs)
-- "Deploy Live Version" flow via DuplicateAsLiveModal
-- LIVE badge distinction in bot cards
-- Premium permission check with upgrade prompt
-- Auto-suggest bot name: "{Original Name} (Live)"
-- Disabled FIXED_USD position sizing for live bots (Symphony requires %)
-
-**Symbol Compatibility**:
-- 100 out of 141 symbols ready for live trading
-- Extended symbol registry with Symphony format support
-- `to_symphony()`, `from_symphony()`, `is_symphony_compatible()` methods
-
-**Security**:
-- API keys encrypted in Vault
-- Ownership verification on all operations
-- Service-level credential isolation
-
----
-
-## 2025-10-21 - Hummingbot-API Deprecation & Production Resilience
-
-**Replaced Hummingbot API with WebSocket live prices**:
-- **Removed Infrastructure**: Hummingbot API (port 8888), PostgreSQL (5433), EMQX broker (1883+)
-- **New Implementation**: LivePriceService using WebSocket live candle data from market-data-ws
-- **Performance**: Sub-millisecond Redis access vs 800ms+ REST API calls
-- **Freshness**: ~1 second updates vs 30 second cache
-- **Resource Savings**: Freed 200MB+ RAM from 3 Docker containers
-- **Architecture**: Live candles stored at `price:live:{symbol}` in Redis, updated every ~1s
-- **Files Archived**: `archive/hummingbot/` (market_data.py, data_client.py, HBOT_API.md)
-- **Migration**: Paper trading, decision engine, and position monitoring now use LivePriceService
-
-**Production Resilience Improvements**:
-- **Automatic Reconnection**: Exponential backoff (1s → 300s max) with up to 100 retry attempts
-- **Connection Health Monitoring**: 30s recv() timeout prevents infinite blocking
-- **Proactive Reconnection**: Automatic reconnect every 15 minutes (prevents Binance disconnects before they happen)
-- **Faster Silence Detection**: 60s threshold (was 120s) - reconnects before live price TTL expires
-- **Seamless Reconnection**: Historical candles refetched on every reconnect (1-2s, prevents indicator errors)
-- **Connection Lifecycle Logging**: Detailed logging of connections, disconnects, and uptime
-- **PM2 Logging Fix**: Logs now go to `logs/market-data-ws-*.log` (was `/dev/null`)
-- **Increased Resilience**: max_restarts 20 → 50 for production reliability
-- **Result**: Zero-downtime operation with proactive prevention, no price data errors, no indicator calculation failures
-
----
-
-## 2025-10-19 - Universal Data Layer & WebSocket Market Data Cache
-
-**Universal Data Layer (Production)**:
-- **Phase 1 Foundation**: MarketIntelligence gateway with DataCatalog, CacheManager, ResponseFormatter
-- **Phase 2 Migration**: ExtractionEngine migrated to UniversalDataClient via Adapter Pattern (2 lines changed)
-- **Production Deployment**: Live in production, 100% success rate across all test scenarios
-- **Performance**: 3x-3000x faster extractions (1-5ms cached vs 2-3s REST polling)
-- **Data Sources**: RedisWebSocketAdapter (priority 1) + BinanceRestAdapter (automatic fallback)
-- **Testing**: 8 integration tests passing (OHLCV flow, Preprocessor compatibility, ExtractionEngine validation)
-- **Architecture**: Foundation for 150+ future data sources (sentiment, news, on-chain, fundamentals)
-- **Files**: `market_intelligence/*` (complete framework), `extraction/v2/universal_data_client.py` (adapter)
-- **Documentation**: Complete architecture in `DOCS/UNIVERSAL_DATA.md`
-
-**WebSocket Market Data Cache (Production)**:
-- **Coverage**: 100 symbols (ggbots + Symphony compatible) × 7 timeframes = 700 datasets
-- **Symbols**: Expanded from 20 → 100 to cover all Symphony.io-compatible trading pairs
-- **Performance**: Sub-100ms data retrieval for cached symbols (vs ~800ms REST fallback)
-- **Architecture**: 200-candle rolling windows maintained in Redis via WebSocket push updates
-- **Capacity**: 700/1024 Binance WebSocket streams (68% utilization, room for growth)
-- **Historical Fetch**: 1.8 seconds for all 700 datasets on startup (100% success rate)
-- **Memory Impact**: ~16MB total (Redis + service overhead)
-- **Symphony Ready**: All 100 cached symbols work with Symphony.io live trading
-- **Files**: `core/services/websocket_market_data_service.py`
-
-**Subscription Permission Fix** (CRITICAL):
-- **Issue**: `subscription_expires_at` set to trial end date instead of NULL for active subscriptions
-- **Impact**: Users with expired trials couldn't access premium features despite active paid subscriptions
-- **Root Cause**: Webhook handler setting expiration date for ongoing subscriptions (should be NULL)
-- **Fix**: Updated `handle_checkout_completed` to set `subscription_expires_at = NULL` for active subs
-- **Result**: Premium permissions now work correctly (can_use_premium_features = true for ggbase tier)
-- **Files**: `ggbot.py` (webhook handler), database migration for existing users
-
----
-
-## 2025-10-11 - Resend Email Integration (Phase 1)
-
-**Automated Email System for User Communication**:
-- **Service Module**: `core/services/resend_service.py` with full Resend API integration
-- **Contact Management**: Automated sync of Supabase users to Resend audience (189/261 users synced)
-- **Email Templates**: Professional responsive templates in `core/email_templates/` (welcome, trade alerts, signal alerts, generic notifications)
-- **Active Features**: Welcome emails automatically sent on new user signup via `user_service.py`
-- **User Sync**: Bulk sync script `scripts/sync_resend_contacts.py` for migrating existing users
-- **Rate Limiting**: Handles Resend's 2 req/sec limit with graceful error handling
-- **Future Integration**: Trade notification and signal alert templates ready, awaiting integration into trading/decision pipelines
-- **Documentation**: Complete setup and usage guide in `DOCS/RESEND.md`
-
----
-
-## 2025-10-04 - Trading System Fixes, Liquidation & X Bot
-
-**Manual Position Management**:
-- Added "Close Position" button to active trades in PositionsTable
-- Implemented API endpoint: `POST /api/v2/bot/{config_id}/positions/{trade_id}/close`
-- Updated paper trading service to handle manual position closure
-- Tested manual close functionality with real-time SSE updates
-- Fixed 401 auth errors by using apiClient instead of direct fetch
-- Included paper trading router in ggbot.py to expose endpoint
-
-**Trading Settings Validation & Position Sizing**:
-- Frontend validation with real-time error/warning feedback
-- Leverage (1-100, warning >20x), Stop Loss (1-50%), Take Profit (1-500%)
-- Position sizing (0.1-100%, warning >50%), Max positions (1-50, warning >10)
-- Red borders for errors (blocking), yellow borders for warnings (non-blocking)
-- **Position sizing FIXED**: Settings now represent MARGIN (risk), multiplied by leverage for position size
-- **P&L calculation FIXED**: Removed double leverage multiplier (was showing 10x too high)
-- Tested position sizing calculations match configuration
-
-**Volume Analysis Fixes**:
-- Debugged volume analysis broken in technical indicators
-- Fixed volume data not appearing in decision prompts
-- Tested volume-based signal validation
-- Verified volume metrics in market analysis formatting
-
-**Liquidation System**:
-- Automatic position liquidation when losses exceed margin (realistic leverage behavior)
-- Liquidation price calculated on trade open based on margin and leverage
-- Priority order: Liquidation → Stop Loss → Take Profit (matches real exchanges)
-- Database schema updated with liquidation_price column
-- Monitoring system checks liquidation before SL/TP
-
-**Self-Service Account Reset Feature**:
-- Default bot cleanup (92 bots deactivated, 83 users affected)
-- Verified 22 custom strategy bots remain active
-- Added "Reset Account" option to bot 3-dot dropdown menu
-- Implemented backend endpoint: `POST /api/v2/bot/{config_id}/reset-account`
-- Reset logic: Close all positions, reset balance to $10k, clear stats, preserve bot config
-- Added confirmation modal with clear warning messaging
-- Tested reset functionality with active positions and historical trades
-- **Metrics filtering by last_reset_at**: Win rate and stats only show post-reset trades
-
-**Extraction Connection Stability**:
-- Fixed session race conditions in parallel timeframe extraction
-- Removed problematic context manager usage causing "Session is closed" errors
-- Added ensure_connected() method for shared session across parallel tasks
-- Improved error message handling for empty aiohttp exceptions
-- Fixed dict error response handling in get_candles method
-
-**Subscription Management UI**:
-- Display current subscription tier and status (Pro/Free badges in UserProfile)
-- Add subscription upgrade interface (UpgradeModal with Stripe Checkout)
-- Add subscription management interface (Stripe Customer Portal)
-- **Upgrade modal update**: Changed to FIRST100 coupon with strikethrough pricing ($29 → $14.50)
-- 50% off promotion for first 100 customers clearly displayed
-
-**X Bot Service**:
-- **Separate PM2 Service**: Independent x-bot process with APScheduler (isolates social media from trading operations)
-- **Platform Status Tweets**: Daily automated tweets at 9:00 AM UTC with real-time platform metrics (active bots, users, trades, symbols tracked, open positions)
-- **Database Integration**: Queries configurations and paper_trades tables for live platform statistics
-- **Free Tier Strategy**: ~90 reads/month + ~240 writes/month (well within 100 read/500 write limits)
-- **Architecture**: Tweepy v4 wrapper with error handling, separate schedulers directory for extensibility
-- **Files**: `x_bot/bot.py` (main service), `x_bot/utils/x_client.py` (API wrapper), `x_bot/schedulers/platform_status.py` (daily tweet logic)
-- **Future Expansion**: Ready for trade announcements, weekly summaries, targeted account replies (documented in X_BOT.md)
-
----
-
-## 2025-10-03 - LLM & Extraction Performance Upgrades
-
-**LLM Provider Optimizations**:
-- **GPT-5 Responses API Migration**: Full integration with reasoning effort controls, CoT passing, and verbosity settings
-- **PRO Model Settings**: 200s timeout + max tokens (OpenAI/Anthropic: 16384, DeepSeek: 8192, XAI: 16384) for quality reasoning
+## 2025-10-03 - LLM & Extraction Performance
+- **GPT-5 Responses API**: Full integration with reasoning effort controls, CoT passing, verbosity settings
+- **PRO Settings**: 200s timeout, max tokens (OpenAI/Anthropic 16384, DeepSeek 8192, XAI 16384)
 - **Universal System Prompts**: All 4 providers support 3 modes (standard, ggshot, trade_management)
-- **Frontend Redesign**: Free users see "Default Model" + locked "Frontier Reasoning Models"; Pro users get 4 individual providers
-
-**Extraction Performance**:
-- **Parallel Timeframes**: asyncio.gather for simultaneous extraction (~60s saved)
-- **Balanced Timeout**: 10s per exchange (reliability under load vs 2s aggressive timeout)
-- **Result**: ~30-60s extraction vs 2 min sequential processing
-
-**Bug Fixes**:
-- GPT-5 response parsing (handles dict with 'output' + direct list formats)
-- Pandas dtype warnings (MFI volume conversion)
-- Numpy.bool_ serialization errors
-- Frontend LLM selection spread order bug
-
----
+- **Frontend**: Free users see "Default Model" + locked "Frontier Reasoning", Pro get 4 individual providers
+- **Extraction**: Parallel timeframes via asyncio.gather (~60s saved), 10s timeout per exchange (reliability), ~30-60s total vs 2min sequential
+- **Bug Fixes**: GPT-5 parsing (dict with 'output' + direct list), pandas dtype warnings (MFI volume), numpy.bool_ serialization, frontend LLM order
 
 ## 2025-10-01 - Stripe Monetization Complete
+- **Pro Plan**: $29/month with 14-day trial, annual $279/year
+- **Backend**: Checkout sessions, 4 webhook events, billing portal, user profile endpoint
+- **Frontend**: Upgrade modal, permission gates, Pro/Free badges, upgrade buttons, billing portal access
+- **Early Adopter**: 50% off 6 months (EARLY50 coupon)
+- **Landing**: Accurate pricing (removed blur, updated features)
+- **Testing**: Full Stripe test mode, ready for production swap
+- **Trade Settings Validation**: 6 fields with real-time errors/warnings, red borders (blocking), yellow (non-blocking), ValidationMessage component
 
-**Pro Plan Implementation**:
-- $29/month with 14-day free trial, annual option at $279/year
-- Complete Backend Integration: Checkout sessions, webhook handlers (4 events), billing portal, user profile endpoint
-- Frontend Upgrade Flow: Modal-based upgrade system with permission gate integration
-- Subscription UI: Pro/Free badges in UserProfile, upgrade buttons, billing portal access
-- Early Adopter Campaign: 50% off for 6 months (coupon: EARLY50)
-- Landing Page Update: Accurate pricing display (removed blur, updated features)
-- Testing Ready: Full Stripe test mode integration, ready for production key swap
+## 2025-09-29 - Logging Consolidation
+- **Cleanup**: Deleted redundant core/common/logging_config.py
+- **PM2 Integration**: All logs to /home/sev/ggbot/logs/ (separated by service/type)
+- **Rotation**: pm2-logrotate (10MB, 5 files)
+- **Verbosity**: Removed excessive prompt logging (saved to DB instead)
 
-**Trading Settings Validation**:
-- Validation Hook: Real-time field validation with error/warning states
-- 6 Validated Fields: Leverage (1-100, warning >20), Stop Loss (1-50%), Take Profit (1-500%), Position Size (0.1-100%, warning >50%), Fixed Amount (max account balance), Max Positions (1-50, warning >10)
-- Visual Feedback: Red borders/text for errors, yellow for warnings, inline messages with icons
-- UX Enhancement: Errors block save, warnings allow save with notification
-- Component: ValidationMessage with AlertCircle/AlertTriangle icons
-
----
-
-## 2025-09-29 - Logging System Consolidation
-
-**Architecture Cleanup**:
-- Consolidated dual logging systems into single standard configuration
-- Legacy Removal: Deleted redundant `core/common/logging_config.py` (test files using legacy system ignored)
-- PM2 Integration: All logs routed through PM2 to `/home/sev/ggbot/logs/` directory structure
-- Log Structure: Separated by service (ggbot, signal-listener) and type (error, out)
-- Rotation Management: pm2-logrotate handles compression and cleanup (10MB rotation, 5 files max)
-- Verbosity Reduction: Removed excessive prompt logging from decision engine (saved to database instead)
-
----
-
-## 2025-09-27 - Disk Space Crisis Resolution & Position Monitoring Fix
-
-**Disk Space Crisis Resolution**:
-- **Root Cause**: Single Docker container log file reached 26GB (hummingbot-api)
-- **Space Recovery**: 25GB+ freed (disk usage: 67% → 41%)
-- **Docker Log Rotation**: Configured 10MB max-size, 3 files (30MB total cap)
-- **PM2 Log Rotation**: `pm2-logrotate` with 10MB rotation and compression
-- **System Log Management**: Fail2ban installed to prevent auth log bloat
-- **Error Rate Limiting**: Connection errors limited to prevent log spam
-- **Monitoring**: Enhanced scripts check Docker, PM2, and system logs
-- **hummingbot-API**: Restored with proper network, database, and auth configuration
-
-**Signal Publishing Consolidation**:
-- **Architecture Cleanup**: Removed unused `signal-publisher` PM2 service and empty queue processing
-- **Publishing Integration**: Telegram publishing now handled directly by ggbot.py orchestrator
-- **Code Consolidation**: Preserved working publishing functions while removing PM2 service scaffolding
-- **Production Mode**: Fixed `DEVELOPMENT_MODE=false` for proper Supabase authentication
-- **Ecosystem Update**: Removed signal-publisher from PM2 configuration (ecosystem.config.js)
-
-**Position Monitoring Reliability Fix** (CRITICAL):
-- **Critical Issue**: ConnectionTerminated errors preventing stop-loss/take-profit execution
-- **Root Cause**: 100+ individual HTTP requests to Supabase every 3 seconds (1200+ requests/minute)
-- **Elegant Solution**: Batch SQL updates using PostgreSQL `UPDATE FROM VALUES` pattern
-- **Performance**: 100 position updates = 1 SQL query instead of 100 HTTP requests (99% reduction)
-- **Trading Safety**: Position closures now execute before price updates (no more failed SL/TP)
-- **Graceful Fallback**: Automatic fallback to individual updates if batch fails
-- **Results**: ConnectionTerminated errors eliminated, monitoring running reliably
-
----
+## 2025-09-27 - Disk Space Crisis & Position Monitoring
+- **Root Cause**: Single Docker log 26GB (hummingbot-api)
+- **Space Recovery**: 25GB+ freed (67%→41%)
+- **Docker Logs**: 10MB max-size, 3 files (30MB cap)
+- **PM2 Rotation**: pm2-logrotate 10MB with compression
+- **Fail2ban**: Installed to prevent auth log bloat
+- **Error Rate Limiting**: Connection errors limited
+- **Monitoring**: Scripts check Docker/PM2/system logs
+- **Position Monitoring Fix**: Batch SQL updates (UPDATE FROM VALUES), 100 updates = 1 query vs 100 HTTP (99% reduction), eliminated ConnectionTerminated errors
 
 ## 2025-09-23 - Critical Bug Fixes & Symbol Validation
+- **XAI Provider**: Fixed signature mismatch causing signal validation failures
+- **Telegram Publishing**: Removed confidence threshold blocking signals
+- **Symbol Selection**: Moved from locked exchange to accessible trading settings
+- **Symbol Validation**: 141 supported pairs with dropdown + search
+- **Help Widget**: Floating question mark with Telegram community invite
+- **Transparency**: All signals publish with APPROVED/REJECTED status
 
-**Critical Bug Fixes**:
-- **XAI Provider Interface**: Fixed signature mismatch causing signal validation failures
-- **Telegram Publishing Gate**: Removed confidence threshold blocking all low-confidence signals
-- **Symbol Selection UX**: Moved from locked exchange section to accessible trading settings
+## 2025-09-19 - Multi-Exchange Fallback
+- **Fallback**: Automatic failover across 5 exchanges (kucoin→binance→okx→gate_io→ascend_ex)
+- **Safety**: Removed dangerous mock price fallback from decision engine
+- **Tests**: test_fallback_methods.py, test_complete_multi_exchange.py (100% pass)
+- **Files**: extraction/v2/data_client.py, trading/paper/market_data.py, decision/engine_v2.py
 
-**New Features**:
-- **Symbol Validation System**: 141 supported trading pairs with dropdown + search
-- **Help Widget**: Floating question mark with Telegram community invitation
-- **Signal Publishing Transparency**: All signals publish with APPROVED/REJECTED status
-
-**UX Improvements**:
-- **Trading Pair Selection**: Professional dropdown replacing free-text input
-- **Symbol Search**: Type-ahead search by base currency (BTC, ETH, SOL, etc.)
-- **Community Access**: Always-visible help widget for user support
-
----
-
-## 2025-09-19 - Multi-Exchange Fallback System
-
-**Files**: `extraction/v2/data_client.py`, `trading/paper/market_data.py`, `decision/engine_v2.py`
-
-**Enhancement**: Automatic failover across 5 exchanges (kucoin→binance→okx→gate_io→ascend_ex)
-
-**Safety**: Removed dangerous mock price fallback from decision engine
-
-**Tests**: `test_fallback_methods.py`, `test_complete_multi_exchange.py` (100% pass rate)
+## Earlier Systems (Pre-Sept 2025)
+- **Scheduler**: APScheduler integration, zero-drift candle execution, Redis idempotency, multi-timeframe (5m-1d), real-time rescheduling, startup reconciliation
+- **Signal Validation**: signals/listener_service.py + publishing_service.py, ggShot integration, AI confidence eval, premium gating, service auth, Telegram publishing, V2 integration
+- **Multi-Timeframe**: 7 timeframes (5m-1w), parallel extraction, rich LLM context, DB storage per timeframe
+- **Paper Trading**: WebSocket prices (sub-ms Redis, ~1s freshness), $10k isolated accounts, 3-second monitoring (batch SQL), liquidation system, confidence-based sizing, real-time P&L
+- **Core V2**: Scheduler + signal flow + multi-timeframe extraction operational, frontend SSE real-time, decision carousel, frontend animations polished, DB market_data fixed, Vercel Analytics, ggShot integrated, multi-user isolation, P&L colors, config save/load, paper accounts/metrics
 
 ---
 
-## Earlier Completed Systems
-
-**Scheduler System**:
-- Files: `core/scheduler/utils.py`, `ggbot.py` (APScheduler integration)
-- Database: Added `state` field to `configurations` table
-- Tests: `tests/test_scheduler.py`
-- Zero-drift execution at candle boundaries
-- Redis idempotency prevents duplicate trades across restarts
-- Multi-timeframe support: 5m, 15m, 30m, 1h, 4h, 1d
-- Real-time rescheduling when users change bot configurations
-- Startup reconciliation automatically restores active bots
-
-**Signal Validation System**:
-- Files: `signals/listener_service.py`, `signals/publishing_service.py`, `decision/prompts/signal_validation.py`
-- Publishing: Integrated into ggbot.py orchestrator (signal-publisher PM2 service discontinued)
-- Generic framework supporting multiple signal sources (ggShot implemented)
-- AI confidence evaluation of external signals using user strategies
-- Premium gating through ggBase subscription tier
-- Service-to-service authentication with dedicated `/api/v2/signal-validation` endpoint
-- Telegram publishing to user-specified channels with APPROVED/REJECTED status
-- Fixed confidence threshold - all signals publish (classification handled by orchestrator)
-- Complete V2 integration using standard extraction → decision → trading flow
-
-**Multi-Timeframe Architecture**:
-- 7 timeframes: 5m, 15m, 30m, 1h, 4h, 1d, 1w extraction
-- Parallel extraction: asyncio.gather for simultaneous timeframe fetching (~30-60s vs 2min sequential)
-- Rich LLM context across all timeframes for decision making
-- Database storage with separate rows per timeframe
-
-**Paper Trading Engine**:
-- Live WebSocket prices from Binance (sub-millisecond Redis access, ~1s freshness)
-- $10,000 isolated accounts per configuration
-- 3-second position monitoring ACTIVE (batch SQL updates for efficiency)
-- Liquidation system - automatic position liquidation when losses exceed margin
-- Confidence-based position sizing
-- Real-time updates - position P&L calculated with live streaming prices
-
-**Core V2 Pipeline**:
-- Core V2 pipeline operational (scheduler, signal flow, multi-timeframe extraction)
-- Frontend SSE real-time updates working
-- Decision carousel display fixed and working
-- Frontend slide animations polished (removed ugly pulse/flash effects)
-- Database market_data column issue resolved
-- Vercel Analytics integration added
-- ggShot signal integration working
-- Multi-user isolation and premium access
-- Profit/loss color schemes implemented
-- Configuration save/load cycle working
-- Paper trading accounts and metrics display
-
----
-
-**For detailed architecture and current production status, see README.md and ACTIVE.md**
+**Documentation**: See README.md (architecture), ACTIVE.md (production status), TODO.md (roadmap)

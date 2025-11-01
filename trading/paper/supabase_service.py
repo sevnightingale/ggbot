@@ -1,7 +1,7 @@
 """
 Supabase Paper Trading Service
 
-Core execution engine for paper trading using Hummingbot API market data and Supabase for persistence.
+Core execution engine for paper trading using WebSocket live prices and Supabase for persistence.
 Handles trade execution, position tracking, and portfolio management via Supabase REST API.
 """
 

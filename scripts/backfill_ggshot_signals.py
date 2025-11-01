@@ -29,8 +29,7 @@ import json
 load_dotenv()
 
 # Import ggShot parser and database
-sys.path.insert(0, os.path.join(PROJECT_DIR, 'ggshot'))
-from ggshot_parser import GGShotParser
+from signals.ggshot_parser import GGShotParser
 from core.common.db import get_db_connection
 from core.common.logger import logger
 

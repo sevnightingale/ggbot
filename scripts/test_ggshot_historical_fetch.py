@@ -31,8 +31,7 @@ from telethon import TelegramClient
 load_dotenv()
 
 # Import ggShot parser
-sys.path.insert(0, os.path.join(PROJECT_DIR, 'ggshot'))
-from ggshot_parser import GGShotParser
+from signals.ggshot_parser import GGShotParser
 
 
 class HistoricalSignalFetcher:

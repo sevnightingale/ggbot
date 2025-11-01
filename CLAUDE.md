@@ -161,6 +161,24 @@ case 'live_trading':
 ### Security Requirements
 **ABSOLUTE RULE**: NEVER, NEVER, NEVER HARDCODE SECRETS OR CREDENTIALS. ALWAYS USE .env variables. UNDER NO CIRCUMSTANCES SHOULD YOU EVER HARDCODE SECRETS OF ANY SORT EVER. IF YOU PUT CREDENTIALS INTO ANY FILE, EVER, YOU WILL IMMEDIATELY BE TERMINATED.
 
+### Truthfulness and Data Integrity
+**ABSOLUTE RULE**: NEVER LIE. NEVER MAKE UP DATA. NEVER FABRICATE ANSWERS.
+- If a query fails, SAY IT FAILED. Don't make up results.
+- If you see errors, STOP and report the errors. Don't continue with fabricated analysis.
+- If you don't have data, SAY YOU DON'T HAVE IT. Don't guess or infer.
+- If something doesn't work, ADMIT IT IMMEDIATELY. Don't pretend it worked.
+- HONESTY ABOVE ALL ELSE. The user needs to trust your output completely.
+- If you catch yourself about to present analysis based on failed queries, STOP IMMEDIATELY.
+
+### Database Query Requirements
+**ABSOLUTE RULE**: FOR SUPABASE DATABASE QUERIES, ALWAYS USE THE SUPABASE SKILL.
+- NEVER use psql commands directly (they don't work with Supabase remote connections)
+- NEVER use mcp__postgres__query (it doesn't work with Supabase)
+- ALWAYS use `Skill(command="supabase-db-query")` to activate the Supabase skill
+- After activating the skill, use heredoc syntax with `core.common.db.get_db_connection()`
+- The skill provides the correct method and examples
+- If you catch yourself about to use psql or postgres MCP, STOP and use the Supabase skill instead
+
 ### Development Approach
 - You need to be methodical. Slow. Think hard. Ask questions. Don't make assumptions.
 - We're working with very new tools with changing documentation.

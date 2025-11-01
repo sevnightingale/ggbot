@@ -261,6 +261,259 @@ def print_status_report(stats):
     print("-" * 80)
 
 
+def get_database_schema():
+    """Query complete database schema from Supabase."""
+    schema = {}
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Get all tables in public schema
+            cur.execute("""
+                SELECT table_name
+                FROM information_schema.tables
+                WHERE table_schema = 'public'
+                AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
+            tables = [row[0] for row in cur.fetchall()]
+
+            # For each table, get columns with types
+            for table in tables:
+                cur.execute("""
+                    SELECT
+                        column_name,
+                        data_type,
+                        character_maximum_length,
+                        is_nullable,
+                        column_default
+                    FROM information_schema.columns
+                    WHERE table_schema = 'public'
+                    AND table_name = %s
+                    ORDER BY ordinal_position
+                """, (table,))
+
+                columns = []
+                for row in cur.fetchall():
+                    col_name, data_type, max_len, nullable, default = row
+
+                    # Format type with length if applicable
+                    if max_len and data_type in ('character varying', 'character'):
+                        type_str = f"{data_type}({max_len})"
+                    else:
+                        type_str = data_type
+
+                    columns.append({
+                        'name': col_name,
+                        'type': type_str,
+                        'nullable': nullable == 'YES',
+                        'default': default
+                    })
+
+                schema[table] = columns
+
+    return schema
+
+
+def format_schema_markdown(schema):
+    """Format database schema as markdown for README.md."""
+    lines = [
+        "## 📊 Database Schema",
+        "",
+        "**Auto-generated schema reference** - Updated automatically by `scripts/status_check.py`",
+        "",
+        f"**Last Updated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "",
+        "---",
+        ""
+    ]
+
+    # Sort tables alphabetically
+    for table_name in sorted(schema.keys()):
+        columns = schema[table_name]
+
+        lines.append(f"### `{table_name}` ({len(columns)} columns)")
+        lines.append("")
+        lines.append("| Column | Type | Nullable | Default |")
+        lines.append("|--------|------|----------|---------|")
+
+        for col in columns:
+            nullable = "✓" if col['nullable'] else ""
+            default = str(col['default'])[:30] if col['default'] else ""
+            lines.append(f"| `{col['name']}` | {col['type']} | {nullable} | {default} |")
+
+        lines.append("")
+
+    lines.append("---")
+    lines.append("")
+
+    return '\n'.join(lines)
+
+
+def get_pm2_status():
+    """Query PM2 for live service status."""
+    import subprocess
+    import json
+
+    try:
+        result = subprocess.run(['pm2', 'jlist'], capture_output=True, text=True, timeout=5)
+        if result.returncode != 0:
+            return []
+
+        services = json.loads(result.stdout)
+        parsed = []
+
+        for svc in services:
+            # Calculate uptime
+            uptime_ms = svc.get('pm2_env', {}).get('pm_uptime', 0)
+            uptime_seconds = (datetime.now().timestamp() * 1000 - uptime_ms) / 1000 if uptime_ms else 0
+            uptime_str = format_uptime(uptime_seconds)
+
+            parsed.append({
+                'name': svc.get('name', 'unknown'),
+                'status': svc.get('pm2_env', {}).get('status', 'unknown'),
+                'cpu': svc.get('monit', {}).get('cpu', 0),
+                'memory': svc.get('monit', {}).get('memory', 0),
+                'uptime': uptime_str,
+                'restarts': svc.get('pm2_env', {}).get('restart_time', 0)
+            })
+
+        return parsed
+    except Exception as e:
+        print(f"⚠️  Warning: Could not get PM2 status: {e}")
+        return []
+
+
+def format_uptime(seconds):
+    """Format uptime in human-readable format."""
+    if seconds < 60:
+        return f"{int(seconds)}s"
+    elif seconds < 3600:
+        return f"{int(seconds/60)}m"
+    elif seconds < 86400:
+        return f"{int(seconds/3600)}h {int((seconds%3600)/60)}m"
+    else:
+        return f"{int(seconds/86400)}d {int((seconds%86400)/3600)}h"
+
+
+def get_vm_resources():
+    """Query VM disk, memory, and CPU usage."""
+    import subprocess
+
+    resources = {}
+
+    try:
+        # Disk usage
+        df_result = subprocess.run(['df', '-h', '/'], capture_output=True, text=True, timeout=5)
+        if df_result.returncode == 0:
+            lines = df_result.stdout.strip().split('\n')
+            if len(lines) > 1:
+                parts = lines[1].split()
+                resources['disk_total'] = parts[1]
+                resources['disk_used'] = parts[2]
+                resources['disk_percent'] = parts[4]
+
+        # Memory usage
+        free_result = subprocess.run(['free', '-h'], capture_output=True, text=True, timeout=5)
+        if free_result.returncode == 0:
+            lines = free_result.stdout.strip().split('\n')
+            if len(lines) > 1:
+                parts = lines[1].split()
+                resources['mem_total'] = parts[1]
+                resources['mem_used'] = parts[2]
+
+        # CPU load averages
+        uptime_result = subprocess.run(['uptime'], capture_output=True, text=True, timeout=5)
+        if uptime_result.returncode == 0:
+            # Parse "load average: 0.52, 0.58, 0.59"
+            output = uptime_result.stdout
+            if 'load average:' in output:
+                load_part = output.split('load average:')[1].strip()
+                loads = load_part.split(',')
+                resources['cpu_load_1m'] = loads[0].strip()
+                resources['cpu_load_5m'] = loads[1].strip() if len(loads) > 1 else '0.00'
+                resources['cpu_load_15m'] = loads[2].strip() if len(loads) > 2 else '0.00'
+
+        return resources
+    except Exception as e:
+        print(f"⚠️  Warning: Could not get VM resources: {e}")
+        return {}
+
+
+def get_redis_status():
+    """Query Redis connectivity and memory usage."""
+    import subprocess
+
+    redis_info = {'status': 'unknown', 'memory': 'N/A'}
+
+    try:
+        # Check connectivity
+        ping_result = subprocess.run(['redis-cli', 'ping'], capture_output=True, text=True, timeout=2)
+        if ping_result.returncode == 0 and 'PONG' in ping_result.stdout:
+            redis_info['status'] = 'connected'
+
+            # Get memory usage
+            mem_result = subprocess.run(['redis-cli', 'info', 'memory'], capture_output=True, text=True, timeout=2)
+            if mem_result.returncode == 0:
+                for line in mem_result.stdout.split('\n'):
+                    if line.startswith('used_memory_human:'):
+                        redis_info['memory'] = line.split(':')[1].strip()
+                        break
+        else:
+            redis_info['status'] = 'disconnected'
+    except Exception as e:
+        redis_info['status'] = 'error'
+        print(f"⚠️  Warning: Could not get Redis status: {e}")
+
+    return redis_info
+
+
+def update_readme_schema(schema):
+    """Update README.md with current database schema."""
+    readme_path = Path(__file__).parent.parent / "README.md"
+
+    if not readme_path.exists():
+        print(f"❌ ERROR: README.md not found at {readme_path}")
+        return False
+
+    # Read current README.md
+    with open(readme_path, 'r') as f:
+        content = f.read()
+
+    # Generate new schema section
+    new_schema = format_schema_markdown(schema)
+
+    # Find and replace existing schema section or append
+    schema_marker_start = "## 📊 Database Schema"
+
+    if schema_marker_start in content:
+        # Find start of schema section
+        start_idx = content.find(schema_marker_start)
+
+        # Find end of schema section (next ## heading or end of file)
+        rest_of_content = content[start_idx + len(schema_marker_start):]
+        next_section = rest_of_content.find("\n## ")
+
+        if next_section != -1:
+            # Replace up to next section
+            end_idx = start_idx + len(schema_marker_start) + next_section
+            new_content = content[:start_idx] + new_schema + content[end_idx:]
+        else:
+            # Replace to end of file
+            new_content = content[:start_idx] + new_schema
+    else:
+        # Append to end of file
+        new_content = content.rstrip() + "\n\n" + new_schema
+
+    # Write back to file
+    with open(readme_path, 'w') as f:
+        f.write(new_content)
+
+    print(f"✅ README.md schema updated successfully!")
+    print(f"   Tables: {len(schema)}")
+    print(f"   Total Columns: {sum(len(cols) for cols in schema.values())}")
+    return True
+
+
 def update_active_md(stats):
     """Update ACTIVE.md with current statistics."""
     active_path = Path(__file__).parent.parent / "ACTIVE.md"
@@ -273,20 +526,134 @@ def update_active_md(stats):
     with open(active_path, 'r') as f:
         content = f.read()
 
-    # Update the header section (first 6 lines)
-    lines = content.split('\n')
+    # Calculate derived stats
+    health_emoji = "🟢" if stats['extractions_1h'] > 0 else "🟡"
+    health_status = "HEALTHY" if stats['extractions_1h'] > 0 else "LOW ACTIVITY"
 
-    # Find the header section and update it
+    # Build comprehensive header with all metrics
     new_header = [
         "# 🚀 ACTIVE - ggbots System Status",
         "",
-        f"**Last Updated**: {datetime.now().strftime('%Y-%m-%d')} (Automated status check)",
-        f"**System Health**: 🟢 Production Live ({stats['total_users']}+ users, {stats['active_bots']}+ active bots)",
-        "**Project Status**: Live application with complete Stripe monetization and Symphony live trading",
+        f"**Last Updated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')} (Auto-updated by status_check.py)",
+        f"**System Health**: {health_emoji} {health_status}",
+        "",
+        "## 📊 Live Platform Metrics",
+        "",
+        "### Users & Subscriptions",
+        f"- **Total Users**: {stats['total_users']}",
+        f"- **Pro Users (ggbase)**: {stats['pro_users']} ({stats['active_subscribers']} active subscriptions)",
+        f"- **Free Users**: {stats['free_users']}",
+        f"- **Users with Bots**: {stats['users_with_bots']} ({stats['users_with_bots']/stats['total_users']*100:.1f}%)",
+        "",
+        "### Bot Statistics",
+        f"- **Total Bots**: {stats['total_bots']}",
+        f"- **Active Bots**: {stats['active_bots']} ({stats['active_bots']/stats['total_bots']*100:.1f}%)",
+        f"  - Paper Trading: {stats['active_paper_bots']}",
+        f"  - Live Trading: {stats['active_live_bots']}",
+        f"- **Inactive Bots**: {stats['inactive_bots']}",
+        f"- **Avg Bots per User**: {stats['total_bots']/stats['users_with_bots']:.1f}",
+        "",
+        "### Trading Activity",
+        f"- **Total Trades (All Time)**: {stats['total_trades']:,}",
+        f"  - Wins: {stats['win_trades']:,}",
+        f"  - Losses: {stats['loss_trades']:,}",
+        f"  - Platform Win Rate: {stats['overall_win_rate']}%",
+        f"  - Total P&L: ${stats['total_pnl']:,.2f}",
+        f"- **Recent Activity**:",
+        f"  - Last 24 hours: {stats['trades_24h']} trades",
+        f"  - Last 7 days: {stats['trades_7d']} trades",
+        f"  - Last 30 days: {stats['trades_30d']} trades",
+        "",
+        "### Open Positions",
+        f"- **Open Positions**: {stats['open_positions']}",
+        f"- **Unique Symbols**: {stats['unique_symbols']}",
+        f"- **Total Exposure**: ${stats['total_exposure']:,.2f}",
+        f"- **Unrealized P&L**: ${stats['unrealized_pnl']:,.2f}",
+        "",
+        "### Account Balances (Paper Trading)",
+        f"- **Average Balance**: ${stats['avg_balance']:,.2f}",
+        f"- **Lowest Balance**: ${stats['min_balance']:,.2f}",
+        f"- **Highest Balance**: ${stats['max_balance']:,.2f}",
+        "",
+        "### Top Trading Symbols (Active Bots)",
         ""
     ]
 
-    # Find where the header ends (usually at the first "---" or "##")
+    # Add top symbols
+    for symbol, count in stats['top_symbols'][:5]:  # Top 5
+        new_header.append(f"- **{symbol}**: {count} bots")
+
+    new_header.extend([
+        "",
+        "### Decision Activity (24h)",
+        ""
+    ])
+
+    # Add recent decisions
+    for action, count, confidence in stats['recent_decisions']:
+        new_header.append(f"- **{action}**: {count} decisions (avg confidence: {confidence}%)")
+
+    new_header.extend([
+        "",
+        "### System Health",
+        f"- **Decisions (last hour)**: {stats['extractions_1h']}",
+        f"- **Status**: {health_emoji} {health_status}",
+        ""
+    ])
+
+    # Add System Resources section
+    new_header.extend([
+        "## 🖥️ System Resources",
+        ""
+    ])
+
+    # PM2 Services
+    pm2_services = get_pm2_status()
+    if pm2_services:
+        new_header.extend([
+            "### PM2 Services",
+            "",
+            "| Service | Status | CPU | Memory | Uptime | Restarts |",
+            "|---------|--------|-----|--------|--------|----------|"
+        ])
+
+        for svc in pm2_services:
+            status_emoji = "🟢" if svc['status'] == 'online' else "🔴"
+            mem_mb = svc['memory'] / (1024 * 1024)  # Convert bytes to MB
+            new_header.append(
+                f"| {svc['name']} | {status_emoji} {svc['status']} | {svc['cpu']}% | {mem_mb:.0f}MB | {svc['uptime']} | {svc['restarts']} |"
+            )
+        new_header.append("")
+
+    # VM Resources
+    vm_resources = get_vm_resources()
+    if vm_resources:
+        new_header.extend([
+            "### VM Resources",
+            ""
+        ])
+        if 'disk_total' in vm_resources:
+            new_header.append(f"- **Disk**: {vm_resources.get('disk_used', 'N/A')} / {vm_resources.get('disk_total', 'N/A')} ({vm_resources.get('disk_percent', 'N/A')})")
+        if 'mem_total' in vm_resources:
+            new_header.append(f"- **Memory**: {vm_resources.get('mem_used', 'N/A')} / {vm_resources.get('mem_total', 'N/A')}")
+        if 'cpu_load_1m' in vm_resources:
+            new_header.append(f"- **CPU Load**: {vm_resources.get('cpu_load_1m', '0.00')} / {vm_resources.get('cpu_load_5m', '0.00')} / {vm_resources.get('cpu_load_15m', '0.00')} (1m/5m/15m)")
+        new_header.append("")
+
+    # Redis Status
+    redis_status = get_redis_status()
+    if redis_status:
+        redis_emoji = "🟢" if redis_status['status'] == 'connected' else "🔴"
+        new_header.extend([
+            "### Infrastructure Services",
+            "",
+            f"- **Redis**: {redis_emoji} {redis_status['status']} (Memory: {redis_status['memory']})",
+            f"- **Supabase PostgreSQL**: 🟢 connected (Remote managed service)",
+            ""
+        ])
+
+    # Find where the header ends (first "---")
+    lines = content.split('\n')
     header_end = 0
     for i, line in enumerate(lines):
         if line.strip() == "---" and i > 5:  # First --- after header
@@ -304,6 +671,8 @@ def update_active_md(stats):
         print(f"✅ ACTIVE.md updated successfully!")
         print(f"   Users: {stats['total_users']}")
         print(f"   Active Bots: {stats['active_bots']}")
+        print(f"   Total Trades: {stats['total_trades']:,}")
+        print(f"   Win Rate: {stats['overall_win_rate']}%")
         return True
     else:
         print("⚠️  WARNING: Could not find header section to update")
@@ -333,7 +702,20 @@ def main():
 
         if args.update:
             print("\n" + "=" * 80)
+            print("UPDATING DOCUMENTATION...")
+            print("=" * 80)
+            print()
+
+            # Update ACTIVE.md
             update_active_md(stats)
+
+            # Update README.md with database schema
+            print("\n📊 Querying database schema...")
+            schema = get_database_schema()
+            update_readme_schema(schema)
+
+            print("\n" + "=" * 80)
+            print("✅ All documentation updated successfully!")
             print("=" * 80)
 
         return 0

@@ -1,6 +1,39 @@
 # TODO.md - ggbots Implementation Plan
 
 
+## 🔧 **HIGH PRIORITY - Maintenance Mode Infrastructure**
+
+**Timeline**: 1-2 days - Complete maintenance mode system for safe production updates
+
+**Status**: Foundation complete, needs final touches for production readiness
+
+### **Phase 1: Core Maintenance Mode** (COMPLETE)
+- [x] Update frontend layout.tsx to check auth before maintenance
+- [x] Add user ID whitelist support via NEXT_PUBLIC_WHITELIST_USER_ID
+- [x] Create maintenance_deactivate_all_bots.py script
+- [x] Create maintenance_close_all_positions.py script
+- [x] Exclude signal_validation configs from deactivation
+- [x] Document maintenance procedures in DOCS/MAINTENANCE_MODE.md
+- [x] Create MAINTENANCE_QUICK_START.md for fast reference
+
+### **Phase 2: Production Testing & Validation**
+- [ ] Test maintenance mode activation on Vercel
+- [ ] Verify whitelisted user can bypass maintenance page
+- [ ] Test bot deactivation script with real data
+- [ ] Test position closure script with real positions
+- [ ] Verify signal_validation configs remain active during maintenance
+- [ ] Test frontend deployment while in maintenance mode
+- [ ] Document maintenance runbook with screenshots
+
+### **Phase 3: Communication & UX**
+- [ ] Create maintenance notification system (optional)
+- [ ] Add maintenance mode banner for admin preview
+- [ ] Create user communication template for maintenance windows
+- [ ] Add maintenance status page or indicator
+- [ ] Plan first maintenance window for major update rollout
+
+---
+
 ## 🤖 **HIGH PRIORITY - Autonomous Trading Agent**
 
 **Timeline**: 1-2 weeks - Enable fully autonomous AI trading agents using Claude Agent SDK
@@ -150,7 +183,7 @@
   - [ ] Verify all decisions logged with `created_by='agent'`
   - [ ] Verify trade_observations records created
 
-**Phase 3 Status**: ✅ **COMPLETE**
+**Phase 3 Status**: ✅ **COMPLETE** (with known issues below)
 
 **Known Issues**:
 - [x] **SSL Connection Error in User Service** - ✅ FIXED with retry logic (2025-10-30)
@@ -158,10 +191,20 @@
   - File: `core/services/user_service.py:83-145`
   - Testing shows ggshot signals now work reliably with BTCUSDT format
 
+- [ ] **Agent Tool Documentation Not Visible** - 🔧 IN PROGRESS (2025-11-01)
+  - Problem: Python docstrings in MCP tools are NOT exposed to the agent
+  - Agent can only see: tool name, @tool description parameter, and schema
+  - Impact: Agent doesn't know valid category names (technical_analysis, sentiment_social, etc.)
+  - Solution: Move ALL category documentation from docstring into @tool description
+  - File: `agent/mcp_server.py:71-74`
+  - Status: Identified root cause, fix in progress
+
 **Next Session Priority**:
-1. Test full strategy definition → autonomous mode flow
-2. Run agent autonomously for 1+ hour with real trades
-3. Monitor token usage and costs with Haiku model
+1. **CRITICAL**: Fix query_market_data tool description so agent sees categories
+2. Add validation in MCP tool to return helpful errors for wrong category names
+3. Test full strategy definition → autonomous mode flow with corrected tool descriptions
+4. Run agent autonomously for 1+ hour with real trades
+5. Monitor token usage and costs with Haiku model
 
 ### **Phase 4: Frontend & User Experience** (2-3 days)
 
@@ -402,6 +445,19 @@
 - **Agent-Ready**: AI agents as first-class consumers via auto-generated tools
 - **Zero Breaking Changes**: Backward compatible migration with feature flag
 
+## 🔧 **MEDIUM PRIORITY - Paper Trading Engine Modernization** ✅ **COMPLETE**
+
+**Status**: Migration from Hummingbot to WebSocket live prices completed October 2025 (see CHANGELOG.md).
+
+**Implementation Details**:
+- Paper trading now uses `LivePriceService` (WebSocket-first, REST fallback)
+- Sub-millisecond Redis access for 100 WebSocket-cached symbols
+- REST API fallback with 5s caching for remaining 42 symbols
+- All 142 symbols supported with intelligent tiering
+- Hummingbot archived to `archive/hummingbot/`
+
+---
+
 ## 🔧 **MEDIUM - Trading System Completeness**
 
 **Timeline**: 2-3 days - Core trading functionality verification and enhancement
@@ -471,14 +527,105 @@
   - [ ] Add proper TypeScript types for signal_data structures
   - [ ] Implement defensive action mapping with unknown value logging
 
+## 📚 **MEDIUM-LOW PRIORITY - Documentation Completeness**
+
+**Timeline**: 3-4 days - Complete module documentation coverage and accuracy
+
+**Current State**: 7/10 major modules have excellent READMEs (extraction/v2, market_intelligence, decision, trading, database, frontend, ggshot)
+
+### **Phase 1: Missing Module READMEs** (2 days)
+- [ ] **Create agent/README.md**
+  - [ ] Document MCP server architecture and tools
+  - [ ] Explain conversation mode vs autonomous mode
+  - [ ] Detail agent-orchestrator communication (Redis queues, HTTP API)
+  - [ ] Include tool documentation and examples
+  - [ ] Document service authentication pattern
+  - [ ] Add development status: "Phase 3 - Foundation Complete, Frontend In Progress"
+
+- [ ] **Create api/README.md** (Optional - Low Priority)
+  - [ ] Document all agent-specific endpoints (9 total)
+  - [ ] Include authentication patterns
+  - [ ] Add request/response examples
+  - [ ] Note: Most other endpoints documented in ACTIVE.md
+
+- [ ] **Create core/config/README.md** (Optional - Medium Priority)
+  - [ ] Document configuration system architecture
+  - [ ] Explain config_data JSONB structure
+  - [ ] Detail template-based setup
+  - [ ] Include config migration patterns
+
+### **Phase 2: Existing README Review & Updates** (1-2 days)
+- [ ] **Review extraction/v2/README.md** (845 lines)
+  - [ ] Verify 21 preprocessors are accurate
+  - [ ] Update performance metrics if changed
+  - [ ] Confirm API examples still work
+
+- [ ] **Review market_intelligence/README.md** (1154 lines)
+  - [ ] Verify 32 data points match production
+  - [ ] Update cost economics section ($195/month platform cost)
+  - [ ] Confirm GrokAgenticAdapter documentation is current
+
+- [ ] **Review decision/README.md** (525 lines)
+  - [ ] Verify V2 template system docs
+  - [ ] Update with any prompt improvements
+  - [ ] Confirm webhook integration details
+
+- [ ] **Review trading/README.md** (723 lines)
+  - [ ] Verify paper trading section accurately reflects WebSocket prices (migration complete Oct 2025)
+  - [ ] Verify Symphony integration docs are current
+  - [ ] Update with any position monitoring improvements
+
+- [ ] **Review database/README.md** (567 lines)
+  - [ ] Add trade_observations table documentation
+  - [ ] Verify paper trading tables match schema
+  - [ ] Update with any recent migrations
+
+- [ ] **Review frontend/README.md** (488 lines)
+  - [ ] Verify Forge architecture documentation
+  - [ ] Remove references to "new-landing" (now integrated into /landing)
+  - [ ] Update subscription system details if changed
+
+- [ ] **Review ggshot/README.md** (384 lines)
+  - [ ] Verify 4-pillar framework documentation
+  - [ ] Update signal processing flow if changed
+
+### **Phase 3: Documentation Consistency** (1 day)
+- [ ] **Cross-Reference Validation**
+  - [ ] Ensure ACTIVE.md and module READMEs don't contradict
+  - [ ] Verify README.md links to all module READMEs
+  - [ ] Update DOCS/ references as needed
+  - [ ] Remove any legacy/outdated information
+
+- [ ] **Update Main README.md**
+  - [ ] Add directory structure section
+  - [ ] List all 7+ module READMEs with descriptions
+  - [ ] Clarify agent status (Phase 3 - Foundation Complete)
+  - [ ] Update frontend section (Forge = production, landing = updated)
+
+**Benefits**:
+- **Onboarding**: New developers can quickly understand each module
+- **Accuracy**: Documentation matches actual production code
+- **Completeness**: No major systems undocumented
+- **Maintenance**: Easier to keep docs updated with clear ownership
+
+---
+
 ## 📊 **MEDIUM-LOW PRIORITY - Trade Timeline Feature**
 
 **Timeline**: 9-12 days - Complete trade lifecycle visualization and analytics foundation
 
 **See**: [DOCS/TRADE_TIMELINE.md](DOCS/TRADE_TIMELINE.md) for complete design specification
+**Status**: ✅ Canvas-based visualization prototype complete at `/view/[config_id]` (mock data, competition demo)
 
 ### Overview
 Comprehensive trade lifecycle view showing Market Data → Entry Decision → Trade Management → Exit Decision, enabling transparency and advanced analytics.
+
+### Phase 0: Prototype Visualization (COMPLETE)
+- [x] Create Canvas-based Activity Timeline component
+- [x] Implement zoom levels (1h/4h/1d/1w/All) with activity grouping
+- [x] Add interactive features (drag pan, hover, click for details)
+- [x] Deploy at `/view/[config_id]` route (public, no auth, mock data)
+- [ ] Connect to real API data (future - currently mock data only)
 
 ### Phase 1: Database Schema (2-3 days)
 - [ ] Add `exit_decision_id` to `paper_trades` table
@@ -573,8 +720,8 @@ Comprehensive trade lifecycle view showing Market Data → Entry Decision → Tr
 **Timeline**: 1-2 weeks - Comprehensive system validation
 
 - [ ] **Symbol Coverage Testing**
-  - [ ] Test all 140+ crypto symbols for KuCoin data availability
-  - [ ] Verify Hummingbot integration works for all supported pairs
+  - [ ] Test all 142 crypto symbols for data availability
+  - [ ] Verify WebSocket + REST fallback works for all supported pairs
   - [ ] Test symbol extraction success rates across all timeframes
   - [ ] Create symbol blacklist for unsupported pairs
   - [ ] Full end-to-end pipeline testing: extraction → decision → trading

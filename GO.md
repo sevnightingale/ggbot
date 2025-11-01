@@ -8,22 +8,26 @@
 
 When a user says "read GO.md" or similar, follow this procedure:
 
-### Step 1: Run Status Check Script
+### Step 1: Run Status Check Script (with auto-update)
 
-Get fresh, accurate platform metrics before diving into documentation:
+Get fresh, accurate platform metrics and auto-update documentation:
 
 ```bash
-source .venv/bin/activate && python scripts/status_check.py
+source .venv/bin/activate && python scripts/status_check.py --update
 ```
 
-This will show you:
-- Current user count and subscription breakdown
-- Active bot count and trading mode split
-- Recent trading activity (24h/7d/30d)
-- Open positions and system health
-- Top trading symbols and decision activity
+This will:
+- Query current user count and subscription breakdown
+- Query active bot count and trading mode split
+- Query recent trading activity (24h/7d/30d)
+- Query open positions and system health
+- Query top trading symbols and decision activity
+- **Auto-update ACTIVE.md** with current stats
+- **Auto-update README.md** with current database schema
 
 Use these **real-time numbers** in your assessment instead of relying on potentially outdated documentation.
+
+**Important**: The `--update` flag ensures README.md always has the current database schema, so you never have to guess column names.
 
 ### Step 2: Read Core Documentation (in order)
 
@@ -81,11 +85,14 @@ As you work on tasks, **keep TODO.md updated in real-time**:
 
 When a significant feature/fix is done:
 
-1. **Update CHANGELOG.md**:
-   - Add entry under appropriate date (create new date section if needed)
-   - Use consistent format: **Feature Name** + bullet list of changes
-   - Include files changed, performance metrics, impact notes
-   - Keep entries factual and concise
+1. **Update CHANGELOG.md** (COMPRESSED FORMAT):
+   - Add entry under date: `## YYYY-MM-DD - Brief Title`
+   - Use **ultra-concise bullet points** - sacrifice grammar for brevity
+   - Format: `- **Category**: What changed, key metric, files`
+   - Example: `- **Tool**: get_current_price - Sub-ms WebSocket lookup with REST fallback`
+   - NO paragraphs, NO explanations, NO narrative - ONLY essential facts
+   - Include: files changed, performance numbers, bug root cause (1 line max)
+   - Target: 3-8 bullets per entry, NOT 20+ line paragraphs
 
 2. **Update TODO.md**:
    - Move completed checkbox items from TODO → CHANGELOG

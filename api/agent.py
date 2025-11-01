@@ -149,25 +149,38 @@ async def query_market_data(
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
-        # Normalize symbol using UniversalSymbolStandardizer
+        # Normalize symbol to CCXT format (BTC/USDT) using UniversalSymbolStandardizer
+        # ExtractionEngineV2 expects CCXT format internally
         standardizer = UniversalSymbolStandardizer()
         symbol = request_body.symbol
 
-        # Try to normalize to platform format (handles BTC -> BTCUSDT, etc.)
         if symbol:
-            # Detect format and normalize to platform standard
+            # Detect format and normalize to CCXT format
             if '/' in symbol:
                 # Already in CCXT format like "BTC/USDT"
-                normalized = standardizer.normalize(symbol, "ccxt", "platform")
-            elif 'USDT' in symbol or 'USD' in symbol:
-                # Already has pair like "BTCUSDT"
                 normalized = symbol
+            elif 'USDT' in symbol or 'USD' in symbol:
+                # Has pair like "BTCUSDT" or "BTC-USDT" - normalize to CCXT
+                # Try platform first, then ggshot
+                normalized = standardizer.to_ccxt(symbol)
+                if not normalized:
+                    # Try ggshot format (BTCUSDT)
+                    normalized = standardizer.normalize(symbol, "ggshot", "ccxt")
+                if not normalized:
+                    # Fallback: manually add separator
+                    base = symbol.replace('USDT', '').replace('USD', '').replace('-', '')
+                    normalized = f"{base}/USDT"
             else:
-                # Simple symbol like "BTC" - assume USDT pair
-                normalized = f"{symbol.upper()}-USDT"
+                # Simple symbol like "BTC" - convert symphony → platform → ccxt
+                platform_format = standardizer.from_symphony(symbol)
+                if platform_format:
+                    normalized = standardizer.to_ccxt(platform_format)
+                else:
+                    # Fallback: manually construct CCXT format
+                    normalized = f"{symbol.upper()}/USDT"
 
             symbol = normalized
-            logger.debug(f"Normalized symbol: {request_body.symbol} -> {symbol}")
+            logger.debug(f"Normalized symbol: {request_body.symbol} -> {symbol} (CCXT format)")
 
         result = {}
 
@@ -267,12 +280,30 @@ async def get_current_price(
     try:
         from trading.paper.hybrid_price_service import HybridPriceService
 
-        # Convert BTCUSDT -> BTC/USDT if needed
-        if '/' not in symbol and symbol.endswith('USDT'):
-            base = symbol[:-4]  # Remove 'USDT'
-            internal_symbol = f"{base}/USDT"
-        else:
+        # Normalize symbol to CCXT format (same logic as query_market_data)
+        standardizer = UniversalSymbolStandardizer()
+
+        if '/' in symbol:
+            # Already in CCXT format
             internal_symbol = symbol
+        elif 'USDT' in symbol or 'USD' in symbol:
+            # Has pair - normalize to CCXT
+            internal_symbol = standardizer.to_ccxt(symbol)
+            if not internal_symbol:
+                internal_symbol = standardizer.normalize(symbol, "ggshot", "ccxt")
+            if not internal_symbol:
+                # Fallback
+                base = symbol.replace('USDT', '').replace('USD', '').replace('-', '')
+                internal_symbol = f"{base}/USDT"
+        else:
+            # Simple symbol - convert via standardizer
+            platform_format = standardizer.from_symphony(symbol)
+            if platform_format:
+                internal_symbol = standardizer.to_ccxt(platform_format)
+            else:
+                internal_symbol = f"{symbol.upper()}/USDT"
+
+        logger.debug(f"Normalized symbol for price: {symbol} -> {internal_symbol} (CCXT format)")
 
         # Get price from hybrid service (WebSocket first, REST fallback)
         price_service = HybridPriceService()

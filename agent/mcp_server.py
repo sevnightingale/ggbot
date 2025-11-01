@@ -59,7 +59,21 @@ def set_agent_context(config_id: str, user_id: str, api_client: GGBotAPIClient):
 
 @tool(
     "query_market_data",
-    "Query market data across 7 categories. Symbol can be 'BTC', 'BTCUSDT', 'BTC/USDT' - all work. Indicators are case-insensitive. Params: symbol (required), categories (dict mapping category to data point list), timeframe (optional, default '1h')",
+    """Query market data across 7 categories:
+
+CATEGORIES (use exact names):
+- technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
+- macro_economics: vix, dxy, cpi, nfp
+- sentiment_social: twitter_sentiment (exact name "twitter_sentiment")
+- derivatives_leverage: btc_funding_rate, eth_funding_rate
+- on_chain_analytics: btc_tvl, whale_activity
+- news_regulatory: crypto_news
+- trading_signals: ggshot (PREMIUM, exact name "ggshot")
+
+EXAMPLE: {"symbol": "BTC", "categories": {"technical_analysis": ["RSI"], "trading_signals": ["ggshot"]}}
+
+Symbol formats: "BTC", "BTCUSDT", "BTC/USDT" all work. Indicators are case-insensitive.
+Params: symbol (required), categories (dict), timeframe (optional, default '1h')""",
     {"symbol": str, "categories": dict, "timeframe": str}
 )
 async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
@@ -100,6 +114,10 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
     Note: Use exact data point names (ggshot, twitter_sentiment, btc_funding_rate)
     """
     try:
+        # LOG: Raw arguments from agent
+        logger.debug(f"🔧 query_market_data CALLED")
+        logger.debug(f"   Args received: {json.dumps(args, indent=2)}")
+
         symbol = args["symbol"]
         categories_raw = args.get("categories", {})
         timeframe = args.get("timeframe", "1h")
@@ -110,11 +128,36 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
         else:
             categories = categories_raw
 
+        # Validate category names
+        VALID_CATEGORIES = {
+            "technical_analysis", "macro_economics", "sentiment_social",
+            "derivatives_leverage", "on_chain_analytics", "news_regulatory", "trading_signals"
+        }
+
+        unknown_categories = set(categories.keys()) - VALID_CATEGORIES
+        if unknown_categories:
+            error_msg = f"❌ Unknown categories: {', '.join(unknown_categories)}\n\nValid categories:\n"
+            for cat in sorted(VALID_CATEGORIES):
+                error_msg += f"  - {cat}\n"
+
+            logger.warning(f"Agent used invalid categories: {unknown_categories}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": error_msg
+                }]
+            }
+
         # Separate technical indicators from intelligence sources
         technical_indicators = categories.get("technical_analysis", [])
         intelligence_sources = {k: v for k, v in categories.items() if k != "technical_analysis"}
 
+        # LOG: Parsed structure
+        logger.debug(f"   Parsed technical_indicators: {technical_indicators}")
+        logger.debug(f"   Parsed intelligence_sources: {intelligence_sources}")
+
         # Call API with proper structure
+        logger.debug(f"   Calling API with symbol={symbol}, indicators={technical_indicators}, data_sources={intelligence_sources}, timeframe={timeframe}")
         result = await agent_context.api_client.query_market_data(
             config_id=agent_context.config_id,
             symbol=symbol,
@@ -137,6 +180,9 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
             response_parts.append(json.dumps(intel_data, indent=2))
 
         formatted_response = "\n".join(response_parts) if response_parts else "No data available"
+
+        # LOG: Response being returned to agent
+        logger.debug(f"   Response: {formatted_response[:500]}{'...' if len(formatted_response) > 500 else ''}")
 
         return {
             "content": [{
@@ -173,6 +219,9 @@ async def get_current_price(args: Dict[str, Any]) -> Dict[str, Any]:
     Returns current price, bid/ask spread, and data source.
     """
     try:
+        # LOG: Tool called
+        logger.debug(f"🔧 get_current_price CALLED with args: {args}")
+
         symbol = args["symbol"]
 
         result = await agent_context.api_client.get_current_price(symbol=symbol)
@@ -769,6 +818,20 @@ def create_mcp_server():
         MCP server instance to be used with Claude Agent SDK
     """
     logger.info("Creating MCP server with 11 trading tools")
+
+    # LOG: All tool definitions
+    logger.debug("📚 MCP TOOLS BEING REGISTERED:")
+    logger.debug("   1. query_market_data - Query market data across 7 categories")
+    logger.debug("   2. get_current_price - Get current price for a symbol")
+    logger.debug("   3. execute_trade - Execute a trade")
+    logger.debug("   4. get_positions - Get open trading positions")
+    logger.debug("   5. get_account_status - Get account balance and statistics")
+    logger.debug("   6. close_position - Close an open position")
+    logger.debug("   7. update_strategy - Update trading strategy")
+    logger.debug("   8. wait_for - Pause execution")
+    logger.debug("   9. record_trade_observation - Record trade learnings")
+    logger.debug("   10. query_trade_observations - Query past observations")
+    logger.debug("   11. request_autonomous_mode - Request mode switch")
 
     # Create server with all tools
     server = create_sdk_mcp_server(

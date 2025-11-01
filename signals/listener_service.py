@@ -79,8 +79,7 @@ class GGShotSignalSource(SignalSource):
         self.client: Optional[any] = None
 
         # Import ggShot parser
-        sys.path.insert(0, os.path.join(PROJECT_DIR, 'ggshot'))
-        from ggshot_parser import GGShotParser
+        from signals.ggshot_parser import GGShotParser
         self.parser = GGShotParser()
 
         # Database storage setup

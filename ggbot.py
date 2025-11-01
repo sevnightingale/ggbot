@@ -612,8 +612,7 @@ class GGBotOrchestrator:
                 channel = await client.get_entity(channel_name)
                 messages = await client.get_messages(channel, limit=10)
 
-                sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), 'ggshot'))
-                from ggshot_parser import GGShotParser
+                from signals.ggshot_parser import GGShotParser
                 parser = GGShotParser()
                 
                 for message in messages:

@@ -30,6 +30,19 @@ from loguru import logger
 import redis.asyncio as redis
 from dotenv import load_dotenv
 
+# Configure detailed agent logging to file
+# IMPORTANT: Only configure logger here (not in mcp_server.py or service_client.py)
+# to avoid duplicate log entries
+logger.add(
+    "/home/sev/ggbot/logs/agent-debug.log",
+    rotation="10 MB",
+    retention="3 days",
+    level="DEBUG",
+    format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
+    backtrace=True,
+    diagnose=True
+)
+
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock
 
 from agent.mcp_server import create_mcp_server, set_agent_context
@@ -176,6 +189,10 @@ Be disciplined, patient, and cost-conscious.
             # Create MCP server
             mcp_server = create_mcp_server()
 
+            # Build system prompt and log it
+            system_prompt = self._build_system_prompt()
+            logger.debug(f"📋 SYSTEM PROMPT:\n{'='*80}\n{system_prompt}\n{'='*80}")
+
             # Create options
             options = ClaudeAgentOptions(
                 model=os.getenv("AGENT_MODEL", "claude-haiku-4-5-20251001"),
@@ -199,7 +216,7 @@ Be disciplined, patient, and cost-conscious.
                     "ExitPlanMode", "NotebookEdit", "BashOutput", "KillShell",
                     "AskUserQuestion", "ListMcpResourcesTool", "ReadMcpResourceTool"
                 ],
-                system_prompt=self._build_system_prompt(),
+                system_prompt=system_prompt,
                 max_turns=100
             )
 
@@ -268,15 +285,22 @@ Be disciplined, patient, and cost-conscious.
 
                 logger.info(f"User: {user_text}")
 
+                # LOG: User message to agent
+                logger.debug(f"👤 USER MESSAGE TO AGENT: {user_text}")
+
                 # Send to agent
                 await client.query(user_text)
 
                 # Collect response
                 async for message in client.receive_response():
+                    # LOG: Full message structure
+                    logger.debug(f"🤖 AGENT MESSAGE RECEIVED: {message}")
+
                     if isinstance(message, AssistantMessage):
                         for block in message.content:
                             if isinstance(block, TextBlock):
                                 logger.info(f"Agent: {block.text}")
+                                logger.debug(f"🤖 AGENT TEXT BLOCK: {block.text}")
                                 await self.redis_client.rpush(
                                     f"agent:{self.config_id}:responses",
                                     json.dumps({

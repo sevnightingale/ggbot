@@ -82,6 +82,15 @@ class GGBotAPIClient:
                 logger.debug(f"Request: {method} {endpoint}, kwargs: {kwargs}")
                 response = await self.client.request(method, endpoint, **kwargs)
                 logger.debug(f"Response URL: {response.url}")
+                logger.debug(f"Response status: {response.status_code}")
+
+                # Log response body for debugging
+                try:
+                    response_data = response.json()
+                    logger.debug(f"Response data: {response_data}")
+                except Exception:
+                    logger.debug(f"Response text: {response.text[:500]}")
+
                 response.raise_for_status()
                 return response
 

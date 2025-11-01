@@ -2,7 +2,25 @@
 
 **Autonomous AI Trading Agents That Trade Like You**
 
-ggbots is a production-ready platform for creating, customizing, and deploying fully autonomous AI trading agents. The platform combines browser automation, advanced reasoning LLMs, and sophisticated execution engines to enable traders to "train an AI to trade like you" - capturing their unique strategies, insights, and decision-making patterns in an autonomous system that operates 24/7.
+ggbots is a production-ready platform for creating, customizing, and deploying fully autonomous AI trading agents. The platform combines real-time market intelligence, advanced reasoning LLMs, and professional-grade execution engines to enable traders to "train an AI to trade like you" - capturing their unique strategies, insights, and decision-making patterns in an autonomous system that operates 24/7.
+
+**Live Production**: 258 users, 383 bots, 5,407+ trades executed
+
+---
+
+## 🚀 Quick Start for New Claude Code Instances
+
+**👉 Start here**: Read **[GO.md](GO.md)** for the standard onboarding procedure. This will:
+- Run automated status checks and schema updates
+- Guide you through core documentation
+- Provide current production metrics
+- Help identify what to work on next
+
+**For operational status**: Check **[ACTIVE.md](ACTIVE.md)** for live system resources, platform metrics, and current capabilities.
+
+**For development tasks**: See **[TODO.md](TODO.md)** for prioritized roadmap and current work.
+
+---
 
 ## Architecture Overview
 
@@ -41,10 +59,37 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 - **Paper Trading Engine** - Professional-grade simulation with real market data
 - **Live Trading Engine** - Symphony.io integration for real-money execution (100 compatible symbols)
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
-- **Real-time monitoring** - 7-second price updates with automatic TP/SL execution
+- **Real-time monitoring** - 3-second price updates with automatic TP/SL execution
 - **Confidence-based sizing** - Position size = confidence × max position (10% of balance)
 - **Risk enforcement** with portfolio limits, exposure tracking, and emergency controls
 - **Multi-exchange support** with advanced order types via Symphony.io
+
+---
+
+## 📁 Codebase Structure
+
+The ggbot repository is organized into the following top-level directories:
+
+| Directory | Purpose | Status | Key Files |
+|-----------|---------|--------|-----------|
+| **agent/** | Autonomous trading agent foundation (MCP server, tools, chat) | 🟡 In Development | run_agent.py, mcp_server.py, service_client.py |
+| **api/** | API endpoints for agent operations | ✅ Active | agent.py, paper_trading.py, symbols.py |
+| **core/** | Core business logic (auth, config, domain, services) | ✅ Active | 16 subdirectories |
+| **decision/** | AI decision engine with V2 template system | ✅ Active | README.md, prompts/, engine_v2.py |
+| **extraction/** | Market data extraction with 21 preprocessors | ✅ Active | v2/ with README.md |
+| **trading/** | Paper & live trading execution engines | ✅ Active | README.md, paper/, live/ |
+| **frontend/** | Next.js Forge application | ✅ Active | README.md, app/forge/ |
+| **market_intelligence/** | Market data orchestrator (32 data points, 7 categories) | ✅ Active | README.md, orchestrator.py |
+| **signals/** | Signal processing, Telegram publishing, ggShot parser | ✅ Active | listener_service.py, ggshot_parser.py |
+| **database/** | Schema, migrations, and database utilities | ✅ Active | README.md, migrations/ |
+| **tests/** | Integration and unit testing suite | ✅ Active | test_trading_flow_simple.py |
+| **scripts/** | Utility scripts (status checks, maintenance, testing) | ✅ Active | status_check.py, maintenance_*.py |
+| **x_bot/** | Twitter bot for platform status updates | ✅ Active | Platform tweets at @ggbots_ai |
+| **archive/** | Legacy code preserved for reference | 🔒 Archived | 15 archived directories (includes ggshot/) |
+
+**Note**: The `agent/` directory contains the foundation for fully autonomous AI trading agents (Phase 3 - MCP server and tools operational, frontend integration in progress). See [TODO.md](TODO.md) for agent development roadmap.
+
+---
 
 ## Platform Infrastructure
 
@@ -63,8 +108,8 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 ├──────────────┼─────────────┼─────────────┼─────────────┼───────┤
 │                   Core Infrastructure                          │
 │  ┌─────────────┬─────────────┬─────────────┬─────────────┐     │
-│  │ Hummingbot  │ Monitoring  │ Config Mgmt │ Database    │     │
-│  │ API         │ & Alerts    │             │ (Supabase)  │     │
+│  │ WebSocket   │ Monitoring  │ Config Mgmt │ Database    │     │
+│  │ Prices      │ & Alerts    │             │ (Supabase)  │     │
 └──┴─────────────┴─────────────┴─────────────┴─────────────┴─────┘
 ```
 
@@ -109,12 +154,26 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 ### **[Frontend Platform](frontend/)**
 
-**Professional Next.js application** featuring:
-- **Multi-bot management** with `selectedConfigId` switching and intuitive interfaces
-- **Real-time performance tracking** with SSE streams and countdown timers
+**Professional Next.js 15 application** deployed at **app.ggbots.ai** featuring:
+
+**Forge** - Main Production Interface (`/forge`):
+- **Multi-bot management** with intuitive bot rail and configuration switching
+- **Real-time monitoring** with SSE streams, performance charts, and position tables
+- **Configuration wizard** with market data selection, strategy editor, and trade settings
+- **Subscription system** with Stripe integration and premium feature gates
+- **Activity Timeline Viewer** (`/view/[config_id]`) - Canvas-based trade visualization (mock data, demo)
+
+**Core Components** (~10 major components):
+- Layout: Header, BotRail, TabNavigation, UserProfile with subscription badge
+- Monitoring: ActivationBar, MetricsBar, DecisionFeed, PositionsTable with real-time P&L
+- Configuration: ConfigTabs, MarketDataSelector, StrategyEditor, TradeSettings, SaveConfigBar
+- Shared: UpgradeModal, SymbolSelector, DuplicateAsLiveModal
+
+**Technical Architecture**:
+- **Server Components** with Supabase auth and JWT token-based API access
 - **Direct API integration** using `BotConfiguration` types without transformation layers
-- **Supabase authentication** with JWT token-based API access
-- **Legacy Dashboard V2**: Deprecated due to WebSocket complexity and architectural debt
+- **SSE Streams** for real-time updates (dashboard-stream) with countdown timers
+- **Vercel deployment** with automatic git-based CI/CD
 
 ## Production Features
 
@@ -205,14 +264,14 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 
 - **[core/config/README.md](core/config/README.md)** - System configuration and templates
 - **[database/README.md](database/README.md)** - Database schema and migrations
-- **[archive/hummingbot/](archive/hummingbot/)** - Deprecated Hummingbot integration (replaced by WebSocket live prices)
+- **[archive/hummingbot/](archive/hummingbot/)** - Legacy Hummingbot integration (deprecated Oct 2025, replaced by WebSocket prices)
 
 ### Planned Updates & Roadmap
 
 - **[TODO.md](TODO.md)** - Current development tasks and roadmap
 - **[CHANGELOG.md](CHANGELOG.md)** - Complete history of features, fixes, and improvements
 - **[DOCS/CONFIG.md](DOCS/CONFIG.md)** - Config component V2 integration roadmap (Phase 8)
-- **[DOCS/FUTURE.md](DOCS/FUTURE.md)** - Comprehensive platform scaling and feature roadmap
+
 
 ## Platform Capabilities
 
@@ -228,12 +287,331 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 - **Confidence-based position sizing** with intelligent risk allocation
 
 ### Professional Trading Features
-- **140+ trading pair support** across major cryptocurrency exchanges
-- **Real-time monitoring** with sub-second execution capabilities
-- **Automated TP/SL management** with position tracking
+- **141 trading pair support** across major cryptocurrency exchanges (100 Symphony-compatible for live trading)
+- **Real-time monitoring** with sub-second execution capabilities via Binance WebSocket
+- **Automated TP/SL management** with 3-second position monitoring
 - **Comprehensive analytics** with P&L tracking and performance attribution
-- **Advanced order types** (TWAP, iceberg, OCO planned via Hummingbot expansion)
+- **Symphony.io integration** for professional-grade live trading execution
 
 ---
 
 **ggbots represents the evolution of autonomous trading - where human expertise meets AI capabilities to create trading agents that truly understand markets, adapt to changing conditions, and execute with the precision of professional trading systems.**
+
+---
+
+## 🛠️ Tech Stack
+
+### Backend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Python** | 3.10.12 | Core backend language |
+| **FastAPI** | 0.115.12 | REST API framework |
+| **APScheduler** | 3.11.0 | Autonomous bot scheduling |
+| **pandas-ta** | 0.3.14b0 | Technical indicators (21 preprocessors) |
+| **PostgreSQL** | Remote (Supabase) | Main application database |
+| **Redis** | 6379 | WebSocket cache, queues, idempotency |
+| **asyncpg** | 0.29.0 | Async PostgreSQL driver |
+| **psycopg2-binary** | 2.9.10 | Sync PostgreSQL driver |
+| **loguru** | 0.7.3 | Structured logging |
+
+### Frontend
+| Technology | Version | Purpose |
+|------------|---------|---------|
+| **Next.js** | 15.3.3 | React framework with App Router |
+| **React** | 19.0.0 | UI library |
+| **TypeScript** | 5.x | Type safety |
+| **Tailwind CSS** | 3.4.17 | Styling framework |
+| **Supabase** | 2.57.0 | Auth & Database client |
+| **Zustand** | 5.0.7 | State management |
+| **Recharts** | 2.15.4 | Performance charts |
+| **Vercel** | - | Production deployment |
+
+### AI/LLM Providers
+| Provider | Integration | Models |
+|----------|-------------|--------|
+| **Anthropic** | 0.49.0 | Claude Haiku 4.5, Sonnet 4.5, Opus 4 |
+| **OpenAI** | 1.70.0 | GPT-4, GPT-5 (Responses API) |
+| **XAI** | 1.3.1 | Grok 4 (Agentic API for market intelligence) |
+| **Google** | 2.1.2 | Gemini models |
+| **DeepSeek** | - | R1 reasoning model |
+
+### Trading & Data
+| Service | Purpose | Status |
+|---------|---------|--------|
+| **Symphony.io** | Live trading execution | ✅ 100 symbols supported |
+| **Binance** | Real-time WebSocket prices | ✅ market-data-ws service |
+| **CCXT** | Multi-exchange library | ✅ 4.4.80 |
+| **Stripe** | Subscription payments | ✅ 11.1.0 |
+
+### Infrastructure
+| Service | Purpose | Access |
+|---------|---------|--------|
+| **PM2** | Process management | 5 services (ggbot, market-data-ws, signal-listener, x-bot, error-alerts) |
+| **Supabase** | PostgreSQL + Auth | Remote managed service |
+| **Redis** | Cache + Queues | Local (port 6379) |
+| **Vercel** | Frontend hosting | Production deployment |
+
+---
+
+## 📚 Module Documentation
+
+The ggbot repository includes 7 comprehensive module READMEs with detailed technical documentation:
+
+| Module | Lines | Contents |
+|--------|-------|----------|
+| **[extraction/v2/README.md](extraction/v2/README.md)** | 845 | 21 preprocessors, 12x performance, API docs |
+| **[market_intelligence/README.md](market_intelligence/README.md)** | 1154 | 32 data points, 7 categories, orchestrator architecture |
+| **[decision/README.md](decision/README.md)** | 525 | V2 template system, 3 modes, webhook integration |
+| **[trading/README.md](trading/README.md)** | 723 | Paper & live trading, Symphony integration |
+| **[database/README.md](database/README.md)** | 567 | Complete schema, migrations, RLS |
+| **[frontend/README.md](frontend/README.md)** | 488 | Forge architecture, subscription system |
+
+**Total**: 4,302 lines of module-specific technical documentation
+
+**Note**: ggshot/README.md (384 lines) archived with legacy ggShot filtering system.
+
+---
+
+## 📊 Database Schema
+
+**Auto-generated schema reference** - Updated automatically by `scripts/status_check.py`
+
+**Last Updated**: 2025-11-01 09:00:04 UTC
+
+---
+
+### `bot_telegram_channels` (6 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `config_id` | uuid |  |  |
+| `telegram_chat_id` | bigint |  |  |
+| `channel_name` | character varying(100) | ✓ |  |
+| `enabled` | boolean | ✓ | true |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `configurations` (10 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `config_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `config_type` | character varying(50) |  |  |
+| `config_name` | character varying(100) | ✓ |  |
+| `config_data` | jsonb |  |  |
+| `created_at` | timestamp with time zone |  | now() |
+| `updated_at` | timestamp with time zone |  | now() |
+| `state` | text |  | 'inactive'::text |
+| `symphony_agent_id` | character varying(255) | ✓ |  |
+| `trading_mode` | character varying(20) | ✓ | 'paper'::character varying |
+
+### `data_points` (11 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `data_point_id` | uuid |  | gen_random_uuid() |
+| `source_id` | uuid |  |  |
+| `name` | character varying(50) |  |  |
+| `display_name` | character varying(100) |  |  |
+| `description` | text | ✓ |  |
+| `config_values` | ARRAY |  |  |
+| `requires_premium` | boolean | ✓ | false |
+| `enabled` | boolean | ✓ | true |
+| `sort_order` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `data_sources` (9 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `source_id` | uuid |  | gen_random_uuid() |
+| `name` | character varying(50) |  |  |
+| `display_name` | character varying(100) |  |  |
+| `description` | text | ✓ |  |
+| `enabled` | boolean | ✓ | true |
+| `requires_premium` | boolean | ✓ | false |
+| `sort_order` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `decisions` (13 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `decision_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `config_id` | uuid | ✓ |  |
+| `symbol` | character varying(20) |  |  |
+| `action` | character varying(20) |  |  |
+| `status` | character varying(20) | ✓ |  |
+| `confidence` | numeric |  |  |
+| `reasoning` | text | ✓ |  |
+| `prompt` | text | ✓ |  |
+| `decision_data` | jsonb | ✓ |  |
+| `parent_decision_id` | uuid | ✓ |  |
+| `created_at` | timestamp with time zone |  | now() |
+| `created_by` | text | ✓ | 'decision_engine_v2'::text |
+
+### `live_trades` (5 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `batch_id` | character varying(255) |  |  |
+| `config_id` | uuid |  |  |
+| `decision_id` | uuid | ✓ |  |
+| `created_at` | timestamp without time zone |  | now() |
+| `closed_at` | timestamp without time zone | ✓ |  |
+
+### `logs` (6 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `log_id` | integer |  | nextval('logs_log_id_seq'::reg |
+| `user_id` | uuid | ✓ |  |
+| `module` | character varying(100) | ✓ |  |
+| `log_level` | character varying(10) |  |  |
+| `message` | text |  |  |
+| `timestamp` | timestamp with time zone |  | now() |
+
+### `market_data` (9 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `id` | integer |  | nextval('market_data_id_seq':: |
+| `user_id` | uuid |  |  |
+| `config_id` | uuid | ✓ |  |
+| `symbol` | character varying(20) |  |  |
+| `timeframe` | character varying(10) |  |  |
+| `data_points` | jsonb | ✓ |  |
+| `raw_data` | jsonb |  |  |
+| `updated_at` | timestamp with time zone |  | now() |
+| `data_source` | uuid | ✓ |  |
+
+### `paper_accounts` (13 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `account_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `config_id` | uuid |  |  |
+| `initial_balance` | numeric |  | 10000.00 |
+| `current_balance` | numeric |  | 10000.00 |
+| `total_pnl` | numeric |  | 0.00 |
+| `open_positions` | integer |  | 0 |
+| `total_trades` | integer |  | 0 |
+| `win_trades` | integer |  | 0 |
+| `loss_trades` | integer |  | 0 |
+| `created_at` | timestamp with time zone |  | now() |
+| `updated_at` | timestamp with time zone |  | now() |
+| `last_reset_at` | timestamp with time zone | ✓ |  |
+
+### `paper_orders` (9 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `order_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `trade_id` | uuid |  |  |
+| `order_type` | character varying(20) |  |  |
+| `side` | character varying(10) |  |  |
+| `filled_price` | numeric |  |  |
+| `size` | numeric |  |  |
+| `fees` | numeric |  | 0.00 |
+| `filled_at` | timestamp with time zone |  | now() |
+
+### `paper_trades` (22 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `trade_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `account_id` | uuid |  |  |
+| `config_id` | uuid |  |  |
+| `decision_id` | uuid | ✓ |  |
+| `symbol` | character varying(20) |  |  |
+| `side` | character varying(10) |  |  |
+| `entry_price` | numeric |  |  |
+| `current_price` | numeric | ✓ |  |
+| `size_usd` | numeric |  |  |
+| `leverage` | integer |  | 1 |
+| `unrealized_pnl` | numeric | ✓ |  |
+| `realized_pnl` | numeric | ✓ |  |
+| `status` | character varying(20) |  | 'open'::character varying |
+| `stop_loss` | numeric | ✓ |  |
+| `take_profit` | numeric | ✓ |  |
+| `confidence_score` | numeric | ✓ |  |
+| `opened_at` | timestamp with time zone |  | now() |
+| `closed_at` | timestamp with time zone | ✓ |  |
+| `margin_used` | numeric | ✓ |  |
+| `close_reason` | character varying(50) | ✓ |  |
+| `liquidation_price` | numeric | ✓ |  |
+
+### `stripe_webhooks` (11 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `webhook_id` | uuid |  | gen_random_uuid() |
+| `stripe_event_id` | character varying(100) |  |  |
+| `event_type` | character varying(50) |  |  |
+| `stripe_customer_id` | character varying(100) | ✓ |  |
+| `stripe_subscription_id` | character varying(100) | ✓ |  |
+| `event_data` | jsonb |  |  |
+| `processed` | boolean | ✓ | false |
+| `processed_at` | timestamp with time zone | ✓ |  |
+| `error_message` | text | ✓ |  |
+| `retry_count` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+
+### `trade_observations` (13 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `observation_id` | uuid |  | gen_random_uuid() |
+| `config_id` | uuid |  |  |
+| `user_id` | uuid |  |  |
+| `trade_id` | uuid |  |  |
+| `observation_type` | text |  |  |
+| `what_went_well` | text | ✓ |  |
+| `what_went_wrong` | text | ✓ |  |
+| `predictive_data_points` | jsonb | ✓ |  |
+| `decision_review` | text | ✓ |  |
+| `trade_pnl` | numeric | ✓ |  |
+| `trade_duration_minutes` | integer | ✓ |  |
+| `importance` | integer | ✓ | 5 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+
+### `user_llm_credentials` (7 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `id` | uuid |  | gen_random_uuid() |
+| `user_id` | uuid |  |  |
+| `credential_name` | text |  |  |
+| `provider` | text |  |  |
+| `vault_secret_id` | uuid |  |  |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `user_profiles` (15 columns)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `user_id` | uuid |  |  |
+| `subscription_tier` | USER-DEFINED | ✓ | 'free'::subscription_tier |
+| `subscription_status` | USER-DEFINED | ✓ | 'active'::subscription_status |
+| `subscription_expires_at` | timestamp with time zone | ✓ |  |
+| `stripe_customer_id` | character varying(100) | ✓ |  |
+| `stripe_subscription_id` | character varying(100) | ✓ |  |
+| `telegram_user_id` | bigint | ✓ |  |
+| `telegram_username` | character varying(50) | ✓ |  |
+| `telegram_chat_id` | bigint | ✓ |  |
+| `monthly_signal_count` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+| `paid_data_points` | ARRAY | ✓ | ARRAY[]::text[] |
+| `symphony_vault_id` | uuid | ✓ |  |
+| `symphony_smart_account` | character varying(42) | ✓ |  |
+
+---

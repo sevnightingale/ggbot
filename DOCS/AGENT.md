@@ -235,11 +235,19 @@ agent/
 
 **Architecture**: One tool with data point names as arguments. Agent receives catalog of available data points from `data_points` table organized by `data_sources`.
 
+**CRITICAL IMPLEMENTATION NOTES**:
+
+1. **Tool Descriptions**: The @tool decorator's description parameter is the ONLY thing the agent sees. Python docstrings are NOT exposed to the model. ALL category names and data point lists MUST be in the description string, not in function docstrings.
+
+2. **Symbol Normalization**: The agent can send symbols in any format (BTC, BTCUSDT, BTC-USDT, BTC/USDT). The API automatically normalizes to CCXT format (BTC/USDT) using UniversalSymbolStandardizer. This works for all 142 registered symbols with fallback logic for others.
+
+3. **Category Validation**: Invalid category names are caught server-side and return helpful error messages listing valid categories, preventing silent failures.
+
 **Schema**:
 ```python
 {
     "symbol": str,                    # "BTCUSDT"
-    "data_point_names": list[str],    # ["RSI", "MACD", "btc_funding_rate", "vix"]
+    "categories": dict,               # {"technical_analysis": ["RSI"], "trading_signals": ["ggshot"]}
     "timeframe": str                  # "1h" (default)
 }
 ```
@@ -250,28 +258,60 @@ agent/
 - Mixed: `["RSI", "vix", "btc_funding_rate"]`
 - Config defaults: Omit `data_point_names` to use config's default selections
 
-**Implementation**:
+**Implementation** (agent/mcp_server.py):
 ```python
-@tool("query_market_data", "Get market intelligence for trading decisions", {
-    "symbol": str,
-    "indicators": list,
-    "timeframes": list,
-    "data_sources": list
-})
+@tool(
+    "query_market_data",
+    """Query market data across 7 categories:
+
+CATEGORIES (use exact names):
+- technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
+- macro_economics: vix, dxy, cpi, nfp
+- sentiment_social: twitter_sentiment (exact name "twitter_sentiment")
+- derivatives_leverage: btc_funding_rate, eth_funding_rate
+- on_chain_analytics: btc_tvl, whale_activity
+- news_regulatory: crypto_news
+- trading_signals: ggshot (PREMIUM, exact name "ggshot")
+
+EXAMPLE: {"symbol": "BTC", "categories": {"technical_analysis": ["RSI"], "trading_signals": ["ggshot"]}}
+
+Symbol formats: "BTC", "BTCUSDT", "BTC/USDT" all work. Indicators are case-insensitive.
+Params: symbol (required), categories (dict), timeframe (optional, default '1h')""",
+    {"symbol": str, "categories": dict, "timeframe": str}
+)
 async def query_market_data(args: dict[str, Any]) -> dict[str, Any]:
-    # 1. Update agent config with requested data
-    await update_agent_config({
-        "selected_pair": args["symbol"],
-        "extraction": build_extraction_config(args)
-    })
+    # 1. Parse and validate categories
+    categories = args.get("categories", {})
+    VALID_CATEGORIES = {
+        "technical_analysis", "macro_economics", "sentiment_social",
+        "derivatives_leverage", "on_chain_analytics", "news_regulatory", "trading_signals"
+    }
 
-    # 2. Call extraction service
-    config = await load_config(AGENT_CONFIG_ID)
-    extraction_engine = ExtractionEngineV2(user_id=AGENT_USER_ID)
-    result = await extraction_engine.extract_for_config(config, AGENT_USER_ID)
+    # Validate category names (fail fast with helpful error)
+    unknown = set(categories.keys()) - VALID_CATEGORIES
+    if unknown:
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"❌ Unknown categories: {unknown}\n\nValid categories:\n{list(VALID_CATEGORIES)}"
+            }]
+        }
 
-    # 3. Format for agent
-    return {"content": [{"type": "text", "text": format_analysis(result)}]}
+    # 2. Separate technical from intelligence sources
+    technical_indicators = categories.get("technical_analysis", [])
+    intelligence_sources = {k: v for k, v in categories.items() if k != "technical_analysis"}
+
+    # 3. Call API (symbol normalized server-side: BTC → BTC/USDT)
+    result = await agent_context.api_client.query_market_data(
+        config_id=agent_context.config_id,
+        symbol=args["symbol"],
+        indicators=technical_indicators if technical_indicators else None,
+        data_sources=intelligence_sources if intelligence_sources else None,
+        timeframe=args.get("timeframe", "1h")
+    )
+
+    # 4. Format response for agent
+    return {"content": [{"type": "text", "text": format_market_data(result)}]}
 ```
 
 ---
@@ -923,7 +963,22 @@ Agent: "Working well. One refinement: avoiding trades when funding > 1.5%"
 
 ## Phase 3 & 4 Implementation Plan
 
-### **Phase 3: Agent Runner** (Current - Week 3)
+### **Phase 3: Agent Runner** ✅ **COMPLETE** (Week 3)
+
+**Status**: Foundation complete, all 10 tools operational, ready for end-to-end testing
+
+**Completed Features**:
+- ✅ TradingAgent class with strategy_definition and autonomous modes
+- ✅ All 10 MCP tools working (query_market_data validated with correct categories)
+- ✅ Redis queue integration for bidirectional user ↔ agent messaging
+- ✅ Symbol normalization: agent can use any format (BTC, BTCUSDT, BTC/USDT)
+- ✅ Category validation with helpful error messages
+- ✅ Comprehensive debug logging to agent-debug.log
+
+**Key Implementation Learnings**:
+1. **Tool Documentation**: Categories MUST be in @tool description, not docstrings
+2. **Symbol Handling**: UniversalSymbolStandardizer converts all formats → CCXT (BTC/USDT)
+3. **Validation Pattern**: Fail fast with helpful errors vs silent failures
 
 **Goal**: Build conversation + autonomous modes with Redis queue architecture
 
@@ -1347,6 +1402,10 @@ async def _log_metrics(self):
 
 ---
 
-**Last Updated**: 2025-10-28
-**Status**: Phase 2 Complete (MCP Server) - Phase 3 Implementation Plan Finalized
-**Next Step**: Begin Phase 3 - Agent Runner Implementation
+**Last Updated**: 2025-11-01
+**Status**: Phase 3 Complete (Agent Runner) - Ready for End-to-End Testing
+**Next Steps**:
+1. Test full strategy definition → autonomous mode flow
+2. Run agent autonomously for 1+ hour with real market data
+3. Monitor token usage and costs with Haiku model
+4. Begin Phase 4 - Frontend integration and PM2 deployment
