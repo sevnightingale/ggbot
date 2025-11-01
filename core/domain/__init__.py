@@ -22,12 +22,11 @@ from .decision import (
 
 # Legacy strategy run model (for backward compatibility during migration)
 from .strategy_run import (
-    StrategyRun, 
-    DecisionScenario, 
-    DecisionOutcome, 
+    StrategyRun,
+    DecisionScenario,
+    DecisionOutcome,
     DecisionContext
 )
-from .strategy_run_repository import StrategyRunRepository, strategy_run_repo
 
 # User management and business model
 from .user_profile import (
@@ -83,10 +82,8 @@ __all__ = [
     # Legacy strategy tracking (backward compatibility)
     'StrategyRun',
     'DecisionScenario',
-    'DecisionOutcome', 
+    'DecisionOutcome',
     'DecisionContext',
-    'StrategyRunRepository',
-    'strategy_run_repo',
     
     # User management and business model
     'UserProfile',

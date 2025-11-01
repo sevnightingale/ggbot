@@ -4,22 +4,6 @@
 
 ggbots is a production-ready platform for creating, customizing, and deploying fully autonomous AI trading agents. The platform combines real-time market intelligence, advanced reasoning LLMs, and professional-grade execution engines to enable traders to "train an AI to trade like you" - capturing their unique strategies, insights, and decision-making patterns in an autonomous system that operates 24/7.
 
-**Live Production**: 258 users, 383 bots, 5,407+ trades executed
-
----
-
-## 🚀 Quick Start for New Claude Code Instances
-
-**👉 Start here**: Read **[GO.md](GO.md)** for the standard onboarding procedure. This will:
-- Run automated status checks and schema updates
-- Guide you through core documentation
-- Provide current production metrics
-- Help identify what to work on next
-
-**For operational status**: Check **[ACTIVE.md](ACTIVE.md)** for live system resources, platform metrics, and current capabilities.
-
-**For development tasks**: See **[TODO.md](TODO.md)** for prioritized roadmap and current work.
-
 ---
 
 ## Architecture Overview
@@ -144,14 +128,6 @@ The ggbot repository is organized into the following top-level directories:
 - **Config-ID architecture** with multi-user isolation
 - **State persistence** for autonomous bot management
 
-### **[Database Layer](database/)**
-
-**Production-ready Supabase PostgreSQL** supporting:
-- **Multi-user isolation** with user_id + config_id architecture
-- **Paper trading tables**: paper_accounts, paper_trades with real-time updates
-- **Decision audit trail** via decisions table for full transparency
-- **Migration system** for schema evolution and deployment
-
 ### **[Frontend Platform](frontend/)**
 
 **Professional Next.js 15 application** deployed at **app.ggbots.ai** featuring:
@@ -233,70 +209,6 @@ The ggbot repository is organized into the following top-level directories:
 - **[API documentation](DOCS/API.md)** for all platform endpoints
 - **[Pipeline documentation](DOCS/FLOW.md)** for end-to-end process flows
 
-## Getting Started
-
-### For New Claude Code Instances
-
-**👉 Start here**: Read **[GO.md](GO.md)** for the standard onboarding procedure. This will guide you through:
-- Reading core documentation in the right order
-- Providing a current status assessment
-- Identifying what to work on from the TODO list
-- Maintaining documentation as you work
-
-### Understanding the System
-
-1. **Read [DOCS/OVERVIEW.md](DOCS/OVERVIEW.md)** for conceptual foundation
-2. **Check [ACTIVE.md](ACTIVE.md)** for current deployment status and live operations
-3. **Review [CHANGELOG.md](CHANGELOG.md)** for complete feature history and improvements
-4. **Explore [DOCS/FLOW.md](DOCS/FLOW.md)** for end-to-end process flow
-5. **Review individual module READMEs** for component-specific details
-
-### Module Deep Dives
-
-- **[extraction/v2/README.md](extraction/v2/README.md)** - Technical indicator extraction (21 preprocessors, V2 pure Python system)
-- **[market_intelligence/README.md](market_intelligence/README.md)** - **Complete market intelligence architecture** (orchestrator, gateway, catalog, 32 data sources)
-- **[decision/README.md](decision/README.md)** - AI reasoning and strategy execution
-- **[trading/README.md](trading/README.md)** - Trade execution and position management
-- **[frontend/README.md](frontend/README.md)** - User interface and platform management
-- **[core/](core/)** - Shared infrastructure and utilities
-
-### Configuration & Deployment
-
-- **[core/config/README.md](core/config/README.md)** - System configuration and templates
-- **[database/README.md](database/README.md)** - Database schema and migrations
-- **[archive/hummingbot/](archive/hummingbot/)** - Legacy Hummingbot integration (deprecated Oct 2025, replaced by WebSocket prices)
-
-### Planned Updates & Roadmap
-
-- **[TODO.md](TODO.md)** - Current development tasks and roadmap
-- **[CHANGELOG.md](CHANGELOG.md)** - Complete history of features, fixes, and improvements
-- **[DOCS/CONFIG.md](DOCS/CONFIG.md)** - Config component V2 integration roadmap (Phase 8)
-
-
-## Platform Capabilities
-
-### Multi-User Architecture
-- **Config-ID based isolation** enabling multiple bots per user
-- **Independent strategy execution** with isolated risk management
-- **Scalable infrastructure** design (shared market data cache and microservices planned)
-
-### Advanced AI Integration
-- **Reasoning LLM pipeline** with DeepSeek R1 and GPT-4 support
-- **Natural language strategy definition** for intuitive customization
-- **Dynamic decision adaptation** based on real-time market conditions
-- **Confidence-based position sizing** with intelligent risk allocation
-
-### Professional Trading Features
-- **141 trading pair support** across major cryptocurrency exchanges (100 Symphony-compatible for live trading)
-- **Real-time monitoring** with sub-second execution capabilities via Binance WebSocket
-- **Automated TP/SL management** with 3-second position monitoring
-- **Comprehensive analytics** with P&L tracking and performance attribution
-- **Symphony.io integration** for professional-grade live trading execution
-
----
-
-**ggbots represents the evolution of autonomous trading - where human expertise meets AI capabilities to create trading agents that truly understand markets, adapt to changing conditions, and execute with the precision of professional trading systems.**
-
 ---
 
 ## 🛠️ Tech Stack
@@ -363,255 +275,55 @@ The ggbot repository includes 7 comprehensive module READMEs with detailed techn
 | **[market_intelligence/README.md](market_intelligence/README.md)** | 1154 | 32 data points, 7 categories, orchestrator architecture |
 | **[decision/README.md](decision/README.md)** | 525 | V2 template system, 3 modes, webhook integration |
 | **[trading/README.md](trading/README.md)** | 723 | Paper & live trading, Symphony integration |
-| **[database/README.md](database/README.md)** | 567 | Complete schema, migrations, RLS |
 | **[frontend/README.md](frontend/README.md)** | 488 | Forge architecture, subscription system |
 
-**Total**: 4,302 lines of module-specific technical documentation
-
-**Note**: ggshot/README.md (384 lines) archived with legacy ggShot filtering system.
 
 ---
 
-## 📊 Database Schema
+## 📊 Database & Configuration Reference
 
-**Auto-generated schema reference** - Updated automatically by `scripts/status_check.py`
+**For current database schema, domain models, and configuration structure**, see **[ACTIVE.md](ACTIVE.md)**:
+- **Database Schema**: Comprehensive schema with PK/FK/indexes/constraints (auto-updated)
+- **Domain Models**: Business logic and @property methods (auto-updated)
+- **Configuration Structure**: config_data JSONB fields from BotConfig model (auto-updated)
 
-**Last Updated**: 2025-11-01 09:00:04 UTC
+**For database design decisions and WHY**, see **[DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)**.
 
 ---
 
-### `bot_telegram_channels` (6 columns)
+## 🗄️ Repository Layer (Data Access)
 
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `config_id` | uuid |  |  |
-| `telegram_chat_id` | bigint |  |  |
-| `channel_name` | character varying(100) | ✓ |  |
-| `enabled` | boolean | ✓ | true |
-| `created_at` | timestamp with time zone | ✓ | now() |
-| `updated_at` | timestamp with time zone | ✓ | now() |
+Repositories provide the data access layer, mapping domain models to database tables.
 
-### `configurations` (10 columns)
+| Repository | Database Table | Domain Model | Purpose |
+|------------|----------------|--------------|---------|
+| `PositionRepository` | `paper_trades` | `Position` | Trading position lifecycle (save, update, close, query open positions) |
+| `MarketDataRepository` | `market_data` | `MarketDataSnapshot` | Store/retrieve market intelligence and indicator data |
+| `AccountRepository` | `paper_accounts` | `Account` | Paper trading account balance and performance tracking |
+| `ConfigRepository` | `configurations` | `BotConfig` | Bot configuration management and persistence |
 
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `config_id` | uuid |  | uuid_generate_v4() |
-| `user_id` | uuid |  |  |
-| `config_type` | character varying(50) |  |  |
-| `config_name` | character varying(100) | ✓ |  |
-| `config_data` | jsonb |  |  |
-| `created_at` | timestamp with time zone |  | now() |
-| `updated_at` | timestamp with time zone |  | now() |
-| `state` | text |  | 'inactive'::text |
-| `symphony_agent_id` | character varying(255) | ✓ |  |
-| `trading_mode` | character varying(20) | ✓ | 'paper'::character varying |
+**Location**: `core/domain/*_repository.py` and `core/config/repository.py`
 
-### `data_points` (11 columns)
+---
 
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `data_point_id` | uuid |  | gen_random_uuid() |
-| `source_id` | uuid |  |  |
-| `name` | character varying(50) |  |  |
-| `display_name` | character varying(100) |  |  |
-| `description` | text | ✓ |  |
-| `config_values` | ARRAY |  |  |
-| `requires_premium` | boolean | ✓ | false |
-| `enabled` | boolean | ✓ | true |
-| `sort_order` | integer | ✓ | 0 |
-| `created_at` | timestamp with time zone | ✓ | now() |
-| `updated_at` | timestamp with time zone | ✓ | now() |
+## 📂 core/ Directory Structure
 
-### `data_sources` (9 columns)
+The `core/` directory contains shared infrastructure used by all agents and modules:
 
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `source_id` | uuid |  | gen_random_uuid() |
-| `name` | character varying(50) |  |  |
-| `display_name` | character varying(100) |  |  |
-| `description` | text | ✓ |  |
-| `enabled` | boolean | ✓ | true |
-| `requires_premium` | boolean | ✓ | false |
-| `sort_order` | integer | ✓ | 0 |
-| `created_at` | timestamp with time zone | ✓ | now() |
-| `updated_at` | timestamp with time zone | ✓ | now() |
-
-### `decisions` (13 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `decision_id` | uuid |  | uuid_generate_v4() |
-| `user_id` | uuid |  |  |
-| `config_id` | uuid | ✓ |  |
-| `symbol` | character varying(20) |  |  |
-| `action` | character varying(20) |  |  |
-| `status` | character varying(20) | ✓ |  |
-| `confidence` | numeric |  |  |
-| `reasoning` | text | ✓ |  |
-| `prompt` | text | ✓ |  |
-| `decision_data` | jsonb | ✓ |  |
-| `parent_decision_id` | uuid | ✓ |  |
-| `created_at` | timestamp with time zone |  | now() |
-| `created_by` | text | ✓ | 'decision_engine_v2'::text |
-
-### `live_trades` (5 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `batch_id` | character varying(255) |  |  |
-| `config_id` | uuid |  |  |
-| `decision_id` | uuid | ✓ |  |
-| `created_at` | timestamp without time zone |  | now() |
-| `closed_at` | timestamp without time zone | ✓ |  |
-
-### `logs` (6 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `log_id` | integer |  | nextval('logs_log_id_seq'::reg |
-| `user_id` | uuid | ✓ |  |
-| `module` | character varying(100) | ✓ |  |
-| `log_level` | character varying(10) |  |  |
-| `message` | text |  |  |
-| `timestamp` | timestamp with time zone |  | now() |
-
-### `market_data` (9 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `id` | integer |  | nextval('market_data_id_seq':: |
-| `user_id` | uuid |  |  |
-| `config_id` | uuid | ✓ |  |
-| `symbol` | character varying(20) |  |  |
-| `timeframe` | character varying(10) |  |  |
-| `data_points` | jsonb | ✓ |  |
-| `raw_data` | jsonb |  |  |
-| `updated_at` | timestamp with time zone |  | now() |
-| `data_source` | uuid | ✓ |  |
-
-### `paper_accounts` (13 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `account_id` | uuid |  | uuid_generate_v4() |
-| `user_id` | uuid |  |  |
-| `config_id` | uuid |  |  |
-| `initial_balance` | numeric |  | 10000.00 |
-| `current_balance` | numeric |  | 10000.00 |
-| `total_pnl` | numeric |  | 0.00 |
-| `open_positions` | integer |  | 0 |
-| `total_trades` | integer |  | 0 |
-| `win_trades` | integer |  | 0 |
-| `loss_trades` | integer |  | 0 |
-| `created_at` | timestamp with time zone |  | now() |
-| `updated_at` | timestamp with time zone |  | now() |
-| `last_reset_at` | timestamp with time zone | ✓ |  |
-
-### `paper_orders` (9 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `order_id` | uuid |  | uuid_generate_v4() |
-| `user_id` | uuid |  |  |
-| `trade_id` | uuid |  |  |
-| `order_type` | character varying(20) |  |  |
-| `side` | character varying(10) |  |  |
-| `filled_price` | numeric |  |  |
-| `size` | numeric |  |  |
-| `fees` | numeric |  | 0.00 |
-| `filled_at` | timestamp with time zone |  | now() |
-
-### `paper_trades` (22 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `trade_id` | uuid |  | uuid_generate_v4() |
-| `user_id` | uuid |  |  |
-| `account_id` | uuid |  |  |
-| `config_id` | uuid |  |  |
-| `decision_id` | uuid | ✓ |  |
-| `symbol` | character varying(20) |  |  |
-| `side` | character varying(10) |  |  |
-| `entry_price` | numeric |  |  |
-| `current_price` | numeric | ✓ |  |
-| `size_usd` | numeric |  |  |
-| `leverage` | integer |  | 1 |
-| `unrealized_pnl` | numeric | ✓ |  |
-| `realized_pnl` | numeric | ✓ |  |
-| `status` | character varying(20) |  | 'open'::character varying |
-| `stop_loss` | numeric | ✓ |  |
-| `take_profit` | numeric | ✓ |  |
-| `confidence_score` | numeric | ✓ |  |
-| `opened_at` | timestamp with time zone |  | now() |
-| `closed_at` | timestamp with time zone | ✓ |  |
-| `margin_used` | numeric | ✓ |  |
-| `close_reason` | character varying(50) | ✓ |  |
-| `liquidation_price` | numeric | ✓ |  |
-
-### `stripe_webhooks` (11 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `webhook_id` | uuid |  | gen_random_uuid() |
-| `stripe_event_id` | character varying(100) |  |  |
-| `event_type` | character varying(50) |  |  |
-| `stripe_customer_id` | character varying(100) | ✓ |  |
-| `stripe_subscription_id` | character varying(100) | ✓ |  |
-| `event_data` | jsonb |  |  |
-| `processed` | boolean | ✓ | false |
-| `processed_at` | timestamp with time zone | ✓ |  |
-| `error_message` | text | ✓ |  |
-| `retry_count` | integer | ✓ | 0 |
-| `created_at` | timestamp with time zone | ✓ | now() |
-
-### `trade_observations` (13 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `observation_id` | uuid |  | gen_random_uuid() |
-| `config_id` | uuid |  |  |
-| `user_id` | uuid |  |  |
-| `trade_id` | uuid |  |  |
-| `observation_type` | text |  |  |
-| `what_went_well` | text | ✓ |  |
-| `what_went_wrong` | text | ✓ |  |
-| `predictive_data_points` | jsonb | ✓ |  |
-| `decision_review` | text | ✓ |  |
-| `trade_pnl` | numeric | ✓ |  |
-| `trade_duration_minutes` | integer | ✓ |  |
-| `importance` | integer | ✓ | 5 |
-| `created_at` | timestamp with time zone | ✓ | now() |
-
-### `user_llm_credentials` (7 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `id` | uuid |  | gen_random_uuid() |
-| `user_id` | uuid |  |  |
-| `credential_name` | text |  |  |
-| `provider` | text |  |  |
-| `vault_secret_id` | uuid |  |  |
-| `created_at` | timestamp with time zone | ✓ | now() |
-| `updated_at` | timestamp with time zone | ✓ | now() |
-
-### `user_profiles` (15 columns)
-
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `user_id` | uuid |  |  |
-| `subscription_tier` | USER-DEFINED | ✓ | 'free'::subscription_tier |
-| `subscription_status` | USER-DEFINED | ✓ | 'active'::subscription_status |
-| `subscription_expires_at` | timestamp with time zone | ✓ |  |
-| `stripe_customer_id` | character varying(100) | ✓ |  |
-| `stripe_subscription_id` | character varying(100) | ✓ |  |
-| `telegram_user_id` | bigint | ✓ |  |
-| `telegram_username` | character varying(50) | ✓ |  |
-| `telegram_chat_id` | bigint | ✓ |  |
-| `monthly_signal_count` | integer | ✓ | 0 |
-| `created_at` | timestamp with time zone | ✓ | now() |
-| `updated_at` | timestamp with time zone | ✓ | now() |
-| `paid_data_points` | ARRAY | ✓ | ARRAY[]::text[] |
-| `symphony_vault_id` | uuid | ✓ |  |
-| `symphony_smart_account` | character varying(42) | ✓ |  |
+| Subdirectory | Purpose | Key Files |
+|--------------|---------|-----------|
+| `core/common/` | Database connections, logging, utilities | `db.py`, `logger.py`, `config.py` |
+| `core/services/` | Shared services (LLM, user, pricing) | `llm_service.py`, `user_service.py`, `websocket_market_data_service.py` |
+| `core/domain/` | Domain models, repositories, business logic | `position.py`, `decision.py`, `user_profile.py`, `*_repository.py` |
+| `core/config/` | Configuration management (Pydantic models) | `models.py` (BotConfig), `repository.py` |
+| `core/scheduler/` | APScheduler integration for autonomous execution | Bot scheduling and candle alignment |
+| `core/symbols/` | Trading pair standardization | Multi-format conversion (CCXT ↔ ggShot ↔ Symphony) |
+| `core/auth/` | Authentication and authorization | User authentication, service auth |
+| `core/credentials/` | Credential management | LLM API keys, exchange credentials |
+| `core/email_templates/` | Email templates | Resend integration templates |
+| `core/integrations/` | External service integrations | Third-party API wrappers |
+| `core/mcp/` | MCP (Model Context Protocol) tools | Agent tool definitions |
+| `core/monitoring/` | System monitoring and observability | Health checks, metrics |
+| `core/sse/` | Server-Sent Events | Real-time updates to frontend |
 
 ---

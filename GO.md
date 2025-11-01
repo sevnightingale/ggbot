@@ -112,6 +112,48 @@ If the user mentions deployment, new user counts, or system changes:
 - **Update user counts**: Use real numbers from status check (not guesses)
 - **Update service status**: PM2 services, infrastructure, background tasks
 
+### Planning Document Lifecycle
+
+For significant TODO items (multi-day work, complex features), maintain planning documents in DOCS/:
+
+**When to Create a Planning Doc:**
+- TODO sections with >3 day timeline
+- Complex features requiring architectural decisions
+- Work involving multiple systems or significant refactoring
+- When user explicitly requests planning/design phase
+
+**Linking TODO Sections to Planning Docs:**
+- Add `[doc-name.md]` suffix to TODO section titles
+- Example: `## 🤖 **HIGH PRIORITY - Autonomous Trading Agent** [AGENT.md]`
+- Planning doc lives in `DOCS/todo/doc-name.md` (implicit path)
+- Update TODO.md section to include: `**See**: [DOCS/todo/AGENT.md](DOCS/todo/AGENT.md) for complete architecture`
+
+**During Active Work:**
+- Keep planning doc in `DOCS/todo/` as single source of truth
+- Update planning doc as you learn and pivot (don't create new versions)
+- Add "REVISION HISTORY" section at top if major pivots occur
+- Document key architectural decisions and trade-offs as you go
+
+**On Completion:**
+1. **Add completion metadata** to top of planning doc:
+   ```markdown
+   ---
+   COMPLETED: YYYY-MM-DD
+   CHANGELOG_ENTRY: ## YYYY-MM-DD - Brief Title
+   TODO_SECTION: [Original TODO section name]
+   ---
+   ```
+2. **Move planning doc**: `DOCS/todo/doc-name.md` → `DOCS/completed/doc-name.md`
+3. **Update CHANGELOG.md** with completion entry (compressed format, as usual)
+4. **Update TODO.md**: Remove completed section or mark complete
+5. **Archive context**: Completed doc preserves all decisions and pivots for future reference
+
+**Benefits:**
+- **Traceability**: Know which planning doc supports which TODO item
+- **Reduced clutter**: Active vs historical planning docs are separated
+- **Preserved context**: Architectural decisions don't get lost
+- **Clean pivots**: Planning docs evolve in place, show full journey
+
 ---
 
 ## ⚠️ Common Pitfalls

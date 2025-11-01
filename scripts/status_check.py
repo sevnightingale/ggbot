@@ -262,7 +262,7 @@ def print_status_report(stats):
 
 
 def get_database_schema():
-    """Query complete database schema from Supabase."""
+    """Query complete database schema from Supabase with comprehensive metadata."""
     schema = {}
 
     with get_db_connection() as conn:
@@ -277,8 +277,9 @@ def get_database_schema():
             """)
             tables = [row[0] for row in cur.fetchall()]
 
-            # For each table, get columns with types
+            # For each table, get comprehensive schema info
             for table in tables:
+                # Get columns with types
                 cur.execute("""
                     SELECT
                         column_name,
@@ -309,17 +310,111 @@ def get_database_schema():
                         'default': default
                     })
 
-                schema[table] = columns
+                # Get primary key columns
+                cur.execute("""
+                    SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema = kcu.table_schema
+                    WHERE tc.table_schema = 'public'
+                    AND tc.table_name = %s
+                    AND tc.constraint_type = 'PRIMARY KEY'
+                    ORDER BY kcu.ordinal_position
+                """, (table,))
+                primary_keys = [row[0] for row in cur.fetchall()]
+
+                # Get foreign keys
+                cur.execute("""
+                    SELECT
+                        kcu.column_name,
+                        ccu.table_name AS foreign_table,
+                        ccu.column_name AS foreign_column
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema = kcu.table_schema
+                    JOIN information_schema.constraint_column_usage ccu
+                        ON ccu.constraint_name = tc.constraint_name
+                        AND ccu.table_schema = tc.table_schema
+                    WHERE tc.table_schema = 'public'
+                    AND tc.table_name = %s
+                    AND tc.constraint_type = 'FOREIGN KEY'
+                """, (table,))
+                foreign_keys = [
+                    {'column': row[0], 'foreign_table': row[1], 'foreign_column': row[2]}
+                    for row in cur.fetchall()
+                ]
+
+                # Get indexes (Supabase may have restricted pg_catalog access)
+                indexes = []
+                try:
+                    cur.execute("""
+                        SELECT
+                            i.relname as index_name,
+                            a.attname as column_name
+                        FROM pg_class t
+                        JOIN pg_index ix ON t.oid = ix.indrelid
+                        JOIN pg_class i ON i.oid = ix.indexrelid
+                        JOIN pg_attribute a ON a.attrelid = t.oid AND a.attnum = ANY(ix.indkey)
+                        WHERE t.relname = %s
+                        AND i.relname NOT LIKE '%%_pkey'
+                        ORDER BY i.relname, a.attnum
+                    """, (table,))
+
+                    # Group by index name
+                    current_index = None
+                    current_cols = []
+                    for row in cur.fetchall():
+                        if len(row) >= 2:
+                            idx_name = row[0]
+                            col_name = row[1]
+                            if current_index != idx_name:
+                                if current_index:
+                                    indexes.append({'name': current_index, 'columns': ', '.join(current_cols)})
+                                current_index = idx_name
+                                current_cols = [col_name]
+                            else:
+                                current_cols.append(col_name)
+                    if current_index:
+                        indexes.append({'name': current_index, 'columns': ', '.join(current_cols)})
+                except Exception:
+                    # Indexes are optional - continue without them
+                    indexes = []
+
+                # Get unique constraints (excluding PKs)
+                cur.execute("""
+                    SELECT kcu.column_name
+                    FROM information_schema.table_constraints tc
+                    JOIN information_schema.key_column_usage kcu
+                        ON tc.constraint_name = kcu.constraint_name
+                        AND tc.table_schema = kcu.table_schema
+                    WHERE tc.table_schema = 'public'
+                    AND tc.table_name = %s
+                    AND tc.constraint_type = 'UNIQUE'
+                    ORDER BY kcu.ordinal_position
+                """, (table,))
+                unique_constraints = [row[0] for row in cur.fetchall()]
+
+                schema[table] = {
+                    'columns': columns,
+                    'primary_keys': primary_keys,
+                    'foreign_keys': foreign_keys,
+                    'indexes': indexes,
+                    'unique_constraints': unique_constraints
+                }
 
     return schema
 
 
 def format_schema_markdown(schema):
-    """Format database schema as markdown for README.md."""
+    """Format database schema as markdown for README.md with comprehensive metadata."""
     lines = [
         "## 📊 Database Schema",
         "",
         "**Auto-generated schema reference** - Updated automatically by `scripts/status_check.py`",
+        "",
+        "**For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).",
         "",
         f"**Last Updated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
         "",
@@ -329,10 +424,47 @@ def format_schema_markdown(schema):
 
     # Sort tables alphabetically
     for table_name in sorted(schema.keys()):
-        columns = schema[table_name]
+        table_data = schema[table_name]
+        columns = table_data['columns']
+        primary_keys = table_data['primary_keys']
+        foreign_keys = table_data['foreign_keys']
+        indexes = table_data['indexes']
+        unique_constraints = table_data['unique_constraints']
 
         lines.append(f"### `{table_name}` ({len(columns)} columns)")
         lines.append("")
+
+        # Primary Keys
+        if primary_keys:
+            pk_str = ", ".join([f"`{pk}`" for pk in primary_keys])
+            lines.append(f"**Primary Key**: {pk_str}")
+            lines.append("")
+
+        # Foreign Keys
+        if foreign_keys:
+            lines.append("**Foreign Keys**:")
+            for fk in foreign_keys:
+                lines.append(f"- `{fk['column']}` → `{fk['foreign_table']}({fk['foreign_column']})`")
+            lines.append("")
+
+        # Indexes
+        if indexes:
+            lines.append("**Indexes**:")
+            for idx in indexes:
+                # Use columns field from new structure
+                if 'columns' in idx:
+                    lines.append(f"- `{idx['name']}` on ({idx['columns']})")
+                else:
+                    lines.append(f"- `{idx['name']}`")
+            lines.append("")
+
+        # Unique Constraints
+        if unique_constraints:
+            uc_str = ", ".join([f"`{uc}`" for uc in unique_constraints])
+            lines.append(f"**Unique Constraints**: {uc_str}")
+            lines.append("")
+
+        # Column table
         lines.append("| Column | Type | Nullable | Default |")
         lines.append("|--------|------|----------|---------|")
 
@@ -343,6 +475,262 @@ def format_schema_markdown(schema):
 
         lines.append("")
 
+    lines.append("---")
+    lines.append("")
+
+    return '\n'.join(lines)
+
+
+def get_domain_models():
+    """Parse domain models from core/domain/ directory using AST."""
+    import ast
+    import inspect
+    from pathlib import Path
+
+    domain_models = []
+    domain_path = Path(__file__).parent.parent / "core" / "domain"
+
+    # List of domain model files to parse
+    model_files = [
+        'user_profile.py',
+        'decision.py',
+        'position.py',
+        'market_data.py',
+        'data_source.py',
+    ]
+
+    for file_name in model_files:
+        file_path = domain_path / file_name
+        if not file_path.exists():
+            continue
+
+        try:
+            with open(file_path, 'r') as f:
+                source = f.read()
+
+            tree = ast.parse(source)
+
+            # Find dataclasses and their properties
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ClassDef):
+                    # Check if it's a dataclass
+                    is_dataclass = any(
+                        isinstance(dec, ast.Name) and dec.id == 'dataclass'
+                        or isinstance(dec, ast.Call) and isinstance(dec.func, ast.Name) and dec.func.id == 'dataclass'
+                        for dec in node.decorator_list
+                    )
+
+                    if not is_dataclass:
+                        continue
+
+                    # Extract class docstring
+                    docstring = ast.get_docstring(node) or ""
+
+                    # Extract fields from annotations
+                    fields = []
+                    for item in node.body:
+                        if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                            field_name = item.target.id
+                            # Get type annotation as string
+                            type_str = ast.unparse(item.annotation) if hasattr(ast, 'unparse') else ''
+                            fields.append({'name': field_name, 'type': type_str})
+
+                    # Extract @property methods
+                    properties = []
+                    for item in node.body:
+                        if isinstance(item, ast.FunctionDef):
+                            is_property = any(
+                                isinstance(dec, ast.Name) and dec.id == 'property'
+                                for dec in item.decorator_list
+                            )
+                            if is_property:
+                                prop_doc = ast.get_docstring(item) or ""
+                                properties.append({'name': item.name, 'doc': prop_doc})
+
+                    if fields:  # Only add if it has fields
+                        domain_models.append({
+                            'class_name': node.name,
+                            'file': file_name,
+                            'docstring': docstring,
+                            'fields': fields,
+                            'properties': properties
+                        })
+        except Exception as e:
+            print(f"⚠️  Warning: Could not parse {file_name}: {e}")
+            continue
+
+    return domain_models
+
+
+def format_domain_models_markdown(domain_models):
+    """Format domain models as markdown for README.md."""
+    if not domain_models:
+        return ""
+
+    lines = [
+        "## 🎯 Domain Models & Business Logic",
+        "",
+        "**Note**: Domain models add business logic, validation, and computed properties on top of database tables.",
+        "",
+        "**For schema design context**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).",
+        "",
+        "---",
+        ""
+    ]
+
+    for model in domain_models:
+        lines.append(f"### `{model['class_name']}` (core/domain/{model['file']})")
+        lines.append("")
+
+        # Add docstring if exists
+        if model['docstring']:
+            # First line of docstring as purpose
+            first_line = model['docstring'].split('\n')[0].strip()
+            lines.append(f"**Purpose**: {first_line}")
+            lines.append("")
+
+        # Fields
+        if model['fields']:
+            lines.append("**Fields**:")
+            for field in model['fields'][:10]:  # Limit to first 10 fields
+                lines.append(f"- `{field['name']}: {field['type']}`")
+            if len(model['fields']) > 10:
+                lines.append(f"- ... and {len(model['fields']) - 10} more fields")
+            lines.append("")
+
+        # Properties (business logic)
+        if model['properties']:
+            lines.append("**Business Logic (@property methods)**:")
+            for prop in model['properties']:
+                if prop['doc']:
+                    lines.append(f"- `{prop['name']}` - {prop['doc']}")
+                else:
+                    lines.append(f"- `{prop['name']}`")
+            lines.append("")
+
+        lines.append("---")
+        lines.append("")
+
+    return '\n'.join(lines)
+
+
+def get_botconfig_structure():
+    """Parse BotConfig structure from core/config/models.py using AST."""
+    import ast
+    from pathlib import Path
+
+    config_file = Path(__file__).parent.parent / "core" / "config" / "models.py"
+
+    if not config_file.exists():
+        return None
+
+    try:
+        with open(config_file, 'r') as f:
+            source = f.read()
+
+        tree = ast.parse(source)
+
+        # Find BotConfig class
+        botconfig_fields = []
+        for node in ast.walk(tree):
+            if isinstance(node, ast.ClassDef) and node.name == 'BotConfig':
+                # Extract docstring
+                docstring = ast.get_docstring(node) or ""
+
+                # Extract fields from annotations
+                for item in node.body:
+                    if isinstance(item, ast.AnnAssign) and isinstance(item.target, ast.Name):
+                        field_name = item.target.id
+
+                        # Get type annotation
+                        type_str = ast.unparse(item.annotation) if hasattr(ast, 'unparse') else ''
+
+                        # Try to extract Field() default and description
+                        default_value = None
+                        description = ""
+
+                        if item.value and isinstance(item.value, ast.Call):
+                            # Check if it's a Field() call
+                            if (isinstance(item.value.func, ast.Name) and item.value.func.id == 'Field') or \
+                               (isinstance(item.value.func, ast.Attribute) and item.value.func.attr == 'Field'):
+                                # Extract keyword arguments
+                                for keyword in item.value.keywords:
+                                    if keyword.arg == 'default':
+                                        if isinstance(keyword.value, ast.Constant):
+                                            default_value = keyword.value.value
+                                        else:
+                                            default_value = ast.unparse(keyword.value) if hasattr(ast, 'unparse') else '...'
+                                    elif keyword.arg == 'description':
+                                        if isinstance(keyword.value, ast.Constant):
+                                            description = keyword.value.value
+                        elif item.value:
+                            # Direct assignment (not Field())
+                            if isinstance(item.value, ast.Constant):
+                                default_value = item.value.value
+                            elif isinstance(item.value, ast.Call):
+                                default_value = ast.unparse(item.value) if hasattr(ast, 'unparse') else '...'
+
+                        botconfig_fields.append({
+                            'name': field_name,
+                            'type': type_str,
+                            'default': default_value,
+                            'description': description
+                        })
+
+                return {
+                    'docstring': docstring,
+                    'fields': botconfig_fields
+                }
+
+        return None
+    except Exception as e:
+        print(f"⚠️  Warning: Could not parse BotConfig: {e}")
+        return None
+
+
+def format_botconfig_markdown(botconfig):
+    """Format BotConfig structure as markdown."""
+    if not botconfig:
+        return ""
+
+    lines = [
+        "## ⚙️ Configuration Structure (config_data JSONB)",
+        "",
+        "**Canonical source**: `core/config/models.py` (BotConfig Pydantic model)",
+        "",
+        "**Auto-generated** - Updated automatically by `scripts/status_check.py`",
+        "",
+        f"**Last Updated**: {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}",
+        "",
+        "---",
+        ""
+    ]
+
+    # Add docstring if exists
+    if botconfig['docstring']:
+        first_para = botconfig['docstring'].split('\n\n')[0].strip()
+        lines.append(f"**Purpose**: {first_para}")
+        lines.append("")
+
+    # Add fields table
+    lines.append("### Configuration Fields")
+    lines.append("")
+    lines.append("| Field | Type | Default | Description |")
+    lines.append("|-------|------|---------|-------------|")
+
+    for field in botconfig['fields']:
+        default_str = str(field['default']) if field['default'] is not None else ""
+        if len(default_str) > 40:
+            default_str = default_str[:37] + "..."
+        desc_str = field['description'] if field['description'] else ""
+        if len(desc_str) > 60:
+            desc_str = desc_str[:57] + "..."
+
+        lines.append(f"| `{field['name']}` | {field['type']} | {default_str} | {desc_str} |")
+
+    lines.append("")
+    lines.append("**Full validation rules**: See `core/config/models.py` for complete Pydantic model with field validators.")
+    lines.append("")
     lines.append("---")
     lines.append("")
 
@@ -467,8 +855,8 @@ def get_redis_status():
     return redis_info
 
 
-def update_readme_schema(schema):
-    """Update README.md with current database schema."""
+def update_readme_schema(schema, domain_models=None):
+    """Update README.md with current database schema and domain models."""
     readme_path = Path(__file__).parent.parent / "README.md"
 
     if not readme_path.exists():
@@ -482,6 +870,14 @@ def update_readme_schema(schema):
     # Generate new schema section
     new_schema = format_schema_markdown(schema)
 
+    # Generate domain models section if provided
+    domain_models_section = ""
+    if domain_models:
+        domain_models_section = "\n" + format_domain_models_markdown(domain_models)
+
+    # Combine schema and domain models
+    combined_content = new_schema + domain_models_section
+
     # Find and replace existing schema section or append
     schema_marker_start = "## 📊 Database Schema"
 
@@ -489,28 +885,46 @@ def update_readme_schema(schema):
         # Find start of schema section
         start_idx = content.find(schema_marker_start)
 
-        # Find end of schema section (next ## heading or end of file)
+        # Find end of documentation sections
+        # Look for Domain Models section first, then next ## heading
         rest_of_content = content[start_idx + len(schema_marker_start):]
-        next_section = rest_of_content.find("\n## ")
 
-        if next_section != -1:
-            # Replace up to next section
-            end_idx = start_idx + len(schema_marker_start) + next_section
-            new_content = content[:start_idx] + new_schema + content[end_idx:]
+        # Check if domain models section exists
+        domain_marker = "\n## 🎯 Domain Models"
+        if domain_marker in rest_of_content:
+            # Find next section after domain models
+            domain_start = rest_of_content.find(domain_marker)
+            after_domain = rest_of_content[domain_start + len(domain_marker):]
+            next_section = after_domain.find("\n## ")
+            if next_section != -1:
+                end_idx = start_idx + len(schema_marker_start) + domain_start + len(domain_marker) + next_section
+            else:
+                end_idx = len(content)
         else:
-            # Replace to end of file
-            new_content = content[:start_idx] + new_schema
+            # No domain models section, find next ## heading
+            next_section = rest_of_content.find("\n## ")
+            if next_section != -1:
+                end_idx = start_idx + len(schema_marker_start) + next_section
+            else:
+                end_idx = len(content)
+
+        new_content = content[:start_idx] + combined_content + content[end_idx:]
     else:
         # Append to end of file
-        new_content = content.rstrip() + "\n\n" + new_schema
+        new_content = content.rstrip() + "\n\n" + combined_content
 
     # Write back to file
     with open(readme_path, 'w') as f:
         f.write(new_content)
 
-    print(f"✅ README.md schema updated successfully!")
-    print(f"   Tables: {len(schema)}")
-    print(f"   Total Columns: {sum(len(cols) for cols in schema.values())}")
+    print(f"✅ README.md updated successfully!")
+    print(f"   Database Tables: {len(schema)}")
+    print(f"   Total Columns: {sum(len(table_data['columns']) for table_data in schema.values())}")
+    print(f"   Primary Keys: {sum(len(table_data['primary_keys']) for table_data in schema.values())}")
+    print(f"   Foreign Keys: {sum(len(table_data['foreign_keys']) for table_data in schema.values())}")
+    print(f"   Indexes: {sum(len(table_data['indexes']) for table_data in schema.values())}")
+    if domain_models:
+        print(f"   Domain Models: {len(domain_models)}")
     return True
 
 
@@ -679,6 +1093,52 @@ def update_active_md(stats):
         return False
 
 
+def append_technical_docs_to_active(schema, domain_models, botconfig):
+    """Append database schema, domain models, and config structure to ACTIVE.md."""
+    active_path = Path(__file__).parent.parent / "ACTIVE.md"
+
+    if not active_path.exists():
+        print(f"❌ ERROR: ACTIVE.md not found at {active_path}")
+        return False
+
+    # Read current ACTIVE.md
+    with open(active_path, 'r') as f:
+        content = f.read()
+
+    # Generate sections
+    schema_section = format_schema_markdown(schema)
+    domain_models_section = format_domain_models_markdown(domain_models) if domain_models else ""
+    botconfig_section = format_botconfig_markdown(botconfig) if botconfig else ""
+
+    # Find where to append (after the last --- marker before any existing schema section)
+    # Look for schema marker to replace, or append to end
+    schema_marker = "## 📊 Database Schema"
+
+    if schema_marker in content:
+        # Replace existing schema + everything after it
+        schema_start = content.find(schema_marker)
+        new_content = content[:schema_start] + schema_section + "\n" + domain_models_section + "\n" + botconfig_section
+    else:
+        # Append to end
+        new_content = content.rstrip() + "\n\n" + schema_section + "\n" + domain_models_section + "\n" + botconfig_section
+
+    # Write back
+    with open(active_path, 'w') as f:
+        f.write(new_content)
+
+    print(f"✅ ACTIVE.md technical documentation updated!")
+    print(f"   Database Tables: {len(schema)}")
+    print(f"   Total Columns: {sum(len(table_data['columns']) for table_data in schema.values())}")
+    print(f"   Primary Keys: {sum(len(table_data['primary_keys']) for table_data in schema.values())}")
+    print(f"   Foreign Keys: {sum(len(table_data['foreign_keys']) for table_data in schema.values())}")
+    print(f"   Indexes: {sum(len(table_data['indexes']) for table_data in schema.values())}")
+    if domain_models:
+        print(f"   Domain Models: {len(domain_models)}")
+    if botconfig:
+        print(f"   Config Fields: {len(botconfig['fields'])}")
+    return True
+
+
 def main():
     parser = argparse.ArgumentParser(description='Check ggbots platform status')
     parser.add_argument('--update', action='store_true',
@@ -706,13 +1166,26 @@ def main():
             print("=" * 80)
             print()
 
-            # Update ACTIVE.md
+            # Update ACTIVE.md with stats
             update_active_md(stats)
 
-            # Update README.md with database schema
+            # Query database schema
             print("\n📊 Querying database schema...")
             schema = get_database_schema()
-            update_readme_schema(schema)
+
+            # Parse domain models
+            print("\n🎯 Parsing domain models...")
+            domain_models = get_domain_models()
+            print(f"   Found {len(domain_models)} domain models")
+
+            # Parse BotConfig structure
+            print("\n⚙️  Parsing BotConfig structure...")
+            botconfig = get_botconfig_structure()
+            if botconfig:
+                print(f"   Found {len(botconfig['fields'])} configuration fields")
+
+            # Append schema + models + config to ACTIVE.md
+            append_technical_docs_to_active(schema, domain_models, botconfig)
 
             print("\n" + "=" * 80)
             print("✅ All documentation updated successfully!")

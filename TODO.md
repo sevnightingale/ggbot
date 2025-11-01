@@ -1,9 +1,11 @@
 # TODO.md - ggbots Implementation Plan
 
 
-## 🔧 **HIGH PRIORITY - Maintenance Mode Infrastructure**
+## 🔧 **HIGH PRIORITY - Maintenance Mode Infrastructure** [MAINTENANCE_MODE.md]
 
 **Timeline**: 1-2 days - Complete maintenance mode system for safe production updates
+
+**See**: [DOCS/todo/MAINTENANCE_MODE.md](DOCS/todo/MAINTENANCE_MODE.md) for complete procedures and documentation
 
 **Status**: Foundation complete, needs final touches for production readiness
 
@@ -13,7 +15,7 @@
 - [x] Create maintenance_deactivate_all_bots.py script
 - [x] Create maintenance_close_all_positions.py script
 - [x] Exclude signal_validation configs from deactivation
-- [x] Document maintenance procedures in DOCS/MAINTENANCE_MODE.md
+- [x] Document maintenance procedures in DOCS/todo/MAINTENANCE_MODE.md
 - [x] Create MAINTENANCE_QUICK_START.md for fast reference
 
 ### **Phase 2: Production Testing & Validation**
@@ -34,11 +36,11 @@
 
 ---
 
-## 🤖 **HIGH PRIORITY - Autonomous Trading Agent**
+## 🤖 **HIGH PRIORITY - Autonomous Trading Agent** [AGENT.md]
 
 **Timeline**: 1-2 weeks - Enable fully autonomous AI trading agents using Claude Agent SDK
 
-**See**: [DOCS/AGENT.md](DOCS/AGENT.md) for complete architecture and design decisions
+**See**: [DOCS/todo/AGENT.md](DOCS/todo/AGENT.md) for complete architecture and design decisions
 
 **Vision**: Transform ggbots from bot platform (scheduled execution) to agent infrastructure (autonomous AI decision-making)
 

@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-01 09:00:04 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-01 13:20:18 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -20,25 +20,25 @@
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,407
-  - Wins: 1,619
-  - Losses: 3,788
-  - Platform Win Rate: 29.94%
-  - Total P&L: $-16,040.97
+- **Total Trades (All Time)**: 5,426
+  - Wins: 1,621
+  - Losses: 3,805
+  - Platform Win Rate: 29.87%
+  - Total P&L: $-16,103.24
 - **Recent Activity**:
-  - Last 24 hours: 189 trades
-  - Last 7 days: 1582 trades
-  - Last 30 days: 4243 trades
+  - Last 24 hours: 151 trades
+  - Last 7 days: 1571 trades
+  - Last 30 days: 4260 trades
 
 ### Open Positions
 - **Open Positions**: 25
-- **Unique Symbols**: 4
-- **Total Exposure**: $28,912.04
-- **Unrealized P&L**: $140.27
+- **Unique Symbols**: 3
+- **Total Exposure**: $20,242.50
+- **Unrealized P&L**: $176.18
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,925.12
-- **Lowest Balance**: $3,470.91
+- **Average Balance**: $9,926.21
+- **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
@@ -51,12 +51,12 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 2438 decisions (avg confidence: 51.6%)
-- **enter**: 193 decisions (avg confidence: 59.3%)
-- **exit**: 92 decisions (avg confidence: 74.1%)
+- **wait**: 2173 decisions (avg confidence: 52.1%)
+- **enter**: 156 decisions (avg confidence: 58.3%)
+- **exit**: 79 decisions (avg confidence: 73.3%)
 
 ### System Health
-- **Decisions (last hour)**: 55
+- **Decisions (last hour)**: 77
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -65,21 +65,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 54MB | 2h 32m | 19 |
-| x-bot | 🟢 online | 0.8% | 29MB | 2h 32m | 19 |
-| error-alerts | 🟢 online | 0% | 28MB | 2h 32m | 26 |
-| ggbot | 🟢 online | 76.1% | 226MB | 2h 32m | 150 |
-| market-data-ws | 🟢 online | 0.3% | 170MB | 2h 32m | 21 |
+| signal-listener | 🟢 online | 0.1% | 32MB | 6h 52m | 19 |
+| x-bot | 🟢 online | 0% | 27MB | 6h 52m | 19 |
+| error-alerts | 🟢 online | 0% | 23MB | 6h 52m | 26 |
+| ggbot | 🟢 online | 0% | 227MB | 2h 55m | 152 |
+| market-data-ws | 🟢 online | 2.7% | 54MB | 6h 52m | 21 |
 
 ### VM Resources
 
 - **Disk**: 35G / 78G (45%)
-- **Memory**: 2.7Gi / 3.8Gi
-- **CPU Load**: 0.88 / 0.55 / 0.71 (1m/5m/15m)
+- **Memory**: 2.2Gi / 3.8Gi
+- **CPU Load**: 0.44 / 0.81 / 0.71 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 10.97M)
+- **Redis**: 🟢 connected (Memory: 14.50M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -313,3 +313,717 @@ df -h
 - **Current Status**: This file (ACTIVE.md) - Production system status and operational reference
 - **Roadmap & Tasks**: `TODO.md` - Current development tasks and priorities
 - **Complete History**: `CHANGELOG.md` - All completed features, fixes, and improvements
+
+## 📊 Database Schema
+
+**Auto-generated schema reference** - Updated automatically by `scripts/status_check.py`
+
+**For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
+
+**Last Updated**: 2025-11-01 13:20:19 UTC
+
+---
+
+### `bot_telegram_channels` (6 columns)
+
+**Primary Key**: `config_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+
+**Indexes**:
+- `idx_bot_telegram_channels_chat_id` on (telegram_chat_id)
+- `idx_bot_telegram_channels_enabled` on (enabled)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `config_id` | uuid |  |  |
+| `telegram_chat_id` | bigint |  |  |
+| `channel_name` | character varying(100) | ✓ |  |
+| `enabled` | boolean | ✓ | true |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `configurations` (10 columns)
+
+**Primary Key**: `config_id`
+
+**Indexes**:
+- `idx_configurations_type` on (config_type)
+- `idx_configurations_user_id` on (user_id)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `config_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `config_type` | character varying(50) |  |  |
+| `config_name` | character varying(100) | ✓ |  |
+| `config_data` | jsonb |  |  |
+| `created_at` | timestamp with time zone |  | now() |
+| `updated_at` | timestamp with time zone |  | now() |
+| `state` | text |  | 'inactive'::text |
+| `symphony_agent_id` | character varying(255) | ✓ |  |
+| `trading_mode` | character varying(20) | ✓ | 'paper'::character varying |
+
+### `data_points` (11 columns)
+
+**Primary Key**: `data_point_id`
+
+**Foreign Keys**:
+- `source_id` → `data_sources(source_id)`
+
+**Indexes**:
+- `data_points_source_id_name_key` on (source_id, name)
+- `idx_data_points_name` on (name)
+- `idx_data_points_premium` on (requires_premium, enabled)
+- `idx_data_points_source` on (source_id, enabled, sort_order)
+
+**Unique Constraints**: `source_id`, `name`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `data_point_id` | uuid |  | gen_random_uuid() |
+| `source_id` | uuid |  |  |
+| `name` | character varying(50) |  |  |
+| `display_name` | character varying(100) |  |  |
+| `description` | text | ✓ |  |
+| `config_values` | ARRAY |  |  |
+| `requires_premium` | boolean | ✓ | false |
+| `enabled` | boolean | ✓ | true |
+| `sort_order` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `data_sources` (9 columns)
+
+**Primary Key**: `source_id`
+
+**Indexes**:
+- `data_sources_name_key` on (name)
+- `idx_data_sources_enabled` on (enabled, sort_order)
+- `idx_data_sources_premium` on (enabled, requires_premium)
+
+**Unique Constraints**: `name`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `source_id` | uuid |  | gen_random_uuid() |
+| `name` | character varying(50) |  |  |
+| `display_name` | character varying(100) |  |  |
+| `description` | text | ✓ |  |
+| `enabled` | boolean | ✓ | true |
+| `requires_premium` | boolean | ✓ | false |
+| `sort_order` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `decisions` (13 columns)
+
+**Primary Key**: `decision_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+- `parent_decision_id` → `decisions(decision_id)`
+
+**Indexes**:
+- `idx_decisions_action_status` on (action, status)
+- `idx_decisions_confidence` on (confidence)
+- `idx_decisions_created_by` on (created_by)
+- `idx_decisions_parent` on (parent_decision_id)
+- `idx_decisions_symbol_created` on (symbol, created_at)
+- `idx_decisions_user_config` on (user_id, config_id)
+- `idx_decisions_user_id_created` on (user_id, created_at)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `decision_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `config_id` | uuid | ✓ |  |
+| `symbol` | character varying(20) |  |  |
+| `action` | character varying(20) |  |  |
+| `status` | character varying(20) | ✓ |  |
+| `confidence` | numeric |  |  |
+| `reasoning` | text | ✓ |  |
+| `prompt` | text | ✓ |  |
+| `decision_data` | jsonb | ✓ |  |
+| `parent_decision_id` | uuid | ✓ |  |
+| `created_at` | timestamp with time zone |  | now() |
+| `created_by` | text | ✓ | 'decision_engine_v2'::text |
+
+### `live_trades` (5 columns)
+
+**Primary Key**: `batch_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+- `decision_id` → `decisions(decision_id)`
+
+**Indexes**:
+- `idx_live_trades_config` on (config_id)
+- `idx_live_trades_open` on (config_id, closed_at)
+- `live_trades_decision_id_unique` on (decision_id)
+
+**Unique Constraints**: `decision_id`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `batch_id` | character varying(255) |  |  |
+| `config_id` | uuid |  |  |
+| `decision_id` | uuid | ✓ |  |
+| `created_at` | timestamp without time zone |  | now() |
+| `closed_at` | timestamp without time zone | ✓ |  |
+
+### `logs` (6 columns)
+
+**Primary Key**: `log_id`
+
+**Indexes**:
+- `idx_logs_level_timestamp` on (log_level, timestamp)
+- `idx_logs_user_timestamp` on (user_id, timestamp)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `log_id` | integer |  | nextval('logs_log_id_seq'::reg |
+| `user_id` | uuid | ✓ |  |
+| `module` | character varying(100) | ✓ |  |
+| `log_level` | character varying(10) |  |  |
+| `message` | text |  |  |
+| `timestamp` | timestamp with time zone |  | now() |
+
+### `market_data` (9 columns)
+
+**Primary Key**: `id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+
+**Indexes**:
+- `idx_market_data_config_symbol` on (config_id, symbol)
+- `idx_market_data_updated_at` on (updated_at)
+- `idx_market_data_user_symbol_timeframe` on (user_id, symbol, timeframe, updated_at)
+- `market_data_unique_per_config` on (user_id, config_id, symbol, timeframe)
+
+**Unique Constraints**: `user_id`, `config_id`, `symbol`, `timeframe`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `id` | integer |  | nextval('market_data_id_seq':: |
+| `user_id` | uuid |  |  |
+| `config_id` | uuid | ✓ |  |
+| `symbol` | character varying(20) |  |  |
+| `timeframe` | character varying(10) |  |  |
+| `data_points` | jsonb | ✓ |  |
+| `raw_data` | jsonb |  |  |
+| `updated_at` | timestamp with time zone |  | now() |
+| `data_source` | uuid | ✓ |  |
+
+### `paper_accounts` (13 columns)
+
+**Primary Key**: `account_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+
+**Indexes**:
+- `idx_paper_accounts_user` on (user_id)
+- `paper_accounts_config_id_key` on (config_id)
+
+**Unique Constraints**: `config_id`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `account_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `config_id` | uuid |  |  |
+| `initial_balance` | numeric |  | 10000.00 |
+| `current_balance` | numeric |  | 10000.00 |
+| `total_pnl` | numeric |  | 0.00 |
+| `open_positions` | integer |  | 0 |
+| `total_trades` | integer |  | 0 |
+| `win_trades` | integer |  | 0 |
+| `loss_trades` | integer |  | 0 |
+| `created_at` | timestamp with time zone |  | now() |
+| `updated_at` | timestamp with time zone |  | now() |
+| `last_reset_at` | timestamp with time zone | ✓ |  |
+
+### `paper_orders` (9 columns)
+
+**Primary Key**: `order_id`
+
+**Foreign Keys**:
+- `trade_id` → `paper_trades(trade_id)`
+
+**Indexes**:
+- `idx_paper_orders_filled_at` on (filled_at)
+- `idx_paper_orders_trade` on (trade_id)
+- `idx_paper_orders_user` on (user_id)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `order_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `trade_id` | uuid |  |  |
+| `order_type` | character varying(20) |  |  |
+| `side` | character varying(10) |  |  |
+| `filled_price` | numeric |  |  |
+| `size` | numeric |  |  |
+| `fees` | numeric |  | 0.00 |
+| `filled_at` | timestamp with time zone |  | now() |
+
+### `paper_trades` (22 columns)
+
+**Primary Key**: `trade_id`
+
+**Foreign Keys**:
+- `account_id` → `paper_accounts(account_id)`
+- `config_id` → `configurations(config_id)`
+- `decision_id` → `decisions(decision_id)`
+
+**Indexes**:
+- `idx_paper_trades_account` on (account_id)
+- `idx_paper_trades_close_reason` on (close_reason)
+- `idx_paper_trades_status` on (status)
+- `idx_paper_trades_symbol_opened` on (symbol, opened_at)
+- `idx_paper_trades_user_config` on (user_id, config_id)
+- `idx_paper_trades_user_status` on (user_id, status, opened_at)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `trade_id` | uuid |  | uuid_generate_v4() |
+| `user_id` | uuid |  |  |
+| `account_id` | uuid |  |  |
+| `config_id` | uuid |  |  |
+| `decision_id` | uuid | ✓ |  |
+| `symbol` | character varying(20) |  |  |
+| `side` | character varying(10) |  |  |
+| `entry_price` | numeric |  |  |
+| `current_price` | numeric | ✓ |  |
+| `size_usd` | numeric |  |  |
+| `leverage` | integer |  | 1 |
+| `unrealized_pnl` | numeric | ✓ |  |
+| `realized_pnl` | numeric | ✓ |  |
+| `status` | character varying(20) |  | 'open'::character varying |
+| `stop_loss` | numeric | ✓ |  |
+| `take_profit` | numeric | ✓ |  |
+| `confidence_score` | numeric | ✓ |  |
+| `opened_at` | timestamp with time zone |  | now() |
+| `closed_at` | timestamp with time zone | ✓ |  |
+| `margin_used` | numeric | ✓ |  |
+| `close_reason` | character varying(50) | ✓ |  |
+| `liquidation_price` | numeric | ✓ |  |
+
+### `stripe_webhooks` (11 columns)
+
+**Primary Key**: `webhook_id`
+
+**Indexes**:
+- `idx_stripe_webhooks_customer` on (stripe_customer_id)
+- `idx_stripe_webhooks_event_id` on (stripe_event_id)
+- `idx_stripe_webhooks_event_type` on (event_type)
+- `idx_stripe_webhooks_processed` on (processed, created_at)
+- `idx_stripe_webhooks_retry` on (processed, retry_count)
+- `idx_stripe_webhooks_subscription` on (stripe_subscription_id)
+- `stripe_webhooks_stripe_event_id_key` on (stripe_event_id)
+
+**Unique Constraints**: `stripe_event_id`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `webhook_id` | uuid |  | gen_random_uuid() |
+| `stripe_event_id` | character varying(100) |  |  |
+| `event_type` | character varying(50) |  |  |
+| `stripe_customer_id` | character varying(100) | ✓ |  |
+| `stripe_subscription_id` | character varying(100) | ✓ |  |
+| `event_data` | jsonb |  |  |
+| `processed` | boolean | ✓ | false |
+| `processed_at` | timestamp with time zone | ✓ |  |
+| `error_message` | text | ✓ |  |
+| `retry_count` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+
+### `trade_observations` (13 columns)
+
+**Primary Key**: `observation_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+- `trade_id` → `paper_trades(trade_id)`
+
+**Indexes**:
+- `idx_trade_observations_config` on (config_id)
+- `idx_trade_observations_config_importance_created` on (config_id, importance, created_at)
+- `idx_trade_observations_config_type_created` on (config_id, observation_type, created_at)
+- `idx_trade_observations_importance` on (importance)
+- `idx_trade_observations_trade` on (trade_id)
+- `idx_trade_observations_type` on (observation_type)
+- `idx_trade_observations_user` on (user_id)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `observation_id` | uuid |  | gen_random_uuid() |
+| `config_id` | uuid |  |  |
+| `user_id` | uuid |  |  |
+| `trade_id` | uuid |  |  |
+| `observation_type` | text |  |  |
+| `what_went_well` | text | ✓ |  |
+| `what_went_wrong` | text | ✓ |  |
+| `predictive_data_points` | jsonb | ✓ |  |
+| `decision_review` | text | ✓ |  |
+| `trade_pnl` | numeric | ✓ |  |
+| `trade_duration_minutes` | integer | ✓ |  |
+| `importance` | integer | ✓ | 5 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+
+### `user_llm_credentials` (7 columns)
+
+**Primary Key**: `id`
+
+**Indexes**:
+- `idx_user_llm_credentials_provider` on (user_id, provider)
+- `idx_user_llm_credentials_user_id` on (user_id)
+- `user_llm_credentials_user_id_credential_name_key` on (user_id, credential_name)
+
+**Unique Constraints**: `user_id`, `credential_name`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `id` | uuid |  | gen_random_uuid() |
+| `user_id` | uuid |  |  |
+| `credential_name` | text |  |  |
+| `provider` | text |  |  |
+| `vault_secret_id` | uuid |  |  |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+
+### `user_profiles` (15 columns)
+
+**Primary Key**: `user_id`
+
+**Indexes**:
+- `idx_user_profiles_paid_data_points` on (paid_data_points)
+- `idx_user_profiles_stripe` on (stripe_customer_id)
+- `idx_user_profiles_subscription` on (subscription_tier, subscription_status)
+- `idx_user_profiles_telegram` on (telegram_user_id)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `user_id` | uuid |  |  |
+| `subscription_tier` | USER-DEFINED | ✓ | 'free'::subscription_tier |
+| `subscription_status` | USER-DEFINED | ✓ | 'active'::subscription_status |
+| `subscription_expires_at` | timestamp with time zone | ✓ |  |
+| `stripe_customer_id` | character varying(100) | ✓ |  |
+| `stripe_subscription_id` | character varying(100) | ✓ |  |
+| `telegram_user_id` | bigint | ✓ |  |
+| `telegram_username` | character varying(50) | ✓ |  |
+| `telegram_chat_id` | bigint | ✓ |  |
+| `monthly_signal_count` | integer | ✓ | 0 |
+| `created_at` | timestamp with time zone | ✓ | now() |
+| `updated_at` | timestamp with time zone | ✓ | now() |
+| `paid_data_points` | ARRAY | ✓ | ARRAY[]::text[] |
+| `symphony_vault_id` | uuid | ✓ |  |
+| `symphony_smart_account` | character varying(42) | ✓ |  |
+
+---
+
+## 🎯 Domain Models & Business Logic
+
+**Note**: Domain models add business logic, validation, and computed properties on top of database tables.
+
+**For schema design context**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
+
+---
+
+### `UserProfile` (core/domain/user_profile.py)
+
+**Purpose**: User profile entity extending Supabase authentication with business model.
+
+**Fields**:
+- `user_id: str`
+- `subscription_tier: SubscriptionTier`
+- `subscription_status: SubscriptionStatus`
+- `created_at: datetime`
+- `updated_at: datetime`
+- `subscription_expires_at: Optional[datetime]`
+- `stripe_customer_id: Optional[str]`
+- `stripe_subscription_id: Optional[str]`
+- `telegram_user_id: Optional[int]`
+- `telegram_username: Optional[str]`
+- ... and 3 more fields
+
+**Business Logic (@property methods)**:
+- `is_free_tier` - Check if user is on free tier.
+- `is_ggbase_tier` - Check if user has ggbase subscription.
+- `is_premium_user` - Check if user has any premium subscription.
+- `has_active_subscription` - Check if user has active subscription.
+- `subscription_expired` - Check if subscription has expired.
+- `can_use_premium_features` - Check if user can access premium features.
+- `requires_own_llm_keys` - Check if user must provide their own LLM API keys.
+- `can_publish_telegram_signals` - Check if user can publish signals to Telegram.
+- `can_use_signal_validation` - Check if user can use signal validation mode.
+- `can_use_live_trading` - Check if user can use Symphony live trading.
+- `has_telegram_integration` - Check if user has Telegram integration configured.
+- `has_stripe_integration` - Check if user has Stripe customer record.
+
+---
+
+### `DecisionData` (core/domain/decision.py)
+
+**Purpose**: Flexible decision context storage (replaces decision_data JSONB field).
+
+**Fields**:
+- `trade_id: Optional[str]`
+- `stop_loss_price: Optional[float]`
+- `take_profit_price: Optional[float]`
+- `position_size: Optional[float]`
+- `entry_price: Optional[float]`
+- `signal_source: Optional[str]`
+- `signal_quality: Optional[float]`
+- `validation_criteria: Optional[Dict[str, Any]]`
+- `current_pnl: Optional[float]`
+- `position_duration: Optional[int]`
+- ... and 2 more fields
+
+---
+
+### `Decision` (core/domain/decision.py)
+
+**Purpose**: Unified decision entity representing all AI decision-making in the system.
+
+**Fields**:
+- `decision_id: str`
+- `user_id: str`
+- `symbol: Symbol`
+- `action: DecisionAction`
+- `confidence: Confidence`
+- `reasoning: Optional[str]`
+- `created_at: datetime`
+- `config_id: Optional[str]`
+- `status: Optional[DecisionStatus]`
+- `prompt: Optional[str]`
+- ... and 3 more fields
+
+**Business Logic (@property methods)**:
+- `is_actionable` - Check if this decision represents an actionable trade signal.
+- `is_entry_signal` - Check if this is an entry signal (BUY).
+- `is_exit_signal` - Check if this is an exit signal (SELL).
+- `is_wait_signal` - Check if this is a wait decision.
+- `is_approved` - Check if decision was approved (for signal validation).
+- `is_rejected` - Check if decision was rejected.
+- `has_parent` - Check if this decision is linked to a parent decision.
+- `is_high_confidence` - Check if decision meets high confidence threshold.
+- `is_user_config_based` - Check if decision is based on user configuration (vs. system signals).
+- `is_system_signal` - Check if decision is from system signals (e.g., ggShot).
+
+---
+
+### `PriceLevel` (core/domain/position.py)
+
+**Purpose**: Value object representing a price level with timestamp.
+
+**Fields**:
+- `price: Decimal`
+- `timestamp: datetime`
+
+**Business Logic (@property methods)**:
+- `age_seconds` - Get age of this price level in seconds.
+
+---
+
+### `PositionMetrics` (core/domain/position.py)
+
+**Purpose**: Value object containing position performance metrics.
+
+**Fields**:
+- `unrealized_pnl: Money`
+- `unrealized_pnl_pct: Decimal`
+- `realized_pnl: Money`
+- `total_pnl: Money`
+- `max_profit: Money`
+- `max_loss: Money`
+- `current_risk_reward_ratio: Optional[Decimal]`
+- `time_in_position_hours: float`
+
+**Business Logic (@property methods)**:
+- `is_profitable` - Check if position is currently profitable.
+- `is_losing` - Check if position is currently losing money.
+
+---
+
+### `Position` (core/domain/position.py)
+
+**Purpose**: Entity representing a trading position with full lifecycle management.
+
+**Fields**:
+- `trade_id: str`
+- `config_id: str`
+- `symbol: Symbol`
+- `side: PositionSide`
+- `status: PositionStatus`
+- `size_usd: Money`
+- `leverage: Decimal`
+- `collateral_amount: Money`
+- `entry_price: PriceLevel`
+- `current_price: Optional[PriceLevel]`
+- ... and 10 more fields
+
+**Business Logic (@property methods)**:
+- `is_active` - Check if position is currently active.
+- `is_pending` - Check if position is pending execution.
+- `is_closed` - Check if position has been closed.
+- `time_in_position` - Get time spent in position.
+
+---
+
+### `Indicator` (core/domain/market_data.py)
+
+**Purpose**: Value object representing a single technical indicator.
+
+**Fields**:
+- `name: str`
+- `timeframe: str`
+- `value: Any`
+- `calculation_time: datetime`
+- `metadata: Dict[str, Any]`
+
+**Business Logic (@property methods)**:
+- `indicator_key` - Get standardized indicator key (e.g., 'RSI_1h').
+- `age_seconds` - Get age of indicator in seconds.
+
+---
+
+### `VolumeData` (core/domain/market_data.py)
+
+**Purpose**: Value object for volume analysis data.
+
+**Fields**:
+- `current_volume: Decimal`
+- `average_volume: Decimal`
+- `volume_ratio: Decimal`
+- `timeframe: str`
+- `period_used: int`
+- `timestamp: datetime`
+
+**Business Logic (@property methods)**:
+- `volume_increase_pct` - Get volume increase percentage above average.
+- `confidence_level` - Get volume confidence level based on ggShot criteria.
+
+---
+
+### `PriceData` (core/domain/market_data.py)
+
+**Purpose**: Value object for current price information.
+
+**Fields**:
+- `symbol: Symbol`
+- `price: Decimal`
+- `timestamp: datetime`
+- `source: DataSource`
+- `bid: Optional[Decimal]`
+- `ask: Optional[Decimal]`
+- `volume_24h: Optional[Decimal]`
+
+**Business Logic (@property methods)**:
+- `age_seconds` - Get age of price data in seconds.
+- `spread` - Get bid-ask spread if available.
+
+---
+
+### `MarketDataSnapshot` (core/domain/market_data.py)
+
+**Purpose**: Entity representing a complete market data snapshot for a symbol.
+
+**Fields**:
+- `id: str`
+- `symbol: Symbol`
+- `data_source: DataSource`
+- `extracted_at: datetime`
+- `indicators: Dict[str, Indicator]`
+- `price_data: Optional[PriceData]`
+- `volume_data: Optional[VolumeData]`
+- `raw_data: Dict[str, Any]`
+- `extraction_config: Dict[str, Any]`
+- `processing_time_ms: Optional[int]`
+
+**Business Logic (@property methods)**:
+- `age_seconds` - Get age of this market data snapshot in seconds.
+- `freshness_level` - Get overall freshness level of this snapshot.
+
+---
+
+### `DataSource` (core/domain/data_source.py)
+
+**Purpose**: Data source entity for categorizing extraction sources.
+
+**Fields**:
+- `source_id: str`
+- `name: str`
+- `display_name: str`
+- `enabled: bool`
+- `requires_premium: bool`
+- `sort_order: int`
+- `created_at: datetime`
+- `updated_at: datetime`
+- `description: Optional[str]`
+
+---
+
+### `DataPoint` (core/domain/data_source.py)
+
+**Purpose**: Data point entity representing specific indicators/signals within a data source.
+
+**Fields**:
+- `data_point_id: str`
+- `source_id: str`
+- `name: str`
+- `display_name: str`
+- `config_values: list[str]`
+- `enabled: bool`
+- `requires_premium: bool`
+- `sort_order: int`
+- `created_at: datetime`
+- `updated_at: datetime`
+- ... and 1 more fields
+
+**Business Logic (@property methods)**:
+- `is_premium` - Check if this data point requires premium access.
+- `is_available` - Check if this data point is available for use.
+
+---
+
+### `DataSourceWithPoints` (core/domain/data_source.py)
+
+**Purpose**: Composite entity containing a data source with its associated data points.
+
+**Fields**:
+- `source: DataSource`
+- `data_points: list[DataPoint]`
+
+---
+
+## ⚙️ Configuration Structure (config_data JSONB)
+
+**Canonical source**: `core/config/models.py` (BotConfig Pydantic model)
+
+**Auto-generated** - Updated automatically by `scripts/status_check.py`
+
+**Last Updated**: 2025-11-01 13:20:19 UTC
+
+---
+
+**Purpose**: Complete GGBot configuration model.
+
+### Configuration Fields
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `schema_version` | str | 1.0 | Configuration schema version |
+| `selected_pair` | Optional[str] |  | Trading pair to analyze |
+| `extraction` | ExtractionConfig |  | Extraction module configuration |
+| `decision` | DecisionConfig |  | Decision module configuration |
+| `llm_config` | LLMConfig |  | LLM provider and API key configuration |
+| `trading` | TradingConfig |  | Trading module configuration |
+| `telegram_integration` | TelegramIntegrationConfig |  | Telegram integration configuration |
+
+**Full validation rules**: See `core/config/models.py` for complete Pydantic model with field validators.
+
+---
