@@ -180,6 +180,7 @@ function ForgeApp() {
   const createDefaultBot = async (): Promise<BotConfiguration> => {
     const defaultConfigData = {
       schema_version: '2.1',
+      config_type: 'autonomous_trading',
       selected_pair: 'BTC/USDT',
       extraction: {
         selected_data_sources: {
@@ -221,9 +222,27 @@ function ForgeApp() {
           api_key: '',
           secret_key: ''
         }
+      },
+      telegram_integration: {
+        listener: {
+          enabled: false,
+          api_id: '',
+          api_hash: '',
+          session_name: 'ggbot_session',
+          source_channels: []
+        },
+        publisher: {
+          enabled: false,
+          bot_token: '',
+          filter_channel: '',
+          confidence_threshold: 0.7,
+          include_reasoning: true,
+          include_market_context: true,
+          message_template: '🔥 {ACTION} {SYMBOL} - Confidence: {CONFIDENCE}\n{REASONING}'
+        }
       }
     }
-    
+
     const newConfig = await apiClient.createConfig('Default ggbot', defaultConfigData)
     console.log('🔨 Created default bot:', newConfig)
     console.log('🔨 Bot config_id:', newConfig.config_id)
