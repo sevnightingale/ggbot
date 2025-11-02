@@ -44,7 +44,10 @@ class LivePriceService:
         - 42 symbols via REST API with caching (~100ms, 5s cache TTL)
 
         Args:
-            symbol: Trading pair in internal format (e.g., 'BTC/USDT')
+            symbol: Trading pair in either format:
+                    - Platform format with dash: 'BTC-USDT'
+                    - CCXT/Binance format with slash: 'BTC/USDT'
+                    Both are automatically normalized to slash format.
 
         Returns:
             MarketPrice with bid, ask, last, and mid prices
@@ -52,6 +55,11 @@ class LivePriceService:
         Raises:
             Exception: If price cannot be retrieved
         """
+        # Normalize symbol format: convert platform format (BTC-USDT) to CCXT format (BTC/USDT)
+        # This makes the API format-agnostic and prevents symbol format errors
+        if "-" in symbol:
+            symbol = symbol.replace("-", "/")
+
         return await self.hybrid_service.get_current_price(symbol)
 
     async def get_multiple_prices(self, symbols: List[str]) -> Dict[str, MarketPrice]:
