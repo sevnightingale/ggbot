@@ -225,11 +225,10 @@ class AsterDEXV3LiveTradingService:
             self._log.info(f"Target position size: ${position_size_usd:.2f} (confidence={confidence:.3f})")
 
             # Step 3: Get current market price for the symbol
-            # Convert platform format (BTC-USDT) to Binance format (BTC/USDT) for price service
-            symbol_for_price = symbol.replace("-", "/")
+            # LivePriceService now handles both BTC-USDT and BTC/USDT formats automatically
             from trading.paper.live_price_service import LivePriceService
             price_service = LivePriceService()
-            market_price = await price_service.get_current_price(symbol_for_price)
+            market_price = await price_service.get_current_price(symbol)
             asset_price = market_price.mid
 
             self._log.info(f"Current {symbol} price: ${asset_price:,.2f}")

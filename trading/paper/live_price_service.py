@@ -69,7 +69,8 @@ class LivePriceService:
         Uses hybrid approach (WebSocket + REST fallback) for each symbol.
 
         Args:
-            symbols: List of symbols in internal format
+            symbols: List of symbols in either format (BTC-USDT or BTC/USDT)
+                     Both formats are automatically normalized.
 
         Returns:
             Dictionary mapping symbols to MarketPrice objects
