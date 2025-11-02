@@ -1,38 +1,217 @@
 # TODO.md - ggbots Implementation Plan
 
+## 🏆 **URGENT - AsterDEX Live Trading Integration** [ASTER.md]
 
-## 🔧 **HIGH PRIORITY - Maintenance Mode Infrastructure** [MAINTENANCE_MODE.md]
+**Timeline**: 7-8 days - Win $50k ASTER token prize in Vibe Trading Competition
+**Status**: Phase 1 Complete - Live Trading Operational ✅
 
-**Timeline**: 1-2 days - Complete maintenance mode system for safe production updates
+**See**: [DOCS/ASTER.md](DOCS/ASTER.md) for complete technical architecture and design
 
-**See**: [DOCS/todo/MAINTENANCE_MODE.md](DOCS/todo/MAINTENANCE_MODE.md) for complete procedures and documentation
+**Competition Context**: AsterDEX is running a trading competition with $50,000 in ASTER tokens for highest volume trader. ggbots' autonomous 24/7 AI trading is perfectly positioned to win.
 
-**Status**: Foundation complete, needs final touches for production readiness
+**Integration Approach**: Follow proven Symphony.io pattern with minimal code changes:
+- Same orchestrator routing (`trading_mode: 'aster'`)
+- Same trade intent interface
+- Same credential management (Vault)
+- Same frontend display logic
 
-### **Phase 1: Core Maintenance Mode** (COMPLETE)
-- [x] Update frontend layout.tsx to check auth before maintenance
-- [x] Add user ID whitelist support via NEXT_PUBLIC_WHITELIST_USER_ID
-- [x] Create maintenance_deactivate_all_bots.py script
-- [x] Create maintenance_close_all_positions.py script
-- [x] Exclude signal_validation configs from deactivation
-- [x] Document maintenance procedures in DOCS/todo/MAINTENANCE_MODE.md
-- [x] Create MAINTENANCE_QUICK_START.md for fast reference
+### **Phase 1: Service Foundation** (Days 1-2)
 
-### **Phase 2: Production Testing & Validation**
-- [ ] Test maintenance mode activation on Vercel
-- [ ] Verify whitelisted user can bypass maintenance page
-- [ ] Test bot deactivation script with real data
-- [ ] Test position closure script with real positions
-- [ ] Verify signal_validation configs remain active during maintenance
-- [ ] Test frontend deployment while in maintenance mode
-- [ ] Document maintenance runbook with screenshots
+**Goal**: Core trading execution working
 
-### **Phase 3: Communication & UX**
-- [ ] Create maintenance notification system (optional)
-- [ ] Add maintenance mode banner for admin preview
-- [ ] Create user communication template for maintenance windows
-- [ ] Add maintenance status page or indicator
-- [ ] Plan first maintenance window for major update rollout
+- [x] **AsterDEX Service Implementation** (`trading/live/aster_service_v3.py`)
+  - [x] Create `AsterDEXV3LiveTradingService` class with Symphony-style interface
+  - [x] Implement Web3 ECDSA signature generation (v3 API)
+  - [x] Implement `execute_trade_intent()` method
+  - [x] Add symbol validation using standardizer
+  - [x] Add idempotency protection (decision_id uniqueness)
+  - [x] Test live trade execution (BTC-USDT: OPEN + CLOSE successful)
+  - [ ] Add SL/TP conditional order creation (STOP_MARKET, TAKE_PROFIT_MARKET)
+  - [ ] Add leverage management (currently defaults to 10x)
+
+- [x] **Symbol Standardization** (`core/symbols/standardizer.py`)
+  - [x] Add `to_aster()` method (BTC-USDT → BTCUSDT)
+  - [x] Add `from_aster()` method (BTCUSDT → BTC-USDT)
+  - [x] Add `is_aster_compatible()` method
+  - [x] Cross-reference 33 compatible symbols from 142 total
+
+- [ ] **Vault Integration** (`core/auth/vault_utils.py`)
+  - [ ] Add `get_aster_credential(user_id)` method
+  - [ ] Add `store_aster_credential(user_id, api_key, api_secret)` method
+  - [ ] Add `delete_aster_credential(user_id)` method
+  - [ ] Test credential encryption/decryption
+
+- [x] **Database Schema** (`database/migrations/`)
+  - [x] Extend `live_trades` table with `provider` field (VARCHAR 20, DEFAULT 'symphony')
+  - [x] Backfill existing trades: `UPDATE live_trades SET provider = 'symphony'`
+  - [x] Add `stop_loss_order_id` and `take_profit_order_id` fields (nullable)
+  - [x] Add provider-aware indexes (`idx_live_trades_provider`, `idx_live_trades_provider_open`)
+  - [x] Execute migration in Supabase
+  - [ ] Fix `decision_id` foreign key (make nullable for test trades)
+
+### **Phase 2: Position Management** (Days 3-4) ✅
+
+**Goal**: Query positions, close trades, get account status
+
+- [x] **Query Endpoints Implementation**
+  - [x] Implement `_get_position_risk()` (GET /fapi/v3/positionRisk)
+  - [x] Implement `_get_account_balance()` (GET /fapi/v3/balance)
+  - [x] Add response transformation to standard format
+  - [x] Test with live credentials
+
+- [x] **Close Position Functionality**
+  - [x] Implement market close via `_place_market_order()`
+  - [x] Test position close (BTC-USDT closed successfully)
+  - [ ] Add SL/TP order cancellation before close
+  - [ ] Update `live_trades.closed_at` timestamp via `close_position(batch_id, user_id)`
+
+- [ ] **Error Handling**
+  - [ ] Add rate limit tracking and backoff logic
+  - [ ] Implement circuit breaker at 80% rate limit
+  - [ ] Add retry logic with exponential backoff
+  - [ ] Handle common API errors gracefully (-1121, -2010, etc.)
+
+### **Phase 3: Orchestrator Integration** (Day 5) ✅
+
+**Goal**: Connect AsterDEX service to main trading pipeline
+
+- [x] **Orchestrator Changes** (`ggbot.py`)
+  - [x] Import `AsterDEXV3LiveTradingService`
+  - [x] Initialize `self.aster_trading` in `__init__()`
+  - [x] Add `'aster'` routing to `_run_trading_v2()`
+  - [x] Test routing with live service
+  - [x] Verify no impact on existing paper/Symphony flows
+
+- [ ] **Configuration Support** (`core/config/models.py`)
+  - [x] Add `'aster'` to trading_mode options (already supports via string field)
+  - [ ] Add `aster_account_id` optional field
+  - [ ] Update BotConfigV2 validation for aster mode
+  - [ ] Test config creation/loading
+
+- [ ] **API Endpoints** (`ggbot.py` or `api/aster.py`)
+  - [ ] Add `POST /api/v2/aster/setup` (store credentials)
+  - [ ] Add `GET /api/v2/aster/status` (check connection)
+  - [ ] Add `POST /api/v2/aster/disconnect` (remove credentials)
+  - [ ] Add `GET /api/v2/positions/aster/{config_id}` (query positions)
+  - [ ] Add `POST /api/v2/positions/aster/{order_id}/close` (close position)
+  - [ ] Add `GET /api/v2/account/aster/{config_id}` (account metrics)
+  - [ ] Add `POST /api/v2/config/duplicate-as-aster` (duplicate bot)
+  - [ ] Test all endpoints with Postman/curl
+
+### **Phase 4: Frontend Integration** (Day 6)
+
+**Goal**: UI for credential setup and aster mode selection
+
+- [ ] **Settings Modal** (`frontend/app/forge/components/settings/`)
+  - [ ] Add "AsterDEX" tab to Settings modal
+  - [ ] Add API Key + Secret input fields
+  - [ ] Add "Test Connection" button (calls /api/v2/aster/status)
+  - [ ] Add "Disconnect" button with confirmation
+  - [ ] Show connection status indicator
+
+- [ ] **Trading Mode Selection** (`frontend/app/forge/components/configure/`)
+  - [ ] Add "AsterDEX Live" option to trading mode selector
+  - [ ] Show AsterDEX badge in bot rail (orange/purple color)
+  - [ ] Disable AsterDEX option if credentials not configured
+  - [ ] Add tooltip explaining AsterDEX mode
+
+- [ ] **Dashboard Display** (`frontend/app/forge/components/monitor/`)
+  - [ ] Add SSE enrichment for `trading_mode === 'aster'`
+  - [ ] Route close button to `/api/v2/positions/aster/`
+  - [ ] Show "Track on AsterDEX" for balance (like Symphony)
+  - [ ] Add AsterDEX icon/badge to active positions
+
+- [ ] **Duplicate Bot Flow**
+  - [ ] Add "Deploy AsterDEX Version" button (like Symphony)
+  - [ ] Show confirmation modal with warning
+  - [ ] Create new bot with `trading_mode='aster'`
+  - [ ] Navigate to new bot config
+
+### **Phase 5: Testing & Validation** (Day 7)
+
+**Goal**: Production-ready, all tests passing
+
+- [ ] **Unit Tests**
+  - [ ] Test signature generation with known examples
+  - [ ] Test symbol conversion (all 141 pairs)
+  - [ ] Test order parameter formatting
+  - [ ] Test error handling logic
+  - [ ] All unit tests passing (pytest)
+
+- [ ] **Integration Tests**
+  - [ ] Test API connection (ping, time, exchangeInfo)
+  - [ ] Test authentication with testnet credentials
+  - [ ] Test account balance query
+  - [ ] Test order placement on testnet
+  - [ ] Test position query on testnet
+  - [ ] Test order cancellation on testnet
+
+- [ ] **End-to-End Tests**
+  - [ ] Create aster bot via frontend
+  - [ ] Setup credentials via Settings modal
+  - [ ] Execute 1 manual trade cycle
+  - [ ] Verify order on AsterDEX platform
+  - [ ] Close position via dashboard
+  - [ ] Verify audit trail in aster_trades table
+  - [ ] Run autonomous bot for 1 hour
+  - [ ] Verify all trades logged correctly
+
+- [ ] **Production Validation**
+  - [ ] Test with real credentials (small amounts)
+  - [ ] Execute 10 trades successfully
+  - [ ] Verify SL/TP conditional orders work
+  - [ ] Test error scenarios (insufficient balance, invalid symbol)
+  - [ ] Monitor rate limiting (no 429 errors)
+  - [ ] Verify no impact on paper/Symphony trading
+
+### **Phase 6: Competition Launch** (Day 8+)
+
+**Goal**: Compete for $50k prize
+
+- [ ] **Competition Strategy**
+  - [ ] Create 5-10 aster bots (multi-symbol)
+  - [ ] Configure for high-frequency trading (5m interval)
+  - [ ] Set moderate leverage (3-5x)
+  - [ ] Enable tight SL/TP for quick exits
+  - [ ] Activate all bots simultaneously
+
+- [ ] **Monitoring & Optimization**
+  - [ ] Monitor total volume daily
+  - [ ] Track competition leaderboard ranking
+  - [ ] Optimize strategies based on performance
+  - [ ] Adjust position sizes for max volume
+  - [ ] Monitor balance stability (>80% starting capital)
+
+- [ ] **Risk Management**
+  - [ ] Set max position size to 1% of balance per bot
+  - [ ] Monitor total exposure across all bots
+  - [ ] Set balance alert at -20% drawdown
+  - [ ] Emergency stop all bots if needed
+  - [ ] Daily balance reconciliation
+
+### **Success Metrics**
+
+- ✅ Zero authentication errors in production
+- ✅ <1% failed trade rate
+- ✅ Sub-2s trade execution latency
+- ✅ 100% audit trail accuracy
+- ✅ Top 10 competition ranking (volume)
+- ✅ $50k prize won (stretch goal)
+
+**Next Steps**: Start with Phase 1 - Service Foundation (Days 1-2)
+
+### **Phase 7: Post-Competition Cleanup** (After Competition)
+
+**Goal**: Update Symphony service for consistency with provider pattern
+
+- [ ] **Symphony Service Update** (`trading/live/symphony_service.py`)
+  - [ ] Update `_save_trade_record()` to include `provider='symphony'` in INSERT
+  - [ ] Update trade queries to use `WHERE provider='symphony'`
+  - [ ] Test Symphony trades still save/query correctly
+  - [ ] Verify backward compatibility with existing trades
+  - [ ] Update any hardcoded table queries in `get_open_positions()`
+
+**Note**: This is non-urgent cleanup. Symphony works fine without this change due to DEFAULT value, but explicit is better than implicit.
 
 ---
 
@@ -43,6 +222,8 @@
 **See**: [DOCS/todo/AGENT.md](DOCS/todo/AGENT.md) for complete architecture and design decisions
 
 **Vision**: Transform ggbots from bot platform (scheduled execution) to agent infrastructure (autonomous AI decision-making)
+
+**Status**: Phase 3 complete (11 tools working), Phase 3.5 complete (full config integration)
 
 **Key Features**:
 - **Two-phase system**: Conversation Mode → Autonomous Mode
@@ -175,65 +356,67 @@
   - [x] Uses `aioconsole.ainput()` for non-blocking input
   - [x] Response monitor shows agent messages immediately
 
-- [ ] **End-to-End Testing** - Ready for full autonomous testing
-  - [x] All 9 tools verified working
-  - [ ] Test: Conversation mode → strategy confirmation → autonomous mode switch
-  - [ ] Test: Guided mode agent executes user-defined strategy
-  - [ ] Test: Experimental mode agent updates its own strategy
-  - [ ] Test: Agent runs for 1+ hours autonomously with wait_for
+- [x] **End-to-End Testing** - ✅ Live testing successful!
+  - [x] All 11 tools verified working (2025-11-01)
+  - [x] Test: Conversation mode → strategy confirmation → autonomous mode switch
+  - [x] Test: Guided mode agent executes user-defined strategy (in progress - agent running live)
+  - [ ] Test: Experimental mode agent updates its own strategy (requires autonomously_editable=true)
+  - [ ] Test: Agent runs for 1+ hours autonomously with wait_for (in progress - 90min wait active)
   - [ ] Test: Compaction triggers (SDK auto-compacts at 95%)
   - [ ] Verify all decisions logged with `created_by='agent'`
   - [ ] Verify trade_observations records created
 
-**Phase 3 Status**: ✅ **COMPLETE** (with known issues below)
+- [x] **System Prompt Refinements** (2025-11-01)
+  - [x] Made strategy-neutral (removed prescriptive trading advice)
+  - [x] Added experience-based branching (beginner vs advanced onboarding)
+  - [x] Added full data source listing (32 data points, 7 categories)
+  - [x] Added timeframe documentation (7 timeframes for technical indicators)
+  - [x] Files: agent/run_agent.py, agent/mcp_server.py
 
-**Known Issues**:
-- [x] **SSL Connection Error in User Service** - ✅ FIXED with retry logic (2025-10-30)
-  - Added 3-retry mechanism with 100ms delay for SSL/connection errors
-  - File: `core/services/user_service.py:83-145`
-  - Testing shows ggshot signals now work reliably with BTCUSDT format
+- [x] **Bug Fixes** (2025-11-01)
+  - [x] Fixed .env port mismatch (API_BASE_URL: 8002 → 8000)
+  - [x] Fixed record_trade_observation JSON parsing (handles freeform text strings)
 
-- [ ] **Agent Tool Documentation Not Visible** - 🔧 IN PROGRESS (2025-11-01)
-  - Problem: Python docstrings in MCP tools are NOT exposed to the agent
-  - Agent can only see: tool name, @tool description parameter, and schema
-  - Impact: Agent doesn't know valid category names (technical_analysis, sentiment_social, etc.)
-  - Solution: Move ALL category documentation from docstring into @tool description
-  - File: `agent/mcp_server.py:71-74`
-  - Status: Identified root cause, fix in progress
+**Phase 3 Status**: ✅ **COMPLETE** - Live autonomous trading operational!
 
-**Next Session Priority**:
-1. **CRITICAL**: Fix query_market_data tool description so agent sees categories
-2. Add validation in MCP tool to return helpful errors for wrong category names
-3. Test full strategy definition → autonomous mode flow with corrected tool descriptions
-4. Run agent autonomously for 1+ hour with real trades
-5. Monitor token usage and costs with Haiku model
+### **Phase 4: Frontend Integration & Activity Timeline** (2-3 weeks)
 
-### **Phase 4: Frontend & User Experience** (2-3 days)
+**Status**: Planning Complete - Ready for Implementation
+**See**: [DOCS/todo/AGENT_P4.md](DOCS/todo/AGENT_P4.md) for complete technical specification
 
-**Goal**: Agent creation UI, dashboard integration
+**Goal**: Two-column strategy definition interface + real-time activity visualization
 
-- [ ] **Backend API Endpoints**
-  - [ ] `POST /api/v2/agent/create` - start conversation mode
-  - [ ] `POST /api/v2/agent/{config_id}/message` - send message to agent
-  - [ ] `GET /api/v2/agent/{config_id}/status` - get mode, strategy version, performance
-  - [ ] `POST /api/v2/agent/{config_id}/stop` - gracefully stop agent
-  - [ ] Filter agent configs: `GET /api/v2/config?config_type=agent`
+#### **Key Architecture Decisions**:
+- ✅ Tool-based activity logging (new `log_activity` tool + auto-logging from existing tools)
+- ✅ Unified `agent_activities` table for timeline events
+- ✅ "Agentic" config type in Forge (Scheduled Trading | Signal Validation | Agentic)
+- ✅ AgentConfigurator component: chat (left) + strategy display (right)
+- ✅ Activity Timeline connects to real data (not mock)
+- ✅ Local state design, SSE + Redis polling for real-time updates
 
-- [ ] **Frontend Integration**
-  - [ ] "Create Agent" flow - conversation UI
-  - [ ] Agent status display (mode, strategy version, P&L)
-  - [ ] Chat interface for conversation mode
-  - [ ] Message agent while autonomous (status checks)
-  - [ ] Strategy evolution timeline (for experimental mode)
-  - [ ] Show learnings from agent_memory table
-  - [ ] "My Agents" vs "My Bots" sections
+#### **Phase 4a: Configure Tab Integration** (Week 1-2) - ✅ **COMPLETE**
+- [x] Config type selection redesign (3-button selector with permissions)
+- [x] AgentConfigurator component with two-column layout
+- [x] Chat interface with Redis queue integration
+- [x] Strategy confirmation flow + display
+- [x] Auto-start agent in strategy_definition mode
+- [x] Redis polling (2s interval) for agent responses
+- [x] Backend API endpoints (start, stop, message, poll-response, status)
+- [x] Updated request_autonomous_mode tool with show_confirm_button flag
+- [x] Renamed "Autonomous Trading" → "Scheduled Trading" (config type cleanup)
+- [ ] ActivationBar integration for agentic mode (deferred - not needed for strategy definition)
+- [ ] "Begin Strategy Discussion" button for editing (deferred - implement when needed)
 
-- [ ] **Testing**
-  - [ ] Create guided mode agent via UI
-  - [ ] Create experimental mode agent via UI
-  - [ ] Send messages to autonomous agent
-  - [ ] View strategy evolution for experimental agent
-  - [ ] Stop/restart agent
+#### **Phase 4b: Activity Timeline Integration** (Week 2-3)
+- [ ] Database: Create `agent_activities` table
+- [ ] MCP Server: Add `log_activity` tool + auto-logging from existing tools
+- [ ] API endpoints: activities, balance-series, metadata
+- [ ] Connect ActivityTimelineViewer to real data (replace mock)
+- [ ] Side panel enhancement with rich activity details
+- [ ] Real-time updates via SSE
+- [ ] Agent status banner with countdown timers
+
+**Testing with existing agent**: config_id `d13d5536-2498-4f27-b2bc-e4f98958e1d8`
 
 ### **Phase 5: Production Deployment** (1-2 days)
 

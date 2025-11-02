@@ -188,22 +188,56 @@ class TelegramIntegrationConfig(BaseModel):
     publisher: TelegramPublisherConfig = Field(default_factory=TelegramPublisherConfig, description="Publisher configuration")
 
 
+class AgentStrategy(BaseModel):
+    """
+    Agent strategy configuration for autonomous trading agents.
+
+    Used when config_type='agent'. Stores the agent's trading strategy
+    and metadata about autonomous editing permissions.
+    """
+    content: str = Field(default="", description="Strategy description/instructions")
+    autonomously_editable: bool = Field(default=False, description="Can agent modify its own strategy")
+    version: int = Field(default=1, ge=1, description="Strategy version number")
+    last_updated_at: str = Field(default="", description="ISO timestamp of last update")
+    last_updated_by: str = Field(default="user", description="Who last updated: 'user' or 'agent'")
+    performance_log: List[Dict[str, Any]] = Field(default_factory=list, description="Historical performance by version")
+
+    @field_validator('last_updated_by')
+    @classmethod
+    def validate_updated_by(cls, v):
+        """Validate last_updated_by field."""
+        if v not in ["user", "agent"]:
+            raise ValueError("last_updated_by must be 'user' or 'agent'")
+        return v
+
+
 class BotConfig(BaseModel):
     """
     Complete GGBot configuration model.
-    
+
     This is the main configuration class that encompasses all module configurations.
     Maps directly to the config_data JSONB field in the configurations table.
+
+    Supports three config types:
+    - Standard bots (config_type=NULL): Requires extraction, decision, llm_config
+    - Signal validation (config_type='signal_validation'): Requires extraction only
+    - Agents (config_type='agent'): Requires agent_strategy, optional extraction/decision
     """
     schema_version: str = Field(default="1.0", description="Configuration schema version")
     selected_pair: Optional[str] = Field("BTC/USDT", description="Trading pair to analyze")
-    
-    extraction: ExtractionConfig = Field(default_factory=ExtractionConfig, description="Extraction module configuration")
-    decision: DecisionConfig = Field(default_factory=DecisionConfig, description="Decision module configuration")
-    llm_config: LLMConfig = Field(default_factory=LLMConfig, description="LLM provider and API key configuration")
+
+    # Standard bot fields (optional for agents)
+    extraction: Optional[ExtractionConfig] = Field(None, description="Extraction module configuration")
+    decision: Optional[DecisionConfig] = Field(None, description="Decision module configuration")
+    llm_config: Optional[LLMConfig] = Field(None, description="LLM provider and API key configuration")
+
+    # Required for all types
     trading: TradingConfig = Field(default_factory=TradingConfig, description="Trading module configuration")
-    telegram_integration: TelegramIntegrationConfig = Field(default_factory=TelegramIntegrationConfig, 
+    telegram_integration: Optional[TelegramIntegrationConfig] = Field(None,
                                                           description="Telegram integration configuration")
+
+    # Agent-specific fields (required for config_type='agent')
+    agent_strategy: Optional[AgentStrategy] = Field(None, description="Agent strategy configuration")
 
     @field_validator('selected_pair')
     @classmethod
@@ -329,29 +363,29 @@ def load_config_from_dict(config_dict: Dict[str, Any]) -> BotConfig:
         
         # Filter out database metadata fields from core_config
         valid_fields = {
-            "schema_version", "selected_pair", "extraction", "decision", 
-            "llm_config", "trading", "telegram_integration"
+            "schema_version", "selected_pair", "extraction", "decision",
+            "llm_config", "trading", "telegram_integration", "agent_strategy"
         }
         filtered_config = {
-            key: value for key, value in core_config.items() 
+            key: value for key, value in core_config.items()
             if key in valid_fields
         }
-            
+
         return BotConfig(**filtered_config)
     else:
         # Handle V1 flat config structure - filter out metadata fields
         valid_fields = {
-            "schema_version", "selected_pair", "extraction", "decision", 
-            "llm_config", "trading", "telegram_integration"
+            "schema_version", "selected_pair", "extraction", "decision",
+            "llm_config", "trading", "telegram_integration", "agent_strategy"
         }
-        
+
         # Filter config_dict to only include valid BotConfig fields
         # Exclude database metadata fields like config_type
         filtered_config = {
-            key: value for key, value in config_dict.items() 
+            key: value for key, value in config_dict.items()
             if key in valid_fields
         }
-        
+
         return BotConfig(**filtered_config)
 
 

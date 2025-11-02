@@ -14,6 +14,8 @@ Architecture:
 import os
 import json
 import time
+import subprocess
+import redis
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from collections import defaultdict
@@ -32,6 +34,13 @@ from extraction.v2.extraction_engine import ExtractionEngineV2
 load_dotenv()
 
 router = APIRouter(prefix="/api/v2/agent", tags=["agent"])
+
+# Redis client for agent message queue
+redis_client = redis.Redis(
+    host=os.getenv('REDIS_HOST', 'localhost'),
+    port=int(os.getenv('REDIS_PORT', 6379)),
+    decode_responses=True
+)
 
 
 # ============================================================================
@@ -804,4 +813,294 @@ async def query_trade_observations(
         raise
     except Exception as e:
         logger.error(f"Query trade observations failed: {e}", user_id=user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# AGENT LIFECYCLE MANAGEMENT ENDPOINTS
+# ============================================================================
+
+@router.post("/{config_id}/start")
+async def start_agent(
+    config_id: str,
+    mode: str = Query(..., description="strategy_definition | autonomous"),
+    user_id: str = Query(..., description="User ID for this request"),
+    authorization: Optional[str] = Header(None),
+    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+):
+    """
+    Start agent process via PM2.
+
+    Args:
+        config_id: Configuration ID
+        mode: Agent mode ('strategy_definition' or 'autonomous')
+        user_id: User ID (from query param)
+
+    Returns:
+        Status of agent startup
+    """
+    validate_agent_service_auth(authorization, x_service_auth)
+
+    try:
+        # Check if already running
+        pm2_list = subprocess.run(
+            ['pm2', 'jlist'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        processes = json.loads(pm2_list.stdout)
+
+        agent_name = f"agent-{config_id}"
+        existing = next((p for p in processes if p['name'] == agent_name), None)
+
+        if existing and existing['pm2_env']['status'] == 'online':
+            logger.info(f"Agent already running: {agent_name}")
+            return {
+                "status": "already_running",
+                "message": "Agent is already active",
+                "agent_name": agent_name
+            }
+
+        # Start via PM2
+        cmd = [
+            'pm2', 'start',
+            'agent/run_agent.py',
+            '--name', agent_name,
+            '--interpreter', '.venv-agent/bin/python',
+            '--',
+            '--config-id', config_id,
+            '--mode', mode
+        ]
+
+        subprocess.run(cmd, cwd='/home/sev/ggbot', check=True)
+
+        logger.info(
+            f"Agent started successfully",
+            config_id=config_id,
+            mode=mode,
+            agent_name=agent_name
+        )
+
+        return {
+            "status": "started",
+            "config_id": config_id,
+            "mode": mode,
+            "agent_name": agent_name,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to start agent: {e}", config_id=config_id)
+        raise HTTPException(status_code=500, detail=f"PM2 command failed: {e}")
+    except Exception as e:
+        logger.error(f"Agent start failed: {e}", config_id=config_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{config_id}/stop")
+async def stop_agent(
+    config_id: str,
+    user_id: str = Query(..., description="User ID for this request"),
+    authorization: Optional[str] = Header(None),
+    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+):
+    """
+    Stop agent process gracefully.
+
+    Args:
+        config_id: Configuration ID
+        user_id: User ID (from query param)
+
+    Returns:
+        Status of agent shutdown
+    """
+    validate_agent_service_auth(authorization, x_service_auth)
+
+    try:
+        agent_name = f"agent-{config_id}"
+
+        # Stop PM2 process
+        subprocess.run(['pm2', 'stop', agent_name], check=False)
+        subprocess.run(['pm2', 'delete', agent_name], check=False)
+
+        # Clear Redis queues
+        redis_client.delete(f"agent:{config_id}:messages")
+        redis_client.delete(f"agent:{config_id}:responses")
+
+        logger.info(f"Agent stopped successfully", config_id=config_id, agent_name=agent_name)
+
+        return {
+            "status": "stopped",
+            "config_id": config_id,
+            "agent_name": agent_name,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Agent stop failed: {e}", config_id=config_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{config_id}/message")
+async def send_message_to_agent(
+    config_id: str,
+    user_id: str = Query(..., description="User ID for this request"),
+    message: str = Body(..., embed=True),
+    authorization: Optional[str] = Header(None),
+    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+):
+    """
+    Push message to Redis queue for agent to receive.
+
+    Args:
+        config_id: Configuration ID
+        user_id: User ID (from query param)
+        message: Message text to send to agent
+
+    Returns:
+        Confirmation of message sent
+    """
+    validate_agent_service_auth(authorization, x_service_auth)
+
+    try:
+        if not message or not message.strip():
+            raise HTTPException(status_code=400, detail="Message cannot be empty")
+
+        # Push to Redis queue (agent polls from right)
+        redis_client.lpush(f"agent:{config_id}:messages", message.strip())
+
+        logger.info(
+            f"Message sent to agent",
+            config_id=config_id,
+            message_preview=message[:50]
+        )
+
+        return {
+            "status": "sent",
+            "message": message.strip(),
+            "config_id": config_id,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Send message failed: {e}", config_id=config_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{config_id}/poll-response")
+async def poll_agent_response(
+    config_id: str,
+    user_id: str = Query(..., description="User ID for this request"),
+    authorization: Optional[str] = Header(None),
+    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+):
+    """
+    Poll for agent response from Redis queue (non-blocking).
+
+    Args:
+        config_id: Configuration ID
+        user_id: User ID (from query param)
+
+    Returns:
+        Agent response if available, or no_message status
+    """
+    validate_agent_service_auth(authorization, x_service_auth)
+
+    try:
+        # Non-blocking pop from right (agent pushes to left)
+        response = redis_client.rpop(f"agent:{config_id}:responses")
+
+        if response:
+            # Try to parse as JSON (for structured responses)
+            try:
+                response_data = json.loads(response)
+                return {
+                    "status": "success",
+                    **response_data,  # Include all fields from agent (message, show_confirm_button, etc.)
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+            except json.JSONDecodeError:
+                # Plain text response
+                return {
+                    "status": "success",
+                    "message": response,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+        else:
+            return {
+                "status": "no_message",
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+    except Exception as e:
+        logger.error(f"Poll response failed: {e}", config_id=config_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{config_id}/status")
+async def get_agent_status(
+    config_id: str,
+    user_id: str = Query(..., description="User ID for this request"),
+    authorization: Optional[str] = Header(None),
+    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+):
+    """
+    Get current agent status (running/stopped, mode, uptime).
+
+    Args:
+        config_id: Configuration ID
+        user_id: User ID (from query param)
+
+    Returns:
+        Agent status information
+    """
+    validate_agent_service_auth(authorization, x_service_auth)
+
+    try:
+        agent_name = f"agent-{config_id}"
+
+        # Get PM2 process list
+        pm2_list = subprocess.run(
+            ['pm2', 'jlist'],
+            capture_output=True,
+            text=True,
+            check=True
+        )
+        processes = json.loads(pm2_list.stdout)
+
+        agent = next((p for p in processes if p['name'] == agent_name), None)
+
+        if not agent:
+            return {
+                "status": "inactive",
+                "config_id": config_id,
+                "agent_name": agent_name,
+                "mode": None,
+                "uptime": None,
+                "timestamp": datetime.utcnow().isoformat()
+            }
+
+        pm2_env = agent.get('pm2_env', {})
+        status = pm2_env.get('status', 'unknown')
+
+        return {
+            "status": status,  # 'online', 'stopped', 'errored', etc.
+            "config_id": config_id,
+            "agent_name": agent_name,
+            "mode": pm2_env.get('AGENT_MODE'),
+            "uptime": pm2_env.get('pm_uptime'),
+            "restarts": pm2_env.get('restart_time', 0),
+            "cpu": agent.get('monit', {}).get('cpu', 0),
+            "memory": agent.get('monit', {}).get('memory', 0),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except subprocess.CalledProcessError as e:
+        logger.error(f"Failed to get agent status: {e}", config_id=config_id)
+        raise HTTPException(status_code=500, detail=f"PM2 command failed: {e}")
+    except Exception as e:
+        logger.error(f"Get agent status failed: {e}", config_id=config_id)
         raise HTTPException(status_code=500, detail=str(e))

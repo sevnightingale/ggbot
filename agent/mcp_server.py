@@ -70,7 +70,14 @@ CATEGORIES (use exact names):
 - news_regulatory: crypto_news
 - trading_signals: ggshot (PREMIUM, exact name "ggshot")
 
-EXAMPLE: {"symbol": "BTC", "categories": {"technical_analysis": ["RSI"], "trading_signals": ["ggshot"]}}
+TIMEFRAMES (for technical_analysis):
+Technical indicators support 7 timeframes: "5m", "15m", "30m", "1h", "4h", "1d", "1w"
+Default: "1h". Other categories use latest available data regardless of timeframe.
+
+EXAMPLES:
+{"symbol": "BTC", "categories": {"technical_analysis": ["RSI"]}}
+{"symbol": "BTC", "categories": {"technical_analysis": ["RSI", "MACD"]}, "timeframe": "15m"}
+{"symbol": "ETH", "categories": {"technical_analysis": ["Stochastic"], "sentiment_social": ["twitter_sentiment"]}, "timeframe": "4h"}
 
 Symbol formats: "BTC", "BTCUSDT", "BTC/USDT" all work. Indicators are case-insensitive.
 Params: symbol (required), categories (dict), timeframe (optional, default '1h')""",
@@ -622,7 +629,12 @@ async def record_trade_observation(args: Dict[str, Any]) -> Dict[str, Any]:
         # Handle JSON string if SDK serializes the dict
         predictive_data_points_raw = args.get("predictive_data_points")
         if isinstance(predictive_data_points_raw, str):
-            predictive_data_points = json.loads(predictive_data_points_raw)
+            try:
+                # Try to parse as JSON first
+                predictive_data_points = json.loads(predictive_data_points_raw)
+            except json.JSONDecodeError:
+                # If not JSON, treat as plain text string (agent wrote freeform description)
+                predictive_data_points = {"notes": predictive_data_points_raw}
         else:
             predictive_data_points = predictive_data_points_raw
 
@@ -773,15 +785,9 @@ async def request_autonomous_mode(args: Dict[str, Any]) -> Dict[str, Any]:
 
         await redis_client.set(f"agent:{config_id}:mode_switch_pending", "true")
         await redis_client.set(f"agent:{config_id}:pending_strategy", strategy_summary)
-        await redis_client.aclose()
 
-        logger.info(f"Mode switch requested for config {config_id}")
-
-        return {
-            "content": [{
-                "type": "text",
-                "text": f"""
-📋 Strategy Ready for Autonomous Trading
+        # Push confirmation request directly to responses queue with special flag
+        confirmation_message = f"""📋 Strategy Ready for Autonomous Trading
 
 {strategy_summary}
 
@@ -791,8 +797,26 @@ Reply with:
 1 - CONFIRM and start autonomous trading
 2 - REVISE strategy
 
-Waiting for your confirmation...
-                """
+Waiting for your confirmation..."""
+
+        await redis_client.rpush(
+            f"agent:{config_id}:responses",
+            json.dumps({
+                "message": confirmation_message,
+                "show_confirm_button": True,  # Frontend will display confirm button
+                "timestamp": datetime.utcnow().isoformat()
+            })
+        )
+
+        await redis_client.aclose()
+
+        logger.info(f"Mode switch requested for config {config_id}")
+
+        # Return simple confirmation to agent (user will see Redis message)
+        return {
+            "content": [{
+                "type": "text",
+                "text": "✅ Confirmation request sent to user. Waiting for response..."
             }]
         }
 

@@ -23,13 +23,14 @@ class BotConfigV2:
         user_id: str,
         config_name: str,
         selected_pair: str,
-        extraction: Dict[str, Any],
-        decision: Dict[str, Any],
-        trading: Dict[str, Any],
+        extraction: Optional[Dict[str, Any]] = None,
+        decision: Optional[Dict[str, Any]] = None,
+        trading: Optional[Dict[str, Any]] = None,
         config_type: str = "autonomous_trading",
         schema_version: str = "2.1",
         llm_config: Optional[Dict[str, Any]] = None,
         telegram_integration: Optional[Dict[str, Any]] = None,
+        agent_strategy: Optional[Dict[str, Any]] = None,
         state: str = "inactive",
         trading_mode: str = "paper",
         symphony_agent_id: Optional[str] = None,
@@ -40,13 +41,14 @@ class BotConfigV2:
         self.user_id = user_id
         self.config_name = config_name
         self.selected_pair = selected_pair
-        self.extraction = extraction
-        self.decision = decision
-        self.trading = trading
+        self.extraction = extraction or {}
+        self.decision = decision or {}
+        self.trading = trading or {}
         self.config_type = config_type
         self.schema_version = schema_version
         self.llm_config = llm_config or {"provider": "default", "use_platform_keys": True, "use_own_key": False}
         self.telegram_integration = telegram_integration or {}
+        self.agent_strategy = agent_strategy
         self.state = state
         self.trading_mode = trading_mode
         self.symphony_agent_id = symphony_agent_id
@@ -71,6 +73,7 @@ class BotConfigV2:
                 "trading": self.trading,
                 "llm_config": self.llm_config,
                 "telegram_integration": self.telegram_integration,
+                "agent_strategy": self.agent_strategy,
             },
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
@@ -81,7 +84,7 @@ class BotConfigV2:
 
         Note: config_type is stored in the table field, not in JSONB to avoid duplication.
         """
-        return {
+        config_data = {
             "schema_version": self.schema_version,
             "selected_pair": self.selected_pair,
             "extraction": self.extraction,
@@ -90,6 +93,10 @@ class BotConfigV2:
             "llm_config": self.llm_config,
             "telegram_integration": self.telegram_integration,
         }
+        # Only include agent_strategy if it exists (not None)
+        if self.agent_strategy is not None:
+            config_data["agent_strategy"] = self.agent_strategy
+        return config_data
     
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'BotConfigV2':
@@ -99,13 +106,14 @@ class BotConfigV2:
             user_id=data["user_id"],
             config_name=data.get("config_name", "Untitled Bot"),
             selected_pair=data["selected_pair"],
-            extraction=data["extraction"],
-            decision=data["decision"],
-            trading=data["trading"],
+            extraction=data.get("extraction"),
+            decision=data.get("decision"),
+            trading=data.get("trading"),
             config_type=data.get("config_type", "autonomous_trading"),
             schema_version=data.get("schema_version", "2.1"),
             llm_config=data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
             telegram_integration=data.get("telegram_integration", {}),
+            agent_strategy=data.get("agent_strategy"),
             state=data.get("state", "inactive"),
             trading_mode=data.get("trading_mode", "paper"),
             symphony_agent_id=data.get("symphony_agent_id"),
@@ -116,21 +124,34 @@ class BotConfigV2:
     def validate(self) -> List[str]:
         """Validate configuration and return list of errors."""
         errors = []
-        
+
         if not self.selected_pair:
             errors.append("selected_pair is required")
-        
+
+        # Agent configs have different validation requirements
+        if self.config_type == "agent":
+            # Agent configs require agent_strategy
+            if not self.agent_strategy:
+                errors.append("agent_strategy is required for agent config_type")
+            elif not self.agent_strategy.get("content"):
+                errors.append("agent_strategy.content is required")
+            # extraction/decision/llm_config are optional for agents
+            return errors
+
+        # Standard bot validation (for autonomous_trading and signal_validation)
         # Support both old (indicators) and new (selected_data_sources) structure
-        if "selected_data_sources" in self.extraction:
+        if not self.extraction:
+            errors.append("extraction is required for non-agent configs")
+        elif "selected_data_sources" in self.extraction:
             # New structure validation
             data_sources = self.extraction.get("selected_data_sources", {})
             has_valid_data_points = False
-            
+
             for source_name, source_config in data_sources.items():
                 if isinstance(source_config, dict) and source_config.get("data_points"):
                     has_valid_data_points = True
                     break
-            
+
             if not has_valid_data_points:
                 errors.append("extraction.selected_data_sources must contain at least one data source with data_points")
         elif "indicators" in self.extraction:
@@ -139,13 +160,16 @@ class BotConfigV2:
                 errors.append("extraction.indicators is required")
         else:
             errors.append("extraction must contain either 'selected_data_sources' or 'indicators'")
-        
-        if not self.decision.get("system_prompt"):
-            errors.append("decision.system_prompt is required")
-        
-        if not self.decision.get("user_prompt"):
-            errors.append("decision.user_prompt is required")
-        
+
+        # Decision validation (only for standard bots, not signal_validation)
+        if self.config_type != "signal_validation":
+            if not self.decision:
+                errors.append("decision is required for autonomous_trading configs")
+            elif not self.decision.get("system_prompt"):
+                errors.append("decision.system_prompt is required")
+            elif not self.decision.get("user_prompt"):
+                errors.append("decision.user_prompt is required")
+
         return errors
 
 
@@ -182,10 +206,11 @@ class ConfigService:
                 config_name=config_name,
                 config_type=config_data.get("config_type", "autonomous_trading"),
                 selected_pair=config_data.get("selected_pair", "BTC/USDT"),
-                extraction=config_data.get("extraction", {}),
-                decision=config_data.get("decision", {}),
-                trading=config_data.get("trading", {}),
+                extraction=config_data.get("extraction"),
+                decision=config_data.get("decision"),
+                trading=config_data.get("trading"),
                 schema_version=config_data.get("schema_version", "2.1"),
+                agent_strategy=config_data.get("agent_strategy"),
                 llm_config=config_data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                 telegram_integration=config_data.get("telegram_integration", {})
             )

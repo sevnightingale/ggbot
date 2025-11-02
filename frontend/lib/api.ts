@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 
 export interface ConfigData {
   schema_version: string
-  config_type?: string  // 'autonomous_trading' | 'signal_validation' | 'agent'
+  config_type?: string  // 'scheduled_trading' | 'signal_validation' | 'agentic'
   selected_pair: string
   extraction?: {  // Optional for agent configs
     selected_data_sources: {
@@ -686,7 +686,7 @@ export const apiClient = new ApiClient()
 export function createDefaultConfigData(): ConfigData {
   return {
     schema_version: "2.1",
-    config_type: "autonomous_trading", // Default to autonomous for all users
+    config_type: "scheduled_trading", // Default to scheduled trading for all users
     selected_pair: "BTC/USDT",
     extraction: {
       selected_data_sources: {

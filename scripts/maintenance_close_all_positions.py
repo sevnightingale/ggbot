@@ -19,7 +19,9 @@ Output:
 import os
 import sys
 import json
+import asyncio
 from datetime import datetime
+from decimal import Decimal
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -34,24 +36,24 @@ def get_open_positions():
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    pt.id as trade_id,
+                    pt.trade_id,
                     pt.config_id,
                     pt.user_id,
                     pt.symbol,
                     pt.side,
-                    pt.quantity,
+                    pt.size_usd,
                     pt.entry_price,
                     pt.current_price,
                     pt.unrealized_pnl,
                     pt.stop_loss,
                     pt.take_profit,
-                    pt.confidence,
-                    pt.created_at,
+                    pt.confidence_score,
+                    pt.opened_at,
                     pa.current_balance
                 FROM paper_trades pt
                 JOIN paper_accounts pa ON pt.config_id = pa.config_id
                 WHERE pt.status = 'open'
-                ORDER BY pt.created_at
+                ORDER BY pt.opened_at
             """)
 
             columns = [desc[0] for desc in cur.description]
@@ -60,7 +62,7 @@ def get_open_positions():
             return [dict(zip(columns, row)) for row in results]
 
 
-def close_position(trade_id, exit_price, exit_reason="maintenance_close"):
+def close_position(trade_id, exit_price, exit_reason="manual"):
     """Close a position and calculate realized P&L."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
@@ -70,19 +72,26 @@ def close_position(trade_id, exit_price, exit_reason="maintenance_close"):
                     config_id,
                     symbol,
                     side,
-                    quantity,
+                    size_usd,
                     entry_price
                 FROM paper_trades
-                WHERE id = %s
+                WHERE trade_id = %s
             """, (trade_id,))
 
             position = cur.fetchone()
             if not position:
                 return None
 
-            config_id, symbol, side, quantity, entry_price = position
+            config_id, symbol, side, size_usd, entry_price = position
+
+            # Convert all to Decimal for consistent math
+            size_usd = Decimal(str(size_usd))
+            entry_price = Decimal(str(entry_price))
+            exit_price = Decimal(str(exit_price))
 
             # Calculate realized P&L
+            # size_usd is position size in USD, convert to quantity using entry price
+            quantity = size_usd / entry_price
             if side == 'long':
                 pnl = (exit_price - entry_price) * quantity
             else:  # short
@@ -93,14 +102,13 @@ def close_position(trade_id, exit_price, exit_reason="maintenance_close"):
                 UPDATE paper_trades
                 SET
                     status = 'closed',
-                    exit_price = %s,
                     current_price = %s,
                     realized_pnl = %s,
                     unrealized_pnl = 0,
-                    exit_reason = %s,
-                    updated_at = NOW()
-                WHERE id = %s
-            """, (exit_price, exit_price, pnl, exit_reason, trade_id))
+                    close_reason = %s,
+                    closed_at = NOW()
+                WHERE trade_id = %s
+            """, (exit_price, pnl, exit_reason, trade_id))
 
             # Update account balance
             cur.execute("""
@@ -109,8 +117,8 @@ def close_position(trade_id, exit_price, exit_reason="maintenance_close"):
                     current_balance = current_balance + %s,
                     total_pnl = total_pnl + %s,
                     total_trades = total_trades + 1,
-                    winning_trades = winning_trades + CASE WHEN %s > 0 THEN 1 ELSE 0 END,
-                    losing_trades = losing_trades + CASE WHEN %s <= 0 THEN 1 ELSE 0 END,
+                    win_trades = win_trades + CASE WHEN %s > 0 THEN 1 ELSE 0 END,
+                    loss_trades = loss_trades + CASE WHEN %s <= 0 THEN 1 ELSE 0 END,
                     updated_at = NOW()
                 WHERE config_id = %s
             """, (pnl, pnl, pnl, pnl, config_id))
@@ -118,11 +126,11 @@ def close_position(trade_id, exit_price, exit_reason="maintenance_close"):
             conn.commit()
 
             return {
-                'trade_id': trade_id,
-                'config_id': config_id,
+                'trade_id': str(trade_id),
+                'config_id': str(config_id),
                 'symbol': symbol,
                 'side': side,
-                'quantity': float(quantity),
+                'size_usd': float(size_usd),
                 'entry_price': float(entry_price),
                 'exit_price': float(exit_price),
                 'realized_pnl': float(pnl),
@@ -174,25 +182,28 @@ def main():
 
     print()
 
-    # Step 4: Initialize price service
+    # Step 4: Fetch current market prices
     print("💰 Fetching current market prices...")
-    price_service = LivePriceService()
 
     # Get unique symbols
     unique_symbols = list(set(p['symbol'] for p in open_positions))
 
-    # Fetch prices in batch
-    prices = {}
-    for symbol in unique_symbols:
-        try:
-            price_data = price_service.get_price(symbol)
-            if price_data and price_data.get('price'):
-                prices[symbol] = price_data['price']
-            else:
-                print(f"⚠️  No price found for {symbol}, using current_price from DB")
-        except Exception as e:
-            print(f"⚠️  Error fetching price for {symbol}: {e}")
+    # Fetch prices using async LivePriceService
+    async def fetch_prices():
+        price_service = LivePriceService()
+        prices_dict = {}
+        for symbol in unique_symbols:
+            try:
+                market_price = await price_service.get_current_price(symbol)
+                if market_price and market_price.price:
+                    prices_dict[symbol] = float(market_price.price)
+                else:
+                    print(f"⚠️  No price found for {symbol}, using current_price from DB")
+            except Exception as e:
+                print(f"⚠️  Error fetching price for {symbol}: {e}")
+        return prices_dict
 
+    prices = asyncio.run(fetch_prices())
     print(f"✅ Fetched prices for {len(prices)}/{len(unique_symbols)} symbols")
     print()
 
@@ -209,7 +220,7 @@ def main():
         exit_price = prices.get(symbol) or float(position['current_price'])
 
         try:
-            result = close_position(trade_id, exit_price, "maintenance_close")
+            result = close_position(trade_id, exit_price, "manual")
             if result:
                 closed_positions.append(result)
                 print(f"✅ Closed {symbol} position (P&L: ${result['realized_pnl']:,.2f})")

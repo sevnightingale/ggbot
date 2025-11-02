@@ -4,6 +4,88 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-02 - Agent Phase 4a: Strategy Definition UI Complete
+
+**Frontend**:
+- **Config Type Selector**: 3-button (Scheduled Trading | Signal Validation | Agentic), permission-gated, renamed autonomous_trading → scheduled_trading
+- **AgentConfigurator**: Two-column layout (chat left, strategy right), Redis polling 2s, auto-scroll, typing indicator, empty states
+- **Conversation Flow**: Send message → poll responses → detect show_confirm_button → confirm strategy → display in right column
+- **State Management**: Page-level agent state (messages, input, waiting, showConfirm), handlers for send/confirm, auto-start in strategy_definition mode
+- **Files**: app/forge/page.tsx (+150 lines agent state/handlers), components/configure/AgentConfigurator.tsx (new, 200 lines), SaveConfigBar.tsx (3-button UI), types/index.ts (ConfigType), lib/api.ts (type comments)
+
+**Backend**:
+- **Agent Lifecycle API**: 5 endpoints (start, stop, message, poll-response, status), PM2 process mgmt, Redis client, service auth
+- **request_autonomous_mode**: Pushes JSON to Redis with show_confirm_button flag, frontend detects and shows confirm button vs text input
+- **Files**: api/agent.py (+290 lines, 5 endpoints), agent/mcp_server.py (request_autonomous_mode update)
+
+**Architecture**:
+- Frontend conditionally renders AgentConfigurator when config_type='agentic', replaces ConfigTabs entirely
+- Agent auto-starts on Configure tab entry, polls Redis responses:queue every 2s, pushes to messages:queue on send
+- Clean separation: strategy definition (chat) vs autonomous mode (will use ActivityTimeline in Phase 4b)
+
+**Status**: Phase 4a complete, ready for end-to-end testing with real agent
+
+---
+
+## 2025-11-02 - AsterDEX Live Trading Integration (Phase 1)
+
+**Symbol Registry**:
+- Cross-referenced 142 ggbot symbols with 140 Aster symbols → 33 compatible (23.2%)
+- Updated `core/symbols/registry.py` with `aster_compatible` flags
+- Added `is_aster_compatible()`, `to_aster()`, `from_aster()` methods to standardizer
+
+**Live Trading**:
+- Built `trading/live/aster_service_v3.py` with Web3 ECDSA authentication
+- Executed full trade cycle on AsterDEX mainnet: OPEN 0.001 BTC @ $110,269.70 (Order: 7086939384), CLOSE @ $110,197.16 (Order: 7087174440)
+- Symbol validation, leverage support (10x default), position management working
+
+**Database**:
+- Extended `live_trades` with `provider` field ('symphony', 'aster'), `stop_loss_order_id`, `take_profit_order_id`
+
+**Documentation**:
+- Created `DOCS/ASTER_SYMBOL_REGISTRY_UPDATE.md`, `DOCS/ASTER_INTEGRATION_SESSION_SUMMARY.md`
+- Test scripts: `scripts/test_aster_live_trade.py`, `scripts/close_aster_position.py`
+
+**Status**: Core integration operational, ready for Vibe Trading Competition ($50k prize)
+
+---
+
+## 2025-11-01 - Agent Phase 3 Complete: Live Autonomous Trading
+
+- **Live Testing**: Strategy creation → autonomous mode switch → disciplined market analysis with 90min wait cycles
+- **System Prompts**: Strategy-neutral framework, experience-based branching, data-grounded onboarding (32 data points, 7 timeframes)
+- **Bug Fixes**: .env port (8002→8000), record_trade_observation JSON parsing (freeform text support)
+- **Files**: agent/run_agent.py, agent/mcp_server.py, .env
+- **Status**: Phase 3 complete, all 11 tools operational, agent running in production
+
+---
+
+## 2025-11-01 - Agent Config Integration (Complete)
+
+**Backend**:
+- **Models**: AgentStrategy model, BotConfig + BotConfigV2 support config_type='agent', conditional validation
+- **Config Fields**: agent_strategy (content, autonomously_editable, version, performance_log), extraction/decision now Optional
+- **Data Source Fix**: signals_group_chats → trading_signals (4 refs in listener_service.py)
+- **Agent Config Repair**: Fixed d13d5536-2498-4f27-b2bc-e4f98958e1d8 (version, timestamps, BTC/USDT format, missing fields)
+- **Files**: core/config/models.py, core/services/config_service.py, signals/listener_service.py
+
+**Frontend**:
+- **Type Definitions**: Made extraction/decision/llm_config optional in ConfigData, added agent_strategy field, added ConfigType union
+- **Page Guards**: Added null checks and fallback guards in forge/page.tsx for safe editing of agent configs
+- **Bot Rail**: Added "Agent" label for config_type='agent'
+- **Config Components**: Added optional chaining guards in MarketDataSelector, SignalsConfiguration, StrategyEditor
+- **Files**: frontend/types/index.ts, frontend/lib/api.ts, frontend/app/forge/page.tsx, frontend/app/forge/components/
+
+**Status**: Full stack integration complete, agent configs working in production (tested with d13d5536-2498-4f27-b2bc-e4f98958e1d8)
+
+## 2025-11-01 - Maintenance Mode Infrastructure Complete
+
+- **Maintenance Mode**: Production-tested whitelist system, 59 bots deactivated, 24 positions closed ($186.88 P&L)
+- **Scripts**: maintenance_deactivate_all_bots.py, maintenance_close_all_positions.py (production-ready with UUID casting, Decimal handling)
+- **Frontend**: layout.tsx whitelist check, NEXT_PUBLIC_MAINTENANCE_MODE + NEXT_PUBLIC_WHITELIST_USER_ID
+- **Bug Fixes**: SQL column names (config_id, trade_id, size_usd, etc.), close_reason constraint ('manual'), async LivePriceService
+- **Files**: scripts/maintenance_*.py, frontend/app/forge/layout.tsx, DOCS/completed/MAINTENANCE_MODE.md
+
 ## 2025-11-01 - Documentation Cleanup
 - **ggShot Parser Migration**: Moved `ggshot/ggshot_parser.py` → `signals/ggshot_parser.py`, updated imports (listener_service.py, ggbot.py, scripts)
 - **Archive ggshot/**: Moved entire legacy directory to `archive/ggshot/`

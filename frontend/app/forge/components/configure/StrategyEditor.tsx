@@ -23,7 +23,7 @@ export function StrategyEditor({
   const currentStrategy = configData?.decision?.user_prompt || ''
   const analysisFrequency = configData?.decision?.analysis_frequency || '1h'
   const llmProvider = configData?.llm_config?.provider || 'default'
-  const currentConfigType = configType || configData?.config_type || 'autonomous_trading'
+  const currentConfigType = configType || configData?.config_type || 'scheduled_trading'
 
   // Check premium access once to avoid repeated permission checks
   const hasPremiumAccess = canAccess('premium_llms')

@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-01 13:20:18 UTC (Auto-updated by status_check.py)
-**System Health**: 🟢 HEALTHY
+**Last Updated**: 2025-11-02 15:13:04 UTC (Auto-updated by status_check.py)
+**System Health**: 🟡 LOW ACTIVITY
 
 ## 📊 Live Platform Metrics
 
@@ -12,52 +12,48 @@
 - **Users with Bots**: 252 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 383
-- **Active Bots**: 60 (15.7%)
-  - Paper Trading: 60
+- **Total Bots**: 379
+- **Active Bots**: 1 (0.3%)
+  - Paper Trading: 1
   - Live Trading: 0
-- **Inactive Bots**: 323
+- **Inactive Bots**: 378
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,426
-  - Wins: 1,621
-  - Losses: 3,805
-  - Platform Win Rate: 29.87%
-  - Total P&L: $-16,103.24
+- **Total Trades (All Time)**: 5,458
+  - Wins: 1,639
+  - Losses: 3,819
+  - Platform Win Rate: 30.03%
+  - Total P&L: $-15,943.29
 - **Recent Activity**:
-  - Last 24 hours: 151 trades
-  - Last 7 days: 1571 trades
-  - Last 30 days: 4260 trades
+  - Last 24 hours: 2 trades
+  - Last 7 days: 1329 trades
+  - Last 30 days: 4248 trades
 
 ### Open Positions
-- **Open Positions**: 25
-- **Unique Symbols**: 3
-- **Total Exposure**: $20,242.50
-- **Unrealized P&L**: $176.18
+- **Open Positions**: 0
+- **Unique Symbols**: 0
+- **Total Exposure**: $0.00
+- **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,926.21
+- **Average Balance**: $9,926.88
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 47 bots
-- **BNB/USDT**: 3 bots
-- **SOL/USDT**: 2 bots
-- **W/USDT**: 2 bots
-- **HBAR/USDT**: 2 bots
+- **ADA/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 2173 decisions (avg confidence: 52.1%)
-- **enter**: 156 decisions (avg confidence: 58.3%)
-- **exit**: 79 decisions (avg confidence: 73.3%)
+- **wait**: 24 decisions (avg confidence: 62.2%)
+- **enter**: 14 decisions (avg confidence: 33.9%)
+- **exit**: 2 decisions (avg confidence: 81.5%)
 
 ### System Health
-- **Decisions (last hour)**: 77
-- **Status**: 🟢 HEALTHY
+- **Decisions (last hour)**: 0
+- **Status**: 🟡 LOW ACTIVITY
 
 ## 🖥️ System Resources
 
@@ -65,21 +61,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0.1% | 32MB | 6h 52m | 19 |
-| x-bot | 🟢 online | 0% | 27MB | 6h 52m | 19 |
-| error-alerts | 🟢 online | 0% | 23MB | 6h 52m | 26 |
-| ggbot | 🟢 online | 0% | 227MB | 2h 55m | 152 |
-| market-data-ws | 🟢 online | 2.7% | 54MB | 6h 52m | 21 |
+| signal-listener | 🟢 online | 0% | 30MB | 23h 53m | 20 |
+| x-bot | 🟢 online | 0% | 28MB | 23h 53m | 20 |
+| error-alerts | 🟢 online | 0% | 22MB | 23h 53m | 27 |
+| ggbot | 🟢 online | 0% | 218MB | 20h 50m | 155 |
+| market-data-ws | 🟢 online | 2% | 72MB | 23h 53m | 22 |
 
 ### VM Resources
 
 - **Disk**: 35G / 78G (45%)
-- **Memory**: 2.2Gi / 3.8Gi
-- **CPU Load**: 0.44 / 0.81 / 0.71 (1m/5m/15m)
+- **Memory**: 2.6Gi / 3.8Gi
+- **CPU Load**: 1.14 / 0.52 / 0.38 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 14.50M)
+- **Redis**: 🟢 connected (Memory: 10.74M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -320,7 +316,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-01 13:20:19 UTC
+**Last Updated**: 2025-11-02 15:13:04 UTC
 
 ---
 
@@ -450,7 +446,7 @@ df -h
 | `created_at` | timestamp with time zone |  | now() |
 | `created_by` | text | ✓ | 'decision_engine_v2'::text |
 
-### `live_trades` (5 columns)
+### `live_trades` (8 columns)
 
 **Primary Key**: `batch_id`
 
@@ -461,6 +457,8 @@ df -h
 **Indexes**:
 - `idx_live_trades_config` on (config_id)
 - `idx_live_trades_open` on (config_id, closed_at)
+- `idx_live_trades_provider` on (config_id, provider)
+- `idx_live_trades_provider_open` on (config_id, closed_at, provider)
 - `live_trades_decision_id_unique` on (decision_id)
 
 **Unique Constraints**: `decision_id`
@@ -472,6 +470,9 @@ df -h
 | `decision_id` | uuid | ✓ |  |
 | `created_at` | timestamp without time zone |  | now() |
 | `closed_at` | timestamp without time zone | ✓ |  |
+| `provider` | character varying(20) |  | 'symphony'::character varying |
+| `stop_loss_order_id` | character varying(50) | ✓ |  |
+| `take_profit_order_id` | character varying(50) | ✓ |  |
 
 ### `logs` (6 columns)
 
@@ -1006,7 +1007,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-01 13:20:19 UTC
+**Last Updated**: 2025-11-02 15:13:04 UTC
 
 ---
 
@@ -1018,11 +1019,12 @@ df -h
 |-------|------|---------|-------------|
 | `schema_version` | str | 1.0 | Configuration schema version |
 | `selected_pair` | Optional[str] |  | Trading pair to analyze |
-| `extraction` | ExtractionConfig |  | Extraction module configuration |
-| `decision` | DecisionConfig |  | Decision module configuration |
-| `llm_config` | LLMConfig |  | LLM provider and API key configuration |
+| `extraction` | Optional[ExtractionConfig] |  | Extraction module configuration |
+| `decision` | Optional[DecisionConfig] |  | Decision module configuration |
+| `llm_config` | Optional[LLMConfig] |  | LLM provider and API key configuration |
 | `trading` | TradingConfig |  | Trading module configuration |
-| `telegram_integration` | TelegramIntegrationConfig |  | Telegram integration configuration |
+| `telegram_integration` | Optional[TelegramIntegrationConfig] |  | Telegram integration configuration |
+| `agent_strategy` | Optional[AgentStrategy] |  | Agent strategy configuration |
 
 **Full validation rules**: See `core/config/models.py` for complete Pydantic model with field validators.
 

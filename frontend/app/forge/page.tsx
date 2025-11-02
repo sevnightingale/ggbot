@@ -17,6 +17,8 @@ import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
 import { TradeHistoryModal } from './components/monitor/TradeHistoryModal'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
+import { SaveConfigBar } from './components/configure/SaveConfigBar'
+import { AgentConfigurator } from './components/configure/AgentConfigurator'
 import { DuplicateAsLiveModal } from '@/components/DuplicateAsLiveModal'
 
 interface Position {
@@ -123,6 +125,16 @@ function ForgeApp() {
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [originalConfig, setOriginalConfig] = useState<BotConfiguration | null>(null)
 
+  // Agent conversation state (for agentic config type)
+  const [agentMessages, setAgentMessages] = useState<Array<{
+    role: 'user' | 'agent'
+    content: string
+    timestamp: string
+  }>>([])
+  const [agentInputValue, setAgentInputValue] = useState('')
+  const [isWaitingForAgent, setIsWaitingForAgent] = useState(false)
+  const [showConfirmButton, setShowConfirmButton] = useState(false)
+
   // Start editing mode when configure tab is activated
   useEffect(() => {
     if (activeTab === 'configure' && selectedBot && !isEditingConfig) {
@@ -180,7 +192,7 @@ function ForgeApp() {
   const createDefaultBot = async (): Promise<BotConfiguration> => {
     const defaultConfigData = {
       schema_version: '2.1',
-      config_type: 'autonomous_trading',
+      config_type: 'scheduled_trading',
       selected_pair: 'BTC/USDT',
       extraction: {
         selected_data_sources: {
@@ -794,7 +806,7 @@ function ForgeApp() {
   }
 
   // Handle bot type changes with warning
-  const handleBotTypeChange = (newType: 'autonomous_trading' | 'signal_validation') => {
+  const handleBotTypeChange = (newType: 'scheduled_trading' | 'signal_validation' | 'agentic') => {
     if (!isEditingConfig) return
 
     // TODO: Show warning about field resets when changing bot type
@@ -804,7 +816,10 @@ function ForgeApp() {
         // Update analysis_frequency based on type
         decision: {
           ...editingConfigData?.decision,
-          analysis_frequency: newType === 'signal_validation' ? 'signal_driven' : '1h'
+          analysis_frequency:
+            newType === 'signal_validation' ? 'signal_driven' :
+            newType === 'agentic' ? 'agent_driven' :
+            '1h'
         }
       }
     })
@@ -969,6 +984,161 @@ function ForgeApp() {
       setIsBotAction(false)
     }
   }
+
+  // ============================================================================
+  // AGENT CONVERSATION HANDLERS
+  // ============================================================================
+
+  // Handler for sending message to agent
+  const handleSendAgentMessage = async () => {
+    if (!selectedConfigId || !agentInputValue.trim() || isWaitingForAgent) return
+
+    try {
+      // Add user message to UI immediately
+      const userMessage = {
+        role: 'user' as const,
+        content: agentInputValue.trim(),
+        timestamp: new Date().toISOString()
+      }
+      setAgentMessages(prev => [...prev, userMessage])
+      setAgentInputValue('')
+      setIsWaitingForAgent(true)
+
+      // Send to backend API
+      const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message?user_id=${user?.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message: agentInputValue.trim() })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to send message')
+      }
+
+      console.log('✅ Message sent to agent')
+    } catch (error) {
+      console.error('❌ Failed to send message:', error)
+      setIsWaitingForAgent(false)
+    }
+  }
+
+  // Handler for confirming strategy
+  const handleConfirmStrategy = async () => {
+    if (!selectedConfigId) return
+
+    try {
+      // Send "1" to agent (confirmation)
+      const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message?user_id=${user?.id}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ message: '1' })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to confirm strategy')
+      }
+
+      setShowConfirmButton(false)
+      console.log('✅ Strategy confirmed')
+
+      // Refresh the bot config to get updated strategy
+      setTimeout(async () => {
+        const refreshedBots = await apiClient.listConfigs()
+        setAllBots(refreshedBots)
+      }, 2000)
+    } catch (error) {
+      console.error('❌ Failed to confirm strategy:', error)
+    }
+  }
+
+  // Start agent in strategy_definition mode when entering agentic config
+  useEffect(() => {
+    if (!selectedConfigId || editingTableFields?.config_type !== 'agentic' || !user?.id) return
+    if (activeTab !== 'configure') return
+
+    const startAgentIfNeeded = async () => {
+      try {
+        // Check if agent is already running
+        const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+        const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status?user_id=${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (!statusResponse.ok) return
+
+        const statusData = await statusResponse.json()
+
+        // If agent is not running, start it in strategy_definition mode
+        if (statusData.status === 'inactive' || statusData.status === 'stopped') {
+          console.log('🤖 Starting agent in strategy_definition mode...')
+          const startResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition&user_id=${user.id}`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${token}`
+            }
+          })
+
+          if (startResponse.ok) {
+            console.log('✅ Agent started successfully')
+          }
+        }
+      } catch (error) {
+        console.error('❌ Failed to start agent:', error)
+      }
+    }
+
+    startAgentIfNeeded()
+  }, [selectedConfigId, editingTableFields?.config_type, activeTab, user?.id])
+
+  // Poll for agent responses (when agentic mode is active)
+  useEffect(() => {
+    if (!selectedConfigId || editingTableFields?.config_type !== 'agentic' || !user?.id) return
+
+    const pollInterval = setInterval(async () => {
+      try {
+        const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+        const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/poll-response?user_id=${user.id}`, {
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (!response.ok) return
+
+        const data = await response.json()
+
+        if (data.status === 'success' && data.message) {
+          // Add agent message to UI
+          const agentMessage = {
+            role: 'agent' as const,
+            content: data.message,
+            timestamp: data.timestamp || new Date().toISOString()
+          }
+          setAgentMessages(prev => [...prev, agentMessage])
+          setIsWaitingForAgent(false)
+
+          // Check for confirmation button flag
+          if (data.show_confirm_button) {
+            setShowConfirmButton(true)
+          }
+        }
+      } catch (error) {
+        console.error('❌ Poll agent response failed:', error)
+      }
+    }, 2000) // Poll every 2 seconds
+
+    return () => clearInterval(pollInterval)
+  }, [selectedConfigId, editingTableFields?.config_type, user?.id])
 
   // Helper function to refresh bot list from server (for error recovery)
   const refreshBotList = async () => {
@@ -1136,7 +1306,32 @@ function ForgeApp() {
                       }}
                     />
                   </div>
+                ) : editingTableFields?.config_type === 'agentic' ? (
+                  // Agentic mode: Show SaveConfigBar + AgentConfigurator
+                  <div className="space-y-4">
+                    <SaveConfigBar
+                      selectedBot={selectedBot}
+                      editingTableFields={editingTableFields}
+                      hasUnsavedChanges={hasUnsavedChanges}
+                      isEditingConfig={isEditingConfig}
+                      onSave={saveConfigurationChanges}
+                      onCancel={cancelConfigurationEditing}
+                      onReset={resetConfigurationChanges}
+                      onBotTypeChange={handleBotTypeChange}
+                    />
+                    <AgentConfigurator
+                      messages={agentMessages}
+                      inputValue={agentInputValue}
+                      isWaiting={isWaitingForAgent}
+                      showConfirmButton={showConfirmButton}
+                      currentStrategy={editingConfigData?.agent_strategy || null}
+                      onSendMessage={handleSendAgentMessage}
+                      onConfirmStrategy={handleConfirmStrategy}
+                      onInputChange={setAgentInputValue}
+                    />
+                  </div>
                 ) : (
+                  // Normal mode: Show regular config tabs
                   <ConfigureLayout
                     selectedBot={selectedBot}
                     editingConfigData={editingConfigData}

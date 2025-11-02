@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Save, X, RotateCcw, Crown } from 'lucide-react'
+import { Save, X, RotateCcw, Crown, Bot } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { usePermissions } from '@/lib/permissions'
@@ -14,7 +14,7 @@ interface SaveConfigBarProps {
   onSave?: () => void
   onCancel?: () => void
   onReset?: () => void
-  onBotTypeChange?: (newType: 'autonomous_trading' | 'signal_validation') => void
+  onBotTypeChange?: (newType: 'scheduled_trading' | 'signal_validation' | 'agentic') => void
 }
 
 export function SaveConfigBar({
@@ -28,47 +28,82 @@ export function SaveConfigBar({
   onBotTypeChange
 }: SaveConfigBarProps) {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
-  const { canAccess } = usePermissions()
+  const { canAccess, userProfile } = usePermissions()
 
   // Use editing config type if available, otherwise fall back to selected bot config type
-  const currentBotType = editingTableFields?.config_type || selectedBot?.config_type || 'autonomous_trading'
+  const currentBotType = editingTableFields?.config_type || selectedBot?.config_type || 'scheduled_trading'
   const hasSignalValidation = canAccess('signal_validation_mode')
+
+  // Check if user is whitelisted for agentic mode
+  const whitelistUserId = process.env.NEXT_PUBLIC_WHITELIST_USER_ID
+  const isWhitelisted = userProfile?.user_id === whitelistUserId
+  const hasAgenticAccess = isWhitelisted // For now, only whitelisted users
 
   return (
     <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
 
-        {/* Left Section: Bot Type Toggle */}
+        {/* Left Section: Bot Type Selector (3 buttons) */}
         <div className="flex items-center gap-4">
           <div className="text-sm text-[var(--text-muted)]">Bot Type:</div>
           <div className="flex items-center rounded-xl border border-[var(--border)] bg-[var(--bg-primary)]">
+            {/* Scheduled Trading */}
             <button
-              onClick={() => onBotTypeChange?.('autonomous_trading')}
-              className={`px-3 py-2 text-sm rounded-l-xl transition-colors ${
-                currentBotType === 'autonomous_trading'
+              onClick={() => onBotTypeChange?.('scheduled_trading')}
+              className={`px-3 py-2 text-sm rounded-l-xl transition-colors flex items-center gap-1.5 ${
+                currentBotType === 'scheduled_trading'
                   ? 'bg-[var(--agent-extraction)] text-white'
                   : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
               }`}
+              title="Automated trading on fixed schedule"
             >
-              Autonomous
+              ⏰ Scheduled Trading
             </button>
+
+            {/* Signal Validation */}
             {hasSignalValidation ? (
               <button
                 onClick={() => onBotTypeChange?.('signal_validation')}
-                className={`px-3 py-2 text-sm rounded-r-xl transition-colors ${
+                className={`px-3 py-2 text-sm transition-colors border-l border-r border-[var(--border)] flex items-center gap-1.5 ${
                   currentBotType === 'signal_validation'
                     ? 'bg-[var(--agent-decision)] text-white'
                     : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
                 }`}
+                title="Validate external signals with AI"
               >
-                Signal Validation
+                ✓ Signal Validation
               </button>
             ) : (
               <button
                 onClick={() => setUpgradeModalOpen(true)}
-                className="px-3 py-2 text-sm rounded-r-xl opacity-60 hover:opacity-80 transition-opacity text-[var(--text-muted)] relative flex items-center gap-1.5"
+                className="px-3 py-2 text-sm opacity-60 hover:opacity-80 transition-opacity text-[var(--text-muted)] border-l border-r border-[var(--border)] flex items-center gap-1.5"
+                title="Requires Pro Plan"
               >
-                Signal Validation
+                ✓ Signal Validation
+                <Crown className="h-3 w-3" />
+              </button>
+            )}
+
+            {/* Agentic */}
+            {hasAgenticAccess ? (
+              <button
+                onClick={() => onBotTypeChange?.('agentic')}
+                className={`px-3 py-2 text-sm rounded-r-xl transition-colors flex items-center gap-1.5 ${
+                  currentBotType === 'agentic'
+                    ? 'bg-purple-600 text-white'
+                    : 'text-[var(--text-secondary)] hover:text-[var(--text-primary)]'
+                }`}
+                title="Autonomous AI agent with conversation"
+              >
+                🤖 Agentic
+              </button>
+            ) : (
+              <button
+                disabled
+                className="px-3 py-2 text-sm rounded-r-xl opacity-40 cursor-not-allowed text-[var(--text-muted)] flex items-center gap-1.5"
+                title="Coming soon"
+              >
+                🤖 Agentic
                 <Crown className="h-3 w-3" />
               </button>
             )}

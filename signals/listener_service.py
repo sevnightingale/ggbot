@@ -121,7 +121,7 @@ class GGShotSignalSource(SignalSource):
                 raise ValueError("No users found in database - cannot store signals")
 
     def _get_signals_source_id(self) -> str:
-        """Get UUID of 'signals_group_chats' data source."""
+        """Get UUID of 'trading_signals' data source."""
         if self._signals_source_id:
             return self._signals_source_id
 
@@ -129,11 +129,11 @@ class GGShotSignalSource(SignalSource):
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT source_id FROM data_sources
-                    WHERE name = 'signals_group_chats'
+                    WHERE name = 'trading_signals'
                 """)
                 result = cur.fetchone()
                 if not result:
-                    raise ValueError("signals_group_chats data source not found in database")
+                    raise ValueError("trading_signals data source not found in database")
                 self._signals_source_id = str(result[0])
                 return self._signals_source_id
 
@@ -472,12 +472,12 @@ class SignalListenerService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     # Query for users with signal_validation configs wanting this signal source
-                    # Check if ggshot is in signals_group_chats data_points
+                    # Check if ggshot is in trading_signals data_points
                     # Debug: First check what configs exist at all
                     cur.execute("""
-                        SELECT c.config_id, c.config_type, c.state, 
+                        SELECT c.config_id, c.config_type, c.state,
                                up.subscription_tier, up.subscription_status, up.paid_data_points,
-                               c.config_data->'extraction'->'selected_data_sources'->'signals_group_chats'->'data_points' as signal_data_points
+                               c.config_data->'extraction'->'selected_data_sources'->'trading_signals'->'data_points' as signal_data_points
                         FROM configurations c
                         JOIN user_profiles up ON c.user_id = up.user_id
                         WHERE c.config_type = 'signal_validation'
@@ -496,8 +496,8 @@ class SignalListenerService:
                         WHERE c.config_type = 'signal_validation'
                           AND c.state = 'active'
                           AND (
-                            c.config_data->'extraction'->'selected_data_sources' ? 'signals_group_chats'
-                            OR c.config_data->'config_data'->'extraction'->'selected_data_sources' ? 'signals_group_chats'
+                            c.config_data->'extraction'->'selected_data_sources' ? 'trading_signals'
+                            OR c.config_data->'config_data'->'extraction'->'selected_data_sources' ? 'trading_signals'
                           )
                           AND %s = ANY(up.paid_data_points)
                           AND up.subscription_tier = 'ggbase'
@@ -519,7 +519,7 @@ class SignalListenerService:
                         else:
                             extraction_config = config_data.get('extraction', {}).get('selected_data_sources', {})
                         
-                        signals_config = extraction_config.get('signals_group_chats', {})
+                        signals_config = extraction_config.get('trading_signals', {})
                         data_points = signals_config.get('data_points', [])
                         
                         self.logger.info(f"🔍 Debug: Config {config_id} has signals data_points: {data_points}")

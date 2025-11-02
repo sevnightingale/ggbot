@@ -21,7 +21,7 @@ interface ConfigureLayoutProps {
   onCancelConfig?: () => void
   onResetConfig?: () => void
   onUpdateConfig?: (updates: Partial<ConfigData>) => void
-  onBotTypeChange?: (newType: 'autonomous_trading' | 'signal_validation') => void
+  onBotTypeChange?: (newType: 'scheduled_trading' | 'signal_validation' | 'agentic') => void
   className?: string
 }
 

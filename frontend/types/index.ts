@@ -46,7 +46,7 @@ export interface ExecutionConfig {
 }
 
 // Config type discriminator
-export type ConfigType = 'autonomous_trading' | 'signal_validation' | 'agent'
+export type ConfigType = 'scheduled_trading' | 'signal_validation' | 'agentic'
 
 // Agent strategy configuration
 export interface AgentStrategy {

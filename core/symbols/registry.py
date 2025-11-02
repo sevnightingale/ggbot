@@ -23,6 +23,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "1inch",
         "symphony": "1INCH",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "aave": {
@@ -35,6 +36,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "aave",
         "symphony": "AAVE",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "ach": {
@@ -47,6 +49,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "alchemy-pay",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "ada": {
@@ -59,6 +62,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "cardano",
         "symphony": "ADA",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "algo": {
@@ -71,6 +75,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "algorand",
         "symphony": "ALGO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "alice": {
@@ -83,6 +88,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "my-neighbor-alice",
         "symphony": "ALICE",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "alpha": {
@@ -95,6 +101,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "alpha-finance",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "alt": {
@@ -107,6 +114,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "altlayer",
         "symphony": "ALT",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ankr": {
@@ -119,6 +127,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ankr",
         "symphony": "ANKR",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ape": {
@@ -131,6 +140,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "apecoin",
         "symphony": "APE",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "api3": {
@@ -143,6 +153,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "api3",
         "symphony": "API3",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "apt": {
@@ -155,6 +166,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "aptos",
         "symphony": "APT",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "arb": {
@@ -167,6 +179,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "arbitrum",
         "symphony": "ARB",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "arkm": {
@@ -179,6 +192,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "arkham",
         "symphony": "ARKM",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ar": {
@@ -191,6 +205,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "arweave",
         "symphony": "AR",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "astr": {
@@ -203,6 +218,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "astar",
         "symphony": "ASTR",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "atom": {
@@ -215,6 +231,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "cosmos",
         "symphony": "ATOM",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "auction": {
@@ -227,6 +244,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "bounce-finance-governance-token",
         "symphony": "AUCTION",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "avax": {
@@ -239,6 +257,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "avalanche-2",
         "symphony": "AVAX",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "axs": {
@@ -251,6 +270,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "axie-infinity",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "bake": {
@@ -263,6 +283,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "bakerytoken",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "bal": {
@@ -275,6 +296,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "balancer",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "band": {
@@ -287,6 +309,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "band-protocol",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "bat": {
@@ -299,6 +322,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "basic-attention-token",
         "symphony": "BAT",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "bch": {
@@ -311,6 +335,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "bitcoin-cash",
         "symphony": "BCH",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "bel": {
@@ -323,6 +348,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "bella-protocol",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "bigtime": {
@@ -335,6 +361,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "big-time",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "bnb": {
@@ -347,6 +374,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "binancecoin",
         "symphony": "BNB",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "bnt": {
@@ -359,6 +387,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "bancor",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "bome": {
@@ -371,6 +400,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "book-of-meme",
         "symphony": "BOME",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "btc": {
@@ -383,6 +413,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "bitcoin",
         "symphony": "BTC",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "cake": {
@@ -395,6 +426,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "pancakeswap-token",
         "symphony": "CAKE",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "celr": {
@@ -407,6 +439,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "celer-network",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "cetus": {
@@ -419,6 +452,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "cetus-protocol",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "cfx": {
@@ -431,6 +465,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "conflux-token",
         "symphony": "CFX",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "chr": {
@@ -443,6 +478,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "chromaway",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "chz": {
@@ -455,6 +491,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "chiliz",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "comp": {
@@ -467,6 +504,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "compound-governance-token",
         "symphony": "COMP",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "coti": {
@@ -479,6 +517,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "coti",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "crv": {
@@ -491,6 +530,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "curve-dao-token",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": True,
         "websocket_cached": False
     },
     "cyber": {
@@ -503,6 +543,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "cyberconnect",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "dash": {
@@ -515,6 +556,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "dash",
         "symphony": "DASH",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "doge": {
@@ -527,6 +569,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "dogecoin",
         "symphony": "DOGE",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "dot": {
@@ -539,6 +582,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "polkadot",
         "symphony": "DOT",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "dydx": {
@@ -551,6 +595,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "dydx",
         "symphony": "DYDX",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "egld": {
@@ -563,6 +608,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "elrond-erd-2",
         "symphony": "EGLD",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ena": {
@@ -575,6 +621,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ethena",
         "symphony": "ENA",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "ens": {
@@ -587,6 +634,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ethereum-name-service",
         "symphony": "ENS",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "etc": {
@@ -599,6 +647,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ethereum-classic",
         "symphony": "ETC",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "eth": {
@@ -611,6 +660,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ethereum",
         "symphony": "ETH",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "ethfi": {
@@ -623,6 +673,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ether-fi",
         "symphony": "ETHFI",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "fet": {
@@ -635,6 +686,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "fetch-ai",
         "symphony": "FET",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "fil": {
@@ -647,6 +699,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "filecoin",
         "symphony": "FIL",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "flm": {
@@ -659,6 +712,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "flamingo-finance",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "flow": {
@@ -671,6 +725,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "flow",
         "symphony": "FLOW",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "gala": {
@@ -683,6 +738,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "gala",
         "symphony": "GALA",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "gmt": {
@@ -695,6 +751,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "stepn",
         "symphony": "GMT",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "gmx": {
@@ -707,6 +764,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "gmx",
         "symphony": "GMX",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "grt": {
@@ -719,6 +777,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "the-graph",
         "symphony": "GRT",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "gtc": {
@@ -731,6 +790,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "gitcoin",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "hbar": {
@@ -743,6 +803,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "hedera-hashgraph",
         "symphony": "HBAR",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "high": {
@@ -755,6 +816,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "highstreet",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "hook": {
@@ -767,6 +829,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "hooked-protocol",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "icp": {
@@ -779,6 +842,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "internet-computer",
         "symphony": "ICP",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "icx": {
@@ -791,6 +855,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "icon",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "id": {
@@ -803,6 +868,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "space-id",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "inj": {
@@ -815,6 +881,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "injective-protocol",
         "symphony": "INJ",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "iost": {
@@ -827,6 +894,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "iostoken",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "iotx": {
@@ -839,6 +907,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "iotex",
         "symphony": "IOTX",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "jasmy": {
@@ -851,6 +920,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "jasmycoin",
         "symphony": "JASMY",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "jto": {
@@ -863,6 +933,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "jito-governance-token",
         "symphony": "JTO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "jup": {
@@ -875,6 +946,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "jupiter-exchange-solana",
         "symphony": "JUP",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "kava": {
@@ -887,6 +959,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "kava",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "knc": {
@@ -899,6 +972,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "kyber-network-crystal",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "ksm": {
@@ -911,6 +985,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "kusama",
         "symphony": "KSM",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ldo": {
@@ -923,6 +998,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "lido-dao",
         "symphony": "LDO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "lever": {
@@ -935,6 +1011,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "leverfi",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "link": {
@@ -947,6 +1024,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "chainlink",
         "symphony": "LINK",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "lpt": {
@@ -959,6 +1037,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "livepeer",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "lqty": {
@@ -971,6 +1050,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "liquity",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "lrc": {
@@ -983,6 +1063,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "loopring",
         "symphony": "LRC",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ltc": {
@@ -995,6 +1076,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "litecoin",
         "symphony": "LTC",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "magic": {
@@ -1007,6 +1089,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "magic",
         "symphony": "MAGIC",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "mana": {
@@ -1019,6 +1102,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "decentraland",
         "symphony": "MANA",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "mask": {
@@ -1031,6 +1115,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "mask-network",
         "symphony": "MASK",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "matic": {
@@ -1043,6 +1128,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "matic-network",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "mkr": {
@@ -1055,6 +1141,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "maker",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "near": {
@@ -1067,6 +1154,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "near",
         "symphony": "NEAR",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "neo": {
@@ -1079,6 +1167,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "neo",
         "symphony": "NEO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "nkn": {
@@ -1091,6 +1180,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "nkn",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "nmr": {
@@ -1103,6 +1193,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "numeraire",
         "symphony": "NMR",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "not": {
@@ -1115,6 +1206,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "notcoin",
         "symphony": "NOT",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ntrn": {
@@ -1127,6 +1219,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "neutron-3",
         "symphony": "NTRN",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "ogn": {
@@ -1139,6 +1232,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "origin-protocol",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "ondo": {
@@ -1151,6 +1245,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ondo-finance",
         "symphony": "ONDO",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "one": {
@@ -1163,6 +1258,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "harmony",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "ont": {
@@ -1175,6 +1271,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ontology",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "op": {
@@ -1187,6 +1284,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "optimism",
         "symphony": "OP",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "ordi": {
@@ -1199,6 +1297,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ordi",
         "symphony": "ORDI",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "pendle": {
@@ -1211,6 +1310,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "pendle",
         "symphony": "PENDLE",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "people": {
@@ -1223,6 +1323,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "constitutiondao",
         "symphony": "PEOPLE",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "pyth": {
@@ -1235,6 +1336,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "pyth-network",
         "symphony": "PYTH",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "qtum": {
@@ -1247,6 +1349,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "qtum",
         "symphony": "QTUM",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "rare": {
@@ -1259,6 +1362,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "superrare",
         "symphony": "RARE",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "render": {
@@ -1271,6 +1375,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "render-token",
         "symphony": "RENDER",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "rlc": {
@@ -1283,6 +1388,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "iexec-rlc",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "rose": {
@@ -1295,6 +1401,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "oasis-network",
         "symphony": "ROSE",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "rsr": {
@@ -1307,6 +1414,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "reserve-rights-token",
         "symphony": "RSR",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "rune": {
@@ -1319,6 +1427,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "thorchain",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "rvn": {
@@ -1331,6 +1440,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ravencoin",
         "symphony": "RVN",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "sand": {
@@ -1343,6 +1453,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "the-sandbox",
         "symphony": "SAND",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "sei": {
@@ -1355,6 +1466,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "sei-network",
         "symphony": "SEI",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "sfp": {
@@ -1367,6 +1479,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "safemoon",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "sklus": {
@@ -1379,6 +1492,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "skl",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "skl": {
@@ -1391,6 +1505,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "skale",
         "symphony": "SKL",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "snx": {
@@ -1403,6 +1518,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "havven",
         "symphony": "SNX",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "sol": {
@@ -1415,6 +1531,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "solana",
         "symphony": "SOL",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "storj": {
@@ -1427,6 +1544,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "storj",
         "symphony": "STORJ",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "strk": {
@@ -1439,6 +1557,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "starknet",
         "symphony": "STRK",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "stx": {
@@ -1451,6 +1570,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "blockstack",
         "symphony": "STX",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "sui": {
@@ -1463,6 +1583,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "sui",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": True,
         "websocket_cached": False
     },
     "s": {
@@ -1475,6 +1596,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "s",
         "symphony": "S",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "sushi": {
@@ -1487,6 +1609,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "sushi",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "sxp": {
@@ -1499,6 +1622,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "swipe",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "tao": {
@@ -1511,6 +1635,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "bittensor",
         "symphony": "TAO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "theta": {
@@ -1523,6 +1648,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "theta-token",
         "symphony": "THETA",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "tia": {
@@ -1535,6 +1661,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "celestia",
         "symphony": "TIA",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "trb": {
@@ -1547,6 +1674,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "tellor",
         "symphony": "TRB",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "trx": {
@@ -1559,6 +1687,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "tron",
         "symphony": "TRX",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "turbo": {
@@ -1571,6 +1700,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "turbo",
         "symphony": "TURBO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "twt": {
@@ -1583,6 +1713,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "trust-wallet-token",
         "symphony": "TWT",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "vanry": {
@@ -1595,6 +1726,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "vanar-chain",
         "symphony": None,
         "symphony_compatible": False,
+        "aster_compatible": False,
         "websocket_cached": False
     },
     "vet": {
@@ -1607,6 +1739,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "vechain",
         "symphony": "VET",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "wif": {
@@ -1619,6 +1752,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "dogwifcoin",
         "symphony": "WIF",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "wld": {
@@ -1631,6 +1765,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "worldcoin-wld",
         "symphony": "WLD",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "woo": {
@@ -1643,6 +1778,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "woo-network",
         "symphony": "WOO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "w": {
@@ -1655,6 +1791,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "wormhole",
         "symphony": "W",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "xrp": {
@@ -1667,6 +1804,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "ripple",
         "symphony": "XRP",
         "symphony_compatible": True,
+        "aster_compatible": True,
         "websocket_cached": True
     },
     "yfi": {
@@ -1679,6 +1817,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "yearn-finance",
         "symphony": "YFI",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "zil": {
@@ -1691,6 +1830,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "zilliqa",
         "symphony": "ZIL",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "zro": {
@@ -1703,6 +1843,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "layerzero",
         "symphony": "ZRO",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     },
     "zrx": {
@@ -1715,6 +1856,7 @@ SYMBOL_REGISTRY = {
         "coingecko_id": "0x",
         "symphony": "ZRX",
         "symphony_compatible": True,
+        "aster_compatible": False,
         "websocket_cached": True
     }
 }

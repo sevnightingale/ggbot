@@ -39,7 +39,7 @@ def get_active_bots():
         with conn.cursor() as cur:
             cur.execute("""
                 SELECT
-                    id,
+                    config_id,
                     user_id,
                     config_type,
                     config_data->>'symbol' as symbol,
@@ -61,10 +61,11 @@ def deactivate_bots(bot_ids):
     """Deactivate all bots by setting state='inactive'."""
     with get_db_connection() as conn:
         with conn.cursor() as cur:
+            # Convert string UUIDs to proper UUID array for PostgreSQL
             cur.execute("""
                 UPDATE configurations
                 SET state = 'inactive'
-                WHERE id = ANY(%s)
+                WHERE config_id = ANY(%s::uuid[])
             """, (bot_ids,))
             conn.commit()
             return cur.rowcount
@@ -148,7 +149,7 @@ def main():
     backup_data = {
         'deactivated_at': datetime.utcnow().isoformat(),
         'total_count': len(active_bots),
-        'config_ids': [bot['id'] for bot in active_bots],
+        'config_ids': [bot['config_id'] for bot in active_bots],
         'details': active_bots
     }
 
@@ -172,7 +173,7 @@ def main():
 
     # Step 5: Stop scheduler jobs
     print("🛑 Stopping scheduler jobs...")
-    config_ids = [bot['id'] for bot in active_bots]
+    config_ids = [bot['config_id'] for bot in active_bots]
     stopped_count = stop_scheduler_jobs(config_ids)
     print(f"✅ Stopped {stopped_count} scheduler jobs")
     print()

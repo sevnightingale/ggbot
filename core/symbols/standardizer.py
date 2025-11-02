@@ -95,6 +95,22 @@ class UniversalSymbolStandardizer:
             return False
         return symbol_data.get("symphony_compatible", False)
 
+    def is_aster_compatible(self, symbol: str, format_type: str = "platform") -> bool:
+        """Check if symbol is compatible with AsterDEX live trading"""
+        symbol_data = self.get_all_formats(symbol, format_type)
+        if not symbol_data:
+            return False
+        return symbol_data.get("aster_compatible", False)
+
+    def to_aster(self, platform_symbol: str) -> Optional[str]:
+        """Convert platform format (BTC-USDT) to AsterDEX format (BTCUSDT)"""
+        # AsterDEX uses same format as ggshot (no separator)
+        return self.normalize(platform_symbol, "platform", "ggshot")
+
+    def from_aster(self, aster_symbol: str) -> Optional[str]:
+        """Convert AsterDEX format (BTCUSDT) to platform format (BTC-USDT)"""
+        return self.normalize(aster_symbol, "ggshot", "platform")
+
     def is_supported(self, symbol: str, format_type: str = "platform") -> bool:
         """Check if symbol is supported in given format"""
         symbol_key = find_symbol_by_format(symbol, format_type)
@@ -156,7 +172,8 @@ class UniversalSymbolStandardizer:
             "hummingbot_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("hummingbot")]),
             "platform_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("platform")]),
             "symphony_symbols": len([s for s in SYMBOL_REGISTRY.values() if s.get("symphony")]),
-            "symphony_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("symphony_compatible")])
+            "symphony_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("symphony_compatible")]),
+            "aster_compatible": len([s for s in SYMBOL_REGISTRY.values() if s.get("aster_compatible")])
         }
     
     def validate_symbol(self, symbol: str, format_type: str = "platform", strict: bool = True) -> Dict[str, Union[bool, str, None]]:

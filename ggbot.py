@@ -102,6 +102,7 @@ from extraction.v2.extraction_engine import ExtractionEngineV2
 from decision.engine_v2 import DecisionEngineV2
 from trading.paper.supabase_service import SupabasePaperTradingService
 from trading.live.symphony_service import SymphonyLiveTradingService
+from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
 from signals.publishing_service import publish_signal_to_telegram
 from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, Symbol, Confidence
 class ConfigCreateRequest(BaseModel):
@@ -284,6 +285,7 @@ class GGBotOrchestrator:
         self.llm_service = llm_service
         self.paper_trading = SupabasePaperTradingService()
         self.symphony_trading = SymphonyLiveTradingService()
+        self.aster_trading = AsterDEXV3LiveTradingService()
         self._log = logger.bind(component="orchestrator")
 
         self._extraction_engines = {}
@@ -1015,21 +1017,23 @@ class GGBotOrchestrator:
             # Determine trading mode (paper vs live)
             trading_mode = getattr(config, 'trading_mode', 'paper')
             is_live = trading_mode == 'live'
+            is_aster = trading_mode == 'aster'
 
             if trading_action == "close":
                 try:
                     from core.common.db import get_db_connection
                     open_positions = []
 
-                    if is_live:
-                        # Live trading: Query live_trades for batch_id
+                    if is_live or is_aster:
+                        # Live/Aster trading: Query live_trades for batch_id
+                        provider = 'aster' if is_aster else 'symphony'
                         with get_db_connection() as conn:
                             with conn.cursor() as cur:
                                 cur.execute("""
                                     SELECT batch_id FROM live_trades
-                                    WHERE config_id = %s AND closed_at IS NULL
+                                    WHERE config_id = %s AND provider = %s AND closed_at IS NULL
                                     ORDER BY created_at DESC LIMIT 1
-                                """, (config.config_id,))
+                                """, (config.config_id, provider))
                                 result = cur.fetchone()
                                 if result:
                                     open_positions.append({'batch_id': result[0]})
@@ -1060,7 +1064,12 @@ class GGBotOrchestrator:
                     position = open_positions[0]
 
                     # Route to appropriate service
-                    if is_live:
+                    if is_aster:
+                        trade_result = await self.aster_trading.close_position(
+                            position['batch_id'],
+                            user_id
+                        )
+                    elif is_live:
                         trade_result = await self.symphony_trading.close_position(
                             position['batch_id'],
                             reason="position_management"
@@ -1082,7 +1091,10 @@ class GGBotOrchestrator:
                     }
             else:
                 # Route based on trading mode
-                if is_live:
+                if is_aster:
+                    trade_result = await self.aster_trading.execute_trade_intent(trading_intent)
+                    self._log.info(f"V2 AsterDEX live trade completed: {trade_result.get('status')} for {symbol}")
+                elif is_live:
                     trade_result = await self.symphony_trading.execute_trade_intent(trading_intent)
                     self._log.info(f"V2 Symphony live trade completed: {trade_result.get('status')} for {symbol}")
                 else:
