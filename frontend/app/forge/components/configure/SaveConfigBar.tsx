@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Save, X, RotateCcw, Crown, Bot } from 'lucide-react'
+import { Save, X, RotateCcw, Crown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { usePermissions } from '@/lib/permissions'

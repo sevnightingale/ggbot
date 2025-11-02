@@ -1005,7 +1005,7 @@ function ForgeApp() {
       setIsWaitingForAgent(true)
 
       // Send to backend API
-      const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+      const token = await getAuthToken()
       const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message?user_id=${user?.id}`, {
         method: 'POST',
         headers: {
@@ -1032,7 +1032,7 @@ function ForgeApp() {
 
     try {
       // Send "1" to agent (confirmation)
-      const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+      const token = await getAuthToken()
       const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message?user_id=${user?.id}`, {
         method: 'POST',
         headers: {
@@ -1067,7 +1067,7 @@ function ForgeApp() {
     const startAgentIfNeeded = async () => {
       try {
         // Check if agent is already running
-        const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+        const token = await getAuthToken()
         const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status?user_id=${user.id}`, {
           headers: {
             'Authorization': `Bearer ${token}`
@@ -1106,7 +1106,7 @@ function ForgeApp() {
 
     const pollInterval = setInterval(async () => {
       try {
-        const token = await supabase.auth.getSession().then(({ data }) => data.session?.access_token)
+        const token = await getAuthToken()
         const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/poll-response?user_id=${user.id}`, {
           headers: {
             'Authorization': `Bearer ${token}`

@@ -179,22 +179,106 @@ class AsterDEXV3LiveTradingService:
             self._log.error(f"Error checking existing trade: {e}")
             return None
 
-    def _calculate_weight(self, config: Any, confidence: float) -> float:
+    async def _calculate_weight(self, config: Any, confidence: float, symbol: str) -> float:
         """
-        Calculate position quantity (in BTC) from config.
+        Calculate position quantity from config and account balance.
 
-        For AsterDEX, we use small fixed quantities for now.
-        Future: Implement proper position sizing based on account balance.
+        Uses the bot's position sizing configuration to determine trade size:
+        - ACCOUNT_PERCENTAGE: Fixed % of account per trade
+        - CONFIDENCE_BASED: Confidence × max_position_percent
+        - FIXED_USD: Fixed USD amount per trade
+
+        Args:
+            config: Bot configuration with position sizing settings
+            confidence: AI confidence score (0.0-1.0)
+            symbol: Platform format symbol (e.g., "BTC-USDT")
+
+        Returns:
+            Position quantity in base asset (e.g., 0.001 BTC)
         """
-        # Get trading config
-        trading = config.trading if hasattr(config, 'trading') else {}
-        sizing = trading.get("position_sizing", {}) if isinstance(trading, dict) else {}
-        method = sizing.get("method", "ACCOUNT_PERCENTAGE") if sizing else "ACCOUNT_PERCENTAGE"
+        try:
+            # Step 1: Query Aster account balance
+            self._log.info("Querying AsterDEX account balance for position sizing...")
+            balance_data = await self._get_account_balance()
+            if not balance_data:
+                self._log.warning("Could not query account balance, using minimum quantity")
+                return 0.001
 
-        # For now, use small fixed quantity for testing
-        # Minimum for BTC on AsterDEX is 0.001 BTC (~$90 at $90k BTC price)
-        # TODO: Implement proper position sizing based on Aster account balance
-        return 0.001  # Minimum allowed quantity
+            # Get USDT available balance (the margin/collateral asset for futures)
+            # Note: USDT is the margin asset, don't sum with USDC (they show same availableBalance = total equity)
+            available_balance = 0.0
+            for asset in balance_data:
+                if asset.get("asset") == "USDT":
+                    available_balance = float(asset.get("availableBalance", 0))
+                    break
+
+            if available_balance <= 0:
+                self._log.warning("No USDT available balance, using minimum quantity")
+                return 0.001
+
+            self._log.info(f"Available balance (USDT margin): ${available_balance:.2f}")
+
+            # Step 2: Calculate USD position size using config
+            # This returns notional position size (margin × leverage)
+            position_size_usd = config.get_position_size(confidence, available_balance)
+
+            self._log.info(f"Target position size: ${position_size_usd:.2f} (confidence={confidence:.3f})")
+
+            # Step 3: Get current market price for the symbol
+            # Convert platform format (BTC-USDT) to Binance format (BTC/USDT) for price service
+            symbol_for_price = symbol.replace("-", "/")
+            from trading.paper.live_price_service import LivePriceService
+            price_service = LivePriceService()
+            market_price = await price_service.get_current_price(symbol_for_price)
+            asset_price = market_price.mid
+
+            self._log.info(f"Current {symbol} price: ${asset_price:,.2f}")
+
+            # Step 4: Convert USD position size to asset quantity
+            # position_size already includes leverage, so just divide by price
+            quantity = position_size_usd / asset_price
+
+            # Step 5: Apply Aster minimum quantity (0.001 for BTC)
+            # TODO: Read this from exchange filters dynamically
+            min_quantity = 0.001
+            if quantity < min_quantity:
+                self._log.warning(
+                    f"Calculated quantity {quantity:.6f} below minimum {min_quantity}, using minimum"
+                )
+                quantity = min_quantity
+
+            # Step 6: Round to appropriate precision (3 decimals for BTC)
+            # TODO: Read quantityPrecision from exchange filters dynamically
+            quantity = round(quantity, 3)
+
+            # Calculate actual margin that will be used
+            trading = config.trading if hasattr(config, 'trading') else {}
+            leverage = trading.get("leverage", 10) if isinstance(trading, dict) else 10
+            leverage = max(leverage, 1)
+
+            notional = quantity * asset_price
+            margin = notional / leverage
+
+            self._log.info(
+                f"Position sizing: {quantity} {symbol.split('-')[0]} "
+                f"(${notional:.2f} notional / {leverage}x = ${margin:.2f} margin)"
+            )
+
+            # Safety check: ensure margin doesn't exceed 95% of available balance
+            if margin > available_balance * 0.95:
+                self._log.warning(f"Margin ${margin:.2f} exceeds 95% of balance ${available_balance:.2f}, reducing")
+                margin = available_balance * 0.95
+                notional = margin * leverage
+                quantity = notional / asset_price
+                quantity = round(quantity, 3)
+                self._log.info(f"Reduced to: {quantity} {symbol.split('-')[0]} (${notional:.2f} notional, ${margin:.2f} margin)")
+
+            return quantity
+
+        except Exception as e:
+            self._log.error(f"Error calculating position size: {e}", exc_info=True)
+            self._log.warning("Falling back to minimum quantity (0.001)")
+            return 0.001
 
     async def execute_trade_intent(self, intent: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -269,8 +353,8 @@ class AsterDEXV3LiveTradingService:
                     "batch_id": None
                 }
 
-            # Step 6: Calculate quantity
-            quantity = self._calculate_weight(config, confidence)
+            # Step 6: Calculate quantity based on position sizing config
+            quantity = await self._calculate_weight(config, confidence, symbol)
 
             # Step 7: Get leverage
             trading = config.trading if hasattr(config, 'trading') else {}
