@@ -436,7 +436,7 @@ async def get_positions(
             # Aster live trading positions
             from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
             aster_service = AsterDEXV3LiveTradingService()
-            aster_positions = await aster_service.get_open_positions()
+            aster_positions = await aster_service.get_open_positions(config_id)
 
             # Transform Aster positions to match expected format
             positions = []
@@ -494,9 +494,37 @@ async def get_account_status(
         if trading_mode == 'paper':
             paper_trading = SupabasePaperTradingService()
             account = await paper_trading.get_account_summary(config_id)
+        elif trading_mode == 'aster':
+            # Aster live trading account
+            from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+            aster_service = AsterDEXV3LiveTradingService()
+
+            # Get account balance (returns list of balance objects)
+            balance_list = await aster_service._get_account_balance()
+
+            # Find USDT balance from list
+            usdt_balance = {}
+            if balance_list:
+                for balance in balance_list:
+                    if balance.get('asset') == 'USDT':
+                        usdt_balance = balance
+                        break
+
+            # Get open positions to calculate metrics
+            positions = await aster_service.get_open_positions(config_id)
+
+            account = {
+                "balance": float(usdt_balance.get('availableBalance', 0)),
+                "margin_balance": float(usdt_balance.get('balance', 0)),
+                "unrealized_pnl": float(usdt_balance.get('unrealizedProfit', 0)),
+                "open_positions": len(positions),
+                "total_trades": 0,  # Not tracked for Aster
+                "win_rate": 0.0,    # Not tracked for Aster
+                "total_pnl": 0.0    # Not tracked for Aster
+            }
         else:
-            # TODO: Live account via Symphony
-            raise HTTPException(status_code=501, detail="Live account status not implemented yet")
+            # Symphony or other live trading
+            raise HTTPException(status_code=501, detail=f"Trading mode '{trading_mode}' account status not implemented yet")
 
         return {
             "status": "success",

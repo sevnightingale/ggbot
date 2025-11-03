@@ -195,9 +195,21 @@ async def get_balance_series(
                 """, (config_id,))
                 paper_trades = cur.fetchall()
 
+                # Get Aster trade IDs for this config from live_trades table
+                cur.execute("""
+                    SELECT batch_id, created_at, closed_at
+                    FROM live_trades
+                    WHERE config_id = %s AND provider = 'aster' AND closed_at IS NOT NULL
+                    ORDER BY closed_at
+                """, (config_id,))
+                aster_trade_records = cur.fetchall()
+
         # Get Aster trades from API (if user is trading on Aster)
         aster_service = AsterDEXV3LiveTradingService()
         aster_trades_raw = await aster_service.get_user_trades(limit=1000)
+
+        # Build set of trade IDs belonging to this config
+        aster_trade_ids = {str(record[0]) for record in aster_trade_records}
 
         # Build unified trade list with timestamps and P&L
         all_trades = []
@@ -210,9 +222,14 @@ async def get_balance_series(
                 "pnl": float(realized_pnl)
             })
 
-        # Add Aster trades (filter by config if needed - for now include all)
-        if aster_trades_raw:
+        # Add Aster trades (filter by config_id using live_trades mapping)
+        if aster_trades_raw and aster_trade_ids:
             for aster_trade in aster_trades_raw:
+                # Check if this trade belongs to our config
+                trade_id = str(aster_trade.get('id', ''))
+                if trade_id not in aster_trade_ids:
+                    continue
+
                 # Aster trades have 'time' in milliseconds
                 trade_time_ms = aster_trade.get('time', 0)
                 trade_time = datetime.fromtimestamp(trade_time_ms / 1000, tz=timezone.utc) if trade_time_ms else None
