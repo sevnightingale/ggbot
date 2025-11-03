@@ -1134,7 +1134,30 @@ function ForgeApp() {
         setIsWaitingForAgent(true)
         console.log('📤 UI state updated, waiting for agent response...')
       } else {
-        console.log('📤 No existing strategy, skipping context message')
+        // No existing strategy - send greeting to start conversation
+        console.log('📤 No existing strategy, sending initial greeting...')
+
+        const greetingMessage = "Hi! I'm ready to build a trading strategy. What do you recommend based on the available data sources?"
+
+        const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ message: greetingMessage })
+        })
+
+        console.log('📤 Greeting sent, status:', messageResponse.status)
+
+        // Add user message to display
+        setAgentMessages([{
+          role: 'user' as const,
+          content: greetingMessage,
+          timestamp: new Date().toISOString()
+        }])
+
+        setIsWaitingForAgent(true)
       }
     } catch (error) {
       console.error('Error starting strategy discussion:', error)
