@@ -959,8 +959,15 @@ async def send_message_to_agent(
         if not message or not message.strip():
             raise HTTPException(status_code=400, detail="Message cannot be empty")
 
-        # Push to Redis queue (agent polls from right)
-        redis_client.lpush(f"agent:{config_id}:messages", message.strip())
+        # Format message as JSON (same as chat.py)
+        message_data = json.dumps({
+            "type": "user_message",
+            "text": message.strip(),
+            "timestamp": datetime.utcnow().isoformat()
+        })
+
+        # Push to Redis queue (agent polls from left with blpop)
+        redis_client.lpush(f"agent:{config_id}:messages", message_data)
 
         logger.info(
             f"Message sent to agent",
@@ -1089,4 +1096,52 @@ async def get_agent_status(
         raise HTTPException(status_code=500, detail=f"PM2 command failed: {e}")
     except Exception as e:
         logger.error(f"Get agent status failed: {e}", config_id=config_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{config_id}/conversation-history")
+async def get_conversation_history(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """
+    Get conversation history for reconnecting to running agent.
+
+    Args:
+        config_id: Configuration ID
+        current_user: Authenticated user from JWT token
+
+    Returns:
+        List of conversation messages with role, content, and timestamp
+    """
+
+    try:
+        # Get all messages from history list
+        history_raw = redis_client.lrange(f"agent:{config_id}:history", 0, -1)
+
+        # Parse JSON messages
+        messages = []
+        for msg in history_raw:
+            try:
+                parsed = json.loads(msg)
+                messages.append(parsed)
+            except json.JSONDecodeError:
+                logger.warning(f"Failed to parse history message: {msg}")
+                continue
+
+        logger.info(
+            f"Fetched conversation history",
+            config_id=config_id,
+            message_count=len(messages)
+        )
+
+        return {
+            "status": "success",
+            "messages": messages,
+            "count": len(messages),
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Get conversation history failed: {e}", config_id=config_id)
         raise HTTPException(status_code=500, detail=str(e))

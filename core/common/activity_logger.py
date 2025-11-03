@@ -20,19 +20,17 @@ ACTIVITY_PRIORITY = {
     # Priority 1 - Never consolidate (always show individually)
     'trade_entry_long': 1,
     'trade_entry_short': 1,
-    'trade_exit': 1,
-    'position_adjusted': 1,
+    'trade_win': 1,
+    'trade_loss': 1,
     'strategy_updated': 1,
 
     # Priority 2 - Can consolidate (group by type + time)
     'market_query': 2,
-    'decision_made': 2,
-    'analysis': 2,
-    'reasoning': 2,
     'agent_wait': 2,
-    'observation': 2,
     'observation_recorded': 2,
-    'plan': 2,
+    'analysis': 2,      # Frontend: Maps to "Agent Thoughts"
+    'reasoning': 2,     # Frontend: Maps to "Agent Thoughts"
+    'plan': 2,          # Frontend: Maps to "Agent Thoughts"
 }
 
 

@@ -275,11 +275,24 @@ Be disciplined and execute the strategy faithfully.
                 for block in message.content:
                     if isinstance(block, TextBlock):
                         logger.info(f"Agent: {block.text}")
+                        response_data = {
+                            "type": "agent_message",
+                            "text": block.text,
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
+
+                        # Push to response queue for polling
                         await self.redis_client.rpush(
                             f"agent:{self.config_id}:responses",
+                            json.dumps(response_data)
+                        )
+
+                        # Store in conversation history
+                        await self.redis_client.rpush(
+                            f"agent:{self.config_id}:history",
                             json.dumps({
-                                "type": "agent_message",
-                                "text": block.text,
+                                "role": "agent",
+                                "content": block.text,
                                 "timestamp": datetime.utcnow().isoformat()
                             })
                         )
@@ -303,6 +316,16 @@ Be disciplined and execute the strategy faithfully.
                 # LOG: User message to agent
                 logger.debug(f"👤 USER MESSAGE TO AGENT: {user_text}")
 
+                # Store user message in conversation history
+                await self.redis_client.rpush(
+                    f"agent:{self.config_id}:history",
+                    json.dumps({
+                        "role": "user",
+                        "content": user_text,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                )
+
                 # Send to agent
                 await client.query(user_text)
 
@@ -316,11 +339,25 @@ Be disciplined and execute the strategy faithfully.
                             if isinstance(block, TextBlock):
                                 logger.info(f"Agent: {block.text}")
                                 logger.debug(f"🤖 AGENT TEXT BLOCK: {block.text}")
+
+                                response_data = {
+                                    "type": "agent_message",
+                                    "text": block.text,
+                                    "timestamp": datetime.utcnow().isoformat()
+                                }
+
+                                # Push to response queue for polling
                                 await self.redis_client.rpush(
                                     f"agent:{self.config_id}:responses",
+                                    json.dumps(response_data)
+                                )
+
+                                # Store in conversation history
+                                await self.redis_client.rpush(
+                                    f"agent:{self.config_id}:history",
                                     json.dumps({
-                                        "type": "agent_message",
-                                        "text": block.text,
+                                        "role": "agent",
+                                        "content": block.text,
                                         "timestamp": datetime.utcnow().isoformat()
                                     })
                                 )
@@ -363,11 +400,24 @@ Be disciplined and execute the strategy faithfully.
                                 await self._save_strategy(strategy_text, autonomously_editable)
 
                                 # Send confirmation message
+                                confirmation_text = "✅ Strategy saved! Exiting strategy definition mode.\n\nTo start autonomous trading, restart with:\npython agent/run_agent.py --config-id={} --mode=autonomous".format(self.config_id)
+                                response_data = {
+                                    "type": "agent_message",
+                                    "text": confirmation_text,
+                                    "timestamp": datetime.utcnow().isoformat()
+                                }
+
                                 await self.redis_client.rpush(
                                     f"agent:{self.config_id}:responses",
+                                    json.dumps(response_data)
+                                )
+
+                                # Store in conversation history
+                                await self.redis_client.rpush(
+                                    f"agent:{self.config_id}:history",
                                     json.dumps({
-                                        "type": "agent_message",
-                                        "text": "✅ Strategy saved! Exiting strategy definition mode.\n\nTo start autonomous trading, restart with:\npython agent/run_agent.py --config-id={} --mode=autonomous".format(self.config_id),
+                                        "role": "agent",
+                                        "content": confirmation_text,
                                         "timestamp": datetime.utcnow().isoformat()
                                     })
                                 )
@@ -402,22 +452,49 @@ Be disciplined and execute the strategy faithfully.
                                     for block in message.content:
                                         if isinstance(block, TextBlock):
                                             logger.info(f"Agent: {block.text}")
+
+                                            response_data = {
+                                                "type": "agent_message",
+                                                "text": block.text,
+                                                "timestamp": datetime.utcnow().isoformat()
+                                            }
+
                                             await self.redis_client.rpush(
                                                 f"agent:{self.config_id}:responses",
+                                                json.dumps(response_data)
+                                            )
+
+                                            # Store in conversation history
+                                            await self.redis_client.rpush(
+                                                f"agent:{self.config_id}:history",
                                                 json.dumps({
-                                                    "type": "agent_message",
-                                                    "text": block.text,
+                                                    "role": "agent",
+                                                    "content": block.text,
                                                     "timestamp": datetime.utcnow().isoformat()
                                                 })
                                             )
                         else:
                             # Invalid choice - ask again
                             logger.warning(f"Invalid confirmation choice: {user_choice}")
+
+                            invalid_text = "Please reply with '1' to CONFIRM or '2' to REVISE the strategy."
+                            response_data = {
+                                "type": "agent_message",
+                                "text": invalid_text,
+                                "timestamp": datetime.utcnow().isoformat()
+                            }
+
                             await self.redis_client.rpush(
                                 f"agent:{self.config_id}:responses",
+                                json.dumps(response_data)
+                            )
+
+                            # Store in conversation history
+                            await self.redis_client.rpush(
+                                f"agent:{self.config_id}:history",
                                 json.dumps({
-                                    "type": "agent_message",
-                                    "text": "Please reply with '1' to CONFIRM or '2' to REVISE the strategy.",
+                                    "role": "agent",
+                                    "content": invalid_text,
                                     "timestamp": datetime.utcnow().isoformat()
                                 })
                             )

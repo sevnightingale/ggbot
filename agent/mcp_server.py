@@ -24,6 +24,7 @@ from claude_agent_sdk import tool, create_sdk_mcp_server
 
 # Local imports (HTTP client, not direct ggbot imports)
 from agent.service_client import GGBotAPIClient
+from core.common.activity_logger import log_activity_safe, ACTIVITY_PRIORITY
 
 
 # ============================================================================
@@ -191,6 +192,24 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
         # LOG: Response being returned to agent
         logger.debug(f"   Response: {formatted_response[:500]}{'...' if len(formatted_response) > 500 else ''}")
 
+        # Auto-log activity to timeline
+        categories_list = list(categories.keys())
+        log_activity_safe(
+            config_id=agent_context.config_id,
+            user_id=agent_context.user_id,
+            activity_type='market_query',
+            activity_source='agent_tool',
+            summary=f"Queried {symbol}: {', '.join(categories_list)}",
+            details={
+                'symbol': symbol,
+                'categories': categories,
+                'timeframe': timeframe,
+                'data_returned': bool(response_parts)
+            },
+            related_symbol=symbol,
+            importance=6
+        )
+
         return {
             "content": [{
                 "type": "text",
@@ -320,6 +339,31 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
 
         if result.get("status") == "success":
             trade = result.get("trade", {})
+
+            # Auto-log activity to timeline
+            activity_type = f"trade_entry_{side}" if side in ['long', 'short'] else 'trade_entry_long'
+            log_activity_safe(
+                config_id=agent_context.config_id,
+                user_id=agent_context.user_id,
+                activity_type=activity_type,
+                activity_source='agent_tool',
+                summary=f"Opened {side} {symbol} at ${trade.get('entry_price', 'N/A')}",
+                details={
+                    'symbol': symbol,
+                    'side': side,
+                    'entry_price': trade.get('entry_price'),
+                    'size_usd': trade.get('size_usd'),
+                    'leverage': leverage,
+                    'stop_loss_price': stop_loss_price,
+                    'take_profit_price': take_profit_price,
+                    'confidence': confidence
+                },
+                trade_id=trade.get('trade_id'),
+                trade_type='paper',  # TODO: Detect paper/live/aster from config
+                related_symbol=symbol,
+                importance=9
+            )
+
             return {
                 "content": [{
                     "type": "text",
@@ -488,6 +532,30 @@ async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
             trade = result.get("trade", {})
             pnl = trade.get("realized_pnl", 0)
             pnl_pct = trade.get("realized_pnl_percent", 0)
+            symbol = trade.get('symbol', 'N/A')
+
+            # Auto-log activity to timeline (trade_win or trade_loss based on P&L)
+            activity_type = 'trade_win' if pnl >= 0 else 'trade_loss'
+            log_activity_safe(
+                config_id=agent_context.config_id,
+                user_id=agent_context.user_id,
+                activity_type=activity_type,
+                activity_source='agent_tool',
+                summary=f"Closed {symbol}: {'+' if pnl > 0 else ''}{pnl:.2f} ({pnl_pct:.1f}%)",
+                details={
+                    'symbol': symbol,
+                    'side': trade.get('side'),
+                    'exit_price': trade.get('exit_price'),
+                    'pnl': pnl,
+                    'pnl_pct': pnl_pct,
+                    'duration_minutes': trade.get('duration_minutes'),
+                    'close_reason': reasoning
+                },
+                trade_id=trade_id,
+                trade_type='paper',  # TODO: Detect paper/live/aster from config
+                related_symbol=symbol,
+                importance=9
+            )
 
             return {
                 "content": [{
@@ -546,6 +614,23 @@ async def update_strategy(args: Dict[str, Any]) -> Dict[str, Any]:
         if result.get("status") == "success":
             strategy = result.get("strategy", {})
             version = strategy.get("version", "unknown")
+            old_version = strategy.get("old_version", version - 1 if isinstance(version, int) else "unknown")
+
+            # Auto-log activity to timeline
+            log_activity_safe(
+                config_id=agent_context.config_id,
+                user_id=agent_context.user_id,
+                activity_type='strategy_updated',
+                activity_source='agent_tool',
+                summary=f"Updated strategy: v{old_version} → v{version}",
+                details={
+                    'old_version': old_version,
+                    'new_version': version,
+                    'reason': reason,
+                    'new_strategy_content': new_strategy
+                },
+                importance=10
+            )
 
             return {
                 "content": [{
@@ -595,6 +680,21 @@ async def wait_for(args: Dict[str, Any]) -> Dict[str, Any]:
         next_check = datetime.utcnow() + timedelta(minutes=duration_minutes)
 
         logger.info(f"Agent waiting {duration_minutes}m: {reason}")
+
+        # Auto-log activity to timeline BEFORE sleeping
+        log_activity_safe(
+            config_id=agent_context.config_id,
+            user_id=agent_context.user_id,
+            activity_type='agent_wait',
+            activity_source='agent_tool',
+            summary=f"Waiting {duration_minutes} minutes: {reason[:50]}",
+            details={
+                'duration_minutes': duration_minutes,
+                'reason': reason,
+                'next_check_at': next_check.isoformat()
+            },
+            importance=4
+        )
 
         await asyncio.sleep(duration_minutes * 60)
 
@@ -666,6 +766,24 @@ async def record_trade_observation(args: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         if result.get("status") == "success":
+            # Auto-log activity to timeline
+            log_activity_safe(
+                config_id=agent_context.config_id,
+                user_id=agent_context.user_id,
+                activity_type='observation_recorded',
+                activity_source='agent_tool',
+                summary=f"Recorded {observation_type} for trade",
+                details={
+                    'observation_type': observation_type,
+                    'what_went_well': what_went_well,
+                    'what_went_wrong': what_went_wrong,
+                    'predictive_data_points': predictive_data_points,
+                    'decision_review': decision_review
+                },
+                trade_id=trade_id,
+                importance=importance
+            )
+
             return {
                 "content": [{
                     "type": "text",
@@ -773,7 +891,92 @@ async def query_trade_observations(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL 10: REQUEST AUTONOMOUS MODE
+# TOOL 10: LOG ACTIVITY (Explicit Agent Logging)
+# ============================================================================
+
+@tool(
+    "log_activity",
+    """Log your reasoning, analysis, or important thoughts for the activity timeline.
+
+Use this to document your decision-making process, market analysis insights,
+or strategic observations that users should see on the timeline.
+
+Activity types:
+- "analysis": Market analysis and interpretation
+- "reasoning": Decision-making logic and rationale
+- "observation": General observations or insights
+- "plan": Strategic planning or next steps
+
+Params: activity_type (required), summary (required, max 200 chars), details (required), related_symbol (optional), importance (optional, 1-10, default 5)""",
+    {"activity_type": str, "summary": str, "details": str, "related_symbol": str, "importance": int}
+)
+async def log_activity_tool(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Agent explicitly logs activity for timeline visibility.
+
+    This tool allows agents to document their thinking process, analysis,
+    and strategic observations that should appear on the activity timeline.
+    """
+    try:
+        activity_type = args["activity_type"]
+        summary = args["summary"]
+        details = args["details"]
+        related_symbol = args.get("related_symbol")
+        importance = args.get("importance", 5)
+
+        # Validate activity type
+        valid_types = ["analysis", "reasoning", "observation", "plan"]
+        if activity_type not in valid_types:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"⚠️ Invalid activity_type '{activity_type}'. Must be one of: {', '.join(valid_types)}"
+                }]
+            }
+
+        # Log to activities table
+        activity_id = log_activity_safe(
+            config_id=agent_context.config_id,
+            user_id=agent_context.user_id,
+            activity_type=activity_type,
+            activity_source='agent_tool',
+            summary=summary,
+            details={'markdown': details},
+            related_symbol=related_symbol,
+            priority=ACTIVITY_PRIORITY.get(activity_type, 2),
+            importance=importance
+        )
+
+        if activity_id:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"✅ Activity logged successfully!\n\n"
+                            f"Type: {activity_type}\n"
+                            f"Summary: {summary}\n"
+                            f"Importance: {importance}/10"
+                }]
+            }
+        else:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": "⚠️ Activity logging failed (non-critical - your thought was not saved to timeline)"
+                }]
+            }
+
+    except Exception as e:
+        logger.error(f"log_activity_tool failed: {e}")
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"❌ Failed to log activity: {str(e)}"
+            }]
+        }
+
+
+# ============================================================================
+# TOOL 11: REQUEST AUTONOMOUS MODE
 # ============================================================================
 
 @tool(
@@ -849,12 +1052,12 @@ Waiting for your confirmation..."""
 
 def create_mcp_server():
     """
-    Create MCP server with 11 tools for autonomous trading agent.
+    Create MCP server with 12 tools for autonomous trading agent.
 
     Returns:
         MCP server instance to be used with Claude Agent SDK
     """
-    logger.info("Creating MCP server with 11 trading tools")
+    logger.info("Creating MCP server with 12 trading tools")
 
     # LOG: All tool definitions
     logger.debug("📚 MCP TOOLS BEING REGISTERED:")
@@ -868,7 +1071,8 @@ def create_mcp_server():
     logger.debug("   8. wait_for - Pause execution")
     logger.debug("   9. record_trade_observation - Record trade learnings")
     logger.debug("   10. query_trade_observations - Query past observations")
-    logger.debug("   11. request_autonomous_mode - Request mode switch")
+    logger.debug("   11. log_activity - Log agent reasoning/analysis to timeline")
+    logger.debug("   12. request_autonomous_mode - Request mode switch")
 
     # Create server with all tools
     server = create_sdk_mcp_server(
@@ -876,7 +1080,7 @@ def create_mcp_server():
         version="1.0.0",
         tools=[
             query_market_data,
-            get_current_price,  # NEW: Lightweight price check
+            get_current_price,
             execute_trade,
             get_positions,
             get_account_status,
@@ -885,11 +1089,12 @@ def create_mcp_server():
             wait_for,
             record_trade_observation,
             query_trade_observations,
+            log_activity_tool,  # NEW: Explicit activity logging
             request_autonomous_mode
         ]
     )
 
-    logger.info("MCP server created successfully with 11 tools")
+    logger.info("MCP server created successfully with 12 tools")
     return server
 
 

@@ -1179,6 +1179,56 @@ function ForgeApp() {
     }
   }
 
+  // Connect to already-running agent and fetch conversation history
+  useEffect(() => {
+    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) return
+    if (activeTab !== 'configure') return
+
+    const connectToRunningAgent = async () => {
+      try {
+        const token = await getAuthToken()
+
+        // Check if agent is running
+        const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+        })
+
+        if (!statusResponse.ok) return
+
+        const statusData = await statusResponse.json()
+        console.log('🔌 Agent status on mount:', statusData.status, 'mode:', statusData.mode)
+
+        // If running in strategy_definition mode, fetch conversation history
+        if (statusData.status === 'online' && statusData.mode === 'strategy_definition') {
+          console.log('🔌 Fetching conversation history...')
+
+          const historyResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/conversation-history`, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          })
+
+          if (historyResponse.ok) {
+            const historyData = await historyResponse.json()
+            console.log('🔌 Got history:', historyData.count, 'messages')
+
+            // Transform history to agentMessages format
+            const formattedMessages = historyData.messages.map((msg: any) => ({
+              role: msg.role,
+              content: msg.content,
+              timestamp: msg.timestamp
+            }))
+
+            setAgentMessages(formattedMessages)
+            console.log('🔌 Connected to running agent with', formattedMessages.length, 'messages')
+          }
+        }
+      } catch (error) {
+        console.error('Error connecting to running agent:', error)
+      }
+    }
+
+    connectToRunningAgent()
+  }, [selectedConfigId, editingTableFields?.config_type, activeTab, user?.id])
+
   // Poll for agent responses (when agent mode is active)
   useEffect(() => {
     if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) {

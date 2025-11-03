@@ -1,6 +1,7 @@
 "use client"
 
 import React, {useEffect, useMemo, useRef, useState} from "react";
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 /**
  * Activity Timeline Viewer – Canvas v3 (Unicode-safe)
@@ -18,19 +19,20 @@ import React, {useEffect, useMemo, useRef, useState} from "react";
 
 // --------- Types ---------
 
-type Priority = 1 | 2 | 3;
+type Priority = 1 | 2;
 
 type ActivityType =
   | "trade_entry_long"
   | "trade_entry_short"
-  | "trade_exit"
-  | "position_adjusted"
-  | "decision_made"
+  | "trade_win"
+  | "trade_loss"
+  | "strategy_updated"
   | "market_query"
   | "agent_wait"
   | "observation_recorded"
-  | "strategy_updated"
-  | "agent_reasoning";
+  | "analysis"
+  | "reasoning"
+  | "plan";
 
 interface ActivityDefinition {
   type: ActivityType;
@@ -65,14 +67,13 @@ const ICONS = {
   robot: "\uD83E\uDD16",             // 🤖 U+1F916
   greenCircle: "\uD83D\uDFE2",       // 🟢 U+1F7E2
   redCircle: "\uD83D\uDD34",         // 🔴 U+1F534
-  blackSquare: "\u2B1B",              // ⬛ U+2B1B
-  counterClockwise: "\uD83D\uDD01",   // 🔄 U+1F501
+  chartUp: "\uD83D\uDCC8",           // 📈 U+1F4C8 (trending up)
+  chartDown: "\uD83D\uDCC9",         // 📉 U+1F4C9 (trending down)
   thoughtBalloon: "\uD83D\uDCAD",     // 💭 U+1F4AD
   barChart: "\uD83D\uDCCA",          // 📊 U+1F4CA
   stopwatch: "\u23F1\uFE0F",          // ⏱️ U+23F1 U+FE0F
   memo: "\uD83D\uDCDD",               // 📝 U+1F4DD
   wrench: "\uD83D\uDD27",             // 🔧 U+1F527
-  lightBulb: "\uD83D\uDCA1",          // 💡 U+1F4A1
   close: "\u2715",                    // ✕ U+2715
 } as const;
 
@@ -93,16 +94,17 @@ const COLORS = {
 };
 
 const ACTIVITY_DEFS: Record<ActivityType, ActivityDefinition> = {
-  trade_entry_long: { type: "trade_entry_long", priority: 1, icon: ICONS.greenCircle, color: "#10b981", label: "Long Entry", description: "Bot opened a long position." },
-  trade_entry_short:{ type: "trade_entry_short",priority: 1, icon: ICONS.redCircle,   color: "#f43f5e", label: "Short Entry", description: "Bot opened a short position." },
-  trade_exit:        { type: "trade_exit",       priority: 1, icon: ICONS.blackSquare, color: "#6b7280", label: "Position Closed", description: "Bot closed a position." },
-  position_adjusted: { type: "position_adjusted",priority: 1, icon: ICONS.counterClockwise, color: "#22c55e", label: "Position Adjusted", description: "Size/SL/TP modified." },
-  decision_made:     { type: "decision_made",    priority: 2, icon: ICONS.thoughtBalloon, color: "#8b5cf6", label: "Decision", description: "Agent decision step." },
-  market_query:      { type: "market_query",     priority: 2, icon: ICONS.barChart,       color: "#3b82f6", label: "Data Query", description: "Fetched market data." },
-  agent_wait:        { type: "agent_wait",       priority: 2, icon: ICONS.stopwatch,      color: "#64748b", label: "Waiting", description: "Waiting for confirmation." },
-  observation_recorded:{type:"observation_recorded",priority:3,icon: ICONS.memo,          color:"#94a3b8", label:"Note", description:"Recorded observation."},
-  strategy_updated:  { type: "strategy_updated", priority: 3, icon: ICONS.wrench,         color: "#a855f7", label: "Strategy Update", description: "Strategy parameters changed." },
-  agent_reasoning:   { type: "agent_reasoning",  priority: 3, icon: ICONS.lightBulb,      color: "#fde047", label: "Reasoning", description: "Internal chain-of-thought summary." },
+  trade_entry_long:  { type: "trade_entry_long",  priority: 1, icon: ICONS.greenCircle,   color: "#10b981", label: "Long Entry",    description: "Opened a long position." },
+  trade_entry_short: { type: "trade_entry_short", priority: 1, icon: ICONS.redCircle,     color: "#f43f5e", label: "Short Entry",   description: "Opened a short position." },
+  trade_win:         { type: "trade_win",         priority: 1, icon: ICONS.chartUp,       color: "#10b981", label: "Trade Win",     description: "Closed position with profit." },
+  trade_loss:        { type: "trade_loss",        priority: 1, icon: ICONS.chartDown,     color: "#f43f5e", label: "Trade Loss",    description: "Closed position with loss." },
+  strategy_updated:  { type: "strategy_updated",  priority: 1, icon: ICONS.wrench,        color: "#a855f7", label: "Strategy Update", description: "Strategy modified." },
+  market_query:      { type: "market_query",      priority: 2, icon: ICONS.barChart,      color: "#3b82f6", label: "Data Query",    description: "Fetched market data." },
+  agent_wait:        { type: "agent_wait",        priority: 2, icon: ICONS.stopwatch,     color: "#64748b", label: "Waiting",       description: "Agent paused." },
+  observation_recorded: { type: "observation_recorded", priority: 2, icon: ICONS.memo,    color: "#94a3b8", label: "Observation",   description: "Recorded trade observation." },
+  analysis:          { type: "analysis",          priority: 2, icon: ICONS.thoughtBalloon, color: "#8b5cf6", label: "Agent Thoughts", description: "Agent analysis or reasoning." },
+  reasoning:         { type: "reasoning",         priority: 2, icon: ICONS.thoughtBalloon, color: "#8b5cf6", label: "Agent Thoughts", description: "Agent analysis or reasoning." },
+  plan:              { type: "plan",              priority: 2, icon: ICONS.thoughtBalloon, color: "#8b5cf6", label: "Agent Thoughts", description: "Agent analysis or reasoning." },
 };
 
 // --------- Mock Data Generator ---------
@@ -213,16 +215,15 @@ const FUTURE_PAD_RATIO = 0.08; // 8% of span beyond now
 const ZOOM_RULES: Record<ZoomTier, {
   spanMs: number | "all";
   bucketMs: number;
-  visible: Priority[];
   iconPx: number;
   minSpacingPx: number;
   railGap: number;
 }> = {
-  "1h":  { spanMs: 60*60*1000,        bucketMs: 60*1000,     visible: [1,2,3], iconPx: 22, minSpacingPx: 18, railGap: 28 },
-  "4h":  { spanMs: 4*60*60*1000,      bucketMs: 10*60*1000,  visible: [1,2],   iconPx: 20, minSpacingPx: 18, railGap: 28 },
-  "1d":  { spanMs: 24*60*60*1000,     bucketMs: 60*60*1000,  visible: [1],     iconPx: 18, minSpacingPx: 20, railGap: 26 },
-  "1w":  { spanMs: 7*24*60*60*1000,   bucketMs: 4*60*60*1000,visible: [1],     iconPx: 16, minSpacingPx: 22, railGap: 24 },
-  "All": { spanMs: "all",            bucketMs: 24*60*60*1000,visible: [1],    iconPx: 14, minSpacingPx: 28, railGap: 24 },
+  "1h":  { spanMs: 60*60*1000,        bucketMs: 60*1000,     iconPx: 22, minSpacingPx: 18, railGap: 28 },
+  "4h":  { spanMs: 4*60*60*1000,      bucketMs: 10*60*1000,  iconPx: 20, minSpacingPx: 18, railGap: 28 },
+  "1d":  { spanMs: 24*60*60*1000,     bucketMs: 60*60*1000,  iconPx: 18, minSpacingPx: 20, railGap: 26 },
+  "1w":  { spanMs: 7*24*60*60*1000,   bucketMs: 4*60*60*1000, iconPx: 16, minSpacingPx: 22, railGap: 24 },
+  "All": { spanMs: "all",            bucketMs: 24*60*60*1000, iconPx: 14, minSpacingPx: 28, railGap: 24 },
 };
 
 // --------- Component ---------
@@ -231,16 +232,121 @@ interface ActivityTimelineViewerProps {
   configId: string; // For future API integration
 }
 
-export default function ActivityTimelineViewer({ configId: _configId }: ActivityTimelineViewerProps) {
-  // _configId will be used when we connect to real API
-  // For now using mock data
-  void _configId; // Acknowledge unused param
+export default function ActivityTimelineViewer({ configId }: ActivityTimelineViewerProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
 
-  const [log] = useState<MockActivityLog>(() => generateMockLog());
+  // API data state
+  const [log, setLog] = useState<MockActivityLog | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<{ access_token?: string } | null>(null);
   const [zoom, setZoom] = useState<ZoomTier>("4h");
+
+  // Get session for auth
+  useEffect(() => {
+    const supabase = createClientComponentClient()
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession()
+      setSession(session)
+    }
+    getSession()
+  }, []);
+
+  // Fetch activity data from API
+  useEffect(() => {
+    if (!configId || !session?.access_token) return;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+
+        // Fetch all three endpoints in parallel
+        const [activitiesRes, balanceSeriesRes, metadataRes] = await Promise.all([
+          fetch(`/api/v2/activities/${configId}`, {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+          }),
+          fetch(`/api/v2/activities/${configId}/balance-series`, {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+          }),
+          fetch(`/api/v2/activities/${configId}/metadata`, {
+            headers: { 'Authorization': `Bearer ${session.access_token}` }
+          })
+        ]);
+
+        if (!activitiesRes.ok || !balanceSeriesRes.ok || !metadataRes.ok) {
+          throw new Error('Failed to fetch activity data');
+        }
+
+        const activities = await activitiesRes.json();
+        const balanceSeries = await balanceSeriesRes.json();
+        const metadata = await metadataRes.json();
+
+        if (activities.status !== 'success' || balanceSeries.status !== 'success' || metadata.status !== 'success') {
+          throw new Error('API returned error status');
+        }
+
+        // Transform API response to match MockActivityLog interface
+        setLog({
+          activities: activities.activities,
+          balanceTimeseries: balanceSeries.balance_series,
+          metadata: metadata.metadata
+        });
+
+        setError(null);
+      } catch (err) {
+        console.error('Failed to fetch activity data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load activity timeline');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    // Poll for updates every 10 seconds
+    const interval = setInterval(fetchData, 10000);
+    return () => clearInterval(interval);
+  }, [configId, session]);
+
+  // Loading state
+  if (loading && !log) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
+          <span className="text-bone-200">Loading activity timeline...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <div className="text-xl text-bone-200 mb-2">Failed to Load Timeline</div>
+          <div className="text-bone-400">{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (!log || log.activities.length === 0) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
+        <div className="text-center">
+          <div className="text-4xl mb-4">📊</div>
+          <div className="text-xl text-bone-200 mb-2">No Activity Yet</div>
+          <div className="text-bone-400">Activities will appear here once the bot starts trading</div>
+        </div>
+      </div>
+    );
+  }
 
   const seriesMs = useMemo(() => log.balanceTimeseries.map(p => new Date(p.timestamp).getTime()), [log.balanceTimeseries]);
   const seriesVal = useMemo(() => log.balanceTimeseries.map(p => p.balance), [log.balanceTimeseries]);
@@ -349,27 +455,47 @@ export default function ActivityTimelineViewer({ configId: _configId }: Activity
 
   const bucketed = useMemo(() => {
     const ms = rules.bucketMs;
-    const visibleP = new Set(rules.visible);
     const { left, right } = domain;
     const pad = (right - left) * 0.25;
 
+    // Filter by time and type visibility only (all priorities visible)
     const acts = log.activities.filter(a => {
       const t = new Date(a.timestamp).getTime();
-      return t >= left - pad && t <= right + pad && visibleP.has(a.priority) && visibleTypes[a.type];
+      return t >= left - pad && t <= right + pad && visibleTypes[a.type];
     });
 
-    const map = new Map<number, ActivityItem[]>();
+    // Group activities by time + type (priority 2) or time + id (priority 1)
+    const map = new Map<string, ActivityItem[]>();
     for (const a of acts) {
       const t = new Date(a.timestamp).getTime();
       const b = Math.floor(t / ms) * ms;
-      const arr = map.get(b) || [];
+
+      // Create composite bucket key based on priority
+      let bucketKey: string;
+      if (a.priority === 1) {
+        // Priority 1 (trades): Never group - each activity gets unique key
+        bucketKey = `${b}:${a.id}`;
+      } else {
+        // Priority 2 (queries, decisions, etc.): Group by type within time bucket
+        bucketKey = `${b}:${a.type}`;
+      }
+
+      const arr = map.get(bucketKey) || [];
       arr.push(a);
-      map.set(b, arr);
+      map.set(bucketKey, arr);
     }
 
-    const groups = Array.from(map.entries()).map(([bucketTs, items]) => {
-      items.sort((a,b)=> (a.priority-b.priority) || (new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime()));
+    // Convert map to groups array
+    const groups = Array.from(map.entries()).map(([bucketKey, items]) => {
+      // Extract bucketTs from composite key (format: "timestamp:type" or "timestamp:id")
+      const bucketTs = parseInt(bucketKey.split(':')[0]);
+
+      // Sort items within group by timestamp
+      items.sort((a,b)=> new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+
+      // Representative is always the first item (or prioritize priority 1 if mixed)
       const rep = items.find(x=>x.priority===1) || items[0];
+
       return { bucketTs, items, rep };
     }).sort((a,b)=> a.bucketTs - b.bucketTs);
 
@@ -580,55 +706,143 @@ export default function ActivityTimelineViewer({ configId: _configId }: Activity
         const nowX = xScale(latestMs);
         const nowY = yScale(linearInterpolateAt(latestMs, seriesMs, seriesVal));
 
+        // Determine pulse color based on current state
+        const latestActivity = [...log.activities].sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+        let pulseColor = COLORS.positive; // default green
+        let pulseRgb = "16,185,129"; // emerald-500
+
+        if (latestActivity) {
+          const lastEntry = [...log.activities]
+            .filter(a => a.type === 'trade_entry_long' || a.type === 'trade_entry_short')
+            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+          const lastExit = [...log.activities]
+            .filter(a => a.type === 'trade_win' || a.type === 'trade_loss')
+            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+          const inPosition = lastEntry && (!lastExit || new Date(lastEntry.timestamp) > new Date(lastExit.timestamp));
+
+          if (inPosition) {
+            pulseColor = lastEntry.type === 'trade_entry_long' ? COLORS.positive : COLORS.negative;
+            pulseRgb = lastEntry.type === 'trade_entry_long' ? "16,185,129" : "244,63,94";
+          } else if (latestActivity.type === 'agent_wait') {
+            pulseRgb = "100,116,139"; // gray
+          } else if (latestActivity.type === 'market_query') {
+            pulseRgb = "59,130,246"; // blue
+          } else if (['analysis', 'reasoning', 'plan'].includes(latestActivity.type)) {
+            pulseRgb = "139,92,246"; // purple
+          }
+        }
+
         // Pulse rings
         const tt = (t/1000) % 1.5;
-        const r1 = 4 + tt*8;
-        const a1 = 0.35 - tt*0.25;
-        const r2 = 4 + ((tt+0.5)%1.5)*8;
-        const a2 = 0.25 - ((tt+0.5)%1.5)*0.2;
+        const r1 = 4 + tt*10;
+        const a1 = 0.4 - tt*0.3;
+        const r2 = 4 + ((tt+0.5)%1.5)*10;
+        const a2 = 0.3 - ((tt+0.5)%1.5)*0.25;
 
         ctx.save();
         ctx.beginPath();
         ctx.arc(nowX, nowY, r1, 0, Math.PI*2);
-        ctx.strokeStyle = `rgba(16,185,129,${Math.max(0,a1)})`;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(${pulseRgb},${Math.max(0,a1)})`;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
         ctx.beginPath();
         ctx.arc(nowX, nowY, r2, 0, Math.PI*2);
-        ctx.strokeStyle = `rgba(16,185,129,${Math.max(0,a2)})`;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = `rgba(${pulseRgb},${Math.max(0,a2)})`;
+        ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        // Center dot
+        // Center dot with glow
+        ctx.shadowColor = pulseColor;
+        ctx.shadowBlur = 8;
         ctx.beginPath();
-        ctx.fillStyle = COLORS.positive;
-        ctx.arc(nowX, nowY, 3.5, 0, Math.PI*2);
+        ctx.fillStyle = pulseColor;
+        ctx.arc(nowX, nowY, 4, 0, Math.PI*2);
         ctx.fill();
+        ctx.shadowBlur = 0;
 
-        // Current state pill
-        const latestActivity = [...log.activities].sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-        const label = latestActivity ? ACTIVITY_DEFS[latestActivity.type].label : "Idle";
-        const text = `Current: ${label}`;
-        ctx.font = "12px ui-sans-serif";
-        const metrics = ctx.measureText(text);
-        const pw = Math.ceil(metrics.width) + 14;
-        const ph = 20;
+        // Current state pill - intelligent status
+        let statusText = "Idle";
+        let statusColor = pulseColor; // Use same color as pulse dot
+
+        if (latestActivity) {
+          const timeSince = Date.now() - new Date(latestActivity.timestamp).getTime();
+          const minutesAgo = Math.floor(timeSince / 60000);
+
+          // Reuse position check from above
+          const lastEntry = [...log.activities]
+            .filter(a => a.type === 'trade_entry_long' || a.type === 'trade_entry_short')
+            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+          const lastExit = [...log.activities]
+            .filter(a => a.type === 'trade_win' || a.type === 'trade_loss')
+            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+          const inPosition = lastEntry && (!lastExit || new Date(lastEntry.timestamp) > new Date(lastExit.timestamp));
+
+          if (inPosition) {
+            const side = lastEntry.type === 'trade_entry_long' ? 'Long' : 'Short';
+            const symbol = lastEntry.data.symbol || 'position';
+            statusText = `🟢 In ${side}: ${symbol}`;
+            statusColor = lastEntry.type === 'trade_entry_long' ? COLORS.positive : COLORS.negative;
+          } else if (latestActivity.type === 'agent_wait') {
+            // Extract wait duration if available
+            const details = latestActivity.data.details as any;
+            if (details && details.duration_minutes) {
+              const elapsed = minutesAgo;
+              const remaining = Math.max(0, details.duration_minutes - elapsed);
+              statusText = remaining > 0 ? `⏱️ Waiting ${remaining}m` : `👁️ Monitoring`;
+              statusColor = "#64748b";
+            } else {
+              statusText = `⏱️ Waiting`;
+              statusColor = "#64748b";
+            }
+          } else if (latestActivity.type === 'market_query') {
+            const symbol = latestActivity.data.symbol || 'markets';
+            statusText = `📊 Analyzing ${symbol}`;
+            statusColor = "#3b82f6";
+          } else if (['analysis', 'reasoning', 'plan'].includes(latestActivity.type)) {
+            statusText = `💭 Thinking...`;
+            statusColor = "#8b5cf6";
+          } else if (latestActivity.type === 'trade_win' || latestActivity.type === 'trade_loss') {
+            if (minutesAgo < 5) {
+              const pnl = (latestActivity.data.details as any)?.pnl || 0;
+              statusText = latestActivity.type === 'trade_win'
+                ? `📈 Won +$${Math.abs(pnl).toFixed(2)}`
+                : `📉 Lost -$${Math.abs(pnl).toFixed(2)}`;
+              statusColor = latestActivity.type === 'trade_win' ? COLORS.positive : COLORS.negative;
+            } else {
+              statusText = `👁️ Monitoring`;
+              statusColor = "#6b7280";
+            }
+          } else if (minutesAgo > 30) {
+            statusText = "😴 Idle";
+            statusColor = "#64748b";
+          } else {
+            const def = ACTIVITY_DEFS[latestActivity.type];
+            statusText = `${def.icon} ${def.label}`;
+            statusColor = def.color;
+          }
+        }
+
+        ctx.font = "13px ui-sans-serif, system-ui";
+        ctx.fontWeight = "500";
+        const metrics = ctx.measureText(statusText);
+        const pw = Math.ceil(metrics.width) + 20;
+        const ph = 26;
         const maxW = (overlay.width/dpr) - 56 - 16;
         const maxH = (overlay.height/dpr) - 24 - 28;
-        const px = Math.min(Math.max(nowX + 10, 56), 56 + Math.max(10, maxW - pw));
-        const py = Math.max(24, Math.min(nowY - ph - 8, 24 + Math.max(10, maxH - ph)));
+        const px = Math.min(Math.max(nowX + 14, 56), 56 + Math.max(10, maxW - pw));
+        const py = Math.max(24, Math.min(nowY - ph - 10, 24 + Math.max(10, maxH - ph)));
 
         ctx.save();
-        roundRect(ctx, px, py, pw, ph, 8);
-        ctx.fillStyle = COLORS.pillBg;
+        roundRect(ctx, px, py, pw, ph, 10);
+        ctx.fillStyle = "rgba(8,10,14,0.92)";
         ctx.fill();
-        ctx.strokeStyle = COLORS.pillBorder;
-        ctx.lineWidth = 1;
+        ctx.strokeStyle = statusColor + "50";
+        ctx.lineWidth = 1.5;
         ctx.stroke();
-        ctx.fillStyle = COLORS.text;
+        ctx.fillStyle = statusColor;
         ctx.textBaseline = "middle";
         ctx.textAlign = "left";
-        ctx.fillText(text, px + 7, py + ph/2 + 0.5);
+        ctx.fillText(statusText, px + 10, py + ph/2 + 1);
         ctx.restore();
       }
 
@@ -755,8 +969,8 @@ export default function ActivityTimelineViewer({ configId: _configId }: Activity
   const info = log.metadata;
 
   return (
-    <div className="w-full h-full min-h-[560px] bg-[#0b0d12] text-white">
-      <div className="max-w-6xl mx-auto p-4 space-y-3">
+    <div className="w-full h-full min-h-screen bg-[#0b0d12] text-white">
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
         {/* Header */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
@@ -793,34 +1007,85 @@ export default function ActivityTimelineViewer({ configId: _configId }: Activity
         {/* Chart area */}
         <div
           ref={containerRef}
-          className="relative w-full h-[460px] rounded-2xl overflow-hidden ring-1 ring-white/10"
+          className="relative w-full h-[calc(100vh-280px)] min-h-[500px] rounded-2xl overflow-hidden ring-1 ring-white/10"
           style={{background: COLORS.bg}}
         >
           <canvas ref={canvasRef} className="absolute inset-0"/>
           <canvas ref={overlayRef} className="absolute inset-0 pointer-events-none"/>
-
-          {/* Legend / filters */}
-          <div className="absolute left-3 bottom-3 flex flex-wrap gap-2 max-w-[90%]">
-            {(Object.keys(ACTIVITY_DEFS) as ActivityType[]).map(k => {
-              const def = ACTIVITY_DEFS[k];
-              const on = visibleTypes[k];
-              return (
-                <button
-                  key={k}
-                  onClick={() => setVisibleTypes(v => ({...v, [k]: !v[k]}))}
-                  className={`px-2 py-1 rounded-xl text-xs border ${on?"bg-white/10 border-white/30":"border-white/10 text-white/50"}`}
-                  title={def.description}
-                >
-                  {def.icon} {def.label}
-                </button>
-              );
-            })}
-          </div>
         </div>
 
-        {/* Navigation hint */}
-        <div className="text-xs text-white/50">
-          Wheel: scroll through time (up = earlier, down = later). Shift+Wheel: change zoom tier. Drag: pan. Hover: glow. Click icons: details.
+        {/* Legend / Activity Filters */}
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-medium text-white/70">Activity Types</h3>
+            <button
+              onClick={() => {
+                const allOn = Object.values(visibleTypes).every(v => v);
+                setVisibleTypes(
+                  Object.fromEntries(
+                    (Object.keys(ACTIVITY_DEFS) as ActivityType[]).map(k => [k, !allOn])
+                  ) as Record<ActivityType, boolean>
+                );
+              }}
+              className="text-xs text-white/50 hover:text-white/80"
+            >
+              Toggle All
+            </button>
+          </div>
+
+          <div className="flex flex-wrap gap-2">
+            {(() => {
+              // Deduplicate: analysis/reasoning/plan all show as one "Agent Thoughts" button
+              const seen = new Set<string>();
+              const legendItems: { key: string; def: ActivityDefinition; types: ActivityType[] }[] = [];
+
+              (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k => {
+                const def = ACTIVITY_DEFS[k];
+                const label = def.label;
+
+                if (!seen.has(label)) {
+                  seen.add(label);
+                  // Find all types with same label
+                  const relatedTypes = (Object.keys(ACTIVITY_DEFS) as ActivityType[])
+                    .filter(t => ACTIVITY_DEFS[t].label === label);
+                  legendItems.push({ key: k, def, types: relatedTypes });
+                }
+              });
+
+              return legendItems.map(({ key, def, types }) => {
+                // Button is "on" if ANY of the related types are visible
+                const on = types.some(t => visibleTypes[t]);
+
+                return (
+                  <button
+                    key={key}
+                    onClick={() => {
+                      // Toggle all related types together
+                      setVisibleTypes(v => {
+                        const newState = { ...v };
+                        types.forEach(t => { newState[t] = !on; });
+                        return newState;
+                      });
+                    }}
+                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${
+                      on
+                        ? "bg-white/10 border-white/30 text-white"
+                        : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
+                    }`}
+                    title={def.description}
+                  >
+                    <span className="text-base mr-1.5">{def.icon}</span>
+                    {def.label}
+                  </button>
+                );
+              });
+            })()}
+          </div>
+
+          {/* Navigation hint */}
+          <div className="text-xs text-white/40 pt-1">
+            💡 <span className="text-white/50">Wheel to scroll time • Shift+Wheel to zoom • Drag to pan • Click icons for details</span>
+          </div>
         </div>
       </div>
 
