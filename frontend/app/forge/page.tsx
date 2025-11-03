@@ -202,6 +202,13 @@ function ForgeApp() {
           method: 'fixed_usd',
           fixed_amount_usd: 100,
           account_percent: 5.0,
+          max_position_percent: 10.0
+        },
+        risk_management: {
+          max_positions: 1,
+          default_stop_loss_percent: 5.0,
+          default_take_profit_percent: 10.0,
+          max_daily_loss_usd: 500
         }
       }
     }
@@ -265,12 +272,6 @@ function ForgeApp() {
           default_stop_loss_percent: 5.0,
           default_take_profit_percent: 10.0,
           max_daily_loss_usd: 500
-        },
-        exchange_config: {
-          exchange_type: 'cex',
-          selected_exchange: 'binance',
-          api_key: '',
-          secret_key: ''
         }
       },
       telegram_integration: {
@@ -841,26 +842,6 @@ function ForgeApp() {
       config_type: originalConfig.config_type
     })
     setHasUnsavedChanges(false)
-  }
-
-  // Handle bot type changes with warning
-  const handleBotTypeChange = (newType: 'scheduled_trading' | 'signal_validation' | 'agentic') => {
-    if (!isEditingConfig) return
-
-    // TODO: Show warning about field resets when changing bot type
-    updateEditingConfig({
-      tableFields: { config_type: newType },
-      configData: {
-        // Update analysis_frequency based on type
-        decision: {
-          ...editingConfigData?.decision,
-          analysis_frequency:
-            newType === 'signal_validation' ? 'signal_driven' :
-            newType === 'agentic' ? 'agent_driven' :
-            '1h'
-        }
-      }
-    })
   }
 
   // Handler function for creating new bot
@@ -1453,15 +1434,15 @@ function ForgeApp() {
                             {/* Start Discussion Button */}
                             <button
                               onClick={handleStartStrategyDiscussion}
-                              disabled={selectedBot?.is_active}
+                              disabled={selectedBot?.state === 'active'}
                               className={`w-full py-4 rounded-lg font-medium transition-colors ${
-                                selectedBot?.is_active
+                                selectedBot?.state === 'active'
                                   ? 'bg-gray-400 cursor-not-allowed opacity-60'
                                   : 'bg-emerald-600 hover:bg-emerald-700 text-white'
                               }`}
-                              title={selectedBot?.is_active ? 'Deactivate bot first to edit strategy' : 'Start conversation to refine strategy'}
+                              title={selectedBot?.state === 'active' ? 'Deactivate bot first to edit strategy' : 'Start conversation to refine strategy'}
                             >
-                              {selectedBot?.is_active ? '🔒 Bot Active - Deactivate to Edit' : '💬 Refine Strategy'}
+                              {selectedBot?.state === 'active' ? '🔒 Bot Active - Deactivate to Edit' : '💬 Refine Strategy'}
                             </button>
                           </div>
                         ) : (
@@ -1513,7 +1494,6 @@ function ForgeApp() {
                     onUpdateConfig={(updates) => {
                       updateEditingConfig({ configData: updates })
                     }}
-                    onBotTypeChange={handleBotTypeChange}
                   />
                 )
               ) : (

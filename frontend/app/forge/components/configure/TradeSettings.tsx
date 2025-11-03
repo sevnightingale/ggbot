@@ -524,68 +524,6 @@ export function TradeSettings({
           </div>
         )}
       </div>
-
-      {/* Exchange Connection (Locked for MVP) */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 opacity-60">
-        <div className="flex items-center gap-3 mb-4">
-          <Lock className="h-5 w-5 text-[var(--text-muted)]" />
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-            Exchange Connection
-          </h3>
-          <span className="px-2 py-1 rounded-full bg-[var(--agent-trading)]/20 text-xs text-[var(--agent-trading)] border border-[var(--agent-trading)]/30">
-            Live Trading - Coming Soon
-          </span>
-        </div>
-
-        <div className="space-y-4">
-          <div className="p-4 rounded-xl bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="h-2 w-2 rounded-full bg-emerald-400"></div>
-              <span className="font-medium text-[var(--text-primary)]">Paper Trading Active</span>
-            </div>
-            <div className="text-sm text-[var(--text-muted)]">
-              Your bot is currently trading with $10,000 in simulated funds. Live trading with real exchanges will be available soon.
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-              Exchange
-            </label>
-            <select
-              disabled
-              className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-            >
-              <option>Binance (Coming Soon)</option>
-            </select>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                API Key
-              </label>
-              <input
-                type="password"
-                placeholder="Your exchange API key"
-                disabled
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                API Secret
-              </label>
-              <input
-                type="password"
-                placeholder="Your exchange API secret"
-                disabled
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-muted)] cursor-not-allowed"
-              />
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   )
 }

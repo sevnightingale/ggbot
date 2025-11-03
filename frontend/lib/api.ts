@@ -76,12 +76,6 @@ export interface ConfigData {
       default_take_profit_percent?: number
       max_daily_loss_usd?: number
     }
-    exchange_config: {
-      exchange_type: string
-      selected_exchange?: string
-      api_key?: string
-      secret_key?: string
-    }
   }
   telegram_integration: {
     listener: {
@@ -745,12 +739,6 @@ export function createDefaultConfigData(): ConfigData {
         default_stop_loss_percent: 5.0, // Wider stops for demo
         default_take_profit_percent: 10.0,
         max_daily_loss_usd: 500
-      },
-      exchange_config: {
-        exchange_type: "cex",
-        selected_exchange: "binance",
-        api_key: "",
-        secret_key: ""
       }
     },
     telegram_integration: {

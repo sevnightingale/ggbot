@@ -9,7 +9,6 @@ from .models import (
     BotConfig,
     PositionSizingMethod,
     ExecutionMode,
-    ExchangeType,
     TradingConfig,
     PositionSizingConfig,
     RiskManagementConfig,
@@ -22,18 +21,17 @@ from .repository import ConfigRepository, config_repo
 __all__ = [
     # Models
     "BotConfig",
-    "PositionSizingMethod", 
+    "PositionSizingMethod",
     "ExecutionMode",
-    "ExchangeType",
     "TradingConfig",
     "PositionSizingConfig",
     "RiskManagementConfig",
-    
+
     # Utilities
     "create_default_config",
     "load_config_from_dict",
     "config_to_dict",
-    
+
     # Repository
     "ConfigRepository",
     "config_repo",

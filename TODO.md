@@ -230,6 +230,115 @@
 
 ---
 
+## 📊 **HIGH PRIORITY - Activity Timeline Integration** [ACTIVITY_TIMELINE.md]
+
+**Timeline**: 8-12 days - Universal activity visualization for all bot types + competition features
+**Status**: Canvas viewer built at `/view/[config_id]` with mock data, ready for real data integration
+
+**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for complete implementation plan
+
+**Vision**: Transform the existing Canvas-based Activity Timeline into a production-ready feature that visualizes the complete lifecycle of bot/agent trading activities. Works for ALL config types: agentic, scheduled, and signal validation.
+
+**Key Innovation**:
+- Every bot action becomes a clickable icon on the performance chart
+- Click a trade to see its entire story - from market analysis to entry to monitoring to exit
+- Trade lifecycle linking: All activities with same `trade_id` are highlighted and grouped
+- Unified `activities` table powers everything
+
+**Competition Features** (Phase 6):
+- "View Configuration" modal showing agent's full strategy conversation
+- Active Positions section at bottom of timeline
+- Submission-ready view page for Aster Vibe Trading Competition
+
+### **Phase 1: Database & Infrastructure** (2-3 days)
+- [ ] Create unified `activities` table (replaces separate `agent_activities` concept)
+- [ ] Add indexes for performance (config_id, created_at, trade_id, priority)
+- [ ] Enable RLS policy for user isolation
+- [ ] Create `log_activity()` helper function (`core/common/activity_logger.py`)
+- [ ] Test basic INSERT/SELECT operations
+
+### **Phase 2: Orchestrator Integration** (2-3 days)
+- [ ] **Scheduled Bot Logging** (`ggbot.py`)
+  - [ ] Log market_query activities after extraction
+  - [ ] Log decision_made activities after decision engine
+  - [ ] Log trade_entry_long/short on position open
+  - [ ] Log trade_exit on position close
+- [ ] **Agent Tool Logging** (`agent/mcp_server.py`)
+  - [ ] Update query_market_data to auto-log
+  - [ ] Update execute_trade to auto-log
+  - [ ] Update close_position to auto-log
+  - [ ] Update wait_for to auto-log
+  - [ ] Add new log_activity tool for explicit logging
+- [ ] Test with real bot/agent execution
+- [ ] Verify activities appear in database with correct linking
+
+### **Phase 3: API Endpoints** (1-2 days)
+- [ ] Create `api/activities.py` with 3 endpoints:
+  - [ ] `GET /api/v2/activities/{config_id}` - Get all activities with filters
+  - [ ] `GET /api/v2/activities/{config_id}/balance-series` - Equity curve data
+  - [ ] `GET /api/v2/activities/{config_id}/metadata` - Bot stats for header
+- [ ] Add query filters (time range, activity types, trade_id, importance)
+- [ ] Register router in ggbot.py
+- [ ] Test with Postman/curl
+- [ ] Verify auth and ownership checks
+
+### **Phase 4: Frontend Integration** (2-3 days)
+- [ ] **Replace Mock Data** (`ActivityTimelineViewer.tsx`)
+  - [ ] Remove generateMockActivityLog()
+  - [ ] Add API calls to three endpoints
+  - [ ] Add loading/error/empty states
+  - [ ] Implement 10s polling for real-time updates
+- [ ] **Trade Lifecycle Highlighting**
+  - [ ] Add selectedTradeId state
+  - [ ] Highlight icons with glow effect when trade selected
+  - [ ] Draw connection lines between related activities
+  - [ ] Filter side panel to show trade narrative
+- [ ] **Enhanced Side Panel**
+  - [ ] Create TradeNarrativePanel component
+  - [ ] Group activities by phase (entry → monitoring → exit)
+  - [ ] Show trade outcome (P&L, duration)
+  - [ ] Expandable cards for activity details
+- [ ] Test with real data from test bot
+
+### **Phase 5: Testing & Polish** (1-2 days)
+- [ ] End-to-end testing with scheduled bot
+- [ ] End-to-end testing with agent bot
+- [ ] Test trade lifecycle clicking and highlighting
+- [ ] Test zoom levels (icons appear/disappear correctly)
+- [ ] Test empty state, loading state, error state
+- [ ] Test performance with 100+ activities
+- [ ] Mobile responsive testing
+- [ ] Edge cases (long timelines, no exit yet, etc.)
+
+### **Phase 6: Competition Features** (1-2 days)
+- [ ] **View Configuration Modal**
+  - [ ] Track conversation history in `agent/run_agent.py` during strategy definition
+  - [ ] Save `conversation_history` array in `config_data.agent_strategy`
+  - [ ] Create `ConfigurationModal.tsx` with two-column layout (conversation + strategy)
+  - [ ] Add "View Configuration" button to view page (left of "Jump to Now")
+  - [ ] Test modal displays conversation + strategy correctly
+- [ ] **Active Positions Section**
+  - [ ] Add `PositionsTable` component to bottom of view page
+  - [ ] Style with proper spacing and borders
+  - [ ] Test with open/empty positions
+- [ ] **Competition Testing**
+  - [ ] Test full page with live agent `d13d5536-2498-4f27-b2bc-e4f98958e1d8`
+  - [ ] Verify page renders on mobile/tablet
+  - [ ] Take screenshots for submission materials
+  - [ ] Verify public access (no auth required)
+
+**Success Metrics**:
+- ✅ Unified activities table capturing all bot/agent actions
+- ✅ Timeline displays real activities with correct icons/timestamps
+- ✅ Trade clicking highlights all related activities
+- ✅ Side panel shows rich details and trade narratives
+- ✅ Real-time updates via polling (10s interval)
+- ✅ All bot types (agents, scheduled, signal validation) supported
+- ✅ Canvas performance smooth at 60fps
+- ✅ Competition features: View Configuration modal + Active Positions section
+
+---
+
 ## 🤖 **HIGH PRIORITY - Autonomous Trading Agent** [AGENT.md]
 
 **Timeline**: 1-2 weeks - Enable fully autonomous AI trading agents using Claude Agent SDK
@@ -448,13 +557,12 @@
 - [ ] "Begin Strategy Discussion" button for editing (DONE - integrated into state machine)
 
 #### **Phase 4b: Activity Timeline Integration** (Week 2-3)
-- [ ] Database: Create `agent_activities` table
-- [ ] MCP Server: Add `log_activity` tool + auto-logging from existing tools
-- [ ] API endpoints: activities, balance-series, metadata
-- [ ] Connect ActivityTimelineViewer to real data (replace mock)
-- [ ] Side panel enhancement with rich activity details
-- [ ] Real-time updates via SSE
-- [ ] Agent status banner with countdown timers
+
+**Note**: Activity Timeline has been consolidated into a universal feature that works for ALL bot types (agents, scheduled, signal validation).
+
+**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for complete implementation plan
+
+- [ ] This section moved to standalone "Activity Timeline Integration" section below
 
 **Testing with existing agent**: config_id `d13d5536-2498-4f27-b2bc-e4f98958e1d8`
 
@@ -832,93 +940,6 @@
 - **Accuracy**: Documentation matches actual production code
 - **Completeness**: No major systems undocumented
 - **Maintenance**: Easier to keep docs updated with clear ownership
-
----
-
-## 📊 **MEDIUM-LOW PRIORITY - Trade Timeline Feature**
-
-**Timeline**: 9-12 days - Complete trade lifecycle visualization and analytics foundation
-
-**See**: [DOCS/TRADE_TIMELINE.md](DOCS/TRADE_TIMELINE.md) for complete design specification
-**Status**: ✅ Canvas-based visualization prototype complete at `/view/[config_id]` (mock data, competition demo)
-
-### Overview
-Comprehensive trade lifecycle view showing Market Data → Entry Decision → Trade Management → Exit Decision, enabling transparency and advanced analytics.
-
-### Phase 0: Prototype Visualization (COMPLETE)
-- [x] Create Canvas-based Activity Timeline component
-- [x] Implement zoom levels (1h/4h/1d/1w/All) with activity grouping
-- [x] Add interactive features (drag pan, hover, click for details)
-- [x] Deploy at `/view/[config_id]` route (public, no auth, mock data)
-- [ ] Connect to real API data (future - currently mock data only)
-
-### Phase 1: Database Schema (2-3 days)
-- [ ] Add `exit_decision_id` to `paper_trades` table
-- [ ] Add `exit_decision_id` to `live_trades` table
-- [ ] Add `trade_id` to `decisions` table (reverse lookup)
-- [ ] Add `trade_type` ('paper'/'live') to `decisions` table
-- [ ] Create indexes for performance
-- [ ] Write and test migration scripts
-- [ ] Deploy schema changes to production
-
-### Phase 2: Backend Integration (3-4 days)
-- [ ] Update Decision Engine V2
-  - [ ] Add `active_trade` parameter to `make_decision()`
-  - [ ] Implement `_link_decision_to_trade()` method
-  - [ ] Link "wait" decisions to active trades
-- [ ] Update Paper Trading Engine
-  - [ ] Link opening decision to trade on entry
-  - [ ] Store exit_decision_id on close
-  - [ ] Update `execute_trade()` method
-  - [ ] Update `close_position()` method
-- [ ] Update Live Trading Engine (Symphony)
-  - [ ] Link opening decision to live_trades
-  - [ ] Store exit_decision_id on Symphony close
-  - [ ] Update Symphony service methods
-- [ ] Update Orchestrator (ggbot.py)
-  - [ ] Pass active_trade context to decision engine
-  - [ ] Pass exit_decision_id when closing positions
-  - [ ] Implement `_get_active_trade()` helper
-
-### Phase 3: API Endpoints (1 day)
-- [ ] Create `GET /api/v2/trade/{trade_id}/timeline` endpoint
-  - [ ] Support both paper and live trades
-  - [ ] Verify ownership/permissions
-  - [ ] Return entry decision, monitoring decisions, exit decision
-  - [ ] Parse and return formatted market data
-- [ ] Update API client (frontend/lib/api.ts)
-  - [ ] Add `getTradeTimeline(tradeId, tradeType)` method
-
-### Phase 4: Frontend Component (2-3 days)
-- [ ] Create `TradeTimelineModal.tsx` component
-  - [ ] 4-section timeline UI (Market Data, Entry, Management, Exit)
-  - [ ] Expandable/collapsible sections
-  - [ ] Loading and error states
-  - [ ] Mobile responsive design
-- [ ] Add Timeline triggers to existing components
-  - [ ] "View Timeline" in TradeDetailPopover
-  - [ ] Timeline icon in PerformanceChart trade dots
-  - [ ] Timeline button in DecisionFeed cards
-  - [ ] Timeline option in Trade History Modal
-- [ ] Market data formatting component
-  - [ ] Parse multi-timeframe data from prompt
-  - [ ] Format indicators for readability
-  - [ ] Highlight critical signals
-
-### Phase 5: Testing & Polish (2 days)
-- [ ] Test with existing trades (NULL exit_decision_id handling)
-- [ ] Test with new trades (verify full linking)
-- [ ] Test paper and live trades separately
-- [ ] Verify monitoring decisions link correctly
-- [ ] Test Timeline modal on mobile
-- [ ] Add fallback queries for old trades without links
-
-### Future Analytics Capabilities
-- [ ] Win/loss pattern analysis by market conditions
-- [ ] Confidence calibration analysis
-- [ ] Indicator effectiveness correlation
-- [ ] Monitoring frequency vs outcomes
-- [ ] Multi-timeframe analysis effectiveness
 
 ---
 

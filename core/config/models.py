@@ -23,12 +23,6 @@ class ExecutionMode(str, Enum):
     LIVE = "live"
 
 
-class ExchangeType(str, Enum):
-    """Exchange type enumeration."""
-    CEX = "cex"
-    DEX = "dex"
-
-
 class DataSourcesConfig(BaseModel):
     """Data sources configuration for extraction module."""
     technical_indicators: List[str] = Field(default_factory=list, description="Timeframe-specific technical indicators")
@@ -131,31 +125,12 @@ class RiskManagementConfig(BaseModel):
         return v
 
 
-class ExchangeConfig(BaseModel):
-    """Exchange configuration for live trading."""
-    exchange_type: ExchangeType = Field(default=ExchangeType.CEX, description="Exchange type")
-    selected_exchange: Optional[str] = Field("binance", description="Selected exchange name")
-    api_key: Optional[str] = Field("", description="Exchange API key (encrypted)")
-    secret_key: Optional[str] = Field("", description="Exchange secret key (encrypted)")
-
-    @field_validator('selected_exchange')
-    @classmethod
-    def validate_exchange_name(cls, v):
-        """Validate exchange name."""
-        if v:
-            valid_cex = ["binance", "coinbase", "kraken", "bybit", "bitmex"]
-            if v not in valid_cex:
-                raise ValueError(f"Invalid exchange: {v}. Must be one of {valid_cex}")
-        return v
-
-
 class TradingConfig(BaseModel):
     """Trading module configuration."""
     execution_mode: ExecutionMode = Field(default=ExecutionMode.PAPER, description="Trading execution mode")
     leverage: int = Field(default=1, ge=1, le=100, description="Trading leverage (1x for spot, up to 100x for perpetuals)")
     position_sizing: PositionSizingConfig = Field(default_factory=PositionSizingConfig, description="Position sizing configuration")
     risk_management: RiskManagementConfig = Field(default_factory=RiskManagementConfig, description="Risk management configuration")
-    exchange_config: ExchangeConfig = Field(default_factory=ExchangeConfig, description="Exchange configuration")
 
 
 class TelegramListenerConfig(BaseModel):
