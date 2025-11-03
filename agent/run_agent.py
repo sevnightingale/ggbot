@@ -369,7 +369,8 @@ Be disciplined and execute the strategy faithfully.
                                 if len(response_text.split('\n')[0]) > 50:
                                     summary += "..."
 
-                                await log_activity(
+                                # log_activity is synchronous, no await needed
+                                log_activity(
                                     config_id=self.config_id,
                                     user_id=self.user_id,
                                     activity_type='analysis',

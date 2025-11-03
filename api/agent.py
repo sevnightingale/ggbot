@@ -219,6 +219,8 @@ async def query_market_data(
                 """Recursively convert numpy/pandas objects to JSON-serializable types"""
                 if isinstance(obj, (np.integer, np.floating)):
                     return float(obj)
+                elif isinstance(obj, np.bool_):
+                    return bool(obj)
                 elif isinstance(obj, np.ndarray):
                     return obj.tolist()
                 elif isinstance(obj, pd.Series):
@@ -262,6 +264,8 @@ async def query_market_data(
 
     except Exception as e:
         logger.error(f"Market data query failed: {e}", user_id=user_id)
+        import traceback
+        logger.error(f"Traceback: {traceback.format_exc()}", user_id=user_id)
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -302,7 +302,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
     const fetchPositions = async () => {
       try {
-        const response = await fetch(`/api/v2/positions?config_id=${configId}`, {
+        const response = await fetch(`/api/v2/paper-trading/${configId}/positions`, {
           headers: { 'Authorization': `Bearer ${session.access_token}` }
         });
         const data = await response.json();

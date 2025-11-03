@@ -1022,12 +1022,11 @@ def create_mcp_server():
             wait_for,
             record_trade_observation,
             query_trade_observations,
-            log_activity_tool,  # NEW: Explicit activity logging
             save_strategy_and_exit
         ]
     )
 
-    logger.info("MCP server created successfully with 12 tools")
+    logger.info("MCP server created successfully with 11 tools")
     return server
 
 
