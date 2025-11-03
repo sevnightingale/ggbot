@@ -1099,12 +1099,13 @@ function ForgeApp() {
 
         // If there's an existing strategy, send it as context
         if (editingConfigData?.agent_strategy?.content) {
+          console.log('📤 Sending existing strategy as context...')
           // Wait a moment for agent to initialize
           await new Promise(resolve => setTimeout(resolve, 2000))
 
           const contextMessage = `Here is my current strategy:\n\n${editingConfigData.agent_strategy.content}\n\nI'd like to refine or update it. What improvements would you suggest?`
 
-          await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
+          const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
@@ -1113,14 +1114,23 @@ function ForgeApp() {
             body: JSON.stringify({ message: contextMessage })
           })
 
+          console.log('📤 Message sent, status:', messageResponse.status)
+
           // Add user message to display
-          setAgentMessages(prev => [...prev, {
-            role: 'user' as const,
-            content: contextMessage,
-            timestamp: new Date().toISOString()
-          }])
+          setAgentMessages(prev => {
+            const updated = [...prev, {
+              role: 'user' as const,
+              content: contextMessage,
+              timestamp: new Date().toISOString()
+            }]
+            console.log('📤 Updated agentMessages:', updated.length, 'messages')
+            return updated
+          })
 
           setIsWaitingForAgent(true)
+          console.log('📤 UI state updated, waiting for agent response...')
+        } else {
+          console.log('📤 No existing strategy, skipping context message')
         }
       }
     } catch (error) {
@@ -1209,7 +1219,12 @@ function ForgeApp() {
 
   // Poll for agent responses (when agent mode is active)
   useEffect(() => {
-    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) return
+    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) {
+      console.log('🔄 Poll skipped:', { selectedConfigId, configType: editingTableFields?.config_type, userId: user?.id })
+      return
+    }
+
+    console.log('🔄 Starting agent response polling...')
 
     const pollInterval = setInterval(async () => {
       try {
@@ -1220,11 +1235,15 @@ function ForgeApp() {
           }
         })
 
+        console.log('🔄 Poll response status:', response.status)
+
         if (!response.ok) return
 
         const data = await response.json()
+        console.log('🔄 Poll data:', data)
 
         if (data.status === 'success' && data.message) {
+          console.log('✅ Got agent message, adding to UI')
           // Add agent message to UI
           const agentMessage = {
             role: 'agent' as const,
@@ -1244,7 +1263,10 @@ function ForgeApp() {
       }
     }, 2000) // Poll every 2 seconds
 
-    return () => clearInterval(pollInterval)
+    return () => {
+      console.log('🔄 Stopping agent response polling')
+      clearInterval(pollInterval)
+    }
   }, [selectedConfigId, editingTableFields?.config_type, user?.id])
 
   // Helper function to refresh bot list from server (for error recovery)
