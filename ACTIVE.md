@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-03 08:59:24 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-03 10:30:16 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -27,8 +27,8 @@
   - Total P&L: $-15,943.29
 - **Recent Activity**:
   - Last 24 hours: 0 trades
-  - Last 7 days: 1162 trades
-  - Last 30 days: 4216 trades
+  - Last 7 days: 1154 trades
+  - Last 30 days: 4215 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -48,7 +48,7 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 7 decisions (avg confidence: 17.1%)
+- **wait**: 9 decisions (avg confidence: 17.8%)
 
 ### System Health
 - **Decisions (last hour)**: 1
@@ -60,22 +60,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 62MB | 1h 55m | 23 |
-| x-bot | 🟢 online | 0% | 40MB | 1h 55m | 23 |
-| error-alerts | 🟢 online | 0% | 33MB | 1h 55m | 30 |
-| market-data-ws | 🟢 online | 1.7% | 166MB | 1h 55m | 25 |
-| ggbot | 🟢 online | 1.3% | 249MB | 1h 19m | 4 |
-| agent-d13d5536-2498-4f27-b2bc-e4f98958e1d8 | 🟢 online | 0% | 62MB | 57m | 0 |
+| signal-listener | 🟢 online | 0% | 52MB | 3h 26m | 23 |
+| x-bot | 🟢 online | 0% | 35MB | 3h 26m | 23 |
+| error-alerts | 🟢 online | 0% | 27MB | 3h 26m | 30 |
+| market-data-ws | 🟢 online | 3.4% | 159MB | 3h 26m | 25 |
+| ggbot | 🟢 online | 1.3% | 234MB | 2h 50m | 4 |
+| agent-d13d5536-2498-4f27-b2bc-e4f98958e1d8 | 🟢 online | 0% | 50MB | 2h 28m | 0 |
 
 ### VM Resources
 
 - **Disk**: 35G / 78G (45%)
-- **Memory**: 2.6Gi / 3.8Gi
-- **CPU Load**: 0.78 / 0.31 / 0.25 (1m/5m/15m)
+- **Memory**: 3.0Gi / 3.8Gi
+- **CPU Load**: 0.08 / 0.22 / 0.30 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 14.26M)
+- **Redis**: 🟢 connected (Memory: 11.68M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -329,7 +329,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-03 08:59:25 UTC
+**Last Updated**: 2025-11-03 10:30:17 UTC
 
 ---
 
@@ -1020,7 +1020,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-03 08:59:25 UTC
+**Last Updated**: 2025-11-03 10:30:17 UTC
 
 ---
 
