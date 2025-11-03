@@ -1211,7 +1211,7 @@ function ForgeApp() {
             console.log('🔌 Got history:', historyData.count, 'messages')
 
             // Transform history to agentMessages format
-            const formattedMessages = historyData.messages.map((msg: any) => ({
+            const formattedMessages = historyData.messages.map((msg: { role: 'user' | 'agent'; content: string; timestamp: string }) => ({
               role: msg.role,
               content: msg.content,
               timestamp: msg.timestamp

@@ -107,63 +107,6 @@ const ACTIVITY_DEFS: Record<ActivityType, ActivityDefinition> = {
   plan:              { type: "plan",              priority: 2, icon: ICONS.thoughtBalloon, color: "#8b5cf6", label: "Agent Thoughts", description: "Agent analysis or reasoning." },
 };
 
-// --------- Mock Data Generator ---------
-
-function generateMockLog(): MockActivityLog {
-  const now = Date.now();
-  const begin = now - 3*24*60*60*1000; // 3 days ago
-  const end = now;
-
-  // Generate balance timeseries (every 5 minutes)
-  const series: BalancePoint[] = [];
-  let bal = 10000;
-  for (let t = begin; t <= end; t += 5*60*1000) {
-    const drift = Math.sin((t - begin) / (6*60*60*1000)) * 8;
-    const noise = (Math.random()-0.5)*10;
-    bal = Math.max(9000, bal + drift + noise);
-    series.push({ timestamp: new Date(t).toISOString(), balance: Math.round(bal) });
-  }
-
-  // Generate activities
-  const types: ActivityType[] = [
-    "trade_entry_long","trade_entry_short","trade_exit","position_adjusted",
-    "decision_made","market_query","agent_wait","observation_recorded",
-    "strategy_updated","agent_reasoning"
-  ];
-  const activities: ActivityItem[] = [];
-
-  for (let i=0;i<260;i++) {
-    const tt = begin + Math.random()*(end-begin);
-    const type = types[Math.floor(Math.random()*types.length)];
-    const def = ACTIVITY_DEFS[type];
-
-    activities.push({
-      id: String(i),
-      timestamp: new Date(tt).toISOString(),
-      type,
-      priority: def.priority,
-      data: {
-        symbol: "BTC/USDT",
-        price: 42000 + Math.round(Math.random()*3000-1500),
-        size: (Math.random()*5000+1000).toFixed(0),
-        reasoning: "Mock rationale for action.",
-        confidence: Math.round(50+Math.random()*50)
-      }
-    });
-  }
-
-  const metadata = {
-    botName: "RSI Scalper v2",
-    startingBalance: 10000,
-    currentBalance: series.at(-1)!.balance,
-    totalTrades: activities.filter(a=>a.type.includes("trade_"))?.length||0,
-    winRate: 68,
-    performance: ((series.at(-1)!.balance-10000)/10000)*100
-  };
-
-  return { activities, balanceTimeseries: series, metadata };
-}
-
 // --------- Utils ---------
 
 function clamp(n: number, a: number, b: number) { return Math.max(a, Math.min(b, n)); }
@@ -243,6 +186,15 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{ access_token?: string } | null>(null);
   const [zoom, setZoom] = useState<ZoomTier>("4h");
+  const [domain, setDomain] = useState<{left: number; right: number}>({ left: Date.now() - 4*60*60*1000, right: Date.now() });
+  const [selected, setSelected] = useState<ActivityItem[] | null>(null);
+  const [visibleTypes, setVisibleTypes] = useState<Record<ActivityType, boolean>>(() => {
+    const o: Record<string, boolean> = {};
+    (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k => o[k] = true);
+    return o as Record<ActivityType, boolean>;
+  });
+  const [size, setSize] = useState({ w: 1200, h: 460 });
+  const hoverRef = useRef<{cx:number;cy:number;R:number;color:string;icon:string}|null>(null);
 
   // Get session for auth
   useEffect(() => {
@@ -310,55 +262,11 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return () => clearInterval(interval);
   }, [configId, session]);
 
-  // Loading state
-  if (loading && !log) {
-    return (
-      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
-        <div className="flex flex-col items-center gap-3">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
-          <span className="text-bone-200">Loading activity timeline...</span>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
-        <div className="text-center">
-          <div className="text-4xl mb-4">⚠️</div>
-          <div className="text-xl text-bone-200 mb-2">Failed to Load Timeline</div>
-          <div className="text-bone-400">{error}</div>
-        </div>
-      </div>
-    );
-  }
-
-  // Empty state
-  if (!log || log.activities.length === 0) {
-    return (
-      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
-        <div className="text-center">
-          <div className="text-4xl mb-4">📊</div>
-          <div className="text-xl text-bone-200 mb-2">No Activity Yet</div>
-          <div className="text-bone-400">Activities will appear here once the bot starts trading</div>
-        </div>
-      </div>
-    );
-  }
-
-  const seriesMs = useMemo(() => log.balanceTimeseries.map(p => new Date(p.timestamp).getTime()), [log.balanceTimeseries]);
-  const seriesVal = useMemo(() => log.balanceTimeseries.map(p => p.balance), [log.balanceTimeseries]);
-  const dataFirst = seriesMs[0];
-  const dataLast = seriesMs[seriesMs.length - 1];
-
-  // Time domain (locked span per zoom, with future pad)
-  const [domain, setDomain] = useState<{left: number; right: number}>(() => {
-    const baseSpan = ZOOM_RULES["4h"].spanMs as number;
-    const pad = Math.round(baseSpan * FUTURE_PAD_RATIO);
-    return { left: dataLast - baseSpan, right: dataLast + pad };
-  });
+  // Derived data (safe to compute even if log is null)
+  const seriesMs = useMemo(() => log?.balanceTimeseries?.map(p => new Date(p.timestamp).getTime()) || [], [log]);
+  const seriesVal = useMemo(() => log?.balanceTimeseries?.map(p => p.balance) || [], [log]);
+  const dataFirst = seriesMs[0] || Date.now() - 24*60*60*1000;
+  const dataLast = seriesMs[seriesMs.length - 1] || Date.now();
 
   const rules = ZOOM_RULES[zoom];
 
@@ -383,18 +291,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom]);
 
-  function clampDomain(left: number, right: number) {
-    if (rules.spanMs === "all") return { left: dataFirst, right: dataLast };
-    const span = right - left;
-    const maxRight = rightBound;
-    const minLeft = dataFirst;
-    if (right > maxRight) { right = maxRight; left = right - span; }
-    if (left < minLeft) { left = minLeft; right = left + span; }
-    return { left, right };
-  }
-
   // Resize
-  const [size, setSize] = useState({ w: 960, h: 460 });
   useEffect(() => {
     const obs = new ResizeObserver(() => {
       const el = containerRef.current;
@@ -405,19 +302,16 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return () => obs.disconnect();
   }, []);
 
-  // Selection + hover
-  const [selected, setSelected] = useState<ActivityItem[] | null>(null);
-  const hoverRef = useRef<{x:number;y:number;cx:number;cy:number;R:number;color:string;icon:string;group:ActivityItem[]} | null>(null);
-
-  // Series slice
+  // Series slice (safe with optional chaining)
   const inDomainSeries = useMemo(() => {
+    if (!log?.balanceTimeseries) return [];
     const { left, right } = domain;
     const pad = (right - left) * 0.5;
     return log.balanceTimeseries.filter(p => {
       const t = new Date(p.timestamp).getTime();
       return t >= left - pad && t <= right + pad;
     });
-  }, [log.balanceTimeseries, domain]);
+  }, [log, domain]);
 
   // Scales
   const padL = 56, padR = 16, padT = 24, padB = 28;
@@ -446,14 +340,9 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return padT + chartH - t * chartH;
   }
 
-  // Visibility + bucketing
-  const [visibleTypes, setVisibleTypes] = useState<Record<ActivityType, boolean>>(() => {
-    const o: Record<string, boolean> = {};
-    (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k => o[k] = true);
-    return o as Record<ActivityType, boolean>;
-  });
-
+  // Bucketing (safe with optional chaining)
   const bucketed = useMemo(() => {
+    if (!log?.activities) return [];
     const ms = rules.bucketMs;
     const { left, right } = domain;
     const pad = (right - left) * 0.25;
@@ -500,7 +389,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     }).sort((a,b)=> a.bucketTs - b.bucketTs);
 
     return groups;
-  }, [log.activities, rules, domain, visibleTypes]);
+  }, [log, rules, domain, visibleTypes]);
 
   // Hit boxes
   const hitBoxesRef = useRef<{x:number;y:number;w:number;h:number; cx:number; cy:number; R:number; color:string; icon:string; group: ActivityItem[]}[]>([]);
@@ -707,11 +596,11 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
         const nowY = yScale(linearInterpolateAt(latestMs, seriesMs, seriesVal));
 
         // Determine pulse color based on current state
-        const latestActivity = [...log.activities].sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+        const latestActivity = log?.activities ? [...log.activities].sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] : null;
         let pulseColor = COLORS.positive; // default green
         let pulseRgb = "16,185,129"; // emerald-500
 
-        if (latestActivity) {
+        if (latestActivity && log?.activities) {
           const lastEntry = [...log.activities]
             .filter(a => a.type === 'trade_entry_long' || a.type === 'trade_entry_short')
             .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
@@ -769,12 +658,12 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           const minutesAgo = Math.floor(timeSince / 60000);
 
           // Reuse position check from above
-          const lastEntry = [...log.activities]
+          const lastEntry = log?.activities ? [...log.activities]
             .filter(a => a.type === 'trade_entry_long' || a.type === 'trade_entry_short')
-            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
-          const lastExit = [...log.activities]
+            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] : null;
+          const lastExit = log?.activities ? [...log.activities]
             .filter(a => a.type === 'trade_win' || a.type === 'trade_loss')
-            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0];
+            .sort((a,b)=> new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())[0] : null;
           const inPosition = lastEntry && (!lastExit || new Date(lastEntry.timestamp) > new Date(lastExit.timestamp));
 
           if (inPosition) {
@@ -784,7 +673,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
             statusColor = lastEntry.type === 'trade_entry_long' ? COLORS.positive : COLORS.negative;
           } else if (latestActivity.type === 'agent_wait') {
             // Extract wait duration if available
-            const details = latestActivity.data.details as any;
+            const details = latestActivity.data.details as unknown as {duration_minutes?: number};
             if (details && details.duration_minutes) {
               const elapsed = minutesAgo;
               const remaining = Math.max(0, details.duration_minutes - elapsed);
@@ -803,7 +692,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
             statusColor = "#8b5cf6";
           } else if (latestActivity.type === 'trade_win' || latestActivity.type === 'trade_loss') {
             if (minutesAgo < 5) {
-              const pnl = (latestActivity.data.details as any)?.pnl || 0;
+              const pnl = (latestActivity.data.details as unknown as {pnl?: number})?.pnl || 0;
               statusText = latestActivity.type === 'trade_win'
                 ? `📈 Won +$${Math.abs(pnl).toFixed(2)}`
                 : `📉 Lost -$${Math.abs(pnl).toFixed(2)}`;
@@ -822,8 +711,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           }
         }
 
-        ctx.font = "13px ui-sans-serif, system-ui";
-        ctx.fontWeight = "500";
+        ctx.font = "500 13px ui-sans-serif, system-ui";
         const metrics = ctx.measureText(statusText);
         const pw = Math.ceil(metrics.width) + 20;
         const ph = 26;
@@ -852,7 +740,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     raf = requestAnimationFrame(draw);
     return () => { if (raf) cancelAnimationFrame(raf); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [domain, dataLast, seriesMs, seriesVal, log.activities]);
+  }, [domain, dataLast, seriesMs, seriesVal, log]);
 
   // Interactions
   useEffect(() => {
@@ -875,8 +763,9 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       const x = (clientX - rect.left);
       const y = (clientY - rect.top);
       const hit = hitBoxesRef.current.find(b => x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h) || null;
-      hoverRef.current = hit ? { x: hit.x, y: hit.y, cx: hit.cx, cy: hit.cy, R: hit.R, color: hit.color, icon: hit.icon, group: hit.group } : null;
+      hoverRef.current = hit ? { cx: hit.cx, cy: hit.cy, R: hit.R, color: hit.color, icon: hit.icon } : null;
       c.style.cursor = hit ? "pointer" : "default";
+      if (hit) setSelected(hit.group);
     };
 
     const onDown = (e: PointerEvent) => {
@@ -955,6 +844,55 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom, domain, rules]);
 
+  // Helper function for domain clamping
+  function clampDomain(left: number, right: number) {
+    if (rules.spanMs === "all") return { left: dataFirst, right: dataLast };
+    const span = right - left;
+    const maxRight = rightBound;
+    const minLeft = dataFirst;
+    if (right > maxRight) { right = maxRight; left = right - span; }
+    if (left < minLeft) { left = minLeft; right = left + span; }
+    return { left, right };
+  }
+
+  // Loading state
+  if (loading && !log) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
+        <div className="flex flex-col items-center gap-3">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-emerald-500" />
+          <span className="text-bone-200">Loading activity timeline...</span>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
+        <div className="text-center">
+          <div className="text-4xl mb-4">⚠️</div>
+          <div className="text-xl text-bone-200 mb-2">Failed to Load Timeline</div>
+          <div className="text-bone-400">{error}</div>
+        </div>
+      </div>
+    );
+  }
+
+  // Empty state
+  if (!log || log.activities.length === 0) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
+        <div className="text-center">
+          <div className="text-4xl mb-4">📊</div>
+          <div className="text-xl text-bone-200 mb-2">No Activity Yet</div>
+          <div className="text-bone-400">Activities will appear here once the bot starts trading</div>
+        </div>
+      </div>
+    );
+  }
+
   // Jump to Now
   const jumpToNow = () => {
     if (rules.spanMs === "all") {
@@ -966,7 +904,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     setDomain({ left: dataLast - span, right: dataLast + pad });
   };
 
-  const info = log.metadata;
+  const info = log?.metadata;
 
   return (
     <div className="w-full h-full min-h-screen bg-[#0b0d12] text-white">
