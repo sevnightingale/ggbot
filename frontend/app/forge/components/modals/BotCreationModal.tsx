@@ -12,7 +12,7 @@ import {
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 
-type BotType = 'scheduled_trading' | 'signal_validation' | 'agentic'
+type BotType = 'scheduled_trading' | 'signal_validation' | 'agent'
 
 interface BotCreationModalProps {
   open: boolean
@@ -31,11 +31,11 @@ export function BotCreationModal({
 
   const hasSignalValidation = canAccess('signal_validation')
 
-  // Check for whitelist access (agentic is whitelisted only for now)
+  // Check for whitelist access (agent is whitelisted only for now)
   const whitelistUserId = process.env.NEXT_PUBLIC_WHITELIST_USER_ID
   const userProfile = usePermissions().userProfile
   const isWhitelisted = userProfile?.user_id === whitelistUserId
-  const hasAgenticAccess = isWhitelisted
+  const hasAgentAccess = isWhitelisted
 
   const botTypes = [
     {
@@ -57,12 +57,12 @@ export function BotCreationModal({
       tier: 'Pro'
     },
     {
-      type: 'agentic' as const,
+      type: 'agent' as const,
       icon: '🤖',
-      label: 'Agentic',
+      label: 'Agent',
       description: 'Autonomous AI agent that defines its own trading strategy through conversation',
       color: '#9333ea', // purple-600
-      available: hasAgenticAccess,
+      available: hasAgentAccess,
       tier: 'Whitelist'
     }
   ]

@@ -190,7 +190,7 @@ function ForgeApp() {
   }
 
   // Create default bot with RSI strategy using proper API client
-  const createDefaultBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agentic' = 'scheduled_trading'): Promise<BotConfiguration> => {
+  const createDefaultBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading'): Promise<BotConfiguration> => {
     // Base config for all types
     const baseConfig = {
       schema_version: '2.1',
@@ -214,10 +214,10 @@ function ForgeApp() {
     }
 
     // Type-specific config
-    if (botType === 'agentic') {
-      // Agentic bots don't need selected_pair, extraction, or decision at creation
+    if (botType === 'agent') {
+      // Agent bots don't need selected_pair, extraction, or decision at creation
       // Agent will define everything through conversation
-      const agenticConfig = {
+      const agentConfig = {
         ...baseConfig,
         decision: {
           analysis_frequency: 'agent_driven'
@@ -229,7 +229,7 @@ function ForgeApp() {
           use_own_key: false
         }
       }
-      const newConfig = await apiClient.createConfig('Agent Bot', agenticConfig)
+      const newConfig = await apiClient.createConfig('Agent Bot', agentConfig)
       return newConfig
     }
 
@@ -845,7 +845,7 @@ function ForgeApp() {
   }
 
   // Handler function for creating new bot
-  const handleCreateNewBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agentic' = 'scheduled_trading') => {
+  const handleCreateNewBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading') => {
     setIsCreatingNew(true)
 
     try {
@@ -854,7 +854,7 @@ function ForgeApp() {
       const typeNames = {
         scheduled_trading: 'ggbot',
         signal_validation: 'signal validator',
-        agentic: 'agent'
+        agent: 'agent'
       }
       const newBotName = `${typeNames[botType]} ${botCount}`
 
@@ -1158,9 +1158,9 @@ function ForgeApp() {
     }
   }
 
-  // Start agent in strategy_definition mode when entering agentic config
+  // Start agent in strategy_definition mode when entering agent config
   useEffect(() => {
-    if (!selectedConfigId || editingTableFields?.config_type !== 'agentic' || !user?.id) return
+    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) return
     if (activeTab !== 'configure') return
 
     const startAgentIfNeeded = async () => {
@@ -1199,9 +1199,9 @@ function ForgeApp() {
     startAgentIfNeeded()
   }, [selectedConfigId, editingTableFields?.config_type, activeTab, user?.id])
 
-  // Poll for agent responses (when agentic mode is active)
+  // Poll for agent responses (when agent mode is active)
   useEffect(() => {
-    if (!selectedConfigId || editingTableFields?.config_type !== 'agentic' || !user?.id) return
+    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) return
 
     const pollInterval = setInterval(async () => {
       try {
@@ -1405,8 +1405,8 @@ function ForgeApp() {
                       }}
                     />
                   </div>
-                ) : editingTableFields?.config_type === 'agentic' ? (
-                  // Agentic mode: State machine based on strategy existence and agent activity
+                ) : editingTableFields?.config_type === 'agent' ? (
+                  // Agent mode: State machine based on strategy existence and agent activity
                   <div className="space-y-4">
                     {/* State 1-3: Show button + optional strategy display */}
                     {agentMessages.length === 0 ? (

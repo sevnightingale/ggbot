@@ -6,7 +6,7 @@ import { createClient } from '@/lib/supabase'
 
 export interface ConfigData {
   schema_version: string
-  config_type?: string  // 'scheduled_trading' | 'signal_validation' | 'agentic'
+  config_type?: string  // 'scheduled_trading' | 'signal_validation' | 'agent'
   selected_pair: string
   extraction?: {  // Optional for agent configs
     selected_data_sources: {

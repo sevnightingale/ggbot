@@ -8,35 +8,35 @@
 - Identify smart money positioning during consolidation periods
 
 **How AI agents would use it:**
-- Agent detects technical breakout with low volume ’ queries whale data
-- If top 50 wallets accumulated in past 48 hours ’ high confidence LONG
-- If whales distributing to exchanges ’ skip trade or take opposite position
+- Agent detects technical breakout with low volume â†’ queries whale data
+- If top 50 wallets accumulated in past 48 hours â†’ high confidence LONG
+- If whales distributing to exchanges â†’ skip trade or take opposite position
 - Use as confirmation filter for technical setups
 
 **Where it exists today:**
 - Nansen ($100-500/month) - entity-labeled wallet tracking
-- Arkham Intelligence (free tier + paid) - wallet clustering and labels
-- Chainalysis ($500-2000/month) - institutional-grade wallet intelligence
+- Arkham Intelligence ($100-500/month paid tier) - wallet clustering and labels
+- No free alternatives with entity labels and clustering
 
 ---
 
-## 2. Exchange Reserve Net Flows
+## 2. Smart Money DeFi Positioning
 
 **Why we want it:**
-- Coins moving off exchanges (self-custody) = reduced selling pressure, bullish
-- Large exchange inflows = potential distribution/selling pressure, bearish
-- Leading indicator for accumulation vs distribution phases
+- See which DeFi protocols whale wallets are using before trends emerge
+- Capital flowing to Aave vs Compound = leading indicator for protocol tokens
+- Whale staking behavior shows conviction levels
 
 **How AI agents would use it:**
-- Query before entering swing trades (multi-day holds)
-- If net outflows >10K BTC in 7 days ’ increases position size (supply shock signal)
-- If net inflows during technical breakdown ’ confirms bearish bias
-- Combine with price action: outflows + sideways price = accumulation before pump
+- Query before trading DeFi governance tokens (AAVE, UNI, CRV, etc.)
+- If whales moving capital into Aave v3 â†’ accumulate AAVE token
+- Track whale yield strategies: if whales rotating from ETH staking to liquid staking â†’ bullish for LSD tokens
+- Identify emerging protocols before retail: whale capital flow = early signal
 
 **Where it exists today:**
-- Glassnode ($100-500/month) - exchange flow data with historical context
-- CryptoQuant ($100-500/month) - real-time exchange reserves and flows
-- Santiment ($200-500/month) - exchange flow metrics
+- Nansen Pro ($500-2000/month) - "Smart Money" wallet DeFi tracking
+- Arkham ($100-500/month) - protocol interaction tracking for known entities
+- No free tools provide whale-specific DeFi positioning
 
 ---
 
@@ -48,15 +48,15 @@
 - Cascading liquidations cause 10-20% moves in hours
 
 **How AI agents would use it:**
-- Agent sees funding rate extreme (>1.5%) ’ queries liquidation data
-- If $2B+ liquidations clustered $500 above current price ’ enter LONG expecting hunt
-- If liquidations spread thin ’ avoid leverage play
+- Agent sees funding rate extreme (>1.5%) â†’ queries liquidation data
+- If $2B+ liquidations clustered $500 above current price â†’ enter LONG expecting hunt
+- If liquidations spread thin â†’ avoid leverage play
 - Use to set price targets (liquidation clusters = magnets)
 
 **Where it exists today:**
-- Coinglass ($200-500/month Pro) - multi-exchange liquidation heatmaps
-- Binance API (free) - estimated liquidation levels for Binance only
-- Hyblock Capital ($100-300/month) - liquidation clustering analytics
+- Coinglass Pro ($200-500/month) - multi-exchange liquidation heatmaps with clustering analytics
+- Hyblock Capital ($100-300/month) - proprietary liquidation clustering algorithms
+- Free alternatives lack predictive clustering analysis
 
 ---
 
@@ -69,28 +69,28 @@
 
 **How AI agents would use it:**
 - Monitor token mention velocity across Twitter/Reddit/forums
-- If mentions spike 200%+ with low price increase ’ early stage, enter
-- If mentions spike 500%+ with 300% price pump ’ late stage, fade/short
+- If mentions spike 200%+ with low price increase â†’ early stage, enter
+- If mentions spike 500%+ with 300% price pump â†’ late stage, fade/short
 - Track narrative themes (AI, gaming, DeFi) for sector rotation
 
 **Where it exists today:**
 - Santiment Pro ($500-1500/month) - ML topic modeling and social trends
-- LunarCrush ($200-500/month) - social mention tracking and clustering
-- Kaito AI ($300-1000/month) - crypto-native social intelligence
+- Kaito AI ($300-1000/month) - crypto-native social intelligence with clustering
+- Free tools don't provide velocity calculations or ML clustering
 
 ---
 
 ## 5. Entity-Labeled On-Chain Flows
 
 **Why we want it:**
-- See when specific institutions (Jump Trading, Alameda successors, major funds) move capital
+- See when specific institutions (Jump Trading, major funds) move capital
 - Protocol treasuries moving funds = insider signal
 - Identify fund rotation between assets/chains
 
 **How AI agents would use it:**
 - Query when price action diverges from technicals
-- If Jump Trading accumulating while price flat ’ high conviction long
-- If VC fund dumping tokens ’ avoid or short
+- If Jump Trading accumulating while price flat â†’ high conviction long
+- If VC fund dumping tokens â†’ avoid or short
 - Track smart money rotation: "funds moving from ETH to SOL" = narrative shift
 
 **Where it exists today:**
@@ -108,15 +108,15 @@
 - Detect "liquidity hunts" where market makers raid stop-losses
 
 **How AI agents would use it:**
-- Before executing large position (>$50K) ’ query order book depth
-- If bid/ask spread >0.5% or depth <$500K within 1% ’ reduce position size
+- Before executing large position (>$50K) â†’ query order book depth
+- If bid/ask spread >0.5% or depth <$500K within 1% â†’ reduce position size
 - Detect walls: large buy wall at support = likely hold, large sell wall at resistance = likely rejection
 - Identify spoofing: walls that appear/disappear = manipulation signal
 
 **Where it exists today:**
-- Kaiko ($300-1000/month) - institutional-grade order book data
-- Coinalyze Pro ($100-300/month) - order book heatmaps
-- Direct exchange websockets (free) - real-time order book but no aggregation/analysis
+- Kaiko ($300-1000/month) - institutional-grade order book analytics with spoofing detection
+- Coinalyze Pro ($100-300/month) - order book heatmaps with depth analysis
+- Free exchange websockets don't provide aggregation or manipulation detection
 
 ---
 
@@ -129,34 +129,34 @@
 
 **How AI agents would use it:**
 - Query before major volatility events (FOMC, CPI)
-- If large call buying at $110K BTC ’ institutions expect breakout, align long
-- If put/call ratio spikes >2.0 ’ extreme fear, contrarian long opportunity
+- If large call buying at $110K BTC â†’ institutions expect breakout, align long
+- If put/call ratio spikes >2.0 â†’ extreme fear, contrarian long opportunity
 - Track max pain price (where most options expire worthless) as price magnet
 
 **Where it exists today:**
-- Deribit API (free basic, paid for analytics) - dominant crypto options exchange
-- Amberdata ($1000-5000/month) - options flow analytics
-- Laevitas ($500-2000/month) - crypto derivatives analytics including options
+- Amberdata ($1000-5000/month) - options flow analytics with gamma exposure models
+- Laevitas ($500-2000/month) - crypto derivatives analytics including gamma
+- Deribit public API lacks processed analytics and gamma calculations
 
 ---
 
-## 8. BTC/ETH ETF Flow Data (Real-Time)
+## 8. BTC/ETH ETF Flow Data (Same-Day Estimates)
 
 **Why we want it:**
 - Institutional money flows into crypto via ETFs
 - $500M+ single-day inflow = multi-day bullish catalyst
-- Outflows signal institutional de-risking
+- Official data lags 1 day - same-day estimates give edge
 
 **How AI agents would use it:**
-- Query daily before US market open (ETF data lags 1 day)
-- If 3+ consecutive days of net inflows >$200M ’ increase BTC allocation
-- If sudden outflow after rally ’ take profits, expect consolidation
+- Query intraday for real-time ETF flow estimates (vs next-day official data)
+- If 3+ consecutive days of net inflows >$200M â†’ increase BTC allocation
+- If sudden outflow after rally â†’ take profits, expect consolidation
 - Compare BTC vs ETH flows to identify rotation
 
 **Where it exists today:**
-- Bloomberg Terminal ($2000+/month) - institutional-grade ETF flows
-- Farside Investors (free but delayed) - daily ETF flow tracking
-- Apollo (Bloomberg alternative, $500-2000/month) - ETF flow data
+- Bloomberg Terminal ($2000+/month) - but may not distribute via Brickroad
+- Specialized ETF analytics firms with intraday estimation models ($500-2000/month)
+- Farside Investors is free but delayed 1 day (no intraday estimates)
 
 ---
 
@@ -169,134 +169,131 @@
 
 **How AI agents would use it:**
 - Monitor top 100 crypto Twitter influencers for coordinated messaging
-- If 5+ influencers tweet same ticker within 2 hours ’ pump warning, fade
+- If 5+ influencers tweet same ticker within 2 hours â†’ pump warning, fade
 - Track influencer portfolio disclosures to follow smart money
 - Detect engagement bot networks (fake hype)
 
 **Where it exists today:**
 - LunarCrush Pro ($200-800/month) - influencer tracking and social graphs
-- Santiment ($500-1500/month) - social network analysis
-- Kaito AI ($300-1000/month) - crypto influencer intelligence
+- Kaito AI ($300-1000/month) - crypto influencer intelligence with network analysis
+- Free tools don't provide coordination detection or bot analysis
 
 ---
 
-## 10. Market Maker Inventory Signals
+## 10. Wallet Profitability Tracking & Copy Trading Signals
 
 **Why we want it:**
-- Market makers reducing inventory = liquidity crisis warning
-- MM positioning shows where they expect price (they front-run)
-- Inventory buildup = MM expects demand, bullish
+- Follow wallets with proven track records (>70% win rate)
+- See what profitable traders are buying before pumps
+- Inverse losing wallets (contrarian signal)
 
 **How AI agents would use it:**
-- Query when volatility spikes >5% in 1 hour
-- If MMs reducing inventory across exchanges ’ exit positions, liquidity crisis imminent
-- If MMs building inventory at support level ’ confirmation of bottom
-- Track MM profitability: stressed MMs = wider spreads = poor trading environment
+- Identify top 100 most profitable wallets by realized PnL
+- When profitable wallet cluster accumulates a token â†’ investigate for entry
+- Track whale wallet historical win rates: 80%+ win rate = higher weight signal
+- Inverse retail wallets: if losing wallets buying â†’ fade or short
 
 **Where it exists today:**
-- Institutional exchange partnerships (expensive, $5K-20K/month)
-- Proprietary MM analytics firms (custom quotes)
-- Some data available from market structure research firms like Kaiko (enterprise tier)
+- Nansen "Smart Money" ($500-2000/month) - wallet PnL tracking
+- Arkham ($100-500/month) - wallet performance metrics
+- Debank Pro ($200-500/month) - wallet profitability analytics
 
 ---
 
-## 11. Stablecoin Issuer Mint/Burn Patterns
+## 11. Token Holder Concentration & Distribution Changes
 
 **Why we want it:**
-- Tether minting $1B+ = fresh liquidity entering crypto (bullish)
-- USDC burns = capital leaving crypto (bearish)
-- Leading indicator for market liquidity conditions
+- Increasing concentration = whales accumulating, bullish
+- Decreasing concentration = distribution to retail, late stage
+- Sharp concentration changes precede major moves
 
 **How AI agents would use it:**
-- Query daily to assess macro liquidity environment
-- If Tether mints >$500M in 24 hours ’ expect buying pressure within 48 hours
-- If USDC supply decreasing for 7+ days ’ reduce exposure, risk-off
-- Compare mint/burn vs price: mints + flat price = accumulation phase
+- Query before entering swing trades (multi-day holds)
+- If top 10 holders increasing % ownership over 30 days â†’ accumulation signal
+- If Gini coefficient increasing (more concentrated) during price decline â†’ smart money buying dip
+- If concentration dropping during rally â†’ distribution, exit signal
 
 **Where it exists today:**
-- Glassnode ($100-500/month) - stablecoin supply tracking
-- DefiLlama (free) - stablecoin market cap data
-- CryptoQuant ($100-500/month) - stablecoin flow metrics
-- Direct blockchain explorers (free but requires parsing)
+- Santiment ($500-1500/month) - holder distribution metrics with concentration tracking
+- Glassnode ($300-800/month paid tiers) - supply distribution analytics
+- IntoTheBlock ($200-500/month) - holder concentration changes
 
 ---
 
-## 12. Multi-Exchange Funding Rate Divergence
+## 12. Protocol Revenue & Fee Analytics (Processed)
 
 **Why we want it:**
-- Funding rate spread across exchanges shows arbitrage opportunities
-- Divergence signals manipulation or isolated liquidation risk on one exchange
-- Extreme divergence = market structure breaking down
+- Protocol revenue = fundamental value for governance tokens
+- Revenue acceleration = undervalued opportunity
+- Fee decline = warning signal before price reflects
 
 **How AI agents would use it:**
-- Compare funding rates across Binance, Bybit, OKX, Deribit
-- If Binance funding +2% but others neutral ’ isolated liquidation risk, avoid Binance longs
-- If all exchanges showing negative funding for 48+ hours ’ contrarian long setup
-- Arbitrage detection: +1% on one exchange, -0.5% on another = opportunity
+- Query before trading DeFi governance tokens
+- If Uniswap 30-day fees up 50% but token flat â†’ accumulate UNI
+- Compare revenue to market cap: high revenue growth + low valuation = value opportunity
+- Track revenue trends vs price: revenue growing but price declining = accumulation zone
 
 **Where it exists today:**
-- Coinglass (free basic, $200-500/month Pro) - multi-exchange funding aggregation
-- Direct exchange APIs (free) - Binance, Bybit, OKX all provide funding data
-- Laevitas ($500-2000/month) - derivatives analytics across venues
+- Token Terminal ($300-1000/month) - protocol economics with revenue analytics
+- DefiLlama Pro ($200-500/month) - processed fee and revenue data
+- Messari Pro ($500-2000/month) - protocol financial metrics
 
 ---
 
-## 13. DApp Traffic & User Growth
+## 13. Crypto Proxy Equity Options Flow (COIN, MSTR, MARA)
 
 **Why we want it:**
-- User growth = fundamental demand for L1/L2 tokens
-- 50%+ user growth over 30 days = bullish for native token
-- Declining usage = bearish signal before price reflects it
+- Institutional traders often position in equities before crypto
+- MSTR options activity = leveraged BTC exposure signal
+- Coinbase options = crypto volatility expectations
 
 **How AI agents would use it:**
-- Query before trading L1/L2 tokens (ETH, SOL, AVAX, ARB, OP)
-- If Solana DApp users up 40% in 30 days ’ increases SOL allocation
-- If Arbitrum users declining despite token pump ’ fade rally
-- Compare user growth to token price: growth + flat price = accumulation opportunity
+- Query before major BTC moves
+- If MSTR call buying surges â†’ institutions expect BTC rally, align long
+- If COIN put buying increases â†’ expect crypto volatility or decline
+- Use equity options as leading indicator (trade before crypto retail reacts)
 
 **Where it exists today:**
-- Token Terminal ($300-1000/month) - DApp usage and protocol metrics
-- DappRadar ($100-500/month) - user and transaction tracking across chains
-- Dune Analytics (free + pro $300/month) - custom on-chain queries for user data
+- SpotGamma ($200-500/month) - equity options flow with gamma exposure
+- FlowAlgo ($200-400/month) - unusual options activity alerts
+- Bloomberg Terminal ($2000+/month) - but likely won't distribute via Brickroad
 
 ---
 
-## 14. Crypto Company Hiring Velocity
+## 14. Institutional Crypto Exposure Survey Data
 
 **Why we want it:**
-- Hiring surge = company expansion, bullish for ecosystem tokens
-- Layoffs = contraction, bearish signal
-- Leading indicator vs price (hiring precedes growth by 6-12 months)
+- Survey data from family offices, RIAs, hedge funds on crypto allocation
+- Increasing allocation = demand coming, decreasing = distribution ahead
+- Sentiment gauge at institutional level (not retail)
 
 **How AI agents would use it:**
-- Track LinkedIn job postings for major protocols (Uniswap, Aave, Lido, etc.)
-- If Coinbase hiring spikes 30% ’ bullish for CEX tokens and BTC/ETH
-- If exchange announces layoffs ’ reduce exposure, expect bearish pressure
-- Track developer hiring specifically: dev team growth = protocol improvements coming
+- Query quarterly or monthly for allocation trend changes
+- If institutions increasing crypto allocation from 2% â†’ 5% â†’ demand surge coming
+- If allocation declining despite price rally â†’ smart money exiting, warning signal
+- Use as macro positioning indicator (combine with ETF flows)
 
 **Where it exists today:**
-- Thinknum ($200-500/month) - job posting analytics and headcount tracking
-- Revelio Labs ($500-2000/month) - workforce intelligence
-- Manual LinkedIn scraping (free but requires infrastructure)
-- Indeed API (free tier available) - job posting data
+- Fidelity Digital Assets surveys (sometimes public, but delayed)
+- Bitwise/Coinbase institutional surveys (proprietary distribution)
+- Research firms aggregating prime broker data ($500-2000/month for processed reports)
 
 ---
 
-## 15. Cross-Chain Capital Flows & Bridge Analytics
+## 15. Credit Spreads & Risk Appetite Index (Processed for Crypto)
 
 **Why we want it:**
-- Money rotating from Ethereum to Solana = sector rotation signal
-- Bridge volume spikes = trend confirmation (capital following narrative)
-- Net outflows from a chain = weakening ecosystem
+- Credit spreads widening = institutional risk-off before crypto feels it
+- Leading indicator for crypto volatility (1-3 day lead time)
+- Shows when "risk-on" environment is deteriorating
 
 **How AI agents would use it:**
-- Query weekly to identify capital rotation trends
-- If $500M+ bridged from ETH to SOL in 7 days ’ rotate portfolio to SOL ecosystem
-- If bridge volume declining on a chain despite token pump ’ distribution signal
-- Track capital following narratives: bridge volume to gaming chains = gaming season
+- Query daily before major position changes
+- If HY-IG credit spread widens >50bps in 3 days â†’ reduce crypto exposure
+- If credit spreads tightening for 2+ weeks + crypto flat â†’ accumulation opportunity
+- Use as filter: widening spreads = avoid new longs, only shorts/cash
 
 **Where it exists today:**
-- Nansen ($500-2000/month) - cross-chain flow tracking
-- Dune Analytics (free + $300/month pro) - bridge transaction analytics
-- DefiLlama (free) - bridge volume aggregation
-- L2Beat (free) - L2 bridge activity and TVL flows
+- Bloomberg Terminal ($2000+/month) - unlikely for Brickroad
+- Boutique risk analytics firms processing credit data for crypto correlation ($300-1000/month)
+- Fred API has raw data (free) but lacks processed crypto correlation analysis

@@ -46,10 +46,10 @@ export function SaveConfigBar({
                 <span className="text-sm font-medium text-[var(--text-primary)]">Signal Validation</span>
               </>
             )}
-            {currentBotType === 'agentic' && (
+            {currentBotType === 'agent' && (
               <>
                 <span className="text-lg">🤖</span>
-                <span className="text-sm font-medium text-[var(--text-primary)]">Agentic</span>
+                <span className="text-sm font-medium text-[var(--text-primary)]">Agent</span>
               </>
             )}
           </div>
