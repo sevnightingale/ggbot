@@ -1179,47 +1179,6 @@ function ForgeApp() {
     }
   }
 
-  // Start agent in strategy_definition mode when entering agent config
-  useEffect(() => {
-    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) return
-    if (activeTab !== 'configure') return
-
-    const startAgentIfNeeded = async () => {
-      try {
-        // Check if agent is already running
-        const token = await getAuthToken()
-        const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-
-        if (!statusResponse.ok) return
-
-        const statusData = await statusResponse.json()
-
-        // If agent is not running, start it in strategy_definition mode
-        if (statusData.status === 'inactive' || statusData.status === 'stopped') {
-          console.log('🤖 Starting agent in strategy_definition mode...')
-          const startResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition`, {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${token}`
-            }
-          })
-
-          if (startResponse.ok) {
-            console.log('✅ Agent started successfully')
-          }
-        }
-      } catch (error) {
-        console.error('❌ Failed to start agent:', error)
-      }
-    }
-
-    startAgentIfNeeded()
-  }, [selectedConfigId, editingTableFields?.config_type, activeTab, user?.id])
-
   // Poll for agent responses (when agent mode is active)
   useEffect(() => {
     if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) {
