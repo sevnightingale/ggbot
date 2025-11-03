@@ -290,20 +290,21 @@ Be disciplined and execute the strategy faithfully.
             if response_text:
                 logger.info(f"Agent: {response_text[:200]}...")
 
-                response_data = {
-                    "type": "agent_message",
-                    "text": response_text,
-                    "timestamp": datetime.utcnow().isoformat()
-                }
-
-                # Push to response queue for polling
-                await self.redis_client.rpush(
-                    f"agent:{self.config_id}:responses",
-                    json.dumps(response_data)
-                )
-
-                # Store in conversation history ONLY for final ResultMessage
+                # Only push to queues for final ResultMessage (not streaming)
                 if is_final:
+                    response_data = {
+                        "type": "agent_message",
+                        "text": response_text,
+                        "timestamp": datetime.utcnow().isoformat()
+                    }
+
+                    # Push to response queue for polling
+                    await self.redis_client.rpush(
+                        f"agent:{self.config_id}:responses",
+                        json.dumps(response_data)
+                    )
+
+                    # Store in conversation history
                     await self.redis_client.rpush(
                         f"agent:{self.config_id}:history",
                         json.dumps({
@@ -370,20 +371,21 @@ Be disciplined and execute the strategy faithfully.
                         logger.info(f"Agent: {response_text[:200]}...")
                         logger.debug(f"🤖 AGENT TEXT: {response_text}")
 
-                        response_data = {
-                            "type": "agent_message",
-                            "text": response_text,
-                            "timestamp": datetime.utcnow().isoformat()
-                        }
-
-                        # Push to response queue for polling
-                        await self.redis_client.rpush(
-                            f"agent:{self.config_id}:responses",
-                            json.dumps(response_data)
-                        )
-
-                        # Store in conversation history ONLY for final ResultMessage (not streaming)
+                        # Only push to queues for final ResultMessage (not streaming AssistantMessage)
                         if is_final:
+                            response_data = {
+                                "type": "agent_message",
+                                "text": response_text,
+                                "timestamp": datetime.utcnow().isoformat()
+                            }
+
+                            # Push to response queue for polling
+                            await self.redis_client.rpush(
+                                f"agent:{self.config_id}:responses",
+                                json.dumps(response_data)
+                            )
+
+                            # Store in conversation history
                             await self.redis_client.rpush(
                                 f"agent:{self.config_id}:history",
                                 json.dumps({
@@ -497,19 +499,20 @@ Be disciplined and execute the strategy faithfully.
                                 if response_text:
                                     logger.info(f"Agent: {response_text[:200]}...")
 
-                                    response_data = {
-                                        "type": "agent_message",
-                                        "text": response_text,
-                                        "timestamp": datetime.utcnow().isoformat()
-                                    }
-
-                                    await self.redis_client.rpush(
-                                        f"agent:{self.config_id}:responses",
-                                        json.dumps(response_data)
-                                    )
-
-                                    # Store in conversation history ONLY for final ResultMessage
+                                    # Only push to queues for final ResultMessage (not streaming)
                                     if is_final:
+                                        response_data = {
+                                            "type": "agent_message",
+                                            "text": response_text,
+                                            "timestamp": datetime.utcnow().isoformat()
+                                        }
+
+                                        await self.redis_client.rpush(
+                                            f"agent:{self.config_id}:responses",
+                                            json.dumps(response_data)
+                                        )
+
+                                        # Store in conversation history
                                         await self.redis_client.rpush(
                                             f"agent:{self.config_id}:history",
                                             json.dumps({
