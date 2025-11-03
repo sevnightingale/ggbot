@@ -221,23 +221,22 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   // Fetch activity data from API
   useEffect(() => {
-    if (!configId || !session?.access_token) return;
+    if (!configId) return;
 
     const fetchData = async () => {
       try {
         setLoading(true);
 
+        // Build headers - include auth if session exists (optional for public viewing)
+        const headers: HeadersInit = session?.access_token
+          ? { 'Authorization': `Bearer ${session.access_token}` }
+          : {};
+
         // Fetch all three endpoints in parallel
         const [activitiesRes, balanceSeriesRes, metadataRes] = await Promise.all([
-          fetch(`/api/v2/activities/${configId}`, {
-            headers: { 'Authorization': `Bearer ${session.access_token}` }
-          }),
-          fetch(`/api/v2/activities/${configId}/balance-series`, {
-            headers: { 'Authorization': `Bearer ${session.access_token}` }
-          }),
-          fetch(`/api/v2/activities/${configId}/metadata`, {
-            headers: { 'Authorization': `Bearer ${session.access_token}` }
-          })
+          fetch(`/api/v2/activities/${configId}`, { headers }),
+          fetch(`/api/v2/activities/${configId}/balance-series`, { headers }),
+          fetch(`/api/v2/activities/${configId}/metadata`, { headers })
         ]);
 
         if (!activitiesRes.ok || !balanceSeriesRes.ok || !metadataRes.ok) {
@@ -277,13 +276,15 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   // Fetch strategy
   useEffect(() => {
-    if (!configId || !session?.access_token) return;
+    if (!configId) return;
 
     const fetchStrategy = async () => {
       try {
-        const response = await fetch(`/api/v2/config/${configId}`, {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
+        const headers: HeadersInit = session?.access_token
+          ? { 'Authorization': `Bearer ${session.access_token}` }
+          : {};
+
+        const response = await fetch(`/api/v2/config/${configId}`, { headers });
         const data = await response.json();
         if (data.config?.agent_strategy?.content) {
           setStrategy(data.config.agent_strategy.content);
@@ -298,13 +299,15 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   // Fetch positions
   useEffect(() => {
-    if (!configId || !session?.access_token) return;
+    if (!configId) return;
 
     const fetchPositions = async () => {
       try {
-        const response = await fetch(`/api/v2/positions/aster/${configId}`, {
-          headers: { 'Authorization': `Bearer ${session.access_token}` }
-        });
+        const headers: HeadersInit = session?.access_token
+          ? { 'Authorization': `Bearer ${session.access_token}` }
+          : {};
+
+        const response = await fetch(`/api/v2/positions/aster/${configId}`, { headers });
         const data = await response.json();
         if (data.positions) {
           setPositions(data.positions);

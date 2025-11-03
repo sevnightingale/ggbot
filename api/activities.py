@@ -26,8 +26,7 @@ async def get_activities(
     activity_types: Optional[List[str]] = Query(None, description="Filter by activity types"),
     trade_id: Optional[str] = Query(None, description="Filter by specific trade"),
     min_importance: int = Query(1, ge=1, le=10, description="Minimum importance level"),
-    limit: int = Query(500, ge=1, le=1000, description="Max activities to return"),
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+    limit: int = Query(500, ge=1, le=1000, description="Max activities to return")
 ):
     """
     Get all activities for a bot configuration (timeline data).
@@ -66,7 +65,7 @@ async def get_activities(
     }
     """
     try:
-        # Verify config ownership
+        # Verify config exists (no auth required for public viewing)
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -77,9 +76,6 @@ async def get_activities(
 
                 if not config:
                     raise HTTPException(status_code=404, detail="Configuration not found")
-
-                if config[0] != current_user.user_id:
-                    raise HTTPException(status_code=403, detail="Not authorized to access this configuration")
 
                 # Build query with filters
                 query = """
@@ -155,8 +151,7 @@ async def get_activities(
 
 @router.get("/{config_id}/balance-series")
 async def get_balance_series(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+    config_id: str
 ):
     """
     Get cumulative P&L over time for timeline chart.
@@ -180,7 +175,7 @@ async def get_balance_series(
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Verify ownership
+                # Verify config exists (no auth required for public viewing)
                 cur.execute("""
                     SELECT user_id, created_at FROM configurations WHERE config_id = %s
                 """, (config_id,))
@@ -188,9 +183,6 @@ async def get_balance_series(
 
                 if not config:
                     raise HTTPException(status_code=404, detail="Configuration not found")
-
-                if config[0] != current_user.user_id:
-                    raise HTTPException(status_code=403, detail="Not authorized")
 
                 config_created_at = config[1]
 
@@ -285,8 +277,7 @@ async def get_balance_series(
 
 @router.get("/{config_id}/metadata")
 async def get_timeline_metadata(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+    config_id: str
 ):
     """
     Get bot/agent metadata for timeline header display.
@@ -312,7 +303,7 @@ async def get_timeline_metadata(
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Verify ownership
+                # Verify config exists (no auth required for public viewing)
                 cur.execute("""
                     SELECT user_id FROM configurations WHERE config_id = %s
                 """, (config_id,))
@@ -320,9 +311,6 @@ async def get_timeline_metadata(
 
                 if not config:
                     raise HTTPException(status_code=404, detail="Configuration not found")
-
-                if config[0] != current_user.user_id:
-                    raise HTTPException(status_code=403, detail="Not authorized")
 
                 # Get config info
                 cur.execute("""
