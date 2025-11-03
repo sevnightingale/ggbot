@@ -21,7 +21,6 @@ interface ConfigureLayoutProps {
   onCancelConfig?: () => void
   onResetConfig?: () => void
   onUpdateConfig?: (updates: Partial<ConfigData>) => void
-  onBotTypeChange?: (newType: 'scheduled_trading' | 'signal_validation' | 'agentic') => void
   className?: string
 }
 
@@ -35,7 +34,6 @@ export function ConfigureLayout({
   onCancelConfig,
   onResetConfig,
   onUpdateConfig,
-  onBotTypeChange,
   className = ''
 }: ConfigureLayoutProps) {
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabType>('strategy')
@@ -70,7 +68,6 @@ export function ConfigureLayout({
         onSave={onSaveConfig}
         onCancel={onCancelConfig}
         onReset={onResetConfig}
-        onBotTypeChange={onBotTypeChange}
       />
 
       {/* Configuration Tabs */}
