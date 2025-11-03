@@ -587,7 +587,7 @@ function ForgeApp() {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
 
       // Route to different endpoints based on config type
-      const isAgent = selectedBot.config_data.config_type === 'agent'
+      const isAgent = selectedBot.config_type === 'agent'
       const endpoint = isAgent
         ? `${apiUrl}/api/v2/agent/${selectedBot.config_id}/start?mode=autonomous`
         : `${apiUrl}/api/v2/bot/${selectedBot.config_id}/start`
@@ -628,7 +628,7 @@ function ForgeApp() {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
 
       // Route to different endpoints based on config type
-      const isAgent = selectedBot.config_data.config_type === 'agent'
+      const isAgent = selectedBot.config_type === 'agent'
       const endpoint = isAgent
         ? `${apiUrl}/api/v2/agent/${selectedBot.config_id}/stop`
         : `${apiUrl}/api/v2/bot/${selectedBot.config_id}/stop`
