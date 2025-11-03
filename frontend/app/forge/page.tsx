@@ -1515,7 +1515,7 @@ function ForgeApp() {
                         inputValue={agentInputValue}
                         isWaiting={isWaitingForAgent}
                         showConfirmButton={showConfirmButton}
-                        currentStrategy={null}  {/* Only set after user confirms in THIS session */}
+                        currentStrategy={null}
                         onSendMessage={handleSendAgentMessage}
                         onConfirmStrategy={handleConfirmStrategy}
                         onInputChange={setAgentInputValue}
