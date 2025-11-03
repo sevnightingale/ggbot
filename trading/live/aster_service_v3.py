@@ -987,3 +987,50 @@ class AsterDEXV3LiveTradingService:
         except Exception as e:
             self._log.error(f"Exception querying account balance: {e}")
             return None
+
+    async def get_user_trades(self, symbol: Optional[str] = None, limit: int = 100) -> Optional[List[Dict[str, Any]]]:
+        """
+        Query user trade history via GET /fapi/v3/userTrades.
+
+        Returns trades with realized P&L for completed trades.
+        Used by Activity Timeline to reconstruct cumulative P&L.
+
+        Args:
+            symbol: Optional symbol filter (e.g., "BTCUSDT")
+            limit: Max trades to return (default 100, max 1000)
+
+        Returns:
+            List of trades with fields:
+            - id: Trade ID
+            - symbol: Trading pair
+            - orderId: Order ID
+            - side: BUY or SELL
+            - price: Execution price
+            - qty: Quantity
+            - realizedPnl: Realized P&L for this trade
+            - time: Execution timestamp (ms)
+        """
+        nonce = math.trunc(time.time() * 1000000)
+        params = {'limit': str(min(limit, 1000))}
+        if symbol:
+            params['symbol'] = symbol
+
+        signed_params = self._generate_signature(params, nonce)
+        url = f"{self.base_url}/fapi/v3/userTrades"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=signed_params,
+                    timeout=aiohttp.ClientTimeout(total=self.timeout)
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    else:
+                        error_text = await response.text()
+                        self._log.error(f"User trades query failed: {response.status} - {error_text}")
+                        return None
+        except Exception as e:
+            self._log.error(f"Exception querying user trades: {e}")
+            return None

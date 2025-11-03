@@ -744,7 +744,8 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   // Interactions
   useEffect(() => {
-    const c = canvasRef.current!;
+    const c = canvasRef.current;
+    if (!c) return;
     let isDragging = false;
     let lastX = 0;
     let v = 0;

@@ -7,11 +7,12 @@ Endpoints return activities, balance series, and metadata for a specific bot con
 
 from fastapi import APIRouter, Query, Depends, HTTPException
 from typing import Optional, List
-from datetime import datetime
+from datetime import datetime, timezone
 
-from core.auth.dependencies import get_current_user
+from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2
 from core.common.db import get_db_connection
 from core.common.logger import logger
+from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
 
 
 router = APIRouter(prefix="/api/v2/activities", tags=["activities"])
@@ -26,7 +27,7 @@ async def get_activities(
     trade_id: Optional[str] = Query(None, description="Filter by specific trade"),
     min_importance: int = Query(1, ge=1, le=10, description="Minimum importance level"),
     limit: int = Query(500, ge=1, le=1000, description="Max activities to return"),
-    user: dict = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
     Get all activities for a bot configuration (timeline data).
@@ -77,7 +78,7 @@ async def get_activities(
                 if not config:
                     raise HTTPException(status_code=404, detail="Configuration not found")
 
-                if config[0] != user['id']:
+                if config[0] != current_user.user_id:
                     raise HTTPException(status_code=403, detail="Not authorized to access this configuration")
 
                 # Build query with filters
@@ -155,23 +156,25 @@ async def get_activities(
 @router.get("/{config_id}/balance-series")
 async def get_balance_series(
     config_id: str,
-    user: dict = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
-    Get account balance over time for equity curve visualization.
+    Get cumulative P&L over time for timeline chart.
 
-    Reconstructs balance history from closed trades to show equity curve
-    on the activity timeline. Used by ActivityTimelineViewer for the chart background.
+    Reconstructs P&L history from all closed trades (paper, live, aster).
+    Chart starts at $0 and shows cumulative realized P&L.
+    Works for all trade types, not just paper trading.
 
     Returns:
     {
         "status": "success",
         "balance_series": [
-            {"timestamp": "2025-11-01T00:00:00Z", "balance": 10000},
-            {"timestamp": "2025-11-01T14:23:00Z", "balance": 10125.50}
+            {"timestamp": "2025-11-01T00:00:00Z", "balance": 0},
+            {"timestamp": "2025-11-01T14:23:00Z", "balance": 125.50},
+            {"timestamp": "2025-11-01T18:45:00Z", "balance": 75.50}
         ],
-        "current_balance": 10125.50,
-        "initial_balance": 10000
+        "current_balance": 75.50,
+        "initial_balance": 0
     }
     """
     try:
@@ -179,76 +182,99 @@ async def get_balance_series(
             with conn.cursor() as cur:
                 # Verify ownership
                 cur.execute("""
-                    SELECT user_id FROM configurations WHERE config_id = %s
+                    SELECT user_id, created_at FROM configurations WHERE config_id = %s
                 """, (config_id,))
                 config = cur.fetchone()
 
                 if not config:
                     raise HTTPException(status_code=404, detail="Configuration not found")
 
-                if config[0] != user['id']:
+                if config[0] != current_user.user_id:
                     raise HTTPException(status_code=403, detail="Not authorized")
 
-                # Get account info
-                cur.execute("""
-                    SELECT initial_balance, current_balance, created_at
-                    FROM paper_accounts
-                    WHERE config_id = %s
-                """, (config_id,))
-                account = cur.fetchone()
+                config_created_at = config[1]
 
-                if not account:
-                    # No paper account yet (probably new bot or live-only)
-                    return {
-                        "status": "success",
-                        "balance_series": [],
-                        "current_balance": 10000,
-                        "initial_balance": 10000
-                    }
-
-                # Get all closed trades for balance reconstruction
+                # Get closed paper trades from database
                 cur.execute("""
                     SELECT closed_at, realized_pnl
                     FROM paper_trades
-                    WHERE config_id = %s AND status = 'closed'
+                    WHERE config_id = %s AND status = 'closed' AND closed_at IS NOT NULL
                     ORDER BY closed_at
                 """, (config_id,))
-                trades = cur.fetchall()
+                paper_trades = cur.fetchall()
 
-                # Reconstruct balance over time
-                initial_balance = float(account[0])
-                current_balance = float(account[1])
-                account_created_at = account[2]
+        # Get Aster trades from API (if user is trading on Aster)
+        aster_service = AsterDEXV3LiveTradingService()
+        aster_trades_raw = await aster_service.get_user_trades(limit=1000)
 
-                balance_points = [
-                    {
-                        "timestamp": account_created_at.isoformat(),
-                        "balance": initial_balance
-                    }
-                ]
+        # Build unified trade list with timestamps and P&L
+        all_trades = []
 
-                # Add balance point after each closed trade
-                running_balance = initial_balance
-                for trade in trades:
-                    closed_at, realized_pnl = trade
-                    running_balance += float(realized_pnl)
-                    balance_points.append({
-                        "timestamp": closed_at.isoformat(),
-                        "balance": running_balance
+        # Add paper trades
+        for trade in paper_trades:
+            closed_at, realized_pnl = trade
+            all_trades.append({
+                "timestamp": closed_at,
+                "pnl": float(realized_pnl)
+            })
+
+        # Add Aster trades (filter by config if needed - for now include all)
+        if aster_trades_raw:
+            for aster_trade in aster_trades_raw:
+                # Aster trades have 'time' in milliseconds
+                trade_time_ms = aster_trade.get('time', 0)
+                trade_time = datetime.fromtimestamp(trade_time_ms / 1000, tz=timezone.utc) if trade_time_ms else None
+                realized_pnl = float(aster_trade.get('realizedPnl', 0))
+
+                if trade_time:
+                    all_trades.append({
+                        "timestamp": trade_time,
+                        "pnl": realized_pnl
                     })
 
-                # Add current balance as final point
-                balance_points.append({
-                    "timestamp": datetime.utcnow().isoformat(),
-                    "balance": current_balance
-                })
+        # Sort all trades by timestamp
+        all_trades.sort(key=lambda x: x['timestamp'])
 
-                return {
-                    "status": "success",
-                    "balance_series": balance_points,
-                    "current_balance": current_balance,
-                    "initial_balance": initial_balance
-                }
+        if not all_trades:
+            # No closed trades yet - return flat $0 line
+            return {
+                "status": "success",
+                "balance_series": [
+                    {"timestamp": config_created_at.isoformat(), "balance": 0},
+                    {"timestamp": datetime.utcnow().isoformat(), "balance": 0}
+                ],
+                "current_balance": 0,
+                "initial_balance": 0
+            }
+
+        # Build cumulative P&L series starting at $0
+        pnl_points = [
+            {
+                "timestamp": config_created_at.isoformat(),
+                "balance": 0
+            }
+        ]
+
+        cumulative_pnl = 0.0
+        for trade in all_trades:
+            cumulative_pnl += trade['pnl']
+            pnl_points.append({
+                "timestamp": trade['timestamp'].isoformat(),
+                "balance": cumulative_pnl
+            })
+
+        # Add current P&L as final point
+        pnl_points.append({
+            "timestamp": datetime.utcnow().isoformat(),
+            "balance": cumulative_pnl
+        })
+
+        return {
+            "status": "success",
+            "balance_series": pnl_points,
+            "current_balance": cumulative_pnl,
+            "initial_balance": 0
+        }
 
     except HTTPException:
         raise
@@ -260,13 +286,13 @@ async def get_balance_series(
 @router.get("/{config_id}/metadata")
 async def get_timeline_metadata(
     config_id: str,
-    user: dict = Depends(get_current_user)
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
     Get bot/agent metadata for timeline header display.
 
-    Returns bot name, type, performance metrics for displaying at top of timeline.
-    Used by ActivityTimelineViewer for the header information.
+    Returns bot name, type, performance metrics from all trade types (paper, live, aster).
+    Metrics calculated from closed trades across all sources.
 
     Returns:
     {
@@ -274,11 +300,11 @@ async def get_timeline_metadata(
         "metadata": {
             "botName": "RSI Scalper v2",
             "configType": "scheduled_trading",
-            "startingBalance": 10000,
-            "currentBalance": 10125.50,
+            "startingBalance": 0,
+            "currentBalance": 125.50,  # Cumulative P&L
             "totalTrades": 12,
             "winRate": 66.7,
-            "performance": 1.26,
+            "performance": 125.50,  # Cumulative P&L
             "createdAt": "2025-11-01T00:00:00Z"
         }
     }
@@ -295,7 +321,7 @@ async def get_timeline_metadata(
                 if not config:
                     raise HTTPException(status_code=404, detail="Configuration not found")
 
-                if config[0] != user['id']:
+                if config[0] != current_user.user_id:
                     raise HTTPException(status_code=403, detail="Not authorized")
 
                 # Get config info
@@ -306,49 +332,49 @@ async def get_timeline_metadata(
                 """, (config_id,))
                 config_row = cur.fetchone()
 
-                # Get account metrics
+                # Get paper trade metrics
                 cur.execute("""
                     SELECT
-                        current_balance,
-                        initial_balance,
-                        total_trades,
-                        win_trades,
-                        loss_trades,
-                        total_pnl
-                    FROM paper_accounts
-                    WHERE config_id = %s
+                        COUNT(*) as total_trades,
+                        SUM(CASE WHEN realized_pnl >= 0 THEN 1 ELSE 0 END) as wins,
+                        SUM(realized_pnl) as total_pnl
+                    FROM paper_trades
+                    WHERE config_id = %s AND status = 'closed'
                 """, (config_id,))
-                account = cur.fetchone()
+                paper_metrics = cur.fetchone()
 
-                if not account:
-                    # No trades yet
-                    win_rate = 0
-                    performance = 0
-                    current_balance = 10000
-                    initial_balance = 10000
-                    total_trades = 0
-                else:
-                    current_balance = float(account[0])
-                    initial_balance = float(account[1])
-                    total_trades = account[2]
-                    win_trades = account[3]
+        # Get Aster trade metrics from API
+        aster_service = AsterDEXV3LiveTradingService()
+        aster_trades = await aster_service.get_user_trades(limit=1000)
 
-                    win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
-                    performance = ((current_balance - initial_balance) / initial_balance) * 100
+        # Combine metrics
+        paper_total = paper_metrics[0] or 0
+        paper_wins = paper_metrics[1] or 0
+        paper_pnl = float(paper_metrics[2]) if paper_metrics[2] else 0.0
 
-                return {
-                    "status": "success",
-                    "metadata": {
-                        "botName": config_row[0],
-                        "configType": config_row[1],
-                        "startingBalance": initial_balance,
-                        "currentBalance": current_balance,
-                        "totalTrades": total_trades,
-                        "winRate": round(win_rate, 1),
-                        "performance": round(performance, 2),
-                        "createdAt": config_row[2].isoformat()
-                    }
-                }
+        aster_total = len(aster_trades) if aster_trades else 0
+        aster_wins = sum(1 for t in (aster_trades or []) if float(t.get('realizedPnl', 0)) >= 0)
+        aster_pnl = sum(float(t.get('realizedPnl', 0)) for t in (aster_trades or []))
+
+        total_trades = paper_total + aster_total
+        win_trades = paper_wins + aster_wins
+        total_pnl = paper_pnl + aster_pnl
+
+        win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
+
+        return {
+            "status": "success",
+            "metadata": {
+                "botName": config_row[0],
+                "configType": config_row[1],
+                "startingBalance": 0,
+                "currentBalance": total_pnl,
+                "totalTrades": total_trades,
+                "winRate": round(win_rate, 1),
+                "performance": total_pnl,  # Cumulative P&L (paper + aster)
+                "createdAt": config_row[2].isoformat()
+            }
+        }
 
     except HTTPException:
         raise

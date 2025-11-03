@@ -1079,11 +1079,19 @@ async def get_agent_status(
         pm2_env = agent.get('pm2_env', {})
         status = pm2_env.get('status', 'unknown')
 
+        # Parse mode from command-line args (e.g., ['--config-id', 'abc', '--mode', 'strategy_definition'])
+        args = pm2_env.get('args', [])
+        mode = None
+        if '--mode' in args:
+            mode_index = args.index('--mode')
+            if mode_index + 1 < len(args):
+                mode = args[mode_index + 1]
+
         return {
             "status": status,  # 'online', 'stopped', 'errored', etc.
             "config_id": config_id,
             "agent_name": agent_name,
-            "mode": pm2_env.get('AGENT_MODE'),
+            "mode": mode,
             "uptime": pm2_env.get('pm_uptime'),
             "restarts": pm2_env.get('restart_time', 0),
             "cpu": agent.get('monit', {}).get('cpu', 0),
