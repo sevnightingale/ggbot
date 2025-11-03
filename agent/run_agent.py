@@ -264,12 +264,57 @@ Be disciplined and execute the strategy faithfully.
         4. When ready, agent calls request_autonomous_mode tool
         5. User confirms → save strategy, exit
         """
-        logger.info("Starting strategy definition mode - waiting for user messages...")
+        logger.info("Starting strategy definition mode")
 
-        # No initial greeting - frontend will immediately send strategy context if available
-        # This avoids the wrong greeting showing up before the user's message
+        # Initial greeting (for new strategies without existing content)
+        # If user has existing strategy, frontend will immediately send it and this greeting provides context
+        await client.query("Hello! I'm ready to help you build your trading strategy. What are your goals?")
+
+        # Process initial greeting
+        async for message in client.receive_response():
+            response_text = None
+            is_final = False
+
+            # Handle AssistantMessage (streaming responses with TextBlocks)
+            if isinstance(message, AssistantMessage):
+                for block in message.content:
+                    if isinstance(block, TextBlock):
+                        response_text = block.text
+                is_final = False
+
+            # Handle ResultMessage (final consolidated response)
+            elif isinstance(message, ResultMessage):
+                response_text = message.result
+                is_final = True
+
+            if response_text:
+                logger.info(f"Agent: {response_text[:200]}...")
+
+                response_data = {
+                    "type": "agent_message",
+                    "text": response_text,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+                # Push to response queue for polling
+                await self.redis_client.rpush(
+                    f"agent:{self.config_id}:responses",
+                    json.dumps(response_data)
+                )
+
+                # Store in conversation history ONLY for final ResultMessage
+                if is_final:
+                    await self.redis_client.rpush(
+                        f"agent:{self.config_id}:history",
+                        json.dumps({
+                            "role": "agent",
+                            "content": response_text,
+                            "timestamp": datetime.utcnow().isoformat()
+                        })
+                    )
 
         # Main conversation loop
+        logger.info("Waiting for user messages...")
         while True:
             # Block until user sends message
             message_data = await self.redis_client.blpop(
