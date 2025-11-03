@@ -1,23 +1,9 @@
-# SQL Scripts - ggbots Platform
-
-Quick-reference SQL scripts for database operations.
-
----
-
-## Activity Timeline - Activities Table Migration
-
-**Purpose**: Create unified activities table for Activity Timeline feature (Phase 1)
-
-**Date**: 2025-11-03
-
-**Run in**: Supabase SQL Editor
-
-```sql
 -- ============================================================================
 -- ACTIVITY TIMELINE MIGRATION
 -- ============================================================================
 -- Creates the unified activities table for tracking all bot/agent actions
 -- Supports: scheduled bots, agents, signal validation
+-- Date: 2025-11-03
 -- ============================================================================
 
 -- Ensure uuid extension is enabled
@@ -48,14 +34,14 @@ CREATE TABLE IF NOT EXISTS activities (
     -- Values: 'agent_tool', 'scheduled_bot', 'signal_validation', 'system_event', 'user_action'
 
     -- Content
-    summary TEXT NOT NULL CHECK (length(summary) <= 200),  -- Brief title for timeline icon
-    details JSONB NOT NULL DEFAULT '{}'::jsonb,             -- Full structured data (activity-type specific)
+    summary TEXT NOT NULL CHECK (length(summary) <= 200),
+    details JSONB NOT NULL DEFAULT '{}'::jsonb,
 
     -- Optional Linking (NULL if not applicable)
-    trade_id UUID,                -- Links to paper_trades.trade_id or live_trades.batch_id
-    trade_type TEXT,              -- 'paper' | 'live' | 'aster' (if trade_id is set)
-    decision_id UUID,             -- Links to decisions.decision_id (if activity is a decision)
-    related_symbol TEXT,          -- Optional symbol context (e.g., "BTC/USDT")
+    trade_id UUID,
+    trade_type TEXT,
+    decision_id UUID,
+    related_symbol TEXT,
 
     -- Display Metadata
     priority INT NOT NULL DEFAULT 2 CHECK (priority IN (1,2,3)),
@@ -66,7 +52,6 @@ CREATE TABLE IF NOT EXISTS activities (
 
     importance INT NOT NULL DEFAULT 5 CHECK (importance BETWEEN 1 AND 10),
     -- User-facing filtering (1=low, 10=critical)
-    -- Allows users to filter timeline: "Show only importance >= 7"
 
     -- Timestamps
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -155,28 +140,3 @@ SELECT
     qual
 FROM pg_policies
 WHERE schemaname = 'public' AND tablename = 'activities';
-
--- ============================================================================
--- MIGRATION COMPLETE
--- ============================================================================
--- Next steps:
--- 1. Create core/common/activity_logger.py helper
--- 2. Add activity logging to ggbot.py (scheduled bots)
--- 3. Add activity logging to agent/mcp_server.py (agent tools)
--- 4. Create API endpoints (api/activities.py)
--- 5. Integrate with frontend ActivityTimelineViewer.tsx
--- ============================================================================
-```
-
----
-
-## Notes
-
-- Always test SQL in a transaction first: `BEGIN; ... ROLLBACK;`
-- For production, run without transaction wrapper
-- Check ACTIVE.md for current schema state after migration
-- Run status check script after major schema changes: `python scripts/status_check.py --update`
-
----
-
-**Last Updated**: 2025-11-03

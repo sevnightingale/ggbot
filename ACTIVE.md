@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-03 10:30:16 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-03 10:54:17 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -60,22 +60,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 52MB | 3h 26m | 23 |
-| x-bot | 🟢 online | 0% | 35MB | 3h 26m | 23 |
-| error-alerts | 🟢 online | 0% | 27MB | 3h 26m | 30 |
-| market-data-ws | 🟢 online | 3.4% | 159MB | 3h 26m | 25 |
-| ggbot | 🟢 online | 1.3% | 234MB | 2h 50m | 4 |
-| agent-d13d5536-2498-4f27-b2bc-e4f98958e1d8 | 🟢 online | 0% | 50MB | 2h 28m | 0 |
+| signal-listener | 🟢 online | 0% | 53MB | 3h 50m | 23 |
+| x-bot | 🟢 online | 0% | 35MB | 3h 50m | 23 |
+| error-alerts | 🟢 online | 0% | 26MB | 3h 50m | 30 |
+| market-data-ws | 🟢 online | 1.7% | 159MB | 3h 50m | 25 |
+| ggbot | 🟢 online | 1.3% | 223MB | 3h 14m | 4 |
+| agent-d13d5536-2498-4f27-b2bc-e4f98958e1d8 | 🟢 online | 0% | 50MB | 2h 52m | 0 |
 
 ### VM Resources
 
 - **Disk**: 35G / 78G (45%)
-- **Memory**: 3.0Gi / 3.8Gi
-- **CPU Load**: 0.08 / 0.22 / 0.30 (1m/5m/15m)
+- **Memory**: 2.7Gi / 3.8Gi
+- **CPU Load**: 0.27 / 0.40 / 0.38 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 11.68M)
+- **Redis**: 🟢 connected (Memory: 11.72M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -329,9 +329,42 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-03 10:30:17 UTC
+**Last Updated**: 2025-11-03 10:54:18 UTC
 
 ---
+
+### `activities` (14 columns)
+
+**Primary Key**: `activity_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+
+**Indexes**:
+- `idx_activities_config_time` on (config_id, created_at)
+- `idx_activities_decision` on (decision_id)
+- `idx_activities_priority` on (config_id, priority, created_at)
+- `idx_activities_symbol` on (config_id, related_symbol, created_at)
+- `idx_activities_trade` on (trade_id)
+- `idx_activities_type` on (config_id, activity_type, created_at)
+- `idx_activities_user` on (user_id, created_at)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `activity_id` | uuid |  | gen_random_uuid() |
+| `config_id` | uuid |  |  |
+| `user_id` | uuid |  |  |
+| `activity_type` | text |  |  |
+| `activity_source` | text |  |  |
+| `summary` | text |  |  |
+| `details` | jsonb |  | '{}'::jsonb |
+| `trade_id` | uuid | ✓ |  |
+| `trade_type` | text | ✓ |  |
+| `decision_id` | uuid | ✓ |  |
+| `related_symbol` | text | ✓ |  |
+| `priority` | integer |  | 2 |
+| `importance` | integer |  | 5 |
+| `created_at` | timestamp with time zone |  | now() |
 
 ### `bot_telegram_channels` (6 columns)
 
@@ -1020,7 +1053,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-03 10:30:17 UTC
+**Last Updated**: 2025-11-03 10:54:18 UTC
 
 ---
 

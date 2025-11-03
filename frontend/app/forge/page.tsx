@@ -1052,10 +1052,18 @@ function ForgeApp() {
 
   // Handler for starting strategy discussion
   const handleStartStrategyDiscussion = async () => {
-    if (!selectedConfigId || !user?.id) return
+    console.log('🎯 handleStartStrategyDiscussion called')
+    console.log('🎯 selectedConfigId:', selectedConfigId)
+    console.log('🎯 user?.id:', user?.id)
+
+    if (!selectedConfigId || !user?.id) {
+      console.error('❌ Early return: missing selectedConfigId or user.id')
+      return
+    }
 
     try {
       const token = await getAuthToken()
+      console.log('🎯 Got auth token:', token ? 'yes' : 'no')
 
       // Check agent status first
       const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status`, {

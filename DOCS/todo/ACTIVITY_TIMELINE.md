@@ -95,10 +95,10 @@ CREATE TABLE activities (
 
     -- Display Metadata
     priority INT DEFAULT 2 CHECK (priority IN (1,2,3)),
-    -- Priority mapping (controls zoom visibility):
-    --   1 = High (trades, critical actions) - Always visible
-    --   2 = Medium (analysis, queries, decisions) - Visible at 4h zoom and tighter
-    --   3 = Low (waits, observations, minor events) - Visible at 1h zoom only
+    -- Priority mapping (controls GROUPING behavior, not visibility):
+    --   1 = Never consolidate (trades, critical actions) - Each activity shows as separate icon
+    --   2 = Can consolidate (analysis, queries, decisions) - Group by type within time windows
+    --   Note: All activity types always visible at all zoom levels (grouped, not hidden)
 
     importance INT DEFAULT 5 CHECK (importance BETWEEN 1 AND 10),
     -- User-facing filtering (1=low, 10=critical)
@@ -188,25 +188,26 @@ async def log_activity(
             return activity_id
 
 # Activity type to priority mapping
+# Priority controls GROUPING behavior:
+#   1 = Never consolidate (each activity = separate icon, no time-based grouping)
+#   2 = Can consolidate (group by type within time buckets, show count badge)
 ACTIVITY_PRIORITY = {
-    # Priority 1 (High) - Always visible
+    # Priority 1 - Never consolidate (always show individually)
     'trade_entry_long': 1,
     'trade_entry_short': 1,
     'trade_exit': 1,
     'position_adjusted': 1,
     'strategy_updated': 1,
 
-    # Priority 2 (Medium) - 4h zoom and tighter
+    # Priority 2 - Can consolidate (group by type + time)
     'market_query': 2,
     'decision_made': 2,
     'analysis': 2,
     'reasoning': 2,
-
-    # Priority 3 (Low) - 1h zoom only
-    'agent_wait': 3,
-    'observation': 3,
-    'observation_recorded': 3,
-    'plan': 3,
+    'agent_wait': 2,
+    'observation': 2,
+    'observation_recorded': 2,
+    'plan': 2,
 }
 ```
 
@@ -719,6 +720,12 @@ app.include_router(activities_router)
 ---
 
 ### Phase 4: Frontend Integration (2-3 days)
+
+**Note**: The ActivityTimelineViewer already has bucketing logic (lines 350-377), but needs updates:
+- Currently groups by TIME only (all activities in a bucket → one icon)
+- Need to group by TIME + TYPE (5 queries + 3 decisions → 2 icons with count badges)
+- Priority 1 activities never group (trades always show individually)
+- Priority 2 activities group by type within time buckets
 
 #### Task 4.1: Replace Mock Data with API Calls
 **File**: `frontend/components/ActivityTimelineViewer.tsx`
