@@ -4,6 +4,29 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-03 - Activity Timeline: Agent Activity Logging + Aster P&L Integration
+
+**Activity Logging System** (Backend + Agent MCP):
+- **Database**: Created `activities` table with 14 columns, 7 indexes, RLS policy for unified activity tracking across all bot types
+- **Activity Logger**: `core/common/activity_logger.py` with `log_activity()` and `log_activity_safe()` helpers, priority-based grouping system (1=never group, 2=can group by type+time)
+- **Agent MCP Integration**: Added `log_activity` tool + auto-logging to 6 existing tools (query_market_data, execute_trade, close_position, update_strategy, wait_for, record_trade_observation)
+- **Activity Types**: trade_entry_long/short, trade_win/loss (P&L-aware), strategy_updated, market_query, agent_wait, observation_recorded, analysis/reasoning/plan
+
+**Activity Timeline API** (Backend):
+- **3 Endpoints**: `/api/v2/activities/{config_id}` (timeline data), `/balance-series` (cumulative P&L chart), `/metadata` (bot stats)
+- **Aster Integration**: Queries `/fapi/v3/userTrades` endpoint, combines paper + Aster trades for unified P&L calculation starting at $0
+- **Added Method**: `AsterDEXV3LiveTradingService.get_user_trades()` for trade history with realized P&L
+
+**Activity Timeline Viewer** (Frontend):
+- **Real API Integration**: Replaced mock data with live polling (10s interval) from activities API endpoints
+- **UI Refinements**: Split trade_exit into trade_win/loss with 📈/📉 icons, consolidated agent thoughts (💭), intelligent live status indicator with pulsing dot
+- **Layout**: Dynamic chart height, legend moved below chart, improved spacing
+- **Fixes**: React hooks rules compliance, canvas null checks, timezone handling for Aster trades
+
+**Status**: Agent activity logging operational, Activity Timeline working with Aster P&L, awaiting agent activities for full visualization
+
+---
+
 ## 2025-11-03 - Agent Phase 4a Extended: Bot Creation Flow + Agentic State Machine
 
 **Bot Creation Modal** (Frontend):

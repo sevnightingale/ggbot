@@ -230,23 +230,24 @@
 
 ---
 
-## 📊 **HIGH PRIORITY - Activity Timeline Integration** [ACTIVITY_TIMELINE.md]
+## 📊 **Activity Timeline Integration** ✅ COMPLETE
 
-**Timeline**: 8-12 days - Universal activity visualization for all bot types + competition features
-**Status**: Canvas viewer built at `/view/[config_id]` with mock data, ready for real data integration
+**Status**: Agent activity logging operational (2025-11-03)
+**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for implementation details
 
-**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for complete implementation plan
+**Completed**:
+- ✅ Activities table with RLS, indexes, priority-based grouping
+- ✅ Activity logger helper (`core/common/activity_logger.py`)
+- ✅ Agent MCP tool integration (log_activity + auto-logging in 6 tools)
+- ✅ 3 API endpoints (activities, balance-series, metadata)
+- ✅ Aster P&L integration (queries `/fapi/v3/userTrades`, combines with paper trades)
+- ✅ Frontend Activity Timeline with real data, 10s polling, React hooks compliance
+- ✅ UI refinements (trade_win/loss icons, live status indicator, dynamic layout)
 
-**Vision**: Transform the existing Canvas-based Activity Timeline into a production-ready feature that visualizes the complete lifecycle of bot/agent trading activities. Works for ALL config types: agentic, scheduled, and signal validation.
-
-**Key Innovation**:
-- Every bot action becomes a clickable icon on the performance chart
-- Click a trade to see its entire story - from market analysis to entry to monitoring to exit
-- Trade lifecycle linking: All activities with same `trade_id` are highlighted and grouped
-- Unified `activities` table powers everything
-
-**Competition Features** (Phase 6):
-- "View Configuration" modal showing agent's full strategy conversation
+**Next Steps**:
+- Agent needs to run and create activities for full timeline visualization
+- Add scheduled bot activity logging (orchestrator integration)
+- Optional: Trade lifecycle linking, "View Configuration" modal for competition
 - Active Positions section at bottom of timeline
 - Submission-ready view page for Aster Vibe Trading Competition
 
