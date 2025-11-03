@@ -1078,10 +1078,11 @@ function ForgeApp() {
       }
 
       const statusData = await statusResponse.json()
+      console.log('🎯 Agent status:', statusData.status)
 
       // Start agent in strategy_definition mode if not running
       if (statusData.status === 'inactive' || statusData.status === 'stopped') {
-        console.log('🤖 Starting agent in strategy_definition mode...')
+        console.log('🤖 Agent is stopped, starting in strategy_definition mode...')
 
         const startResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition`, {
           method: 'POST',
@@ -1096,42 +1097,44 @@ function ForgeApp() {
         }
 
         console.log('✅ Agent started successfully')
+        // Wait a moment for agent to initialize
+        await new Promise(resolve => setTimeout(resolve, 2000))
+      } else {
+        console.log('✅ Agent is already running')
+      }
 
-        // If there's an existing strategy, send it as context
-        if (editingConfigData?.agent_strategy?.content) {
-          console.log('📤 Sending existing strategy as context...')
-          // Wait a moment for agent to initialize
-          await new Promise(resolve => setTimeout(resolve, 2000))
+      // Send context message if there's an existing strategy
+      if (editingConfigData?.agent_strategy?.content) {
+        console.log('📤 Sending existing strategy as context...')
 
-          const contextMessage = `Here is my current strategy:\n\n${editingConfigData.agent_strategy.content}\n\nI'd like to refine or update it. What improvements would you suggest?`
+        const contextMessage = `Here is my current strategy:\n\n${editingConfigData.agent_strategy.content}\n\nI'd like to refine or update it. What improvements would you suggest?`
 
-          const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ message: contextMessage })
-          })
+        const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ message: contextMessage })
+        })
 
-          console.log('📤 Message sent, status:', messageResponse.status)
+        console.log('📤 Message sent, status:', messageResponse.status)
 
-          // Add user message to display
-          setAgentMessages(prev => {
-            const updated = [...prev, {
-              role: 'user' as const,
-              content: contextMessage,
-              timestamp: new Date().toISOString()
-            }]
-            console.log('📤 Updated agentMessages:', updated.length, 'messages')
-            return updated
-          })
+        // Add user message to display
+        setAgentMessages(prev => {
+          const updated = [...prev, {
+            role: 'user' as const,
+            content: contextMessage,
+            timestamp: new Date().toISOString()
+          }]
+          console.log('📤 Updated agentMessages:', updated.length, 'messages')
+          return updated
+        })
 
-          setIsWaitingForAgent(true)
-          console.log('📤 UI state updated, waiting for agent response...')
-        } else {
-          console.log('📤 No existing strategy, skipping context message')
-        }
+        setIsWaitingForAgent(true)
+        console.log('📤 UI state updated, waiting for agent response...')
+      } else {
+        console.log('📤 No existing strategy, skipping context message')
       }
     } catch (error) {
       console.error('Error starting strategy discussion:', error)
