@@ -2340,6 +2340,85 @@ async def close_live_position(
         )
 
 
+@app.get("/api/v2/positions/aster/{config_id}")
+async def get_aster_positions(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get open Aster positions for a bot configuration."""
+    try:
+        # Verify user owns this config
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Check if it's an Aster trading bot
+        if getattr(config, 'trading_mode', 'paper') != 'aster':
+            return {
+                "positions": [],
+                "message": "Not an Aster trading bot"
+            }
+
+        # Get positions from Aster service
+        positions = await orchestrator.aster_trading.get_open_positions(config_id)
+
+        return {
+            "positions": positions,
+            "count": len(positions)
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get Aster positions: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get Aster positions: {str(e)}"
+        )
+
+
+@app.post("/api/v2/positions/aster/{order_id}/close")
+async def close_aster_position(
+    order_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Close an Aster position by order_id."""
+    try:
+        # Verify user owns this position
+        from core.common.db import get_db_connection
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT lt.config_id, c.user_id
+                    FROM live_trades lt
+                    JOIN configurations c ON lt.config_id = c.config_id
+                    WHERE lt.batch_id = %s AND lt.provider = 'aster'
+                """, (order_id,))
+                result = cur.fetchone()
+
+                if not result:
+                    raise HTTPException(status_code=404, detail="Position not found")
+
+                config_id, user_id = result
+                if user_id != current_user.user_id:
+                    raise HTTPException(status_code=403, detail="Unauthorized")
+
+        # Close position via Aster service
+        close_result = await orchestrator.aster_trading.close_position(order_id)
+
+        return close_result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to close Aster position: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to close Aster position: {str(e)}"
+        )
+
+
 @app.get("/api/v2/account/live/{config_id}")
 async def get_live_account_metrics(
     config_id: str,
