@@ -585,19 +585,26 @@ function ForgeApp() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${selectedBot.config_id}/start`, {
+
+      // Route to different endpoints based on config type
+      const isAgent = selectedBot.config_data.config_type === 'agent'
+      const endpoint = isAgent
+        ? `${apiUrl}/api/v2/agent/${selectedBot.config_id}/start?mode=autonomous`
+        : `${apiUrl}/api/v2/bot/${selectedBot.config_id}/start`
+
+      const response = await apiClient.authenticatedFetch(endpoint, {
         method: 'POST'
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to start bot: ${response.status}`)
+        throw new Error(`Failed to start ${isAgent ? 'agent' : 'bot'}: ${response.status}`)
       }
 
       const result = await response.json()
-      
+
       // Update local bot state and next run from API response
-      setAllBots(prev => prev.map(bot => 
-        bot.config_id === selectedBot.config_id 
+      setAllBots(prev => prev.map(bot =>
+        bot.config_id === selectedBot.config_id
           ? { ...bot, state: 'active' as const }
           : bot
       ))
@@ -619,19 +626,26 @@ function ForgeApp() {
 
     try {
       const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-      const response = await apiClient.authenticatedFetch(`${apiUrl}/api/v2/bot/${selectedBot.config_id}/stop`, {
+
+      // Route to different endpoints based on config type
+      const isAgent = selectedBot.config_data.config_type === 'agent'
+      const endpoint = isAgent
+        ? `${apiUrl}/api/v2/agent/${selectedBot.config_id}/stop`
+        : `${apiUrl}/api/v2/bot/${selectedBot.config_id}/stop`
+
+      const response = await apiClient.authenticatedFetch(endpoint, {
         method: 'POST'
       })
 
       if (!response.ok) {
-        throw new Error(`Failed to stop bot: ${response.status}`)
+        throw new Error(`Failed to stop ${isAgent ? 'agent' : 'bot'}: ${response.status}`)
       }
 
       await response.json()
 
       // Update local bot state and clear scheduling info
-      setAllBots(prev => prev.map(bot => 
-        bot.config_id === selectedBot.config_id 
+      setAllBots(prev => prev.map(bot =>
+        bot.config_id === selectedBot.config_id
           ? { ...bot, state: 'inactive' as const }
           : bot
       ))
@@ -1182,7 +1196,7 @@ function ForgeApp() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: JSON.stringify(confirmationData) })
+        body: JSON.stringify({ message: JSON.stringify(confirmationData) })  // Stringify once for the message field
       })
 
       if (!response.ok) {

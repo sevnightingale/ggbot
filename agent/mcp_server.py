@@ -980,68 +980,86 @@ async def log_activity_tool(args: Dict[str, Any]) -> Dict[str, Any]:
 # ============================================================================
 
 @tool(
-    "request_autonomous_mode",
-    "Request permission to switch to autonomous trading mode. Params: strategy_summary (required)",
-    {"strategy_summary": str}
+    "save_strategy_and_exit",
+    "Save the trading strategy to database and exit strategy definition mode. Call this when strategy is finalized. Params: strategy_summary (required), autonomously_editable (optional, default false)",
+    {"strategy_summary": str, "autonomously_editable": bool}
 )
-async def request_autonomous_mode(args: Dict[str, Any]) -> Dict[str, Any]:
+async def save_strategy_and_exit(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Request mode switch from strategy_definition to autonomous.
-
-    Agent calls this when strategy is complete and ready for execution.
-    Sets Redis flag + stores strategy that run_agent.py will detect and wait for user confirmation.
+    Save strategy and signal run_agent.py to exit.
+    No confirmation needed - agent decides when strategy is ready.
     """
     try:
         strategy_summary = args["strategy_summary"]
+        autonomously_editable = args.get("autonomously_editable", False)
         config_id = agent_context.config_id
+        user_id = agent_context.user_id
 
-        # Connect to Redis and set pending flag + strategy
+        # Save strategy to database directly
+        from core.common.db import get_db_connection
+        import json
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Get current config_data
+                cur.execute(
+                    "SELECT config_data FROM configurations WHERE config_id = %s",
+                    (config_id,)
+                )
+                row = cur.fetchone()
+                if not row:
+                    raise ValueError(f"Config {config_id} not found")
+
+                config_data = row[0]
+
+                # Add agent_strategy
+                config_data["agent_strategy"] = {
+                    "content": strategy_summary,
+                    "autonomously_editable": autonomously_editable,
+                    "version": 1,
+                    "last_updated_at": datetime.utcnow().isoformat(),
+                    "last_updated_by": "user",
+                    "performance_log": []
+                }
+
+                # Update database
+                cur.execute(
+                    "UPDATE configurations SET config_data = %s, updated_at = NOW() WHERE config_id = %s",
+                    (json.dumps(config_data), config_id)
+                )
+                conn.commit()
+
+        # Set exit flag for run_agent.py to detect
         redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
         redis_client = await redis.from_url(redis_url)
+        await redis_client.set(f"agent:{config_id}:strategy_saved_exit", "true")
 
-        await redis_client.set(f"agent:{config_id}:mode_switch_pending", "true")
-        await redis_client.set(f"agent:{config_id}:pending_strategy", strategy_summary)
-
-        # Push confirmation request directly to responses queue with special flag
-        confirmation_message = f"""📋 Strategy Ready for Autonomous Trading
-
-{strategy_summary}
-
-⚠️ I'm ready to start trading autonomously with this strategy.
-
-Reply with:
-1 - CONFIRM and start autonomous trading
-2 - REVISE strategy
-
-Waiting for your confirmation..."""
-
-        await redis_client.rpush(
-            f"agent:{config_id}:responses",
-            json.dumps({
-                "message": confirmation_message,
-                "show_confirm_button": True,  # Frontend will display confirm button
-                "timestamp": datetime.utcnow().isoformat()
-            })
-        )
+        # Also stop PM2 process to prevent auto-restart
+        import subprocess
+        agent_name = f"agent-{config_id}"
+        try:
+            subprocess.run(['pm2', 'delete', agent_name], check=False)  # Don't fail if not running
+            logger.info(f"PM2 process {agent_name} deleted")
+        except Exception as e:
+            logger.warning(f"Could not delete PM2 process: {e}")
 
         await redis_client.aclose()
 
-        logger.info(f"Mode switch requested for config {config_id}")
+        logger.info(f"Strategy saved for config {config_id}, autonomously_editable={autonomously_editable}")
 
-        # Return simple confirmation to agent (user will see Redis message)
         return {
             "content": [{
                 "type": "text",
-                "text": "✅ Confirmation request sent to user. Waiting for response..."
+                "text": f"✅ Strategy saved! Shutting down strategy definition mode.\n\nTo start autonomous trading, click 'Activate Agent' in the UI."
             }]
         }
 
     except Exception as e:
-        logger.error(f"request_autonomous_mode failed: {e}")
+        logger.error(f"save_strategy_and_exit failed: {e}")
         return {
             "content": [{
                 "type": "text",
-                "text": f"❌ Failed to request mode switch: {str(e)}"
+                "text": f"❌ Failed to save strategy: {str(e)}"
             }]
         }
 
@@ -1072,7 +1090,7 @@ def create_mcp_server():
     logger.debug("   9. record_trade_observation - Record trade learnings")
     logger.debug("   10. query_trade_observations - Query past observations")
     logger.debug("   11. log_activity - Log agent reasoning/analysis to timeline")
-    logger.debug("   12. request_autonomous_mode - Request mode switch")
+    logger.debug("   12. save_strategy_and_exit - Save strategy and exit")
 
     # Create server with all tools
     server = create_sdk_mcp_server(
@@ -1090,7 +1108,7 @@ def create_mcp_server():
             record_trade_observation,
             query_trade_observations,
             log_activity_tool,  # NEW: Explicit activity logging
-            request_autonomous_mode
+            save_strategy_and_exit
         ]
     )
 

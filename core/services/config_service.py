@@ -125,18 +125,17 @@ class BotConfigV2:
         """Validate configuration and return list of errors."""
         errors = []
 
-        if not self.selected_pair:
-            errors.append("selected_pair is required")
-
         # Agent configs have different validation requirements
         if self.config_type == "agent":
-            # Agent configs require agent_strategy
-            if not self.agent_strategy:
-                errors.append("agent_strategy is required for agent config_type")
-            elif not self.agent_strategy.get("content"):
-                errors.append("agent_strategy.content is required")
+            # Agent configs can be created WITHOUT agent_strategy initially
+            # Strategy is built during strategy_definition mode, then saved
+            # selected_pair is also optional (agent can trade multiple pairs)
             # extraction/decision/llm_config are optional for agents
             return errors
+
+        # For non-agent configs, selected_pair is required
+        if not self.selected_pair:
+            errors.append("selected_pair is required")
 
         # Standard bot validation (for autonomous_trading and signal_validation)
         # Support both old (indicators) and new (selected_data_sources) structure

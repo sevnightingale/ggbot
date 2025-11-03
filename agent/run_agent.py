@@ -158,7 +158,7 @@ strategy_definition: Help user build a complete strategy for YOU to execute auto
   - Position sizing rules
   - Monitoring frequency
 
-  Use request_autonomous_mode when strategy is clear, feasible, and complete.
+  Use save_strategy_and_exit when strategy is finalized to save it and exit.
 
 autonomous: Execute the strategy 24/7 without user interaction.
   - Check positions first (close if exit conditions met)
@@ -223,7 +223,7 @@ Be disciplined and execute the strategy faithfully.
                     "mcp__trading__wait_for",
                     "mcp__trading__record_trade_observation",
                     "mcp__trading__query_trade_observations",
-                    "mcp__trading__request_autonomous_mode"
+                    "mcp__trading__save_strategy_and_exit"
                 ],
                 disallowed_tools=[
                     "Task", "Bash", "Read", "Write", "Edit", "Glob", "Grep",
@@ -261,8 +261,7 @@ Be disciplined and execute the strategy faithfully.
         1. Agent greets user
         2. User sends messages via Redis queue
         3. Agent responds via query/receive_response pattern
-        4. When ready, agent calls request_autonomous_mode tool
-        5. User confirms → save strategy, exit
+        4. When ready, agent calls save_strategy_and_exit → saves and exits
         """
         logger.info("Starting strategy definition mode - waiting for user's first message...")
 
@@ -352,157 +351,19 @@ Be disciplined and execute the strategy faithfully.
                                 })
                             )
 
-                # Check if mode switch was requested (would be in Redis flag)
-                mode_switch_pending = await self.redis_client.get(
-                    f"agent:{self.config_id}:mode_switch_pending"
+                # Check if agent saved strategy and wants to exit
+                strategy_saved = await self.redis_client.get(
+                    f"agent:{self.config_id}:strategy_saved_exit"
                 )
-                if mode_switch_pending:
-                    logger.info("Mode switch requested - waiting for user confirmation")
+                if strategy_saved:
+                    logger.info("Strategy saved - agent exiting strategy definition mode")
 
-                    # Wait for user's confirmation (1 or 2)
-                    confirmation_data = await self.redis_client.blpop(
-                        f"agent:{self.config_id}:messages",
-                        timeout=0  # Block indefinitely
-                    )
+                    # Clean up Redis flag
+                    await self.redis_client.delete(f"agent:{self.config_id}:strategy_saved_exit")
 
-                    if confirmation_data:
-                        _, confirmation_bytes = confirmation_data
-                        confirmation_json = json.loads(confirmation_bytes.decode('utf-8'))
+                    # Exit loop
+                    break
 
-                        # Handle both old format {"text": "1"} and new format {"confirm": true, "autonomously_editable": false}
-                        user_choice = confirmation_json.get("text", "").strip()
-                        is_confirmed = user_choice == "1" or confirmation_json.get("confirm") is True
-                        autonomously_editable = confirmation_json.get("autonomously_editable", False)
-
-                        if is_confirmed:
-                            # CONFIRM - Save strategy and exit
-                            logger.info(f"User confirmed autonomous mode - saving strategy (autonomously_editable={autonomously_editable})")
-
-                            # Retrieve strategy from Redis
-                            pending_strategy = await self.redis_client.get(
-                                f"agent:{self.config_id}:pending_strategy"
-                            )
-
-                            if pending_strategy:
-                                strategy_text = pending_strategy.decode('utf-8')
-
-                                # Save to database with autonomously_editable setting
-                                await self._save_strategy(strategy_text, autonomously_editable)
-
-                                # Send confirmation message
-                                confirmation_text = "✅ Strategy saved! Exiting strategy definition mode.\n\nTo start autonomous trading, restart with:\npython agent/run_agent.py --config-id={} --mode=autonomous".format(self.config_id)
-                                response_data = {
-                                    "type": "agent_message",
-                                    "text": confirmation_text,
-                                    "timestamp": datetime.utcnow().isoformat()
-                                }
-
-                                await self.redis_client.rpush(
-                                    f"agent:{self.config_id}:responses",
-                                    json.dumps(response_data)
-                                )
-
-                                # Store in conversation history
-                                await self.redis_client.rpush(
-                                    f"agent:{self.config_id}:history",
-                                    json.dumps({
-                                        "role": "agent",
-                                        "content": confirmation_text,
-                                        "timestamp": datetime.utcnow().isoformat()
-                                    })
-                                )
-
-                                # Clean up Redis
-                                await self.redis_client.delete(
-                                    f"agent:{self.config_id}:mode_switch_pending",
-                                    f"agent:{self.config_id}:pending_strategy"
-                                )
-
-                                logger.info("Strategy saved successfully - exiting")
-                                break
-                            else:
-                                logger.error("No pending strategy found in Redis")
-
-                        elif user_choice == "2" or confirmation_json.get("confirm") is False:
-                            # REVISE - Clear flag and continue conversation
-                            logger.info("User chose to revise strategy - continuing conversation")
-
-                            # Clear flags
-                            await self.redis_client.delete(
-                                f"agent:{self.config_id}:mode_switch_pending",
-                                f"agent:{self.config_id}:pending_strategy"
-                            )
-
-                            # Send to agent
-                            await client.query("The user wants to revise the strategy. Let's continue refining it.")
-
-                            # Collect response
-                            async for message in client.receive_response():
-                                response_text = None
-                                is_final = False
-
-                                # Handle AssistantMessage (streaming responses with TextBlocks)
-                                if isinstance(message, AssistantMessage):
-                                    for block in message.content:
-                                        if isinstance(block, TextBlock):
-                                            response_text = block.text
-                                    is_final = False
-
-                                # Handle ResultMessage (final consolidated response)
-                                elif isinstance(message, ResultMessage):
-                                    response_text = message.result
-                                    is_final = True
-
-                                if response_text:
-                                    logger.info(f"Agent: {response_text[:200]}...")
-
-                                    # Only push to queues for final ResultMessage (not streaming)
-                                    if is_final:
-                                        response_data = {
-                                            "type": "agent_message",
-                                            "text": response_text,
-                                            "timestamp": datetime.utcnow().isoformat()
-                                        }
-
-                                        await self.redis_client.rpush(
-                                            f"agent:{self.config_id}:responses",
-                                            json.dumps(response_data)
-                                        )
-
-                                        # Store in conversation history
-                                        await self.redis_client.rpush(
-                                            f"agent:{self.config_id}:history",
-                                            json.dumps({
-                                                "role": "agent",
-                                                "content": response_text,
-                                                "timestamp": datetime.utcnow().isoformat()
-                                            })
-                                        )
-                        else:
-                            # Invalid choice - ask again
-                            logger.warning(f"Invalid confirmation choice: {user_choice}")
-
-                            invalid_text = "Please reply with '1' to CONFIRM or '2' to REVISE the strategy."
-                            response_data = {
-                                "type": "agent_message",
-                                "text": invalid_text,
-                                "timestamp": datetime.utcnow().isoformat()
-                            }
-
-                            await self.redis_client.rpush(
-                                f"agent:{self.config_id}:responses",
-                                json.dumps(response_data)
-                            )
-
-                            # Store in conversation history
-                            await self.redis_client.rpush(
-                                f"agent:{self.config_id}:history",
-                                json.dumps({
-                                    "role": "agent",
-                                    "content": invalid_text,
-                                    "timestamp": datetime.utcnow().isoformat()
-                                })
-                            )
 
     async def _save_strategy(self, strategy_content: str, autonomously_editable: bool = False):
         """

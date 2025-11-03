@@ -109,12 +109,13 @@ class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
     config_type: str = "autonomous_trading"
-    selected_pair: str = "BTC/USDT"
-    extraction: Dict[str, Any]
-    decision: Dict[str, Any]
-    trading: Dict[str, Any]
-    llm_config: Dict[str, Any]
+    selected_pair: Optional[str] = "BTC/USDT"  # Optional for agents
+    extraction: Optional[Dict[str, Any]] = None  # Optional for agents and signal_validation
+    decision: Optional[Dict[str, Any]] = None  # Optional for agents
+    trading: Dict[str, Any]  # Always required
+    llm_config: Optional[Dict[str, Any]] = None  # Optional for agents
     telegram_integration: Optional[Dict[str, Any]] = None
+    agent_strategy: Optional[Dict[str, Any]] = None  # For agent-type configs
 
 
 class ConfigUpdateRequest(BaseModel):
@@ -127,6 +128,7 @@ class ConfigUpdateRequest(BaseModel):
     trading: Optional[Dict[str, Any]] = None
     llm_config: Optional[Dict[str, Any]] = None
     telegram_integration: Optional[Dict[str, Any]] = None
+    agent_strategy: Optional[Dict[str, Any]] = None
 
 
 class SignalOrchestrationRequest(BaseModel):
