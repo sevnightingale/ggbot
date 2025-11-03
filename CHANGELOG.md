@@ -4,6 +4,77 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-03 - Agent Phase 4a Extended: Bot Creation Flow + Agentic State Machine
+
+**Bot Creation Modal** (Frontend):
+- **Type Selection at Creation**: Moved config type selector from Configure tab to new BotCreationModal component shown on "+ New" click
+- **3 Bot Types**: Scheduled Trading (Free), Signal Validation (Pro), Agentic (Whitelist only)
+- **Permission Gating**: Each type shows tier badge, locked types trigger UpgradeModal
+- **createDefaultBot() Enhancement**: Now accepts botType parameter, creates minimal config for agentic (no selected_pair, no extraction/decision - agent defines via chat)
+- **Integration**: Updated BotRail and MobileNav to open modal instead of direct creation
+- **Files**: `components/modals/BotCreationModal.tsx` (new, 170 lines), `page.tsx` (createDefaultBot refactor), `BotRail.tsx` (modal integration)
+
+**SaveConfigBar Refactor** (Frontend):
+- **Static Type Display**: Removed 3-button selector, replaced with static badge showing current type (icon + label)
+- **Cleaner ConfigureLayout**: Type is immutable after creation, only Save/Cancel/Reset buttons remain
+- **Usage Pattern**: SaveConfigBar only rendered for scheduled_trading and signal_validation (via ConfigureLayout), NOT for agentic bots
+- **Files**: `SaveConfigBar.tsx` (static display), `page.tsx` (removed SaveConfigBar from agentic rendering)
+
+**Agentic Bot State Machine** (Frontend):
+- **4 States Implementation**:
+  - State 1: No strategy + inactive → Large centered "Start Strategy Discussion" button with empty state
+  - State 2: Has strategy + inactive → Strategy card + "Refine Strategy" button (editable)
+  - State 3: Has strategy + active → Strategy card + DISABLED button with lock icon (must deactivate first)
+  - State 4: Agent running → AgentConfigurator chat interface (messages.length > 0)
+- **handleStartStrategyDiscussion()**: Checks agent status, starts in strategy_definition mode, auto-sends existing strategy as context if editing
+- **Context-Aware Editing**: When refining, waits 2s for agent init, then sends: "Here is my current strategy:\n\n{content}\n\nI'd like to refine it..."
+- **Files**: `page.tsx` (state machine rendering + handler, ~80 lines)
+
+**Autonomously Editable Setting** (Full Stack):
+- **Frontend**: Checkbox in AgentConfigurator confirmation UI with label: "Allow agent to modify strategy autonomously (Advanced)"
+- **Confirmation Flow**: Updated `handleConfirmStrategy(autonomouslyEditable)` to send JSON: `{confirm: true, autonomously_editable: boolean}`
+- **Backend Parsing**: `run_agent.py` parses JSON confirmation, extracts autonomously_editable flag, passes to `_save_strategy()`
+- **Database**: Saves user's choice to `configurations.config_data.agent_strategy.autonomously_editable` with version increment
+- **Backward Compatibility**: Supports old "1"/"2" text format and new JSON format
+- **Files**: `AgentConfigurator.tsx` (checkbox component), `page.tsx` (JSON send), `agent/run_agent.py` (JSON parsing + save)
+
+**Architecture**:
+- Bot type selection now part of creation flow, not configuration flow (prevents invalid type switching)
+- Agentic bots have completely separate UI path (no ConfigTabs, no SaveConfigBar, just state machine)
+- State machine uses `agentMessages.length === 0` to detect button vs chat view
+- Agent auto-starts only when "Start/Refine Strategy" button clicked (removed auto-start on tab entry)
+
+**Status**: Phase 4a fully complete - elegant bot creation flow, clear state machine, user choice for autonomy level
+
+---
+
+## 2025-11-03 - Agent Position Size Overrides + Dynamic AsterDEX Sizing
+
+**Agent Autonomous Position Control** (Full Stack):
+- **Trading Services**: Added override support to all three services (Aster, Paper, Symphony) for `position_size_override`, `position_size_usd_override`, `leverage_override`
+- **Sizing Semantics**: `size_usd` = total position size (notional), NOT margin. Example: $1000 position @ 10x = $100 margin required
+- **Backend API**: Created `/api/v2/agent/execute-trade` endpoint with service authentication and override parameter support
+- **Agent Integration**: Updated agent API client (`agent/service_client.py`) and MCP tool (`agent/mcp_server.py`) to pass override params with clear documentation
+- **Validation**: Comprehensive safety checks (balance validation, minimum quantities, leverage limits) across all services
+- **Files**: `trading/live/aster_service_v3.py`, `trading/paper/supabase_service.py`, `trading/live/symphony_service.py`, `ggbot.py`, `agent/service_client.py`, `agent/mcp_server.py`
+
+**AsterDEX Dynamic Position Sizing**:
+- **Account Balance Query**: Implemented real-time USDT balance fetching for dynamic position sizing
+- **Config-Based Sizing**: Respects bot config (ACCOUNT_PERCENTAGE, CONFIDENCE_BASED, FIXED_USD) with proper leverage calculations
+- **Safety Caps**: Automatically reduces position if margin exceeds 95% of available balance
+- **Minimum Enforcement**: Validates against AsterDEX minimums (0.001 BTC) with fallback to minimum if calculated size too small
+- **Test Results**: Validated with $9.84 account, proper scaling confirmed (10% account = $0.98 margin @ 10x leverage)
+
+**LivePriceService Format Fix**:
+- **Symbol Format Agnostic**: `LivePriceService.get_current_price()` now accepts both `BTC-USDT` (platform) and `BTC/USDT` (CCXT) formats
+- **Auto-Normalization**: Automatically converts dash separator to slash for Binance API compatibility
+- **Cleaner Code**: Removed manual symbol conversion from Aster service and other call sites
+- **Files**: `trading/paper/live_price_service.py`
+
+**Status**: Agents can now control position sizing and leverage independently from bot config, enabling intelligent risk management based on market analysis
+
+---
+
 ## 2025-11-02 - Agent Phase 4a: Strategy Definition UI Complete
 
 **Frontend**:

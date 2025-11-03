@@ -186,10 +186,12 @@ class GGBotAPIClient:
         confidence: float = 0.7,
         stop_loss_price: Optional[float] = None,
         take_profit_price: Optional[float] = None,
-        decision_id: Optional[str] = None
+        decision_id: Optional[str] = None,
+        size_usd: Optional[float] = None,
+        leverage: Optional[int] = None
     ) -> Dict[str, Any]:
         """
-        Execute a trade directly.
+        Execute a trade directly with optional position sizing overrides.
 
         Args:
             config_id: Configuration ID
@@ -199,6 +201,13 @@ class GGBotAPIClient:
             stop_loss_price: Optional stop loss price
             take_profit_price: Optional take profit price
             decision_id: Optional decision ID to link
+            size_usd: Optional position size in USD (NOTIONAL, not margin - overrides config)
+                      Example: 1000 with 10x leverage = $1000 position using $100 margin
+            leverage: Optional leverage multiplier (overrides config)
+
+        Note:
+            size_usd is the TOTAL POSITION SIZE (notional), not the margin/collateral.
+            Actual capital at risk = size_usd / leverage
 
         Returns:
             Trade execution result
@@ -215,6 +224,10 @@ class GGBotAPIClient:
             payload["take_profit_price"] = take_profit_price
         if decision_id:
             payload["decision_id"] = decision_id
+        if size_usd:
+            payload["position_size_usd_override"] = size_usd
+        if leverage:
+            payload["leverage_override"] = leverage
 
         response = await self._retry_request(
             "POST",

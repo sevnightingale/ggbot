@@ -219,10 +219,21 @@ class SupabasePaperTradingService:
     async def execute_trade_intent(self, intent: Dict[str, Any]) -> Dict[str, Any]:
         """
         Execute paper trade from Decision Module intent.
-        
+
         Args:
-            intent: Trade intent from Decision Module
-            
+            intent: Trade intent from Decision Module with optional overrides:
+                - config_id: Bot configuration ID
+                - user_id: User ID
+                - symbol: Trading symbol
+                - action: "long" or "short"
+                - confidence: 0.0-1.0
+                - decision_id: Optional decision UUID
+                - stop_loss_price: Optional stop loss price
+                - take_profit_price: Optional take profit price
+                - position_size_override: Optional position size in base asset
+                - position_size_usd_override: Optional position size in USD notional
+                - leverage_override: Optional leverage multiplier
+
         Returns:
             Execution result with trade details
         """
@@ -236,6 +247,11 @@ class SupabasePaperTradingService:
             decision_id = intent.get("decision_id")
             stop_loss = intent.get("stop_loss_price")
             take_profit = intent.get("take_profit_price")
+
+            # Extract override parameters (for agent control)
+            position_size_override = intent.get("position_size_override")
+            position_size_usd_override = intent.get("position_size_usd_override")
+            leverage_override = intent.get("leverage_override")
             # Note: reasoning is tracked in decisions table, not in paper_trades
             
             logger.info(f"Executing paper trade intent: {action} {symbol} (confidence={confidence:.3f})")
@@ -294,12 +310,28 @@ class SupabasePaperTradingService:
             intent = self._apply_default_risk_levels(config, intent, entry_price)
             stop_loss = intent.get("stop_loss_price")  # Updated with defaults
             take_profit = intent.get("take_profit_price")  # Updated with defaults
-            
-            # Calculate position size using configuration
-            position_size_usd = self._calculate_position_size(config, confidence, float(account.current_balance.amount))
 
-            # Get leverage from config
-            leverage = config.trading.leverage
+            # Calculate position size - with override support for agents
+            if position_size_usd_override:
+                # Direct USD override (e.g., agent says "trade $500 worth")
+                position_size_usd = float(position_size_usd_override)
+                logger.info(f"Using position size USD override: ${position_size_usd:.2f}")
+            elif position_size_override:
+                # Base asset quantity override (e.g., agent says "trade 0.005 BTC")
+                # Convert to USD using current price
+                position_size_usd = float(position_size_override) * entry_price
+                logger.info(f"Using position size override: {position_size_override} * ${entry_price:.2f} = ${position_size_usd:.2f}")
+            else:
+                # Use config-based position sizing
+                position_size_usd = self._calculate_position_size(config, confidence, float(account.current_balance.amount))
+
+            # Get leverage - with override support
+            if leverage_override:
+                leverage = int(leverage_override)
+                leverage = max(1, leverage)  # Minimum 1x
+                logger.info(f"Using leverage override: {leverage}x")
+            else:
+                leverage = config.trading.leverage
 
             # Calculate margin required (position size / leverage)
             margin_required = position_size_usd / leverage

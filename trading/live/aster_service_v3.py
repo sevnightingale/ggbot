@@ -284,7 +284,18 @@ class AsterDEXV3LiveTradingService:
         Execute live trade via AsterDEX v3 API.
 
         Args:
-            intent: Trade intent from Decision Module
+            intent: Trade intent from Decision Module with optional overrides:
+                - config_id: Bot configuration ID
+                - user_id: User ID
+                - symbol: Trading symbol (platform format)
+                - action: "long" or "short"
+                - confidence: 0.0-1.0
+                - decision_id: Optional decision UUID
+                - stop_loss_price: Optional stop loss price
+                - take_profit_price: Optional take profit price
+                - position_size_override: Optional position size in base asset (e.g., 0.005 BTC)
+                - position_size_usd_override: Optional position size in USD notional
+                - leverage_override: Optional leverage (1-20x)
 
         Returns:
             Execution result with status, batch_id, etc.
@@ -299,6 +310,11 @@ class AsterDEXV3LiveTradingService:
             decision_id = intent.get("decision_id")
             stop_loss = intent.get("stop_loss_price")
             take_profit = intent.get("take_profit_price")
+
+            # Extract override parameters (for agent control)
+            position_size_override = intent.get("position_size_override")  # Base asset quantity
+            position_size_usd_override = intent.get("position_size_usd_override")  # USD notional
+            leverage_override = intent.get("leverage_override")  # 1-20x
 
             self._log.info(f"Executing AsterDEX v3 live trade: {action.upper()} {symbol} (confidence={confidence:.3f})")
 
@@ -352,13 +368,78 @@ class AsterDEXV3LiveTradingService:
                     "batch_id": None
                 }
 
-            # Step 6: Calculate quantity based on position sizing config
-            quantity = await self._calculate_weight(config, confidence, symbol)
+            # Step 6: Calculate quantity - with override support for agents
+            if position_size_override:
+                # Direct quantity override (e.g., agent says "trade 0.005 BTC")
+                quantity = float(position_size_override)
+                self._log.info(f"Using position size override: {quantity} (base asset)")
+            elif position_size_usd_override:
+                # USD notional override (e.g., agent says "trade $500 worth")
+                from trading.paper.live_price_service import LivePriceService
+                price_service = LivePriceService()
+                market_price = await price_service.get_current_price(symbol)
+                asset_price = market_price.mid
 
-            # Step 7: Get leverage
-            trading = config.trading if hasattr(config, 'trading') else {}
-            leverage = trading.get("leverage", 10) if isinstance(trading, dict) else 10  # Default 10x for testing
-            leverage = max(leverage, 1)
+                # Get leverage for calculation
+                trading = config.trading if hasattr(config, 'trading') else {}
+                temp_leverage = leverage_override if leverage_override else (trading.get("leverage", 10) if isinstance(trading, dict) else 10)
+
+                # Convert USD to quantity (notional / price, no leverage adjustment needed here)
+                quantity = float(position_size_usd_override) / asset_price
+                quantity = round(quantity, 3)
+                self._log.info(f"Using USD override: ${position_size_usd_override} = {quantity} at ${asset_price:,.2f}")
+            else:
+                # Use config-based position sizing
+                quantity = await self._calculate_weight(config, confidence, symbol)
+
+            # Validate minimum quantity
+            min_quantity = 0.001  # Aster minimum for BTC
+            if quantity < min_quantity:
+                self._log.warning(f"Quantity {quantity} below minimum {min_quantity}, adjusting to minimum")
+                quantity = min_quantity
+
+            # Step 7: Get leverage - with override support
+            if leverage_override:
+                leverage = int(leverage_override)
+                leverage = max(1, min(leverage, 20))  # Clamp to 1-20x
+                self._log.info(f"Using leverage override: {leverage}x")
+            else:
+                trading = config.trading if hasattr(config, 'trading') else {}
+                leverage = trading.get("leverage", 10) if isinstance(trading, dict) else 10
+                leverage = max(leverage, 1)
+
+            # Validate position against account balance
+            balance_data = await self._get_account_balance()
+            if balance_data:
+                available_balance = 0.0
+                for asset in balance_data:
+                    if asset.get("asset") == "USDT":
+                        available_balance = float(asset.get("availableBalance", 0))
+                        break
+
+                if available_balance > 0:
+                    # Get current price for margin calculation
+                    from trading.paper.live_price_service import LivePriceService
+                    price_service = LivePriceService()
+                    market_price = await price_service.get_current_price(symbol)
+                    asset_price = market_price.mid
+
+                    notional = quantity * asset_price
+                    margin_required = notional / leverage
+                    max_margin = available_balance * 0.95
+
+                    if margin_required > max_margin:
+                        self._log.warning(
+                            f"Position requires ${margin_required:.2f} margin but only ${max_margin:.2f} available, "
+                            f"reducing quantity"
+                        )
+                        # Reduce quantity to fit balance
+                        max_notional = max_margin * leverage
+                        quantity = max_notional / asset_price
+                        quantity = round(quantity, 3)
+                        quantity = max(quantity, min_quantity)  # Keep at minimum at least
+                        self._log.info(f"Reduced to {quantity} (${quantity * asset_price:.2f} notional, ${margin_required:.2f} margin)")
+
 
             # Step 8: Apply default SL/TP if not provided
             if not stop_loss or not take_profit:

@@ -341,11 +341,15 @@ Be disciplined and execute the strategy faithfully.
                     if confirmation_data:
                         _, confirmation_bytes = confirmation_data
                         confirmation_json = json.loads(confirmation_bytes.decode('utf-8'))
-                        user_choice = confirmation_json.get("text", "").strip()
 
-                        if user_choice == "1":
+                        # Handle both old format {"text": "1"} and new format {"confirm": true, "autonomously_editable": false}
+                        user_choice = confirmation_json.get("text", "").strip()
+                        is_confirmed = user_choice == "1" or confirmation_json.get("confirm") is True
+                        autonomously_editable = confirmation_json.get("autonomously_editable", False)
+
+                        if is_confirmed:
                             # CONFIRM - Save strategy and exit
-                            logger.info("User confirmed autonomous mode - saving strategy")
+                            logger.info(f"User confirmed autonomous mode - saving strategy (autonomously_editable={autonomously_editable})")
 
                             # Retrieve strategy from Redis
                             pending_strategy = await self.redis_client.get(
@@ -355,8 +359,8 @@ Be disciplined and execute the strategy faithfully.
                             if pending_strategy:
                                 strategy_text = pending_strategy.decode('utf-8')
 
-                                # Save to database
-                                await self._save_strategy(strategy_text)
+                                # Save to database with autonomously_editable setting
+                                await self._save_strategy(strategy_text, autonomously_editable)
 
                                 # Send confirmation message
                                 await self.redis_client.rpush(
@@ -379,7 +383,7 @@ Be disciplined and execute the strategy faithfully.
                             else:
                                 logger.error("No pending strategy found in Redis")
 
-                        elif user_choice == "2":
+                        elif user_choice == "2" or confirmation_json.get("confirm") is False:
                             # REVISE - Clear flag and continue conversation
                             logger.info("User chose to revise strategy - continuing conversation")
 
@@ -418,8 +422,14 @@ Be disciplined and execute the strategy faithfully.
                                 })
                             )
 
-    async def _save_strategy(self, strategy_content: str):
-        """Save strategy to database config_data.agent_strategy"""
+    async def _save_strategy(self, strategy_content: str, autonomously_editable: bool = False):
+        """
+        Save strategy to database config_data.agent_strategy
+
+        Args:
+            strategy_content: Strategy text content
+            autonomously_editable: Whether agent can modify its own strategy
+        """
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
@@ -436,11 +446,14 @@ Be disciplined and execute the strategy faithfully.
 
                     config_data = row[0] or {}
 
+                    # Get current version if updating existing strategy
+                    current_version = config_data.get('agent_strategy', {}).get('version', 0)
+
                     # Update agent_strategy
                     config_data['agent_strategy'] = {
                         "content": strategy_content,
-                        "autonomously_editable": False,  # Default to guided mode
-                        "version": 1,
+                        "autonomously_editable": autonomously_editable,
+                        "version": current_version + 1,
                         "last_updated_at": datetime.utcnow().isoformat(),
                         "last_updated_by": "user",
                         "performance_log": []

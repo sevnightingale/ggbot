@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request
+from fastapi import FastAPI, Depends, HTTPException, BackgroundTasks, Request, Query, Header
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_serializer
 import uvicorn
@@ -2838,6 +2838,119 @@ async def get_bot_decisions(
         raise HTTPException(status_code=500, detail="Failed to get decisions")
 
 
+# Agent Trade Execution Endpoint
+@app.post("/api/v2/agent/execute-trade")
+async def agent_execute_trade(
+    request: Dict[str, Any],
+    user_id: str = Query(...),
+    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+) -> Dict[str, Any]:
+    """
+    Execute trade for agent with optional position sizing overrides.
+
+    This endpoint is called by autonomous agents via MCP tools.
+    Supports position size and leverage overrides for agent decision-making.
+
+    Args:
+        request: Trade execution request with:
+            - config_id: Bot configuration ID
+            - symbol: Trading symbol (any format accepted)
+            - side: "long" or "short"
+            - confidence: Optional confidence score (0.0-1.0, default 0.7)
+            - stop_loss_price: Optional stop loss price
+            - take_profit_price: Optional take_profit price
+            - decision_id: Optional decision UUID to link
+            - position_size_override: Optional position size in base asset (e.g., 0.005 BTC)
+            - position_size_usd_override: Optional total position size in USD NOTIONAL (e.g., 500)
+                                          Note: This is the FULL POSITION SIZE, not margin/collateral
+                                          Example: 1000 with 10x leverage = $1000 position using $100 margin
+            - leverage_override: Optional leverage (e.g., 15)
+        user_id: User ID (passed as query param by service client)
+        x_service_auth: Service authentication header
+
+    Returns:
+        Trade execution result with status, trade_id/batch_id, etc.
+    """
+    try:
+        # Service authentication check (same as signal-listener pattern)
+        if x_service_auth != "agent-runner":
+            raise HTTPException(status_code=401, detail="Unauthorized service")
+
+        # Extract required fields
+        config_id = request.get("config_id")
+        symbol = request.get("symbol")
+        side = request.get("side")
+
+        if not config_id or not symbol or not side:
+            raise HTTPException(status_code=400, detail="Missing required fields: config_id, symbol, side")
+
+        # Validate config belongs to user
+        config = await config_service.get_config(config_id, user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # Build trade intent with overrides
+        intent = {
+            "config_id": config_id,
+            "user_id": user_id,
+            "symbol": symbol,
+            "action": side,  # "long" or "short"
+            "confidence": request.get("confidence", 0.7),
+            "stop_loss_price": request.get("stop_loss_price"),
+            "take_profit_price": request.get("take_profit_price"),
+            "decision_id": request.get("decision_id"),
+            # Agent override parameters
+            "position_size_override": request.get("position_size_override"),
+            "position_size_usd_override": request.get("position_size_usd_override"),
+            "leverage_override": request.get("leverage_override")
+        }
+
+        # Route to appropriate trading service based on trading_mode
+        trading_mode = getattr(config, 'trading_mode', 'paper')
+        is_live = trading_mode == 'live'
+        is_aster = trading_mode == 'aster'
+
+        if is_aster:
+            result = await orchestrator.aster_trading.execute_trade_intent(intent)
+            return {
+                "status": "success",
+                "message": "Trade executed on AsterDEX",
+                "trade": {
+                    "batch_id": result.get("batch_id"),
+                    "status": result.get("status")
+                }
+            }
+        elif is_live:
+            result = await orchestrator.symphony_trading.execute_trade_intent(intent)
+            return {
+                "status": "success",
+                "message": "Trade executed on Symphony",
+                "trade": {
+                    "batch_id": result.get("batch_id"),
+                    "status": result.get("status")
+                }
+            }
+        else:
+            # Paper trading
+            result = await orchestrator.paper_trading.execute_trade_intent(intent)
+            return {
+                "status": "success",
+                "message": "Paper trade executed",
+                "trade": {
+                    "trade_id": result.get("trade_id"),
+                    "entry_price": result.get("entry_price"),
+                    "size_usd": result.get("size_usd"),
+                    "status": result.get("status")
+                }
+            }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Agent trade execution failed: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Trade execution failed: {str(e)}")
+
+
 # Bot Lifecycle Endpoints (placeholders for now)
 @app.post("/api/v2/bot/{config_id}/start")
 async def start_bot(
@@ -3474,10 +3587,12 @@ if os.getenv("DEVELOPMENT_MODE", "false").lower() == "true":
     app.dependency_overrides[get_current_user_v2] = get_mock_user_for_dev
 
 if __name__ == "__main__":
+    # Disable reload in production (PM2 handles process management)
+    is_dev = os.getenv("DEV_MODE", "false").lower() == "true"
     uvicorn.run(
         "ggbot:app",
         host="0.0.0.0",
         port=8000,
-        reload=True,
+        reload=is_dev,
         log_level="info"
     )

@@ -52,7 +52,7 @@ class SymphonyLiveTradingService:
         Execute live trade via Symphony API.
 
         Args:
-            intent: Trade intent from Decision Module with:
+            intent: Trade intent from Decision Module with optional overrides:
                 - decision_id: UUID from decision engine
                 - user_id: User UUID
                 - config_id: Bot config UUID
@@ -61,6 +61,12 @@ class SymphonyLiveTradingService:
                 - confidence: 0.0-1.0
                 - stop_loss_price: Optional float
                 - take_profit_price: Optional float
+                - position_size_override: Optional position size in base asset (converted to %)
+                - position_size_usd_override: Optional position size in USD (converted to %)
+                - leverage_override: Optional leverage (1.1x+)
+
+        Note: Symphony uses percentage-based position sizing, so USD overrides are
+        approximate and require account balance estimation.
 
         Returns:
             Execution result with:
@@ -78,6 +84,11 @@ class SymphonyLiveTradingService:
             decision_id = intent.get("decision_id")
             stop_loss = intent.get("stop_loss_price")
             take_profit = intent.get("take_profit_price")
+
+            # Extract override parameters (for agent control)
+            position_size_override = intent.get("position_size_override")
+            position_size_usd_override = intent.get("position_size_usd_override")
+            leverage_override = intent.get("leverage_override")
 
             self._log.info(f"Executing Symphony live trade: {action.upper()} {symbol} (confidence={confidence:.3f})")
 
@@ -139,13 +150,41 @@ class SymphonyLiveTradingService:
 
             symphony_symbol = self.standardizer.normalize(symbol, "ccxt", "symphony")
 
-            # Step 5: Calculate weight (position size %) from config
-            weight = self._calculate_weight(config, confidence)
+            # Step 5: Calculate weight (position size %) - with override support
+            if position_size_usd_override or position_size_override:
+                # Note: Symphony uses percentage, but agents may specify USD amounts
+                # We'll use a reasonable default percentage for overrides
+                # Ideally we'd query Symphony account balance, but API doesn't expose it easily
+                if position_size_usd_override:
+                    # Estimate: assume $10k account, convert USD to percentage
+                    # This is approximate - agents should use percentage for Symphony
+                    estimated_account = 10000.0  # Default estimate
+                    weight = (float(position_size_usd_override) / estimated_account) * 100
+                    weight = max(0.1, min(weight, 100.0))  # Clamp to 0.1-100%
+                    self._log.warning(
+                        f"USD override for Symphony is approximate (estimated account: ${estimated_account}). "
+                        f"Using {weight:.1f}% of account for ${position_size_usd_override}"
+                    )
+                elif position_size_override:
+                    # Convert base asset quantity to percentage (also approximate)
+                    # This is very rough - agents should avoid this for Symphony
+                    weight = 10.0  # Default to 10% if base asset specified
+                    self._log.warning(
+                        f"Base asset override for Symphony not supported directly. Using default {weight}%"
+                    )
+            else:
+                # Use config-based weight calculation
+                weight = self._calculate_weight(config, confidence)
 
-            # Step 6: Get leverage from config
-            leverage = config.trading.get("leverage", 1) if config.trading else 1
-            # Ensure min leverage for Symphony (1.1x minimum)
-            leverage = max(leverage, 1.1)
+            # Step 6: Get leverage - with override support
+            if leverage_override:
+                leverage = float(leverage_override)
+                leverage = max(leverage, 1.1)  # Minimum 1.1x for Symphony
+                self._log.info(f"Using leverage override: {leverage}x")
+            else:
+                leverage = config.trading.get("leverage", 1) if config.trading else 1
+                # Ensure min leverage for Symphony (1.1x minimum)
+                leverage = max(leverage, 1.1)
 
             # Step 6.5: Get market price and apply default SL/TP from config
             try:

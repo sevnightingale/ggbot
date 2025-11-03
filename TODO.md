@@ -82,6 +82,20 @@
   - [x] Test routing with live service
   - [x] Verify no impact on existing paper/Symphony flows
 
+- [x] **Dynamic Position Sizing** (`trading/live/aster_service_v3.py`)
+  - [x] Implement `_calculate_weight()` with account balance query
+  - [x] Respect bot config (ACCOUNT_PERCENTAGE, CONFIDENCE_BASED, FIXED_USD)
+  - [x] Add safety caps (95% of available balance)
+  - [x] Validate minimum quantities (0.001 BTC)
+  - [x] Test with $9.84 account balance
+
+- [x] **Agent Position Size Overrides** (Full Stack Implementation)
+  - [x] Add override support to all trading services (Aster, Paper, Symphony)
+  - [x] Create `/api/v2/agent/execute-trade` endpoint with override params
+  - [x] Update agent API client to pass `size_usd` and `leverage` params
+  - [x] Wire up agent MCP tool with override parameters
+  - [x] Add comprehensive validation and safety checks
+
 - [ ] **Configuration Support** (`core/config/models.py`)
   - [x] Add `'aster'` to trading_mode options (already supports via string field)
   - [ ] Add `aster_account_id` optional field
@@ -89,6 +103,7 @@
   - [ ] Test config creation/loading
 
 - [ ] **API Endpoints** (`ggbot.py` or `api/aster.py`)
+  - [x] Add `POST /api/v2/agent/execute-trade` (agent trade execution with overrides)
   - [ ] Add `POST /api/v2/aster/setup` (store credentials)
   - [ ] Add `GET /api/v2/aster/status` (check connection)
   - [ ] Add `POST /api/v2/aster/disconnect` (remove credentials)
@@ -394,7 +409,7 @@
 - ✅ Activity Timeline connects to real data (not mock)
 - ✅ Local state design, SSE + Redis polling for real-time updates
 
-#### **Phase 4a: Configure Tab Integration** (Week 1-2) - ✅ **COMPLETE**
+#### **Phase 4a: Strategy Definition UI** (Week 1-2) - ✅ **COMPLETE** (2025-11-03)
 - [x] Config type selection redesign (3-button selector with permissions)
 - [x] AgentConfigurator component with two-column layout
 - [x] Chat interface with Redis queue integration
@@ -404,8 +419,33 @@
 - [x] Backend API endpoints (start, stop, message, poll-response, status)
 - [x] Updated request_autonomous_mode tool with show_confirm_button flag
 - [x] Renamed "Autonomous Trading" → "Scheduled Trading" (config type cleanup)
+- [x] **Bot Creation Modal** - Moved type selection from Configure to creation flow
+  - [x] Created `BotCreationModal.tsx` with 3 bot types (Scheduled/Signal/Agentic)
+  - [x] Permission gating per type (Free/Pro/Whitelist)
+  - [x] Integrated with BotRail and MobileNav
+  - [x] Updated `createDefaultBot()` to accept botType parameter
+  - [x] Agentic bots created with minimal config (agent defines strategy via chat)
+- [x] **SaveConfigBar Refactor** - Converted to static type display
+  - [x] Removed 3-button type selector
+  - [x] Added static type badge display (icon + label)
+  - [x] Kept Save/Cancel/Reset buttons for scheduled_trading & signal_validation
+- [x] **Agentic Bot State Machine** - 4-state UI flow
+  - [x] State 1: No strategy, inactive → "Start Strategy Discussion" button
+  - [x] State 2: Has strategy, inactive → Strategy display + "Refine Strategy" button
+  - [x] State 3: Has strategy, active → Strategy display + disabled button (must deactivate first)
+  - [x] State 4: Agent running → Chat interface with AgentConfigurator
+- [x] **Strategy Editing Flow** - Context-aware conversation
+  - [x] Added `handleStartStrategyDiscussion()` handler
+  - [x] Auto-sends existing strategy as context when refining
+  - [x] Starts agent in strategy_definition mode
+  - [x] Waits for agent greeting then polls responses
+- [x] **Autonomously Editable Setting** - User choice during confirmation
+  - [x] Added checkbox to AgentConfigurator confirmation UI
+  - [x] Updated `handleConfirmStrategy()` to send JSON: `{confirm: true, autonomously_editable: boolean}`
+  - [x] Backend `run_agent.py` parses JSON and saves setting to database
+  - [x] Backward compatible with old "1"/"2" format
 - [ ] ActivationBar integration for agentic mode (deferred - not needed for strategy definition)
-- [ ] "Begin Strategy Discussion" button for editing (deferred - implement when needed)
+- [ ] "Begin Strategy Discussion" button for editing (DONE - integrated into state machine)
 
 #### **Phase 4b: Activity Timeline Integration** (Week 2-3)
 - [ ] Database: Create `agent_activities` table

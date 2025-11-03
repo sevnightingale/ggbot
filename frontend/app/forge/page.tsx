@@ -17,9 +17,9 @@ import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
 import { TradeHistoryModal } from './components/monitor/TradeHistoryModal'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
-import { SaveConfigBar } from './components/configure/SaveConfigBar'
 import { AgentConfigurator } from './components/configure/AgentConfigurator'
 import { DuplicateAsLiveModal } from '@/components/DuplicateAsLiveModal'
+import { BotCreationModal } from './components/modals/BotCreationModal'
 
 interface Position {
   trade_id: string
@@ -88,6 +88,7 @@ function ForgeApp() {
   const [isBotAction, setIsBotAction] = useState(false)
   const [isTradeHistoryModalOpen, setIsTradeHistoryModalOpen] = useState(false)
   const [duplicateAsLiveModalOpen, setDuplicateAsLiveModalOpen] = useState(false)
+  const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
   const [sourceBotForLive, setSourceBotForLive] = useState<BotConfiguration | null>(null)
 
   // Use ref to track selectedConfigId for SSE filtering without causing reconnections
@@ -189,10 +190,45 @@ function ForgeApp() {
   }
 
   // Create default bot with RSI strategy using proper API client
-  const createDefaultBot = async (): Promise<BotConfiguration> => {
-    const defaultConfigData = {
+  const createDefaultBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agentic' = 'scheduled_trading'): Promise<BotConfiguration> => {
+    // Base config for all types
+    const baseConfig = {
       schema_version: '2.1',
-      config_type: 'scheduled_trading',
+      config_type: botType,
+      trading: {
+        execution_mode: 'paper',
+        leverage: 1,
+        position_sizing: {
+          method: 'fixed_usd',
+          fixed_amount_usd: 100,
+          account_percent: 5.0,
+        }
+      }
+    }
+
+    // Type-specific config
+    if (botType === 'agentic') {
+      // Agentic bots don't need selected_pair, extraction, or decision at creation
+      // Agent will define everything through conversation
+      const agenticConfig = {
+        ...baseConfig,
+        decision: {
+          analysis_frequency: 'agent_driven'
+        },
+        llm_config: {
+          provider: 'default',
+          model: 'default',
+          use_platform_keys: true,
+          use_own_key: false
+        }
+      }
+      const newConfig = await apiClient.createConfig('Agent Bot', agenticConfig)
+      return newConfig
+    }
+
+    // Standard scheduled_trading and signal_validation configs
+    const defaultConfigData = {
+      ...baseConfig,
       selected_pair: 'BTC/USDT',
       extraction: {
         selected_data_sources: {
@@ -203,9 +239,11 @@ function ForgeApp() {
         }
       },
       decision: {
-        analysis_frequency: '1h',
+        analysis_frequency: botType === 'signal_validation' ? 'signal_driven' : '1h',
         system_prompt: 'You are an expert cryptocurrency trader. Analyze the provided market data and provide clear, reasoned responses about trading actions. Format your response with clear sections for Decision, Confidence, and Reasoning.',
-        user_prompt: 'if RSI 1hr below 50 enter long, if above enter short'
+        user_prompt: botType === 'signal_validation'
+          ? 'Validate the provided signal and decide whether to approve or reject it'
+          : 'if RSI 1hr below 50 enter long, if above enter short'
       },
       llm_config: {
         provider: 'default',
@@ -826,16 +864,21 @@ function ForgeApp() {
   }
 
   // Handler function for creating new bot
-  const handleCreateNewBot = async () => {
+  const handleCreateNewBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agentic' = 'scheduled_trading') => {
     setIsCreatingNew(true)
 
     try {
-      // Generate a unique name for the new bot
+      // Generate a unique name for the new bot based on type
       const botCount = allBots.length + 1
-      const newBotName = `ggbot ${botCount}`
+      const typeNames = {
+        scheduled_trading: 'ggbot',
+        signal_validation: 'signal validator',
+        agentic: 'agent'
+      }
+      const newBotName = `${typeNames[botType]} ${botCount}`
 
-      // Create new bot using existing createDefaultBot logic
-      const newBot = await createDefaultBot()
+      // Create new bot with specified type
+      const newBot = await createDefaultBot(botType)
 
       // Update name to be more descriptive
       const updatedBot = await apiClient.updateConfig(newBot.config_id, {}, newBotName)
@@ -1006,7 +1049,7 @@ function ForgeApp() {
 
       // Send to backend API
       const token = await getAuthToken()
-      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message?user_id=${user?.id}`, {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1026,20 +1069,95 @@ function ForgeApp() {
     }
   }
 
+  // Handler for starting strategy discussion
+  const handleStartStrategyDiscussion = async () => {
+    if (!selectedConfigId || !user?.id) return
+
+    try {
+      const token = await getAuthToken()
+
+      // Check agent status first
+      const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+
+      if (!statusResponse.ok) {
+        console.error('Failed to check agent status')
+        return
+      }
+
+      const statusData = await statusResponse.json()
+
+      // Start agent in strategy_definition mode if not running
+      if (statusData.status === 'inactive' || statusData.status === 'stopped') {
+        console.log('🤖 Starting agent in strategy_definition mode...')
+
+        const startResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition`, {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`
+          }
+        })
+
+        if (!startResponse.ok) {
+          console.error('Failed to start agent')
+          return
+        }
+
+        console.log('✅ Agent started successfully')
+
+        // If there's an existing strategy, send it as context
+        if (editingConfigData?.agent_strategy?.content) {
+          // Wait a moment for agent to initialize
+          await new Promise(resolve => setTimeout(resolve, 2000))
+
+          const contextMessage = `Here is my current strategy:\n\n${editingConfigData.agent_strategy.content}\n\nI'd like to refine or update it. What improvements would you suggest?`
+
+          await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ message: contextMessage })
+          })
+
+          // Add user message to display
+          setAgentMessages(prev => [...prev, {
+            role: 'user' as const,
+            content: contextMessage,
+            timestamp: new Date().toISOString()
+          }])
+
+          setIsWaitingForAgent(true)
+        }
+      }
+    } catch (error) {
+      console.error('Error starting strategy discussion:', error)
+    }
+  }
+
   // Handler for confirming strategy
-  const handleConfirmStrategy = async () => {
+  const handleConfirmStrategy = async (autonomouslyEditable: boolean) => {
     if (!selectedConfigId) return
 
     try {
-      // Send "1" to agent (confirmation)
+      // Send confirmation with autonomously_editable setting as JSON
       const token = await getAuthToken()
-      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message?user_id=${user?.id}`, {
+      const confirmationData = {
+        confirm: true,
+        autonomously_editable: autonomouslyEditable
+      }
+
+      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: '1' })
+        body: JSON.stringify({ message: JSON.stringify(confirmationData) })
       })
 
       if (!response.ok) {
@@ -1068,7 +1186,7 @@ function ForgeApp() {
       try {
         // Check if agent is already running
         const token = await getAuthToken()
-        const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status?user_id=${user.id}`, {
+        const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -1081,7 +1199,7 @@ function ForgeApp() {
         // If agent is not running, start it in strategy_definition mode
         if (statusData.status === 'inactive' || statusData.status === 'stopped') {
           console.log('🤖 Starting agent in strategy_definition mode...')
-          const startResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition&user_id=${user.id}`, {
+          const startResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`
@@ -1107,7 +1225,7 @@ function ForgeApp() {
     const pollInterval = setInterval(async () => {
       try {
         const token = await getAuthToken()
-        const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/poll-response?user_id=${user.id}`, {
+        const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/poll-response`, {
           headers: {
             'Authorization': `Bearer ${token}`
           }
@@ -1236,7 +1354,7 @@ function ForgeApp() {
             selectedId={selectedConfigId}
             onSelect={handleBotSelection}
             accounts={accounts}
-            onCreateNew={handleCreateNewBot}
+            onCreateNew={() => setBotCreationModalOpen(true)}
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
@@ -1307,28 +1425,79 @@ function ForgeApp() {
                     />
                   </div>
                 ) : editingTableFields?.config_type === 'agentic' ? (
-                  // Agentic mode: Show SaveConfigBar + AgentConfigurator
+                  // Agentic mode: State machine based on strategy existence and agent activity
                   <div className="space-y-4">
-                    <SaveConfigBar
-                      selectedBot={selectedBot}
-                      editingTableFields={editingTableFields}
-                      hasUnsavedChanges={hasUnsavedChanges}
-                      isEditingConfig={isEditingConfig}
-                      onSave={saveConfigurationChanges}
-                      onCancel={cancelConfigurationEditing}
-                      onReset={resetConfigurationChanges}
-                      onBotTypeChange={handleBotTypeChange}
-                    />
-                    <AgentConfigurator
-                      messages={agentMessages}
-                      inputValue={agentInputValue}
-                      isWaiting={isWaitingForAgent}
-                      showConfirmButton={showConfirmButton}
-                      currentStrategy={editingConfigData?.agent_strategy || null}
-                      onSendMessage={handleSendAgentMessage}
-                      onConfirmStrategy={handleConfirmStrategy}
-                      onInputChange={setAgentInputValue}
-                    />
+                    {/* State 1-3: Show button + optional strategy display */}
+                    {agentMessages.length === 0 ? (
+                      <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-12">
+                        {/* Show existing strategy if available */}
+                        {editingConfigData?.agent_strategy ? (
+                          <div className="w-full max-w-3xl space-y-6">
+                            {/* Strategy Display */}
+                            <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-6">
+                              <h3 className="text-lg font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">
+                                <span>📋</span>
+                                <span>Current Strategy</span>
+                              </h3>
+                              <div className="prose prose-sm dark:prose-invert max-w-none">
+                                <div className="whitespace-pre-wrap text-[var(--text-secondary)]">
+                                  {editingConfigData.agent_strategy.content}
+                                </div>
+                              </div>
+                              <div className="mt-4 pt-4 border-t border-[var(--border)] text-xs text-[var(--text-muted)] space-y-1">
+                                <div>Version: {editingConfigData.agent_strategy.version || 1}</div>
+                                <div>Autonomously editable: {editingConfigData.agent_strategy.autonomously_editable ? 'Yes' : 'No'}</div>
+                              </div>
+                            </div>
+
+                            {/* Start Discussion Button */}
+                            <button
+                              onClick={handleStartStrategyDiscussion}
+                              disabled={selectedBot?.is_active}
+                              className={`w-full py-4 rounded-lg font-medium transition-colors ${
+                                selectedBot?.is_active
+                                  ? 'bg-gray-400 cursor-not-allowed opacity-60'
+                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
+                              }`}
+                              title={selectedBot?.is_active ? 'Deactivate bot first to edit strategy' : 'Start conversation to refine strategy'}
+                            >
+                              {selectedBot?.is_active ? '🔒 Bot Active - Deactivate to Edit' : '💬 Refine Strategy'}
+                            </button>
+                          </div>
+                        ) : (
+                          // No strategy yet
+                          <div className="text-center space-y-6">
+                            <div className="text-6xl">🤖</div>
+                            <div>
+                              <h3 className="text-xl font-medium text-[var(--text-primary)] mb-2">
+                                Define Your Trading Strategy
+                              </h3>
+                              <p className="text-sm text-[var(--text-muted)] max-w-md">
+                                Start a conversation with your AI agent to build a custom trading strategy
+                              </p>
+                            </div>
+                            <button
+                              onClick={handleStartStrategyDiscussion}
+                              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+                            >
+                              Start Strategy Discussion
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ) : (
+                      // State 4: Agent is running - show chat interface
+                      <AgentConfigurator
+                        messages={agentMessages}
+                        inputValue={agentInputValue}
+                        isWaiting={isWaitingForAgent}
+                        showConfirmButton={showConfirmButton}
+                        currentStrategy={editingConfigData?.agent_strategy || null}
+                        onSendMessage={handleSendAgentMessage}
+                        onConfirmStrategy={handleConfirmStrategy}
+                        onInputChange={setAgentInputValue}
+                      />
+                    )}
                   </div>
                 ) : (
                   // Normal mode: Show regular config tabs
@@ -1364,7 +1533,7 @@ function ForgeApp() {
         selectedId={selectedConfigId}
         onSelect={handleBotSelection}
         accounts={accounts}
-        onCreateNew={handleCreateNewBot}
+        onCreateNew={() => setBotCreationModalOpen(true)}
         isCreatingNew={isCreatingNew}
         onRename={handleRenameBot}
         onDuplicate={handleDuplicateBot}
@@ -1389,6 +1558,13 @@ function ForgeApp() {
         onOpenChange={setDuplicateAsLiveModalOpen}
         sourceBot={sourceBotForLive}
         onSuccess={handleLiveBotCreated}
+      />
+
+      {/* Bot Creation Modal */}
+      <BotCreationModal
+        open={botCreationModalOpen}
+        onOpenChange={setBotCreationModalOpen}
+        onConfirm={handleCreateNewBot}
       />
     </div>
   )

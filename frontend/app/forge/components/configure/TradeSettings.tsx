@@ -13,7 +13,7 @@ import { ValidationMessage } from '@/components/ValidationMessage'
 interface TradeSettingsProps {
   configData?: ConfigData
   configId?: string
-  tradingMode?: 'paper' | 'live'
+  tradingMode?: 'paper' | 'live' | 'aster'
   onUpdate?: (updates: Partial<ConfigData>) => void
   onValidationChange?: (hasErrors: boolean) => void
   className?: string

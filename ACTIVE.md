@@ -123,6 +123,13 @@
 - `POST /api/v2/test/signal-publishing/{config_id}` - Test Telegram signal publishing
 - Signal listener service (PM2 background process with service authentication)
 
+**Agent Management** (Phase 4a)
+- `POST /api/v2/agent/{config_id}/start` - Start agent in strategy_definition or autonomous mode
+- `POST /api/v2/agent/{config_id}/stop` - Stop agent and cleanup Redis queues
+- `POST /api/v2/agent/{config_id}/message` - Send message to agent via Redis queue
+- `GET /api/v2/agent/{config_id}/poll-response` - Poll for agent responses (non-blocking)
+- `GET /api/v2/agent/{config_id}/status` - Get agent process status
+
 **User Management**
 - `GET /api/v2/user/profile` - User profile with subscription details
 - `GET /api/v2/me` - Current user profile (includes permissions)
@@ -142,6 +149,10 @@
 - `POST /api/v2/config/duplicate-as-live` - Duplicate paper bot as live bot
 - `GET /api/v2/account/live/{config_id}` - Account metrics from Symphony
 - `GET /api/v2/trades/live/{config_id}` - Trade history from Symphony
+
+**AsterDEX Trading**
+- `POST /api/v2/agent/execute-trade` - Agent trade execution with position size/leverage overrides
+- Note: Aster uses .env credentials (Pro API Web3 ECDSA), frontend UI pending
 
 **Stripe Subscription Management**
 - `POST /api/v2/create-checkout-session` - Create Stripe checkout session
@@ -170,6 +181,7 @@
 - **Startup Reconciliation**: Restores active bots automatically
 - **Paper Trading**: $10k isolated accounts per config with 3-second position monitoring
 - **Symphony Live Trading**: Real-money trading via Symphony.io (100 compatible symbols)
+- **AsterDEX Trading**: Decentralized futures with Web3 auth (33 symbols, up to 20x leverage, dynamic position sizing)
 - **Telegram Publishing**: Signal broadcasting to user channels (APPROVED/REJECTED status)
 - **REST API**: 30+ endpoints for bot control, positions, analytics
 
@@ -207,6 +219,7 @@
 ### **Trading Modes**
 - **Paper Trading**: Virtual $10k accounts, risk-free testing
 - **Live Trading**: Symphony.io integration (premium feature, ggBase required)
+- **AsterDEX Trading**: Decentralized futures (33 symbols, up to 20x leverage, competition-ready)
 
 ---
 

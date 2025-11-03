@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Send } from 'lucide-react'
 
 interface Message {
@@ -23,7 +23,7 @@ interface AgentConfiguratorProps {
   showConfirmButton: boolean
   currentStrategy?: AgentStrategy | null
   onSendMessage: () => void
-  onConfirmStrategy: () => void
+  onConfirmStrategy: (autonomouslyEditable: boolean) => void
   onInputChange: (value: string) => void
 }
 
@@ -38,6 +38,7 @@ export function AgentConfigurator({
   onInputChange
 }: AgentConfiguratorProps) {
   const messagesEndRef = useRef<HTMLDivElement>(null)
+  const [autonomouslyEditable, setAutonomouslyEditable] = useState(false)
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -120,12 +121,33 @@ export function AgentConfigurator({
         {!currentStrategy && (
           <div className="p-4 border-t border-[var(--border)]">
             {showConfirmButton ? (
-              <button
-                onClick={onConfirmStrategy}
-                className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
-              >
-                ✓ Confirm Strategy
-              </button>
+              <div className="space-y-3">
+                {/* Autonomously Editable Checkbox */}
+                <label className="flex items-start gap-3 p-3 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] cursor-pointer hover:bg-[var(--bg-tertiary)] transition-colors">
+                  <input
+                    type="checkbox"
+                    checked={autonomouslyEditable}
+                    onChange={(e) => setAutonomouslyEditable(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-[var(--border)] text-emerald-600 focus:ring-2 focus:ring-emerald-500"
+                  />
+                  <div className="flex-1">
+                    <div className="text-sm font-medium text-[var(--text-primary)]">
+                      Allow agent to modify strategy autonomously
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)] mt-1">
+                      Advanced: Agent can update its own strategy based on performance and learnings
+                    </div>
+                  </div>
+                </label>
+
+                {/* Confirm Button */}
+                <button
+                  onClick={() => onConfirmStrategy(autonomouslyEditable)}
+                  className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
+                >
+                  ✓ Confirm Strategy
+                </button>
+              </div>
             ) : (
               <div className="flex gap-2">
                 <input

@@ -42,11 +42,13 @@ External Signals → Signal Validation → Decision Agent → Trading Agent → 
 **⚡ [Trading Agent](trading/)** - Precision Execution Engine
 - **Paper Trading Engine** - Professional-grade simulation with real market data
 - **Live Trading Engine** - Symphony.io integration for real-money execution (100 compatible symbols)
+- **AsterDEX Integration** - Decentralized futures trading with Web3 authentication (33 compatible symbols, up to 20x leverage)
+- **Dynamic Position Sizing** - Real-time account balance queries with config-based calculations
+- **Agent Override Support** - Autonomous agents can control position size and leverage independently
 - **Isolated accounts** - $10,000 starting balance per strategy configuration
 - **Real-time monitoring** - 3-second price updates with automatic TP/SL execution
-- **Confidence-based sizing** - Position size = confidence × max position (10% of balance)
 - **Risk enforcement** with portfolio limits, exposure tracking, and emergency controls
-- **Multi-exchange support** with advanced order types via Symphony.io
+- **Multi-exchange support** with Symphony.io and AsterDEX integrations
 
 ---
 

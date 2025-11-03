@@ -19,11 +19,12 @@ import redis
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from collections import defaultdict
-from fastapi import APIRouter, HTTPException, Header, Query, Body
+from fastapi import APIRouter, HTTPException, Header, Query, Body, Depends
 from pydantic import BaseModel
 from dotenv import load_dotenv
 
 from core.common.logger import logger
+from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2
 from core.config.config_main import get_configuration
 from core.common.db import get_db_connection
 from core.symbols.standardizer import UniversalSymbolStandardizer
@@ -824,9 +825,7 @@ async def query_trade_observations(
 async def start_agent(
     config_id: str,
     mode: str = Query(..., description="strategy_definition | autonomous"),
-    user_id: str = Query(..., description="User ID for this request"),
-    authorization: Optional[str] = Header(None),
-    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
     Start agent process via PM2.
@@ -834,12 +833,11 @@ async def start_agent(
     Args:
         config_id: Configuration ID
         mode: Agent mode ('strategy_definition' or 'autonomous')
-        user_id: User ID (from query param)
+        current_user: Authenticated user from JWT token
 
     Returns:
         Status of agent startup
     """
-    validate_agent_service_auth(authorization, x_service_auth)
 
     try:
         # Check if already running
@@ -901,21 +899,18 @@ async def start_agent(
 @router.post("/{config_id}/stop")
 async def stop_agent(
     config_id: str,
-    user_id: str = Query(..., description="User ID for this request"),
-    authorization: Optional[str] = Header(None),
-    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
     Stop agent process gracefully.
 
     Args:
         config_id: Configuration ID
-        user_id: User ID (from query param)
+        current_user: Authenticated user from JWT token
 
     Returns:
         Status of agent shutdown
     """
-    validate_agent_service_auth(authorization, x_service_auth)
 
     try:
         agent_name = f"agent-{config_id}"
@@ -945,23 +940,20 @@ async def stop_agent(
 @router.post("/{config_id}/message")
 async def send_message_to_agent(
     config_id: str,
-    user_id: str = Query(..., description="User ID for this request"),
     message: str = Body(..., embed=True),
-    authorization: Optional[str] = Header(None),
-    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
     Push message to Redis queue for agent to receive.
 
     Args:
         config_id: Configuration ID
-        user_id: User ID (from query param)
         message: Message text to send to agent
+        current_user: Authenticated user from JWT token
 
     Returns:
         Confirmation of message sent
     """
-    validate_agent_service_auth(authorization, x_service_auth)
 
     try:
         if not message or not message.strip():
@@ -993,21 +985,18 @@ async def send_message_to_agent(
 @router.get("/{config_id}/poll-response")
 async def poll_agent_response(
     config_id: str,
-    user_id: str = Query(..., description="User ID for this request"),
-    authorization: Optional[str] = Header(None),
-    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
     Poll for agent response from Redis queue (non-blocking).
 
     Args:
         config_id: Configuration ID
-        user_id: User ID (from query param)
+        current_user: Authenticated user from JWT token
 
     Returns:
         Agent response if available, or no_message status
     """
-    validate_agent_service_auth(authorization, x_service_auth)
 
     try:
         # Non-blocking pop from right (agent pushes to left)
@@ -1043,21 +1032,18 @@ async def poll_agent_response(
 @router.get("/{config_id}/status")
 async def get_agent_status(
     config_id: str,
-    user_id: str = Query(..., description="User ID for this request"),
-    authorization: Optional[str] = Header(None),
-    x_service_auth: Optional[str] = Header(None, alias="X-Service-Auth")
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
     Get current agent status (running/stopped, mode, uptime).
 
     Args:
         config_id: Configuration ID
-        user_id: User ID (from query param)
+        current_user: Authenticated user from JWT token
 
     Returns:
         Agent status information
     """
-    validate_agent_service_auth(authorization, x_service_auth)
 
     try:
         agent_name = f"agent-{config_id}"

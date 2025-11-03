@@ -185,6 +185,339 @@ The SSE dashboard stream automatically enriches live bot data:
 - Symphony compatibility checked before trade execution
 - See `core/symbols/registry.py` for full compatibility mapping
 
+---
+
+## Live Trading with AsterDEX
+
+**Production-ready decentralized futures trading** via AsterDEX v3 API. Built for the Vibe Trading Competition ($50,000 ASTER token prize).
+
+### Key Features
+
+- **Decentralized Futures**: Non-custodial perpetuals trading on blockchain
+- **Web3 Authentication**: ECDSA signature-based authentication (no traditional API keys)
+- **High Leverage**: Up to 20x leverage for maximizing competition volume
+- **Real-Money Execution**: Mainnet trading with USDT/USDC collateral
+- **Direct Credentials**: Stored in .env (Pro API private key model)
+- **Smart Routing**: Bot config `trading_mode: 'aster'` automatically routes to AsterDEX
+- **Unified Interface**: Same dashboard, same decision engine as paper/Symphony trading
+- **Position Management**: Real-time position queries and market closes
+- **Dynamic Position Sizing**: Respects config sizing methods with balance-aware calculations
+
+### AsterDEX Integration Architecture
+
+**Service Layer** (`trading/live/aster_service_v3.py`):
+```python
+from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+
+# Initialize service
+aster = AsterDEXV3LiveTradingService()
+
+# Execute trade intent (same format as paper/Symphony trading)
+result = await aster.execute_trade_intent({
+    "config_id": "uuid",
+    "user_id": "uuid",
+    "symbol": "BTC-USDT",  # Platform format
+    "action": "long",
+    "confidence": 0.75,
+    "stop_loss_price": 108000,  # Optional - defaults applied if not provided
+    "take_profit_price": 115000
+})
+# Returns: {"status": "success", "batch_id": "7086939384"}  # AsterDEX order ID
+```
+
+**What Gets Applied from Config:**
+1. **Position Sizing**: Queries AsterDEX account balance, calculates position size from config method (ACCOUNT_PERCENTAGE, CONFIDENCE_BASED, FIXED_USD)
+2. **Leverage**: `config.trading.leverage` (default 10x for testing, up to 20x supported)
+3. **Default SL/TP**: `config.trading.risk_management` defaults applied if not in decision
+4. **Safety Caps**: Automatically reduces position if margin exceeds 95% of available balance
+
+**Execution Flow:**
+1. Decision Module generates intent with confidence score
+2. Service validates symbol compatibility (33 symbols supported)
+3. Queries AsterDEX account balance (USDT margin)
+4. Calculates position size using config method + confidence + balance
+5. Validates against minimums (0.001 BTC) and balance caps (95% max margin)
+6. Converts symbol to Aster format (BTC-USDT → BTCUSDT)
+7. Places market order with Web3 ECDSA signature
+8. Optional: Places SL/TP conditional orders (STOP_MARKET, TAKE_PROFIT_MARKET)
+9. Saves order ID to `live_trades` table with `provider='aster'`
+10. Dashboard displays real-time position data
+
+### Web3 Authentication
+
+AsterDEX uses **blockchain-style authentication** instead of traditional HMAC:
+
+**Authentication Flow:**
+```python
+# 1. Create sorted JSON string of parameters
+params_json = '{"quantity":"0.001","side":"BUY","symbol":"BTCUSDT",...}'
+
+# 2. ABI encode with user, signer, nonce
+from eth_abi import encode
+from web3 import Web3
+encoded = encode(['string', 'address', 'address', 'uint256'],
+                 [params_json, user_wallet, signer_wallet, nonce])
+
+# 3. Keccak hash
+keccak_hex = Web3.keccak(encoded).hex()
+
+# 4. ECDSA sign with private key
+from eth_account import Account
+from eth_account.messages import encode_defunct
+signable_msg = encode_defunct(hexstr=keccak_hex)
+signed_message = Account.sign_message(signable_msg, private_key)
+signature = '0x' + signed_message.signature.hex()
+
+# 5. Include in request
+params = {
+    "user": "0x4a24...",      # Main wallet (holds funds)
+    "signer": "0xD322...",    # Pro API agent wallet
+    "nonce": 1730595234567890,  # Microsecond timestamp
+    "signature": signature
+}
+```
+
+**Three-Wallet System:**
+- **User Wallet**: Your main ERC20 wallet (funds stored here)
+- **Signer Wallet**: Pro API agent (authorized to trade, cannot withdraw)
+- **Private Key**: ECDSA key for signer wallet (signs API requests)
+
+### Dynamic Position Sizing
+
+**Real-Time Balance Query:**
+```python
+# Queries AsterDEX account balance before each trade
+balance_data = await service._get_account_balance()  # GET /fapi/v3/balance
+usdt_balance = balance_data['USDT']['availableBalance']  # e.g., $9.84
+
+# Calculates position size based on config method
+position_size_usd = config.get_position_size(confidence=0.75, balance=9.84)
+# Example: ACCOUNT_PERCENTAGE 10% → $0.98 position
+
+# Converts to base asset quantity
+quantity_btc = position_size_usd / btc_price  # e.g., 0.001 BTC minimum
+```
+
+**Position Sizing Examples:**
+
+| Config Method | Balance | Confidence | Leverage | Calculation | Margin Required |
+|---------------|---------|------------|----------|-------------|-----------------|
+| ACCOUNT_PERCENTAGE (10%) | $1,000 | 0.75 | 5x | $100 margin × 5x = $500 position | $100 |
+| CONFIDENCE_BASED (15% max) | $1,000 | 0.80 | 10x | 0.8 × 15% × $1000 = $120 margin × 10x | $120 |
+| FIXED_USD ($50) | $1,000 | 0.75 | 3x | $50 margin × 3x = $150 position | $50 |
+
+**Safety Features:**
+- Validates against AsterDEX minimums (0.001 BTC for BTCUSDT)
+- Caps margin at 95% of available balance
+- Falls back to minimum quantity if calculated size too small
+- Adjusts quantity to fit balance constraints
+
+### Agent Position Size Overrides
+
+**NEW**: Agents can override position sizing for intelligent risk management:
+
+```python
+# Agent decides: "High conviction trade, use larger position"
+intent = {
+    "symbol": "BTC-USDT",
+    "action": "long",
+    "confidence": 0.95,
+    "position_size_usd_override": 1000,  # NOTIONAL: $1000 total position size
+    "leverage_override": 15,              # 15x leverage
+    "stop_loss_price": 108000,
+    "take_profit_price": 115000
+}
+# Result: $1000 position @ 15x leverage
+#         Margin required: $1000 / 15 = $66.67 (actual capital at risk)
+
+# Agent decides: "Uncertain market, use smaller position"
+intent = {
+    "symbol": "ETH-USDT",
+    "action": "short",
+    "confidence": 0.60,
+    "position_size_usd_override": 100,   # NOTIONAL: $100 total position size
+    "leverage_override": 2,               # 2x leverage (conservative)
+    "stop_loss_price": 4100,
+    "take_profit_price": 3900
+}
+# Result: $100 position @ 2x leverage
+#         Margin required: $100 / 2 = $50 (actual capital at risk)
+```
+
+**IMPORTANT: `position_size_usd_override` is the TOTAL POSITION SIZE (notional), NOT the margin.**
+- To calculate actual capital at risk: `margin = position_size_usd / leverage`
+- Example: $1000 position with 10x leverage = $100 margin required
+- Example: $500 position with 5x leverage = $100 margin required
+
+**Override Validation:**
+- Checks against available balance (95% max margin)
+- Enforces exchange minimums (0.001 BTC)
+- Clamps leverage to exchange limits (1-20x for Aster)
+- Falls back to config sizing if override invalid
+
+### Database Schema
+
+**live_trades Table** (Shared with Symphony):
+```sql
+CREATE TABLE live_trades (
+    batch_id VARCHAR PRIMARY KEY,          -- AsterDEX order ID (e.g., "7086939384")
+    config_id UUID NOT NULL,               -- Which bot executed this
+    decision_id UUID,                      -- Links to decisions table
+    provider VARCHAR(20) NOT NULL,         -- 'aster' | 'symphony' | 'binance'
+    stop_loss_order_id VARCHAR(50),        -- AsterDEX SL order ID (if placed)
+    take_profit_order_id VARCHAR(50),      -- AsterDEX TP order ID (if placed)
+    created_at TIMESTAMP NOT NULL,         -- When we opened it
+    closed_at TIMESTAMP                    -- When we closed it (NULL if open)
+);
+
+-- Provider-aware indexes
+CREATE INDEX idx_live_trades_provider ON live_trades(provider, config_id);
+CREATE INDEX idx_live_trades_provider_open ON live_trades(provider, config_id, closed_at)
+    WHERE closed_at IS NULL;
+```
+
+**Design Philosophy**: Multi-exchange support with shared table. `provider` field distinguishes between AsterDEX, Symphony, and future integrations (Binance, Bybit, dYdX).
+
+### API Endpoints
+
+**Trading Execution**:
+- `POST /api/v2/bot/{config_id}/execute` - Execute trade (routes to Aster if `trading_mode='aster'`)
+- `POST /api/v2/agent/execute-trade` - Agent execution with optional position size/leverage overrides
+
+**Position Management**:
+- `GET /api/v2/positions/aster/{config_id}` - Get open positions from AsterDEX API
+- `POST /api/v2/positions/aster/{order_id}/close` - Close position via market order
+
+**Metrics & Analytics**:
+- `GET /api/v2/account/aster/{config_id}` - Account balance and position metrics
+- `GET /api/v2/trades/aster/{config_id}` - Closed trade history
+
+### Symbol Compatibility
+
+**33 of 142 symbols** compatible with AsterDEX:
+
+**Multi-Exchange (available on BOTH Symphony AND Aster):**
+```
+AAVEUSDT    ADAUSDT     APEUSDT     APTUSDT     ARBUSDT
+ATOMUSDT    AVAXUSDT    BCHUSDT     BNBUSDT     BTCUSDT
+CAKEUSDT    DASHUSDT    DOGEUSDT    DOTUSDT     DYDXUSDT
+ENAUSDT     ETCUSDT     ETHUSDT     GALAUSDT    INJUSDT
+LINKUSDT    LTCUSDT     NEARUSDT    ONDOUSDT    OPUSDT
+PYTHUSDT    SEIUSDT     SOLUSDT     TRXUSDT     WLDUSDT
+XRPUSDT
+```
+
+**Aster-Only (not on Symphony):**
+```
+CRVUSDT     SUIUSDT
+```
+
+- AsterDEX compatibility checked before trade execution
+- See `core/symbols/registry.py` for full compatibility mapping with `aster_compatible` flags
+- Additional Aster symbols can be added to registry as needed
+
+### Configuration Setup
+
+**1. Environment Variables** (`.env`):
+```bash
+# AsterDEX Pro API Credentials (Web3 ECDSA)
+ASTER_USER_WALLET=0xREDACTED_TREASURY_WALLET      # Main wallet (holds funds)
+ASTER_WALLET_ADDRESS=0xREDACTED_TEST_WALLET  # Pro API signer wallet
+ASTER_PRIVATE_KEY=0x573302a9...                                  # Pro API private key (ECDSA)
+```
+
+**2. Bot Configuration** (`configurations` table):
+```json
+{
+    "trading_mode": "aster",                   // Routes to AsterDEX
+    "trading": {
+        "leverage": 10,                         // Up to 20x supported
+        "position_sizing": {
+            "method": "ACCOUNT_PERCENTAGE",     // Dynamic sizing
+            "account_percent": 10.0             // 10% of balance per trade
+        },
+        "risk_management": {
+            "default_stop_loss_percent": 2.0,   // Applied if decision doesn't provide
+            "default_take_profit_percent": 3.0
+        }
+    }
+}
+```
+
+### Testing & Validation
+
+**Test Live Trade Execution**:
+```bash
+# Test full trade cycle (open + close)
+python scripts/test_aster_live_trade.py --confirm
+
+# Expected output:
+# ✅ BTC-USDT LONG executed: 0.001 BTC @ $110,269.70 (Order: 7086939384)
+# ✅ Position closed @ $110,197.16 (Order: 7087174440)
+# P&L: -$0.07 (-0.066% price movement)
+```
+
+**Test Position Sizing**:
+```bash
+# Test dynamic sizing with different configs
+python scripts/test_aster_position_sizing.py
+
+# Expected output:
+# Available balance: $9.84
+# ACCOUNT_PERCENTAGE 10%: $0.98 target → 0.001 BTC (minimum)
+# CONFIDENCE_BASED 15%: $1.48 target → 0.001 BTC (minimum)
+# Safety cap: Margin $11.00 exceeds balance, reduced to 0.001 BTC
+```
+
+**Test Symphony Integration**:
+```bash
+# Close any open Aster positions
+python scripts/close_aster_position.py --confirm
+
+# Cross-reference compatible symbols
+python scripts/cross_reference_aster_symbols.py
+```
+
+### Production Considerations
+
+**Credential Security**:
+- ✅ Stored in .env (not exposed in API responses)
+- ✅ Web3 ECDSA signatures (no API key leakage)
+- ✅ Signer wallet cannot withdraw funds (only trade)
+
+**Competition Strategy**:
+- **Objective**: Maximize trading volume for $50k ASTER prize
+- **Approach**: 24/7 automated trading with AI decisions
+- **Leverage**: Use higher leverage (10-15x) for competition volume
+- **Multi-Symbol**: Deploy bots across multiple symbols (BTC, ETH, SOL)
+- **Risk Management**: Tight SL/TP for quick exits and re-entries
+
+**Error Handling**:
+- Failed trades return graceful errors to decision engine
+- Symbol validation prevents incompatible trades
+- Balance checks prevent over-leveraged positions
+
+**Rate Limits** (AsterDEX API):
+- 2400 requests/minute (weight-based)
+- 1200 orders/minute
+- 300 orders/10 seconds
+- Service respects limits with exponential backoff
+
+**Known Limitations**:
+- SL/TP conditional orders implemented but not tested live
+- Dashboard enrichment pending (manual API queries for now)
+- Frontend integration pending (Aster mode selector, credentials UI)
+
+### Live Trading Results
+
+**Mainnet Validation** (2025-11-02):
+- ✅ Trade 1 (OPEN): 0.001 BTC LONG @ $110,269.70 (Order: 7086939384)
+- ✅ Trade 2 (CLOSE): @ $110,197.16 (Order: 7087174440)
+- P&L: -$0.07 (0.066% price movement)
+- **Status**: Full integration operational on mainnet
+
+---
+
 ### Configuration Setup
 
 **1. Bot Configuration** (`configurations` table):

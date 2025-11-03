@@ -277,15 +277,24 @@ async def get_current_price(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     "execute_trade",
-    "Execute a trade with REQUIRED stop loss and take profit. Params: symbol, side (long/short), stop_loss_price, take_profit_price (all required). Optional: confidence (0-1), size_usd, leverage",
+    "Execute a trade with REQUIRED stop loss and take profit. Params: symbol, side (long/short), stop_loss_price, take_profit_price (all required). Optional: confidence (0-1), size_usd (total position size in USD, NOT margin - e.g., 1000 with 10x leverage means $1000 position using $100 margin), leverage (1-20x multiplier)",
     {"symbol": str, "side": str, "confidence": float, "size_usd": float, "leverage": int, "stop_loss_price": float, "take_profit_price": float}
 )
 async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Execute trade with optional position sizing overrides.
 
-    NOTE: size_usd and leverage overrides not yet implemented in paper trading service.
-    Currently uses config defaults for position sizing.
+    Agents can control position size and leverage:
+    - size_usd: Total position size in USD (NOTIONAL, not margin/collateral)
+      Example: size_usd=1000 with leverage=10 means $1000 position using $100 margin
+      Example: size_usd=500 with leverage=5 means $500 position using $100 margin
+    - leverage: Leverage multiplier (e.g., 10 = 10x leverage)
+      Actual capital at risk = size_usd / leverage
+
+    If not specified, uses bot config defaults for position sizing.
+
+    IMPORTANT: size_usd is the FULL POSITION SIZE, not the margin.
+    To calculate margin: margin = size_usd / leverage
     """
     try:
         symbol = args["symbol"]
@@ -294,7 +303,9 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
         stop_loss_price = args["stop_loss_price"]
         take_profit_price = args["take_profit_price"]
 
-        # TODO: Add size_usd and leverage to API call once paper service supports overrides
+        # Extract position sizing overrides (optional)
+        size_usd = args.get("size_usd")
+        leverage = args.get("leverage")
 
         result = await agent_context.api_client.execute_trade(
             config_id=agent_context.config_id,
@@ -302,7 +313,9 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
             side=side,
             confidence=confidence,
             stop_loss_price=stop_loss_price,
-            take_profit_price=take_profit_price
+            take_profit_price=take_profit_price,
+            size_usd=size_usd,
+            leverage=leverage
         )
 
         if result.get("status") == "success":
