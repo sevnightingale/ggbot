@@ -172,20 +172,29 @@ STRATEGY UPDATES:
 - If AUTONOMOUSLY_EDITABLE=false: Cannot modify strategy - execute it as written
 
 AVAILABLE DATA SOURCES:
-Use query_market_data tool to access:
-- Technical Analysis (20+ indicators): RSI, MACD, Stochastic, Bollinger Bands, Williams %R, CCI, MFI, ADX, PSAR, Aroon, ATR, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
-- Macro Economics: VIX, DXY, CPI, NFP
-- Sentiment/Social: twitter_sentiment
-- Derivatives/Leverage: btc_funding_rate, eth_funding_rate
-- On-Chain Analytics: btc_tvl, whale_activity
-- News/Regulatory: crypto_news
-- Trading Signals: ggshot (premium)
+Use query_market_data tool with these EXACT categories and data point names:
 
-CRITICAL: Use EXACT data point names from above list:
-- "twitter_sentiment" NOT "twitter" or "sentiment"
-- "ggshot" NOT "ggshot_signals"
-- "btc_funding_rate" NOT "funding_rate"
-DO NOT abbreviate or modify data point names - they must match exactly.
+CATEGORIES:
+- technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
+- macro_economics: vix, dxy, cpi, nfp
+- sentiment_social: twitter_sentiment
+- derivatives_leverage: btc_funding_rate, eth_funding_rate
+- on_chain_analytics: btc_tvl, whale_activity
+- news_regulatory: crypto_news
+- trading_signals: ggshot
+
+CRITICAL RULES:
+1. ggshot is a TRADING SIGNAL, NOT a technical indicator
+   ✅ CORRECT: {{"trading_signals": ["ggshot"]}}
+   ❌ WRONG: {{"technical_analysis": ["ggshot"]}}
+
+2. Use EXACT names (case-insensitive but complete):
+   - "twitter_sentiment" NOT "twitter" or "sentiment"
+   - "ggshot" NOT "ggshot_signals"
+   - "btc_funding_rate" NOT "funding_rate"
+
+3. Category names must be EXACT:
+   - "trading_signals" NOT "signals" or "trading_signal"
 
 Be disciplined and execute the strategy faithfully.
         """
@@ -350,6 +359,28 @@ Be disciplined and execute the strategy faithfully.
                                     "timestamp": datetime.utcnow().isoformat()
                                 })
                             )
+
+                            # Log agent thought as activity for timeline
+                            try:
+                                from core.common.activity_logger import log_activity
+
+                                # Create a short summary from first line or first 50 chars
+                                summary = response_text.split('\n')[0][:50]
+                                if len(response_text.split('\n')[0]) > 50:
+                                    summary += "..."
+
+                                await log_activity(
+                                    config_id=self.config_id,
+                                    user_id=self.user_id,
+                                    activity_type='analysis',
+                                    activity_source='agent_tool',
+                                    summary=summary,
+                                    details={'thought': response_text},
+                                    priority=2,
+                                    importance=5
+                                )
+                            except Exception as e:
+                                logger.error(f"Failed to log agent thought activity: {e}")
 
                 # Check if agent saved strategy and wants to exit
                 strategy_saved = await self.redis_client.get(

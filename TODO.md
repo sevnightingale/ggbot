@@ -567,16 +567,46 @@
 
 **Testing with existing agent**: config_id `d13d5536-2498-4f27-b2bc-e4f98958e1d8`
 
-### **Phase 5: Production Deployment** (1-2 days)
+#### **Phase 4c: Autonomous Mode Launch Flow** (Day 3) - ✅ **COMPLETE** (2025-11-03)
+
+**Goal**: Remove confirmation friction, enable clean strategy-to-autonomous transition
+
+- [x] **Removed Confirmation Flow**
+  - [x] Replaced `request_autonomous_mode` tool with `save_strategy_and_exit`
+  - [x] Tool saves strategy directly to database and exits (no user confirmation needed)
+  - [x] Tool deletes own PM2 process to prevent auto-restart loop
+  - [x] Agent exits cleanly after strategy definition complete
+
+- [x] **Frontend Routing Fixes**
+  - [x] Fixed activation button to route agents to `/api/v2/agent/{id}/start?mode=autonomous`
+  - [x] Fixed stop button to route agents to `/api/v2/agent/{id}/stop`
+  - [x] Fixed config_type check (was checking `config_data.config_type`, now checks `config_type` column)
+  - [x] Activate/Deactivate buttons now work for agent configs
+
+- [x] **System Prompt Improvements**
+  - [x] Fixed f-string syntax error (escaped curly braces in examples)
+  - [x] Added explicit rules for ggshot category placement (trading_signals, NOT technical_analysis)
+  - [x] Added category name validation guidance
+
+- [x] **Autonomous Mode Validation**
+  - [x] Agent runs autonomously with 5-minute monitoring cycles
+  - [x] Disciplined decision-making (waits for ALL entry conditions)
+  - [x] Proper tool usage (query_market_data, get_current_price, wait_for)
+  - [x] Professional analysis with data tables and reasoning
+
+**Phase 4c Status**: ✅ **COMPLETE** - Agents can now autonomously trade 24/7!
+
+### **Phase 5: Production Deployment** (1-2 days) - 🟡 **IN PROGRESS**
 
 **Goal**: Deploy, monitor, document
 
-- [ ] **Deployment**
-  - [ ] Deploy agent code to production
-  - [ ] Set up PM2 service for agents (one per user initially)
-  - [ ] Configure production environment variables
-  - [ ] Set up Redis for message queue
-  - [ ] Test agent startup/shutdown/restart
+- [x] **Deployment** - Core infrastructure operational
+  - [x] Agent code deployed to production
+  - [x] PM2 service working (agents spawn via `/api/v2/agent/{id}/start`)
+  - [x] Environment variables configured (.venv-agent, ANTHROPIC_API_KEY)
+  - [x] Redis message queues operational (messages, responses, history)
+  - [x] Agent startup/shutdown/restart tested and working
+  - [ ] Lifecycle management improvements (cleanup on delete, restart policies)
 
 - [ ] **Monitoring**
   - [ ] Agent-specific logging (mode, tokens, strategy version)

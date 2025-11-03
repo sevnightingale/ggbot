@@ -4,6 +4,34 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-03 - Agent Phase 4c: Autonomous Mode Launch (24/7 Trading Live!)
+
+**Confirmation Flow Removed** (Backend):
+- **Tool**: Replaced `request_autonomous_mode` with `save_strategy_and_exit` - saves strategy to DB, deletes own PM2 process, exits cleanly
+- **Files**: `agent/mcp_server.py` (save_strategy_and_exit tool at line 987), `agent/run_agent.py` (exit detection at line 355)
+- **Behavior**: Agent exits after strategy definition, no user confirmation needed, prevents PM2 auto-restart loop
+
+**Frontend Activation Routing** (Frontend):
+- **Fix**: Activate button routes agent configs to `/api/v2/agent/{id}/start?mode=autonomous` (not `/api/v2/bot/`)
+- **Fix**: Stop button routes to `/api/v2/agent/{id}/stop`
+- **Fix**: `config_type` check corrected (was `selectedBot.config_data.config_type`, now `selectedBot.config_type` column)
+- **Files**: `frontend/app/forge/page.tsx` (startBot/stopBot at lines 582-662)
+- **Status**: Activate/Deactivate buttons functional for agentic configs
+
+**System Prompt Fixes** (Backend):
+- **Fix**: F-string syntax error (escaped curly braces in JSON examples: `{{` and `}}`)
+- **Enhancement**: Explicit ggshot category rules - `trading_signals` NOT `technical_analysis` with ✅/❌ examples
+- **Files**: `agent/run_agent.py` (system prompt at line 186-197)
+
+**Autonomous Mode Validation** (Production):
+- **Test**: Agent running live for 13+ minutes (config: bb2560fd-b053-464f-8a58-8e254e4d36fa)
+- **Behavior**: 5-min monitoring cycles, disciplined no-entry decisions (waits for ALL conditions: RSI extreme + MACD reversal + Stochastic)
+- **Analysis**: Creates data tables, tracks price changes ($106,604 → $106,164), professional market regime assessment
+- **Tools**: Using query_market_data (RSI/Stochastic/MACD/funding), get_current_price (WebSocket), wait_for (strategic 5min intervals)
+- **Status**: ✅ Agents can autonomously trade 24/7 with zero human intervention
+
+---
+
 ## 2025-11-03 - Activity Timeline: Agent Activity Logging + Aster P&L Integration
 
 **Activity Logging System** (Backend + Agent MCP):

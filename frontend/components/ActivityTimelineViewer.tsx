@@ -48,7 +48,18 @@ interface ActivityItem {
   timestamp: string; // ISO
   type: ActivityType;
   priority: Priority;
-  data: Record<string, string | number>;
+  data: Record<string, unknown>;
+}
+
+interface Position {
+  symbol: string;
+  side: 'long' | 'short';
+  entry_price: number;
+  current_price: number;
+  size: number;
+  unrealized_pnl: number;
+  unrealized_pnl_percentage: number;
+  opened_at: string;
 }
 
 interface BalancePoint { timestamp: string; balance: number; }
@@ -188,13 +199,15 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const [zoom, setZoom] = useState<ZoomTier>("4h");
   const [domain, setDomain] = useState<{left: number; right: number}>({ left: Date.now() - 4*60*60*1000, right: Date.now() });
   const [selected, setSelected] = useState<ActivityItem[] | null>(null);
+  const [showStrategy, setShowStrategy] = useState(false);
+  const [strategy, setStrategy] = useState<string | null>(null);
+  const [positions, setPositions] = useState<Position[]>([]);
   const [visibleTypes, setVisibleTypes] = useState<Record<ActivityType, boolean>>(() => {
     const o: Record<string, boolean> = {};
     (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k => o[k] = true);
     return o as Record<ActivityType, boolean>;
   });
   const [size, setSize] = useState({ w: 1200, h: 460 });
-  const hoverRef = useRef<{cx:number;cy:number;R:number;color:string;icon:string}|null>(null);
 
   // Get session for auth
   useEffect(() => {
@@ -262,9 +275,73 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return () => clearInterval(interval);
   }, [configId, session]);
 
+  // Fetch strategy
+  useEffect(() => {
+    if (!configId || !session?.access_token) return;
+
+    const fetchStrategy = async () => {
+      try {
+        const response = await fetch(`/api/v2/config/${configId}`, {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        const data = await response.json();
+        if (data.config?.agent_strategy?.content) {
+          setStrategy(data.config.agent_strategy.content);
+        }
+      } catch (err) {
+        console.error('Failed to fetch strategy:', err);
+      }
+    };
+
+    fetchStrategy();
+  }, [configId, session]);
+
+  // Fetch positions
+  useEffect(() => {
+    if (!configId || !session?.access_token) return;
+
+    const fetchPositions = async () => {
+      try {
+        const response = await fetch(`/api/v2/positions?config_id=${configId}`, {
+          headers: { 'Authorization': `Bearer ${session.access_token}` }
+        });
+        const data = await response.json();
+        if (data.positions) {
+          setPositions(data.positions);
+        }
+      } catch (err) {
+        console.error('Failed to fetch positions:', err);
+      }
+    };
+
+    fetchPositions();
+    // Poll for position updates every 5 seconds
+    const interval = setInterval(fetchPositions, 5000);
+    return () => clearInterval(interval);
+  }, [configId, session]);
+
   // Derived data (safe to compute even if log is null)
-  const seriesMs = useMemo(() => log?.balanceTimeseries?.map(p => new Date(p.timestamp).getTime()) || [], [log]);
-  const seriesVal = useMemo(() => log?.balanceTimeseries?.map(p => p.balance) || [], [log]);
+  const seriesMs = useMemo(() => {
+    const points = log?.balanceTimeseries?.map(p => new Date(p.timestamp).getTime()) || [];
+    // If no trades yet, create synthetic baseline spanning activities
+    if (points.length === 0 && log?.activities && log.activities.length > 0) {
+      const activityTimes = log.activities.map(a => new Date(a.timestamp).getTime());
+      const earliest = Math.min(...activityTimes);
+      const latest = Math.max(...activityTimes, Date.now());
+      return [earliest, latest];
+    }
+    return points;
+  }, [log]);
+
+  const seriesVal = useMemo(() => {
+    const balances = log?.balanceTimeseries?.map(p => p.balance) || [];
+    // If no trades yet, create $0 baseline
+    if (balances.length === 0 && log?.activities && log.activities.length > 0) {
+      return [0, 0]; // Flat line at $0
+    }
+    return balances;
+  }, [log]);
+
   const dataFirst = seriesMs[0] || Date.now() - 24*60*60*1000;
   const dataLast = seriesMs[seriesMs.length - 1] || Date.now();
 
@@ -304,14 +381,27 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   // Series slice (safe with optional chaining)
   const inDomainSeries = useMemo(() => {
-    if (!log?.balanceTimeseries) return [];
     const { left, right } = domain;
     const pad = (right - left) * 0.5;
-    return log.balanceTimeseries.filter(p => {
-      const t = new Date(p.timestamp).getTime();
-      return t >= left - pad && t <= right + pad;
-    });
-  }, [log, domain]);
+
+    // If we have real balance data, use it
+    if (log?.balanceTimeseries && log.balanceTimeseries.length > 0) {
+      return log.balanceTimeseries.filter(p => {
+        const t = new Date(p.timestamp).getTime();
+        return t >= left - pad && t <= right + pad;
+      });
+    }
+
+    // Otherwise create synthetic $0 baseline for activities to anchor to
+    if (log?.activities && log.activities.length > 0 && seriesMs.length === 2) {
+      return [
+        { timestamp: new Date(seriesMs[0]).toISOString(), balance: 0 },
+        { timestamp: new Date(seriesMs[1]).toISOString(), balance: 0 }
+      ];
+    }
+
+    return [];
+  }, [log, domain, seriesMs]);
 
   // Scales
   const padL = 56, padR = 16, padT = 24, padB = 28;
@@ -569,26 +659,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       ctx.setTransform(dpr,0,0,dpr,0,0);
       ctx.clearRect(0,0,overlay.width/dpr, overlay.height/dpr);
 
-      // Hover effect
-      const h = hoverRef.current;
-      if (h) {
-        ctx.save();
-        ctx.beginPath();
-        ctx.arc(h.cx, h.cy, h.R+6, 0, Math.PI*2);
-        ctx.fillStyle = COLORS.hoverGlow;
-        ctx.fill();
-        ctx.beginPath();
-        ctx.lineWidth = 2.5;
-        ctx.strokeStyle = h.color;
-        ctx.arc(h.cx, h.cy, h.R-0.5, 0, Math.PI*2);
-        ctx.stroke();
-        ctx.font = `${Math.max(14,h.R)}px "Apple Color Emoji","Segoe UI Emoji", system-ui`;
-        ctx.textAlign="center";
-        ctx.textBaseline="middle";
-        ctx.fillText(h.icon, h.cx, h.cy+0.5);
-        ctx.restore();
-      }
-
       // Pulsing "now" dot
       const latestMs = dataLast;
       if (latestMs >= domain.left && latestMs <= domain.right) {
@@ -747,6 +817,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     const c = canvasRef.current;
     if (!c) return;
     let isDragging = false;
+    let dragStartX = 0;
     let lastX = 0;
     let v = 0;
     let raf: number | null = null;
@@ -759,25 +830,22 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       setDomain(clamped);
     };
 
-    const hitTest = (clientX:number, clientY:number) => {
-      const rect = c.getBoundingClientRect();
-      const x = (clientX - rect.left);
-      const y = (clientY - rect.top);
-      const hit = hitBoxesRef.current.find(b => x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h) || null;
-      hoverRef.current = hit ? { cx: hit.cx, cy: hit.cy, R: hit.R, color: hit.color, icon: hit.icon } : null;
-      c.style.cursor = hit ? "pointer" : "default";
-      if (hit) setSelected(hit.group);
-    };
-
     const onDown = (e: PointerEvent) => {
       isDragging = true;
+      dragStartX = e.clientX;
       lastX = e.clientX;
       v = 0;
       (e.target as HTMLElement).setPointerCapture(e.pointerId);
     };
 
     const onMove = (e: PointerEvent) => {
-      hitTest(e.clientX, e.clientY);
+      // Show pointer cursor on hover
+      const rect = c.getBoundingClientRect();
+      const x = (e.clientX - rect.left);
+      const y = (e.clientY - rect.top);
+      const hit = hitBoxesRef.current.find(b => x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h);
+      c.style.cursor = hit ? "pointer" : "default";
+
       if (!isDragging) return;
       const dx = e.clientX - lastX;
       lastX = e.clientX;
@@ -790,28 +858,33 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       if (!isDragging) return;
       isDragging = false;
       (e.target as HTMLElement).releasePointerCapture(e.pointerId);
-      const decay = 0.92;
-      let vel = v;
-      const step = () => {
-        if (Math.abs(vel) < 0.2) {
-          if (raf) cancelAnimationFrame(raf);
-          raf = null;
-          return;
-        }
-        const msPerPx = span() / (Math.max(1, (c.clientWidth) - 56 - 16));
-        applyPan(-vel * msPerPx);
-        vel *= decay;
-        raf = requestAnimationFrame(step);
-      };
-      if (!raf) raf = requestAnimationFrame(step);
-    };
 
-    const onClick = (e: MouseEvent) => {
-      const rect = c.getBoundingClientRect();
-      const x = e.clientX - rect.left;
-      const y = e.clientY - rect.top;
-      const hit = hitBoxesRef.current.find(b => x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h);
-      if (hit) setSelected(hit.group);
+      // Only trigger click if we didn't drag much
+      const dragDistance = Math.abs(e.clientX - dragStartX);
+      if (dragDistance < 5) {
+        // This was a click, not a drag
+        const rect = c.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const hit = hitBoxesRef.current.find(b => x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h);
+        if (hit) setSelected(hit.group);
+      } else {
+        // This was a drag, apply inertia
+        const decay = 0.92;
+        let vel = v;
+        const step = () => {
+          if (Math.abs(vel) < 0.2) {
+            if (raf) cancelAnimationFrame(raf);
+            raf = null;
+            return;
+          }
+          const msPerPx = span() / (Math.max(1, (c.clientWidth) - 56 - 16));
+          applyPan(-vel * msPerPx);
+          vel *= decay;
+          raf = requestAnimationFrame(step);
+        };
+        if (!raf) raf = requestAnimationFrame(step);
+      }
     };
 
     const onWheel = (e: WheelEvent) => {
@@ -831,14 +904,12 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     c.addEventListener("pointerdown", onDown);
     window.addEventListener("pointermove", onMove);
     window.addEventListener("pointerup", onUp);
-    c.addEventListener("click", onClick);
     c.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
       c.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
-      c.removeEventListener("click", onClick);
       c.removeEventListener("wheel", onWheel);
       if (raf) cancelAnimationFrame(raf);
     };
@@ -911,16 +982,9 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     <div className="w-full h-full min-h-screen bg-[#0b0d12] text-white">
       <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
         {/* Header */}
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-xl bg-emerald-500/20 grid place-items-center">{ICONS.robot}</div>
-            <div className="text-lg font-semibold">{info.botName}</div>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-white/70">
-            <div className="px-2 py-1 rounded-lg bg-white/5">Perf: {info.performance.toFixed(2)}%</div>
-            <div className="px-2 py-1 rounded-lg bg-white/5">Trades: {info.totalTrades}</div>
-            <div className="px-2 py-1 rounded-lg bg-white/5">Win: {info.winRate}%</div>
-          </div>
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/20 grid place-items-center">{ICONS.robot}</div>
+          <div className="text-lg font-semibold">{info.botName}</div>
         </div>
 
         {/* Controls */}
@@ -935,6 +999,14 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
             </button>
           ))}
           <div className="flex-1" />
+          {strategy && (
+            <button
+              className="px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10"
+              onClick={()=>setShowStrategy(true)}
+            >
+              📋 View Strategy
+            </button>
+          )}
           <button
             className="px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10"
             onClick={jumpToNow}
@@ -943,20 +1015,63 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           </button>
         </div>
 
-        {/* Chart area */}
-        <div
-          ref={containerRef}
-          className="relative w-full h-[calc(100vh-280px)] min-h-[500px] rounded-2xl overflow-hidden ring-1 ring-white/10"
-          style={{background: COLORS.bg}}
-        >
-          <canvas ref={canvasRef} className="absolute inset-0"/>
-          <canvas ref={overlayRef} className="absolute inset-0 pointer-events-none"/>
-        </div>
+        {/* Chart area with left sidebar legend */}
+        <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+          {/* Legend / Activity Filters - Left Sidebar */}
+          <div className="w-48 space-y-3 flex-shrink-0">
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-medium text-white/70">Activity Types</h3>
+            </div>
 
-        {/* Legend / Activity Filters */}
-        <div className="space-y-3">
-          <div className="flex items-center justify-between">
-            <h3 className="text-sm font-medium text-white/70">Activity Types</h3>
+            <div className="flex flex-col gap-2">
+              {(() => {
+                // Deduplicate: analysis/reasoning/plan all show as one "Agent Thoughts" button
+                const seen = new Set<string>();
+                const legendItems: { key: string; def: ActivityDefinition; types: ActivityType[] }[] = [];
+
+                (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k => {
+                  const def = ACTIVITY_DEFS[k];
+                  const label = def.label;
+
+                  if (!seen.has(label)) {
+                    seen.add(label);
+                    // Find all types with same label
+                    const relatedTypes = (Object.keys(ACTIVITY_DEFS) as ActivityType[])
+                      .filter(t => ACTIVITY_DEFS[t].label === label);
+                    legendItems.push({ key: k, def, types: relatedTypes });
+                  }
+                });
+
+                return legendItems.map(({ key, def, types }) => {
+                  // Button is "on" if ANY of the related types are visible
+                  const on = types.some(t => visibleTypes[t]);
+
+                  return (
+                    <button
+                      key={key}
+                      onClick={() => {
+                        // Toggle all related types together
+                        setVisibleTypes(v => {
+                          const newState = { ...v };
+                          types.forEach(t => { newState[t] = !on; });
+                          return newState;
+                        });
+                      }}
+                      className={`px-3 py-2 rounded-xl text-sm border transition-all ${
+                        on
+                          ? "bg-white/10 border-white/30 text-white"
+                          : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
+                      }`}
+                      title={def.description}
+                    >
+                      <span className="text-base mr-1.5">{def.icon}</span>
+                      {def.label}
+                    </button>
+                  );
+                });
+              })()}
+            </div>
+
             <button
               onClick={() => {
                 const allOn = Object.values(visibleTypes).every(v => v);
@@ -966,67 +1081,94 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
                   ) as Record<ActivityType, boolean>
                 );
               }}
-              className="text-xs text-white/50 hover:text-white/80"
+              className="w-full text-xs text-white/50 hover:text-white/80 py-1 border border-white/10 rounded-lg hover:bg-white/5"
             >
               Toggle All
             </button>
+
+            {/* Navigation hint */}
+            <div className="text-xs text-white/40 pt-2">
+              💡 <span className="text-white/50">Wheel to scroll • Shift+Wheel to zoom • Drag to pan</span>
+            </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            {(() => {
-              // Deduplicate: analysis/reasoning/plan all show as one "Agent Thoughts" button
-              const seen = new Set<string>();
-              const legendItems: { key: string; def: ActivityDefinition; types: ActivityType[] }[] = [];
-
-              (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k => {
-                const def = ACTIVITY_DEFS[k];
-                const label = def.label;
-
-                if (!seen.has(label)) {
-                  seen.add(label);
-                  // Find all types with same label
-                  const relatedTypes = (Object.keys(ACTIVITY_DEFS) as ActivityType[])
-                    .filter(t => ACTIVITY_DEFS[t].label === label);
-                  legendItems.push({ key: k, def, types: relatedTypes });
-                }
-              });
-
-              return legendItems.map(({ key, def, types }) => {
-                // Button is "on" if ANY of the related types are visible
-                const on = types.some(t => visibleTypes[t]);
-
-                return (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      // Toggle all related types together
-                      setVisibleTypes(v => {
-                        const newState = { ...v };
-                        types.forEach(t => { newState[t] = !on; });
-                        return newState;
-                      });
-                    }}
-                    className={`px-3 py-2 rounded-xl text-sm border transition-all ${
-                      on
-                        ? "bg-white/10 border-white/30 text-white"
-                        : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
-                    }`}
-                    title={def.description}
-                  >
-                    <span className="text-base mr-1.5">{def.icon}</span>
-                    {def.label}
-                  </button>
-                );
-              });
-            })()}
-          </div>
-
-          {/* Navigation hint */}
-          <div className="text-xs text-white/40 pt-1">
-            💡 <span className="text-white/50">Wheel to scroll time • Shift+Wheel to zoom • Drag to pan • Click icons for details</span>
+          {/* Chart area */}
+          <div
+            ref={containerRef}
+            className="relative flex-1 rounded-2xl overflow-hidden ring-1 ring-white/10"
+            style={{background: COLORS.bg}}
+          >
+            <canvas ref={canvasRef} className="absolute inset-0 w-full h-full"/>
+            <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none"/>
           </div>
         </div>
       </div>
+
+      {/* Active Positions Section */}
+      {positions.length > 0 && (
+        <div className="max-w-7xl mx-auto px-6 pb-6">
+          <div className="bg-[#12151c] rounded-2xl border border-white/10 overflow-hidden">
+            <div className="px-6 py-4 border-b border-white/10">
+              <h3 className="text-lg font-semibold">Active Positions</h3>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="text-left text-sm text-white/70 border-b border-white/10">
+                    <th className="px-6 py-3">Symbol</th>
+                    <th className="px-6 py-3">Side</th>
+                    <th className="px-6 py-3">Entry Price</th>
+                    <th className="px-6 py-3">Current Price</th>
+                    <th className="px-6 py-3">Size</th>
+                    <th className="px-6 py-3">P&L</th>
+                    <th className="px-6 py-3">Time</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {positions.map((pos: Position, idx: number) => {
+                    const pnl = pos.unrealized_pnl || 0;
+                    const pnlColor = pnl >= 0 ? 'text-emerald-400' : 'text-red-400';
+                    return (
+                      <tr key={idx} className="border-b border-white/5 hover:bg-white/5">
+                        <td className="px-6 py-4 font-medium">{pos.symbol}</td>
+                        <td className="px-6 py-4">
+                          <span className={`px-2 py-1 rounded text-xs ${pos.side === 'long' ? 'bg-emerald-500/20 text-emerald-400' : 'bg-red-500/20 text-red-400'}`}>
+                            {pos.side?.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 font-mono text-sm">${pos.entry_price?.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-mono text-sm">${pos.current_price?.toFixed(2)}</td>
+                        <td className="px-6 py-4 font-mono text-sm">{pos.size?.toFixed(4)}</td>
+                        <td className={`px-6 py-4 font-mono text-sm font-semibold ${pnlColor}`}>
+                          {pnl >= 0 ? '+' : ''}{pnl.toFixed(2)} ({pos.unrealized_pnl_percentage?.toFixed(2)}%)
+                        </td>
+                        <td className="px-6 py-4 text-sm text-white/60">
+                          {pos.opened_at ? new Date(pos.opened_at).toLocaleString() : 'N/A'}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Strategy Modal */}
+      {showStrategy && strategy && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={()=>setShowStrategy(false)}>
+          <div className="bg-[#12151c] rounded-2xl border border-white/10 max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e)=>e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Agent Strategy</h2>
+              <button onClick={()=>setShowStrategy(false)} className="text-white/70 hover:text-white text-2xl">{ICONS.close}</button>
+            </div>
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-5rem)]">
+              <pre className="whitespace-pre-wrap text-sm text-white/90 font-mono leading-relaxed">{strategy}</pre>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Side panel */}
       <SidePanel selected={selected} onClose={()=>setSelected(null)} />
@@ -1037,46 +1179,98 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 // --------- Side Panel Component ---------
 
 function SidePanel({ selected, onClose }: { selected: ActivityItem[] | null; onClose: ()=>void }) {
+  const panelRef = useRef<HTMLDivElement>(null);
+
+  // Click outside to close
+  useEffect(() => {
+    if (!selected) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+
+    // Add slight delay to prevent immediate close on same click that opened
+    const timeoutId = setTimeout(() => {
+      document.addEventListener('mousedown', handleClickOutside);
+    }, 100);
+
+    return () => {
+      clearTimeout(timeoutId);
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [selected, onClose]);
+
   return (
-    <div className={`fixed top-0 right-0 h-full w-[420px] bg-[#12151c] shadow-2xl border-l border-white/10 transition-transform duration-300 ${selected?"translate-x-0":"translate-x-full"}`}>
-      <div className="h-12 flex items-center justify-between px-4 border-b border-white/10">
-        <div className="font-semibold">
-          {selected ? (selected.length>1 ? `${selected.length} Activities` : ACTIVITY_DEFS[selected[0].type].label) : ""}
+    <>
+      {/* Backdrop */}
+      {selected && (
+        <div className="fixed inset-0 bg-black/30 backdrop-blur-sm transition-opacity duration-300 z-40" onClick={onClose} />
+      )}
+
+      {/* Panel */}
+      <div
+        ref={panelRef}
+        className={`fixed top-0 right-0 h-full w-[560px] bg-[#12151c] shadow-2xl border-l border-white/10 transition-transform duration-300 z-50 ${selected?"translate-x-0":"translate-x-full"}`}
+      >
+        <div className="h-14 flex items-center justify-between px-6 border-b border-white/10">
+          <div className="font-semibold text-lg">
+            {selected ? (selected.length>1 ? `${selected.length} Activities` : ACTIVITY_DEFS[selected[0].type].label) : ""}
+          </div>
+          <button onClick={onClose} className="text-white/70 hover:text-white text-xl">{ICONS.close}</button>
         </div>
-        <button onClick={onClose} className="text-white/70 hover:text-white">{ICONS.close}</button>
-      </div>
-      <div className="p-3 space-y-3 overflow-y-auto h-[calc(100%-3rem)]">
-        {!selected && (
-          <div className="text-white/50 text-sm">Click any icon on the chart to see full context.</div>
-        )}
-        {selected && selected
-          .slice()
-          .sort((a,b)=> (a.priority-b.priority)|| (new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime()))
-          .map(item => {
-            const def = ACTIVITY_DEFS[item.type];
-            const t = new Date(item.timestamp);
-            return (
-              <div key={item.id} className="p-3 rounded-xl bg-white/5 border border-white/10">
-                <div className="flex items-center gap-2">
-                  <div className="text-xl">{def.icon}</div>
-                  <div className="font-medium">{def.label}</div>
-                  <div className="ml-auto text-xs text-white/60">{t.toUTCString()}</div>
-                </div>
-                <div className="mt-2 grid grid-cols-2 gap-2 text-sm text-white/80">
-                  {Object.entries(item.data).map(([k, v]) => (
-                    <div key={k} className="flex items-center justify-between gap-2">
-                      <span className="text-white/50">{k}</span>
-                      <span className="font-mono">{typeof v === 'number' ? v.toLocaleString() : String(v)}</span>
+        <div className="p-6 space-y-4 overflow-y-auto h-[calc(100%-3.5rem)]">
+          {!selected && (
+            <div className="text-white/50 text-sm">Click any icon on the chart to see full context.</div>
+          )}
+          {selected && selected
+            .slice()
+            .sort((a,b)=> (a.priority-b.priority)|| (new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime()))
+            .map(item => {
+              const def = ACTIVITY_DEFS[item.type];
+              const t = new Date(item.timestamp);
+              return (
+                <div key={item.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">{def.icon}</div>
+                    <div>
+                      <div className="font-medium text-base">{def.label}</div>
+                      <div className="text-xs text-white/60">{t.toUTCString()}</div>
                     </div>
-                  ))}
+                  </div>
+                  <div className="space-y-2 text-sm">
+                    {Object.entries(item.data).filter(([k]) => k !== 'details' && k !== 'reasoning' && k !== 'summary').map(([k, v]) => (
+                      <div key={k} className="flex items-start justify-between gap-4 py-1">
+                        <span className="text-white/50 min-w-[100px]">{k}:</span>
+                        <span className="font-mono text-white/90 text-right flex-1">{typeof v === 'number' ? v.toLocaleString() : String(v)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  {/* Display agent thought content */}
+                  {(() => {
+                    const details = item.data.details;
+                    if (details && typeof details === 'object' && 'thought' in details) {
+                      const thought = (details as { thought: unknown }).thought;
+                      if (typeof thought === 'string') {
+                        return (
+                          <div className="mt-3 pt-3 border-t border-white/10 text-sm text-white/80 whitespace-pre-wrap leading-relaxed">
+                            {thought}
+                          </div>
+                        );
+                      }
+                    }
+                    return null;
+                  })()}
+                  {/* Fallback for reasoning field */}
+                  {typeof item.data.reasoning === 'string' && (
+                    <div className="mt-3 pt-3 border-t border-white/10 text-sm text-white/80 whitespace-pre-wrap">{item.data.reasoning}</div>
+                  )}
                 </div>
-                {item.data.reasoning && (
-                  <div className="mt-2 text-sm text-white/80">{item.data.reasoning}</div>
-                )}
-              </div>
-            );
-          })}
+              );
+            })}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
