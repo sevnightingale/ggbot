@@ -43,7 +43,7 @@ logger.add(
     diagnose=True
 )
 
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ResultMessage
 
 from agent.mcp_server import create_mcp_server, set_agent_context
 from agent.service_client import GGBotAPIClient
@@ -271,31 +271,42 @@ Be disciplined and execute the strategy faithfully.
 
         # Process initial greeting
         async for message in client.receive_response():
+            response_text = None
+
+            # Handle AssistantMessage (streaming responses with TextBlocks)
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock):
-                        logger.info(f"Agent: {block.text}")
-                        response_data = {
-                            "type": "agent_message",
-                            "text": block.text,
-                            "timestamp": datetime.utcnow().isoformat()
-                        }
+                        response_text = block.text
 
-                        # Push to response queue for polling
-                        await self.redis_client.rpush(
-                            f"agent:{self.config_id}:responses",
-                            json.dumps(response_data)
-                        )
+            # Handle ResultMessage (final consolidated response)
+            elif isinstance(message, ResultMessage):
+                response_text = message.result
 
-                        # Store in conversation history
-                        await self.redis_client.rpush(
-                            f"agent:{self.config_id}:history",
-                            json.dumps({
-                                "role": "agent",
-                                "content": block.text,
-                                "timestamp": datetime.utcnow().isoformat()
-                            })
-                        )
+            if response_text:
+                logger.info(f"Agent: {response_text}")
+
+                response_data = {
+                    "type": "agent_message",
+                    "text": response_text,
+                    "timestamp": datetime.utcnow().isoformat()
+                }
+
+                # Push to response queue for polling
+                await self.redis_client.rpush(
+                    f"agent:{self.config_id}:responses",
+                    json.dumps(response_data)
+                )
+
+                # Store in conversation history
+                await self.redis_client.rpush(
+                    f"agent:{self.config_id}:history",
+                    json.dumps({
+                        "role": "agent",
+                        "content": response_text,
+                        "timestamp": datetime.utcnow().isoformat()
+                    })
+                )
 
         # Main conversation loop
         logger.info("Waiting for user messages...")
@@ -334,33 +345,43 @@ Be disciplined and execute the strategy faithfully.
                     # LOG: Full message structure
                     logger.debug(f"🤖 AGENT MESSAGE RECEIVED: {message}")
 
+                    response_text = None
+
+                    # Handle AssistantMessage (streaming responses with TextBlocks)
                     if isinstance(message, AssistantMessage):
                         for block in message.content:
                             if isinstance(block, TextBlock):
-                                logger.info(f"Agent: {block.text}")
-                                logger.debug(f"🤖 AGENT TEXT BLOCK: {block.text}")
+                                response_text = block.text
 
-                                response_data = {
-                                    "type": "agent_message",
-                                    "text": block.text,
-                                    "timestamp": datetime.utcnow().isoformat()
-                                }
+                    # Handle ResultMessage (final consolidated response)
+                    elif isinstance(message, ResultMessage):
+                        response_text = message.result
 
-                                # Push to response queue for polling
-                                await self.redis_client.rpush(
-                                    f"agent:{self.config_id}:responses",
-                                    json.dumps(response_data)
-                                )
+                    if response_text:
+                        logger.info(f"Agent: {response_text}")
+                        logger.debug(f"🤖 AGENT TEXT: {response_text}")
 
-                                # Store in conversation history
-                                await self.redis_client.rpush(
-                                    f"agent:{self.config_id}:history",
-                                    json.dumps({
-                                        "role": "agent",
-                                        "content": block.text,
-                                        "timestamp": datetime.utcnow().isoformat()
-                                    })
-                                )
+                        response_data = {
+                            "type": "agent_message",
+                            "text": response_text,
+                            "timestamp": datetime.utcnow().isoformat()
+                        }
+
+                        # Push to response queue for polling
+                        await self.redis_client.rpush(
+                            f"agent:{self.config_id}:responses",
+                            json.dumps(response_data)
+                        )
+
+                        # Store in conversation history
+                        await self.redis_client.rpush(
+                            f"agent:{self.config_id}:history",
+                            json.dumps({
+                                "role": "agent",
+                                "content": response_text,
+                                "timestamp": datetime.utcnow().isoformat()
+                            })
+                        )
 
                 # Check if mode switch was requested (would be in Redis flag)
                 mode_switch_pending = await self.redis_client.get(
@@ -448,31 +469,41 @@ Be disciplined and execute the strategy faithfully.
 
                             # Collect response
                             async for message in client.receive_response():
+                                response_text = None
+
+                                # Handle AssistantMessage (streaming responses with TextBlocks)
                                 if isinstance(message, AssistantMessage):
                                     for block in message.content:
                                         if isinstance(block, TextBlock):
-                                            logger.info(f"Agent: {block.text}")
+                                            response_text = block.text
 
-                                            response_data = {
-                                                "type": "agent_message",
-                                                "text": block.text,
-                                                "timestamp": datetime.utcnow().isoformat()
-                                            }
+                                # Handle ResultMessage (final consolidated response)
+                                elif isinstance(message, ResultMessage):
+                                    response_text = message.result
 
-                                            await self.redis_client.rpush(
-                                                f"agent:{self.config_id}:responses",
-                                                json.dumps(response_data)
-                                            )
+                                if response_text:
+                                    logger.info(f"Agent: {response_text}")
 
-                                            # Store in conversation history
-                                            await self.redis_client.rpush(
-                                                f"agent:{self.config_id}:history",
-                                                json.dumps({
-                                                    "role": "agent",
-                                                    "content": block.text,
-                                                    "timestamp": datetime.utcnow().isoformat()
-                                                })
-                                            )
+                                    response_data = {
+                                        "type": "agent_message",
+                                        "text": response_text,
+                                        "timestamp": datetime.utcnow().isoformat()
+                                    }
+
+                                    await self.redis_client.rpush(
+                                        f"agent:{self.config_id}:responses",
+                                        json.dumps(response_data)
+                                    )
+
+                                    # Store in conversation history
+                                    await self.redis_client.rpush(
+                                        f"agent:{self.config_id}:history",
+                                        json.dumps({
+                                            "role": "agent",
+                                            "content": response_text,
+                                            "timestamp": datetime.utcnow().isoformat()
+                                        })
+                                    )
                         else:
                             # Invalid choice - ask again
                             logger.warning(f"Invalid confirmation choice: {user_choice}")
@@ -587,11 +618,16 @@ Start now.
 
         # Process indefinitely
         async for message in client.receive_messages():
+            # Handle AssistantMessage (streaming responses with TextBlocks)
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock):
                         # Log all agent activity
                         logger.info(f"Agent: {block.text}")
+
+            # Handle ResultMessage (final consolidated response)
+            elif isinstance(message, ResultMessage):
+                logger.info(f"Agent: {message.result}")
 
             # Check for compaction
             if hasattr(message, 'type') and getattr(message, 'type', None) == 'system':

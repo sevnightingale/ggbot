@@ -1254,12 +1254,12 @@ function ForgeApp() {
         const data = await response.json()
         console.log('🔄 Poll data:', data)
 
-        if (data.status === 'success' && data.message) {
+        if (data.status === 'success' && data.text) {
           console.log('✅ Got agent message, adding to UI')
           // Add agent message to UI
           const agentMessage = {
             role: 'agent' as const,
-            content: data.message,
+            content: data.text,
             timestamp: data.timestamp || new Date().toISOString()
           }
           setAgentMessages(prev => [...prev, agentMessage])
