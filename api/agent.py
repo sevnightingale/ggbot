@@ -432,9 +432,29 @@ async def get_positions(
         if trading_mode == 'paper':
             paper_trading = SupabasePaperTradingService()
             positions = await paper_trading.get_open_positions(config_id)
+        elif trading_mode == 'aster':
+            # Aster live trading positions
+            from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+            aster_service = AsterDEXV3LiveTradingService()
+            aster_positions = await aster_service.get_open_positions()
+
+            # Transform Aster positions to match expected format
+            positions = []
+            for pos in aster_positions:
+                positions.append({
+                    'symbol': pos.get('symbol'),
+                    'side': 'long' if float(pos.get('positionAmt', 0)) > 0 else 'short',
+                    'entry_price': float(pos.get('entryPrice', 0)),
+                    'current_price': float(pos.get('markPrice', 0)),
+                    'size': abs(float(pos.get('positionAmt', 0))),
+                    'unrealized_pnl': float(pos.get('unrealizedProfit', 0)),
+                    'unrealized_pnl_percentage': float(pos.get('unRealizedProfit', 0)) / abs(float(pos.get('notional', 1))) * 100 if pos.get('notional') else 0,
+                    'opened_at': pos.get('updateTime'),  # Aster doesn't track open time, use last update
+                    'leverage': int(pos.get('leverage', 1))
+                })
         else:
-            # TODO: Live trading positions via Symphony
-            raise HTTPException(status_code=501, detail="Live trading positions not implemented yet")
+            # Symphony or other live trading
+            raise HTTPException(status_code=501, detail=f"Trading mode '{trading_mode}' positions not implemented yet")
 
         return {
             "status": "success",

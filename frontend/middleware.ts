@@ -6,8 +6,8 @@ export function middleware(request: NextRequest) {
 
   // If accessing via aster subdomain (Aster Vibe Trading competition submission)
   if (hostname.startsWith('aster.')) {
-    // TODO: Replace with actual config_id for competition submission
-    const ASTER_VIBE_TRADER_CONFIG_ID = 'YOUR_CONFIG_ID_HERE'
+    // Aster Vibe Trader config ID
+    const ASTER_VIBE_TRADER_CONFIG_ID = 'bb2560fd-b053-464f-8a58-8e254e4d36fa'
 
     // Route root to the specific vibe trader's activity timeline
     if (pathname === '/') {
