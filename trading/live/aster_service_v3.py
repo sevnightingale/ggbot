@@ -41,6 +41,7 @@ from web3 import Web3
 
 from core.common.logger import logger
 from core.common.db import get_db_connection
+from core.common.activity_logger import log_activity_safe
 from core.config.models import PositionSizingMethod
 from core.symbols.standardizer import UniversalSymbolStandardizer
 
@@ -546,6 +547,49 @@ class AsterDEXV3LiveTradingService:
                 symbol=symbol  # Save universal symbol format
             )
 
+            # Step 13: Log activity to timeline
+            try:
+                # Fetch entry price from current position (post-execution)
+                from trading.paper.live_price_service import LivePriceService
+                price_service = LivePriceService()
+                price_data = await price_service.get_current_price(symbol)
+                entry_price = price_data.mid
+
+                # Calculate notional value
+                notional_value = quantity * entry_price
+
+                # Determine activity type
+                activity_type = f"trade_entry_{action.lower()}"
+
+                log_activity_safe(
+                    config_id=config_id,
+                    user_id=user_id,
+                    activity_type=activity_type,
+                    activity_source='aster_service',
+                    summary=f"Opened {action.lower()} {symbol} at ${entry_price:,.2f}",
+                    details={
+                        'symbol': symbol,
+                        'side': action.lower(),
+                        'entry_price': entry_price,
+                        'quantity': quantity,
+                        'size_usd': notional_value,
+                        'leverage': leverage,
+                        'stop_loss_price': stop_loss,
+                        'take_profit_price': take_profit,
+                        'stop_loss_order_id': sl_order_id,
+                        'take_profit_order_id': tp_order_id,
+                        'confidence': confidence
+                    },
+                    trade_id=order_id,
+                    trade_type='aster',
+                    related_symbol=symbol,
+                    priority=1,
+                    importance=9
+                )
+                self._log.info(f"Activity logged for trade {order_id}")
+            except Exception as e:
+                self._log.warning(f"Failed to log activity (non-critical): {e}")
+
             return {
                 "status": "success",
                 "batch_id": order_id,
@@ -871,6 +915,53 @@ class AsterDEXV3LiveTradingService:
 
             self._log.info(f"Position closed successfully: {close_order_id}")
 
+            # Log activity to timeline
+            try:
+                # Fetch P&L from Aster API user trades
+                user_trades = await self.get_user_trades(limit=100)
+                matched_trade = next((t for t in (user_trades or []) if str(t.get('id', '')) == batch_id), None)
+
+                pnl = 0.0
+                pnl_pct = 0.0
+                if matched_trade:
+                    pnl = float(matched_trade.get('realizedPnl', 0))
+                    # Calculate percentage if we have entry data
+                    qty = float(matched_trade.get('qty', 0))
+                    price = float(matched_trade.get('price', 0))
+                    if qty > 0 and price > 0:
+                        position_value = qty * price
+                        pnl_pct = (pnl / position_value) * 100 if position_value > 0 else 0
+
+                # Determine activity type based on P&L
+                activity_type = 'trade_win' if pnl >= 0 else 'trade_loss'
+
+                # Get config_id from trade record for activity log
+                config_id = trade_record.get('config_id')
+
+                log_activity_safe(
+                    config_id=config_id,
+                    user_id=user_id,
+                    activity_type=activity_type,
+                    activity_source='aster_service',
+                    summary=f"Closed {symbol}: {'+' if pnl >= 0 else ''}{pnl:.2f} ({pnl_pct:.1f}%)",
+                    details={
+                        'symbol': symbol,
+                        'pnl': pnl,
+                        'pnl_pct': pnl_pct,
+                        'quantity': close_quantity,
+                        'close_reason': 'manual',
+                        'close_order_id': close_order_id
+                    },
+                    trade_id=batch_id,
+                    trade_type='aster',
+                    related_symbol=symbol,
+                    priority=1,
+                    importance=9
+                )
+                self._log.info(f"Activity logged for close {batch_id}")
+            except Exception as e:
+                self._log.warning(f"Failed to log close activity (non-critical): {e}")
+
             return {
                 "status": "success",
                 "close_order_id": close_order_id,
@@ -909,6 +1000,52 @@ class AsterDEXV3LiveTradingService:
                     return None
         except Exception as e:
             self._log.error(f"Error getting trade record: {e}")
+            return None
+
+    async def _get_order_status(self, symbol: str, order_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get order status from Aster API.
+
+        Args:
+            symbol: Trading symbol (e.g., "BTCUSDT")
+            order_id: Order ID to query
+
+        Returns:
+            Order info dict with 'status' field: "NEW", "FILLED", "CANCELED", etc.
+            None on error.
+        """
+        nonce = math.trunc(time.time() * 1000000)
+
+        params = {
+            "symbol": symbol,
+            "orderId": order_id
+        }
+
+        signed_params = self._generate_signature(params, nonce)
+
+        url = f"{self.base_url}/fapi/v3/order"
+        headers = {
+            "Content-Type": "application/x-www-form-urlencoded",
+            "User-Agent": "ggbots/1.0"
+        }
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=signed_params,
+                    headers=headers,
+                    timeout=aiohttp.ClientTimeout(total=self.timeout)
+                ) as response:
+                    if response.status == 200:
+                        order_info = await response.json()
+                        return order_info
+                    else:
+                        error_text = await response.text()
+                        self._log.warning(f"Failed to get order status {order_id}: {response.status} - {error_text}")
+                        return None
+        except Exception as e:
+            self._log.error(f"Exception getting order status: {e}")
             return None
 
     async def _cancel_order(self, symbol: str, order_id: str) -> bool:
@@ -987,10 +1124,15 @@ class AsterDEXV3LiveTradingService:
                     "reason": "USDT balance not found"
                 }
 
+            # availableBalance is the account balance (source of truth for trading equity)
+            # balance field is the settled balance (doesn't include unrealized P&L)
+            account_balance = float(usdt_balance.get("availableBalance", 0))
+
             return {
                 "status": "success",
-                "balance": float(usdt_balance.get("balance", 0)),
-                "available_balance": float(usdt_balance.get("availableBalance", 0)),
+                "balance": account_balance,  # Use availableBalance as primary balance
+                "available_balance": account_balance,  # Keep for backwards compatibility
+                "settled_balance": float(usdt_balance.get("balance", 0)),  # Settled balance only
                 "cross_wallet_balance": float(usdt_balance.get("crossWalletBalance", 0)),
                 "cross_unrealized_pnl": float(usdt_balance.get("crossUnPnl", 0)),
                 "total_unrealized_pnl": total_unrealized_pnl,

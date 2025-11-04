@@ -288,15 +288,27 @@ params = {
 ```python
 # Queries AsterDEX account balance before each trade
 balance_data = await service._get_account_balance()  # GET /fapi/v3/balance
-usdt_balance = balance_data['USDT']['availableBalance']  # e.g., $9.84
 
-# Calculates position size based on config method
-position_size_usd = config.get_position_size(confidence=0.75, balance=9.84)
-# Example: ACCOUNT_PERCENTAGE 10% → $0.98 position
+# IMPORTANT: availableBalance is the account balance (source of truth)
+# This includes wallet balance + unrealized P&L + cross-margin equity
+usdt_balance = balance_data['USDT']['availableBalance']  # e.g., $206.80
+
+# balance field is ONLY settled balance (excludes unrealized P&L)
+settled_only = balance_data['USDT']['balance']  # e.g., $10.66
+
+# Calculates position size based on config method using availableBalance
+position_size_usd = config.get_position_size(confidence=0.75, balance=usdt_balance)
+# Example: ACCOUNT_PERCENTAGE 10% of $206.80 → $20.68 position
 
 # Converts to base asset quantity
 quantity_btc = position_size_usd / btc_price  # e.g., 0.001 BTC minimum
 ```
+
+**Balance Fields Explained:**
+- **`availableBalance`**: Total account equity (wallet + unrealized P&L). **This is the source of truth for trading.**
+- **`balance`**: Settled balance only (excludes unrealized P&L from open positions)
+- **`crossWalletBalance`**: Cross-margin wallet balance
+- **`crossUnPnl`**: Unrealized P&L from open positions
 
 **Position Sizing Examples:**
 

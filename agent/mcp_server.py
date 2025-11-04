@@ -41,17 +41,40 @@ class AgentContext:
     config_id: Optional[str] = None
     user_id: Optional[str] = None
     api_client: Optional[GGBotAPIClient] = None
+    trading_mode: Optional[str] = None  # 'paper', 'aster', or 'symphony'
 
 
 agent_context = AgentContext()
 
 
-def set_agent_context(config_id: str, user_id: str, api_client: GGBotAPIClient):
-    """Initialize agent context (called by runner before agent starts)"""
+async def set_agent_context(config_id: str, user_id: str, api_client: GGBotAPIClient):
+    """
+    Initialize agent context (called by runner before agent starts).
+    Fetches trading_mode from database to enable proper activity logging.
+    """
     agent_context.config_id = config_id
     agent_context.user_id = user_id
     agent_context.api_client = api_client
-    logger.info(f"Agent context set: config_id={config_id}, user_id={user_id}")
+
+    # Fetch trading_mode from database
+    try:
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute(
+                    "SELECT trading_mode FROM configurations WHERE config_id = %s",
+                    (config_id,)
+                )
+                row = cur.fetchone()
+                if row:
+                    agent_context.trading_mode = row[0] or 'paper'
+                else:
+                    agent_context.trading_mode = 'paper'
+
+        logger.info(f"Agent context set: config_id={config_id}, user_id={user_id}, trading_mode={agent_context.trading_mode}")
+    except Exception as e:
+        logger.error(f"Failed to fetch trading_mode, defaulting to paper: {e}")
+        agent_context.trading_mode = 'paper'
 
 
 # ============================================================================
@@ -342,6 +365,8 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
 
             # Auto-log activity to timeline
             activity_type = f"trade_entry_{side}" if side in ['long', 'short'] else 'trade_entry_long'
+            trade_type = agent_context.trading_mode or 'paper'  # 'paper', 'aster', or 'symphony'
+
             log_activity_safe(
                 config_id=agent_context.config_id,
                 user_id=agent_context.user_id,
@@ -359,7 +384,7 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
                     'confidence': confidence
                 },
                 trade_id=trade.get('trade_id'),
-                trade_type='paper',  # TODO: Detect paper/live/aster from config
+                trade_type=trade_type,
                 related_symbol=symbol,
                 importance=9
             )
@@ -571,6 +596,8 @@ async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
 
             # Auto-log activity to timeline (trade_win or trade_loss based on P&L)
             activity_type = 'trade_win' if pnl >= 0 else 'trade_loss'
+            trade_type = agent_context.trading_mode or 'paper'  # 'paper', 'aster', or 'symphony'
+
             log_activity_safe(
                 config_id=agent_context.config_id,
                 user_id=agent_context.user_id,
@@ -587,7 +614,7 @@ async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
                     'close_reason': reasoning
                 },
                 trade_id=trade_id,
-                trade_type='paper',  # TODO: Detect paper/live/aster from config
+                trade_type=trade_type,
                 related_symbol=symbol,
                 importance=9
             )
@@ -994,6 +1021,21 @@ async def save_strategy_and_exit(args: Dict[str, Any]) -> Dict[str, Any]:
             logger.warning(f"Could not delete PM2 process: {e}")
 
         await redis_client.aclose()
+
+        # Log activity to timeline
+        log_activity_safe(
+            config_id=config_id,
+            user_id=user_id,
+            activity_type='strategy_updated',
+            activity_source='agent_tool',
+            summary=f"Strategy saved (autonomously_editable={autonomously_editable})",
+            details={
+                'strategy_content': strategy_summary[:200],  # First 200 chars
+                'autonomously_editable': autonomously_editable,
+                'version': 1
+            },
+            importance=10
+        )
 
         logger.info(f"Strategy saved for config {config_id}, autonomously_editable={autonomously_editable}")
 

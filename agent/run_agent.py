@@ -85,8 +85,8 @@ class TradingAgent:
         # Initialize API client
         self.api_client = GGBotAPIClient(user_id=self.user_id)
 
-        # Set agent context for MCP tools
-        set_agent_context(self.config_id, self.user_id, self.api_client)
+        # Set agent context for MCP tools (fetches trading_mode from DB)
+        await set_agent_context(self.config_id, self.user_id, self.api_client)
 
         logger.info("Agent initialized successfully")
 

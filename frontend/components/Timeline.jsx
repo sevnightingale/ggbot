@@ -206,9 +206,10 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
           : {};
 
         // Fetch all endpoints in parallel
+        // Use balance mode for account balance chart (shows actual $206.80 balance over time)
         const [activitiesRes, balanceSeriesRes, metadataRes, strategyRes] = await Promise.all([
           fetch(`/api/v2/activities/${configId}`, { headers }),
-          fetch(`/api/v2/activities/${configId}/balance-series`, { headers }),
+          fetch(`/api/v2/activities/${configId}/balance-series?mode=balance`, { headers }),
           fetch(`/api/v2/activities/${configId}/metadata`, { headers }),
           fetch(`/api/v2/configs/${configId}/strategy`, { headers }).catch(() => null)
         ]);

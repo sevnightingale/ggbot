@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-04 04:04:38 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-04 13:58:21 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,11 +12,11 @@
 - **Users with Bots**: 252 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 378
+- **Total Bots**: 377
 - **Active Bots**: 3 (0.8%)
   - Paper Trading: 2
   - Live Trading: 0
-- **Inactive Bots**: 375
+- **Inactive Bots**: 374
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
@@ -26,9 +26,9 @@
   - Platform Win Rate: 29.99%
   - Total P&L: $-16,000.65
 - **Recent Activity**:
-  - Last 24 hours: 1 trades
-  - Last 7 days: 1049 trades
-  - Last 30 days: 4191 trades
+  - Last 24 hours: 0 trades
+  - Last 7 days: 980 trades
+  - Last 30 days: 4178 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -37,7 +37,7 @@
 - **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,926.72
+- **Average Balance**: $9,926.33
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
@@ -49,8 +49,7 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 21 decisions (avg confidence: 22.1%)
-- **enter**: 1 decisions (avg confidence: 75.0%)
+- **wait**: 22 decisions (avg confidence: 22.0%)
 - **exit**: 1 decisions (avg confidence: 85.0%)
 
 ### System Health
@@ -63,22 +62,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 63MB | 4m | 34 |
-| x-bot | 🟢 online | 0% | 41MB | 4m | 34 |
-| error-alerts | 🟢 online | 0% | 33MB | 4m | 41 |
-| market-data-ws | 🟢 online | 2% | 149MB | 4m | 36 |
-| ggbot | 🟢 online | 0.9% | 249MB | 4m | 76 |
-| agent-93ffaf91-22e0-4b8b-89b1-55539ad4c2ca | 🟢 online | 0% | 64MB | 4m | 2 |
+| signal-listener | 🟢 online | 0% | 16MB | 9h 58m | 34 |
+| x-bot | 🟢 online | 0% | 18MB | 9h 58m | 34 |
+| error-alerts | 🟢 online | 0% | 17MB | 9h 58m | 41 |
+| market-data-ws | 🟢 online | 1.9% | 23MB | 9h 58m | 36 |
+| ggbot | 🟢 online | 1.7% | 259MB | 1h 57m | 91 |
+| agent-bb2560fd-b053-464f-8a58-8e254e4d36fa | 🟢 online | 0% | 63MB | 1h 57m | 7 |
 
 ### VM Resources
 
 - **Disk**: 35G / 78G (46%)
-- **Memory**: 1.5Gi / 3.8Gi
-- **CPU Load**: 0.44 / 0.42 / 0.42 (1m/5m/15m)
+- **Memory**: 2.0Gi / 3.8Gi
+- **CPU Load**: 0.15 / 0.23 / 0.18 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 14.73M)
+- **Redis**: 🟢 connected (Memory: 10.36M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -332,7 +331,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-04 04:04:39 UTC
+**Last Updated**: 2025-11-04 13:58:22 UTC
 
 ---
 
@@ -495,7 +494,7 @@ df -h
 | `created_at` | timestamp with time zone |  | now() |
 | `created_by` | text | ✓ | 'decision_engine_v2'::text |
 
-### `live_trades` (8 columns)
+### `live_trades` (9 columns)
 
 **Primary Key**: `batch_id`
 
@@ -508,6 +507,7 @@ df -h
 - `idx_live_trades_open` on (config_id, closed_at)
 - `idx_live_trades_provider` on (config_id, provider)
 - `idx_live_trades_provider_open` on (config_id, closed_at, provider)
+- `idx_live_trades_symbol` on (config_id, closed_at, symbol)
 - `live_trades_decision_id_unique` on (decision_id)
 
 **Unique Constraints**: `decision_id`
@@ -522,6 +522,7 @@ df -h
 | `provider` | character varying(20) |  | 'symphony'::character varying |
 | `stop_loss_order_id` | character varying(50) | ✓ |  |
 | `take_profit_order_id` | character varying(50) | ✓ |  |
+| `symbol` | character varying(20) | ✓ |  |
 
 ### `logs` (6 columns)
 
@@ -691,7 +692,7 @@ df -h
 | `retry_count` | integer | ✓ | 0 |
 | `created_at` | timestamp with time zone | ✓ | now() |
 
-### `trade_observations` (13 columns)
+### `trade_observations` (14 columns)
 
 **Primary Key**: `observation_id`
 
@@ -713,7 +714,7 @@ df -h
 | `observation_id` | uuid |  | gen_random_uuid() |
 | `config_id` | uuid |  |  |
 | `user_id` | uuid |  |  |
-| `trade_id` | uuid |  |  |
+| `trade_id` | uuid | ✓ |  |
 | `observation_type` | text |  |  |
 | `what_went_well` | text | ✓ |  |
 | `what_went_wrong` | text | ✓ |  |
@@ -723,6 +724,7 @@ df -h
 | `trade_duration_minutes` | integer | ✓ |  |
 | `importance` | integer | ✓ | 5 |
 | `created_at` | timestamp with time zone | ✓ | now() |
+| `batch_id` | character varying(255) | ✓ |  |
 
 ### `user_llm_credentials` (7 columns)
 
@@ -1056,7 +1058,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-04 04:04:39 UTC
+**Last Updated**: 2025-11-04 13:58:22 UTC
 
 ---
 

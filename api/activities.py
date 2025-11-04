@@ -151,13 +151,18 @@ async def get_activities(
 
 @router.get("/{config_id}/balance-series")
 async def get_balance_series(
-    config_id: str
+    config_id: str,
+    mode: str = Query("pnl", description="Chart mode: 'pnl' (cumulative P&L from $0) or 'balance' (actual account balance)")
 ):
     """
-    Get cumulative P&L over time for timeline chart.
+    Get cumulative P&L or account balance over time for timeline chart.
 
-    Reconstructs P&L history from all closed trades (paper, live, aster).
-    Chart starts at $0 and shows cumulative realized P&L.
+    Reconstructs P&L/balance history from all closed trades (paper, live, aster).
+
+    Modes:
+    - pnl: Chart starts at $0 and shows cumulative realized P&L
+    - balance: Chart shows actual account balance over time (for Aster, uses current balance - future P&L)
+
     Works for all trade types, not just paper trading.
 
     Returns:
@@ -169,7 +174,8 @@ async def get_balance_series(
             {"timestamp": "2025-11-01T18:45:00Z", "balance": 75.50}
         ],
         "current_balance": 75.50,
-        "initial_balance": 0
+        "initial_balance": 0,
+        "mode": "pnl"
     }
     """
     try:
@@ -256,34 +262,85 @@ async def get_balance_series(
                 "initial_balance": 0
             }
 
-        # Build cumulative P&L series starting at $0
-        pnl_points = [
-            {
-                "timestamp": config_created_at.isoformat(),
-                "balance": 0
-            }
-        ]
+        # Determine if we're using balance mode (requires current Aster balance)
+        current_aster_balance = None
+        if mode == "balance" and aster_trade_ids:
+            # Get current Aster USDT balance
+            balance_data = await aster_service._get_account_balance()
+            if balance_data:
+                for asset in balance_data:
+                    if asset.get('asset') == 'USDT':
+                        # availableBalance is the account balance (source of truth)
+                        current_aster_balance = float(asset.get('availableBalance', 0))
+                        break
 
-        cumulative_pnl = 0.0
-        for trade in all_trades:
-            cumulative_pnl += trade['pnl']
+        # Build series based on mode
+        if mode == "balance" and current_aster_balance is not None:
+            # Balance mode: Calculate historical balance from current balance
+            # Current balance = starting balance + cumulative P&L
+            # Therefore: starting balance = current balance - cumulative P&L
+
+            cumulative_pnl = sum(trade['pnl'] for trade in all_trades)
+            starting_balance = current_aster_balance - cumulative_pnl
+
+            balance_points = [
+                {
+                    "timestamp": config_created_at.isoformat(),
+                    "balance": starting_balance
+                }
+            ]
+
+            running_balance = starting_balance
+            for trade in all_trades:
+                running_balance += trade['pnl']
+                balance_points.append({
+                    "timestamp": trade['timestamp'].isoformat(),
+                    "balance": running_balance
+                })
+
+            # Add current balance as final point
+            balance_points.append({
+                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "balance": current_aster_balance
+            })
+
+            return {
+                "status": "success",
+                "balance_series": balance_points,
+                "current_balance": current_aster_balance,
+                "initial_balance": starting_balance,
+                "mode": "balance"
+            }
+        else:
+            # P&L mode (default): Show cumulative P&L starting from $0
+            pnl_points = [
+                {
+                    "timestamp": config_created_at.isoformat(),
+                    "balance": 0
+                }
+            ]
+
+            cumulative_pnl = 0.0
+            for trade in all_trades:
+                cumulative_pnl += trade['pnl']
+                pnl_points.append({
+                    "timestamp": trade['timestamp'].isoformat(),
+                    "balance": cumulative_pnl
+                })
+
+            # Add current P&L as final point
             pnl_points.append({
-                "timestamp": trade['timestamp'].isoformat(),
+                "timestamp": datetime.now(timezone.utc).isoformat(),
                 "balance": cumulative_pnl
             })
 
-        # Add current P&L as final point
-        pnl_points.append({
-            "timestamp": datetime.now(timezone.utc).isoformat(),
-            "balance": cumulative_pnl
-        })
-
-        return {
-            "status": "success",
-            "balance_series": pnl_points,
-            "current_balance": cumulative_pnl,
-            "initial_balance": 0
-        }
+            return {
+                "status": "success",
+                "balance_series": pnl_points,
+                "current_balance": cumulative_pnl,
+                "initial_balance": 0,
+                "mode": "pnl"
+            }
 
     except HTTPException:
         raise
