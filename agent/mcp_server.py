@@ -549,11 +549,11 @@ Unrealized P&L: ${unrealized_pnl:,.2f}
 
 @tool(
     "close_position",
-    "Close an open trading position. Params: trade_id (required), reasoning (required)",
+    "Close an open trading position. Params: trade_id (required - use batch_id from get_positions for live trades, or trade_id for paper trades), reasoning (required - explain why closing)",
     {"trade_id": str, "reasoning": str}
 )
 async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
-    """Close a specific position"""
+    """Close a specific position. For live trades (Aster/Symphony), use the batch_id from get_positions as trade_id."""
     try:
         trade_id = args["trade_id"]
         reasoning = args["reasoning"]

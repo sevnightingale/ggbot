@@ -1,3 +1,4 @@
+
 "use client";
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -24,43 +25,29 @@ const VIBE = {
 };
 
 // -----------------------------
-// Types
+// Types (JSDoc)
 // -----------------------------
- type Priority = 1 | 2;
- export type ActivityType =
-  | "trade_entry_long"
-  | "trade_entry_short"
-  | "trade_win"
-  | "trade_loss"
-  | "strategy_updated"
-  | "market_query"
-  | "agent_wait"
-  | "observation_recorded"
-  | "analysis"
-  | "reasoning"
-  | "plan";
-
- interface ActivityDefinition { type: ActivityType; priority: Priority; color: string; label: string; description: string; }
- export interface ActivityItem { id: string; timestamp: string; type: ActivityType; priority: Priority; data: Record<string, any>; }
- export interface BalancePoint { timestamp: string; balance: number; }
- export interface ActivityLog {
-  activities: ActivityItem[];
-  balanceTimeseries: BalancePoint[];
-  metadata: { botName: string; startingBalance: number; currentBalance: number; totalTrades: number; winRate: number; performance: number; };
- }
+/**
+ * @typedef {1 | 2} Priority
+ * @typedef {'trade_entry_long' | 'trade_entry_short' | 'trade_win' | 'trade_loss' | 'strategy_updated' | 'market_query' | 'agent_wait' | 'observation_recorded' | 'analysis' | 'reasoning' | 'plan'} ActivityType
+ * @typedef {{type: ActivityType; priority: Priority; color: string; label: string; description: string;}} ActivityDefinition
+ * @typedef {{id: string; timestamp: string; type: ActivityType; priority: Priority; data: Record<string, any>;}} ActivityItem
+ * @typedef {{timestamp: string; balance: number;}} BalancePoint
+ * @typedef {{activities: ActivityItem[]; balanceTimeseries: BalancePoint[]; metadata: {botName: string; startingBalance: number; currentBalance: number; totalTrades: number; winRate: number; performance: number;}}} ActivityLog
+ */
 
 // -----------------------------
 // Utility
 // -----------------------------
-const clamp = (n:number,a:number,b:number)=> Math.max(a, Math.min(b,n));
-function niceTicks(min:number, max:number, target=5){
-  const span=max-min; if(span<=0) return [] as number[];
+const clamp = (n,a,b)=> Math.max(a, Math.min(b,n));
+function niceTicks(min, max, target=5){
+  const span=max-min; if(span<=0) return [];
   const step=Math.pow(10,Math.floor(Math.log10(span/target)));
   const err=(target*span)/(step*10);
   const steps= err>=7.5?10: err>=3?5: err>=1.5?2:1;
-  const s=steps*step; const ticks:number[]=[]; const start=Math.ceil(min/s)*s; for(let v=start; v<=max; v+=s) ticks.push(v); return ticks;
+  const s=steps*step; const ticks=[]; const start=Math.ceil(min/s)*s; for(let v=start; v<=max; v+=s) ticks.push(v); return ticks;
 }
-function lerpAt(ms:number, xs:number[], ys:number[]){
+function lerpAt(ms, xs, ys){
   const n=xs.length; if(!n) return 0; if(ms<=xs[0]) return ys[0]; if(ms>=xs[n-1]) return ys[n-1];
   let lo=0, hi=n-1; while(hi-lo>1){ const mid=(lo+hi)>>1; if(xs[mid]<=ms) lo=mid; else hi=mid; }
   const t0=xs[lo], t1=xs[hi], v0=ys[lo], v1=ys[hi]; const a=(ms-t0)/(t1-t0); return v0+(v1-v0)*a;
@@ -69,10 +56,9 @@ function lerpAt(ms:number, xs:number[], ys:number[]){
 // -----------------------------
 // Zoom rules
 // -----------------------------
-const ZOOMS = ["1h","4h","1d","1w","All"] as const;
- type ZoomTier = typeof ZOOMS[number];
- const FUTURE_PAD_RATIO = 0.25;
- const ZOOM_RULES: Record<ZoomTier, { spanMs: number|"all"; bucketMs:number; iconPx:number; minSpacingPx:number; railGap:number; }>= {
+const ZOOMS = ["1h","4h","1d","1w","All"];
+const FUTURE_PAD_RATIO = 0.25;
+const ZOOM_RULES = {
   "1h":  { spanMs: 60*60*1000,        bucketMs: 60*1000,      iconPx:22, minSpacingPx:18, railGap:28 },
   "4h":  { spanMs: 4*60*60*1000,      bucketMs: 10*60*1000,   iconPx:20, minSpacingPx:18, railGap:28 },
   "1d":  { spanMs: 24*60*60*1000,     bucketMs: 60*60*1000,   iconPx:18, minSpacingPx:20, railGap:26 },
@@ -83,12 +69,7 @@ const ZOOMS = ["1h","4h","1d","1w","All"] as const;
 // -----------------------------
 // Flat glyphs (canvas + React SVG)
 // -----------------------------
- type GlyphId =
-  | 'long' | 'short' | 'win' | 'loss'
-  | 'strategy' | 'query' | 'wait' | 'note'
-  | 'think' | 'plan' | 'close' | 'gear';
-
- function drawGlyph(ctx:CanvasRenderingContext2D, id:GlyphId, cx:number, cy:number, r:number, color:string){
+function drawGlyph(ctx, id, cx, cy, r, color){
   ctx.save();
   ctx.fillStyle = color;
   const s=r*0.9; // glyph box
@@ -132,23 +113,23 @@ const ZOOMS = ["1h","4h","1d","1w","All"] as const;
 
  // React SVG counterparts for panel & buttons
  const Svg = {
-  Long:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 4l-9 16h18z" fill="currentColor"/></svg>),
-  Short:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 20l9-16H3z" fill="currentColor"/></svg>),
-  Up:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M11 21h2V8l4.5 4.5L19 11l-7-7-7 7 1.5 1.5L11 8z" fill="currentColor"/></svg>),
-  Down:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M13 3h-2v13l-4.5-4.5L5 13l7 7 7-7-1.5-1.5L13 16z" fill="currentColor"/></svg>),
-  Wrench:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M14.7 6.3a5 5 0 01-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 006.4-6.4l-3-3z" fill="currentColor"/></svg>),
-  Bars:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M4 20h4V8H4v12zm6 0h4V12h-4v8zm6 0h4V4h-4v16z" fill="currentColor"/></svg>),
-  Clock:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 10V6h-2v8h6v-2h-4z" fill="currentColor"/></svg>),
-  Note:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm8 1.5V8h4.5L14 3.5z" fill="currentColor"/></svg>),
-  Bubble:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M4 4h16v12H8l-4 4V4z" fill="currentColor"/></svg>),
-  X:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2"/></svg>),
-  Gear:(p:any)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm9 4l-2.2.6a7.9 7.9 0 01-.9 2.1l1.3 1.9-2 2-1.9-1.3a7.9 7.9 0 01-2.1.9L12 21l-.6-2.2a7.9 7.9 0 01-2.1-.9L7.4 19.2l-2-2 1.3-1.9a7.9 7.9 0 01-.9-2.1L3 12l2.2-.6c.2-.7.5-1.4.9-2.1L4.8 7.4l2-2 1.9 1.3c.7-.4 1.4-.7 2.1-.9L12 3l.6 2.2c.7.2 1.4.5 2.1.9L16.6 5.4l2 2-1.3 1.9c.4.7.7 1.4.9 2.1L21 12z" fill="currentColor"/></svg>),
- } as const;
+  Long:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 4l-9 16h18z" fill="currentColor"/></svg>),
+  Short:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 20l9-16H3z" fill="currentColor"/></svg>),
+  Up:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M11 21h2V8l4.5 4.5L19 11l-7-7-7 7 1.5 1.5L11 8z" fill="currentColor"/></svg>),
+  Down:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M13 3h-2v13l-4.5-4.5L5 13l7 7 7-7-1.5-1.5L13 16z" fill="currentColor"/></svg>),
+  Wrench:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M14.7 6.3a5 5 0 01-6.4 6.4L3 18l3 3 5.3-5.3a5 5 0 006.4-6.4l-3-3z" fill="currentColor"/></svg>),
+  Bars:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M4 20h4V8H4v12zm6 0h4V12h-4v8zm6 0h4V4h-4v16z" fill="currentColor"/></svg>),
+  Clock:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 10V6h-2v8h6v-2h-4z" fill="currentColor"/></svg>),
+  Note:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M6 2h9l5 5v13a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm8 1.5V8h4.5L14 3.5z" fill="currentColor"/></svg>),
+  Bubble:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M4 4h16v12H8l-4 4V4z" fill="currentColor"/></svg>),
+  X:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="2"/></svg>),
+  Gear:(p)=> (<svg viewBox="0 0 24 24" aria-hidden className={p.className}><path d="M12 8a4 4 0 100 8 4 4 0 000-8zm9 4l-2.2.6a7.9 7.9 0 01-.9 2.1l1.3 1.9-2 2-1.9-1.3a7.9 7.9 0 01-2.1.9L12 21l-.6-2.2a7.9 7.9 0 01-2.1-.9L7.4 19.2l-2-2 1.3-1.9a7.9 7.9 0 01-.9-2.1L3 12l2.2-.6c.2-.7.5-1.4.9-2.1L4.8 7.4l2-2 1.9 1.3c.7-.4 1.4-.7 2.1-.9L12 3l.6 2.2c.7.2 1.4.5 2.1.9L16.6 5.4l2 2-1.3 1.9c.4.7.7 1.4.9 2.1L21 12z" fill="currentColor"/></svg>),
+ };
 
 // -----------------------------
 // Activity definitions (hardwired colors)
 // -----------------------------
-const ACTIVITY_DEFS: Record<ActivityType, ActivityDefinition> = {
+const ACTIVITY_DEFS = {
   trade_entry_long:  { type:"trade_entry_long",  priority:1, color:VIBE.signal, label:"Long Entry", description:"Opened a long position." },
   trade_entry_short: { type:"trade_entry_short", priority:1, color:VIBE.ember,  label:"Short Entry", description:"Opened a short position." },
   trade_win:         { type:"trade_win",         priority:1, color:VIBE.signal, label:"Trade Win",   description:"Closed with profit." },
@@ -162,7 +143,7 @@ const ACTIVITY_DEFS: Record<ActivityType, ActivityDefinition> = {
   plan:              { type:"plan",              priority:2, color:VIBE.lilac,  label:"Agent Thoughts", description:"Plan." },
 };
 
-function glyphIdFor(t: ActivityType): GlyphId{
+function glyphIdFor(t){
   switch(t){
     case 'trade_entry_long': return 'long';
     case 'trade_entry_short': return 'short';
@@ -181,28 +162,22 @@ function glyphIdFor(t: ActivityType): GlyphId{
 // -----------------------------
 // Component
 // -----------------------------
-export interface ActivityTimelineViewerProps {
-  configId: string;
-  title?: string;
-  initialZoom?: ZoomTier;
-}
-
-export default function Timeline({ configId, title, initialZoom = '4h' }: ActivityTimelineViewerProps){
+export default function Timeline({ configId, title, initialZoom = '4h' }){
   // No theme lookup: fixed palette
   const theme = VIBE;
 
-  const [log, setLog] = useState<ActivityLog | null>(null);
+  const [log, setLog] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [session, setSession] = useState<any>(null);
-  const [strategy, setStrategy] = useState<string | null>(null);
+  const [error, setError] = useState(null);
+  const [session, setSession] = useState(null);
+  const [strategy, setStrategy] = useState(null);
   const [showStrategy, setShowStrategy] = useState(false);
-  const [zoom, setZoom] = useState<ZoomTier>(initialZoom);
+  const [zoom, setZoom] = useState(initialZoom);
   const [domain, setDomain] = useState(()=>({left: Date.now()-24*60*60*1000, right: Date.now()}));
-  const [selected, setSelected] = useState<ActivityItem[] | null>(null);
+  const [selected, setSelected] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const [visibleTypes, setVisibleTypes] = useState<Record<ActivityType, boolean>>(()=>{
-    const o:Record<ActivityType,boolean> = (Object.keys(ACTIVITY_DEFS) as ActivityType[]).reduce((acc:any,k)=>{acc[k]=true; return acc;},{} as any);
+  const [visibleTypes, setVisibleTypes] = useState(()=>{
+    const o = Object.keys(ACTIVITY_DEFS).reduce((acc,k)=>{acc[k]=true; return acc;},{});
     return o;
   });
 
@@ -278,9 +253,9 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
   }, [configId, session]);
 
   // ---- Sizing (mobile-friendly)
-  const containerRef = useRef<HTMLDivElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const overlayRef = useRef<HTMLCanvasElement>(null);
+  const containerRef = useRef(null);
+  const canvasRef = useRef(null);
+  const overlayRef = useRef(null);
   const [size, setSize] = useState({w:1200,h:480});
   useEffect(()=>{
     const obs=new ResizeObserver(()=>{ const el=containerRef.current; if(!el) return; setSize({w: el.clientWidth, h: el.clientHeight}); });
@@ -299,7 +274,7 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
   // initialize domain on zoom change
   useEffect(()=>{
     if(rules.spanMs === "all") return setDomain({left:dataFirst, right:rightBound});
-    const span = rules.spanMs as number; const now = Date.now();
+    const span = rules.spanMs; const now = Date.now();
     let right = Math.min(now, rightBound); let left = right - span;
     if(left < dataFirst){ left = dataFirst; right = Math.min(left+span, rightBound); }
     setDomain({left,right});
@@ -307,8 +282,8 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
 
   // ---- Slice series into domain (+guards for continuity)
   const inDomainSeries = useMemo(()=>{
-    if(!log?.balanceTimeseries?.length) return [] as BalancePoint[];
-    const {left,right}=domain; const src=log.balanceTimeseries; const out:BalancePoint[]=[];
+    if(!log?.balanceTimeseries?.length) return [];
+    const {left,right}=domain; const src=log.balanceTimeseries; const out=[];
     for(let i=0;i<src.length;i++){
       const t=new Date(src[i].timestamp).getTime();
       if(t>=left && t<=right) out.push(src[i]);
@@ -319,34 +294,34 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
 
   // ---- Scales
   const padL=64, padR=16, padT=20, padB=32; const chartW=Math.max(10, size.w - padL - padR); const chartH=Math.max(10, size.h - padT - padB);
-  const xScale = (ms:number)=> padL + ((ms-domain.left)/(domain.right-domain.left))*chartW;
+  const xScale = (ms)=> padL + ((ms-domain.left)/(domain.right-domain.left))*chartW;
   const yExtent = useMemo(()=>{
     let min=Infinity, max=-Infinity; for(const p of inDomainSeries){ min=Math.min(min,p.balance); max=Math.max(max,p.balance); }
     if(!isFinite(min)||!isFinite(max)) { min=0; max=100; }
     const span=max-min; const minRange=120; if(span<minRange){ const c=(min+max)/2; return {min:c-minRange/2, max:c+minRange/2}; }
     const pad=span*0.1; return {min:min-pad, max:max+pad};
   },[inDomainSeries]);
-  const yScale = (v:number)=> padT + chartH - ((v-yExtent.min)/(yExtent.max-yExtent.min))*chartH;
+  const yScale = (v)=> padT + chartH - ((v-yExtent.min)/(yExtent.max-yExtent.min))*chartH;
 
   // ---- Bucket activities
   const bucketed = useMemo(()=>{
-    if(!log?.activities) return [] as {bucketTs:number; items:ActivityItem[]; rep:ActivityItem}[];
+    if(!log?.activities) return [];
     const ms = rules.bucketMs; const {left,right}=domain; const pad=(right-left)*0.25; const acts = log.activities.filter(a=>{
       const t=new Date(a.timestamp).getTime(); return t>=left-pad && t<=right+pad && visibleTypes[a.type];
     });
-    const map = new Map<string, ActivityItem[]>();
+    const map = new Map();
     for(const a of acts){ const t=new Date(a.timestamp).getTime(); const b=Math.floor(t/ms)*ms; const key = a.priority===1? `${b}:${a.id}` : `${b}:${a.type}`; const arr = map.get(key) || []; arr.push(a); map.set(key, arr); }
     return Array.from(map.entries()).map(([k,items])=>{ const bucketTs=parseInt(k.split(":")[0]); items.sort((a,b)=> new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime()); const rep= items.find(x=>x.priority===1) || items[0]; return {bucketTs, items, rep}; }).sort((a,b)=> a.bucketTs-b.bucketTs);
   },[log, rules, domain, visibleTypes]);
 
   // ---- Canvas draw
-  const hitBoxesRef = useRef<{x:number;y:number;w:number;h:number; cx:number; cy:number; R:number; color:string; glyph:GlyphId; group: ActivityItem[]}[]>([]);
-  const hoverRef = useRef<{cx:number; cy:number; R:number; color:string; glyph:GlyphId} | null>(null);
+  const hitBoxesRef = useRef([]);
+  const hoverRef = useRef(null);
 
   useEffect(()=>{
     const c=canvasRef.current, o=overlayRef.current; if(!c||!o) return; const dpr=window.devicePixelRatio||1;
     for(const el of [c,o]){ el.width=Math.floor(size.w*dpr); el.height=Math.floor(size.h*dpr); el.style.width=`${size.w}px`; el.style.height=`${size.h}px`; }
-    const ctx=c.getContext("2d")!; const octx=o.getContext("2d")!; ctx.setTransform(dpr,0,0,dpr,0,0); octx.setTransform(dpr,0,0,dpr,0,0);
+    const ctx=c.getContext("2d"); const octx=o.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); octx.setTransform(dpr,0,0,dpr,0,0);
 
     // Surface
     ctx.fillStyle = theme.carbon; ctx.fillRect(0,0,size.w,size.h);
@@ -395,8 +370,8 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
 
   // ---- Overlay (hover + now pulse)
   useEffect(()=>{
-    const o=overlayRef.current; if(!o) return; const ctx=o.getContext("2d")!; let raf:number|undefined;
-    const draw=(t:number)=>{
+    const o=overlayRef.current; if(!o) return; const ctx=o.getContext("2d"); let raf;
+    const draw=(t)=>{
       const dpr=window.devicePixelRatio||1; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,o.width/dpr,o.height/dpr);
       const h=hoverRef.current; if(h){ ctx.save(); ctx.beginPath(); ctx.arc(h.cx,h.cy,h.R+6,0,Math.PI*2); ctx.fillStyle=VIBE.hair; ctx.fill(); drawGlyph(ctx,h.glyph,h.cx,h.cy,h.R*0.72,h.color); ctx.restore(); }
       // now pulse
@@ -416,44 +391,46 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
   const domainRef = useRef(domain); const rulesRef = useRef(rules); const dataFirstRef=useRef(dataFirst); const rightBoundRef=useRef(rightBound);
   useEffect(()=>{ domainRef.current=domain; rulesRef.current=rules; dataFirstRef.current=dataFirst; rightBoundRef.current=rightBound; },[domain,rules,dataFirst,rightBound]);
   useEffect(()=>{
-    const c=canvasRef.current; if(!c) return; let isDragging=false; let dragStartX=0; let lastX=0; let v=0; let raf:number|undefined;
-    const clampDom=(left:number,right:number)=>{ if(rulesRef.current.spanMs==="all") return {left:dataFirstRef.current,right:rightBoundRef.current}; const span=right-left; const maxR=rightBoundRef.current; const minL=dataFirstRef.current; if(right>maxR){ right=maxR; left=right-span; } if(left<minL){ left=minL; right=Math.min(left+span,maxR); } return {left,right}; };
+    const c=canvasRef.current; if(!c) return; let isDragging=false; let dragStartX=0; let lastX=0; let v=0; let raf;
+    const clampDom=(left,right)=>{ if(rulesRef.current.spanMs==="all") return {left:dataFirstRef.current,right:rightBoundRef.current}; const span=right-left; const maxR=rightBoundRef.current; const minL=dataFirstRef.current; if(right>maxR){ right=maxR; left=right-span; } if(left<minL){ left=minL; right=Math.min(left+span,maxR); } return {left,right}; };
     const span=()=> (domainRef.current.right - domainRef.current.left);
-    const applyPan=(dtMs:number)=>{ const left=domainRef.current.left + dtMs; const right=domainRef.current.right + dtMs; setDomain(clampDom(left,right)); };
+    const applyPan=(dtMs)=>{ const left=domainRef.current.left + dtMs; const right=domainRef.current.right + dtMs; setDomain(clampDom(left,right)); };
 
-    const onDown=(e:PointerEvent)=>{ isDragging=true; dragStartX=e.clientX; lastX=e.clientX; v=0; (e.target as HTMLElement).setPointerCapture(e.pointerId); };
-    const onMove=(e:PointerEvent)=>{ const rect=c.getBoundingClientRect(); const x=(e.clientX-rect.left); const y=(e.clientY-rect.top); const hit=hitBoxesRef.current.find(b=> x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); (c as any).style.cursor = hit? "pointer" : "default"; hoverRef.current = hit? {cx:hit.cx, cy:hit.cy, R:hit.R, color:hit.color, glyph:hit.glyph}: null; if(!isDragging) return; const dx=e.clientX - lastX; lastX=e.clientX; v=dx; const msPerPx = span() / Math.max(1, (c.clientWidth) - padL - padR); applyPan(-dx*msPerPx); };
-    const onUp=(e:PointerEvent)=>{ if(!isDragging) return; isDragging=false; (e.target as HTMLElement).releasePointerCapture(e.pointerId); const dragDist=Math.abs(e.clientX-dragStartX); if(dragDist<5){ const rect=c.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top; const hit=hitBoxesRef.current.find(b=> x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); if(hit) setSelected(hit.group); }
+    const onDown=(e)=>{ isDragging=true; dragStartX=e.clientX; lastX=e.clientX; v=0; e.target.setPointerCapture(e.pointerId); };
+    const onMove=(e)=>{ const rect=c.getBoundingClientRect(); const x=(e.clientX-rect.left); const y=(e.clientY-rect.top); const hit=hitBoxesRef.current.find(b=> x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); c.style.cursor = hit? "pointer" : "default"; hoverRef.current = hit? {cx:hit.cx, cy:hit.cy, R:hit.R, color:hit.color, glyph:hit.glyph}: null; if(!isDragging) return; const dx=e.clientX - lastX; lastX=e.clientX; v=dx; const msPerPx = span() / Math.max(1, (c.clientWidth) - padL - padR); applyPan(-dx*msPerPx); };
+    const onUp=(e)=>{ if(!isDragging) return; isDragging=false; e.target.releasePointerCapture(e.pointerId); const dragDist=Math.abs(e.clientX-dragStartX); if(dragDist<5){ const rect=c.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top; const hit=hitBoxesRef.current.find(b=> x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); if(hit) setSelected(hit.group); }
       else{ let vel=v; const decay=.92; const step=()=>{ if(Math.abs(vel)<.2){ if(raf) cancelAnimationFrame(raf); raf=undefined; return; } const msPerPx = span() / Math.max(1,(c.clientWidth)-padL-padR); applyPan(-vel*msPerPx); vel*=decay; raf=requestAnimationFrame(step); }; if(!raf) raf=requestAnimationFrame(step); }
     };
-    const onWheel=(e:WheelEvent)=>{ e.preventDefault(); if(rulesRef.current.spanMs==="all") return; if(e.shiftKey){ const idx=ZOOMS.indexOf(zoom); const next = e.deltaY < 0 ? clamp(idx-1,0,ZOOMS.length-1) : clamp(idx+1,0,ZOOMS.length-1); if(next!==idx) setZoom(ZOOMS[next]); return; } const step=(domainRef.current.right-domainRef.current.left)*0.15; const dir=e.deltaY<0? -1: 1; applyPan(dir*step); };
+    const onWheel=(e)=>{ e.preventDefault(); if(rulesRef.current.spanMs==="all") return; if(e.shiftKey){ const idx=ZOOMS.indexOf(zoom); const next = e.deltaY < 0 ? clamp(idx-1,0,ZOOMS.length-1) : clamp(idx+1,0,ZOOMS.length-1); if(next!==idx) setZoom(ZOOMS[next]); return; } const step=(domainRef.current.right-domainRef.current.left)*0.15; const dir=e.deltaY<0? -1: 1; applyPan(dir*step); };
 
     c.addEventListener("pointerdown", onDown); window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); c.addEventListener("wheel", onWheel, {passive:false});
     return ()=>{ c.removeEventListener("pointerdown", onDown); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); c.removeEventListener("wheel", onWheel); if(raf) cancelAnimationFrame(raf); };
   },[zoom]);
 
   // ---- Helpers
-  const jumpToNow = ()=>{ if(rules.spanMs==="all") return setDomain({left:dataFirst,right:rightBound}); const span = rules.spanMs as number; const now=Date.now(); let right=Math.min(now,rightBound); let left=right-span; if(left<dataFirst){ left=dataFirst; right=Math.min(left+span,rightBound);} setDomain({left,right}); };
+  const jumpToNow = ()=>{ if(rules.spanMs==="all") return setDomain({left:dataFirst,right:rightBound}); const span = rules.spanMs; const now=Date.now(); let right=Math.min(now,rightBound); let left=right-span; if(left<dataFirst){ left=dataFirst; right=Math.min(left+span,rightBound);} setDomain({left,right}); };
 
   const info = log?.metadata; const isEmpty = !log || (log.activities?.length ?? 0)===0 || (log.balanceTimeseries?.length ?? 0)===0;
 
   // ---- Filter list UI (shared)
   function FiltersList(){
-    const entries = (Object.keys(ACTIVITY_DEFS) as ActivityType[]).map(k=>{
+    const entries = Object.keys(ACTIVITY_DEFS).map(k=>{
       const def=ACTIVITY_DEFS[k]; const on=visibleTypes[k]; const glyph=glyphIdFor(k);
-      const Icon = (():React.FC<any>=>{
+      /* eslint-disable react/display-name */
+      const Icon = (()=>{
         switch(glyph){
-          case 'long': return (p:any)=> <Svg.Long {...p}/>;
-          case 'short': return (p:any)=> <Svg.Short {...p}/>;
-          case 'win': return (p:any)=> <Svg.Up {...p}/>;
-          case 'loss': return (p:any)=> <Svg.Down {...p}/>;
-          case 'strategy': return (p:any)=> <Svg.Wrench {...p}/>;
-          case 'query': return (p:any)=> <Svg.Bars {...p}/>;
-          case 'wait': return (p:any)=> <Svg.Clock {...p}/>;
-          case 'note': return (p:any)=> <Svg.Note {...p}/>;
-          default: return (p:any)=> <Svg.Bubble {...p}/>;
+          case 'long': return (p)=> <Svg.Long {...p}/>;
+          case 'short': return (p)=> <Svg.Short {...p}/>;
+          case 'win': return (p)=> <Svg.Up {...p}/>;
+          case 'loss': return (p)=> <Svg.Down {...p}/>;
+          case 'strategy': return (p)=> <Svg.Wrench {...p}/>;
+          case 'query': return (p)=> <Svg.Bars {...p}/>;
+          case 'wait': return (p)=> <Svg.Clock {...p}/>;
+          case 'note': return (p)=> <Svg.Note {...p}/>;
+          default: return (p)=> <Svg.Bubble {...p}/>;
         }
       })();
+      /* eslint-enable react/display-name */
       return (
         <button key={k}
           onClick={()=> setVisibleTypes(prev=>({...prev,[k]:!on}))}
@@ -568,7 +545,7 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
             <div className="rounded-xl border p-4" style={{ backgroundColor: theme.carbon, borderColor: theme.hair }}>
               <div className="text-sm" style={{ color: 'rgba(237,235,231,0.7)' }}>Activity Types</div>
               <FiltersList/>
-              <button onClick={()=>{ const allOn=Object.values(visibleTypes).every(v=>v); const next: any={}; (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k=> next[k]=!allOn); setVisibleTypes(next); }}
+              <button onClick={()=>{ const allOn=Object.values(visibleTypes).every(v=>v); const next={}; Object.keys(ACTIVITY_DEFS).forEach(k=> next[k]=!allOn); setVisibleTypes(next); }}
                 className="w-full mt-3 text-xs px-3 py-1.5 rounded-lg border"
                 style={{ borderColor: theme.hair, color: 'rgba(237,235,231,0.85)' }}
               >
@@ -603,7 +580,7 @@ export default function Timeline({ configId, title, initialZoom = '4h' }: Activi
                 </button>
               </div>
               <FiltersList/>
-              <button onClick={()=>{ const allOn=Object.values(visibleTypes).every(v=>v); const next: any={}; (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k=> next[k]=!allOn); setVisibleTypes(next); }}
+              <button onClick={()=>{ const allOn=Object.values(visibleTypes).every(v=>v); const next={}; Object.keys(ACTIVITY_DEFS).forEach(k=> next[k]=!allOn); setVisibleTypes(next); }}
                 className="w-full mt-3 text-xs px-3 py-2 rounded-lg border"
                 style={{ borderColor: theme.hair, color:'rgba(237,235,231,0.9)' }}
               >

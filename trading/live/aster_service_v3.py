@@ -542,7 +542,8 @@ class AsterDEXV3LiveTradingService:
                 config_id=config_id,
                 decision_id=decision_id,
                 sl_order_id=sl_order_id,
-                tp_order_id=tp_order_id
+                tp_order_id=tp_order_id,
+                symbol=symbol  # Save universal symbol format
             )
 
             return {
@@ -702,7 +703,8 @@ class AsterDEXV3LiveTradingService:
         config_id: str,
         decision_id: Optional[str],
         sl_order_id: Optional[str],
-        tp_order_id: Optional[str]
+        tp_order_id: Optional[str],
+        symbol: str
     ) -> None:
         """Save audit trail to live_trades table with provider='aster'."""
         try:
@@ -710,11 +712,11 @@ class AsterDEXV3LiveTradingService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         INSERT INTO live_trades
-                        (batch_id, config_id, decision_id, provider, stop_loss_order_id, take_profit_order_id, created_at)
-                        VALUES (%s, %s, %s, 'aster', %s, %s, NOW())
-                    """, (batch_id, config_id, decision_id, sl_order_id, tp_order_id))
+                        (batch_id, config_id, decision_id, provider, stop_loss_order_id, take_profit_order_id, symbol, created_at)
+                        VALUES (%s, %s, %s, 'aster', %s, %s, %s, NOW())
+                    """, (batch_id, config_id, decision_id, sl_order_id, tp_order_id, symbol))
                     conn.commit()
-                    self._log.info(f"Saved AsterDEX trade record: {batch_id}")
+                    self._log.info(f"Saved AsterDEX trade record: {batch_id} for {symbol}")
         except Exception as e:
             self._log.error(f"Error saving trade record: {e}")
 
@@ -725,6 +727,22 @@ class AsterDEXV3LiveTradingService:
             if not positions_data:
                 return []
 
+            # Get batch_ids from database by symbol
+            batch_id_map = {}  # Map: symbol -> batch_id
+            try:
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT symbol, batch_id
+                            FROM live_trades
+                            WHERE config_id = %s AND provider = 'aster' AND closed_at IS NULL
+                        """, (config_id,))
+                        for row in cur.fetchall():
+                            symbol, batch_id = row
+                            batch_id_map[symbol] = batch_id
+            except Exception as e:
+                self._log.error(f"Error querying batch_ids: {e}")
+
             open_positions = []
             for pos in positions_data:
                 position_amt = float(pos.get("positionAmt", 0))
@@ -733,6 +751,9 @@ class AsterDEXV3LiveTradingService:
 
                 aster_symbol = pos.get("symbol", "")
                 universal_symbol = self._from_aster_symbol(aster_symbol)
+
+                # Look up batch_id from database by symbol
+                batch_id = batch_id_map.get(universal_symbol)
 
                 open_positions.append({
                     "symbol": universal_symbol,
@@ -743,7 +764,8 @@ class AsterDEXV3LiveTradingService:
                     "unrealized_pnl": float(pos.get("unRealizedProfit", 0)),
                     "liquidation_price": float(pos.get("liquidationPrice", 0)),
                     "leverage": int(pos.get("leverage", 1)),
-                    "margin_type": pos.get("marginType", "isolated")
+                    "margin_type": pos.get("marginType", "isolated"),
+                    "batch_id": batch_id  # Include batch_id from database
                 })
 
             self._log.info(f"Found {len(open_positions)} open positions")

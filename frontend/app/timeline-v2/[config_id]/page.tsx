@@ -5,6 +5,7 @@ export default async function TimelineV2Page({ params }: { params: Promise<{ con
 
   return (
     <div className="min-h-screen">
+      {/* @ts-expect-error - Timeline is JSX, props are optional */}
       <Timeline configId={config_id} />
     </div>
   )

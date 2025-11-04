@@ -4,6 +4,37 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-04 - AsterDEX Position Management: Agent Can Now Close Trades
+
+**Database Schema Enhancement**:
+- **Added `symbol` column to `live_trades` table**: VARCHAR(20) column to store trading pair for position-trade matching
+- **Index**: Created `idx_live_trades_symbol` on (config_id, symbol, closed_at) for fast lookups
+- **Migration**: Backfilled 2 existing open trades with "BTC/USDT" symbol
+
+**Trade Recording Fix** (`trading/live/aster_service_v3.py`):
+- **Updated `_save_live_trade_record()`**: Added `symbol` parameter, saves universal symbol format (e.g., "BTC/USDT") to database
+- **Updated caller**: `execute_trade_intent()` now passes symbol when creating trade records (line 546)
+- **Database**: INSERT statement now includes symbol column (line 714)
+
+**Position Matching Fix** (`trading/live/aster_service_v3.py`):
+- **Updated `get_open_positions()`**: Queries database for open trades by config_id, builds symbol → batch_id map
+- **Matching Logic**: Matches exchange positions with database records by symbol (lines 730-756)
+- **Return Value**: Each position now includes correct `batch_id` for the agent to use when closing
+
+**Issue Resolved**:
+- **Problem**: Agent couldn't close Aster positions because `batch_id` was None in position data
+- **Root Cause**: `live_trades` table had no symbol column, making it impossible to match exchange positions with database trade records
+- **Solution**: Added symbol column, populate it during trade creation, use it to match positions with their batch_ids
+- **Impact**: Agent can now properly close positions using `close_position(trade_id='7215356800', reasoning='...')`
+
+**Files Changed**:
+- `trading/live/aster_service_v3.py`: 3 methods updated (_save_live_trade_record, execute_trade_intent, get_open_positions)
+- Database: 1 column added, 1 index created, 2 trades backfilled
+
+**Status**: ✅ Agent position closing operational for Aster live trading
+
+---
+
 ## 2025-11-03 - Agent Phase 4c: Autonomous Mode Launch (24/7 Trading Live!)
 
 **Confirmation Flow Removed** (Backend):

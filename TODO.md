@@ -46,6 +46,8 @@
   - [x] Backfill existing trades: `UPDATE live_trades SET provider = 'symphony'`
   - [x] Add `stop_loss_order_id` and `take_profit_order_id` fields (nullable)
   - [x] Add provider-aware indexes (`idx_live_trades_provider`, `idx_live_trades_provider_open`)
+  - [x] **Add `symbol` column** (VARCHAR 20) for position-trade matching (2025-11-04)
+  - [x] **Add `idx_live_trades_symbol` index** on (config_id, symbol, closed_at) (2025-11-04)
   - [x] Execute migration in Supabase
   - [ ] Fix `decision_id` foreign key (make nullable for test trades)
 
@@ -62,6 +64,7 @@
 - [x] **Close Position Functionality**
   - [x] Implement market close via `_place_market_order()`
   - [x] Test position close (BTC-USDT closed successfully)
+  - [x] **Fixed batch_id matching** - Added `symbol` column to `live_trades`, position matching now works (2025-11-04)
   - [ ] Add SL/TP order cancellation before close
   - [ ] Update `live_trades.closed_at` timestamp via `close_position(batch_id, user_id)`
 
