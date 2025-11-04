@@ -254,6 +254,14 @@ class AsterOrderMonitor:
                 if sl_status == "FILLED":
                     logger.info(f"Stop Loss FILLED for trade {batch_id}")
 
+                    # CRITICAL: Cancel the TP order since position is closed
+                    if tp_order_id:
+                        cancel_success = await self.aster_service._cancel_order(aster_symbol, tp_order_id)
+                        if cancel_success:
+                            logger.info(f"Cancelled TP order {tp_order_id} after SL fill")
+                        else:
+                            logger.warning(f"Failed to cancel TP order {tp_order_id} after SL fill")
+
                     # Mark closed
                     await self.mark_trade_closed(batch_id, 'stop_loss')
 
@@ -278,6 +286,14 @@ class AsterOrderMonitor:
                 tp_status = await self.check_order_status(aster_symbol, tp_order_id)
                 if tp_status == "FILLED":
                     logger.info(f"Take Profit FILLED for trade {batch_id}")
+
+                    # CRITICAL: Cancel the SL order since position is closed
+                    if sl_order_id:
+                        cancel_success = await self.aster_service._cancel_order(aster_symbol, sl_order_id)
+                        if cancel_success:
+                            logger.info(f"Cancelled SL order {sl_order_id} after TP fill")
+                        else:
+                            logger.warning(f"Failed to cancel SL order {sl_order_id} after TP fill")
 
                     # Mark closed
                     await self.mark_trade_closed(batch_id, 'take_profit')

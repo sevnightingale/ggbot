@@ -70,6 +70,17 @@ export default function BalanceChartTV({
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    // Ensure container has valid dimensions
+    const containerWidth = chartContainerRef.current.clientWidth;
+    const containerHeight = chartContainerRef.current.clientHeight;
+
+    console.log('[BalanceChartTV] Container dimensions:', { containerWidth, containerHeight });
+
+    if (containerWidth === 0 || containerHeight === 0) {
+      console.error('[BalanceChartTV] Container has zero dimensions, cannot create chart');
+      return;
+    }
+
     // Log data for debugging
     console.log('[BalanceChartTV] Received data:', {
       balanceDataLength: balanceData?.length,
@@ -139,16 +150,22 @@ export default function BalanceChartTV({
         const time = new Date(point.timestamp).getTime();
         return !isNaN(time) && isFinite(point.balance);
       })
-      .map(point => ({
-        time: Math.floor(new Date(point.timestamp).getTime() / 1000) as Time,
-        value: point.balance,
-      }))
+      .map(point => {
+        const time = Math.floor(new Date(point.timestamp).getTime() / 1000);
+        const value = Number(point.balance);
+        return { time: time as Time, value };
+      })
+      .filter(point => {
+        // Double-check: ensure no null/NaN values after mapping
+        return point.value != null && !isNaN(point.value) && isFinite(point.value);
+      })
       .sort((a, b) => (a.time as number) - (b.time as number));
 
     console.log('[BalanceChartTV] Processed chart data:', {
       originalLength: balanceData.length,
       filteredLength: chartData.length,
-      chartData: chartData.slice(0, 3)  // Log first 3 points
+      firstThree: chartData.slice(0, 3),
+      allData: chartData  // Log ALL points to see where null is
     });
 
     // Don't render if no valid data
@@ -165,33 +182,52 @@ export default function BalanceChartTV({
     const markers: SeriesMarker<Time>[] = activities
       .filter(activity => {
         // Filter out null/invalid activities
-        if (!activity || !activity.timestamp || activity.priority > 2) return false;
+        if (!activity || !activity.timestamp || !activity.type || activity.priority > 2) return false;
         const time = new Date(activity.timestamp).getTime();
         return !isNaN(time);
       })
       .map(activity => {
         const markerConfig = getMarkerConfig(activity.type);
 
+        const markerTime = Math.floor(new Date(activity.timestamp).getTime() / 1000);
+
         return {
-          time: Math.floor(new Date(activity.timestamp).getTime() / 1000) as Time,
+          time: markerTime as Time,
           position: markerConfig.position,
           color: markerConfig.color,
           shape: markerConfig.shape,
           text: markerConfig.text,
         };
       })
+      .filter(marker => {
+        // Ensure all marker fields are valid
+        return marker.time != null &&
+               marker.position != null &&
+               marker.color != null &&
+               marker.shape != null &&
+               marker.text != null;
+      })
       .sort((a, b) => (a.time as number) - (b.time as number));
 
     console.log('[BalanceChartTV] Processed markers:', {
       originalLength: activities.length,
       filteredLength: markers.length,
-      markers: markers.slice(0, 3)  // Log first 3 markers
+      firstThree: markers.slice(0, 3),
+      allMarkers: markers  // Log all markers
     });
 
     // Add markers using v5 plugin API
-    if (markers.length > 0) {
-      createSeriesMarkers(lineSeries, markers);
+    try {
+      if (markers.length > 0) {
+        console.log('[BalanceChartTV] Adding markers to chart...');
+        createSeriesMarkers(lineSeries, markers);
+        console.log('[BalanceChartTV] Markers added successfully');
+      }
+    } catch (error) {
+      console.error('[BalanceChartTV] Error adding markers:', error);
+      // Continue without markers rather than crash
     }
+
     chart.timeScale().fitContent();
 
     chartRef.current = chart;
