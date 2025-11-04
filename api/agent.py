@@ -372,11 +372,30 @@ async def execute_trade(
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
-        # Build trade intent
+        # Normalize symbol to CCXT format (BTC/USDT) using standardizer
+        standardizer = UniversalSymbolStandardizer()
+        symbol = request.symbol
+
+        # Handle different symbol formats (BTC, BTC-USDT, BTCUSDT, BTC/USDT, etc.)
+        try:
+            # Try direct conversion first
+            normalized_symbol = standardizer.to_ccxt(symbol)
+        except:
+            # If that fails, try ggshot normalization
+            try:
+                normalized_symbol = standardizer.normalize(symbol, "ggshot", "ccxt")
+            except:
+                # Last resort: if symbol is just base asset (BTC), assume USDT pair
+                if '/' not in symbol and '-' not in symbol and not symbol.endswith('USDT'):
+                    normalized_symbol = f"{symbol}/USDT"
+                else:
+                    normalized_symbol = symbol
+
+        # Build trade intent with normalized symbol
         intent = {
             "config_id": request.config_id,
             "user_id": user_id,
-            "symbol": request.symbol,
+            "symbol": normalized_symbol,  # NOW USING NORMALIZED SYMBOL
             "action": request.side,  # "long" or "short"
             "confidence": request.confidence,
             "stop_loss_price": request.stop_loss_price,
@@ -384,10 +403,25 @@ async def execute_trade(
             "decision_id": request.decision_id
         }
 
-        # Execute via paper trading service
-        # TODO: Add live trading support when config.trading_mode == "live"
-        paper_trading = SupabasePaperTradingService()
-        result = await paper_trading.execute_trade_intent(intent)
+        # Route to correct trading service based on config
+        trading_mode = config.get('trading_mode', 'paper')
+
+        if trading_mode == 'aster':
+            # Aster live trading
+            from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+            aster_service = AsterDEXV3LiveTradingService()
+
+            # Add override parameters if provided
+            if request.position_size_usd_override:
+                intent['position_size_usd_override'] = request.position_size_usd_override
+            if request.leverage_override:
+                intent['leverage_override'] = request.leverage_override
+
+            result = await aster_service.execute_trade_intent(intent)
+        else:
+            # Paper trading (default)
+            paper_trading = SupabasePaperTradingService()
+            result = await paper_trading.execute_trade_intent(intent)
 
         logger.info(
             f"Agent executed trade: {request.symbol} {request.side}",

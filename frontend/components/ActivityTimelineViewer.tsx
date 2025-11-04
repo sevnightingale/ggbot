@@ -292,6 +292,18 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           : {};
 
         const response = await fetch(`/api/v2/config/${configId}`, { headers });
+
+        // Handle 403 gracefully (public viewing doesn't have strategy access)
+        if (response.status === 403) {
+          console.log('[ActivityTimeline] Strategy endpoint requires auth (public view)');
+          return;
+        }
+
+        if (!response.ok) {
+          console.warn('[ActivityTimeline] Failed to fetch strategy:', response.status);
+          return;
+        }
+
         const data = await response.json();
         if (data.config?.agent_strategy?.content) {
           setStrategy(data.config.agent_strategy.content);
