@@ -216,7 +216,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return o as Record<ActivityType, boolean>;
   });
   const [size, setSize] = useState({ w: 1200, h: 460 });
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
 
   // Get session for auth
   useEffect(() => {
@@ -932,41 +931,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain, dataLast, seriesMs, seriesVal, log]);
 
-  // Helper function for domain clamping (defined before interactions so it can be used)
-  const clampDomain = (left: number, right: number) => {
-    if (rules.spanMs === "all") return { left: dataFirst, right: rightBound };
-    const span = right - left;
-    const maxRight = rightBound;
-    const minLeft = dataFirst;
-
-    // Clamp right boundary first
-    if (right > maxRight) {
-      right = maxRight;
-      left = right - span;
-    }
-
-    // Clamp left boundary, but don't violate right boundary
-    if (left < minLeft) {
-      left = minLeft;
-      right = Math.min(left + span, maxRight);
-    }
-
-    return { left, right };
-  };
-
-  // Interactions - use refs to avoid recreating handlers on every domain change
-  const domainRef = useRef(domain);
-  const zoomRef = useRef(zoom);
-  const rulesRef = useRef(rules);
-
-  // Keep refs in sync
-  useEffect(() => {
-    domainRef.current = domain;
-    zoomRef.current = zoom;
-    rulesRef.current = rules;
-  }, [domain, zoom, rules]);
-
-  // Stable interaction handlers
+  // Interactions
   useEffect(() => {
     const c = canvasRef.current;
     if (!c) return;
@@ -976,10 +941,10 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     let v = 0;
     let raf: number | null = null;
 
-    const span = () => (domainRef.current.right - domainRef.current.left);
+    const span = () => (domain.right - domain.left);
     const applyPan = (dtMs: number) => {
-      const left = domainRef.current.left + dtMs;
-      const right = domainRef.current.right + dtMs;
+      const left = domain.left + dtMs;
+      const right = domain.right + dtMs;
       const clamped = clampDomain(left, right);
       setDomain(clamped);
     };
@@ -1048,14 +1013,14 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
-      if (rulesRef.current.spanMs === "all") return;
+      if (rules.spanMs === "all") return;
       if (e.shiftKey) {
-        const idx = ZOOMS.indexOf(zoomRef.current);
+        const idx = ZOOMS.indexOf(zoom);
         const next = e.deltaY < 0 ? clamp(idx-1, 0, ZOOMS.length-1) : clamp(idx+1, 0, ZOOMS.length-1);
         if (next !== idx) setZoom(ZOOMS[next]);
         return;
       }
-      const step = (domainRef.current.right - domainRef.current.left) * 0.15;
+      const step = (domain.right - domain.left) * 0.15;
       const dir = e.deltaY < 0 ? -1 : 1;
       applyPan(dir * step);
     };
@@ -1073,7 +1038,29 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       if (raf) cancelAnimationFrame(raf);
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // Only set up once
+  }, [zoom, domain, rules]);
+
+  // Helper function for domain clamping
+  function clampDomain(left: number, right: number) {
+    if (rules.spanMs === "all") return { left: dataFirst, right: rightBound };
+    const span = right - left;
+    const maxRight = rightBound;
+    const minLeft = dataFirst;
+
+    // Clamp right boundary first
+    if (right > maxRight) {
+      right = maxRight;
+      left = right - span;
+    }
+
+    // Clamp left boundary, but don't violate right boundary
+    if (left < minLeft) {
+      left = minLeft;
+      right = Math.min(left + span, maxRight);
+    }
+
+    return { left, right };
+  }
 
   // Loading state
   if (loading && !log) {
@@ -1139,53 +1126,45 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   return (
     <div className="w-full h-full min-h-screen bg-[#0b0d12] text-white">
-      <div className="max-w-7xl mx-auto px-4 md:px-6 py-4 md:py-6 space-y-3 md:space-y-4">
+      <div className="max-w-7xl mx-auto px-6 py-6 space-y-4">
         {/* Header */}
         <div className="flex items-center gap-3">
           <div className="w-8 h-8 rounded-xl bg-emerald-500/20 grid place-items-center">{ICONS.robot}</div>
-          <div className="text-base md:text-lg font-semibold truncate">{info.botName}</div>
+          <div className="text-lg font-semibold">{info.botName}</div>
         </div>
 
         {/* Controls */}
-        <div className="flex items-center gap-2 flex-wrap">
-          {/* Zoom buttons */}
-          <div className="flex gap-2">
-            {ZOOMS.map(z => (
-              <button
-                key={z}
-                className={`px-2 md:px-3 py-1 rounded-xl border text-xs md:text-sm ${z===zoom?"bg-white text-black":"border-white/20 text-white/80 hover:bg-white/10"}`}
-                onClick={()=>setZoom(z)}
-              >
-                {z}
-              </button>
-            ))}
-          </div>
-
-          <div className="flex-1" />
-
-          {/* Action buttons */}
-          <div className="flex gap-2">
-            {strategy && (
-              <button
-                className="hidden md:flex px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10 items-center gap-1 text-sm"
-                onClick={()=>setShowStrategy(true)}
-              >
-                {ICONS.clipboard} View Configuration
-              </button>
-            )}
+        <div className="flex items-center gap-2">
+          {ZOOMS.map(z => (
             <button
-              className="px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10 text-xs md:text-sm whitespace-nowrap"
-              onClick={jumpToNow}
+              key={z}
+              className={`px-3 py-1 rounded-xl border text-sm ${z===zoom?"bg-white text-black":"border-white/20 text-white/80 hover:bg-white/10"}`}
+              onClick={()=>setZoom(z)}
             >
-              Jump to Now
+              {z}
             </button>
-          </div>
+          ))}
+          <div className="flex-1" />
+          {strategy && (
+            <button
+              className="px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10"
+              onClick={()=>setShowStrategy(true)}
+            >
+              {ICONS.clipboard} View Configuration
+            </button>
+          )}
+          <button
+            className="px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10"
+            onClick={jumpToNow}
+          >
+            Jump to Now
+          </button>
         </div>
 
         {/* Chart area with left sidebar legend */}
-        <div className="flex gap-4 h-[calc(100vh-140px)] md:h-[calc(100vh-180px)] min-h-[400px] md:min-h-[500px]">
-          {/* Legend / Activity Filters - Left Sidebar (hidden on mobile) */}
-          <div className="hidden md:flex md:w-48 space-y-3 flex-shrink-0 flex-col">
+        <div className="flex gap-4 h-[calc(100vh-180px)] min-h-[500px]">
+          {/* Legend / Activity Filters - Left Sidebar */}
+          <div className="w-48 space-y-3 flex-shrink-0">
             <div className="flex items-center justify-between">
               <h3 className="text-sm font-medium text-white/70">Activity Types</h3>
             </div>
@@ -1266,132 +1245,18 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           >
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full"/>
             <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none"/>
-
-            {/* Mobile: Floating Filter Button */}
-            <button
-              onClick={() => setMobileFiltersOpen(true)}
-              className="md:hidden absolute bottom-4 left-4 bg-emerald-500 text-white px-4 py-2 rounded-xl shadow-lg flex items-center gap-2 z-10"
-            >
-              <span className="text-lg">{ICONS.wrench}</span>
-              <span className="text-sm font-medium">Filters</span>
-            </button>
           </div>
         </div>
-
-        {/* Mobile: Bottom Sheet Filter Panel */}
-        {mobileFiltersOpen && (
-          <>
-            {/* Backdrop */}
-            <div
-              className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
-              onClick={() => setMobileFiltersOpen(false)}
-            />
-
-            {/* Bottom Sheet */}
-            <div className="md:hidden fixed inset-x-0 bottom-0 bg-[#12151c] rounded-t-3xl border-t border-white/10 z-50 max-h-[70vh] overflow-hidden flex flex-col">
-              {/* Handle bar */}
-              <div className="flex justify-center py-3 border-b border-white/10">
-                <div className="w-12 h-1 bg-white/20 rounded-full" />
-              </div>
-
-              {/* Header */}
-              <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Activity Filters</h3>
-                <button
-                  onClick={() => setMobileFiltersOpen(false)}
-                  className="text-white/70 hover:text-white text-xl"
-                >
-                  {ICONS.close}
-                </button>
-              </div>
-
-              {/* Filter buttons - scrollable */}
-              <div className="flex-1 overflow-y-auto px-6 py-4">
-                <div className="space-y-3">
-                  {/* Filter buttons */}
-                  <div className="flex flex-col gap-2">
-                    {(() => {
-                      // Deduplicate: analysis/reasoning/plan all show as one "Agent Thoughts" button
-                      const seen = new Set<string>();
-                      const legendItems: { key: string; def: ActivityDefinition; types: ActivityType[] }[] = [];
-
-                      (Object.keys(ACTIVITY_DEFS) as ActivityType[]).forEach(k => {
-                        const def = ACTIVITY_DEFS[k];
-                        const label = def.label;
-
-                        if (!seen.has(label)) {
-                          seen.add(label);
-                          // Find all types with same label
-                          const relatedTypes = (Object.keys(ACTIVITY_DEFS) as ActivityType[])
-                            .filter(t => ACTIVITY_DEFS[t].label === label);
-                          legendItems.push({ key: k, def, types: relatedTypes });
-                        }
-                      });
-
-                      return legendItems.map(({ key, def, types }) => {
-                        // Button is "on" if ANY of the related types are visible
-                        const on = types.some(t => visibleTypes[t]);
-
-                        return (
-                          <button
-                            key={key}
-                            onClick={() => {
-                              // Toggle all related types together
-                              setVisibleTypes(v => {
-                                const newState = { ...v };
-                                types.forEach(t => { newState[t] = !on; });
-                                return newState;
-                              });
-                            }}
-                            className={`px-4 py-3 rounded-xl text-sm border transition-all ${
-                              on
-                                ? "bg-white/10 border-white/30 text-white"
-                                : "border-white/10 text-white/40 hover:border-white/20 hover:text-white/60"
-                            }`}
-                            title={def.description}
-                          >
-                            <span className="text-base mr-2">{def.icon}</span>
-                            {def.label}
-                          </button>
-                        );
-                      });
-                    })()}
-                  </div>
-
-                  <button
-                    onClick={() => {
-                      const allOn = Object.values(visibleTypes).every(v => v);
-                      setVisibleTypes(
-                        Object.fromEntries(
-                          (Object.keys(ACTIVITY_DEFS) as ActivityType[]).map(k => [k, !allOn])
-                        ) as Record<ActivityType, boolean>
-                      );
-                    }}
-                    className="w-full text-sm text-white/50 hover:text-white/80 py-2 border border-white/10 rounded-lg hover:bg-white/5"
-                  >
-                    Toggle All
-                  </button>
-
-                  {/* Navigation hint */}
-                  <div className="text-xs text-white/40 pt-2 pb-4">
-                    {ICONS.lightbulb} <span className="text-white/50">Swipe to scroll • Pinch to zoom • Tap icons for details</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </>
-        )}
       </div>
 
       {/* Active Positions Section */}
       {positions.length > 0 && (
-        <div className="max-w-7xl mx-auto px-4 md:px-6 pb-6">
+        <div className="max-w-7xl mx-auto px-6 pb-6">
           <div className="bg-[#12151c] rounded-2xl border border-white/10 overflow-hidden">
-            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-white/10">
-              <h3 className="text-base md:text-lg font-semibold">Active Positions</h3>
+            <div className="px-6 py-4 border-b border-white/10">
+              <h3 className="text-lg font-semibold">Active Positions</h3>
             </div>
             <div className="overflow-x-auto">
-              <div className="min-w-[800px]">
               <table className="w-full">
                 <thead>
                   <tr className="text-left text-sm text-white/70 border-b border-white/10">
@@ -1430,7 +1295,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
                   })}
                 </tbody>
               </table>
-              </div>
             </div>
           </div>
         </div>
@@ -1438,14 +1302,14 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
       {/* Strategy Modal */}
       {showStrategy && strategy && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4 md:p-8" onClick={()=>setShowStrategy(false)}>
-          <div className="bg-[#12151c] rounded-2xl border border-white/10 max-w-3xl w-full max-h-[90vh] md:max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e)=>e.stopPropagation()}>
-            <div className="px-4 md:px-6 py-3 md:py-4 border-b border-white/10 flex items-center justify-between">
-              <h2 className="text-lg md:text-xl font-semibold">Agent Configuration</h2>
-              <button onClick={()=>setShowStrategy(false)} className="text-white/70 hover:text-white text-xl md:text-2xl">{ICONS.close}</button>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={()=>setShowStrategy(false)}>
+          <div className="bg-[#12151c] rounded-2xl border border-white/10 max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e)=>e.stopPropagation()}>
+            <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Agent Configuration</h2>
+              <button onClick={()=>setShowStrategy(false)} className="text-white/70 hover:text-white text-2xl">{ICONS.close}</button>
             </div>
-            <div className="p-4 md:p-6 overflow-y-auto max-h-[calc(90vh-4rem)] md:max-h-[calc(80vh-5rem)]">
-              <pre className="whitespace-pre-wrap text-xs md:text-sm text-white/90 font-mono leading-relaxed">{strategy}</pre>
+            <div className="p-6 overflow-y-auto max-h-[calc(80vh-5rem)]">
+              <pre className="whitespace-pre-wrap text-sm text-white/90 font-mono leading-relaxed">{strategy}</pre>
             </div>
           </div>
         </div>
@@ -1493,15 +1357,15 @@ function SidePanel({ selected, onClose }: { selected: ActivityItem[] | null; onC
       {/* Panel */}
       <div
         ref={panelRef}
-        className={`fixed top-0 right-0 h-full w-full md:w-[560px] bg-[#12151c] shadow-2xl border-l border-white/10 transition-transform duration-300 z-50 ${selected?"translate-x-0":"translate-x-full"}`}
+        className={`fixed top-0 right-0 h-full w-[560px] bg-[#12151c] shadow-2xl border-l border-white/10 transition-transform duration-300 z-50 ${selected?"translate-x-0":"translate-x-full"}`}
       >
-        <div className="h-14 flex items-center justify-between px-4 md:px-6 border-b border-white/10">
-          <div className="font-semibold text-base md:text-lg">
+        <div className="h-14 flex items-center justify-between px-6 border-b border-white/10">
+          <div className="font-semibold text-lg">
             {selected ? (selected.length>1 ? `${selected.length} Activities` : ACTIVITY_DEFS[selected[0].type].label) : ""}
           </div>
           <button onClick={onClose} className="text-white/70 hover:text-white text-xl">{ICONS.close}</button>
         </div>
-        <div className="p-4 md:p-6 space-y-4 overflow-y-auto h-[calc(100%-3.5rem)]">
+        <div className="p-6 space-y-4 overflow-y-auto h-[calc(100%-3.5rem)]">
           {!selected && (
             <div className="text-white/50 text-sm">Click any icon on the chart to see full context.</div>
           )}
@@ -1512,19 +1376,19 @@ function SidePanel({ selected, onClose }: { selected: ActivityItem[] | null; onC
               const def = ACTIVITY_DEFS[item.type];
               const t = new Date(item.timestamp);
               return (
-                <div key={item.id} className="p-3 md:p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
-                  <div className="flex items-center gap-2 md:gap-3">
-                    <div className="text-xl md:text-2xl">{def.icon}</div>
+                <div key={item.id} className="p-4 rounded-xl bg-white/5 border border-white/10 space-y-3">
+                  <div className="flex items-center gap-3">
+                    <div className="text-2xl">{def.icon}</div>
                     <div>
-                      <div className="font-medium text-sm md:text-base">{def.label}</div>
+                      <div className="font-medium text-base">{def.label}</div>
                       <div className="text-xs text-white/60">{t.toUTCString()}</div>
                     </div>
                   </div>
-                  <div className="space-y-2 text-xs md:text-sm">
+                  <div className="space-y-2 text-sm">
                     {Object.entries(item.data).filter(([k]) => k !== 'details' && k !== 'reasoning' && k !== 'summary').map(([k, v]) => (
-                      <div key={k} className="flex items-start justify-between gap-2 md:gap-4 py-1">
-                        <span className="text-white/50 min-w-[80px] md:min-w-[100px]">{k}:</span>
-                        <span className="font-mono text-white/90 text-right flex-1 break-all">{typeof v === 'number' ? v.toLocaleString() : String(v)}</span>
+                      <div key={k} className="flex items-start justify-between gap-4 py-1">
+                        <span className="text-white/50 min-w-[100px]">{k}:</span>
+                        <span className="font-mono text-white/90 text-right flex-1">{typeof v === 'number' ? v.toLocaleString() : String(v)}</span>
                       </div>
                     ))}
                   </div>
