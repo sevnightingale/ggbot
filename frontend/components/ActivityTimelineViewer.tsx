@@ -197,14 +197,14 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const hoverRef = useRef<{cx:number; cy:number; R:number; color:string; icon:string} | null>(null);
   const initialLoadRef = useRef(true);
-  const prevZoomRef = useRef<ZoomTier>("1h");
+  const prevZoomRef = useRef<ZoomTier>("4h");
 
   // API data state
   const [log, setLog] = useState<MockActivityLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{ access_token?: string } | null>(null);
-  const [zoom, setZoom] = useState<ZoomTier>("1h");  // Default to 1h view
+  const [zoom, setZoom] = useState<ZoomTier>("4h");  // Default to 4h view
   const [domain, setDomain] = useState<{left: number; right: number}>({ left: Date.now() - 24*60*60*1000, right: Date.now() });
   const [selected, setSelected] = useState<ActivityItem[] | null>(null);
   const [showStrategy, setShowStrategy] = useState(false);
@@ -417,9 +417,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     const obs = new ResizeObserver(() => {
       const el = containerRef.current;
       if (!el) return;
-      const newSize = { w: el.clientWidth, h: el.clientHeight };
-      console.log('[Timeline] Container size:', newSize);
-      setSize(newSize);
+      setSize({ w: el.clientWidth, h: el.clientHeight });
     });
     if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
@@ -483,8 +481,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const padL = 56, padR = 16, padT = 24, padB = 28;
   const chartW = Math.max(10, size.w - padL - padR);
   const chartH = Math.max(10, size.h - padT - padB);
-
-  console.log('[Timeline] Chart dimensions - size.h:', size.h, 'chartH:', chartH, 'padT:', padT, 'padB:', padB);
 
   function xScale(ms: number) {
     const t = (ms - domain.left) / (domain.right - domain.left);
@@ -1166,7 +1162,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
         </div>
 
         {/* Chart area with left sidebar legend */}
-        <div className="flex gap-4 h-[calc(100vh-220px)] min-h-[500px]">
+        <div className="flex gap-4 h-[calc(100vh-180px)] min-h-[500px]">
           {/* Legend / Activity Filters - Left Sidebar */}
           <div className="w-48 space-y-3 flex-shrink-0">
             <div className="flex items-center justify-between">
@@ -1245,8 +1241,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           {/* Chart area */}
           <div
             ref={containerRef}
-            className="relative flex-1 rounded-2xl overflow-hidden ring-1 ring-white/10"
-            style={{background: COLORS.bg}}
+            className="relative flex-1"
           >
             <canvas ref={canvasRef} className="absolute inset-0 w-full h-full"/>
             <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none"/>
