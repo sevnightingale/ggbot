@@ -262,32 +262,41 @@ async def get_balance_series(
                 "initial_balance": 0
             }
 
-        # Determine if we're using balance mode (requires current Aster balance)
-        current_aster_balance = None
-        if mode == "balance" and aster_trade_ids:
+        # Balance mode: Show account balance over time (reconstructed from current balance)
+        if mode == "balance":
             # Get current Aster USDT balance
             balance_data = await aster_service._get_account_balance()
+            current_balance = 0.0
+
             if balance_data:
                 for asset in balance_data:
                     if asset.get('asset') == 'USDT':
                         # availableBalance is the account balance (source of truth)
-                        current_aster_balance = float(asset.get('availableBalance', 0))
+                        current_balance = float(asset.get('availableBalance', 0))
                         break
 
-        # Build series based on mode
-        if mode == "balance" and current_aster_balance is not None:
-            # Balance mode: Calculate historical balance from current balance
-            # Current balance = starting balance + cumulative P&L
-            # Therefore: starting balance = current balance - cumulative P&L
-
-            cumulative_pnl = sum(trade['pnl'] for trade in all_trades)
-            starting_balance = current_aster_balance - cumulative_pnl
-
-            balance_points = [
-                {
-                    "timestamp": config_created_at.isoformat(),
-                    "balance": starting_balance
+            if not all_trades:
+                # No trades yet - show flat line at current balance
+                return {
+                    "status": "success",
+                    "balance_series": [
+                        {"timestamp": config_created_at.isoformat(), "balance": current_balance},
+                        {"timestamp": datetime.now(timezone.utc).isoformat(), "balance": current_balance}
+                    ],
+                    "current_balance": current_balance,
+                    "initial_balance": current_balance,
+                    "mode": "balance"
                 }
+
+            # Calculate starting balance by working backwards from current balance
+            # Current balance = starting balance + total P&L
+            # Starting balance = current balance - total P&L
+            cumulative_pnl = sum(trade['pnl'] for trade in all_trades)
+            starting_balance = current_balance - cumulative_pnl
+
+            # Build balance series showing how balance changed with each trade
+            balance_points = [
+                {"timestamp": config_created_at.isoformat(), "balance": starting_balance}
             ]
 
             running_balance = starting_balance
@@ -301,13 +310,13 @@ async def get_balance_series(
             # Add current balance as final point
             balance_points.append({
                 "timestamp": datetime.now(timezone.utc).isoformat(),
-                "balance": current_aster_balance
+                "balance": current_balance
             })
 
             return {
                 "status": "success",
                 "balance_series": balance_points,
-                "current_balance": current_aster_balance,
+                "current_balance": current_balance,
                 "initial_balance": starting_balance,
                 "mode": "balance"
             }
@@ -386,57 +395,96 @@ async def get_timeline_metadata(
                 if not config:
                     raise HTTPException(status_code=404, detail="Configuration not found")
 
-                # Get config info
+                # Get config info including trading_mode
                 cur.execute("""
-                    SELECT config_name, config_type, created_at
+                    SELECT config_name, config_type, created_at, config_data->>'trading_mode'
                     FROM configurations
                     WHERE config_id = %s
                 """, (config_id,))
                 config_row = cur.fetchone()
 
-                # Get paper trade metrics
+                config_name = config_row[0]
+                config_type = config_row[1]
+                created_at = config_row[2]
+                trading_mode = config_row[3] or 'paper'
+
+                # Get Aster trade IDs for this config
                 cur.execute("""
-                    SELECT
-                        COUNT(*) as total_trades,
-                        SUM(CASE WHEN realized_pnl >= 0 THEN 1 ELSE 0 END) as wins,
-                        SUM(realized_pnl) as total_pnl
-                    FROM paper_trades
-                    WHERE config_id = %s AND status = 'closed'
+                    SELECT batch_id FROM live_trades
+                    WHERE config_id = %s AND provider = 'aster'
                 """, (config_id,))
-                paper_metrics = cur.fetchone()
+                aster_trade_ids = {str(row[0]) for row in cur.fetchall()}
 
-        # Get Aster trade metrics from API
+        # Check if this is an Aster bot
         aster_service = AsterDEXV3LiveTradingService()
-        aster_trades = await aster_service.get_user_trades(limit=1000)
 
-        # Combine metrics
-        paper_total = paper_metrics[0] or 0
-        paper_wins = paper_metrics[1] or 0
-        paper_pnl = float(paper_metrics[2]) if paper_metrics[2] else 0.0
+        if trading_mode == 'aster' and aster_trade_ids:
+            # ASTER BOT: Use actual account balance
+            # Get current Aster balance
+            balance_data = await aster_service._get_account_balance()
+            current_balance = 0.0
 
-        aster_total = len(aster_trades) if aster_trades else 0
-        aster_wins = sum(1 for t in (aster_trades or []) if float(t.get('realizedPnl', 0)) >= 0)
-        aster_pnl = sum(float(t.get('realizedPnl', 0)) for t in (aster_trades or []))
+            if balance_data:
+                for asset in balance_data:
+                    if asset.get('asset') == 'USDT':
+                        current_balance = float(asset.get('availableBalance', 0))
+                        break
 
-        total_trades = paper_total + aster_total
-        win_trades = paper_wins + aster_wins
-        total_pnl = paper_pnl + aster_pnl
+            # Get Aster trades for this config only
+            all_aster_trades = await aster_service.get_user_trades(limit=1000)
+            config_trades = [t for t in (all_aster_trades or []) if str(t.get('id', '')) in aster_trade_ids]
 
-        win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
+            total_trades = len(config_trades)
+            win_trades = sum(1 for t in config_trades if float(t.get('realizedPnl', 0)) >= 0)
+            total_pnl = sum(float(t.get('realizedPnl', 0)) for t in config_trades)
+            win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
 
-        return {
-            "status": "success",
-            "metadata": {
-                "botName": config_row[0],
-                "configType": config_row[1],
-                "startingBalance": 0,
-                "currentBalance": total_pnl,
-                "totalTrades": total_trades,
-                "winRate": round(win_rate, 1),
-                "performance": total_pnl,  # Cumulative P&L (paper + aster)
-                "createdAt": config_row[2].isoformat()
+            # Calculate starting balance
+            starting_balance = current_balance - total_pnl
+
+            return {
+                "status": "success",
+                "metadata": {
+                    "bot_name": config_name,
+                    "startingBalance": starting_balance,
+                    "currentBalance": current_balance,  # Actual Aster balance
+                    "totalTrades": total_trades,
+                    "winRate": round(win_rate, 1),
+                    "performance": ((current_balance - starting_balance) / starting_balance * 100) if starting_balance > 0 else 0,
+                    "createdAt": created_at.isoformat()
+                }
             }
-        }
+        else:
+            # PAPER BOT: Use P&L metrics
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT
+                            COUNT(*) as total_trades,
+                            SUM(CASE WHEN realized_pnl >= 0 THEN 1 ELSE 0 END) as wins,
+                            SUM(realized_pnl) as total_pnl
+                        FROM paper_trades
+                        WHERE config_id = %s AND status = 'closed'
+                    """, (config_id,))
+                    paper_metrics = cur.fetchone()
+
+            paper_total = paper_metrics[0] or 0
+            paper_wins = paper_metrics[1] or 0
+            paper_pnl = float(paper_metrics[2]) if paper_metrics[2] else 0.0
+            win_rate = (paper_wins / paper_total * 100) if paper_total > 0 else 0
+
+            return {
+                "status": "success",
+                "metadata": {
+                    "bot_name": config_name,
+                    "startingBalance": 0,
+                    "currentBalance": paper_pnl,
+                    "totalTrades": paper_total,
+                    "winRate": round(win_rate, 1),
+                    "performance": paper_pnl,
+                    "createdAt": created_at.isoformat()
+                }
+            }
 
     except HTTPException:
         raise

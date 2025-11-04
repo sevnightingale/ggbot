@@ -229,11 +229,11 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
           activities: activities.activities || [],
           balanceTimeseries: balanceSeries.balance_series || [],
           metadata: {
-            botName: metadata.bot_name || 'Unknown Bot',
-            startingBalance: metadata.starting_balance || 0,
-            currentBalance: metadata.current_balance || 0,
-            totalTrades: metadata.total_trades || 0,
-            winRate: metadata.win_rate || 0,
+            botName: metadata.bot_name || metadata.botName || 'Unknown Bot',
+            startingBalance: metadata.startingBalance || metadata.starting_balance || 0,
+            currentBalance: metadata.currentBalance || metadata.current_balance || 0,
+            totalTrades: metadata.totalTrades || metadata.total_trades || 0,
+            winRate: metadata.winRate || metadata.win_rate || 0,
             performance: metadata.performance || 0
           }
         });

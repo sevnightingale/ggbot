@@ -1559,6 +1559,61 @@ async def get_config(
         raise HTTPException(status_code=500, detail=f"Failed to retrieve configuration: {str(e)}")
 
 
+@app.get("/api/v2/configs/{config_id}/strategy")
+async def get_config_strategy(
+    config_id: str
+) -> Dict[str, Any]:
+    """
+    Get agent strategy for a configuration (PUBLIC for timeline viewing).
+
+    Used by Activity Timeline to display strategy in "View Configuration" modal.
+    Returns just the agent_strategy content, or 404 if not an agent config.
+    """
+    from core.common.db import get_db_connection
+
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT config_type, config_data
+                    FROM configurations
+                    WHERE config_id = %s
+                """, (config_id,))
+                row = cur.fetchone()
+
+                if not row:
+                    raise HTTPException(status_code=404, detail="Configuration not found")
+
+                config_type = row[0]
+                config_data = row[1]
+
+                # Check if this is an agent config
+                if config_type != 'agent':
+                    raise HTTPException(status_code=404, detail="Not an agent configuration")
+
+                # Extract agent_strategy
+                agent_strategy = config_data.get('agent_strategy', {})
+                strategy_content = agent_strategy.get('content', '')
+
+                if not strategy_content:
+                    raise HTTPException(status_code=404, detail="No strategy defined for this agent")
+
+                return {
+                    "status": "success",
+                    "strategy": strategy_content,
+                    "version": agent_strategy.get('version', 1),
+                    "autonomously_editable": agent_strategy.get('autonomously_editable', False),
+                    "last_updated_at": agent_strategy.get('last_updated_at'),
+                    "last_updated_by": agent_strategy.get('last_updated_by', 'user')
+                }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to get strategy for config {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to retrieve strategy: {str(e)}")
+
+
 @app.put("/api/v2/config/{config_id}")
 async def update_config(
     config_id: str,
