@@ -196,8 +196,8 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{ access_token?: string } | null>(null);
-  const [zoom, setZoom] = useState<ZoomTier>("4h");
-  const [domain, setDomain] = useState<{left: number; right: number}>({ left: Date.now() - 4*60*60*1000, right: Date.now() });
+  const [zoom, setZoom] = useState<ZoomTier>("All");  // Default to "All" to show full history from bot creation
+  const [domain, setDomain] = useState<{left: number; right: number}>({ left: Date.now() - 24*60*60*1000, right: Date.now() });
   const [selected, setSelected] = useState<ActivityItem[] | null>(null);
   const [showStrategy, setShowStrategy] = useState(false);
   const [strategy, setStrategy] = useState<string | null>(null);
@@ -355,7 +355,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return dataLast + Math.round((rules.spanMs as number) * FUTURE_PAD_RATIO);
   }, [rules, dataLast]);
 
-  // Recompute domain when zoom changes
+  // Recompute domain when zoom changes or data loads
   useEffect(() => {
     if (rules.spanMs === "all") { setDomain({ left: dataFirst, right: dataLast }); return; }
     const span = rules.spanMs as number;
@@ -369,7 +369,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     if (left < dataFirst) { left = dataFirst; right = left + desiredSpan; }
     setDomain({ left, right });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom]);
+  }, [zoom, dataFirst, dataLast, rules]);
 
   // Resize
   useEffect(() => {
