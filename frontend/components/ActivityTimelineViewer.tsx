@@ -196,13 +196,15 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
   const hoverRef = useRef<{cx:number; cy:number; R:number; color:string; icon:string} | null>(null);
+  const initialLoadRef = useRef(true);
+  const prevZoomRef = useRef<ZoomTier>("1h");
 
   // API data state
   const [log, setLog] = useState<MockActivityLog | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<{ access_token?: string } | null>(null);
-  const [zoom, setZoom] = useState<ZoomTier>("All");  // Default to "All" to show full history from bot creation
+  const [zoom, setZoom] = useState<ZoomTier>("1h");  // Default to 1h view
   const [domain, setDomain] = useState<{left: number; right: number}>({ left: Date.now() - 24*60*60*1000, right: Date.now() });
   const [selected, setSelected] = useState<ActivityItem[] | null>(null);
   const [showStrategy, setShowStrategy] = useState(false);
@@ -375,11 +377,19 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return result;
   }, [dataFirst, dataLast]);
 
-  // Recompute domain when zoom changes or data loads
+  // Recompute domain only on zoom changes or initial load (not on data updates)
   useEffect(() => {
+    // Only update domain if this is initial load OR zoom changed
+    const zoomChanged = zoom !== prevZoomRef.current;
+    if (!initialLoadRef.current && !zoomChanged) {
+      return; // Skip - this is just a data update from polling
+    }
+
     // "All" zoom: show full history from bot creation to now + buffer
     if (rules.spanMs === "all") {
       setDomain({ left: dataFirst, right: rightBound });
+      initialLoadRef.current = false;
+      prevZoomRef.current = zoom;
       return;
     }
 
@@ -402,6 +412,8 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     }
 
     setDomain({ left, right });
+    initialLoadRef.current = false;
+    prevZoomRef.current = zoom;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [zoom, dataFirst, dataLast, rightBound, rules]);
 
@@ -1039,8 +1051,19 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     const span = right - left;
     const maxRight = rightBound;
     const minLeft = dataFirst;
-    if (right > maxRight) { right = maxRight; left = right - span; }
-    if (left < minLeft) { left = minLeft; right = left + span; }
+
+    // Clamp right boundary first
+    if (right > maxRight) {
+      right = maxRight;
+      left = right - span;
+    }
+
+    // Clamp left boundary, but don't violate right boundary
+    if (left < minLeft) {
+      left = minLeft;
+      right = Math.min(left + span, maxRight);
+    }
+
     return { left, right };
   }
 
