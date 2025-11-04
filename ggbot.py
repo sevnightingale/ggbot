@@ -1519,18 +1519,34 @@ async def list_configs(
 
 @app.get("/api/v2/config/{config_id}")
 async def get_config(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+    config_id: str
 ) -> Dict[str, Any]:
-    """Get a specific configuration."""
-    config = await config_service.get_config(config_id, current_user.user_id)
-    
-    if not config:
+    """Get a specific configuration (PUBLIC for competition viewing)."""
+    # Get config without user_id verification (public viewing)
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT config_id, user_id, config_name, config_type, created_at, config_data
+                FROM configurations
+                WHERE config_id = %s
+            """, (config_id,))
+            row = cur.fetchone()
+
+    if not row:
         raise HTTPException(status_code=404, detail="Configuration not found")
-    
+
+    config = {
+        "config_id": str(row[0]),
+        "user_id": str(row[1]),
+        "config_name": row[2],
+        "config_type": row[3],
+        "created_at": row[4].isoformat(),
+        "config_data": row[5]
+    }
+
     return {
         "status": "success",
-        "config": config.to_dict()
+        "config": config
     }
 
 
@@ -2342,18 +2358,25 @@ async def close_live_position(
 
 @app.get("/api/v2/positions/aster/{config_id}")
 async def get_aster_positions(
-    config_id: str,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+    config_id: str
 ) -> Dict[str, Any]:
-    """Get open Aster positions for a bot configuration."""
+    """Get open Aster positions for a bot configuration (PUBLIC for competition viewing)."""
     try:
-        # Verify user owns this config
-        config = await config_service.get_config(config_id, current_user.user_id)
-        if not config:
+        # Verify config exists (no auth required for public viewing)
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT config_data FROM configurations WHERE config_id = %s
+                """, (config_id,))
+                row = cur.fetchone()
+
+        if not row:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
+        config_data = row[0]
+
         # Check if it's an Aster trading bot
-        if getattr(config, 'trading_mode', 'paper') != 'aster':
+        if config_data.get('trading_mode', 'paper') != 'aster':
             return {
                 "positions": [],
                 "message": "Not an Aster trading bot"

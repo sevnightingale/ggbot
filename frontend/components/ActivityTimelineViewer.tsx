@@ -422,6 +422,12 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const inDomainSeries = useMemo(() => {
     const { left, right } = domain;
 
+    // DEBUG: Log the entire log object to diagnose issues
+    console.log('[ActivityTimeline] inDomainSeries recalculating');
+    console.log('[ActivityTimeline] log state:', log);
+    console.log('[ActivityTimeline] log?.balanceTimeseries:', log?.balanceTimeseries);
+    console.log('[ActivityTimeline] balanceTimeseries length:', log?.balanceTimeseries?.length);
+
     // If we have real balance data, use it
     if (log?.balanceTimeseries && log.balanceTimeseries.length > 0) {
       const series = log.balanceTimeseries;
