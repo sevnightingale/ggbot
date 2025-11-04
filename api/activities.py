@@ -250,7 +250,7 @@ async def get_balance_series(
                 "status": "success",
                 "balance_series": [
                     {"timestamp": config_created_at.isoformat(), "balance": 0},
-                    {"timestamp": datetime.utcnow().isoformat(), "balance": 0}
+                    {"timestamp": datetime.now(timezone.utc).isoformat(), "balance": 0}
                 ],
                 "current_balance": 0,
                 "initial_balance": 0
@@ -274,7 +274,7 @@ async def get_balance_series(
 
         # Add current P&L as final point
         pnl_points.append({
-            "timestamp": datetime.utcnow().isoformat(),
+            "timestamp": datetime.now(timezone.utc).isoformat(),
             "balance": cumulative_pnl
         })
 
