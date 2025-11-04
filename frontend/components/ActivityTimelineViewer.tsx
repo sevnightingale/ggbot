@@ -394,21 +394,16 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     }
 
     // For time-based zooms (1h, 4h, etc): calculate scrollable window
+    // Use same logic as "Jump to Now" button
     const span = rules.spanMs as number;
-
-    // On first load or zoom change, position view at the end (showing "now")
-    // User can then scroll left to see earlier history
-    let right = Math.min(Date.now(), rightBound);
+    const now = Date.now();
+    let right = Math.min(now, rightBound);
     let left = right - span;
 
-    // Clamp to data boundaries
+    // Ensure we don't go before bot creation
     if (left < dataFirst) {
       left = dataFirst;
-      right = left + span;
-    }
-    if (right > rightBound) {
-      right = rightBound;
-      left = Math.max(dataFirst, right - span);
+      right = Math.min(left + span, rightBound);
     }
 
     setDomain({ left, right });
