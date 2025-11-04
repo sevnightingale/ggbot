@@ -219,6 +219,10 @@ function ForgeApp() {
       // Agent will define everything through conversation
       const agentConfig = {
         ...baseConfig,
+        trading: {
+          ...baseConfig.trading,
+          execution_mode: 'aster'  // Agents use Aster DEX for live trading
+        },
         decision: {
           analysis_frequency: 'agent_driven'
         },
