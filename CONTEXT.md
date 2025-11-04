@@ -1,805 +1,111 @@
-
-
-  page-9de0690c50fec3f0.js:1 🔍 API Call: getUserProfile to https://ggbots-api.nightingale.business/api/v2/user/profile
-page-9de0690c50fec3f0.js:1  GET https://ggbots-api.nightingale.business/api/v2/user/profile 502 (Bad Gateway)
-(anonymous) @ page-9de0690c50fec3f0.js:1
-await in (anonymous)
-retryWithBackoff @ page-9de0690c50fec3f0.js:1
-authenticatedFetch @ page-9de0690c50fec3f0.js:1
-getUserProfile @ page-9de0690c50fec3f0.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-oq @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-iS @ 4bd1b696-7b0de16f9be7d2e0.js:1
-(anonymous) @ 4bd1b696-7b0de16f9be7d2e0.js:1
-w @ 684-5885beaba1490ee8.js:1Understand this error
-page-9de0690c50fec3f0.js:1 📡 Response status: 502 Bad Gateway
-page-9de0690c50fec3f0.js:1  GET https://ggbots-api.nightingale.business/api/v2/config 502 (Bad Gateway)
-(anonymous) @ page-9de0690c50fec3f0.js:1
-await in (anonymous)
-retryWithBackoff @ page-9de0690c50fec3f0.js:1
-authenticatedFetch @ page-9de0690c50fec3f0.js:1
-listConfigs @ page-9de0690c50fec3f0.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-oq @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-iS @ 4bd1b696-7b0de16f9be7d2e0.js:1
-(anonymous) @ 4bd1b696-7b0de16f9be7d2e0.js:1
-w @ 684-5885beaba1490ee8.js:1Understand this error
-684-5885beaba1490ee8.js:1 ❌ API Error: <html>
-<head><title>502 Bad Gateway</title></head>
-<body>
-<center><h1>502 Bad Gateway</h1></center>
-<hr><center>nginx/1.18.0 (Ubuntu)</center>
-</body>
-</html>
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-
-(anonymous) @ 684-5885beaba1490ee8.js:1
-getUserProfile @ page-9de0690c50fec3f0.js:1
-await in getUserProfile
-(anonymous) @ page-9de0690c50fec3f0.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-oq @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-iS @ 4bd1b696-7b0de16f9be7d2e0.js:1
-(anonymous) @ 4bd1b696-7b0de16f9be7d2e0.js:1
-w @ 684-5885beaba1490ee8.js:1Understand this error
-684-5885beaba1490ee8.js:1 💥 Network error: Error: Failed to load user profile: <html>
-<head><title>502 Bad Gateway</title></head>
-<body>
-<center><h1>502 Bad Gateway</h1></center>
-<hr><center>nginx/1.18.0 (Ubuntu)</center>
-</body>
-</html>
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-
-    at i.getUserProfile (page-9de0690c50fec3f0.js:1:4125)
-    at async page-9de0690c50fec3f0.js:1:10397
-(anonymous) @ 684-5885beaba1490ee8.js:1
-getUserProfile @ page-9de0690c50fec3f0.js:1
-await in getUserProfile
-(anonymous) @ page-9de0690c50fec3f0.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-oq @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-iS @ 4bd1b696-7b0de16f9be7d2e0.js:1
-(anonymous) @ 4bd1b696-7b0de16f9be7d2e0.js:1
-w @ 684-5885beaba1490ee8.js:1Understand this error
-684-5885beaba1490ee8.js:1 Failed to load user profile: Error: Failed to load user profile: <html>
-<head><title>502 Bad Gateway</title></head>
-<body>
-<center><h1>502 Bad Gateway</h1></center>
-<hr><center>nginx/1.18.0 (Ubuntu)</center>
-</body>
-</html>
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-
-    at i.getUserProfile (page-9de0690c50fec3f0.js:1:4125)
-    at async page-9de0690c50fec3f0.js:1:10397
-(anonymous) @ 684-5885beaba1490ee8.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-await in (anonymous)
-(anonymous) @ page-9de0690c50fec3f0.js:1
-oq @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-iS @ 4bd1b696-7b0de16f9be7d2e0.js:1
-(anonymous) @ 4bd1b696-7b0de16f9be7d2e0.js:1
-w @ 684-5885beaba1490ee8.js:1Understand this error
-dashboard-stream:1  GET https://ggbots-api.nightingale.business/api/dashboard-stream?token=eyJhbGciOiJIUzI1NiIsImtpZCI6IkJUQVBRc2pxZGMrVGFEVTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2NpaW5hdXh0bmt3ZXllYnlodWNsLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzZDQ3YzE3My05MjM0LTQ3YzctYjU3Yi05MTU5YzlkZjVkYmQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYyMTU1MTg5LCJpYXQiOjE3NjIxNTE1ODksImVtYWlsIjoic2V2bmlnaHRpbmdhbGVAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCIsImdvb2dsZSJdfSwidXNlcl9tZXRhZGF0YSI6eyJhdmF0YXJfdXJsIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS3NqeTlBOFJVX3VCbVIwaUpmdDl1S2d6ZDFPSUwwSnNiVkE2b1FpWWIwTTdXLTNNNTE9czk2LWMiLCJlbWFpbCI6InNldm5pZ2h0aW5nYWxlQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiJTZXYgTmlnaHRpbmdhbGUiLCJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYW1lIjoiU2V2IE5pZ2h0aW5nYWxlIiwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS3NqeTlBOFJVX3VCbVIwaUpmdDl1S2d6ZDFPSUwwSnNiVkE2b1FpWWIwTTdXLTNNNTE9czk2LWMiLCJwcm92aWRlcl9pZCI6IjExMzM0Njk2MDMzMjI0Nzk3ODYzOCIsInN1YiI6IjExMzM0Njk2MDMzMjI0Nzk3ODYzOCJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6Im9hdXRoIiwidGltZXN0YW1wIjoxNzYyMDEwNDE1fV0sInNlc3Npb25faWQiOiI1ODUwMmMwOS03ZWFjLTRiYWQtYWNiNy1kMzJkNmZjMTk3ZjQiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.G30Uzn45sbyOjN4ILQnXyuMvF_iFSlJyach-GSzaLKA 502 (Bad Gateway)Understand this error
-684-5885beaba1490ee8.js:1 ❌ SSE connection error: Event {isTrusted: true, type: 'error', target: EventSource, currentTarget: EventSource, eventPhase: 2, …}
-(anonymous) @ 684-5885beaba1490ee8.js:1
-push.81638.t.onerror @ page-9de0690c50fec3f0.js:1Understand this error
-page-9de0690c50fec3f0.js:1 🔄 SSE reconnecting in 5s (attempt 1)...
-684-5885beaba1490ee8.js:1 ❌ Failed to load/create bot: Error: Failed to list configs: <html>
-<head><title>502 Bad Gateway</title></head>
-<body>
-<center><h1>502 Bad Gateway</h1></center>
-<hr><center>nginx/1.18.0 (Ubuntu)</center>
-</body>
-</html>
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-<!-- a padding to disable MSIE and Chrome friendly error page -->
-
-    at i.listConfigs (page-9de0690c50fec3f0.js:1:2387)
-    at async page-9de0690c50fec3f0.js:1:157776
-(anonymous) @ 684-5885beaba1490ee8.js:1
-(anonymous) @ page-9de0690c50fec3f0.js:1
-await in (anonymous)
-(anonymous) @ page-9de0690c50fec3f0.js:1
-oq @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-um @ 4bd1b696-7b0de16f9be7d2e0.js:1
-uh @ 4bd1b696-7b0de16f9be7d2e0.js:1
-iS @ 4bd1b696-7b0de16f9be7d2e0.js:1
-(anonymous) @ 4bd1b696-7b0de16f9be7d2e0.js:1
-w @ 684-5885beaba1490ee8.js:1Understand this error
-dashboard-stream:1  GET https://ggbots-api.nightingale.business/api/dashboard-stream?token=eyJhbGciOiJIUzI1NiIsImtpZCI6IkJUQVBRc2pxZGMrVGFEVTYiLCJ0eXAiOiJKV1QifQ.eyJpc3MiOiJodHRwczovL2NpaW5hdXh0bmt3ZXllYnlodWNsLnN1cGFiYXNlLmNvL2F1dGgvdjEiLCJzdWIiOiIzZDQ3YzE3My05MjM0LTQ3YzctYjU3Yi05MTU5YzlkZjVkYmQiLCJhdWQiOiJhdXRoZW50aWNhdGVkIiwiZXhwIjoxNzYyMTU1MTg5LCJpYXQiOjE3NjIxNTE1ODksImVtYWlsIjoic2V2bmlnaHRpbmdhbGVAZ21haWwuY29tIiwicGhvbmUiOiIiLCJhcHBfbWV0YWRhdGEiOnsicHJvdmlkZXIiOiJlbWFpbCIsInByb3ZpZGVycyI6WyJlbWFpbCIsImdvb2dsZSJdfSwidXNlcl9tZXRhZGF0YSI6eyJhdmF0YXJfdXJsIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS3NqeTlBOFJVX3VCbVIwaUpmdDl1S2d6ZDFPSUwwSnNiVkE2b1FpWWIwTTdXLTNNNTE9czk2LWMiLCJlbWFpbCI6InNldm5pZ2h0aW5nYWxlQGdtYWlsLmNvbSIsImVtYWlsX3ZlcmlmaWVkIjp0cnVlLCJmdWxsX25hbWUiOiJTZXYgTmlnaHRpbmdhbGUiLCJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20iLCJuYW1lIjoiU2V2IE5pZ2h0aW5nYWxlIiwicGhvbmVfdmVyaWZpZWQiOmZhbHNlLCJwaWN0dXJlIjoiaHR0cHM6Ly9saDMuZ29vZ2xldXNlcmNvbnRlbnQuY29tL2EvQUNnOG9jS3NqeTlBOFJVX3VCbVIwaUpmdDl1S2d6ZDFPSUwwSnNiVkE2b1FpWWIwTTdXLTNNNTE9czk2LWMiLCJwcm92aWRlcl9pZCI6IjExMzM0Njk2MDMzMjI0Nzk3ODYzOCIsInN1YiI6IjExMzM0Njk2MDMzMjI0Nzk3ODYzOCJ9LCJyb2xlIjoiYXV0aGVudGljYXRlZCIsImFhbCI6ImFhbDEiLCJhbXIiOlt7Im1ldGhvZCI6Im9hdXRoIiwidGltZXN0YW1wIjoxNzYyMDEwNDE1fV0sInNlc3Npb25faWQiOiI1ODUwMmMwOS03ZWFjLTRiYWQtYWNiNy1kMzJkNmZjMTk3ZjQiLCJpc19hbm9ueW1vdXMiOmZhbHNlfQ.G30Uzn45sbyOjN4ILQnXyuMvF_iFSlJyach-GSzaLKA 502 (Bad Gateway)Understand this error
-684-5885beaba1490ee8.js:1 ❌ SSE connection error: Event {isTrusted: true, type: 'error', target: EventSource, curr
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] inDomainSeries recalculating
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log state: null
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] log?.balanceTimeseries: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] balanceTimeseries length: undefined
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] No data at all
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Y-extent raw min/max: 0 100
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Using normal padding: 10
+/api/v2/config/bb2560fd-b053-464f-8a58-8e254e4d36fa:1  Failed to load resource: the server responded with a status of 500 ()Understand this error
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Failed to fetch strategy: 500
+(anonymous) @ page-89a2d3ebbe8e713f.js:1Understand this warning
+bb2560fd-b053-464f-8a58-8e254e4d36fa:1  Failed to load resource: the server responded with a status of 500 ()Understand this error
+/api/v2/config/bb2560fd-b053-464f-8a58-8e254e4d36fa:1  Failed to load resource: the server responded with a status of 500 ()Understand this error
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] Failed to fetch strategy: 500
+(anonymous) @ page-89a2d3ebbe8e713f.js:1Understand this warning
+bb2560fd-b053-464f-8a58-8e254e4d36fa:1  Failed to load resource: the server responded with a status of 500 ()Understand this error
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] API Response - Activities: 87 items
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] API Response - Balance series: 2 points
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] API Response - First balance point: Object
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] API Response - Last balance point: Object
+page-89a2d3ebbe8e713f.js:1 [ActivityTimeline] API Response - Metadata: Object
