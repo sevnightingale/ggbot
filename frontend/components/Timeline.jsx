@@ -2,6 +2,13 @@
 "use client";
 import React, {useEffect, useMemo, useRef, useState} from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import dynamic from 'next/dynamic';
+
+// Dynamically import TradingView chart (client-side only)
+const BalanceChartTV = dynamic(
+  () => import('./BalanceChartTV'),
+  { ssr: false }
+);
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // =====================================================
@@ -229,12 +236,12 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
           activities: activities.activities || [],
           balanceTimeseries: balanceSeries.balance_series || [],
           metadata: {
-            botName: metadata.bot_name || metadata.botName || 'Unknown Bot',
-            startingBalance: metadata.startingBalance || metadata.starting_balance || 0,
-            currentBalance: metadata.currentBalance || metadata.current_balance || 0,
-            totalTrades: metadata.totalTrades || metadata.total_trades || 0,
-            winRate: metadata.winRate || metadata.win_rate || 0,
-            performance: metadata.performance || 0
+            botName: metadata.metadata?.botName || metadata.bot_name || metadata.botName || 'Unknown Bot',
+            startingBalance: metadata.metadata?.startingBalance || metadata.startingBalance || metadata.starting_balance || 0,
+            currentBalance: metadata.metadata?.currentBalance || metadata.currentBalance || metadata.current_balance || 0,
+            totalTrades: metadata.metadata?.totalTrades || metadata.totalTrades || metadata.total_trades || 0,
+            winRate: metadata.metadata?.winRate || metadata.winRate || metadata.win_rate || 0,
+            performance: metadata.metadata?.performance || metadata.performance || 0
           }
         });
 
@@ -253,16 +260,8 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
     fetchData();
   }, [configId, session]);
 
-  // ---- Sizing (mobile-friendly)
-  const containerRef = useRef(null);
-  const canvasRef = useRef(null);
-  const overlayRef = useRef(null);
-  const [size, setSize] = useState({w:1200,h:480});
-  useEffect(()=>{
-    const obs=new ResizeObserver(()=>{ const el=containerRef.current; if(!el) return; setSize({w: el.clientWidth, h: el.clientHeight}); });
-    if(containerRef.current) obs.observe(containerRef.current);
-    return ()=>obs.disconnect();
-  },[]);
+  // Chart container ref (TradingView handles its own sizing)
+  const chartContainerRef = useRef(null);
 
   // ---- Derived series
   const seriesMs = useMemo(()=> log?.balanceTimeseries?.map(p=> new Date(p.timestamp).getTime()) ?? [], [log]);
@@ -552,16 +551,21 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
               >
                 Toggle All
               </button>
-              <div className="font-mono text-[11px] mt-3" style={{ color: 'rgba(237,235,231,0.6)' }}>Wheel = scroll • Shift+Wheel = zoom • Drag = pan</div>
+              <div className="font-mono text-[11px] mt-3" style={{ color: 'rgba(237,235,231,0.6)' }}>Click markers to view details • Scroll to zoom • Drag to pan</div>
             </div>
           </aside>
 
           {/* RIGHT – Chart */}
           <div className="col-span-12 md:col-span-9 min-h-[360px] sm:min-h-[420px]">
             <div className="rounded-xl border h-full relative overflow-hidden" style={{ backgroundColor: theme.carbon, borderColor: theme.hair }}>
-              <div ref={containerRef} className="absolute inset-0">
-                <canvas ref={canvasRef} className="absolute inset-0 w-full h-full"/>
-                <canvas ref={overlayRef} className="absolute inset-0 w-full h-full pointer-events-none"/>
+              <div ref={chartContainerRef} className="absolute inset-0">
+                {log?.balanceTimeseries && log?.activities && (
+                  <BalanceChartTV
+                    balanceData={log.balanceTimeseries}
+                    activities={log.activities}
+                    onActivityClick={(activity) => setSelected([activity])}
+                  />
+                )}
               </div>
             </div>
           </div>

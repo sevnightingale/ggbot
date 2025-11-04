@@ -201,23 +201,14 @@ async def get_balance_series(
                 """, (config_id,))
                 paper_trades = cur.fetchall()
 
-                # Get Aster trade IDs for this config from live_trades table
+                # Check if this is an Aster bot
                 cur.execute("""
-                    SELECT batch_id, created_at, closed_at
-                    FROM live_trades
-                    WHERE config_id = %s AND provider = 'aster' AND closed_at IS NOT NULL
-                    ORDER BY closed_at
+                    SELECT trading_mode FROM configurations WHERE config_id = %s
                 """, (config_id,))
-                aster_trade_records = cur.fetchall()
+                trading_row = cur.fetchone()
+                is_aster = trading_row and trading_row[0] == 'aster'
 
-        # Get Aster trades from API (if user is trading on Aster)
-        aster_service = AsterDEXV3LiveTradingService()
-        aster_trades_raw = await aster_service.get_user_trades(limit=1000)
-
-        # Build set of trade IDs belonging to this config
-        aster_trade_ids = {str(record[0]) for record in aster_trade_records}
-
-        # Build unified trade list with timestamps and P&L
+        # Get Aster trades from API (if Aster bot)
         all_trades = []
 
         # Add paper trades
@@ -228,24 +219,25 @@ async def get_balance_series(
                 "pnl": float(realized_pnl)
             })
 
-        # Add Aster trades (filter by config_id using live_trades mapping)
-        if aster_trades_raw and aster_trade_ids:
-            for aster_trade in aster_trades_raw:
-                # Check if this trade belongs to our config
-                trade_id = str(aster_trade.get('id', ''))
-                if trade_id not in aster_trade_ids:
-                    continue
+        # Add Aster trades (account-wide, only with non-zero P&L)
+        if is_aster:
+            aster_service = AsterDEXV3LiveTradingService()
+            aster_trades_raw = await aster_service.get_user_trades(limit=1000)
 
-                # Aster trades have 'time' in milliseconds
-                trade_time_ms = aster_trade.get('time', 0)
-                trade_time = datetime.fromtimestamp(trade_time_ms / 1000, tz=timezone.utc) if trade_time_ms else None
+            for aster_trade in (aster_trades_raw or []):
                 realized_pnl = float(aster_trade.get('realizedPnl', 0))
 
-                if trade_time:
-                    all_trades.append({
-                        "timestamp": trade_time,
-                        "pnl": realized_pnl
-                    })
+                # Only include trades with actual P&L (position closes)
+                if realized_pnl != 0:
+                    # Aster trades have 'time' in milliseconds
+                    trade_time_ms = aster_trade.get('time', 0)
+                    trade_time = datetime.fromtimestamp(trade_time_ms / 1000, tz=timezone.utc) if trade_time_ms else None
+
+                    if trade_time:
+                        all_trades.append({
+                            "timestamp": trade_time,
+                            "pnl": realized_pnl
+                        })
 
         # Sort all trades by timestamp
         all_trades.sort(key=lambda x: x['timestamp'])
@@ -408,10 +400,10 @@ async def get_timeline_metadata(
                 created_at = config_row[2]
                 trading_mode = config_row[3] or 'paper'
 
-                # Get Aster trade IDs for this config
+                # Get Aster trade IDs for this config (CLOSED trades only for metrics)
                 cur.execute("""
                     SELECT batch_id FROM live_trades
-                    WHERE config_id = %s AND provider = 'aster'
+                    WHERE config_id = %s AND provider = 'aster' AND closed_at IS NOT NULL
                 """, (config_id,))
                 aster_trade_ids = {str(row[0]) for row in cur.fetchall()}
 
@@ -430,13 +422,18 @@ async def get_timeline_metadata(
                         current_balance = float(asset.get('availableBalance', 0))
                         break
 
-            # Get Aster trades for this config only
+            # Get ALL Aster trades for this account
+            # Note: Aster doesn't distinguish between configs - it's account-wide
+            # So we calculate total P&L across all trades
             all_aster_trades = await aster_service.get_user_trades(limit=1000)
-            config_trades = [t for t in (all_aster_trades or []) if str(t.get('id', '')) in aster_trade_ids]
 
-            total_trades = len(config_trades)
-            win_trades = sum(1 for t in config_trades if float(t.get('realizedPnl', 0)) >= 0)
-            total_pnl = sum(float(t.get('realizedPnl', 0)) for t in config_trades)
+            # Calculate account-wide metrics
+            total_pnl = sum(float(t.get('realizedPnl', 0)) for t in (all_aster_trades or []))
+
+            # Count only trades with non-zero P&L (actual position closes)
+            closed_trades = [t for t in (all_aster_trades or []) if float(t.get('realizedPnl', 0)) != 0]
+            total_trades = len(closed_trades)
+            win_trades = sum(1 for t in closed_trades if float(t.get('realizedPnl', 0)) > 0)
             win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
 
             # Calculate starting balance
@@ -445,7 +442,7 @@ async def get_timeline_metadata(
             return {
                 "status": "success",
                 "metadata": {
-                    "bot_name": config_name,
+                    "botName": config_name,  # Use camelCase for frontend
                     "startingBalance": starting_balance,
                     "currentBalance": current_balance,  # Actual Aster balance
                     "totalTrades": total_trades,
