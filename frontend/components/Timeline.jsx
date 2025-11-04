@@ -321,12 +321,20 @@ export default function Timeline({ configId, title }){
           <div className="col-span-12 md:col-span-9 min-h-[360px] sm:min-h-[420px]">
             <div className="rounded-xl border h-full relative overflow-hidden" style={{ backgroundColor: theme.carbon, borderColor: theme.hair }}>
               <div ref={chartContainerRef} className="absolute inset-0">
-                {log?.balanceTimeseries && log?.activities && (
+                {log?.balanceTimeseries && Array.isArray(log.balanceTimeseries) && log.balanceTimeseries.length > 0 &&
+                 log?.activities && Array.isArray(log.activities) ? (
                   <BalanceChartTV
                     balanceData={log.balanceTimeseries}
                     activities={log.activities}
                     onActivityClick={(activity) => setSelected([activity])}
                   />
+                ) : (
+                  <div className="flex items-center justify-center h-full" style={{ color: theme.hair }}>
+                    <div className="text-center">
+                      <p className="text-sm">No chart data available</p>
+                      <p className="text-xs mt-2">Waiting for trades...</p>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>

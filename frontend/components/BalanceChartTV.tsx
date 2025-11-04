@@ -70,6 +70,14 @@ export default function BalanceChartTV({
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    // Log data for debugging
+    console.log('[BalanceChartTV] Received data:', {
+      balanceDataLength: balanceData?.length,
+      activitiesLength: activities?.length,
+      firstBalance: balanceData?.[0],
+      firstActivity: activities?.[0]
+    });
+
     // Create chart with Trade37 styling
     const chart = createChart(chartContainerRef.current, {
       width: chartContainerRef.current.clientWidth,
@@ -124,18 +132,42 @@ export default function BalanceChartTV({
     });
 
     // Convert balance data (timestamp in SECONDS for TradingView)
-    const chartData: LineData[] = balanceData.map(point => ({
-      time: Math.floor(new Date(point.timestamp).getTime() / 1000) as Time,
-      value: point.balance,
-    }));
+    // Filter out null/invalid values and sort by time
+    const chartData: LineData[] = balanceData
+      .filter(point => {
+        if (!point || point.balance == null || !point.timestamp) return false;
+        const time = new Date(point.timestamp).getTime();
+        return !isNaN(time) && isFinite(point.balance);
+      })
+      .map(point => ({
+        time: Math.floor(new Date(point.timestamp).getTime() / 1000) as Time,
+        value: point.balance,
+      }))
+      .sort((a, b) => (a.time as number) - (b.time as number));
+
+    console.log('[BalanceChartTV] Processed chart data:', {
+      originalLength: balanceData.length,
+      filteredLength: chartData.length,
+      chartData: chartData.slice(0, 3)  // Log first 3 points
+    });
+
+    // Don't render if no valid data
+    if (chartData.length === 0) {
+      console.error('[BalanceChartTV] No valid chart data after filtering');
+      chart.remove();
+      return;
+    }
 
     lineSeries.setData(chartData);
 
     // Create markers from activities
+    // Filter out invalid activities and sort by time
     const markers: SeriesMarker<Time>[] = activities
       .filter(activity => {
-        // Filter out low-priority activities if needed
-        return activity.priority <= 2;
+        // Filter out null/invalid activities
+        if (!activity || !activity.timestamp || activity.priority > 2) return false;
+        const time = new Date(activity.timestamp).getTime();
+        return !isNaN(time);
       })
       .map(activity => {
         const markerConfig = getMarkerConfig(activity.type);
@@ -147,10 +179,19 @@ export default function BalanceChartTV({
           shape: markerConfig.shape,
           text: markerConfig.text,
         };
-      });
+      })
+      .sort((a, b) => (a.time as number) - (b.time as number));
+
+    console.log('[BalanceChartTV] Processed markers:', {
+      originalLength: activities.length,
+      filteredLength: markers.length,
+      markers: markers.slice(0, 3)  // Log first 3 markers
+    });
 
     // Add markers using v5 plugin API
-    createSeriesMarkers(lineSeries, markers);
+    if (markers.length > 0) {
+      createSeriesMarkers(lineSeries, markers);
+    }
     chart.timeScale().fitContent();
 
     chartRef.current = chart;
