@@ -417,7 +417,9 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     const obs = new ResizeObserver(() => {
       const el = containerRef.current;
       if (!el) return;
-      setSize({ w: el.clientWidth, h: el.clientHeight });
+      const newSize = { w: el.clientWidth, h: el.clientHeight };
+      console.log('[Timeline] Container size:', newSize);
+      setSize(newSize);
     });
     if (containerRef.current) obs.observe(containerRef.current);
     return () => obs.disconnect();
@@ -481,6 +483,8 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const padL = 56, padR = 16, padT = 24, padB = 28;
   const chartW = Math.max(10, size.w - padL - padR);
   const chartH = Math.max(10, size.h - padT - padB);
+
+  console.log('[Timeline] Chart dimensions - size.h:', size.h, 'chartH:', chartH, 'padT:', padT, 'padB:', padB);
 
   function xScale(ms: number) {
     const t = (ms - domain.left) / (domain.right - domain.left);
