@@ -43,8 +43,6 @@ const VIBE = {
  * @typedef {{activities: ActivityItem[]; balanceTimeseries: BalancePoint[]; metadata: {botName: string; startingBalance: number; currentBalance: number; totalTrades: number; winRate: number; performance: number;}}} ActivityLog
  */
 
-// Zoom presets (UI only - TradingView handles actual zoom)
-const ZOOMS = ["1h","4h","1d","1w","All"];
 
  // React SVG counterparts for panel & buttons
  const Svg = {
@@ -97,7 +95,7 @@ function glyphIdFor(t){
 // -----------------------------
 // Component
 // -----------------------------
-export default function Timeline({ configId, title, initialZoom = '4h' }){
+export default function Timeline({ configId, title }){
   // No theme lookup: fixed palette
   const theme = VIBE;
 
@@ -107,7 +105,6 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
   const [session, setSession] = useState(null);
   const [strategy, setStrategy] = useState(null);
   const [showStrategy, setShowStrategy] = useState(false);
-  const [zoom, setZoom] = useState(initialZoom);
   const [selected, setSelected] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState(()=>{
@@ -275,21 +272,6 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
                   <span>View Configuration</span>
                 </button>
               )}
-              <div className="inline-flex rounded-lg overflow-hidden border" style={{ backgroundColor: theme.carbon, borderColor: theme.hair }}>
-                {ZOOMS.map(z=> (
-                  <button key={z} onClick={()=>setZoom(z)}
-                    className={`px-3 py-1.5 text-xs sm:text-sm transition-colors`}
-                    style={ z===zoom ? { backgroundColor: theme.brass, color: '#0B0B0C' } : { color: theme.ivory } }
-                  >
-                    {z}
-                  </button>
-                ))}
-              </div>
-              <button onClick={jumpToNow} className="px-3 py-1.5 text-xs sm:text-sm rounded-lg border"
-                style={{ borderColor: theme.hair, color: theme.ivory }}
-              >
-                Jump to Now
-              </button>
               {/* Mobile Filters toggle */}
               <button onClick={()=> setMobileFiltersOpen(true)} className="md:hidden px-3 py-1.5 text-xs sm:text-sm rounded-lg border" style={{ borderColor: theme.hair }}>
                 Filters
