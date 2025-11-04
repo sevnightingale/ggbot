@@ -86,6 +86,11 @@ const ICONS = {
   memo: "\uD83D\uDCDD",               // 📝 U+1F4DD
   wrench: "\uD83D\uDD27",             // 🔧 U+1F527
   close: "\u2715",                    // ✕ U+2715
+  eye: "\uD83D\uDC41\uFE0F",         // 👁️ U+1F441 U+FE0F
+  warning: "\u26A0\uFE0F",            // ⚠️ U+26A0 U+FE0F
+  lightbulb: "\uD83D\uDCA1",          // 💡 U+1F4A1
+  clipboard: "\uD83D\uDCCB",          // 📋 U+1F4CB
+  sleeping: "\uD83D\uDE34",           // 😴 U+1F634
 } as const;
 
 // --------- Theme (ggbots colors) ---------
@@ -190,6 +195,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const overlayRef = useRef<HTMLCanvasElement>(null);
+  const hoverRef = useRef<{cx:number; cy:number; R:number; color:string; icon:string} | null>(null);
 
   // API data state
   const [log, setLog] = useState<MockActivityLog | null>(null);
@@ -251,13 +257,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           throw new Error('API returned error status');
         }
 
-        // DEBUG: Log API responses
-        console.log('[ActivityTimeline] API Response - Activities:', activities.activities?.length, 'items');
-        console.log('[ActivityTimeline] API Response - Balance series:', balanceSeries.balance_series?.length, 'points');
-        console.log('[ActivityTimeline] API Response - First balance point:', balanceSeries.balance_series?.[0]);
-        console.log('[ActivityTimeline] API Response - Last balance point:', balanceSeries.balance_series?.[balanceSeries.balance_series.length - 1]);
-        console.log('[ActivityTimeline] API Response - Metadata:', metadata.metadata);
-
         // Transform API response to match MockActivityLog interface
         setLog({
           activities: activities.activities,
@@ -295,12 +294,10 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
         // Handle 403 gracefully (public viewing doesn't have strategy access)
         if (response.status === 403) {
-          console.log('[ActivityTimeline] Strategy endpoint requires auth (public view)');
           return;
         }
 
         if (!response.ok) {
-          console.warn('[ActivityTimeline] Failed to fetch strategy:', response.status);
           return;
         }
 
@@ -364,37 +361,24 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return balances;
   }, [log]);
 
-  const dataFirst = seriesMs[0] || Date.now() - 24*60*60*1000;
-  const dataLast = seriesMs[seriesMs.length - 1] || Date.now();
+  const dataFirst = useMemo(() => seriesMs[0] || Date.now() - 24*60*60*1000, [seriesMs]);
+  const dataLast = useMemo(() => seriesMs[seriesMs.length - 1] || Date.now(), [seriesMs]);
 
   const rules = ZOOM_RULES[zoom];
 
   // Calculate the right boundary with 25% buffer beyond "now"
   // This allows scrolling past current time like TradingView
   const rightBound = useMemo(() => {
-    console.log('[ActivityTimeline] rightBound calculation:');
-    console.log('  dataFirst:', dataFirst, new Date(dataFirst).toISOString());
-    console.log('  dataLast:', dataLast, new Date(dataLast).toISOString());
     const totalDataSpan = dataLast - dataFirst;
-    console.log('  totalDataSpan:', totalDataSpan, 'ms =', (totalDataSpan / 3600000).toFixed(2), 'hours');
     const buffer = Math.round(totalDataSpan * FUTURE_PAD_RATIO);
-    console.log('  buffer:', buffer, 'ms');
     const result = dataLast + buffer;
-    console.log('  rightBound result:', result, new Date(result).toISOString());
     return result;
   }, [dataFirst, dataLast]);
 
   // Recompute domain when zoom changes or data loads
   useEffect(() => {
-    console.log('[ActivityTimeline] Domain calculation useEffect triggered');
-    console.log('  zoom:', zoom, 'spanMs:', rules.spanMs);
-    console.log('  dataFirst:', dataFirst, new Date(dataFirst).toISOString());
-    console.log('  dataLast:', dataLast, new Date(dataLast).toISOString());
-    console.log('  rightBound:', rightBound, new Date(rightBound).toISOString());
-
     // "All" zoom: show full history from bot creation to now + buffer
     if (rules.spanMs === "all") {
-      console.log('  Setting domain for "All" zoom: left =', new Date(dataFirst).toISOString(), 'right =', new Date(rightBound).toISOString());
       setDomain({ left: dataFirst, right: rightBound });
       return;
     }
@@ -436,21 +420,9 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   const inDomainSeries = useMemo(() => {
     const { left, right } = domain;
 
-    // DEBUG: Log the entire log object to diagnose issues
-    console.log('[ActivityTimeline] inDomainSeries recalculating');
-    console.log('[ActivityTimeline] log state:', log);
-    console.log('[ActivityTimeline] log?.balanceTimeseries:', log?.balanceTimeseries);
-    console.log('[ActivityTimeline] balanceTimeseries length:', log?.balanceTimeseries?.length);
-
     // If we have real balance data, use it
     if (log?.balanceTimeseries && log.balanceTimeseries.length > 0) {
       const series = log.balanceTimeseries;
-
-      // DEBUG: Log the full series
-      console.log('[ActivityTimeline] Full balance series:', series.length, 'points');
-      console.log('[ActivityTimeline] Domain:', new Date(left).toISOString(), 'to', new Date(right).toISOString());
-      console.log('[ActivityTimeline] First point:', series[0]);
-      console.log('[ActivityTimeline] Last point:', series[series.length - 1]);
 
       // Find points in domain + immediate neighbors for smooth line continuity
       const filtered: typeof series = [];
@@ -481,14 +453,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       // Ensure we have at least 2 points for a line
       if (filtered.length === 0 && series.length >= 2) {
         // Domain is outside data range - include first and last for context
-        console.log('[ActivityTimeline] Domain outside range, using first+last');
         return [series[0], series[series.length - 1]];
-      }
-
-      console.log('[ActivityTimeline] Filtered to', filtered.length, 'points for rendering');
-      if (filtered.length > 0) {
-        console.log('[ActivityTimeline] First filtered:', filtered[0]);
-        console.log('[ActivityTimeline] Last filtered:', filtered[filtered.length - 1]);
       }
 
       return filtered.length > 0 ? filtered : series;
@@ -496,15 +461,12 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
     // Otherwise create synthetic $0 baseline for activities to anchor to
     if (log?.activities && log.activities.length > 0 && seriesMs.length === 2) {
-      console.log('[ActivityTimeline] No balance data, using synthetic $0 baseline');
-      console.log('[ActivityTimeline] Synthetic range:', new Date(seriesMs[0]).toISOString(), 'to', new Date(seriesMs[1]).toISOString());
       return [
         { timestamp: new Date(seriesMs[0]).toISOString(), balance: 0 },
         { timestamp: new Date(seriesMs[1]).toISOString(), balance: 0 }
       ];
     }
 
-    console.log('[ActivityTimeline] No data at all');
     return [];
   }, [log, domain, seriesMs]);
 
@@ -526,8 +488,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     }
     if (!isFinite(min)||!isFinite(max)) { min=0; max=100; }
 
-    console.log('[ActivityTimeline] Y-extent raw min/max:', min, max);
-
     const span = max - min;
 
     // Ensure minimum meaningful range for chart visibility
@@ -537,7 +497,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     if (span < minRange) {
       // Center the data within minimum range
       const center = (min + max) / 2;
-      console.log('[ActivityTimeline] Span too small, using minimum range. Center:', center);
       return {
         min: center - minRange / 2,
         max: center + minRange / 2
@@ -546,7 +505,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
     // Normal case: add 10% padding
     const pad = span * 0.1;
-    console.log('[ActivityTimeline] Using normal padding:', pad);
     return { min: min - pad, max: max + pad };
   }, [inDomainSeries]);
 
@@ -660,7 +618,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     }
 
     // Equity line
-    console.log('[ActivityTimeline] Drawing equity line with', inDomainSeries.length, 'points');
     ctx.save();
     ctx.beginPath();
     let first=true;
@@ -668,12 +625,10 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       const x=xScale(new Date(p.timestamp).getTime());
       const y=yScale(p.balance);
       if(first){
-        console.log('[ActivityTimeline] Line starts at x:', x, 'y:', y, 'balance:', p.balance);
         ctx.moveTo(x,y);
         first=false;
       }
       else {
-        console.log('[ActivityTimeline] Line to x:', x, 'y:', y, 'balance:', p.balance);
         ctx.lineTo(x,y);
       }
     }
@@ -682,7 +637,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     ctx.strokeStyle=COLORS.positive;
     ctx.lineWidth=2;
     ctx.stroke();
-    console.log('[ActivityTimeline] Equity line drawn with color:', COLORS.positive);
     ctx.restore();
 
     // X labels
@@ -703,9 +657,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     const railHeights=[rules.railGap, rules.railGap*2, rules.railGap*3];
     const occupancy = new Array(cols).fill(0);
 
-    console.log('[ActivityTimeline] Drawing', bucketed.length, 'activity icons');
-    console.log('[ActivityTimeline] seriesMs length:', seriesMs.length, 'seriesVal length:', seriesVal.length);
-
     for (const g of bucketed){
       const px = xScale(g.bucketTs);
       if (px < padL || px > padL+chartW) continue;
@@ -718,10 +669,6 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       const anchorBal = linearInterpolateAt(g.bucketTs, seriesMs, seriesVal);
       let anchorY=yScale(anchorBal);
       anchorY=clamp(anchorY, padT, padT+chartH);
-
-      if (bucketed.indexOf(g) < 3) {
-        console.log('[ActivityTimeline] Icon', bucketed.indexOf(g), 'at time:', new Date(g.bucketTs).toISOString(), 'anchorBal:', anchorBal, 'anchorY:', anchorY);
-      }
 
       const upwards = anchorY - padT > padB + 80;
       const offset = railHeights[row];
@@ -799,6 +746,29 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       const dpr = window.devicePixelRatio || 1;
       ctx.setTransform(dpr,0,0,dpr,0,0);
       ctx.clearRect(0,0,overlay.width/dpr, overlay.height/dpr);
+
+      // Hover glow
+      const h = hoverRef.current;
+      if (h) {
+        ctx.save();
+        ctx.beginPath();
+        ctx.arc(h.cx, h.cy, h.R + 6, 0, Math.PI * 2);
+        ctx.fillStyle = COLORS.hoverGlow;
+        ctx.fill();
+
+        ctx.beginPath();
+        ctx.lineWidth = 2.5;
+        ctx.strokeStyle = h.color;
+        ctx.arc(h.cx, h.cy, h.R - 0.5, 0, Math.PI * 2);
+        ctx.stroke();
+
+        // Repaint icon on top
+        ctx.font = `${Math.max(14, h.R)}px "Apple Color Emoji","Segoe UI Emoji", system-ui`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(h.icon, h.cx, h.cy + 0.5);
+        ctx.restore();
+      }
 
       // Pulsing "now" dot
       const latestMs = dataLast;
@@ -880,7 +850,8 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
           if (inPosition) {
             const side = lastEntry.type === 'trade_entry_long' ? 'Long' : 'Short';
             const symbol = lastEntry.data.symbol || 'position';
-            statusText = `🟢 In ${side}: ${symbol}`;
+            const posIcon = lastEntry.type === 'trade_entry_long' ? ICONS.greenCircle : ICONS.redCircle;
+            statusText = `${posIcon} In ${side}: ${symbol}`;
             statusColor = lastEntry.type === 'trade_entry_long' ? COLORS.positive : COLORS.negative;
           } else if (latestActivity.type === 'agent_wait') {
             // Extract wait duration if available
@@ -888,32 +859,32 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
             if (details && details.duration_minutes) {
               const elapsed = minutesAgo;
               const remaining = Math.max(0, details.duration_minutes - elapsed);
-              statusText = remaining > 0 ? `⏱️ Waiting ${remaining}m` : `👁️ Monitoring`;
+              statusText = remaining > 0 ? `${ICONS.stopwatch} Waiting ${remaining}m` : `${ICONS.eye} Monitoring`;
               statusColor = "#64748b";
             } else {
-              statusText = `⏱️ Waiting`;
+              statusText = `${ICONS.stopwatch} Waiting`;
               statusColor = "#64748b";
             }
           } else if (latestActivity.type === 'market_query') {
             const symbol = latestActivity.data.symbol || 'markets';
-            statusText = `📊 Analyzing ${symbol}`;
+            statusText = `${ICONS.barChart} Analyzing ${symbol}`;
             statusColor = "#3b82f6";
           } else if (['analysis', 'reasoning', 'plan'].includes(latestActivity.type)) {
-            statusText = `💭 Thinking...`;
+            statusText = `${ICONS.thoughtBalloon} Thinking...`;
             statusColor = "#8b5cf6";
           } else if (latestActivity.type === 'trade_win' || latestActivity.type === 'trade_loss') {
             if (minutesAgo < 5) {
               const pnl = (latestActivity.data.details as unknown as {pnl?: number})?.pnl || 0;
               statusText = latestActivity.type === 'trade_win'
-                ? `📈 Won +$${Math.abs(pnl).toFixed(2)}`
-                : `📉 Lost -$${Math.abs(pnl).toFixed(2)}`;
+                ? `${ICONS.chartUp} Won +$${Math.abs(pnl).toFixed(2)}`
+                : `${ICONS.chartDown} Lost -$${Math.abs(pnl).toFixed(2)}`;
               statusColor = latestActivity.type === 'trade_win' ? COLORS.positive : COLORS.negative;
             } else {
-              statusText = `👁️ Monitoring`;
+              statusText = `${ICONS.eye} Monitoring`;
               statusColor = "#6b7280";
             }
           } else if (minutesAgo > 30) {
-            statusText = "😴 Idle";
+            statusText = `${ICONS.sleeping} Idle`;
             statusColor = "#64748b";
           } else {
             const def = ACTIVITY_DEFS[latestActivity.type];
@@ -980,12 +951,17 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     };
 
     const onMove = (e: PointerEvent) => {
-      // Show pointer cursor on hover
+      // Show pointer cursor on hover and track hover state
       const rect = c.getBoundingClientRect();
       const x = (e.clientX - rect.left);
       const y = (e.clientY - rect.top);
       const hit = hitBoxesRef.current.find(b => x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h);
       c.style.cursor = hit ? "pointer" : "default";
+
+      // Update hover state for overlay glow
+      hoverRef.current = hit
+        ? { cx: hit.cx, cy: hit.cy, R: hit.R, color: hit.color, icon: hit.icon }
+        : null;
 
       if (!isDragging) return;
       const dx = e.clientX - lastX;
@@ -1085,7 +1061,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return (
       <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
         <div className="text-center">
-          <div className="text-4xl mb-4">⚠️</div>
+          <div className="text-4xl mb-4">{ICONS.warning}</div>
           <div className="text-xl text-bone-200 mb-2">Failed to Load Timeline</div>
           <div className="text-bone-400">{error}</div>
         </div>
@@ -1098,7 +1074,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     return (
       <div className="w-full h-screen flex items-center justify-center bg-charcoal-900">
         <div className="text-center">
-          <div className="text-4xl mb-4">📊</div>
+          <div className="text-4xl mb-4">{ICONS.barChart}</div>
           <div className="text-xl text-bone-200 mb-2">No Activity Yet</div>
           <div className="text-bone-400">Activities will appear here once the bot starts trading</div>
         </div>
@@ -1156,7 +1132,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
               className="px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10"
               onClick={()=>setShowStrategy(true)}
             >
-              📋 View Strategy
+              {ICONS.clipboard} View Strategy
             </button>
           )}
           <button
@@ -1240,7 +1216,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
             {/* Navigation hint */}
             <div className="text-xs text-white/40 pt-2">
-              💡 <span className="text-white/50">Wheel to scroll • Shift+Wheel to zoom • Drag to pan</span>
+              {ICONS.lightbulb} <span className="text-white/50">Wheel to scroll • Shift+Wheel to zoom • Drag to pan</span>
             </div>
           </div>
 
