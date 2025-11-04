@@ -485,19 +485,20 @@ async def get_positions(
             aster_service = AsterDEXV3LiveTradingService()
             aster_positions = await aster_service.get_open_positions(config_id)
 
-            # Transform Aster positions to match expected format
+            # Aster service already transforms to snake_case, just need to normalize field names for agent
             positions = []
             for pos in aster_positions:
                 positions.append({
                     'symbol': pos.get('symbol'),
-                    'side': 'long' if float(pos.get('positionAmt', 0)) > 0 else 'short',
-                    'entry_price': float(pos.get('entryPrice', 0)),
-                    'current_price': float(pos.get('markPrice', 0)),
-                    'size': abs(float(pos.get('positionAmt', 0))),
-                    'unrealized_pnl': float(pos.get('unrealizedProfit', 0)),
-                    'unrealized_pnl_percentage': float(pos.get('unRealizedProfit', 0)) / abs(float(pos.get('notional', 1))) * 100 if pos.get('notional') else 0,
-                    'opened_at': pos.get('updateTime'),  # Aster doesn't track open time, use last update
-                    'leverage': int(pos.get('leverage', 1))
+                    'side': pos.get('side', '').lower(),  # Already transformed by service
+                    'entry_price': float(pos.get('entry_price', 0)),
+                    'current_price': float(pos.get('mark_price', 0)),
+                    'size': float(pos.get('size', 0)),
+                    'unrealized_pnl': float(pos.get('unrealized_pnl', 0)),
+                    'unrealized_pnl_percentage': float(pos.get('unrealized_pnl', 0)) / abs(float(pos.get('size', 1)) * float(pos.get('entry_price', 1))) * 100 if pos.get('size') and pos.get('entry_price') else 0,
+                    'opened_at': None,  # Aster doesn't track open time
+                    'leverage': int(pos.get('leverage', 1)),
+                    'batch_id': pos.get('batch_id')  # Include batch_id if available
                 })
         else:
             # Symphony or other live trading

@@ -220,7 +220,7 @@ Be disciplined and execute the strategy faithfully.
 
             # Create options
             options = ClaudeAgentOptions(
-                model=os.getenv("AGENT_MODEL", "claude-haiku-4-5-20251001"),
+                model=os.getenv("AGENT_MODEL", "claude-sonnet-4-5-20250929"),
                 mcp_servers={"trading": mcp_server},
                 allowed_tools=[
                     "mcp__trading__query_market_data",
@@ -466,16 +466,72 @@ Be disciplined and execute the strategy faithfully.
         strategy = self.config.get('config_data', {}).get('agent_strategy', {}).get('content', 'Undefined')
         logger.info(f"Strategy: {strategy}")
 
+        # STARTUP CHECK: Get current state before agent starts
+        logger.info("Performing startup checks...")
+        startup_context = ""
+        try:
+            # Get account status
+            account_result = await self.api_client.get_account_status(config_id=self.config_id)
+            account = account_result.get('account', {})
+            trading_mode = account_result.get('trading_mode', 'unknown')
+            balance = account.get('balance', 0)
+
+            # Get open positions
+            positions_result = await self.api_client.get_positions(config_id=self.config_id)
+            positions = positions_result.get('positions', [])
+
+            # Log startup state to activity timeline
+            log_activity_safe(
+                config_id=self.config_id,
+                user_id=self.user_id,
+                activity_type='analysis',
+                activity_source='agent',
+                summary=f"Agent started - Balance: ${balance:.2f}, Open positions: {len(positions)}",
+                details={
+                    'thought': f"Agent restarted. Current state:\n- Trading Mode: {trading_mode}\n- Balance: ${balance:.2f}\n- Open Positions: {len(positions)}",
+                    'trading_mode': trading_mode,
+                    'balance': balance,
+                    'positions_count': len(positions)
+                }
+            )
+
+            # Build context for agent
+            startup_context = f"""
+## STARTUP STATE (as of {datetime.now().strftime('%Y-%m-%d %H:%M:%S UTC')}):
+- Trading Mode: {trading_mode.upper()}
+- Account Balance: ${balance:,.2f}
+- Open Positions: {len(positions)}
+"""
+
+            if positions:
+                startup_context += "\n**OPEN POSITIONS:**\n"
+                for pos in positions:
+                    side = pos.get('side', 'unknown').upper()
+                    symbol = pos.get('symbol', 'unknown')
+                    entry = pos.get('entry_price', 0)
+                    current = pos.get('current_price', 0)
+                    pnl = pos.get('unrealized_pnl', 0)
+                    pnl_pct = pos.get('unrealized_pnl_percentage', 0)
+                    startup_context += f"- {symbol} {side}: Entry ${entry:.2f}, Current ${current:.2f}, P&L ${pnl:.2f} ({pnl_pct:.2f}%)\n"
+            else:
+                startup_context += "- No open positions (clean slate)\n"
+
+            logger.info(f"Startup check complete: Balance=${balance:.2f}, Positions={len(positions)}")
+
+        except Exception as e:
+            logger.error(f"Startup check failed: {e}", exc_info=True)
+            startup_context = "\n## STARTUP STATE: Unable to retrieve current state (check failed)\n"
+
         # Initial prompt to start autonomous loop
         await client.query(f"""
 You are now in autonomous trading mode.
-
+{startup_context}
 Your strategy:
 {strategy}
 
 Begin autonomous execution:
-1. Check your current account status and positions
-2. Analyze market data for your trading pair
+1. Acknowledge your current state (positions, balance)
+2. Analyze market data for opportunities
 3. Execute your strategy (trade, close, or wait)
 4. Use wait_for() to control timing - be patient
 5. Record trade observations after closing positions

@@ -509,9 +509,12 @@ class AsterDEXV3LiveTradingService:
                     quantity=quantity,
                     stop_price=stop_loss
                 )
+                self._log.info(f"Stop-loss order response: {sl_result}")
                 if sl_result and "orderId" in sl_result:
                     sl_order_id = str(sl_result["orderId"])
                     self._log.info(f"Stop-loss order placed: {sl_order_id}")
+                else:
+                    self._log.warning(f"Stop-loss order failed or returned no orderId")
 
             # Step 10: Place take-profit order
             tp_order_id = None
@@ -522,9 +525,12 @@ class AsterDEXV3LiveTradingService:
                     quantity=quantity,
                     stop_price=take_profit
                 )
+                self._log.info(f"Take-profit order response: {tp_result}")
                 if tp_result and "orderId" in tp_result:
                     tp_order_id = str(tp_result["orderId"])
                     self._log.info(f"Take-profit order placed: {tp_order_id}")
+                else:
+                    self._log.warning(f"Take-profit order failed or returned no orderId")
 
             # Step 11: Wait for settlement
             self._log.info(f"Waiting {self.settlement_wait}s for trade to settle...")

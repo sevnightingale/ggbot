@@ -428,12 +428,26 @@ async def get_positions(args: Dict[str, Any]) -> Dict[str, Any]:
         positions_text = f"Open Positions ({len(positions)}):\n\n"
         for pos in positions:
             pnl = pos.get("unrealized_pnl", 0)
-            pnl_pct = pos.get("unrealized_pnl_percent", 0)
+            pnl_pct = pos.get("unrealized_pnl_percentage", 0)  # Fixed typo: was unrealized_pnl_percent
+            entry_price = pos.get('entry_price', 0)
+            current_price = pos.get('current_price', 0)
+            size = pos.get('size', pos.get('size_usd', 0))  # Try 'size' first, fallback to 'size_usd'
+            leverage = pos.get('leverage', 1)
+
             positions_text += f"• {pos['symbol']} {pos['side'].upper()}\n"
-            positions_text += f"  Entry: ${pos['entry_price']:.2f} | Current: ${pos.get('current_price', 0):.2f}\n"
-            positions_text += f"  Size: ${pos.get('size_usd', 0):.2f} | Leverage: {pos.get('leverage', 1)}x\n"
+            positions_text += f"  Entry: ${entry_price:.2f} | Current: ${current_price:.2f}\n"
+            positions_text += f"  Size: ${size:.2f} | Leverage: {leverage}x\n"
             positions_text += f"  P&L: ${pnl:.2f} ({pnl_pct:.2f}%)\n"
-            positions_text += f"  Trade ID: {pos['trade_id']}\n\n"
+
+            # Show ID field based on what's available (paper uses trade_id, live uses batch_id or orderId)
+            if 'trade_id' in pos:
+                positions_text += f"  Trade ID: {pos['trade_id']}\n\n"
+            elif 'batch_id' in pos:
+                positions_text += f"  Batch ID: {pos['batch_id']}\n\n"
+            elif 'orderId' in pos:
+                positions_text += f"  Order ID: {pos['orderId']}\n\n"
+            else:
+                positions_text += "\n"  # No ID field available
 
         return {
             "content": [{
@@ -465,7 +479,7 @@ async def get_account_status(args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Get account status with performance metrics.
 
-    NOTE: Currently paper trading only. Live trading account status coming soon.
+    Supports both paper trading and live trading (Aster/Symphony).
     """
     try:
         result = await agent_context.api_client.get_account_status(
@@ -473,23 +487,44 @@ async def get_account_status(args: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         account = result.get("account", {})
-        metrics = result.get("metrics", {})
+        trading_mode = result.get("trading_mode", "paper")
 
-        balance = account.get("current_balance", 0)
+        # Fix: API returns 'balance', not 'current_balance'
+        balance = account.get("balance", 0)
         total_pnl = account.get("total_pnl", 0)
-        total_trades = metrics.get("total_trades", 0)
-        win_rate = metrics.get("win_rate", 0)
+        total_trades = account.get("total_trades", 0)
+        win_rate = account.get("win_rate", 0)
+        open_positions = account.get("open_positions", 0)
+
+        # Additional live trading metrics
+        margin_balance = account.get("margin_balance", 0)
+        unrealized_pnl = account.get("unrealized_pnl", 0)
+
+        # Dynamic header based on trading mode
+        mode_label = {
+            "paper": "Paper Trading",
+            "aster": "Live Trading (AsterDEX)",
+            "symphony": "Live Trading (Symphony)"
+        }.get(trading_mode, "Trading")
 
         account_text = f"""
-📊 Account Status (Paper Trading)
+📊 Account Status ({mode_label})
 
 Balance: ${balance:,.2f}
 Total P&L: ${total_pnl:,.2f}
 Total Trades: {total_trades}
 Win Rate: {win_rate:.1%}
 
-Open Positions: {metrics.get('open_positions', 0)}
+Open Positions: {open_positions}
         """.strip()
+
+        # Add live trading specific details if available
+        if trading_mode in ["aster", "symphony"] and margin_balance != 0:
+            account_text += f"""
+
+Margin Balance: ${margin_balance:,.2f}
+Unrealized P&L: ${unrealized_pnl:,.2f}
+            """.strip()
 
         return {
             "content": [{
