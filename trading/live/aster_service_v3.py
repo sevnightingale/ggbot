@@ -287,7 +287,7 @@ class AsterDEXV3LiveTradingService:
             intent: Trade intent from Decision Module with optional overrides:
                 - config_id: Bot configuration ID
                 - user_id: User ID
-                - symbol: Trading symbol (platform format)
+                - symbol: Trading symbol (any format - auto-detected: CCXT, platform, ggshot, symphony)
                 - action: "long" or "short"
                 - confidence: 0.0-1.0
                 - decision_id: Optional decision UUID
@@ -338,23 +338,38 @@ class AsterDEXV3LiveTradingService:
                     "batch_id": None
                 }
 
-            # Step 3: Validate symbol compatibility with AsterDEX
+            # Step 3: Auto-detect symbol format and validate AsterDEX compatibility
             standardizer = UniversalSymbolStandardizer()
-            if not standardizer.is_aster_compatible(symbol, format_type="platform"):
-                self._log.error(f"Symbol {symbol} is not compatible with AsterDEX")
-                return {
-                    "status": "failed",
-                    "reason": f"Symbol {symbol} is not available on AsterDEX",
-                    "batch_id": None
-                }
 
-            # Step 4: Convert symbol to Aster format (BTCUSDT)
-            aster_symbol = standardizer.to_aster(symbol)
-            if not aster_symbol:
-                self._log.error(f"Failed to convert symbol {symbol} to Aster format")
+            # Try different formats to find the symbol
+            formats_to_check = ["ccxt", "platform", "ggshot", "symphony", "hummingbot"]
+            symbol_found = False
+            aster_symbol = None
+
+            for format_type in formats_to_check:
+                if standardizer.is_supported(symbol, format_type):
+                    # Check if Aster-compatible
+                    if not standardizer.is_aster_compatible(symbol, format_type=format_type):
+                        self._log.error(f"Symbol {symbol} is not compatible with AsterDEX")
+                        return {
+                            "status": "failed",
+                            "reason": f"Symbol {symbol} is not available on AsterDEX",
+                            "batch_id": None
+                        }
+
+                    # Convert to Aster format (BTCUSDT)
+                    all_formats = standardizer.get_all_formats(symbol, format_type)
+                    if all_formats:
+                        aster_symbol = all_formats.get("ggshot")  # AsterDEX uses ggshot format
+                        symbol_found = True
+                        self._log.info(f"Symbol detected as {format_type} format: {symbol} → {aster_symbol}")
+                        break
+
+            if not symbol_found or not aster_symbol:
+                self._log.error(f"Symbol {symbol} not found in registry")
                 return {
                     "status": "failed",
-                    "reason": f"Symbol conversion failed for {symbol}",
+                    "reason": f"Symbol {symbol} is not supported",
                     "batch_id": None
                 }
 

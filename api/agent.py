@@ -100,6 +100,8 @@ class ExecuteTradeRequest(BaseModel):
     stop_loss_price: Optional[float] = None
     take_profit_price: Optional[float] = None
     decision_id: Optional[str] = None
+    position_size_usd_override: Optional[float] = None  # Agent can override position size
+    leverage_override: Optional[int] = None              # Agent can override leverage
 
 
 class UpdateStrategyRequest(BaseModel):
@@ -376,20 +378,31 @@ async def execute_trade(
         standardizer = UniversalSymbolStandardizer()
         symbol = request.symbol
 
-        # Handle different symbol formats (BTC, BTC-USDT, BTCUSDT, BTC/USDT, etc.)
-        try:
-            # Try direct conversion first
-            normalized_symbol = standardizer.to_ccxt(symbol)
-        except:
-            # If that fails, try ggshot normalization
-            try:
-                normalized_symbol = standardizer.normalize(symbol, "ggshot", "ccxt")
-            except:
-                # Last resort: if symbol is just base asset (BTC), assume USDT pair
-                if '/' not in symbol and '-' not in symbol and not symbol.endswith('USDT'):
-                    normalized_symbol = f"{symbol}/USDT"
-                else:
-                    normalized_symbol = symbol
+        # Safety check
+        if not symbol:
+            logger.error(f"Symbol is None or empty in request: {request.dict()}")
+            raise HTTPException(status_code=400, detail="Symbol is required")
+
+        # Auto-detect symbol format and convert to CCXT
+        # Agent can send: "BTC" (symphony), "BTC-USDT" (platform), "BTC/USDT" (ccxt), "BTCUSDT" (ggshot)
+        formats_to_check = ["symphony", "platform", "ccxt", "ggshot", "hummingbot"]
+        normalized_symbol = None
+
+        for format_type in formats_to_check:
+            if standardizer.is_supported(symbol, format_type):
+                # Found the format! Convert to CCXT
+                all_formats = standardizer.get_all_formats(symbol, format_type)
+                if all_formats:
+                    normalized_symbol = all_formats.get("ccxt")
+                    logger.info(f"Symbol detected as {format_type} format: {symbol} → {normalized_symbol}")
+                    break
+
+        # If still not found, return error
+        if not normalized_symbol:
+            logger.error(f"Symbol normalization failed: '{symbol}' not found in registry")
+            raise HTTPException(status_code=400, detail=f"Symbol '{symbol}' is not supported. Use /api/symbols/supported to see available symbols.")
+
+        logger.info(f"Symbol normalized: {symbol} → {normalized_symbol}")
 
         # Build trade intent with normalized symbol
         intent = {
@@ -599,9 +612,15 @@ async def close_position(
         if trading_mode == 'paper':
             paper_trading = SupabasePaperTradingService()
             result = await paper_trading.close_position(trade_id=trade_id)
-        else:
+        elif trading_mode == 'aster':
+            from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+            aster_service = AsterDEXV3LiveTradingService()
+            result = await aster_service.close_position(batch_id=trade_id, user_id=user_id)
+        elif trading_mode == 'symphony':
             # TODO: Close live position via Symphony
-            raise HTTPException(status_code=501, detail="Live position closing not implemented yet")
+            raise HTTPException(status_code=501, detail="Symphony position closing not implemented yet")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown trading mode: {trading_mode}")
 
         logger.info(
             f"Agent closed position: {trade_id}",
@@ -733,16 +752,34 @@ async def record_trade_observation(
                 detail="Importance must be between 1 and 10"
             )
 
-        # Get trade details for context
+        # Get config to determine trading mode
+        config = get_configuration(user_id=user_id, config_id=request.config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        trading_mode = config.get('trading_mode', 'paper')
+
+        # Get trade details from appropriate table
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Verify trade exists and belongs to user
-                cur.execute("""
-                    SELECT symbol, realized_pnl,
-                           EXTRACT(EPOCH FROM (closed_at - opened_at))/60 as duration_minutes
-                    FROM paper_trades
-                    WHERE trade_id = %s AND user_id = %s
-                """, (request.trade_id, user_id))
+                if trading_mode == 'paper':
+                    # Paper trading: use trade_id (UUID)
+                    cur.execute("""
+                        SELECT symbol, realized_pnl,
+                               EXTRACT(EPOCH FROM (closed_at - opened_at))/60 as duration_minutes
+                        FROM paper_trades
+                        WHERE trade_id = %s AND user_id = %s
+                    """, (request.trade_id, user_id))
+                else:
+                    # Live trading: use batch_id (string) - get data from live_trades
+                    cur.execute("""
+                        SELECT
+                            NULL as symbol,
+                            NULL as realized_pnl,
+                            EXTRACT(EPOCH FROM (closed_at - created_at))/60 as duration_minutes
+                        FROM live_trades
+                        WHERE batch_id = %s AND config_id = %s
+                    """, (request.trade_id, request.config_id))
 
                 trade = cur.fetchone()
                 if not trade:
@@ -750,27 +787,49 @@ async def record_trade_observation(
 
                 symbol, pnl, duration = trade
 
-                # Insert observation
-                cur.execute("""
-                    INSERT INTO trade_observations
-                        (config_id, user_id, trade_id, observation_type,
-                         what_went_well, what_went_wrong, predictive_data_points,
-                         decision_review, trade_pnl, trade_duration_minutes, importance)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
-                    RETURNING observation_id, created_at
-                """, (
-                    request.config_id,
-                    user_id,
-                    request.trade_id,
-                    request.observation_type,
-                    request.what_went_well,
-                    request.what_went_wrong,
-                    json.dumps(request.predictive_data_points) if request.predictive_data_points else None,
-                    request.decision_review,
-                    pnl,
-                    int(duration) if duration else None,
-                    request.importance
-                ))
+                # Insert observation with appropriate ID column
+                if trading_mode == 'paper':
+                    cur.execute("""
+                        INSERT INTO trade_observations
+                            (config_id, user_id, trade_id, observation_type,
+                             what_went_well, what_went_wrong, predictive_data_points,
+                             decision_review, trade_pnl, trade_duration_minutes, importance)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING observation_id, created_at
+                    """, (
+                        request.config_id,
+                        user_id,
+                        request.trade_id,
+                        request.observation_type,
+                        request.what_went_well,
+                        request.what_went_wrong,
+                        json.dumps(request.predictive_data_points) if request.predictive_data_points else None,
+                        request.decision_review,
+                        pnl,
+                        int(duration) if duration else None,
+                        request.importance
+                    ))
+                else:
+                    cur.execute("""
+                        INSERT INTO trade_observations
+                            (config_id, user_id, batch_id, observation_type,
+                             what_went_well, what_went_wrong, predictive_data_points,
+                             decision_review, trade_pnl, trade_duration_minutes, importance)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING observation_id, created_at
+                    """, (
+                        request.config_id,
+                        user_id,
+                        request.trade_id,  # batch_id
+                        request.observation_type,
+                        request.what_went_well,
+                        request.what_went_wrong,
+                        json.dumps(request.predictive_data_points) if request.predictive_data_points else None,
+                        request.decision_review,
+                        pnl,
+                        int(duration) if duration else None,
+                        request.importance
+                    ))
                 result = cur.fetchone()
                 conn.commit()
 
@@ -816,11 +875,11 @@ async def query_trade_observations(
     validate_agent_service_auth(authorization, x_service_auth)
 
     try:
-        # Build dynamic query
+        # Build dynamic query supporting both paper and live trades
         query = """
             SELECT
                 o.observation_id,
-                o.trade_id,
+                COALESCE(o.trade_id::text, o.batch_id) as trade_ref,
                 o.observation_type,
                 o.what_went_well,
                 o.what_went_wrong,
@@ -830,12 +889,12 @@ async def query_trade_observations(
                 o.trade_duration_minutes,
                 o.importance,
                 o.created_at,
-                t.symbol,
-                t.side,
+                COALESCE(t.symbol, 'N/A') as symbol,
+                COALESCE(t.side, 'N/A') as side,
                 t.entry_price,
                 t.current_price
             FROM trade_observations o
-            JOIN paper_trades t ON o.trade_id = t.trade_id
+            LEFT JOIN paper_trades t ON o.trade_id = t.trade_id
             WHERE o.config_id = %s AND o.user_id = %s
         """
         params = [request.config_id, user_id]
