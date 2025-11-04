@@ -1150,7 +1150,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
               className="px-3 py-1 rounded-xl border border-white/20 text-white/80 hover:bg-white/10"
               onClick={()=>setShowStrategy(true)}
             >
-              {ICONS.clipboard} View Strategy
+              {ICONS.clipboard} View Configuration
             </button>
           )}
           <button
@@ -1305,7 +1305,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-8" onClick={()=>setShowStrategy(false)}>
           <div className="bg-[#12151c] rounded-2xl border border-white/10 max-w-3xl w-full max-h-[80vh] overflow-hidden shadow-2xl" onClick={(e)=>e.stopPropagation()}>
             <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
-              <h2 className="text-xl font-semibold">Agent Strategy</h2>
+              <h2 className="text-xl font-semibold">Agent Configuration</h2>
               <button onClick={()=>setShowStrategy(false)} className="text-white/70 hover:text-white text-2xl">{ICONS.close}</button>
             </div>
             <div className="p-6 overflow-y-auto max-h-[calc(80vh-5rem)]">
