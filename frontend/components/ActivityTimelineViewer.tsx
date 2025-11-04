@@ -372,15 +372,29 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   // Calculate the right boundary with 25% buffer beyond "now"
   // This allows scrolling past current time like TradingView
   const rightBound = useMemo(() => {
+    console.log('[ActivityTimeline] rightBound calculation:');
+    console.log('  dataFirst:', dataFirst, new Date(dataFirst).toISOString());
+    console.log('  dataLast:', dataLast, new Date(dataLast).toISOString());
     const totalDataSpan = dataLast - dataFirst;
+    console.log('  totalDataSpan:', totalDataSpan, 'ms =', (totalDataSpan / 3600000).toFixed(2), 'hours');
     const buffer = Math.round(totalDataSpan * FUTURE_PAD_RATIO);
-    return dataLast + buffer;
+    console.log('  buffer:', buffer, 'ms');
+    const result = dataLast + buffer;
+    console.log('  rightBound result:', result, new Date(result).toISOString());
+    return result;
   }, [dataFirst, dataLast]);
 
   // Recompute domain when zoom changes or data loads
   useEffect(() => {
+    console.log('[ActivityTimeline] Domain calculation useEffect triggered');
+    console.log('  zoom:', zoom, 'spanMs:', rules.spanMs);
+    console.log('  dataFirst:', dataFirst, new Date(dataFirst).toISOString());
+    console.log('  dataLast:', dataLast, new Date(dataLast).toISOString());
+    console.log('  rightBound:', rightBound, new Date(rightBound).toISOString());
+
     // "All" zoom: show full history from bot creation to now + buffer
     if (rules.spanMs === "all") {
+      console.log('  Setting domain for "All" zoom: left =', new Date(dataFirst).toISOString(), 'right =', new Date(rightBound).toISOString());
       setDomain({ left: dataFirst, right: rightBound });
       return;
     }
