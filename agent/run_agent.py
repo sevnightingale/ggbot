@@ -48,6 +48,7 @@ from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessa
 from agent.mcp_server import create_mcp_server, set_agent_context
 from agent.service_client import GGBotAPIClient
 from core.common.db import get_db_connection
+from core.common.activity_logger import log_activity_safe
 
 # Load environment
 load_dotenv()
@@ -492,9 +493,29 @@ Start now.
                         # Log all agent activity
                         logger.info(f"Agent: {block.text}")
 
+                        # Save agent thoughts to activity timeline
+                        log_activity_safe(
+                            config_id=self.config_id,
+                            user_id=self.user_id,
+                            activity_type='analysis',
+                            activity_source='agent',
+                            summary=block.text[:200],  # Truncate for summary
+                            details={'thought': block.text}
+                        )
+
             # Handle ResultMessage (final consolidated response)
             elif isinstance(message, ResultMessage):
                 logger.info(f"Agent: {message.result}")
+
+                # Save agent thoughts to activity timeline
+                log_activity_safe(
+                    config_id=self.config_id,
+                    user_id=self.user_id,
+                    activity_type='analysis',
+                    activity_source='agent',
+                    summary=message.result[:200],  # Truncate for summary
+                    details={'thought': message.result}
+                )
 
             # Check for compaction
             if hasattr(message, 'type') and getattr(message, 'type', None) == 'system':
