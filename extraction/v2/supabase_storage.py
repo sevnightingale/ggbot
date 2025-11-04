@@ -6,6 +6,7 @@ Integrates with the new schema: data_source UUID, data_points JSONB, raw_data JS
 """
 
 import json
+import os
 import pandas as pd
 from datetime import datetime
 from typing import Dict, Any, Optional, List
@@ -29,12 +30,15 @@ class SupabaseStorage:
     
     def __init__(self):
         """Initialize Supabase client with service key for full access."""
-        self.url = "https://ciinauxtnkweyebyhucl.supabase.co"
-        self.service_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImNpaW5hdXh0bmt3ZXllYnlodWNsIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1NjU0OTQzNSwiZXhwIjoyMDcyMTI1NDM1fQ.NZqGnTDanB7DSalQyuFxP6Ie7AUu80VgvIr7MQ8rckI"
-        
+        self.url = os.getenv("SUPABASE_URL")
+        self.service_key = os.getenv("SUPABASE_SERVICE_KEY")
+
+        if not self.url or not self.service_key:
+            raise ValueError("SUPABASE_URL and SUPABASE_SERVICE_KEY must be set in environment variables")
+
         self.client: Client = create_client(self.url, self.service_key)
         self._log = logger.bind(component="supabase_storage")
-        
+
         # Technical Analysis data source UUID from Supabase
         self.TECHNICAL_ANALYSIS_SOURCE_ID = "75f6030b-117e-4178-9bfc-5d1c244ccb96"
     

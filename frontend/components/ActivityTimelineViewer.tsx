@@ -385,14 +385,44 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   // Series slice (safe with optional chaining)
   const inDomainSeries = useMemo(() => {
     const { left, right } = domain;
-    const pad = (right - left) * 0.5;
 
     // If we have real balance data, use it
     if (log?.balanceTimeseries && log.balanceTimeseries.length > 0) {
-      return log.balanceTimeseries.filter(p => {
-        const t = new Date(p.timestamp).getTime();
-        return t >= left - pad && t <= right + pad;
-      });
+      const series = log.balanceTimeseries;
+
+      // Find points in domain + immediate neighbors for smooth line continuity
+      const filtered: typeof series = [];
+
+      for (let i = 0; i < series.length; i++) {
+        const t = new Date(series[i].timestamp).getTime();
+
+        // Include if in domain
+        if (t >= left && t <= right) {
+          filtered.push(series[i]);
+        }
+        // Include prev point if next point is in domain (for line continuity)
+        else if (i < series.length - 1) {
+          const tNext = new Date(series[i + 1].timestamp).getTime();
+          if (tNext >= left && tNext <= right && filtered.length === 0) {
+            filtered.push(series[i]);
+          }
+        }
+      }
+
+      // Always include the last point if domain extends past it (for "now" indicator)
+      const lastPoint = series[series.length - 1];
+      const lastTime = new Date(lastPoint.timestamp).getTime();
+      if (lastTime <= right && filtered.length > 0 && filtered[filtered.length - 1] !== lastPoint) {
+        filtered.push(lastPoint);
+      }
+
+      // Ensure we have at least 2 points for a line
+      if (filtered.length === 0 && series.length >= 2) {
+        // Domain is outside data range - include first and last for context
+        return [series[0], series[series.length - 1]];
+      }
+
+      return filtered.length > 0 ? filtered : series;
     }
 
     // Otherwise create synthetic $0 baseline for activities to anchor to
@@ -422,9 +452,25 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       min = Math.min(min, p.balance);
       max = Math.max(max, p.balance);
     }
-    if (!isFinite(min)||!isFinite(max)) { min=0; max=1; }
+    if (!isFinite(min)||!isFinite(max)) { min=0; max=100; }
+
     const span = max - min;
-    const pad = span*0.1 + 1;
+
+    // Ensure minimum meaningful range for chart visibility
+    // If span is too small (< $10), use fixed minimum range
+    const minRange = 100; // Minimum $100 range
+
+    if (span < minRange) {
+      // Center the data within minimum range
+      const center = (min + max) / 2;
+      return {
+        min: center - minRange / 2,
+        max: center + minRange / 2
+      };
+    }
+
+    // Normal case: add 10% padding
+    const pad = span * 0.1;
     return { min: min - pad, max: max + pad };
   }, [inDomainSeries]);
 
