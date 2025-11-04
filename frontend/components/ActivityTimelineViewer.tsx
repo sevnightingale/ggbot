@@ -164,7 +164,7 @@ function roundRect(ctx: CanvasRenderingContext2D, x:number,y:number,w:number,h:n
 
 const ZOOMS = ["1h","4h","1d","1w","All"] as const;
 type ZoomTier = typeof ZOOMS[number];
-const FUTURE_PAD_RATIO = 0.08; // 8% of span beyond now
+const FUTURE_PAD_RATIO = 0.25; // 25% of span beyond now (TradingView-style)
 
 const ZOOM_RULES: Record<ZoomTier, {
   spanMs: number | "all";
@@ -250,6 +250,13 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
         if (activities.status !== 'success' || balanceSeries.status !== 'success' || metadata.status !== 'success') {
           throw new Error('API returned error status');
         }
+
+        // DEBUG: Log API responses
+        console.log('[ActivityTimeline] API Response - Activities:', activities.activities?.length, 'items');
+        console.log('[ActivityTimeline] API Response - Balance series:', balanceSeries.balance_series?.length, 'points');
+        console.log('[ActivityTimeline] API Response - First balance point:', balanceSeries.balance_series?.[0]);
+        console.log('[ActivityTimeline] API Response - Last balance point:', balanceSeries.balance_series?.[balanceSeries.balance_series.length - 1]);
+        console.log('[ActivityTimeline] API Response - Metadata:', metadata.metadata);
 
         // Transform API response to match MockActivityLog interface
         setLog({
@@ -350,26 +357,43 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   const rules = ZOOM_RULES[zoom];
 
+  // Calculate the right boundary with 25% buffer beyond "now"
+  // This allows scrolling past current time like TradingView
   const rightBound = useMemo(() => {
-    if (rules.spanMs === "all") return dataLast;
-    return dataLast + Math.round((rules.spanMs as number) * FUTURE_PAD_RATIO);
-  }, [rules, dataLast]);
+    const totalDataSpan = dataLast - dataFirst;
+    const buffer = Math.round(totalDataSpan * FUTURE_PAD_RATIO);
+    return dataLast + buffer;
+  }, [dataFirst, dataLast]);
 
   // Recompute domain when zoom changes or data loads
   useEffect(() => {
-    if (rules.spanMs === "all") { setDomain({ left: dataFirst, right: dataLast }); return; }
+    // "All" zoom: show full history from bot creation to now + buffer
+    if (rules.spanMs === "all") {
+      setDomain({ left: dataFirst, right: rightBound });
+      return;
+    }
+
+    // For time-based zooms (1h, 4h, etc): calculate scrollable window
     const span = rules.spanMs as number;
-    const pad = Math.round(span * FUTURE_PAD_RATIO);
-    const desiredSpan = span + pad;
-    const center = (domain.left + domain.right) / 2;
-    let left = Math.round(center - (span));
-    let right = left + desiredSpan;
-    const maxRight = rightBound;
-    if (right > maxRight) { right = maxRight; left = right - desiredSpan; }
-    if (left < dataFirst) { left = dataFirst; right = left + desiredSpan; }
+
+    // On first load or zoom change, position view at the end (showing "now")
+    // User can then scroll left to see earlier history
+    let right = Math.min(Date.now(), rightBound);
+    let left = right - span;
+
+    // Clamp to data boundaries
+    if (left < dataFirst) {
+      left = dataFirst;
+      right = left + span;
+    }
+    if (right > rightBound) {
+      right = rightBound;
+      left = Math.max(dataFirst, right - span);
+    }
+
     setDomain({ left, right });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [zoom, dataFirst, dataLast, rules]);
+  }, [zoom, dataFirst, dataLast, rightBound, rules]);
 
   // Resize
   useEffect(() => {
@@ -389,6 +413,12 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     // If we have real balance data, use it
     if (log?.balanceTimeseries && log.balanceTimeseries.length > 0) {
       const series = log.balanceTimeseries;
+
+      // DEBUG: Log the full series
+      console.log('[ActivityTimeline] Full balance series:', series.length, 'points');
+      console.log('[ActivityTimeline] Domain:', new Date(left).toISOString(), 'to', new Date(right).toISOString());
+      console.log('[ActivityTimeline] First point:', series[0]);
+      console.log('[ActivityTimeline] Last point:', series[series.length - 1]);
 
       // Find points in domain + immediate neighbors for smooth line continuity
       const filtered: typeof series = [];
@@ -419,7 +449,14 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       // Ensure we have at least 2 points for a line
       if (filtered.length === 0 && series.length >= 2) {
         // Domain is outside data range - include first and last for context
+        console.log('[ActivityTimeline] Domain outside range, using first+last');
         return [series[0], series[series.length - 1]];
+      }
+
+      console.log('[ActivityTimeline] Filtered to', filtered.length, 'points for rendering');
+      if (filtered.length > 0) {
+        console.log('[ActivityTimeline] First filtered:', filtered[0]);
+        console.log('[ActivityTimeline] Last filtered:', filtered[filtered.length - 1]);
       }
 
       return filtered.length > 0 ? filtered : series;
@@ -427,12 +464,15 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
     // Otherwise create synthetic $0 baseline for activities to anchor to
     if (log?.activities && log.activities.length > 0 && seriesMs.length === 2) {
+      console.log('[ActivityTimeline] No balance data, using synthetic $0 baseline');
+      console.log('[ActivityTimeline] Synthetic range:', new Date(seriesMs[0]).toISOString(), 'to', new Date(seriesMs[1]).toISOString());
       return [
         { timestamp: new Date(seriesMs[0]).toISOString(), balance: 0 },
         { timestamp: new Date(seriesMs[1]).toISOString(), balance: 0 }
       ];
     }
 
+    console.log('[ActivityTimeline] No data at all');
     return [];
   }, [log, domain, seriesMs]);
 
@@ -454,6 +494,8 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     }
     if (!isFinite(min)||!isFinite(max)) { min=0; max=100; }
 
+    console.log('[ActivityTimeline] Y-extent raw min/max:', min, max);
+
     const span = max - min;
 
     // Ensure minimum meaningful range for chart visibility
@@ -463,6 +505,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     if (span < minRange) {
       // Center the data within minimum range
       const center = (min + max) / 2;
+      console.log('[ActivityTimeline] Span too small, using minimum range. Center:', center);
       return {
         min: center - minRange / 2,
         max: center + minRange / 2
@@ -471,6 +514,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
     // Normal case: add 10% padding
     const pad = span * 0.1;
+    console.log('[ActivityTimeline] Using normal padding:', pad);
     return { min: min - pad, max: max + pad };
   }, [inDomainSeries]);
 
@@ -584,20 +628,29 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     }
 
     // Equity line
+    console.log('[ActivityTimeline] Drawing equity line with', inDomainSeries.length, 'points');
     ctx.save();
     ctx.beginPath();
     let first=true;
     for (const p of inDomainSeries){
       const x=xScale(new Date(p.timestamp).getTime());
       const y=yScale(p.balance);
-      if(first){ctx.moveTo(x,y); first=false;}
-      else {ctx.lineTo(x,y);}
+      if(first){
+        console.log('[ActivityTimeline] Line starts at x:', x, 'y:', y, 'balance:', p.balance);
+        ctx.moveTo(x,y);
+        first=false;
+      }
+      else {
+        console.log('[ActivityTimeline] Line to x:', x, 'y:', y, 'balance:', p.balance);
+        ctx.lineTo(x,y);
+      }
     }
     ctx.shadowColor=COLORS.lineGlow;
     ctx.shadowBlur=16;
     ctx.strokeStyle=COLORS.positive;
     ctx.lineWidth=2;
     ctx.stroke();
+    console.log('[ActivityTimeline] Equity line drawn with color:', COLORS.positive);
     ctx.restore();
 
     // X labels
@@ -618,6 +671,9 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     const railHeights=[rules.railGap, rules.railGap*2, rules.railGap*3];
     const occupancy = new Array(cols).fill(0);
 
+    console.log('[ActivityTimeline] Drawing', bucketed.length, 'activity icons');
+    console.log('[ActivityTimeline] seriesMs length:', seriesMs.length, 'seriesVal length:', seriesVal.length);
+
     for (const g of bucketed){
       const px = xScale(g.bucketTs);
       if (px < padL || px > padL+chartW) continue;
@@ -630,6 +686,10 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
       const anchorBal = linearInterpolateAt(g.bucketTs, seriesMs, seriesVal);
       let anchorY=yScale(anchorBal);
       anchorY=clamp(anchorY, padT, padT+chartH);
+
+      if (bucketed.indexOf(g) < 3) {
+        console.log('[ActivityTimeline] Icon', bucketed.indexOf(g), 'at time:', new Date(g.bucketTs).toISOString(), 'anchorBal:', anchorBal, 'anchorY:', anchorY);
+      }
 
       const upwards = anchorY - padT > padB + 80;
       const offset = railHeights[row];
@@ -967,7 +1027,7 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
 
   // Helper function for domain clamping
   function clampDomain(left: number, right: number) {
-    if (rules.spanMs === "all") return { left: dataFirst, right: dataLast };
+    if (rules.spanMs === "all") return { left: dataFirst, right: rightBound };
     const span = right - left;
     const maxRight = rightBound;
     const minLeft = dataFirst;
@@ -1017,12 +1077,23 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   // Jump to Now
   const jumpToNow = () => {
     if (rules.spanMs === "all") {
-      setDomain({ left: dataFirst, right: dataLast });
+      // Show full timeline with buffer
+      setDomain({ left: dataFirst, right: rightBound });
       return;
     }
-    const span = (rules.spanMs as number);
-    const pad = Math.round(span * FUTURE_PAD_RATIO);
-    setDomain({ left: dataLast - span, right: dataLast + pad });
+    // For time-based zooms, center on "now" with the zoom window
+    const span = rules.spanMs as number;
+    const now = Date.now();
+    let right = Math.min(now, rightBound);
+    let left = right - span;
+
+    // Ensure we don't go before bot creation
+    if (left < dataFirst) {
+      left = dataFirst;
+      right = Math.min(left + span, rightBound);
+    }
+
+    setDomain({ left, right });
   };
 
   const info = log?.metadata;
