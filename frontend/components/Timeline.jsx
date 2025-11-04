@@ -1,6 +1,6 @@
 
 "use client";
-import React, {useEffect, useMemo, useRef, useState} from "react";
+import React, {useEffect, useRef, useState} from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import dynamic from 'next/dynamic';
 
@@ -43,80 +43,8 @@ const VIBE = {
  * @typedef {{activities: ActivityItem[]; balanceTimeseries: BalancePoint[]; metadata: {botName: string; startingBalance: number; currentBalance: number; totalTrades: number; winRate: number; performance: number;}}} ActivityLog
  */
 
-// -----------------------------
-// Utility
-// -----------------------------
-const clamp = (n,a,b)=> Math.max(a, Math.min(b,n));
-function niceTicks(min, max, target=5){
-  const span=max-min; if(span<=0) return [];
-  const step=Math.pow(10,Math.floor(Math.log10(span/target)));
-  const err=(target*span)/(step*10);
-  const steps= err>=7.5?10: err>=3?5: err>=1.5?2:1;
-  const s=steps*step; const ticks=[]; const start=Math.ceil(min/s)*s; for(let v=start; v<=max; v+=s) ticks.push(v); return ticks;
-}
-function lerpAt(ms, xs, ys){
-  const n=xs.length; if(!n) return 0; if(ms<=xs[0]) return ys[0]; if(ms>=xs[n-1]) return ys[n-1];
-  let lo=0, hi=n-1; while(hi-lo>1){ const mid=(lo+hi)>>1; if(xs[mid]<=ms) lo=mid; else hi=mid; }
-  const t0=xs[lo], t1=xs[hi], v0=ys[lo], v1=ys[hi]; const a=(ms-t0)/(t1-t0); return v0+(v1-v0)*a;
-}
-
-// -----------------------------
-// Zoom rules
-// -----------------------------
+// Zoom presets (UI only - TradingView handles actual zoom)
 const ZOOMS = ["1h","4h","1d","1w","All"];
-const FUTURE_PAD_RATIO = 0.25;
-const ZOOM_RULES = {
-  "1h":  { spanMs: 60*60*1000,        bucketMs: 60*1000,      iconPx:22, minSpacingPx:18, railGap:28 },
-  "4h":  { spanMs: 4*60*60*1000,      bucketMs: 10*60*1000,   iconPx:20, minSpacingPx:18, railGap:28 },
-  "1d":  { spanMs: 24*60*60*1000,     bucketMs: 60*60*1000,   iconPx:18, minSpacingPx:20, railGap:26 },
-  "1w":  { spanMs: 7*24*60*60*1000,   bucketMs: 4*60*60*1000, iconPx:16, minSpacingPx:22, railGap:24 },
-  "All": { spanMs: "all",            bucketMs: 24*60*60*1000,iconPx:14, minSpacingPx:28, railGap:24 },
- };
-
-// -----------------------------
-// Flat glyphs (canvas + React SVG)
-// -----------------------------
-function drawGlyph(ctx, id, cx, cy, r, color){
-  ctx.save();
-  ctx.fillStyle = color;
-  const s=r*0.9; // glyph box
-  switch(id){
-    case 'long': { // triangle up
-      ctx.beginPath(); ctx.moveTo(cx, cy - s*0.8); ctx.lineTo(cx - s*0.7, cy + s*0.6); ctx.lineTo(cx + s*0.7, cy + s*0.6); ctx.closePath(); ctx.fill();
-      break; }
-    case 'short': { // triangle down
-      ctx.beginPath(); ctx.moveTo(cx, cy + s*0.8); ctx.lineTo(cx - s*0.7, cy - s*0.6); ctx.lineTo(cx + s*0.7, cy - s*0.6); ctx.closePath(); ctx.fill();
-      break; }
-    case 'win': { // up arrow
-      ctx.beginPath(); ctx.moveTo(cx, cy - s*0.8); ctx.lineTo(cx - s*0.5, cy - s*0.2); ctx.lineTo(cx - s*0.15, cy - s*0.2); ctx.lineTo(cx - s*0.15, cy + s*0.8); ctx.lineTo(cx + s*0.15, cy + s*0.8); ctx.lineTo(cx + s*0.15, cy - s*0.2); ctx.lineTo(cx + s*0.5, cy - s*0.2); ctx.closePath(); ctx.fill();
-      break; }
-    case 'loss': { // down arrow
-      ctx.beginPath(); ctx.moveTo(cx, cy + s*0.8); ctx.lineTo(cx - s*0.5, cy + s*0.2); ctx.lineTo(cx - s*0.15, cy + s*0.2); ctx.lineTo(cx - s*0.15, cy - s*0.8); ctx.lineTo(cx + s*0.15, cy - s*0.8); ctx.lineTo(cx + s*0.15, cy + s*0.2); ctx.lineTo(cx + s*0.5, cy + s*0.2); ctx.closePath(); ctx.fill();
-      break; }
-    case 'strategy': { // wrench-ish
-      ctx.beginPath();
-      ctx.arc(cx - s*0.2, cy - s*0.2, s*0.35, Math.PI*0.1, Math.PI*1.2);
-      ctx.lineTo(cx + s*0.5, cy + s*0.5);
-      ctx.arc(cx + s*0.5, cy + s*0.5, s*0.12, 0, Math.PI*2);
-      ctx.closePath(); ctx.fill();
-      break; }
-    case 'query': { // bar chart
-      const w=s*0.25; ctx.fillRect(cx - s*0.5, cy + s*0.2, w, -s*0.6); ctx.fillRect(cx - w/2, cy + s*0.2, w, -s*0.35); ctx.fillRect(cx + s*0.25, cy + s*0.2, w, -s*0.8);
-      break; }
-    case 'wait': { // clock
-      ctx.beginPath(); ctx.arc(cx, cy, s*0.75, 0, Math.PI*2); ctx.fill(); ctx.fillStyle = '#000000'; ctx.globalAlpha = 0.18; ctx.beginPath(); ctx.arc(cx, cy, s*0.55, 0, Math.PI*2); ctx.fill(); ctx.globalAlpha = 1; ctx.fillStyle = '#fff'; ctx.fillRect(cx-1, cy - s*0.35, 2, s*0.35); ctx.fillRect(cx, cy-1, s*0.28, 2); break; }
-    case 'note': { // note with dog-ear
-      const w=s*1.1, h=s*1.1; const x=cx-w/2, y=cy-h/2; ctx.fillRect(x, y, w, h); ctx.fillStyle='#000000'; ctx.globalAlpha=0.18; ctx.fillRect(x + w*0.1, y + h*0.25, w*0.8, 2); ctx.fillRect(x + w*0.1, y + h*0.5, w*0.6, 2); ctx.globalAlpha=1; break; }
-    case 'think':
-    case 'plan': { // speech bubble
-      const w=s*1.15, h=s*0.8; const x=cx-w/2, y=cy-h/2; const r=6; ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.moveTo(cx - w*0.2, y+h); ctx.lineTo(cx - w*0.05, y+h + h*0.25); ctx.lineTo(cx + w*0.05, y+h); ctx.closePath(); ctx.fill(); break; }
-    case 'close': { // X
-      const t=s*0.2; ctx.fillRect(cx-t, cy- s*0.8, 2*t, 2*t); break; }
-    case 'gear': { // simple gear disc with teeth blocks
-      ctx.beginPath(); ctx.arc(cx,cy,s*0.7,0,Math.PI*2); ctx.fill(); const teeth=6; const tr=s*0.95; const tw=s*0.12; for(let i=0;i<teeth;i++){ const a=(i/teeth)*Math.PI*2; const x=cx+Math.cos(a)*tr; const y=cy+Math.sin(a)*tr; ctx.save(); ctx.translate(x,y); ctx.rotate(a); ctx.fillRect(-tw/2,-tw/2,tw,tw); ctx.restore(); } break; }
-  }
-  ctx.restore();
- }
 
  // React SVG counterparts for panel & buttons
  const Svg = {
@@ -260,155 +188,8 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
     fetchData();
   }, [configId, session]);
 
-  // Chart container ref (TradingView handles its own sizing)
+  // TradingView chart container ref
   const chartContainerRef = useRef(null);
-
-  // ---- Derived series
-  const seriesMs = useMemo(()=> log?.balanceTimeseries?.map(p=> new Date(p.timestamp).getTime()) ?? [], [log]);
-  const seriesVal = useMemo(()=> log?.balanceTimeseries?.map(p=> p.balance) ?? [], [log]);
-  const dataFirst = useMemo(()=> seriesMs[0] ?? Date.now()-24*60*60*1000, [seriesMs]);
-  const dataLast  = useMemo(()=> seriesMs[seriesMs.length-1] ?? Date.now(), [seriesMs]);
-  const rules = ZOOM_RULES[zoom];
-  const rightBound = useMemo(()=> { const span=(dataLast - dataFirst); const buffer=Math.round(span*FUTURE_PAD_RATIO); return dataLast + buffer; }, [dataFirst, dataLast]);
-
-  // initialize domain on zoom change
-  useEffect(()=>{
-    if(rules.spanMs === "all") return setDomain({left:dataFirst, right:rightBound});
-    const span = rules.spanMs; const now = Date.now();
-    let right = Math.min(now, rightBound); let left = right - span;
-    if(left < dataFirst){ left = dataFirst; right = Math.min(left+span, rightBound); }
-    setDomain({left,right});
-  },[zoom, rules, dataFirst, rightBound]);
-
-  // ---- Slice series into domain (+guards for continuity)
-  const inDomainSeries = useMemo(()=>{
-    if(!log?.balanceTimeseries?.length) return [];
-    const {left,right}=domain; const src=log.balanceTimeseries; const out=[];
-    for(let i=0;i<src.length;i++){
-      const t=new Date(src[i].timestamp).getTime();
-      if(t>=left && t<=right) out.push(src[i]);
-      else if(i<src.length-1){ const tNext=new Date(src[i+1].timestamp).getTime(); if(tNext>=left && tNext<=right && out.length===0) out.push(src[i]); }
-    }
-    if(out.length===0 && src.length>=2) return [src[0], src[src.length-1]]; return out.length?out:src;
-  },[log, domain]);
-
-  // ---- Scales
-  const padL=64, padR=16, padT=20, padB=32; const chartW=Math.max(10, size.w - padL - padR); const chartH=Math.max(10, size.h - padT - padB);
-  const xScale = (ms)=> padL + ((ms-domain.left)/(domain.right-domain.left))*chartW;
-  const yExtent = useMemo(()=>{
-    let min=Infinity, max=-Infinity; for(const p of inDomainSeries){ min=Math.min(min,p.balance); max=Math.max(max,p.balance); }
-    if(!isFinite(min)||!isFinite(max)) { min=0; max=100; }
-    const span=max-min; const minRange=120; if(span<minRange){ const c=(min+max)/2; return {min:c-minRange/2, max:c+minRange/2}; }
-    const pad=span*0.1; return {min:min-pad, max:max+pad};
-  },[inDomainSeries]);
-  const yScale = (v)=> padT + chartH - ((v-yExtent.min)/(yExtent.max-yExtent.min))*chartH;
-
-  // ---- Bucket activities
-  const bucketed = useMemo(()=>{
-    if(!log?.activities) return [];
-    const ms = rules.bucketMs; const {left,right}=domain; const pad=(right-left)*0.25; const acts = log.activities.filter(a=>{
-      const t=new Date(a.timestamp).getTime(); return t>=left-pad && t<=right+pad && visibleTypes[a.type];
-    });
-    const map = new Map();
-    for(const a of acts){ const t=new Date(a.timestamp).getTime(); const b=Math.floor(t/ms)*ms; const key = a.priority===1? `${b}:${a.id}` : `${b}:${a.type}`; const arr = map.get(key) || []; arr.push(a); map.set(key, arr); }
-    return Array.from(map.entries()).map(([k,items])=>{ const bucketTs=parseInt(k.split(":")[0]); items.sort((a,b)=> new Date(a.timestamp).getTime()-new Date(b.timestamp).getTime()); const rep= items.find(x=>x.priority===1) || items[0]; return {bucketTs, items, rep}; }).sort((a,b)=> a.bucketTs-b.bucketTs);
-  },[log, rules, domain, visibleTypes]);
-
-  // ---- Canvas draw
-  const hitBoxesRef = useRef([]);
-  const hoverRef = useRef(null);
-
-  useEffect(()=>{
-    const c=canvasRef.current, o=overlayRef.current; if(!c||!o) return; const dpr=window.devicePixelRatio||1;
-    for(const el of [c,o]){ el.width=Math.floor(size.w*dpr); el.height=Math.floor(size.h*dpr); el.style.width=`${size.w}px`; el.style.height=`${size.h}px`; }
-    const ctx=c.getContext("2d"); const octx=o.getContext("2d"); ctx.setTransform(dpr,0,0,dpr,0,0); octx.setTransform(dpr,0,0,dpr,0,0);
-
-    // Surface
-    ctx.fillStyle = theme.carbon; ctx.fillRect(0,0,size.w,size.h);
-
-    // Grid
-    ctx.strokeStyle = VIBE.hair; ctx.globalAlpha = 1; ctx.lineWidth=1; ctx.beginPath();
-    for(let i=0;i<=6;i++){ const x=padL+(chartW/6)*i; ctx.moveTo(x,padT); ctx.lineTo(x,padT+chartH);} const ys=niceTicks(yExtent.min,yExtent.max,5); for(const v of ys){ const y=Math.round(yScale(v))+0.5; ctx.moveTo(padL,y); ctx.lineTo(padL+chartW,y);} ctx.stroke();
-
-    // Y labels
-    ctx.fillStyle = theme.ivory; ctx.font = "12px var(--font-sans, ui-sans-serif)"; ctx.textAlign="right"; ctx.textBaseline="middle";
-    for(const v of ys){ const y=yScale(v); ctx.fillText(`$${Math.round(v).toLocaleString()}`, padL-10, y); }
-
-    // Equity line
-    ctx.save(); ctx.beginPath(); let first=true; for(const p of inDomainSeries){ const x=xScale(new Date(p.timestamp).getTime()); const y=yScale(p.balance); if(first){ctx.moveTo(x,y); first=false;} else ctx.lineTo(x,y);} ctx.shadowColor=`${theme.signal}`; ctx.shadowBlur=10; ctx.strokeStyle=theme.signal; ctx.lineWidth=2; ctx.stroke(); ctx.restore();
-
-    // X labels
-    ctx.textAlign="center"; ctx.textBaseline="top"; const spanMs=domain.right-domain.left; const xTicks=[domain.left, domain.left+spanMs/2, domain.right];
-    for(const t of xTicks){ const d=new Date(t); const label= spanMs<=24*60*60*1000 ? d.toUTCString().slice(17,22)+" UTC" : d.toUTCString().slice(5,16); ctx.fillText(label, xScale(t), padT+chartH+8); }
-
-    // Activities
-    hitBoxesRef.current = [];
-    const colW = rules.minSpacingPx; const cols=Math.ceil(chartW/colW); const railHeights=[rules.railGap, rules.railGap*2, rules.railGap*3]; const occupancy=new Array(cols).fill(0);
-    for(const g of bucketed){ const px=xScale(g.bucketTs); if(px<padL||px>padL+chartW) continue; const col=Math.floor((px-padL)/colW); let row=occupancy[col]||0; if(row>2) row=2; occupancy[col]=row+1;
-      const anchorBal = lerpAt(g.bucketTs, seriesMs, seriesVal); let ay=yScale(anchorBal); ay=clamp(ay,padT,padT+chartH);
-      const upwards = ay - padT > padB + 80; const offset=railHeights[row]; const py = upwards ? (ay - offset) : (ay + offset);
-      const def = ACTIVITY_DEFS[g.rep.type]; const R=ZOOM_RULES[zoom].iconPx; const stem=`${def.color}`;
-      // stem
-      ctx.strokeStyle = stem; ctx.globalAlpha=0.55; ctx.lineWidth=2; ctx.beginPath(); ctx.moveTo(px,ay); const ctrlY = upwards? ay-offset*0.6 : ay+offset*0.6; ctx.bezierCurveTo(px,ctrlY,px,ctrlY,px,py); ctx.stroke(); ctx.globalAlpha=1;
-      // anchor dot
-      ctx.beginPath(); ctx.fillStyle=def.color; ctx.arc(px, ay, 3,0,Math.PI*2); ctx.fill();
-      // icon disc
-      ctx.beginPath(); ctx.fillStyle = theme.obsidian; ctx.globalAlpha=0.9; ctx.arc(px,py,R,0,Math.PI*2); ctx.fill(); ctx.globalAlpha=1;
-      // ring
-      ctx.beginPath(); ctx.strokeStyle = VIBE.hair; ctx.lineWidth=1.25; ctx.arc(px,py,R-0.5,0,Math.PI*2); ctx.stroke();
-      // glyph (solid flat)
-      drawGlyph(ctx, glyphIdFor(g.rep.type), px, py, R*0.72, def.color);
-      // badge
-      if(g.items.length>1){ const r=8, bx=px+R-4, by=py-R+4; ctx.beginPath(); ctx.fillStyle=def.color; ctx.arc(bx,by,r,0,Math.PI*2); ctx.fill(); ctx.fillStyle=theme.obsidian; ctx.font="10px ui-sans-serif"; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText(String(g.items.length), bx, by+0.5); }
-      // hitbox
-      hitBoxesRef.current.push({x:px-R,y:py-R,w:R*2,h:R*2,cx:px,cy:py,R,color:def.color,glyph:glyphIdFor(g.rep.type),group:g.items});
-    }
-
-    // clear overlay
-    octx.clearRect(0,0,size.w,size.h);
-  },[size, domain, inDomainSeries, bucketed, yExtent, zoom, seriesMs, seriesVal, theme]);
-
-  // ---- Overlay (hover + now pulse)
-  useEffect(()=>{
-    const o=overlayRef.current; if(!o) return; const ctx=o.getContext("2d"); let raf;
-    const draw=(t)=>{
-      const dpr=window.devicePixelRatio||1; ctx.setTransform(dpr,0,0,dpr,0,0); ctx.clearRect(0,0,o.width/dpr,o.height/dpr);
-      const h=hoverRef.current; if(h){ ctx.save(); ctx.beginPath(); ctx.arc(h.cx,h.cy,h.R+6,0,Math.PI*2); ctx.fillStyle=VIBE.hair; ctx.fill(); drawGlyph(ctx,h.glyph,h.cx,h.cy,h.R*0.72,h.color); ctx.restore(); }
-      // now pulse
-      const latestMs = dataLast; if(latestMs>=domain.left && latestMs<=domain.right){
-        const nowX = xScale(latestMs); const nowY = yScale(lerpAt(latestMs, seriesMs, seriesVal));
-        const tt=(t/1000)%1.6; const r1=4+tt*10, a1=.35-tt*.25; const r2=4+((tt+.6)%1.6)*10, a2=.28-((tt+.6)%1.6)*.2;
-        ctx.save(); ctx.beginPath(); ctx.arc(nowX,nowY,r1,0,Math.PI*2); ctx.strokeStyle=theme.signal; ctx.globalAlpha=Math.max(0,a1); ctx.lineWidth=2.5; ctx.stroke();
-        ctx.beginPath(); ctx.arc(nowX,nowY,r2,0,Math.PI*2); ctx.globalAlpha=Math.max(0,a2); ctx.lineWidth=2.5; ctx.stroke(); ctx.globalAlpha=1;
-        ctx.shadowColor=theme.signal; ctx.shadowBlur=8; ctx.beginPath(); ctx.fillStyle=theme.signal; ctx.arc(nowX,nowY,4,0,Math.PI*2); ctx.fill(); ctx.restore();
-      }
-      raf=requestAnimationFrame(draw);
-    };
-    raf=requestAnimationFrame(draw); return ()=>{ if(raf) cancelAnimationFrame(raf); };
-  },[domain, dataLast, seriesMs, seriesVal, theme]);
-
-  // ---- Interaction
-  const domainRef = useRef(domain); const rulesRef = useRef(rules); const dataFirstRef=useRef(dataFirst); const rightBoundRef=useRef(rightBound);
-  useEffect(()=>{ domainRef.current=domain; rulesRef.current=rules; dataFirstRef.current=dataFirst; rightBoundRef.current=rightBound; },[domain,rules,dataFirst,rightBound]);
-  useEffect(()=>{
-    const c=canvasRef.current; if(!c) return; let isDragging=false; let dragStartX=0; let lastX=0; let v=0; let raf;
-    const clampDom=(left,right)=>{ if(rulesRef.current.spanMs==="all") return {left:dataFirstRef.current,right:rightBoundRef.current}; const span=right-left; const maxR=rightBoundRef.current; const minL=dataFirstRef.current; if(right>maxR){ right=maxR; left=right-span; } if(left<minL){ left=minL; right=Math.min(left+span,maxR); } return {left,right}; };
-    const span=()=> (domainRef.current.right - domainRef.current.left);
-    const applyPan=(dtMs)=>{ const left=domainRef.current.left + dtMs; const right=domainRef.current.right + dtMs; setDomain(clampDom(left,right)); };
-
-    const onDown=(e)=>{ isDragging=true; dragStartX=e.clientX; lastX=e.clientX; v=0; e.target.setPointerCapture(e.pointerId); };
-    const onMove=(e)=>{ const rect=c.getBoundingClientRect(); const x=(e.clientX-rect.left); const y=(e.clientY-rect.top); const hit=hitBoxesRef.current.find(b=> x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); c.style.cursor = hit? "pointer" : "default"; hoverRef.current = hit? {cx:hit.cx, cy:hit.cy, R:hit.R, color:hit.color, glyph:hit.glyph}: null; if(!isDragging) return; const dx=e.clientX - lastX; lastX=e.clientX; v=dx; const msPerPx = span() / Math.max(1, (c.clientWidth) - padL - padR); applyPan(-dx*msPerPx); };
-    const onUp=(e)=>{ if(!isDragging) return; isDragging=false; e.target.releasePointerCapture(e.pointerId); const dragDist=Math.abs(e.clientX-dragStartX); if(dragDist<5){ const rect=c.getBoundingClientRect(); const x=e.clientX-rect.left; const y=e.clientY-rect.top; const hit=hitBoxesRef.current.find(b=> x>=b.x && x<=b.x+b.w && y>=b.y && y<=b.y+b.h); if(hit) setSelected(hit.group); }
-      else{ let vel=v; const decay=.92; const step=()=>{ if(Math.abs(vel)<.2){ if(raf) cancelAnimationFrame(raf); raf=undefined; return; } const msPerPx = span() / Math.max(1,(c.clientWidth)-padL-padR); applyPan(-vel*msPerPx); vel*=decay; raf=requestAnimationFrame(step); }; if(!raf) raf=requestAnimationFrame(step); }
-    };
-    const onWheel=(e)=>{ e.preventDefault(); if(rulesRef.current.spanMs==="all") return; if(e.shiftKey){ const idx=ZOOMS.indexOf(zoom); const next = e.deltaY < 0 ? clamp(idx-1,0,ZOOMS.length-1) : clamp(idx+1,0,ZOOMS.length-1); if(next!==idx) setZoom(ZOOMS[next]); return; } const step=(domainRef.current.right-domainRef.current.left)*0.15; const dir=e.deltaY<0? -1: 1; applyPan(dir*step); };
-
-    c.addEventListener("pointerdown", onDown); window.addEventListener("pointermove", onMove); window.addEventListener("pointerup", onUp); c.addEventListener("wheel", onWheel, {passive:false});
-    return ()=>{ c.removeEventListener("pointerdown", onDown); window.removeEventListener("pointermove", onMove); window.removeEventListener("pointerup", onUp); c.removeEventListener("wheel", onWheel); if(raf) cancelAnimationFrame(raf); };
-  },[zoom]);
-
-  // ---- Helpers
-  const jumpToNow = ()=>{ if(rules.spanMs==="all") return setDomain({left:dataFirst,right:rightBound}); const span = rules.spanMs; const now=Date.now(); let right=Math.min(now,rightBound); let left=right-span; if(left<dataFirst){ left=dataFirst; right=Math.min(left+span,rightBound);} setDomain({left,right}); };
 
   const info = log?.metadata; const isEmpty = !log || (log.activities?.length ?? 0)===0 || (log.balanceTimeseries?.length ?? 0)===0;
 

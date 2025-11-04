@@ -360,10 +360,25 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
             leverage=leverage
         )
 
+        # Check if API call succeeded AND trade actually executed
         if result.get("status") == "success":
             trade = result.get("trade", {})
 
-            # Auto-log activity to timeline
+            # Check nested trade status - API can return success but trade can fail!
+            if trade.get("status") == "failed":
+                return {
+                    "content": [{
+                        "type": "text",
+                        "text": f"❌ Trade execution FAILED\n\n"
+                                f"Symbol: {symbol}\n"
+                                f"Side: {side}\n"
+                                f"Reason: {trade.get('reason', 'Unknown error')}\n\n"
+                                f"No position was opened. You can try again with different parameters."
+                    }],
+                    "isError": True
+                }
+
+            # Trade succeeded - log activity to timeline
             activity_type = f"trade_entry_{side}" if side in ['long', 'short'] else 'trade_entry_long'
             trade_type = agent_context.trading_mode or 'paper'  # 'paper', 'aster', or 'symphony'
 
