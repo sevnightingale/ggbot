@@ -197,13 +197,17 @@ class ConfigService:
         """
         try:
             config_id = str(uuid.uuid4())
-            
+
+            # Determine trading mode based on config type
+            config_type = config_data.get("config_type", "autonomous_trading")
+            trading_mode = "aster" if config_type == "agent" else "paper"
+
             # Create config object
             config = BotConfigV2(
                 config_id=config_id,
                 user_id=user_id,
                 config_name=config_name,
-                config_type=config_data.get("config_type", "autonomous_trading"),
+                config_type=config_type,
                 selected_pair=config_data.get("selected_pair", "BTC/USDT"),
                 extraction=config_data.get("extraction"),
                 decision=config_data.get("decision"),
@@ -211,7 +215,8 @@ class ConfigService:
                 schema_version=config_data.get("schema_version", "2.1"),
                 agent_strategy=config_data.get("agent_strategy"),
                 llm_config=config_data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
-                telegram_integration=config_data.get("telegram_integration", {})
+                telegram_integration=config_data.get("telegram_integration", {}),
+                trading_mode=trading_mode
             )
             
             # Validate configuration
@@ -225,14 +230,15 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         INSERT INTO configurations
-                        (config_id, user_id, config_type, config_name, config_data, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, NOW(), NOW())
+                        (config_id, user_id, config_type, config_name, config_data, trading_mode, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
                     """, (
                         config_id,
                         user_id,
                         config.config_type,  # Use actual config_type from BotConfigV2
                         config_name,
-                        json.dumps(config.to_jsonb())
+                        json.dumps(config.to_jsonb()),
+                        config.trading_mode
                     ))
                 conn.commit()
             
