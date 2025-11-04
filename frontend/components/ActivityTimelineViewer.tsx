@@ -932,39 +932,21 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [domain, dataLast, seriesMs, seriesVal, log]);
 
-  // Helper function for domain clamping (defined before interactions so it can be used)
-  const clampDomain = (left: number, right: number) => {
-    if (rules.spanMs === "all") return { left: dataFirst, right: rightBound };
-    const span = right - left;
-    const maxRight = rightBound;
-    const minLeft = dataFirst;
-
-    // Clamp right boundary first
-    if (right > maxRight) {
-      right = maxRight;
-      left = right - span;
-    }
-
-    // Clamp left boundary, but don't violate right boundary
-    if (left < minLeft) {
-      left = minLeft;
-      right = Math.min(left + span, maxRight);
-    }
-
-    return { left, right };
-  };
-
   // Interactions - use refs to avoid recreating handlers on every domain change
   const domainRef = useRef(domain);
   const zoomRef = useRef(zoom);
   const rulesRef = useRef(rules);
+  const dataFirstRef = useRef(dataFirst);
+  const rightBoundRef = useRef(rightBound);
 
   // Keep refs in sync
   useEffect(() => {
     domainRef.current = domain;
     zoomRef.current = zoom;
     rulesRef.current = rules;
-  }, [domain, zoom, rules]);
+    dataFirstRef.current = dataFirst;
+    rightBoundRef.current = rightBound;
+  }, [domain, zoom, rules, dataFirst, rightBound]);
 
   // Stable interaction handlers
   useEffect(() => {
@@ -975,6 +957,28 @@ export default function ActivityTimelineViewer({ configId }: ActivityTimelineVie
     let lastX = 0;
     let v = 0;
     let raf: number | null = null;
+
+    // Helper function for domain clamping using refs
+    const clampDomain = (left: number, right: number) => {
+      if (rulesRef.current.spanMs === "all") return { left: dataFirstRef.current, right: rightBoundRef.current };
+      const span = right - left;
+      const maxRight = rightBoundRef.current;
+      const minLeft = dataFirstRef.current;
+
+      // Clamp right boundary first
+      if (right > maxRight) {
+        right = maxRight;
+        left = right - span;
+      }
+
+      // Clamp left boundary, but don't violate right boundary
+      if (left < minLeft) {
+        left = minLeft;
+        right = Math.min(left + span, maxRight);
+      }
+
+      return { left, right };
+    };
 
     const span = () => (domainRef.current.right - domainRef.current.left);
     const applyPan = (dtMs: number) => {
