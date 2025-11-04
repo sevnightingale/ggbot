@@ -108,7 +108,6 @@ export default function Timeline({ configId, title, initialZoom = '4h' }){
   const [strategy, setStrategy] = useState(null);
   const [showStrategy, setShowStrategy] = useState(false);
   const [zoom, setZoom] = useState(initialZoom);
-  const [domain, setDomain] = useState(()=>({left: Date.now()-24*60*60*1000, right: Date.now()}));
   const [selected, setSelected] = useState(null);
   const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
   const [visibleTypes, setVisibleTypes] = useState(()=>{
