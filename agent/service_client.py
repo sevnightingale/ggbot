@@ -294,6 +294,31 @@ class GGBotAPIClient:
         )
         return response.json()
 
+    async def cancel_order(
+        self,
+        config_id: str,
+        order_id: str,
+        symbol: str
+    ) -> Dict[str, Any]:
+        """
+        Cancel a specific order (TP/SL/Limit).
+
+        Args:
+            config_id: Configuration ID
+            order_id: Order ID to cancel
+            symbol: Trading pair symbol
+
+        Returns:
+            Cancellation result
+        """
+        response = await self._retry_request(
+            "DELETE",
+            f"/api/v2/agent/orders/{order_id}",
+            params={"user_id": self.user_id},
+            json={"config_id": config_id, "symbol": symbol}
+        )
+        return response.json()
+
     # ========================================================================
     # CONFIGURATION & STRATEGY
     # ========================================================================

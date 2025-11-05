@@ -161,15 +161,22 @@ export default function BalanceChartTV({
       })
       .sort((a, b) => (a.time as number) - (b.time as number));
 
+    // Check for any null/undefined values
+    const hasInvalidValues = chartData.some(d =>
+      d.time == null || d.value == null ||
+      isNaN(d.value as number) || !isFinite(d.value as number)
+    );
+
     console.log('[BalanceChartTV] Processed chart data:', {
       originalLength: balanceData.length,
       filteredLength: chartData.length,
-      firstThree: chartData.slice(0, 3).map(d => ({
+      hasInvalidValues,
+      allData: chartData.map(d => ({
         time: d.time,
         humanTime: new Date((d.time as number) * 1000).toISOString(),
-        value: d.value
+        value: d.value,
+        valueType: typeof d.value
       })),
-      allTimes: chartData.map(d => d.time),
       timesAreSorted: chartData.every((d, i) =>
         i === 0 || (d.time as number) >= (chartData[i-1].time as number)
       )
@@ -182,14 +189,22 @@ export default function BalanceChartTV({
       return;
     }
 
+    if (hasInvalidValues) {
+      console.error('[BalanceChartTV] Chart data contains invalid values, skipping render');
+      chart.remove();
+      return;
+    }
+
+    console.log('[BalanceChartTV] Setting line data with', chartData.length, 'points');
     lineSeries.setData(chartData);
+    console.log('[BalanceChartTV] Line data set successfully');
 
     // Create markers from activities
     // Filter out invalid activities and sort by time
     const markers: SeriesMarker<Time>[] = activities
       .filter(activity => {
-        // Only show highest priority activities (priority 1) to avoid clutter
-        if (!activity || !activity.timestamp || !activity.type || activity.priority !== 1) return false;
+        // Show all activities (you want to see everything)
+        if (!activity || !activity.timestamp || !activity.type) return false;
         const time = new Date(activity.timestamp).getTime();
         return !isNaN(time);
       })

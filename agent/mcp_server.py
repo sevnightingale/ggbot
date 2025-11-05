@@ -1,9 +1,9 @@
 """
 Agent MCP Server
 
-Defines 10 MCP tools for autonomous trading agent using Claude Agent SDK.
+Defines 12 MCP tools for autonomous trading agent using Claude Agent SDK.
 Tools provide market data queries, trade execution, account management,
-trade observation learning, and mode switching.
+order management, trade observation learning, and mode switching.
 
 Architecture:
 - Module-level state (AgentContext) for single-agent Phase 2 testing
@@ -539,6 +539,7 @@ async def get_account_status(args: Dict[str, Any]) -> Dict[str, Any]:
         # Additional live trading metrics
         margin_balance = account.get("margin_balance", 0)
         unrealized_pnl = account.get("unrealized_pnl", 0)
+        open_orders = account.get("open_orders", [])
 
         # Dynamic header based on trading mode
         mode_label = {
@@ -565,6 +566,41 @@ Open Positions: {open_positions}
 Margin Balance: ${margin_balance:,.2f}
 Unrealized P&L: ${unrealized_pnl:,.2f}
             """.strip()
+
+        # Add open orders section if any exist
+        if open_orders:
+            account_text += f"""
+
+📋 Open Orders ({len(open_orders)}):
+            """.strip()
+
+            for order in open_orders:
+                order_type = order.get('type', 'UNKNOWN')
+                symbol = order.get('symbol', 'UNKNOWN')
+                side = order.get('side', 'UNKNOWN')
+                qty = float(order.get('origQty', 0))
+                order_id = order.get('orderId', 'unknown')
+
+                # Format based on order type
+                if order_type in ['STOP_MARKET', 'STOP']:
+                    stop_price = float(order.get('stopPrice', 0))
+                    account_text += f"""
+  • SL: {symbol} {side} {qty} @ ${stop_price:,.2f} (ID: {order_id})"""
+                elif order_type in ['TAKE_PROFIT_MARKET', 'TAKE_PROFIT']:
+                    stop_price = float(order.get('stopPrice', 0))
+                    account_text += f"""
+  • TP: {symbol} {side} {qty} @ ${stop_price:,.2f} (ID: {order_id})"""
+                elif order_type == 'LIMIT':
+                    price = float(order.get('price', 0))
+                    account_text += f"""
+  • LIMIT: {symbol} {side} {qty} @ ${price:,.2f} (ID: {order_id})"""
+                else:
+                    account_text += f"""
+  • {order_type}: {symbol} {side} {qty} (ID: {order_id})"""
+
+            account_text += """
+
+💡 Tip: Use cancel_order tool to remove orphaned orders"""
 
         return {
             "content": [{
@@ -668,7 +704,61 @@ async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ============================================================================
-# TOOL 6: UPDATE STRATEGY
+# TOOL 6: CANCEL ORDER
+# ============================================================================
+
+@tool(
+    "cancel_order",
+    "Cancel a specific open order (TP/SL/Limit). Params: order_id (required), symbol (required)",
+    {"order_id": str, "symbol": str}
+)
+async def cancel_order(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Cancel an open order by ID.
+
+    Use this to clean up orphaned TP/SL orders or cancel pending limit orders.
+    Check get_account_status to see all open orders first.
+    """
+    try:
+        order_id = args["order_id"]
+        symbol = args["symbol"]
+
+        result = await agent_context.api_client.cancel_order(
+            config_id=agent_context.config_id,
+            order_id=order_id,
+            symbol=symbol
+        )
+
+        if result.get("status") == "success":
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"✅ Order cancelled successfully!\n\n"
+                            f"Order ID: {order_id}\n"
+                            f"Symbol: {symbol}\n\n"
+                            f"The order has been removed from your account."
+                }]
+            }
+        else:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"⚠️ Failed to cancel order: {result.get('message', 'Unknown error')}"
+                }]
+            }
+
+    except Exception as e:
+        logger.error(f"cancel_order failed: {e}")
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"❌ Failed to cancel order: {str(e)}"
+            }]
+        }
+
+
+# ============================================================================
+# TOOL 7: UPDATE STRATEGY
 # ============================================================================
 
 @tool(
@@ -1094,13 +1184,13 @@ def create_mcp_server():
     logger.debug("   2. get_current_price - Get current price for a symbol")
     logger.debug("   3. execute_trade - Execute a trade")
     logger.debug("   4. get_positions - Get open trading positions")
-    logger.debug("   5. get_account_status - Get account balance and statistics")
+    logger.debug("   5. get_account_status - Get account balance, statistics, and open orders")
     logger.debug("   6. close_position - Close an open position")
-    logger.debug("   7. update_strategy - Update trading strategy")
-    logger.debug("   8. wait_for - Pause execution")
-    logger.debug("   9. record_trade_observation - Record trade learnings")
-    logger.debug("   10. query_trade_observations - Query past observations")
-    logger.debug("   11. log_activity - Log agent reasoning/analysis to timeline")
+    logger.debug("   7. cancel_order - Cancel a specific open order (TP/SL/Limit)")
+    logger.debug("   8. update_strategy - Update trading strategy")
+    logger.debug("   9. wait_for - Pause execution")
+    logger.debug("   10. record_trade_observation - Record trade learnings")
+    logger.debug("   11. query_trade_observations - Query past observations")
     logger.debug("   12. save_strategy_and_exit - Save strategy and exit")
 
     # Create server with all tools
@@ -1114,6 +1204,7 @@ def create_mcp_server():
             get_positions,
             get_account_status,
             close_position,
+            cancel_order,
             update_strategy,
             wait_for,
             record_trade_observation,
@@ -1122,7 +1213,7 @@ def create_mcp_server():
         ]
     )
 
-    logger.info("MCP server created successfully with 11 tools")
+    logger.info("MCP server created successfully with 12 tools")
     return server
 
 

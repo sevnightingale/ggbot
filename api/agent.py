@@ -561,11 +561,15 @@ async def get_account_status(
             # Get open positions to calculate metrics
             positions = await aster_service.get_open_positions(config_id)
 
+            # Get all open orders (TP/SL/Limit orders)
+            open_orders = await aster_service.get_open_orders() or []
+
             account = {
                 "balance": float(usdt_balance.get('availableBalance', 0)),
                 "margin_balance": float(usdt_balance.get('balance', 0)),
                 "unrealized_pnl": float(usdt_balance.get('unrealizedProfit', 0)),
                 "open_positions": len(positions),
+                "open_orders": open_orders,  # Include all open orders
                 "total_trades": 0,  # Not tracked for Aster
                 "win_rate": 0.0,    # Not tracked for Aster
                 "total_pnl": 0.0    # Not tracked for Aster
@@ -641,7 +645,69 @@ async def close_position(
 
 
 # ============================================================================
-# 6. UPDATE STRATEGY (Agent modifies its own strategy)
+# 6. CANCEL ORDER
+# ============================================================================
+
+@router.delete("/orders/{order_id}")
+async def cancel_order(
+    order_id: str,
+    symbol: str = Body(..., embed=True),
+    config_id: str = Body(..., embed=True),
+    user_id: str = Query(...),
+    authorization: str = Header(None),
+    x_service_auth: str = Header(None, alias="x-service-auth")
+) -> Dict[str, Any]:
+    """
+    Cancel a specific order (TP/SL/Limit).
+
+    Used by agent to clean up orphaned orders.
+    """
+    validate_agent_service_auth(authorization, x_service_auth)
+
+    try:
+        config = get_configuration(user_id=user_id, config_id=config_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        trading_mode = config.get('trading_mode', 'paper')
+
+        if trading_mode == 'paper':
+            # Paper trading doesn't have pending orders to cancel
+            raise HTTPException(status_code=400, detail="Paper trading doesn't support order cancellation")
+        elif trading_mode == 'aster':
+            from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+            aster_service = AsterDEXV3LiveTradingService()
+            result = await aster_service.cancel_order(
+                symbol=symbol,
+                order_id=order_id,
+                user_id=user_id,
+                config_id=config_id
+            )
+        elif trading_mode == 'symphony':
+            # TODO: Cancel order via Symphony
+            raise HTTPException(status_code=501, detail="Symphony order cancellation not implemented yet")
+        else:
+            raise HTTPException(status_code=400, detail=f"Unknown trading mode: {trading_mode}")
+
+        logger.info(
+            f"Agent cancelled order: {order_id}",
+            user_id=user_id,
+            config_id=config_id
+        )
+
+        return {
+            "status": "success",
+            "result": result,
+            "timestamp": datetime.utcnow().isoformat()
+        }
+
+    except Exception as e:
+        logger.error(f"Cancel order failed: {e}", user_id=user_id)
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# 7. UPDATE STRATEGY (Agent modifies its own strategy)
 # ============================================================================
 
 @router.patch("/config/{config_id}/strategy")

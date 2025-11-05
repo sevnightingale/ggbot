@@ -305,9 +305,9 @@ quantity_btc = position_size_usd / btc_price  # e.g., 0.001 BTC minimum
 ```
 
 **Balance Fields Explained:**
-- **`availableBalance`**: Total account equity (wallet + unrealized P&L). **This is the source of truth for trading.**
+- **`crossWalletBalance`**: **TOTAL EQUITY** (settled balance + unrealized P&L). **This is the source of truth for charts/performance.**
+- **`availableBalance`**: Free cash available for trading (not locked in positions)
 - **`balance`**: Settled balance only (excludes unrealized P&L from open positions)
-- **`crossWalletBalance`**: Cross-margin wallet balance
 - **`crossUnPnl`**: Unrealized P&L from open positions
 
 **Position Sizing Examples:**

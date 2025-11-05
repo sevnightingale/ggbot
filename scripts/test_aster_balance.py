@@ -51,21 +51,27 @@ async def main():
     print(json.dumps(balance_data, indent=2))
     print()
 
-    # Extract USDT balance if available
+    # Extract stablecoin balances (USDT + USDC)
     if isinstance(balance_data, list):
+        total_equity = 0.0
+
         for asset in balance_data:
-            if asset.get('asset') == 'USDT':
-                print("USDT Balance Details:")
-                print(f"  ✅ Account Balance (availableBalance): ${asset.get('availableBalance', 'N/A')}")
-                print(f"     └─ SOURCE OF TRUTH for trading equity")
+            if asset.get('asset') in ['USDT', 'USDC']:
+                asset_name = asset.get('asset')
+                cross_wallet = float(asset.get('crossWalletBalance', 0))
+                total_equity += cross_wallet
+
+                print(f"{asset_name} Balance:")
+                print(f"  Equity (crossWalletBalance): ${cross_wallet}")
+                print(f"  Available: ${asset.get('availableBalance', 'N/A')}")
+                print(f"  Settled: ${asset.get('balance', 'N/A')}")
+                print(f"  Unrealized P&L: ${asset.get('crossUnPnl', 'N/A')}")
                 print()
-                print(f"  Settled Balance (balance): ${asset.get('balance', 'N/A')}")
-                print(f"     └─ Excludes unrealized P&L")
-                print()
-                print(f"  Cross Wallet Balance: ${asset.get('crossWalletBalance', 'N/A')}")
-                print(f"  Cross Unrealized P&L: ${asset.get('crossUnPnl', 'N/A')}")
-                print(f"  Max Withdraw: ${asset.get('maxWithdrawAmount', 'N/A')}")
-                print()
+
+        if total_equity > 0:
+            print(f"✅ TOTAL ACCOUNT EQUITY (USDT + USDC): ${total_equity:.2f}")
+            print(f"   └─ This is the SOURCE OF TRUTH for charts")
+            print()
 
 
 if __name__ == "__main__":

@@ -1112,30 +1112,32 @@ class AsterDEXV3LiveTradingService:
             positions = await self.get_open_positions(config_id)
             total_unrealized_pnl = sum(pos.get("unrealized_pnl", 0) for pos in positions)
 
-            usdt_balance = None
+            # Sum balances from both USDT and USDC (Aster pays profits in USDT, but capital may be in USDC)
+            total_equity = 0.0
+            available_balance = 0.0
+            cross_unrealized_pnl = 0.0
+
+            for asset in balance_data:
+                if asset.get("asset") in ["USDT", "USDC"]:
+                    # crossWalletBalance = settled balance + unrealized P&L for this asset
+                    total_equity += float(asset.get("crossWalletBalance", 0))
+                    cross_unrealized_pnl += float(asset.get("crossUnPnl", 0))
+
+            # availableBalance from one asset shows total USD value (they should be similar)
+            # We'll use this as a sanity check
             for asset in balance_data:
                 if asset.get("asset") == "USDT":
-                    usdt_balance = asset
+                    available_balance = float(asset.get("availableBalance", 0))
                     break
-
-            if not usdt_balance:
-                return {
-                    "status": "failed",
-                    "reason": "USDT balance not found"
-                }
-
-            # availableBalance is the account balance (source of truth for trading equity)
-            # balance field is the settled balance (doesn't include unrealized P&L)
-            account_balance = float(usdt_balance.get("availableBalance", 0))
 
             return {
                 "status": "success",
-                "balance": account_balance,  # Use availableBalance as primary balance
-                "available_balance": account_balance,  # Keep for backwards compatibility
+                "balance": total_equity,  # TOTAL EQUITY for charts (realized + unrealized)
+                "available_balance": available_balance,  # Free cash (for trading checks)
                 "settled_balance": float(usdt_balance.get("balance", 0)),  # Settled balance only
-                "cross_wallet_balance": float(usdt_balance.get("crossWalletBalance", 0)),
-                "cross_unrealized_pnl": float(usdt_balance.get("crossUnPnl", 0)),
-                "total_unrealized_pnl": total_unrealized_pnl,
+                "cross_wallet_balance": total_equity,  # Same as total equity
+                "cross_unrealized_pnl": cross_unrealized_pnl,  # Unrealized P&L
+                "total_unrealized_pnl": total_unrealized_pnl,  # From positions endpoint (should match)
                 "positions_count": len(positions),
                 "positions": positions
             }
@@ -1219,3 +1221,90 @@ class AsterDEXV3LiveTradingService:
         except Exception as e:
             self._log.error(f"Exception querying user trades: {e}")
             return None
+
+    async def get_open_orders(self, symbol: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get all open orders for the account.
+
+        Args:
+            symbol: Optional symbol filter (e.g., "BTCUSDT")
+
+        Returns:
+            List of open orders with details:
+            - orderId: Order ID
+            - symbol: Trading pair
+            - side: BUY or SELL
+            - type: Order type (LIMIT, STOP_MARKET, TAKE_PROFIT_MARKET, etc.)
+            - origQty: Original quantity
+            - price: Limit price (for limit orders)
+            - stopPrice: Trigger price (for stop orders)
+            - time: Order creation timestamp (ms)
+            - updateTime: Last update timestamp (ms)
+        """
+        nonce = math.trunc(time.time() * 1000000)
+        params = {}
+        if symbol:
+            params['symbol'] = symbol
+
+        signed_params = self._generate_signature(params, nonce)
+        url = f"{self.base_url}/fapi/v3/openOrders"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=signed_params,
+                    timeout=aiohttp.ClientTimeout(total=self.timeout)
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    else:
+                        error_text = await response.text()
+                        self._log.error(f"Open orders query failed: {response.status} - {error_text}")
+                        return None
+        except Exception as e:
+            self._log.error(f"Exception querying open orders: {e}")
+            return None
+
+    async def cancel_order(self, symbol: str, order_id: str, user_id: str, config_id: str) -> Dict[str, Any]:
+        """
+        Cancel a specific order (public method for agent/API use).
+
+        Args:
+            symbol: Trading pair (e.g., "BTCUSDT")
+            order_id: Order ID to cancel
+            user_id: User ID for activity logging
+            config_id: Config ID for activity logging
+
+        Returns:
+            Dict with status and details
+        """
+        success = await self._cancel_order(symbol, order_id)
+
+        if success:
+            # Log activity
+            log_activity_safe(
+                config_id=config_id,
+                user_id=user_id,
+                activity_type='order_cancelled',
+                activity_source='aster_service',
+                summary=f"Cancelled order {order_id} for {symbol}",
+                details={
+                    'symbol': symbol,
+                    'order_id': order_id
+                },
+                trade_type='aster',
+                related_symbol=symbol,
+                priority=2,
+                importance=5
+            )
+
+            return {
+                "status": "success",
+                "message": f"Order {order_id} cancelled successfully"
+            }
+        else:
+            return {
+                "status": "failed",
+                "message": f"Failed to cancel order {order_id}"
+            }
