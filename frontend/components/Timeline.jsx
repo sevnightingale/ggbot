@@ -1,14 +1,10 @@
 
 "use client";
-import React, {useEffect, useRef, useState} from "react";
+import React, {useEffect, useState} from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import dynamic from 'next/dynamic';
 
-// Dynamically import TradingView chart (client-side only)
-const BalanceChartTV = dynamic(
-  () => import('./BalanceChartTV'),
-  { ssr: false }
-);
+// Import Recharts component
+import BalanceChartRecharts from './BalanceChartRecharts';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 
 // =====================================================
@@ -184,9 +180,6 @@ export default function Timeline({ configId, title }){
     fetchData();
   }, [configId, session]);
 
-  // TradingView chart container ref
-  const chartContainerRef = useRef(null);
-
   const info = log?.metadata; const isEmpty = !log || (log.activities?.length ?? 0)===0 || (log.balanceTimeseries?.length ?? 0)===0;
 
   // ---- Filter list UI (shared)
@@ -320,10 +313,9 @@ export default function Timeline({ configId, title }){
           {/* RIGHT – Chart */}
           <div className="col-span-12 md:col-span-9 min-h-[360px] sm:min-h-[420px]">
             <div className="rounded-xl border h-full relative overflow-hidden" style={{ backgroundColor: theme.carbon, borderColor: theme.hair }}>
-              <div ref={chartContainerRef} className="absolute inset-0">
-                {log?.balanceTimeseries && Array.isArray(log.balanceTimeseries) && log.balanceTimeseries.length > 0 &&
-                 log?.activities && Array.isArray(log.activities) ? (
-                  <BalanceChartTV
+              <div className="absolute inset-0">
+                {log?.balanceTimeseries && log?.activities ? (
+                  <BalanceChartRecharts
                     balanceData={log.balanceTimeseries}
                     activities={log.activities}
                     onActivityClick={(activity) => setSelected([activity])}
