@@ -164,8 +164,15 @@ export default function BalanceChartTV({
     console.log('[BalanceChartTV] Processed chart data:', {
       originalLength: balanceData.length,
       filteredLength: chartData.length,
-      firstThree: chartData.slice(0, 3),
-      allData: chartData  // Log ALL points to see where null is
+      firstThree: chartData.slice(0, 3).map(d => ({
+        time: d.time,
+        humanTime: new Date((d.time as number) * 1000).toISOString(),
+        value: d.value
+      })),
+      allTimes: chartData.map(d => d.time),
+      timesAreSorted: chartData.every((d, i) =>
+        i === 0 || (d.time as number) >= (chartData[i-1].time as number)
+      )
     });
 
     // Don't render if no valid data
@@ -209,11 +216,28 @@ export default function BalanceChartTV({
       })
       .sort((a, b) => (a.time as number) - (b.time as number));
 
+    // Analyze timestamp distribution
+    const markerTimes = markers.map(m => m.time as number);
+    const uniqueTimes = new Set(markerTimes);
+    const timeDiffs = markerTimes.slice(1).map((t, i) => t - markerTimes[i]);
+
     console.log('[BalanceChartTV] Processed markers:', {
       originalLength: activities.length,
       filteredLength: markers.length,
-      firstThree: markers.slice(0, 3),
-      allMarkers: markers  // Log all markers
+      uniqueTimestamps: uniqueTimes.size,
+      duplicateCount: markers.length - uniqueTimes.size,
+      firstTen: markers.slice(0, 10).map(m => ({
+        time: m.time,
+        humanTime: new Date((m.time as number) * 1000).toISOString(),
+        type: m.text,
+        position: m.position
+      })),
+      timeSpan: {
+        min: new Date(Math.min(...markerTimes) * 1000).toISOString(),
+        max: new Date(Math.max(...markerTimes) * 1000).toISOString(),
+        spanHours: ((Math.max(...markerTimes) - Math.min(...markerTimes)) / 3600).toFixed(1)
+      },
+      avgTimeBetweenMarkers: (timeDiffs.reduce((a, b) => a + b, 0) / timeDiffs.length / 60).toFixed(1) + ' minutes'
     });
 
     // Add markers using v5 plugin API
