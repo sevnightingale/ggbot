@@ -181,8 +181,8 @@ export default function BalanceChartTV({
     // Filter out invalid activities and sort by time
     const markers: SeriesMarker<Time>[] = activities
       .filter(activity => {
-        // Filter out null/invalid activities
-        if (!activity || !activity.timestamp || !activity.type || activity.priority > 2) return false;
+        // Only show highest priority activities (priority 1) to avoid clutter
+        if (!activity || !activity.timestamp || !activity.type || activity.priority !== 1) return false;
         const time = new Date(activity.timestamp).getTime();
         return !isNaN(time);
       })

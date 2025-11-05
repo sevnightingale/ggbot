@@ -642,7 +642,11 @@ async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
                             f"Side: {trade.get('side', 'N/A')}\n"
                             f"P&L: ${pnl:.2f} ({pnl_pct:.2f}%)\n"
                             f"Reason: {reasoning}\n\n"
-                            f"Consider recording a trade observation to reflect on this trade."
+                            f"**NEXT STEPS:**\n"
+                            f"1. Record a trade observation (optional but recommended)\n"
+                            f"2. Use wait_for() to schedule your next market scan\n"
+                            f"3. Continue autonomous trading loop\n\n"
+                            f"Remember: You must ALWAYS use wait_for() to control timing between actions."
                 }]
             }
         else:

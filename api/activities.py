@@ -299,9 +299,11 @@ async def get_balance_series(
                     "balance": running_balance
                 })
 
-            # Add current balance as final point
+            # Add current balance as final point (ensure timestamp is after last trade)
+            last_trade_time = all_trades[-1]['timestamp'] if all_trades else config_created_at
+            final_timestamp = max(last_trade_time, datetime.now(timezone.utc))
             balance_points.append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": final_timestamp.isoformat(),
                 "balance": current_balance
             })
 
@@ -329,9 +331,11 @@ async def get_balance_series(
                     "balance": cumulative_pnl
                 })
 
-            # Add current P&L as final point
+            # Add current P&L as final point (ensure timestamp is after last trade)
+            last_trade_time = all_trades[-1]['timestamp'] if all_trades else config_created_at
+            final_timestamp = max(last_trade_time, datetime.now(timezone.utc))
             pnl_points.append({
-                "timestamp": datetime.now(timezone.utc).isoformat(),
+                "timestamp": final_timestamp.isoformat(),
                 "balance": cumulative_pnl
             })
 

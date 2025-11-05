@@ -53,18 +53,19 @@ class AsterOrderMonitor:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT
-                            batch_id,
-                            config_id,
-                            user_id,
-                            stop_loss_order_id,
-                            take_profit_order_id,
-                            symbol,
-                            created_at
-                        FROM live_trades
-                        WHERE provider = 'aster'
-                        AND closed_at IS NULL
-                        AND (stop_loss_order_id IS NOT NULL OR take_profit_order_id IS NOT NULL)
-                        ORDER BY created_at DESC
+                            lt.batch_id,
+                            lt.config_id,
+                            c.user_id,
+                            lt.stop_loss_order_id,
+                            lt.take_profit_order_id,
+                            lt.symbol,
+                            lt.created_at
+                        FROM live_trades lt
+                        JOIN configurations c ON lt.config_id = c.config_id
+                        WHERE lt.provider = 'aster'
+                        AND lt.closed_at IS NULL
+                        AND (lt.stop_loss_order_id IS NOT NULL OR lt.take_profit_order_id IS NOT NULL)
+                        ORDER BY lt.created_at DESC
                     """)
                     rows = cur.fetchall()
 
