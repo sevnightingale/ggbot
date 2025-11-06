@@ -233,371 +233,77 @@
 
 ---
 
-## 📊 **Activity Timeline Integration** ✅ COMPLETE
+## 📊 **Activity Timeline Integration** ✅ COMPLETE (2025-11-06)
 
-**Status**: Agent activity logging operational (2025-11-03)
-**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for implementation details
+**Status**: Production-ready activity logging for all bot types (agents, scheduled, signal validation)
+**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for full implementation details
 
-**Completed**:
+**Completed Features**:
 - ✅ Activities table with RLS, indexes, priority-based grouping
-- ✅ Activity logger helper (`core/common/activity_logger.py`)
-- ✅ Agent MCP tool integration (log_activity + auto-logging in 6 tools)
+- ✅ Activity logger helper with auto-logging from 11 agent MCP tools
 - ✅ 3 API endpoints (activities, balance-series, metadata)
-- ✅ Aster P&L integration (queries `/fapi/v3/userTrades`, combines with paper trades)
-- ✅ Frontend Activity Timeline with real data, 10s polling, React hooks compliance
-- ✅ UI refinements (trade_win/loss icons, live status indicator, dynamic layout)
+- ✅ Aster P&L integration (combines paper + live trades)
+- ✅ Frontend Activity Timeline with real data, 10s polling
+- ✅ UI polish (trade_win/loss icons, live status, responsive layout)
 
-**Next Steps**:
-- Agent needs to run and create activities for full timeline visualization
-- Add scheduled bot activity logging (orchestrator integration)
-- Optional: Trade lifecycle linking, "View Configuration" modal for competition
+**Optional Future Enhancements**:
+- Scheduled bot activity logging (orchestrator integration)
+- Trade lifecycle linking with click highlighting
+- "View Configuration" modal for competition
 - Active Positions section at bottom of timeline
-- Submission-ready view page for Aster Vibe Trading Competition
-
-### **Phase 1: Database & Infrastructure** (2-3 days)
-- [ ] Create unified `activities` table (replaces separate `agent_activities` concept)
-- [ ] Add indexes for performance (config_id, created_at, trade_id, priority)
-- [ ] Enable RLS policy for user isolation
-- [ ] Create `log_activity()` helper function (`core/common/activity_logger.py`)
-- [ ] Test basic INSERT/SELECT operations
-
-### **Phase 2: Orchestrator Integration** (2-3 days)
-- [ ] **Scheduled Bot Logging** (`ggbot.py`)
-  - [ ] Log market_query activities after extraction
-  - [ ] Log decision_made activities after decision engine
-  - [ ] Log trade_entry_long/short on position open
-  - [ ] Log trade_exit on position close
-- [ ] **Agent Tool Logging** (`agent/mcp_server.py`)
-  - [ ] Update query_market_data to auto-log
-  - [ ] Update execute_trade to auto-log
-  - [ ] Update close_position to auto-log
-  - [ ] Update wait_for to auto-log
-  - [ ] Add new log_activity tool for explicit logging
-- [ ] Test with real bot/agent execution
-- [ ] Verify activities appear in database with correct linking
-
-### **Phase 3: API Endpoints** (1-2 days)
-- [ ] Create `api/activities.py` with 3 endpoints:
-  - [ ] `GET /api/v2/activities/{config_id}` - Get all activities with filters
-  - [ ] `GET /api/v2/activities/{config_id}/balance-series` - Equity curve data
-  - [ ] `GET /api/v2/activities/{config_id}/metadata` - Bot stats for header
-- [ ] Add query filters (time range, activity types, trade_id, importance)
-- [ ] Register router in ggbot.py
-- [ ] Test with Postman/curl
-- [ ] Verify auth and ownership checks
-
-### **Phase 4: Frontend Integration** (2-3 days)
-- [ ] **Replace Mock Data** (`ActivityTimelineViewer.tsx`)
-  - [ ] Remove generateMockActivityLog()
-  - [ ] Add API calls to three endpoints
-  - [ ] Add loading/error/empty states
-  - [ ] Implement 10s polling for real-time updates
-- [ ] **Trade Lifecycle Highlighting**
-  - [ ] Add selectedTradeId state
-  - [ ] Highlight icons with glow effect when trade selected
-  - [ ] Draw connection lines between related activities
-  - [ ] Filter side panel to show trade narrative
-- [ ] **Enhanced Side Panel**
-  - [ ] Create TradeNarrativePanel component
-  - [ ] Group activities by phase (entry → monitoring → exit)
-  - [ ] Show trade outcome (P&L, duration)
-  - [ ] Expandable cards for activity details
-- [ ] Test with real data from test bot
-
-### **Phase 5: Testing & Polish** (1-2 days)
-- [ ] End-to-end testing with scheduled bot
-- [ ] End-to-end testing with agent bot
-- [ ] Test trade lifecycle clicking and highlighting
-- [ ] Test zoom levels (icons appear/disappear correctly)
-- [ ] Test empty state, loading state, error state
-- [ ] Test performance with 100+ activities
-- [ ] Mobile responsive testing
-- [ ] Edge cases (long timelines, no exit yet, etc.)
-
-### **Phase 6: Competition Features** (1-2 days)
-- [ ] **View Configuration Modal**
-  - [ ] Track conversation history in `agent/run_agent.py` during strategy definition
-  - [ ] Save `conversation_history` array in `config_data.agent_strategy`
-  - [ ] Create `ConfigurationModal.tsx` with two-column layout (conversation + strategy)
-  - [ ] Add "View Configuration" button to view page (left of "Jump to Now")
-  - [ ] Test modal displays conversation + strategy correctly
-- [ ] **Active Positions Section**
-  - [ ] Add `PositionsTable` component to bottom of view page
-  - [ ] Style with proper spacing and borders
-  - [ ] Test with open/empty positions
-- [ ] **Competition Testing**
-  - [ ] Test full page with live agent `d13d5536-2498-4f27-b2bc-e4f98958e1d8`
-  - [ ] Verify page renders on mobile/tablet
-  - [ ] Take screenshots for submission materials
-  - [ ] Verify public access (no auth required)
-
-**Success Metrics**:
-- ✅ Unified activities table capturing all bot/agent actions
-- ✅ Timeline displays real activities with correct icons/timestamps
-- ✅ Trade clicking highlights all related activities
-- ✅ Side panel shows rich details and trade narratives
-- ✅ Real-time updates via polling (10s interval)
-- ✅ All bot types (agents, scheduled, signal validation) supported
-- ✅ Canvas performance smooth at 60fps
-- ✅ Competition features: View Configuration modal + Active Positions section
 
 ---
 
-## 🤖 **HIGH PRIORITY - Autonomous Trading Agent** [AGENT.md]
+## 🤖 **HIGH PRIORITY - Autonomous Trading Agent** [AGENT.md] ✅ OPERATIONAL
 
-**Timeline**: 1-2 weeks - Enable fully autonomous AI trading agents using Claude Agent SDK
+**Timeline**: Phases 1-4c Complete (Production Ready) | Phase 5: Production Polish In Progress
 
-**See**: [DOCS/todo/AGENT.md](DOCS/todo/AGENT.md) for complete architecture and design decisions
+**See**: [agent/README.md](agent/README.md) for usage guide | [DOCS/todo/AGENT.md](DOCS/todo/AGENT.md) for architecture
 
 **Vision**: Transform ggbots from bot platform (scheduled execution) to agent infrastructure (autonomous AI decision-making)
 
-**Status**: Phase 3 complete (11 tools working), Phase 3.5 complete (full config integration)
+**Status**: ✅ Production - 12 tools operational, 2 agents running live, frontend integration complete
 
-**Key Features**:
-- **Two-phase system**: Conversation Mode → Autonomous Mode
-- **Two personalities**: Guided (user-defined strategy) vs Experimental (agent-evolving strategy)
-- **Minimal DB changes**: 1 field + 1 table
-- **7 tools**: Market data, trading, positions, account, wait, update_strategy, record_learning
-- **Context-based compaction**: Auto-reload at 150k tokens
-- **Single agent per user** (initially)
+**Completed Features**:
+- ✅ **12 MCP Tools**: Market data, price checks, trading, positions, account, orders, strategy, observations, timing
+- ✅ **Two-mode system**: Strategy Definition (interactive chat) → Autonomous (24/7 trading)
+- ✅ **Frontend Integration**: AgentConfigurator with real-time Redis polling, bot creation flow
+- ✅ **Trading Support**: Paper (142 symbols) + Aster (33 symbols) fully operational
+- ✅ **Activity Logging**: All agent actions logged to timeline for monitoring
+- ✅ **Production Deployment**: PM2 process management, Redis queues, service auth
 
-### **Phase 1: Database & Foundation** (1 day)
+### **Phases 1-4c: Foundation & Frontend** ✅ COMPLETE (2025-11-03)
 
-**Goal**: Database schema changes, project setup
+**Completed Work**:
+- ✅ **Phase 1**: Database schema (`decisions.created_by`, `trade_observations` table), `.venv-agent` setup
+- ✅ **Phase 2**: 12 MCP tools implemented, category-based market data, service client with retries
+- ✅ **Phase 3**: Agent runner (strategy_definition + autonomous modes), Redis queues, PM2 lifecycle
+- ✅ **Phase 4a**: Frontend integration (AgentConfigurator, bot creation modal, Redis polling)
+- ✅ **Phase 4c**: Autonomous launch flow (save_strategy_and_exit tool, activation routing)
 
-**Architecture Decision**: Agent runs as **separate microservice** with isolated venv to avoid dependency conflicts.
-- Agent uses `.venv-agent/` (isolated dependencies)
-- Main ggbot uses `.venv/` (unchanged)
-- Communication: HTTP API + direct DB/Redis access
-- Deployment: PM2 process with interpreter path to `.venv-agent/bin/python`
+### **Symphony Live Trading Integration** - 🔜 PENDING API FIX
 
-- [x] **Database Changes**
-  - [x] Add `created_by TEXT DEFAULT 'decision_engine_v2'` column to `decisions` table
-  - [x] Create `agent_memory` table (id, config_id, user_id, memory_type, content, importance, created_at)
-  - [x] Migration executed successfully in Supabase
-  - [x] Verified paper close endpoint exists: `POST /api/v2/paper/{config_id}/positions/{trade_id}/close`
+**Blocker**: Symphony `/agent/all-positions` endpoint returns 404 (documented but not implemented)
 
-- [x] **Project Setup**
-  - [x] Create `agent/` directory structure (5 stub files)
-  - [x] Create `requirements-agent.txt` with isolated dependencies
-  - [x] Create `scripts/setup_agent_venv.sh` for venv setup
-  - [x] Update `.env.example` with agent configuration
-  - [x] Redis already running (verified in ACTIVE.md)
-  - [x] Run `./scripts/setup_agent_venv.sh` to create agent venv
-  - [x] Test agent venv installation (Claude Agent SDK imported successfully)
-  - [x] Configure `.env` with ANTHROPIC_API_KEY and AGENT_WHITELIST_USER_ID
-  - [x] Add `.venv-agent/` to `.gitignore`
+**What's Needed**: Symphony team must fix/implement the following API endpoint:
+```
+GET https://api.symphony.io/agent/all-positions?userAddress={WALLET_ADDRESS}
+Returns: accountSummary with totalEquity, availableBalance, marginUsed
+```
 
-**Phase 1 Status**: ✅ **COMPLETE**
+**Current State**:
+- ✅ `SymphonyLiveTradingService` exists and works (uses `/agent/positions`, `/agent/batches`)
+- ❌ Balance data NOT available (Symphony API limitation)
+- ✅ Agent endpoints support Paper + Aster modes
+- 🔜 Symphony branches ready to add once API is fixed
 
-### **Phase 2: MCP Server & Tools** (2-3 days)
+**Implementation Plan** (Once API Fixed):
+1. Add `get_account_summary()` method to Symphony service (~30 mins)
+2. Add Symphony branches to 5 agent endpoints (~45 mins)
+3. Update system prompt with Symphony capabilities (~15 mins)
+4. Test end-to-end with real Symphony credentials (~1 hour)
 
-**Goal**: Build 9 MCP tools, implement trade observations model
-
-- [x] **Database Migration**
-  - [x] Replace `agent_memory` with `trade_observations` table (post-trade reflection model)
-  - [x] Migration executed in Supabase, verified with 13 columns, 8 indexes, RLS enabled
-
-- [x] **API Endpoints** (`api/agent.py`)
-  - [x] 7 existing endpoints + 2 new: `POST /agent/trade-observations`, `POST /agent/trade-observations/query`
-
-- [x] **Service Client** (`agent/service_client.py`)
-  - [x] HTTP client with retry logic for all 9 endpoints (market data, trading, positions, account, strategy, observations)
-
-- [x] **MCP Server Tools** (`agent/mcp_server.py`)
-  - [x] 9 tools implemented: query_market_data, execute_trade, get_positions, get_account_status, close_position, update_strategy, wait_for, record_trade_observation, query_trade_observations
-  - [x] Module-level AgentContext for single-agent testing
-  - [x] MCP server tested and verified (9 tools registered)
-
-**Phase 2 Status**: ✅ **COMPLETE**
-
-### **Phase 3: Agent Runner** (2-3 days) - ✅ **COMPLETE**
-
-**Goal**: Build conversation + autonomous modes, test end-to-end
-
-**Status**: All 9 tools operational, agent ready for autonomous trading. Auth deadlock resolved via simplified service authentication.
-
-- [x] **TradingAgent Class** (`agent/run_agent.py`)
-  - [x] Simplified architecture: Separate strategy_definition and autonomous modes (no dual tasks)
-  - [x] Initialize ClaudeSDKClient with MCP server
-  - [x] Build single system prompt with mode/strategy context injection
-  - [x] Added 32 data points documentation (7 categories) to system prompt
-  - [x] Redis queue integration (messages and responses)
-  - [x] Strategy definition mode: Simple query/response loop via Redis
-  - [x] Autonomous mode: Pure `receive_messages()` infinite loop
-  - [x] Mode switching logic: Detects flag, handles user confirmation "1" (save)/"2" (revise)
-  - [x] Strategy persistence: Saves to `config_data.agent_strategy` in database
-  - [ ] Compaction context injection (deferred to Phase 4 - SDK auto-compacts at 95%)
-
-- [x] **Message Queue Integration**
-  - [x] Redis queue for user → agent messages: `agent:{config_id}:messages`
-  - [x] Redis queue for agent → user responses: `agent:{config_id}:responses`
-  - [x] Removed dual-task complexity after SDK stream conflicts
-
-- [x] **MCP Tools** - All 10 tools operational ✅
-  - [x] Added `request_autonomous_mode` tool (10 tools total)
-  - [x] Updated `query_market_data` tool to use category-based structure (7 categories, 32 data points)
-  - [x] Fixed dict parameter parsing (JSON string handling)
-  - [x] Added tool sandboxing with `disallowed_tools` (restricts agent to trading-only operations)
-  - [x] Tool Status (9/9 working):
-    - ✅ `query_market_data` - 32 data points across 7 categories
-    - ✅ `execute_trade` - Opens positions with SL/TP
-    - ✅ `get_positions` - Returns all open positions
-    - ✅ `close_position` - Closes trades with realized P&L
-    - ✅ `get_account_status` - Account balance & performance metrics
-    - ✅ `wait_for` - Agent timing control (up to 24 hours)
-    - ✅ `update_strategy` - Strategy modification (when autonomously_editable=true)
-    - ✅ `record_trade_observation` - Post-trade reflection logging
-    - ✅ `query_trade_observations` - Search past learnings
-    - ✅ `request_autonomous_mode` - Mode switching with user confirmation
-
-- [x] **API Endpoints** (`api/agent.py`) - All 8 endpoints operational ✅
-  - [x] All 8 endpoints exist and registered in ggbot.py
-  - [x] Orchestrator supports `data_points_override` for dynamic queries
-  - [x] Simplified service authentication (removed `Depends()` complexity)
-  - [x] Fixed `get_configuration()` positional argument bug
-  - [x] Added JSON serialization for numpy/pandas objects
-  - [x] Fixed paper trading method signatures (`get_open_positions`, `close_position`)
-  - [x] Fixed SQL column names (`current_price` vs `exit_price`)
-  - [x] Fixed request body structure for `record_trade_observation`
-
-- [x] **Service Client** (`agent/service_client.py`)
-  - [x] Complete rewrite with service authentication
-  - [x] Sends `Authorization: Bearer {SERVICE_KEY}` header
-  - [x] Sends `X-Service-Auth: agent-runner` header
-  - [x] All methods send `params={"user_id": self.user_id}` query parameter
-  - [x] Proper retry logic with exponential backoff
-
-- [x] **Backend Authentication** - Production-safe service auth ✅
-  - [x] Replaced complex `Depends(get_service_or_user_auth)` with simple `validate_agent_service_auth()`
-  - [x] Synchronous header validation (no async dependency chain)
-  - [x] Resolved FastAPI event loop deadlock
-  - [x] All endpoints tested and working without timeout
-
-- [x] **Model Configuration**
-  - [x] Model selected: `claude-haiku-4-5-20251001` for testing ($1/$5 per MTok)
-  - [ ] Test token usage and performance with Haiku
-  - [ ] Note: Upgrade to `claude-sonnet-4-5-20250929` for production ($3/$15 per MTok)
-
-- [x] **CLI Testing Interface**
-  - [x] Rewrote `agent/chat.py` with concurrent tasks for real-time responses
-  - [x] Uses `aioconsole.ainput()` for non-blocking input
-  - [x] Response monitor shows agent messages immediately
-
-- [x] **End-to-End Testing** - ✅ Live testing successful!
-  - [x] All 11 tools verified working (2025-11-01)
-  - [x] Test: Conversation mode → strategy confirmation → autonomous mode switch
-  - [x] Test: Guided mode agent executes user-defined strategy (in progress - agent running live)
-  - [ ] Test: Experimental mode agent updates its own strategy (requires autonomously_editable=true)
-  - [ ] Test: Agent runs for 1+ hours autonomously with wait_for (in progress - 90min wait active)
-  - [ ] Test: Compaction triggers (SDK auto-compacts at 95%)
-  - [ ] Verify all decisions logged with `created_by='agent'`
-  - [ ] Verify trade_observations records created
-
-- [x] **System Prompt Refinements** (2025-11-01)
-  - [x] Made strategy-neutral (removed prescriptive trading advice)
-  - [x] Added experience-based branching (beginner vs advanced onboarding)
-  - [x] Added full data source listing (32 data points, 7 categories)
-  - [x] Added timeframe documentation (7 timeframes for technical indicators)
-  - [x] Files: agent/run_agent.py, agent/mcp_server.py
-
-- [x] **Bug Fixes** (2025-11-01)
-  - [x] Fixed .env port mismatch (API_BASE_URL: 8002 → 8000)
-  - [x] Fixed record_trade_observation JSON parsing (handles freeform text strings)
-
-**Phase 3 Status**: ✅ **COMPLETE** - Live autonomous trading operational!
-
-### **Phase 4: Frontend Integration & Activity Timeline** (2-3 weeks)
-
-**Status**: Planning Complete - Ready for Implementation
-**See**: [DOCS/todo/AGENT_P4.md](DOCS/todo/AGENT_P4.md) for complete technical specification
-
-**Goal**: Two-column strategy definition interface + real-time activity visualization
-
-#### **Key Architecture Decisions**:
-- ✅ Tool-based activity logging (new `log_activity` tool + auto-logging from existing tools)
-- ✅ Unified `agent_activities` table for timeline events
-- ✅ "Agentic" config type in Forge (Scheduled Trading | Signal Validation | Agentic)
-- ✅ AgentConfigurator component: chat (left) + strategy display (right)
-- ✅ Activity Timeline connects to real data (not mock)
-- ✅ Local state design, SSE + Redis polling for real-time updates
-
-#### **Phase 4a: Strategy Definition UI** (Week 1-2) - ✅ **COMPLETE** (2025-11-03)
-- [x] Config type selection redesign (3-button selector with permissions)
-- [x] AgentConfigurator component with two-column layout
-- [x] Chat interface with Redis queue integration
-- [x] Strategy confirmation flow + display
-- [x] Auto-start agent in strategy_definition mode
-- [x] Redis polling (2s interval) for agent responses
-- [x] Backend API endpoints (start, stop, message, poll-response, status)
-- [x] Updated request_autonomous_mode tool with show_confirm_button flag
-- [x] Renamed "Autonomous Trading" → "Scheduled Trading" (config type cleanup)
-- [x] **Bot Creation Modal** - Moved type selection from Configure to creation flow
-  - [x] Created `BotCreationModal.tsx` with 3 bot types (Scheduled/Signal/Agentic)
-  - [x] Permission gating per type (Free/Pro/Whitelist)
-  - [x] Integrated with BotRail and MobileNav
-  - [x] Updated `createDefaultBot()` to accept botType parameter
-  - [x] Agentic bots created with minimal config (agent defines strategy via chat)
-- [x] **SaveConfigBar Refactor** - Converted to static type display
-  - [x] Removed 3-button type selector
-  - [x] Added static type badge display (icon + label)
-  - [x] Kept Save/Cancel/Reset buttons for scheduled_trading & signal_validation
-- [x] **Agentic Bot State Machine** - 4-state UI flow
-  - [x] State 1: No strategy, inactive → "Start Strategy Discussion" button
-  - [x] State 2: Has strategy, inactive → Strategy display + "Refine Strategy" button
-  - [x] State 3: Has strategy, active → Strategy display + disabled button (must deactivate first)
-  - [x] State 4: Agent running → Chat interface with AgentConfigurator
-- [x] **Strategy Editing Flow** - Context-aware conversation
-  - [x] Added `handleStartStrategyDiscussion()` handler
-  - [x] Auto-sends existing strategy as context when refining
-  - [x] Starts agent in strategy_definition mode
-  - [x] Waits for agent greeting then polls responses
-- [x] **Autonomously Editable Setting** - User choice during confirmation
-  - [x] Added checkbox to AgentConfigurator confirmation UI
-  - [x] Updated `handleConfirmStrategy()` to send JSON: `{confirm: true, autonomously_editable: boolean}`
-  - [x] Backend `run_agent.py` parses JSON and saves setting to database
-  - [x] Backward compatible with old "1"/"2" format
-- [ ] ActivationBar integration for agentic mode (deferred - not needed for strategy definition)
-- [ ] "Begin Strategy Discussion" button for editing (DONE - integrated into state machine)
-
-#### **Phase 4b: Activity Timeline Integration** (Week 2-3)
-
-**Note**: Activity Timeline has been consolidated into a universal feature that works for ALL bot types (agents, scheduled, signal validation).
-
-**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for complete implementation plan
-
-- [ ] This section moved to standalone "Activity Timeline Integration" section below
-
-**Testing with existing agent**: config_id `d13d5536-2498-4f27-b2bc-e4f98958e1d8`
-
-#### **Phase 4c: Autonomous Mode Launch Flow** (Day 3) - ✅ **COMPLETE** (2025-11-03)
-
-**Goal**: Remove confirmation friction, enable clean strategy-to-autonomous transition
-
-- [x] **Removed Confirmation Flow**
-  - [x] Replaced `request_autonomous_mode` tool with `save_strategy_and_exit`
-  - [x] Tool saves strategy directly to database and exits (no user confirmation needed)
-  - [x] Tool deletes own PM2 process to prevent auto-restart loop
-  - [x] Agent exits cleanly after strategy definition complete
-
-- [x] **Frontend Routing Fixes**
-  - [x] Fixed activation button to route agents to `/api/v2/agent/{id}/start?mode=autonomous`
-  - [x] Fixed stop button to route agents to `/api/v2/agent/{id}/stop`
-  - [x] Fixed config_type check (was checking `config_data.config_type`, now checks `config_type` column)
-  - [x] Activate/Deactivate buttons now work for agent configs
-
-- [x] **System Prompt Improvements**
-  - [x] Fixed f-string syntax error (escaped curly braces in examples)
-  - [x] Added explicit rules for ggshot category placement (trading_signals, NOT technical_analysis)
-  - [x] Added category name validation guidance
-
-- [x] **Autonomous Mode Validation**
-  - [x] Agent runs autonomously with 5-minute monitoring cycles
-  - [x] Disciplined decision-making (waits for ALL entry conditions)
-  - [x] Proper tool usage (query_market_data, get_current_price, wait_for)
-  - [x] Professional analysis with data tables and reasoning
-
-**Phase 4c Status**: ✅ **COMPLETE** - Agents can now autonomously trade 24/7!
+**See**: [agent/README.md](agent/README.md) "Symphony Integration Steps" section for complete implementation guide
 
 ### **Phase 5: Production Deployment** (1-2 days) - 🟡 **IN PROGRESS**
 
@@ -618,11 +324,11 @@
   - [ ] Alert on agent failures/errors
   - [ ] Track strategy performance by mode (guided vs experimental)
 
-- [ ] **Documentation**
-  - [ ] Agent usage guide (`agent/README.md`)
+- [x] **Documentation**
+  - [x] Agent usage guide (`agent/README.md` - complete with Symphony integration roadmap)
   - [ ] Example strategies (conservative, aggressive, experimental)
-  - [ ] Troubleshooting guide
-  - [ ] API documentation for agent endpoints
+  - [ ] Advanced troubleshooting guide
+  - [ ] API documentation for agent endpoints (partially in ACTIVE.md)
 
 ### **Future Enhancements** (Post-Launch)
 

@@ -294,7 +294,10 @@ export default function BalanceChartRecharts({
       {/* Chart */}
       <div className="flex-1 relative">
         <ResponsiveContainer width="100%" height="100%">
-          <ComposedChart margin={{ top: 20, right: 40, left: 10, bottom: 20 }}>
+          <ComposedChart
+            data={chartData}
+            margin={{ top: 20, right: 40, left: 10, bottom: 50 }}
+          >
             <defs>
               <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
                 <stop offset="5%" stopColor={VIBE.signal} stopOpacity={0.2} />
@@ -335,7 +338,6 @@ export default function BalanceChartRecharts({
 
             {/* Balance line */}
             <Line
-              data={chartData}
               type="monotone"
               dataKey="balance"
               stroke={VIBE.signal}

@@ -58,7 +58,7 @@ The ggbot repository is organized into the following top-level directories:
 
 | Directory | Purpose | Status | Key Files |
 |-----------|---------|--------|-----------|
-| **agent/** | Autonomous trading agent foundation (MCP server, tools, chat) | 🟡 In Development | run_agent.py, mcp_server.py, service_client.py |
+| **agent/** | Autonomous trading agent foundation (MCP server, tools, chat) | ✅ Active | README.md, run_agent.py, mcp_server.py, service_client.py |
 | **api/** | API endpoints for agent operations | ✅ Active | agent.py, paper_trading.py, symbols.py |
 | **core/** | Core business logic (auth, config, domain, services) | ✅ Active | 16 subdirectories |
 | **decision/** | AI decision engine with V2 template system | ✅ Active | README.md, prompts/, engine_v2.py |
@@ -73,7 +73,7 @@ The ggbot repository is organized into the following top-level directories:
 | **x_bot/** | Twitter bot for platform status updates | ✅ Active | Platform tweets at @ggbots_ai |
 | **archive/** | Legacy code preserved for reference | 🔒 Archived | 15 archived directories (includes ggshot/) |
 
-**Note**: The `agent/` directory contains the foundation for fully autonomous AI trading agents (Phase 3 - MCP server and tools operational, frontend integration in progress). See [TODO.md](TODO.md) for agent development roadmap.
+**Note**: The `agent/` directory contains fully autonomous AI trading agents with 12 MCP tools for 24/7 trading (Phase 3 complete, Phase 4a frontend integration operational). See [agent/README.md](agent/README.md) for architecture and usage guide, or [TODO.md](TODO.md) for roadmap.
 
 ---
 
@@ -269,10 +269,11 @@ The ggbot repository is organized into the following top-level directories:
 
 ## 📚 Module Documentation
 
-The ggbot repository includes 7 comprehensive module READMEs with detailed technical documentation:
+The ggbot repository includes 8 comprehensive module READMEs with detailed technical documentation:
 
 | Module | Lines | Contents |
 |--------|-------|----------|
+| **[agent/README.md](agent/README.md)** | 750+ | 12 MCP tools, 2 modes (strategy/autonomous), Symphony integration roadmap |
 | **[extraction/v2/README.md](extraction/v2/README.md)** | 845 | 21 preprocessors, 12x performance, API docs |
 | **[market_intelligence/README.md](market_intelligence/README.md)** | 1154 | 32 data points, 7 categories, orchestrator architecture |
 | **[decision/README.md](decision/README.md)** | 525 | V2 template system, 3 modes, webhook integration |

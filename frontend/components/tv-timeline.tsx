@@ -1,0 +1,268 @@
+'use client';
+
+import React, { useEffect, useState, useRef } from 'react';
+import { createChart, ColorType, LineStyle } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts';
+import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
+import type { Session } from '@supabase/supabase-js';
+
+// Trade37 palette (hardwired)
+const VIBE = {
+  obsidian: '#0B0B0C',   // page background
+  carbon: '#141416',     // card surface
+  ivory: '#EDEBE7',      // main text
+  hair: 'rgba(237,235,231,0.16)', // hairline borders
+  brass: '#C1A87D',      // accent / primary (buttons)
+  signal: '#3CA6E0',     // equity line, data highlights
+  ember: '#D74A1F',      // negative
+  lilac: '#8B7CF2',      // thoughts
+} as const;
+
+interface BalancePoint {
+  timestamp: string;
+  balance: number;
+}
+
+interface ActivityMetadata {
+  botName: string;
+  startingBalance: number;
+  currentBalance: number;
+  totalTrades: number;
+  winRate: number;
+  performance: number;
+}
+
+interface TimelineProps {
+  configId: string;
+  title?: string;
+}
+
+export default function TVTimeline({ configId, title }: TimelineProps) {
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const chartRef = useRef<IChartApi | null>(null);
+  const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
+  const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
+
+  // Get session for auth
+  useEffect(() => {
+    const supabase = createClientComponentClient();
+    const getSession = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      setSession(session);
+    };
+    getSession();
+  }, []);
+
+  // Initialize chart
+  useEffect(() => {
+    if (!chartContainerRef.current) return;
+
+    const chart = createChart(chartContainerRef.current, {
+      layout: {
+        background: { type: ColorType.Solid, color: VIBE.carbon },
+        textColor: VIBE.hair,
+      },
+      grid: {
+        vertLines: { color: VIBE.hair, style: LineStyle.Dotted },
+        horzLines: { color: VIBE.hair, style: LineStyle.Dotted },
+      },
+      rightPriceScale: {
+        borderColor: VIBE.hair,
+      },
+      timeScale: {
+        borderColor: VIBE.hair,
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        mode: 1,
+        vertLine: {
+          color: VIBE.brass,
+          width: 1,
+          style: LineStyle.Dashed,
+        },
+        horzLine: {
+          color: VIBE.brass,
+          width: 1,
+          style: LineStyle.Dashed,
+        },
+      },
+    });
+
+    chartRef.current = chart;
+
+    const lineSeries = chart.addLineSeries({
+      color: VIBE.signal,
+      lineWidth: 2,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+      lastValueVisible: true,
+      priceLineVisible: true,
+    });
+
+    lineSeriesRef.current = lineSeries;
+
+    const handleResize = () => {
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainerRef.current.clientWidth,
+          height: chartContainerRef.current.clientHeight,
+        });
+      }
+    };
+
+    window.addEventListener('resize', handleResize);
+
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      chart.remove();
+      chartRef.current = null;
+      lineSeriesRef.current = null;
+    };
+  }, []);
+
+  // Fetch data
+  useEffect(() => {
+    if (!configId) return;
+
+    const fetchData = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+
+        const headers: HeadersInit = session?.access_token
+          ? { Authorization: `Bearer ${session.access_token}` }
+          : {};
+
+        const [balanceSeriesRes, metadataRes] = await Promise.all([
+          fetch(`/api/v2/activities/${configId}/balance-series?mode=pnl`, { headers }),
+          fetch(`/api/v2/activities/${configId}/metadata`, { headers }),
+        ]);
+
+        if (!balanceSeriesRes.ok || !metadataRes.ok) {
+          throw new Error('Failed to fetch timeline data');
+        }
+
+        const [balanceSeries, metadataData] = await Promise.all([
+          balanceSeriesRes.json(),
+          metadataRes.json(),
+        ]);
+
+        const balancePoints: BalancePoint[] = balanceSeries.balance_series || [];
+
+        setMetadata({
+          botName: metadataData.metadata?.botName || metadataData.bot_name || metadataData.botName || 'Unknown Bot',
+          startingBalance: metadataData.metadata?.startingBalance || metadataData.startingBalance || metadataData.starting_balance || 0,
+          currentBalance: metadataData.metadata?.currentBalance || metadataData.currentBalance || metadataData.current_balance || 0,
+          totalTrades: metadataData.metadata?.totalTrades || metadataData.totalTrades || metadataData.total_trades || 0,
+          winRate: metadataData.metadata?.winRate || metadataData.winRate || metadataData.win_rate || 0,
+          performance: metadataData.metadata?.performance || metadataData.performance || 0,
+        });
+
+        const chartData: LineData[] = balancePoints.map((point) => ({
+          time: (new Date(point.timestamp).getTime() / 1000) as Time,
+          value: point.balance,
+        }));
+
+        if (lineSeriesRef.current && chartData.length > 0) {
+          lineSeriesRef.current.setData(chartData);
+          chartRef.current?.timeScale().fitContent();
+        }
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching timeline data:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load data');
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    const intervalId = setInterval(fetchData, 10000);
+    return () => clearInterval(intervalId);
+  }, [configId, session]);
+
+  const info = metadata;
+
+  // Loading state
+  if (loading && !metadata) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
+        <div className="text-center">
+          <div className="text-xl mb-2">Loading Timeline...</div>
+          <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
+            Fetching activity data
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (error) {
+    return (
+      <div className="w-full h-screen flex items-center justify-center" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
+        <div className="max-w-md mx-auto text-center">
+          <div className="text-xl mb-2" style={{ color: VIBE.ember }}>
+            Failed to Load Timeline
+          </div>
+          <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
+            {error}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative w-full min-h-screen font-sans" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
+      {/* HEADER */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-5 pt-5 pb-4">
+        <div className="rounded-xl border p-4 sm:p-6" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair }}>
+          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 sm:gap-6">
+            <div className="flex-1 min-w-0">
+              <h1 className="text-xl sm:text-2xl md:text-3xl leading-tight tracking-tight">
+                {title ?? info?.botName ?? 'Activity Timeline'}
+              </h1>
+              <p className="font-mono text-xs sm:text-sm" style={{ color: 'rgba(237,235,231,0.7)' }}>
+                ARENA STATUS • {new Date().toUTCString().slice(5, 16).toUpperCase()} UTC
+              </p>
+            </div>
+          </div>
+
+          {/* KPI Row */}
+          {info && (
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 mt-4">
+              {[
+                { k: 'Balance', v: `$${Math.round(info.currentBalance).toLocaleString()}` },
+                { k: 'P/L', v: `${info.currentBalance - info.startingBalance >= 0 ? '+' : ''}${Math.round(info.currentBalance - info.startingBalance).toLocaleString()}` },
+                { k: 'Trades', v: String(info.totalTrades) },
+                { k: 'Win Rate', v: `${Math.round(info.winRate)}%` },
+                { k: 'Perf', v: `${typeof info.performance === 'number' ? info.performance.toFixed(2) : info.performance}%` },
+              ].map((d, i) => (
+                <div key={i} className="border rounded-lg px-3 py-2" style={{ borderColor: VIBE.hair }}>
+                  <div className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                    {d.k}
+                  </div>
+                  <div className="text-lg sm:text-xl leading-snug">{d.v}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </section>
+
+      {/* CHART */}
+      <section className="max-w-7xl mx-auto px-4 sm:px-5 pb-5">
+        <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: 'calc(100vh - 280px)', minHeight: '400px' }}>
+          <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+        </div>
+      </section>
+    </div>
+  );
+}

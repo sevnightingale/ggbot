@@ -125,12 +125,19 @@
 - `POST /api/v2/test/signal-publishing/{config_id}` - Test Telegram signal publishing
 - Signal listener service (PM2 background process with service authentication)
 
-**Agent Management** (Phase 4a)
+**Agent Management** (Production - Phase 4a Complete)
 - `POST /api/v2/agent/{config_id}/start` - Start agent in strategy_definition or autonomous mode
 - `POST /api/v2/agent/{config_id}/stop` - Stop agent and cleanup Redis queues
 - `POST /api/v2/agent/{config_id}/message` - Send message to agent via Redis queue
 - `GET /api/v2/agent/{config_id}/poll-response` - Poll for agent responses (non-blocking)
 - `GET /api/v2/agent/{config_id}/status` - Get agent process status
+- `POST /api/v2/agent/execute-trade` - Agent trade execution with position size/leverage overrides
+- `GET /api/v2/agent/positions/{config_id}` - Get open positions (paper/aster/symphony routing)
+- `GET /api/v2/agent/account/{config_id}` - Get account status and performance metrics
+- `POST /api/v2/agent/positions/{trade_id}/close` - Close position (supports all trading modes)
+- `POST /api/v2/agent/trade-observations` - Record post-trade reflection
+- `POST /api/v2/agent/trade-observations/query` - Query past trade observations
+- `POST /api/v2/agent/query-market-data` - Query market data with category structure
 
 **User Management**
 - `GET /api/v2/user/profile` - User profile with subscription details
