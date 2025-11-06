@@ -59,7 +59,12 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
   // Fetch data and initialize chart
   useEffect(() => {
-    if (!configId || !chartContainerRef.current) return;
+    console.log('useEffect running', { configId, hasContainer: !!chartContainerRef.current, hasSession: !!session });
+
+    if (!configId || !chartContainerRef.current) {
+      console.log('Early return - missing configId or container');
+      return;
+    }
 
     // Create chart if it doesn't exist
     if (!chartRef.current) {
@@ -131,6 +136,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
     const fetchData = async () => {
       try {
+        console.log('fetchData starting...', { configId, hasSession: !!session });
         setLoading(true);
         setError(null);
 
@@ -138,13 +144,24 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           ? { Authorization: `Bearer ${session.access_token}` }
           : {};
 
+        console.log('Fetching from API...');
         const [balanceSeriesRes, metadataRes] = await Promise.all([
           fetch(`/api/v2/activities/${configId}/balance-series?mode=pnl`, { headers }),
           fetch(`/api/v2/activities/${configId}/metadata`, { headers }),
         ]);
 
+        console.log('API responses:', {
+          balanceOk: balanceSeriesRes.ok,
+          balanceStatus: balanceSeriesRes.status,
+          metadataOk: metadataRes.ok,
+          metadataStatus: metadataRes.status
+        });
+
         if (!balanceSeriesRes.ok || !metadataRes.ok) {
-          throw new Error('Failed to fetch timeline data');
+          const balanceError = await balanceSeriesRes.text();
+          const metadataError = await metadataRes.text();
+          console.error('API errors:', { balanceError, metadataError });
+          throw new Error(`Failed to fetch timeline data: ${balanceSeriesRes.status}, ${metadataRes.status}`);
         }
 
         const [balanceSeries, metadataData] = await Promise.all([
@@ -192,8 +209,10 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
       }
     };
 
+    console.log('About to call fetchData...');
     fetchData();
 
+    console.log('Setting up polling interval...');
     const intervalId = setInterval(fetchData, 10000);
 
     return () => {
