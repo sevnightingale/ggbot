@@ -113,7 +113,6 @@ type ActivityType =
   | 'trade_entry_short'
   | 'trade_win'
   | 'trade_loss'
-  | 'trade_exit'
   | 'strategy_updated'
   | 'market_query'
   | 'agent_wait'
@@ -172,7 +171,6 @@ export default function BalanceChartRecharts({
   onActivityClick,
 }: BalanceChartRechartsProps) {
   const [selectedRange, setSelectedRange] = useState<TimeRange>('1D');
-  const [selectedCluster, setSelectedCluster] = useState<ClusteredMarker | null>(null);
 
   // Convert balance data to chart format
   const allChartData: ChartDataPoint[] = useMemo(
@@ -183,7 +181,7 @@ export default function BalanceChartRecharts({
           return {
             time,
             balance: point.balance,
-            humanTime: new Date(point.timestamp).toLocaleString(),
+            humanTime: new Date(point.timestamp).toLocaleString('en-US', { timeZone: 'UTC' }) + ' UTC',
           };
         })
         .sort((a, b) => a.time - b.time),
@@ -305,7 +303,6 @@ export default function BalanceChartRecharts({
   };
 
   const handleMarkerClick = (marker: ClusteredMarker) => {
-    setSelectedCluster(marker);
     if (onActivityClick && marker.activities[0]) {
       onActivityClick(marker.activities[0]);
     }
@@ -473,55 +470,6 @@ export default function BalanceChartRecharts({
             />
           </ComposedChart>
         </ResponsiveContainer>
-
-        {/* Activity cluster details */}
-        {selectedCluster && (
-          <div
-            className="absolute top-4 right-4 rounded-lg border p-3 shadow-lg max-w-xs max-h-96 overflow-y-auto"
-            style={{
-              backgroundColor: VIBE.carbon,
-              borderColor: VIBE.hair,
-              color: VIBE.ivory,
-            }}
-          >
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-xs font-semibold">
-                {selectedCluster.count} {selectedCluster.count > 1 ? 'Activities' : 'Activity'}
-              </span>
-              <button
-                onClick={() => setSelectedCluster(null)}
-                className="text-xs hover:opacity-70"
-                style={{ color: VIBE.hair }}
-              >
-                ✕
-              </button>
-            </div>
-            <div className="space-y-2">
-              {selectedCluster.activities.slice(0, 10).map((activity) => (
-                <div
-                  key={activity.id}
-                  className="text-xs border-b pb-2"
-                  style={{ borderColor: VIBE.hair }}
-                >
-                  <div className="font-medium" style={{ color: getActivityColor(activity.type) }}>
-                    {activity.type.replace(/_/g, ' ')}
-                  </div>
-                  <div className="text-[10px] mt-1" style={{ color: VIBE.hair }}>
-                    {(activity.data.summary as string) || 'No details'}
-                  </div>
-                  <div className="text-[9px] mt-1" style={{ color: VIBE.hair }}>
-                    {new Date(activity.timestamp).toLocaleString()}
-                  </div>
-                </div>
-              ))}
-              {selectedCluster.activities.length > 10 && (
-                <div className="text-[10px] text-center" style={{ color: VIBE.hair }}>
-                  + {selectedCluster.activities.length - 10} more
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
@@ -556,7 +504,7 @@ function CustomTooltip({ active, payload }: TooltipProps) {
       <div className="text-[10px]" style={{ color: VIBE.hair }}>
         {'humanTime' in data
           ? data.humanTime
-          : new Date(data.time).toLocaleString()}
+          : new Date(data.time).toLocaleString('en-US', { timeZone: 'UTC' })} UTC
       </div>
     </div>
   );
@@ -573,7 +521,6 @@ function getActivityColor(type: ActivityType): string {
     trade_entry_short: VIBE.ember,
     trade_win: VIBE.signal,
     trade_loss: VIBE.ember,
-    trade_exit: VIBE.brass,
     strategy_updated: VIBE.brass,
     market_query: VIBE.lilac,
     agent_wait: VIBE.hair,

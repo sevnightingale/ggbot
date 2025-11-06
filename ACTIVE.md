@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-04 13:58:21 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-06 09:44:49 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,11 +12,11 @@
 - **Users with Bots**: 252 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 377
+- **Total Bots**: 378
 - **Active Bots**: 3 (0.8%)
   - Paper Trading: 2
   - Live Trading: 0
-- **Inactive Bots**: 374
+- **Inactive Bots**: 375
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
@@ -27,8 +27,8 @@
   - Total P&L: $-16,000.65
 - **Recent Activity**:
   - Last 24 hours: 0 trades
-  - Last 7 days: 980 trades
-  - Last 30 days: 4178 trades
+  - Last 7 days: 490 trades
+  - Last 30 days: 4125 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -37,7 +37,7 @@
 - **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,926.33
+- **Average Balance**: $9,926.53
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
@@ -49,8 +49,7 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 22 decisions (avg confidence: 22.0%)
-- **exit**: 1 decisions (avg confidence: 85.0%)
+- **wait**: 24 decisions (avg confidence: 15.0%)
 
 ### System Health
 - **Decisions (last hour)**: 1
@@ -62,22 +61,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 16MB | 9h 58m | 34 |
-| x-bot | 🟢 online | 0% | 18MB | 9h 58m | 34 |
-| error-alerts | 🟢 online | 0% | 17MB | 9h 58m | 41 |
-| market-data-ws | 🟢 online | 1.9% | 23MB | 9h 58m | 36 |
-| ggbot | 🟢 online | 1.7% | 259MB | 1h 57m | 91 |
-| agent-bb2560fd-b053-464f-8a58-8e254e4d36fa | 🟢 online | 0% | 63MB | 1h 57m | 7 |
+| signal-listener | 🟢 online | 0% | 27MB | 1d 0h | 38 |
+| x-bot | 🟢 online | 0% | 26MB | 1d 0h | 38 |
+| error-alerts | 🟢 online | 0% | 21MB | 1d 0h | 45 |
+| market-data-ws | 🟢 online | 1.3% | 138MB | 1d 0h | 40 |
+| ggbot | 🟢 online | 2% | 252MB | 23h 42m | 104 |
+| agent-bb2560fd-b053-464f-8a58-8e254e4d36fa | 🟢 online | 0% | 64MB | 17h 38m | 14 |
+| agent-60256e2c-11c3-4802-aec1-36d1387ce76b | 🟢 online | 0% | 64MB | 20h 38m | 0 |
 
 ### VM Resources
 
-- **Disk**: 35G / 78G (46%)
-- **Memory**: 2.0Gi / 3.8Gi
-- **CPU Load**: 0.15 / 0.23 / 0.18 (1m/5m/15m)
+- **Disk**: 36G / 78G (46%)
+- **Memory**: 2.2Gi / 3.8Gi
+- **CPU Load**: 0.24 / 0.12 / 0.03 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 10.36M)
+- **Redis**: 🟢 connected (Memory: 13.16M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -194,11 +194,15 @@
 - **Liquidation Monitoring**: Automatic position liquidation when losses exceed margin
 
 ### **signal-listener Service**
-- **ggShot Integration**: External signal validation from Telegram
-- **AI Confidence Evaluation**: Validates signals using user-defined strategies
-- **Service Authentication**: Dedicated `/api/v2/signal-validation` endpoint
-- **Multi-timeframe Storage**: Latest signal per timeframe for autonomous context
-- **Premium Gating**: ggBase subscription enforcement
+- **ggShot Integration**: Receives live trading signals from ggShot Telegram bot
+- **Database Storage**: All signals stored in `market_data` table as JSONB (`data_points->>'ggshot_signal'`)
+- **Historical Data**: 1,829+ signals with 70 days of history (seeded + live updates)
+- **Signal Structure**: Direction, entry zone, stop loss, take profit targets, confidence scores
+- **Multi-timeframe Support**: Signals for 5m, 15m, 30m, 1h, 4h, 1d timeframes
+- **AI Confidence Evaluation**: Routes signals to signal_validation bots for AI filtering
+- **Agent Access**: Agents and scheduled bots can query ggshot signals via MCP market data tool
+- **Service Authentication**: Dedicated `/api/v2/signal-validation` endpoint with service auth
+- **Premium Gating**: ggBase subscription enforcement for signal validation mode
 
 ### **x-bot Service**
 - **Platform Status Tweets**: Automated updates on @ggbots_ai
@@ -211,7 +215,7 @@
 ### **Market Intelligence**
 **32 data points across 7 categories (8 Grok-powered sources LIVE):**
 - **Technical Analysis** (21 indicators): RSI, MACD, Bollinger Bands, volume, momentum, trend
-- **Trading Signals** (1 source): ggShot AI-filtered signals (premium)
+- **Trading Signals** (1 source): ggShot AI-filtered signals (1,829+ stored in database, 70 days history, live updates)
 - **On-Chain Analytics** (2 live): BTC TVL, whale activity
 - **Derivatives & Leverage** (2 rates): BTC/ETH funding rates
 - **Sentiment & Social** (1 live): Twitter sentiment analysis
@@ -331,7 +335,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-04 13:58:22 UTC
+**Last Updated**: 2025-11-06 09:44:50 UTC
 
 ---
 
@@ -1058,7 +1062,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-04 13:58:22 UTC
+**Last Updated**: 2025-11-06 09:44:50 UTC
 
 ---
 
