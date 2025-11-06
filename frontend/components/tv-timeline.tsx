@@ -188,7 +188,9 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         // Transform and validate data
         const validatedData: LineData[] = balancePoints
           .map((point) => {
-            const timestamp = new Date(point.timestamp).getTime() / 1000;
+            // Convert to unix timestamp (seconds) and round to integer
+            // TradingView may not handle fractional seconds correctly
+            const timestamp = Math.floor(new Date(point.timestamp).getTime() / 1000);
             return {
               time: timestamp as Time,
               value: point.balance,
@@ -228,6 +230,19 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         console.log('Removed duplicates:', validatedData.length - chartData.length);
         console.log('First 3 points:', chartData.slice(0, 3));
         console.log('Last 3 points:', chartData.slice(-3));
+
+        // Debug time spacing
+        if (chartData.length >= 3) {
+          const t0 = typeof chartData[0].time === 'number' ? chartData[0].time : parseFloat(chartData[0].time as string);
+          const t1 = typeof chartData[1].time === 'number' ? chartData[1].time : parseFloat(chartData[1].time as string);
+          const t2 = typeof chartData[2].time === 'number' ? chartData[2].time : parseFloat(chartData[2].time as string);
+          console.log('Time spacing (first 3 points):');
+          console.log(`  Point 0 to 1: ${t1 - t0} seconds (${(t1 - t0) / 3600} hours)`);
+          console.log(`  Point 1 to 2: ${t2 - t1} seconds (${(t2 - t1) / 3600} hours)`);
+          console.log(`  Point 0 date: ${new Date(t0 * 1000).toISOString()}`);
+          console.log(`  Point 1 date: ${new Date(t1 * 1000).toISOString()}`);
+        }
+
         console.log('Line series ref exists:', !!lineSeriesRef.current);
 
         if (lineSeriesRef.current && chartData.length > 0) {
