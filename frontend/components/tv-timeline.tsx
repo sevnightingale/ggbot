@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { createChart, ColorType, LineStyle } from 'lightweight-charts';
-import type { IChartApi, ISeriesApi, LineData, Time } from 'lightweight-charts';
+import type { IChartApi, ISeriesApi, LineData, Time, SeriesMarker } from 'lightweight-charts';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Session } from '@supabase/supabase-js';
 
@@ -62,6 +62,10 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   const [error, setError] = useState<string | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
+  const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+
+  // Map to lookup activities by timestamp
+  const activitiesMapRef = useRef<Map<number, Activity>>(new Map());
 
   // Get session for auth
   useEffect(() => {
@@ -140,6 +144,37 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
       lineSeriesRef.current = lineSeries;
       console.log('Line series created:', !!lineSeries);
+
+      // Crosshair move handler - highlight activity when crosshair snaps to it
+      chart.subscribeCrosshairMove((param) => {
+        if (!param.time) {
+          setSelectedActivity(null);
+          return;
+        }
+
+        const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
+        const activity = activitiesMapRef.current.get(timestamp);
+
+        if (activity && (activity.type === 'trade_entry_long' || activity.type === 'trade_entry_short')) {
+          // Only highlight trade entries for now
+          setSelectedActivity(activity);
+        } else {
+          setSelectedActivity(null);
+        }
+      });
+
+      // Click handler - open activity detail when clicking on a point
+      chart.subscribeClick((param) => {
+        if (!param.time) return;
+
+        const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
+        const activity = activitiesMapRef.current.get(timestamp);
+
+        if (activity && (activity.type === 'trade_entry_long' || activity.type === 'trade_entry_short')) {
+          console.log('Clicked activity:', activity);
+          // For now just log, we'll add detail panel later
+        }
+      });
 
       const handleResize = () => {
         if (chartContainer && chartRef.current) {
@@ -286,6 +321,40 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           console.log('Setting data on chart...');
           lineSeriesRef.current.setData(chartData);
 
+          // Build activities lookup map and create markers for trade entries
+          activitiesMapRef.current.clear();
+          const tradeMarkers: SeriesMarker<Time>[] = [];
+
+          activities.forEach((activity) => {
+            const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
+            activitiesMapRef.current.set(timestamp, activity);
+
+            // Only create markers for trade entries
+            if (activity.type === 'trade_entry_long') {
+              tradeMarkers.push({
+                time: timestamp as Time,
+                position: 'belowBar',
+                color: '#16a34a', // green-600
+                shape: 'arrowUp',
+                text: 'LONG',
+              });
+            } else if (activity.type === 'trade_entry_short') {
+              tradeMarkers.push({
+                time: timestamp as Time,
+                position: 'aboveBar',
+                color: '#dc2626', // red-600
+                shape: 'arrowDown',
+                text: 'SHORT',
+              });
+            }
+          });
+
+          // Set markers on the line series
+          if (tradeMarkers.length > 0) {
+            lineSeriesRef.current.setMarkers(tradeMarkers);
+            console.log('Trade markers added:', tradeMarkers.length);
+          }
+
           // Only fit content on first load, preserve user zoom/pan on subsequent updates
           if (isFirstLoadRef.current) {
             chartRef.current?.timeScale().fitContent();
@@ -370,6 +439,33 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
       <section className="max-w-7xl mx-auto px-4 sm:px-5 pb-5">
         <div className="rounded-xl border overflow-hidden relative" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: 'calc(100vh - 280px)', minHeight: '400px' }}>
           <div ref={setChartContainer} style={{ width: '100%', height: '100%' }} />
+
+          {/* Activity hover tooltip */}
+          {selectedActivity && (
+            <div
+              className="absolute top-4 left-4 rounded-lg border px-4 py-3 pointer-events-none"
+              style={{
+                backgroundColor: VIBE.carbon,
+                borderColor: VIBE.brass,
+                borderWidth: '2px',
+                maxWidth: '300px',
+                zIndex: 10
+              }}
+            >
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
+                {selectedActivity.type === 'trade_entry_long' ? '↑ LONG ENTRY' : '↓ SHORT ENTRY'}
+              </div>
+              <div className="text-sm mb-1">{selectedActivity.data.summary || 'Trade entry'}</div>
+              <div className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                {new Date(selectedActivity.timestamp).toLocaleString()}
+              </div>
+              {selectedActivity.data.symbol && (
+                <div className="text-xs mt-2" style={{ color: VIBE.signal }}>
+                  {selectedActivity.data.symbol}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Loading overlay */}
           {loading && !metadata && (
