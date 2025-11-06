@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useMemo, useCallback } from 'react';
 import {
   ComposedChart,
   Line,
@@ -11,6 +11,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   ReferenceLine,
+  Brush,
 } from 'recharts';
 
 // Trade37 Palette
@@ -156,24 +157,13 @@ interface ClusteredMarker {
   activityType: ActivityType;
 }
 
-type TimeRange = '1H' | '4H' | '1D' | '1W';
-
-const TIME_RANGES: Record<TimeRange, { ms: number; clusterWindow: number; label: string }> = {
-  '1H': { ms: 60 * 60 * 1000, clusterWindow: 1 * 60 * 1000, label: '1 Hour' },
-  '4H': { ms: 4 * 60 * 60 * 1000, clusterWindow: 15 * 60 * 1000, label: '4 Hours' },
-  '1D': { ms: 24 * 60 * 60 * 1000, clusterWindow: 30 * 60 * 1000, label: '1 Day' },
-  '1W': { ms: 7 * 24 * 60 * 60 * 1000, clusterWindow: 4 * 60 * 60 * 1000, label: '1 Week' },
-};
-
 export default function BalanceChartRecharts({
   balanceData,
   activities,
   onActivityClick,
 }: BalanceChartRechartsProps) {
-  const [selectedRange, setSelectedRange] = useState<TimeRange>('1D');
-
-  // Convert balance data to chart format
-  const allChartData: ChartDataPoint[] = useMemo(
+  // Convert balance data to chart format - show ALL data
+  const chartData: ChartDataPoint[] = useMemo(
     () =>
       balanceData
         .map((point) => {
@@ -188,93 +178,70 @@ export default function BalanceChartRecharts({
     [balanceData]
   );
 
-  // Filter chart data based on selected time range
-  const { chartData, timeDomain } = useMemo(() => {
-    if (allChartData.length === 0) return { chartData: [], timeDomain: [0, 0] };
+  // Calculate time domain from all data
+  const timeDomain = useMemo(() => {
+    if (chartData.length === 0) return [0, 0];
+    return [chartData[0].time, chartData[chartData.length - 1].time];
+  }, [chartData]);
 
-    const now = Date.now();
-    const rangeMs = TIME_RANGES[selectedRange].ms;
-    const startTime = now - rangeMs;
-
-    const filtered = allChartData.filter((d) => d.time >= startTime);
-
-    // If no data in range, show all data
-    if (filtered.length === 0) {
-      const min = allChartData[0].time;
-      const max = allChartData[allChartData.length - 1].time;
-      return { chartData: allChartData, timeDomain: [min, max] };
-    }
-
-    return {
-      chartData: filtered,
-      timeDomain: [filtered[0].time, filtered[filtered.length - 1].time],
-    };
-  }, [allChartData, selectedRange]);
-
-  // Interpolate balance at a given timestamp
+  // Interpolate balance at a given timestamp using STEP function (P&L is flat between trades)
   const interpolateBalance = useCallback((timestamp: number): number => {
-    if (allChartData.length === 0) return 0;
-    if (allChartData.length === 1) return allChartData[0].balance;
+    if (chartData.length === 0) return 0;
+    if (chartData.length === 1) return chartData[0].balance;
 
-    // Find surrounding points
+    // Find the most recent balance point before or at this timestamp
     let beforeIdx = -1;
-    let afterIdx = -1;
-
-    for (let i = 0; i < allChartData.length; i++) {
-      if (allChartData[i].time <= timestamp) {
+    for (let i = chartData.length - 1; i >= 0; i--) {
+      if (chartData[i].time <= timestamp) {
         beforeIdx = i;
-      }
-      if (allChartData[i].time >= timestamp && afterIdx === -1) {
-        afterIdx = i;
         break;
       }
     }
 
-    // Edge cases
-    if (beforeIdx === -1) return allChartData[0].balance;
-    if (afterIdx === -1) return allChartData[allChartData.length - 1].balance;
-    if (beforeIdx === afterIdx) return allChartData[beforeIdx].balance;
+    // If timestamp is before all data, use first point
+    if (beforeIdx === -1) return chartData[0].balance;
 
-    // Linear interpolation
-    const before = allChartData[beforeIdx];
-    const after = allChartData[afterIdx];
-    const ratio = (timestamp - before.time) / (after.time - before.time);
-    return before.balance + ratio * (after.balance - before.balance);
-  }, [allChartData]);
+    // Step interpolation: use the balance from the most recent point
+    return chartData[beforeIdx].balance;
+  }, [chartData]);
 
-  // Cluster activities by time window
+  // Cluster activities by time window AND activity type (adaptive based on data span)
   const clusteredMarkers: ClusteredMarker[] = useMemo(() => {
-    const clusterWindow = TIME_RANGES[selectedRange].clusterWindow;
-    const clusters: Map<number, Activity[]> = new Map();
+    if (chartData.length === 0 || activities.length === 0) return [];
 
-    // Filter activities in current time range
-    const visibleActivities = activities.filter(
-      (a) => {
-        const time = new Date(a.timestamp).getTime();
-        return time >= timeDomain[0] && time <= timeDomain[1];
-      }
+    // Calculate adaptive cluster window based on total time span
+    const timeSpan = timeDomain[1] - timeDomain[0];
+    // Aim for roughly 50-100 potential clusters across the entire span
+    const clusterWindow = Math.max(
+      5 * 60 * 1000,  // Minimum 5 minutes
+      timeSpan / 50   // Or 1/50th of the total span
     );
 
-    // Group activities into time buckets
-    visibleActivities.forEach((activity) => {
+    // Group by BOTH time bucket AND activity type
+    const clusters: Map<string, Activity[]> = new Map();
+
+    activities.forEach((activity) => {
       const time = new Date(activity.timestamp).getTime();
       const bucket = Math.floor(time / clusterWindow) * clusterWindow;
 
-      if (!clusters.has(bucket)) {
-        clusters.set(bucket, []);
+      // Create composite key: timeBucket_activityType
+      const clusterKey = `${bucket}_${activity.type}`;
+
+      if (!clusters.has(clusterKey)) {
+        clusters.set(clusterKey, []);
       }
-      clusters.get(bucket)!.push(activity);
+      clusters.get(clusterKey)!.push(activity);
     });
 
-    // Create clustered markers
+    // Create clustered markers (one per time+type combination)
     return Array.from(clusters.entries()).map(([, acts]) => {
-      // Use the average timestamp of all activities in cluster
+      // Use the average timestamp of all activities in this cluster
       const avgTime = acts.reduce((sum, a) => sum + new Date(a.timestamp).getTime(), 0) / acts.length;
 
-      // Get color and icon from first priority 1 activity, or first activity
-      const primaryActivity = acts.find((a) => a.priority === 1) || acts[0];
-      const color = getActivityColor(primaryActivity.type);
-      const icon = getActivityIcon(primaryActivity.type, color);
+      // All activities in this cluster have the same type now
+      const activityType = acts[0].type;
+      const color = getActivityColor(activityType);
+      const icon = getActivityIcon(activityType, color);
 
       return {
         time: avgTime,
@@ -283,10 +250,10 @@ export default function BalanceChartRecharts({
         color,
         count: acts.length,
         icon,
-        activityType: primaryActivity.type,
+        activityType,
       };
     }).sort((a, b) => a.time - b.time);
-  }, [activities, selectedRange, timeDomain, interpolateBalance]);
+  }, [activities, chartData, timeDomain, interpolateBalance]);
 
   const startingBalance = chartData[0]?.balance || 0;
 
@@ -296,10 +263,13 @@ export default function BalanceChartRecharts({
 
   const formatDate = (timestamp: number) => {
     const date = new Date(timestamp);
-    if (selectedRange === '1H' || selectedRange === '4H') {
-      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    }
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return date.toLocaleString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      timeZone: 'UTC'
+    });
   };
 
   const handleMarkerClick = (marker: ClusteredMarker) => {
@@ -321,28 +291,6 @@ export default function BalanceChartRecharts({
 
   return (
     <div className="w-full h-full flex flex-col">
-      {/* Time range selector */}
-      <div className="flex items-center gap-2 px-4 py-2 border-b" style={{ borderColor: VIBE.hair }}>
-        {(['1H', '4H', '1D', '1W'] as TimeRange[]).map((range) => (
-          <button
-            key={range}
-            onClick={() => setSelectedRange(range)}
-            className="px-3 py-1 text-xs font-medium rounded transition-colors"
-            style={{
-              backgroundColor: selectedRange === range ? VIBE.brass : 'transparent',
-              color: selectedRange === range ? VIBE.obsidian : VIBE.ivory,
-              border: `1px solid ${selectedRange === range ? VIBE.brass : VIBE.hair}`,
-            }}
-          >
-            {range}
-          </button>
-        ))}
-        <div className="flex-1" />
-        <span className="text-xs" style={{ color: VIBE.hair }}>
-          {chartData.length} balance points • {clusteredMarkers.length} activity groups
-        </span>
-      </div>
-
       {/* Chart */}
       <div className="flex-1 relative">
         <ResponsiveContainer width="100%" height="100%">
@@ -467,6 +415,15 @@ export default function BalanceChartRecharts({
                   </g>
                 );
               }}
+            />
+
+            {/* Brush for pan/zoom */}
+            <Brush
+              dataKey="time"
+              height={30}
+              stroke={VIBE.brass}
+              fill={VIBE.carbon}
+              tickFormatter={formatDate}
             />
           </ComposedChart>
         </ResponsiveContainer>
