@@ -72,6 +72,8 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [detailActivities, setDetailActivities] = useState<Activity[]>([]);
   const [crosshairPosition, setCrosshairPosition] = useState<{ x: number; y: number } | null>(null);
+  const [latestActivity, setLatestActivity] = useState<Activity | null>(null);
+  const [statusText, setStatusText] = useState<string>('');
 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
   const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
@@ -351,6 +353,14 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           // Set the grouped activities in the ref
           activitiesMapRef.current = groupedByTimestamp;
 
+          // Update latest activity for status display
+          const sortedActivities = activities.sort((a, b) =>
+            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+          );
+          if (sortedActivities.length > 0) {
+            setLatestActivity(sortedActivities[0]);
+          }
+
           // Create one marker per timestamp based on priority
           const markers: SeriesMarker<Time>[] = [];
 
@@ -460,7 +470,87 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
     };
   }, [configId, session, chartContainer]);
 
+  // Track latest activity and update status text
+  useEffect(() => {
+    // Find the most recent activity
+    const sortedActivities = Array.from(activitiesMapRef.current.values())
+      .flat()
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+    if (sortedActivities.length > 0) {
+      setLatestActivity(sortedActivities[0]);
+    }
+  }, []);
+
+  // Update status text every second
+  useEffect(() => {
+    if (!latestActivity) return;
+
+    const updateStatus = () => {
+      const now = new Date();
+      const activityTime = new Date(latestActivity.timestamp);
+      const diffMs = now.getTime() - activityTime.getTime();
+      const diffMins = Math.floor(diffMs / 60000);
+      const diffSecs = Math.floor((diffMs % 60000) / 1000);
+
+      // For agent_wait, show countdown to next check
+      if (latestActivity.type === 'agent_wait' && latestActivity.data.details) {
+        const details = latestActivity.data.details as Record<string, unknown>;
+        if (details.next_check_at) {
+          const nextCheck = new Date(String(details.next_check_at));
+          const remainingMs = nextCheck.getTime() - now.getTime();
+
+          if (remainingMs > 0) {
+            const mins = Math.floor(remainingMs / 60000);
+            const secs = Math.floor((remainingMs % 60000) / 1000);
+            setStatusText(`⏸ WAITING • Next check in ${mins}m ${secs}s`);
+            return;
+          } else {
+            setStatusText('⏸ WAITING • Check imminent');
+            return;
+          }
+        }
+      }
+
+      // For other activity types, show time since
+      let icon = '●';
+      let label = 'ACTIVE';
+
+      if (latestActivity.type === 'trade_entry_long') {
+        icon = '↑';
+        label = 'LONG ENTERED';
+      } else if (latestActivity.type === 'trade_entry_short') {
+        icon = '↓';
+        label = 'SHORT ENTERED';
+      } else if (latestActivity.type === 'market_query') {
+        icon = '📊';
+        label = 'QUERIED MARKET';
+      } else if (latestActivity.type === 'analysis') {
+        icon = '💭';
+        label = 'ANALYZING';
+      }
+
+      const timeAgo = diffMins > 0 ? `${diffMins}m ago` : `${diffSecs}s ago`;
+      setStatusText(`${icon} ${label} • ${timeAgo}`);
+    };
+
+    updateStatus();
+    const interval = setInterval(updateStatus, 1000);
+    return () => clearInterval(interval);
+  }, [latestActivity]);
+
   const info = metadata;
+
+  // Get status color based on activity type
+  const getStatusColor = () => {
+    if (!latestActivity) return VIBE.brass;
+    if (latestActivity.type === 'trade_entry_long') return '#16a34a';
+    if (latestActivity.type === 'trade_entry_short') return '#dc2626';
+    if (latestActivity.type === 'market_query') return VIBE.signal;
+    if (latestActivity.type === 'analysis') return VIBE.brass;
+    if (latestActivity.type === 'agent_wait') return VIBE.ivory;
+    return VIBE.brass;
+  };
 
   return (
     <div className="relative w-full min-h-screen font-sans" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
@@ -475,6 +565,16 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
             filter: drop-shadow(0 0 16px currentColor);
           }
         }
+        @keyframes statusPulse {
+          0%, 100% {
+            opacity: 1;
+            transform: scale(1);
+          }
+          50% {
+            opacity: 0.6;
+            transform: scale(1.2);
+          }
+        }
       `}</style>
       {/* HEADER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-5 pt-5 pb-4">
@@ -484,9 +584,16 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
               <h1 className="text-xl sm:text-2xl md:text-3xl leading-tight tracking-tight">
                 {title ?? info?.botName ?? 'Activity Timeline'}
               </h1>
-              <p className="font-mono text-xs sm:text-sm" style={{ color: 'rgba(237,235,231,0.7)' }}>
-                ARENA STATUS • {new Date().toUTCString().slice(5, 16).toUpperCase()} UTC
-              </p>
+              <div className="flex items-center gap-2 font-mono text-xs sm:text-sm" style={{ color: 'rgba(237,235,231,0.7)' }}>
+                <div
+                  className="w-2 h-2 rounded-full"
+                  style={{
+                    backgroundColor: getStatusColor(),
+                    animation: 'statusPulse 2s ease-in-out infinite'
+                  }}
+                />
+                <span>{statusText || 'ARENA STATUS'}</span>
+              </div>
             </div>
           </div>
 
