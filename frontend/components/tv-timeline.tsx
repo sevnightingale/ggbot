@@ -797,22 +797,22 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                             <div className="font-semibold mb-1" style={{ color: VIBE.brass }}>{indName}</div>
 
                             {/* Current Value */}
-                            {indicator.current && (
+                            {indicator.current ? (
                               <div className="text-sm mb-1">
                                 Value: <span className="font-mono">{typeof indicator.current === 'object' ? JSON.stringify((indicator.current as Record<string, unknown>).value || indicator.current) : String(indicator.current)}</span>
                               </div>
-                            )}
+                            ) : null}
 
                             {/* Trend */}
-                            {indicator.context && typeof indicator.context === 'object' && (indicator.context as Record<string, unknown>).trend && (
+                            {indicator.context && typeof indicator.context === 'object' && (indicator.context as Record<string, unknown>).trend ? (
                               <div className="text-sm mb-1">
                                 Trend: <span className="font-mono">{String(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).direction)}</span>
-                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength && <span className="ml-2">({(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength) * 100).toFixed(1)}%)</span>}
+                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength ? <span className="ml-2">({(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength) * 100).toFixed(1)}%)</span> : null}
                               </div>
-                            )}
+                            ) : null}
 
                             {/* Patterns */}
-                            {indicator.patterns && typeof indicator.patterns === 'object' && Object.keys(indicator.patterns as Record<string, unknown>).length > 0 && (
+                            {indicator.patterns && typeof indicator.patterns === 'object' && Object.keys(indicator.patterns as Record<string, unknown>).length > 0 ? (
                               <div className="text-sm">
                                 Patterns: {Object.keys(indicator.patterns as Record<string, unknown>).map(p => (
                                   <span key={p} className="inline-block px-2 py-0.5 mr-1 rounded text-xs" style={{ backgroundColor: 'rgba(193, 168, 125, 0.3)' }}>
@@ -820,7 +820,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                                   </span>
                                 ))}
                               </div>
-                            )}
+                            ) : null}
                           </div>
                         );
                         })}
