@@ -57,85 +57,77 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
     getSession();
   }, []);
 
-  // Initialize chart
+  // Fetch data and initialize chart
   useEffect(() => {
-    if (!chartContainerRef.current) return;
+    if (!configId || !chartContainerRef.current) return;
 
-    const containerWidth = chartContainerRef.current.clientWidth;
-    const containerHeight = chartContainerRef.current.clientHeight;
+    // Create chart if it doesn't exist
+    if (!chartRef.current) {
+      const containerWidth = chartContainerRef.current.clientWidth;
+      const containerHeight = chartContainerRef.current.clientHeight;
 
-    console.log('Creating chart with dimensions:', { width: containerWidth, height: containerHeight });
+      console.log('Creating chart with dimensions:', { width: containerWidth, height: containerHeight });
 
-    const chart = createChart(chartContainerRef.current, {
-      width: containerWidth,
-      height: containerHeight,
-      layout: {
-        background: { type: ColorType.Solid, color: VIBE.carbon },
-        textColor: VIBE.hair,
-      },
-      grid: {
-        vertLines: { color: VIBE.hair, style: LineStyle.Dotted },
-        horzLines: { color: VIBE.hair, style: LineStyle.Dotted },
-      },
-      rightPriceScale: {
-        borderColor: VIBE.hair,
-      },
-      timeScale: {
-        borderColor: VIBE.hair,
-        timeVisible: true,
-        secondsVisible: false,
-      },
-      crosshair: {
-        mode: 1,
-        vertLine: {
-          color: VIBE.brass,
-          width: 1,
-          style: LineStyle.Dashed,
+      const chart = createChart(chartContainerRef.current, {
+        width: containerWidth,
+        height: containerHeight,
+        layout: {
+          background: { type: ColorType.Solid, color: VIBE.carbon },
+          textColor: VIBE.hair,
         },
-        horzLine: {
-          color: VIBE.brass,
-          width: 1,
-          style: LineStyle.Dashed,
+        grid: {
+          vertLines: { color: VIBE.hair, style: LineStyle.Dotted },
+          horzLines: { color: VIBE.hair, style: LineStyle.Dotted },
         },
-      },
-    });
+        rightPriceScale: {
+          borderColor: VIBE.hair,
+        },
+        timeScale: {
+          borderColor: VIBE.hair,
+          timeVisible: true,
+          secondsVisible: false,
+        },
+        crosshair: {
+          mode: 1,
+          vertLine: {
+            color: VIBE.brass,
+            width: 1,
+            style: LineStyle.Dashed,
+          },
+          horzLine: {
+            color: VIBE.brass,
+            width: 1,
+            style: LineStyle.Dashed,
+          },
+        },
+      });
 
-    chartRef.current = chart;
-    console.log('Chart created:', chart);
+      chartRef.current = chart;
+      console.log('Chart created:', !!chart);
 
-    const lineSeries = chart.addLineSeries({
-      color: VIBE.signal,
-      lineWidth: 2,
-      crosshairMarkerVisible: true,
-      crosshairMarkerRadius: 4,
-      lastValueVisible: true,
-      priceLineVisible: true,
-    });
+      const lineSeries = chart.addLineSeries({
+        color: VIBE.signal,
+        lineWidth: 2,
+        crosshairMarkerVisible: true,
+        crosshairMarkerRadius: 4,
+        lastValueVisible: true,
+        priceLineVisible: true,
+      });
 
-    lineSeriesRef.current = lineSeries;
+      lineSeriesRef.current = lineSeries;
+      console.log('Line series created:', !!lineSeries);
 
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({
-          width: chartContainerRef.current.clientWidth,
-          height: chartContainerRef.current.clientHeight,
-        });
-      }
-    };
+      const handleResize = () => {
+        if (chartContainerRef.current && chartRef.current) {
+          chartRef.current.applyOptions({
+            width: chartContainerRef.current.clientWidth,
+            height: chartContainerRef.current.clientHeight,
+          });
+        }
+      };
 
-    window.addEventListener('resize', handleResize);
-
-    return () => {
-      window.removeEventListener('resize', handleResize);
-      chart.remove();
-      chartRef.current = null;
-      lineSeriesRef.current = null;
-    };
-  }, []);
-
-  // Fetch data
-  useEffect(() => {
-    if (!configId) return;
+      window.addEventListener('resize', handleResize);
+    }
 
     const fetchData = async () => {
       try {
@@ -203,7 +195,16 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
     fetchData();
 
     const intervalId = setInterval(fetchData, 10000);
-    return () => clearInterval(intervalId);
+
+    return () => {
+      clearInterval(intervalId);
+      if (chartRef.current) {
+        window.removeEventListener('resize', () => {});
+        chartRef.current.remove();
+        chartRef.current = null;
+        lineSeriesRef.current = null;
+      }
+    };
   }, [configId, session]);
 
   const info = metadata;
