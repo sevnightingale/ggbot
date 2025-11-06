@@ -182,7 +182,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         });
 
         // Transform and validate data
-        const chartData: LineData[] = balancePoints
+        const validatedData: LineData[] = balancePoints
           .map((point) => {
             const timestamp = new Date(point.timestamp).getTime() / 1000;
             return {
@@ -205,8 +205,23 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
             return aTime - bTime;
           }); // TradingView requires sorted data
 
+        // Deduplicate by time - keep last value for each timestamp
+        // TradingView requires unique timestamps
+        const timeMap = new Map<number, number>();
+        validatedData.forEach((point) => {
+          const timeNum = typeof point.time === 'number' ? point.time : parseFloat(point.time as string);
+          timeMap.set(timeNum, point.value);
+        });
+
+        const chartData: LineData[] = Array.from(timeMap.entries()).map(([time, value]) => ({
+          time: time as Time,
+          value,
+        }));
+
         console.log('Balance points:', balancePoints.length);
-        console.log('Chart data after validation:', chartData.length);
+        console.log('After validation:', validatedData.length);
+        console.log('After deduplication:', chartData.length);
+        console.log('Removed duplicates:', validatedData.length - chartData.length);
         console.log('First 3 points:', chartData.slice(0, 3));
         console.log('Last 3 points:', chartData.slice(-3));
         console.log('Line series ref exists:', !!lineSeriesRef.current);
