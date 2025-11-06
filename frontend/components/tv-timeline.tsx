@@ -61,7 +61,14 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   useEffect(() => {
     if (!chartContainerRef.current) return;
 
+    const containerWidth = chartContainerRef.current.clientWidth;
+    const containerHeight = chartContainerRef.current.clientHeight;
+
+    console.log('Creating chart with dimensions:', { width: containerWidth, height: containerHeight });
+
     const chart = createChart(chartContainerRef.current, {
+      width: containerWidth,
+      height: containerHeight,
       layout: {
         background: { type: ColorType.Solid, color: VIBE.carbon },
         textColor: VIBE.hair,
@@ -94,6 +101,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
     });
 
     chartRef.current = chart;
+    console.log('Chart created:', chart);
 
     const lineSeries = chart.addLineSeries({
       color: VIBE.signal,
@@ -168,9 +176,20 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           value: point.balance,
         }));
 
+        console.log('Balance points:', balancePoints.length);
+        console.log('Chart data:', chartData.length, chartData.slice(0, 3));
+        console.log('Line series ref exists:', !!lineSeriesRef.current);
+
         if (lineSeriesRef.current && chartData.length > 0) {
+          console.log('Setting data on chart...');
           lineSeriesRef.current.setData(chartData);
           chartRef.current?.timeScale().fitContent();
+          console.log('Data set successfully');
+        } else {
+          console.warn('Cannot set data:', {
+            hasLineSeries: !!lineSeriesRef.current,
+            dataLength: chartData.length
+          });
         }
 
         setLoading(false);
