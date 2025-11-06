@@ -208,86 +208,61 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           performance: metadataData.metadata?.performance || metadataData.performance || 0,
         });
 
-        // Step 1: Create lookup map of balance by timestamp (use unix seconds as key)
-        const balanceMap = new Map<number, number>();
-        balancePoints.forEach((point) => {
-          const unixTime = Math.floor(new Date(point.timestamp).getTime() / 1000);
-          balanceMap.set(unixTime, point.balance);
-        });
-
-        console.log('Balance map created:', balanceMap.size, 'entries');
-
-        // Step 2: Sort activities by timestamp
-        const sortedActivities = [...activities].sort((a, b) =>
-          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-        );
-
-        console.log('Activities sorted:', sortedActivities.length);
-
-        // Step 3: Merge activities with P&L using carry-forward
-        // Find the P&L value at the time of the first activity
-        // by looking at the most recent balance point before it
-        let currentPnl = 0.0;
-
-        if (sortedActivities.length > 0 && balancePoints.length > 0) {
-          const firstActivityTime = new Date(sortedActivities[0].timestamp);
-
-          // Sort balance points by time and find the last one before first activity
-          const sortedBalancePoints = [...balancePoints].sort((a, b) =>
-            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
-          );
-
-          for (const balancePoint of sortedBalancePoints) {
-            const balanceTime = new Date(balancePoint.timestamp);
-            if (balanceTime <= firstActivityTime) {
-              currentPnl = balancePoint.balance;
-            } else {
-              break;
-            }
-          }
-
-          console.log('Starting P&L (from last balance before first activity):', currentPnl);
+        // Step 1: Create timeline events from both balance points and activities
+        interface TimelineEvent {
+          timestamp: number; // unix seconds
+          type: 'balance' | 'activity';
+          value?: number; // P&L value (only for balance events)
         }
 
+        const timelineEvents: TimelineEvent[] = [];
+
+        // Add balance points
+        balancePoints.forEach((point) => {
+          timelineEvents.push({
+            timestamp: Math.floor(new Date(point.timestamp).getTime() / 1000),
+            type: 'balance',
+            value: point.balance,
+          });
+        });
+
+        // Add activities
+        activities.forEach((activity) => {
+          timelineEvents.push({
+            timestamp: Math.floor(new Date(activity.timestamp).getTime() / 1000),
+            type: 'activity',
+          });
+        });
+
+        // Step 2: Sort all events chronologically
+        timelineEvents.sort((a, b) => a.timestamp - b.timestamp);
+
+        console.log('Timeline events (balance + activities):', timelineEvents.length);
+
+        // Step 3: Walk through events, update P&L when we hit balance points
+        let currentPnl = 0.0;
         const mergedData: LineData[] = [];
+        const seenTimestamps = new Set<number>();
 
-        sortedActivities.forEach((activity) => {
-          // Convert to unix timestamp (seconds)
-          const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
-
-          // Check if this activity has a balance point (match by unix seconds)
-          if (balanceMap.has(timestamp)) {
-            currentPnl = balanceMap.get(timestamp)!;
-            console.log(`P&L update at ${activity.timestamp}: $${currentPnl}`);
+        timelineEvents.forEach((event) => {
+          // Update P&L if this is a balance event
+          if (event.type === 'balance' && event.value !== undefined) {
+            currentPnl = event.value;
+            console.log(`P&L update at ${new Date(event.timestamp * 1000).toISOString()}: $${currentPnl}`);
           }
-          // Otherwise carry forward current P&L
 
-          mergedData.push({
-            time: timestamp as Time,
-            value: currentPnl,
-          });
+          // Add point to chart (dedupe by timestamp)
+          if (!seenTimestamps.has(event.timestamp)) {
+            mergedData.push({
+              time: event.timestamp as Time,
+              value: currentPnl,
+            });
+            seenTimestamps.add(event.timestamp);
+          }
         });
 
-        console.log('Merged data:', mergedData.length, 'points');
-
-        // Step 4: Deduplicate by timestamp (keep last value)
-        // Some activities might have same timestamp
-        const timeMap = new Map<number, number>();
-        mergedData.forEach((point) => {
-          const timeNum = typeof point.time === 'number' ? point.time : parseFloat(point.time as string);
-          timeMap.set(timeNum, point.value);
-        });
-
-        const chartData: LineData[] = Array.from(timeMap.entries())
-          .map(([time, value]) => ({
-            time: time as Time,
-            value,
-          }))
-          .sort((a, b) => {
-            const aTime = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
-            const bTime = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
-            return aTime - bTime;
-          });
+        // Data is already sorted and deduped
+        const chartData = mergedData;
 
         console.log('Final chart data:', chartData.length, 'points');
         console.log('First 3 points:', chartData.slice(0, 3));
