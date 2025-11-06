@@ -1,54 +1,37 @@
-useEffect running {configId: 'bb2560fd-b053-464f-8a58-8e254e4d36fa', hasContainer: false, hasSession: false}
-page-9f760fc024695772.js:1 Early return - missing configId or container
-page-9f760fc024695772.js:1 useEffect running {configId: 'bb2560fd-b053-464f-8a58-8e254e4d36fa', hasContainer: true, hasSession: false}
-page-9f760fc024695772.js:1 Creating chart with dimensions: {width: 1271, height: 711}
-page-9f760fc024695772.js:1 Chart created: true
-page-9f760fc024695772.js:1 Line series created: true
-page-9f760fc024695772.js:1 About to call fetchData...
-page-9f760fc024695772.js:1 fetchData starting... {configId: 'bb2560fd-b053-464f-8a58-8e254e4d36fa', hasSession: false}
-page-9f760fc024695772.js:1 Fetching from API...
-page-9f760fc024695772.js:1 Setting up polling interval...
-page-9f760fc024695772.js:1 useEffect running {configId: 'bb2560fd-b053-464f-8a58-8e254e4d36fa', hasContainer: true, hasSession: true}
-page-9f760fc024695772.js:1 Creating chart with dimensions: {width: 1271, height: 711}
-page-9f760fc024695772.js:1 Chart created: true
-page-9f760fc024695772.js:1 Line series created: true
-page-9f760fc024695772.js:1 About to call fetchData...
-page-9f760fc024695772.js:1 fetchData starting... {configId: 'bb2560fd-b053-464f-8a58-8e254e4d36fa', hasSession: true}
-page-9f760fc024695772.js:1 Fetching from API...
-page-9f760fc024695772.js:1 Setting up polling interval...
-page-9f760fc024695772.js:1 API responses: {balanceOk: true, balanceStatus: 200, activitiesOk: true, activitiesStatus: 200, metadataOk: true, …}
-page-9f760fc024695772.js:1 Raw balance points: 29
-page-9f760fc024695772.js:1 Raw activities: 500
-page-9f760fc024695772.js:1 Balance map created: 13 entries
-page-9f760fc024695772.js:1 Activities sorted: 500
-page-9f760fc024695772.js:1 Starting P&L (from last balance before first activity): 0.6416999999999999
-page-9f760fc024695772.js:1 Merged data: 500 points
-page-9f760fc024695772.js:1 Final chart data: 380 points
-page-9f760fc024695772.js:1 First 3 points: (3) [{…}, {…}, {…}]
-page-9f760fc024695772.js:1 Last 3 points: (3) [{…}, {…}, {…}]
-page-9f760fc024695772.js:1 Time spacing (first 3 points):
-page-9f760fc024695772.js:1   Point 0 to 1: 10 seconds (0.002777777777777778 hours)
-page-9f760fc024695772.js:1   Point 1 to 2: 2 seconds (0.0005555555555555556 hours)
-page-9f760fc024695772.js:1   Point 0 date: 2025-11-04T11:07:55.000Z
-page-9f760fc024695772.js:1   Point 1 date: 2025-11-04T11:08:05.000Z
-page-9f760fc024695772.js:1 Line series ref exists: true
-page-9f760fc024695772.js:1 Setting data on chart...
-page-9f760fc024695772.js:1 Data set successfully (initial load, fitted content)
-page-9f760fc024695772.js:1 API responses: {balanceOk: true, balanceStatus: 200, activitiesOk: true, activitiesStatus: 200, metadataOk: true, …}
-page-9f760fc024695772.js:1 Raw balance points: 29
-page-9f760fc024695772.js:1 Raw activities: 500
-page-9f760fc024695772.js:1 Balance map created: 13 entries
-page-9f760fc024695772.js:1 Activities sorted: 500
-page-9f760fc024695772.js:1 Starting P&L (from last balance before first activity): 0.6416999999999999
-page-9f760fc024695772.js:1 Merged data: 500 points
-page-9f760fc024695772.js:1 Final chart data: 380 points
-page-9f760fc024695772.js:1 First 3 points: (3) [{…}, {…}, {…}]
-page-9f760fc024695772.js:1 Last 3 points: (3) [{…}, {…}, {…}]
-page-9f760fc024695772.js:1 Time spacing (first 3 points):
-page-9f760fc024695772.js:1   Point 0 to 1: 10 seconds (0.002777777777777778 hours)
-page-9f760fc024695772.js:1   Point 1 to 2: 2 seconds (0.0005555555555555556 hours)
-page-9f760fc024695772.js:1   Point 0 date: 2025-11-04T11:07:55.000Z
-page-9f760fc024695772.js:1   Point 1 date: 2025-11-04T11:08:05.000Z
-page-9f760fc024695772.js:1 Line series ref exists: true
-page-9f760fc024695772.js:1 Setting data on chart...
-page-9f760fc024695772.js:1 Data set successfully (update, preserved zoom/pan)
+Clicked activity: {id: '05d85412-49e6-4fef-babf-e566109b901b', timestamp: '2025-11-05T10:55:12.140879+00:00', type: 'trade_entry_long', priority: 1, data: {…}}data: {summary: 'Opened long ETHUSDT at $N/A', details: {…}, symbol: 'ETHUSDT', importance: 9, trade_id: null, …}id: "05d85412-49e6-4fef-babf-e566109b901b"priority: 1timestamp: "2025-11-05T10:55:12.140879+00:00"type: "trade_entry_long"[[Prototype]]: Object
+page-d632acaea6afd1a4.js:1 fetchData starting... {configId: 'bb2560fd-b053-464f-8a58-8e254e4d36fa', hasSession: true}
+page-d632acaea6afd1a4.js:1 Fetching from API...
+page-d632acaea6afd1a4.js:1 API responses: {balanceOk: true, balanceStatus: 200, activitiesOk: true, activitiesStatus: 200, metadataOk: true, …}
+page-d632acaea6afd1a4.js:1 Raw balance points: 29
+page-d632acaea6afd1a4.js:1 Raw activities: 500
+page-d632acaea6afd1a4.js:1 Timeline events (balance + activities): 529
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-02T19:12:33.000Z: $-0.0732
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-03T20:59:33.000Z: $0
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T04:42:06.000Z: $-0.047450000000000006
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T04:42:06.000Z: $0.029799999999999993
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T04:43:56.000Z: $0.008999999999999994
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T04:48:47.000Z: $0.007299999999999994
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T08:13:49.000Z: $0.6416999999999999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T13:50:10.000Z: $1.23401904
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T13:50:10.000Z: $13.08039999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T16:59:28.000Z: $22.75899999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T17:34:19.000Z: $22.12109999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T19:54:57.000Z: $20.04209999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-04T19:54:57.000Z: $17.96309999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:01.000Z: $24.52889999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:01.000Z: $26.646899989999998
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $27.25319999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $27.85949999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $28.46579999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $29.07209999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $29.678399990000003
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $30.284699990000004
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $30.890999990000005
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $31.497299990000005
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $32.103599990000006
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $32.709899990000004
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $33.31619999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $33.92249999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-05T12:27:02.000Z: $37.56029999
+page-d632acaea6afd1a4.js:1 P&L update at 2025-11-06T17:12:48.000Z: $37.56029999
+page-d632acaea6afd1a4.js:1 Final chart data: 393 points

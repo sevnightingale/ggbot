@@ -5,6 +5,7 @@ import { createChart, ColorType, LineStyle } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, LineData, Time, SeriesMarker } from 'lightweight-charts';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Session } from '@supabase/supabase-js';
+import BottomSheet from './bottom-sheet';
 
 // Trade37 palette (hardwired)
 const VIBE = {
@@ -63,6 +64,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
+  const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
 
   // Map to lookup activities by timestamp
   const activitiesMapRef = useRef<Map<number, Activity>>(new Map());
@@ -172,7 +174,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
         if (activity && (activity.type === 'trade_entry_long' || activity.type === 'trade_entry_short')) {
           console.log('Clicked activity:', activity);
-          // For now just log, we'll add detail panel later
+          setDetailActivity(activity);
         }
       });
 
@@ -500,6 +502,111 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           )}
         </div>
       </section>
+
+      {/* Activity Detail Bottom Sheet */}
+      <BottomSheet
+        isOpen={!!detailActivity}
+        onClose={() => setDetailActivity(null)}
+        title={detailActivity?.type === 'trade_entry_long' ? 'Long Entry' : detailActivity?.type === 'trade_entry_short' ? 'Short Entry' : 'Activity'}
+      >
+        {detailActivity && (
+          <div className="px-6 py-4 space-y-4">
+            {/* Activity Type Badge */}
+            <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
+              backgroundColor: detailActivity.type === 'trade_entry_long' ? '#16a34a' : '#dc2626',
+              color: VIBE.ivory
+            }}>
+              {detailActivity.type === 'trade_entry_long' ? '↑ Long Entry' : '↓ Short Entry'}
+            </div>
+
+            {/* Timestamp */}
+            <div>
+              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                Timestamp
+              </div>
+              <div className="text-sm font-mono">
+                {new Date(detailActivity.timestamp).toLocaleString('en-US', {
+                  dateStyle: 'medium',
+                  timeStyle: 'medium'
+                })}
+              </div>
+            </div>
+
+            {/* Symbol */}
+            {detailActivity.data.symbol && (
+              <div>
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  Symbol
+                </div>
+                <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
+                  {detailActivity.data.symbol}
+                </div>
+              </div>
+            )}
+
+            {/* Summary */}
+            {detailActivity.data.summary && (
+              <div>
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  Summary
+                </div>
+                <div className="text-sm leading-relaxed">
+                  {detailActivity.data.summary}
+                </div>
+              </div>
+            )}
+
+            {/* Trade ID */}
+            {detailActivity.data.trade_id && (
+              <div>
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  Trade ID
+                </div>
+                <div className="text-sm font-mono" style={{ color: VIBE.brass }}>
+                  {detailActivity.data.trade_id}
+                </div>
+              </div>
+            )}
+
+            {/* Details (if present) */}
+            {detailActivity.data.details && Object.keys(detailActivity.data.details).length > 0 && (
+              <div>
+                <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  Details
+                </div>
+                <div className="bg-black bg-opacity-30 rounded-lg p-3 overflow-auto">
+                  <pre className="text-xs font-mono" style={{ color: VIBE.ivory }}>
+                    {JSON.stringify(detailActivity.data.details, null, 2)}
+                  </pre>
+                </div>
+              </div>
+            )}
+
+            {/* Importance Level */}
+            {detailActivity.data.importance !== undefined && (
+              <div>
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  Importance
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex gap-1">
+                    {[1, 2, 3, 4, 5].map((level) => (
+                      <div
+                        key={level}
+                        className="w-8 h-2 rounded"
+                        style={{
+                          backgroundColor: level <= (detailActivity.data.importance || 0) ? VIBE.brass : 'rgba(237,235,231,0.2)'
+                        }}
+                      />
+                    ))}
+                  </div>
+                  <span className="text-sm">{detailActivity.data.importance}/5</span>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+      </BottomSheet>
     </div>
   );
 }
