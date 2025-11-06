@@ -208,10 +208,11 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           performance: metadataData.metadata?.performance || metadataData.performance || 0,
         });
 
-        // Step 1: Create lookup map of balance by timestamp
-        const balanceMap = new Map<string, number>();
+        // Step 1: Create lookup map of balance by timestamp (use unix seconds as key)
+        const balanceMap = new Map<number, number>();
         balancePoints.forEach((point) => {
-          balanceMap.set(point.timestamp, point.balance);
+          const unixTime = Math.floor(new Date(point.timestamp).getTime() / 1000);
+          balanceMap.set(unixTime, point.balance);
         });
 
         console.log('Balance map created:', balanceMap.size, 'entries');
@@ -251,14 +252,15 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         const mergedData: LineData[] = [];
 
         sortedActivities.forEach((activity) => {
-          // Check if this activity has a balance point
-          if (balanceMap.has(activity.timestamp)) {
-            currentPnl = balanceMap.get(activity.timestamp)!;
-          }
-          // Otherwise carry forward current P&L
-
           // Convert to unix timestamp (seconds)
           const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
+
+          // Check if this activity has a balance point (match by unix seconds)
+          if (balanceMap.has(timestamp)) {
+            currentPnl = balanceMap.get(timestamp)!;
+            console.log(`P&L update at ${activity.timestamp}: $${currentPnl}`);
+          }
+          // Otherwise carry forward current P&L
 
           mergedData.push({
             time: timestamp as Time,
