@@ -351,8 +351,14 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
           // Set markers on the line series
           if (tradeMarkers.length > 0) {
-            lineSeriesRef.current.setMarkers(tradeMarkers);
-            console.log('Trade markers added:', tradeMarkers.length);
+            // CRITICAL: Markers must be sorted by time in ascending order
+            const sortedMarkers = tradeMarkers.sort((a, b) => {
+              const timeA = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
+              const timeB = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
+              return timeA - timeB;
+            });
+            lineSeriesRef.current.setMarkers(sortedMarkers);
+            console.log('Trade markers added:', sortedMarkers.length);
           }
 
           // Only fit content on first load, preserve user zoom/pan on subsequent updates
