@@ -215,6 +215,13 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
         # LOG: Response being returned to agent
         logger.debug(f"   Response: {formatted_response[:500]}{'...' if len(formatted_response) > 500 else ''}")
 
+        # Extract market data for activity logging
+        market_data = {}
+        if result.get('data', {}).get('technicals'):
+            market_data['technicals'] = result['data']['technicals']
+        if result.get('data', {}).get('market_intelligence'):
+            market_data['market_intelligence'] = result['data']['market_intelligence']
+
         # Auto-log activity to timeline
         categories_list = list(categories.keys())
         log_activity_safe(
@@ -227,7 +234,8 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
                 'symbol': symbol,
                 'categories': categories,
                 'timeframe': timeframe,
-                'data_returned': bool(response_parts)
+                'data_returned': bool(response_parts),
+                'market_data': market_data  # NEW: Actual data agent received
             },
             related_symbol=symbol,
             importance=6
