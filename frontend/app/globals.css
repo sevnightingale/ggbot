@@ -576,10 +576,15 @@ body {
   --bone-200: #e3e5e6;
   --bone-300: #d0d2d3;
 
-  /* Agent colors (same in both themes) */
-  --agent-extraction: #38a1c7;
-  --agent-decision: #2cbe77;
-  --agent-trading: #be6a47;
+  /* Brass pipeline colors - ceremonial brutalism */
+  --agent-extraction: #d4bc91;  /* Light brass - extraction phase */
+  --agent-decision: #c1a87d;     /* Medium brass - decision phase */
+  --agent-trading: #a89168;      /* Dark brass - trading phase */
+
+  /* Legacy agent colors (deprecated - preserved for backwards compatibility) */
+  --agent-extraction-legacy: #38a1c7;
+  --agent-decision-legacy: #2cbe77;
+  --agent-trading-legacy: #be6a47;
 
   /* Status colors (same in both themes) */
   --status-success: #10b981;

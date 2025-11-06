@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Crown } from 'lucide-react'
+import { Crown, Clock, CheckSquare, Bot } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -40,7 +40,7 @@ export function BotCreationModal({
   const botTypes = [
     {
       type: 'scheduled_trading' as const,
-      icon: '⏰',
+      Icon: Clock,
       label: 'Scheduled Trading',
       description: 'Automated trading on a fixed schedule (5m, 15m, 1h, etc.)',
       color: 'var(--agent-extraction)',
@@ -49,7 +49,7 @@ export function BotCreationModal({
     },
     {
       type: 'signal_validation' as const,
-      icon: '✓',
+      Icon: CheckSquare,
       label: 'Signal Validation',
       description: 'Validate external signals (Telegram, webhooks) with AI analysis',
       color: 'var(--agent-decision)',
@@ -58,7 +58,7 @@ export function BotCreationModal({
     },
     {
       type: 'agent' as const,
-      icon: '🤖',
+      Icon: Bot,
       label: 'Agent',
       description: 'Autonomous AI agent that defines its own trading strategy through conversation',
       color: '#9333ea', // purple-600
@@ -90,22 +90,22 @@ export function BotCreationModal({
         </DialogHeader>
 
         <div className="space-y-3 py-4">
-          {botTypes.map(({ type, icon, label, description, color, available, tier }) => (
+          {botTypes.map(({ type, Icon, label, description, color, available, tier }) => (
             <button
               key={type}
               onClick={() => setSelectedType(type)}
               className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
                 selectedType === type
-                  ? 'border-emerald-500 bg-emerald-500/10'
+                  ? 'border-[var(--accent)] bg-[var(--accent)]/10'
                   : 'border-[var(--border)] hover:border-[var(--border-hover)]'
               } ${!available ? 'opacity-60' : ''}`}
             >
               <div className="flex items-start gap-3">
                 <div
-                  className="text-3xl flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center"
+                  className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center"
                   style={{ backgroundColor: available ? `${color}20` : 'var(--bg-tertiary)' }}
                 >
-                  {icon}
+                  <Icon className="h-6 w-6" style={{ color: available ? color : 'var(--text-muted)' }} />
                 </div>
 
                 <div className="flex-1">
@@ -128,12 +128,12 @@ export function BotCreationModal({
 
                 <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mt-1 ${
                   selectedType === type
-                    ? 'border-emerald-500 bg-emerald-500'
+                    ? 'border-[var(--accent)] bg-[var(--accent)]'
                     : 'border-[var(--border)]'
                 }`}>
                   {selectedType === type && (
-                    <div className="w-full h-full flex items-center justify-center text-white text-xs">
-                      ✓
+                    <div className="w-full h-full flex items-center justify-center text-obsidian">
+                      <Crown className="h-3 w-3" />
                     </div>
                   )}
                 </div>
@@ -152,7 +152,7 @@ export function BotCreationModal({
 
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-700 text-white transition-colors"
+            className="px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-obsidian font-medium transition-colors"
           >
             {botTypes.find(t => t.type === selectedType)?.available ? 'Create Bot' : 'Upgrade to Create'}
           </button>

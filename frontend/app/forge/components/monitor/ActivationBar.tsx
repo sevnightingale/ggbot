@@ -78,7 +78,7 @@ export function ActivationBar({
               className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition ${
                 isActive
                   ? 'bg-rose-600/90 hover:bg-rose-600 ring-rose-500 text-white'
-                  : 'bg-emerald-600/90 hover:bg-emerald-600 ring-emerald-500 text-white'
+                  : 'bg-[var(--accent)]/90 hover:bg-[var(--accent)] ring-[var(--accent)] text-obsidian'
               } disabled:opacity-50`}
             >
               {isActive ? (

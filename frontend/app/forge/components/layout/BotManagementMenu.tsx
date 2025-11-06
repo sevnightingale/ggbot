@@ -3,6 +3,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { BotConfiguration } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
+import { Edit2, Copy, Zap, RefreshCw, Check, MoreHorizontal, Trash2 } from 'lucide-react'
 
 interface BotManagementMenuProps {
   bot: BotConfiguration
@@ -124,8 +125,9 @@ export function BotManagementMenu({
             <button
               onClick={handleRenameSubmit}
               disabled={isBotAction}
-              className="px-3 py-2 bg-emerald-600 text-white rounded hover:bg-emerald-700 disabled:opacity-50 text-xs"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-[var(--accent)] text-obsidian rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 text-xs font-medium"
             >
+              <Check className="h-3.5 w-3.5" />
               Save
             </button>
             <button
@@ -216,7 +218,7 @@ export function BotManagementMenu({
         className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
         aria-label="Bot actions"
       >
-        ⋯
+        <MoreHorizontal className="h-4 w-4" />
       </button>
 
       {isOpen && (
@@ -225,10 +227,11 @@ export function BotManagementMenu({
             <button
               onClick={handleRename}
               disabled={isBotAction || hasUnsavedChanges}
-              className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               title={hasUnsavedChanges ? "Finish editing configuration first" : undefined}
             >
-              ✏️ Rename
+              <Edit2 className="h-3.5 w-3.5" />
+              Rename
             </button>
             <button
               onClick={() => {
@@ -236,9 +239,10 @@ export function BotManagementMenu({
                 setIsOpen(false)
               }}
               disabled={isBotAction}
-              className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
-              📋 Duplicate
+              <Copy className="h-3.5 w-3.5" />
+              Duplicate
             </button>
             {isPaperBot && onDuplicateAsLive && (
               <button
@@ -253,26 +257,29 @@ export function BotManagementMenu({
                   }
                 }}
                 disabled={isBotAction}
-                className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                ⚡ Deploy Live Version
+                <Zap className="h-3.5 w-3.5" />
+                Deploy Live Version
               </button>
             )}
             {onResetAccount && (
               <button
                 onClick={handleResetClick}
                 disabled={isBotAction}
-                className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                className="w-full px-3 py-2 text-left text-xs text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
               >
-                🔄 Reset Account
+                <RefreshCw className="h-3.5 w-3.5" />
+                Reset Account
               </button>
             )}
             <hr className="my-1 border-[var(--border)]" />
             <button
               onClick={handleDeleteClick}
               disabled={isBotAction}
-              className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full px-3 py-2 text-left text-xs text-rose-400 hover:bg-[var(--bg-tertiary)] disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-2"
             >
+              <Trash2 className="h-3.5 w-3.5" />
               Delete
             </button>
           </div>
