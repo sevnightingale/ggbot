@@ -150,7 +150,7 @@ export function StrategyEditor({
                   onClick={() => handleFrequencyChange(freq)}
                   className={`px-4 py-3 text-sm rounded-xl border transition-all relative ${
                     analysisFrequency === freq
-                      ? 'bg-[var(--agent-decision)] text-white border-[var(--agent-decision)]'
+                      ? 'bg-[var(--accent)] text-obsidian border-[var(--accent)] hover:bg-[var(--accent-hover)]'
                       : isLocked
                         ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 hover:opacity-80'
                         : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'

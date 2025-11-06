@@ -38,13 +38,13 @@ export default function Pricing() {
   ]
 
   return (
-    <section id="pricing" className="py-20 bg-charcoal-800 border-t-2 border-bone-200/10">
+    <section id="pricing" className="py-20 bg-carbon border-t-2 border-ivory/10">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
+          <h2 className="text-3xl md:text-4xl font-bold text-ivory mb-6 font-display">
             Simple, transparent pricing
           </h2>
-          <p className="text-lg text-bone-200/70 max-w-2xl mx-auto">
+          <p className="text-lg text-ivory/70 max-w-2xl mx-auto">
             Start free and upgrade as your trading grows. No hidden fees, cancel anytime.
           </p>
         </div>
@@ -53,16 +53,16 @@ export default function Pricing() {
           {plans.map((plan, index) => (
             <div
               key={index}
-              className={`relative bg-charcoal-900 border-2 rounded-sm p-8 ${
+              className={`relative bg-obsidian border-2 rounded-sm p-8 ${
                 plan.popular
-                  ? 'border-agents-decision shadow-[0_0_25px_rgba(44,190,119,0.3)]'
-                  : 'border-bone-200/20'
+                  ? 'border-brass shadow-[0_0_25px_rgba(193,168,125,0.3)]'
+                  : 'border-ivory/20'
               }`}
             >
               {/* Popular Badge */}
               {plan.popular && (
                 <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
-                  <div className="bg-agents-decision text-bone-200 px-4 py-1 rounded-full text-sm font-medium">
+                  <div className="bg-brass text-obsidian px-4 py-1 rounded-full text-sm font-medium">
                     Most Popular
                   </div>
                 </div>
@@ -70,23 +70,23 @@ export default function Pricing() {
 
               {/* Plan Header */}
               <div className="text-center mb-8">
-                <h3 className="text-xl font-bold text-bone-200 mb-2 font-display">
+                <h3 className="text-xl font-bold text-ivory mb-2 font-display">
                   {plan.name}
                 </h3>
                 <div className="mb-4">
-                  <span className="text-3xl font-bold text-bone-200">
+                  <span className="text-3xl font-bold text-ivory">
                     {plan.price}
                   </span>
                   {plan.price !== "Free" && (
-                    <span className="text-bone-200/60 ml-1">/month</span>
+                    <span className="text-ivory/60 ml-1">/month</span>
                   )}
                 </div>
                 {plan.badge && (
-                  <div className="inline-block bg-green-500/20 text-green-400 text-xs px-3 py-1 rounded-full mb-2">
+                  <div className="inline-block bg-brass/20 text-brass text-xs px-3 py-1 rounded-full mb-2">
                     {plan.badge}
                   </div>
                 )}
-                <p className="text-sm text-bone-200/70">
+                <p className="text-sm text-ivory/70">
                   {plan.description}
                 </p>
               </div>
@@ -95,8 +95,8 @@ export default function Pricing() {
               <ul className="space-y-3 mb-8">
                 {plan.features.map((feature, featureIndex) => (
                   <li key={featureIndex} className="flex items-start gap-3">
-                    <Check className="text-agents-decision flex-shrink-0 mt-0.5" size={16} />
-                    <span className="text-bone-200/80 text-sm">
+                    <Check className="text-brass flex-shrink-0 mt-0.5" size={16} />
+                    <span className="text-ivory/80 text-sm">
                       {feature}
                     </span>
                   </li>
@@ -108,8 +108,8 @@ export default function Pricing() {
                 href={plan.href}
                 className={`block w-full text-center py-3 px-6 rounded-sm font-medium transition-all duration-200 ${
                   plan.popular
-                    ? 'bg-agents-decision hover:bg-agents-decision/90 text-bone-200 shadow-[0_0_15px_rgba(44,190,119,0.3)]'
-                    : 'bg-charcoal-700 hover:bg-charcoal-600 text-bone-200 border border-bone-200/20 hover:border-bone-200/40'
+                    ? 'bg-brass hover:bg-brass-light text-obsidian shadow-[0_0_15px_rgba(193,168,125,0.3)]'
+                    : 'bg-carbon hover:bg-[#1a1a1c] text-ivory border border-ivory/20 hover:border-ivory/40'
                 }`}
               >
                 {plan.cta}
@@ -120,11 +120,11 @@ export default function Pricing() {
         </div>
 
         {/* Bottom Note */}
-        <div className="text-center mt-12 p-6 bg-charcoal-900 border border-bone-200/20 rounded-sm">
-          <p className="text-bone-200/70 mb-4">
-            <strong className="text-bone-200">Limited Offer:</strong> First 100 users get 50% off for 6 months with code <span className="font-mono bg-charcoal-800 px-2 py-1 rounded text-agents-decision">FIRST100</span>
+        <div className="text-center mt-12 p-6 bg-obsidian border border-ivory/20 rounded-sm">
+          <p className="text-ivory/70 mb-4">
+            <strong className="text-ivory">Limited Offer:</strong> First 100 users get 50% off for 6 months with code <span className="font-mono bg-carbon px-2 py-1 rounded text-brass">FIRST100</span>
           </p>
-          <div className="flex flex-wrap justify-center gap-6 text-sm text-bone-200/60">
+          <div className="flex flex-wrap justify-center gap-6 text-sm text-ivory/60">
             <span>• 14-day free trial</span>
             <span>• No credit card required</span>
             <span>• Cancel anytime</span>
@@ -133,12 +133,12 @@ export default function Pricing() {
 
         {/* Final CTA */}
         <div className="text-center mt-12">
-          <p className="text-xl text-bone-200/80 mb-6">
+          <p className="text-xl text-ivory/80 mb-6">
             Ready to let AI trade like you do?
           </p>
           <a
             href="https://app.ggbots.ai"
-            className="inline-flex items-center gap-2 bg-agents-extraction hover:bg-agents-extraction/90 text-bone-200 px-8 py-4 rounded-sm font-medium transition-all duration-200 text-lg shadow-[0_0_25px_rgba(56,161,199,0.3)] hover:shadow-[0_0_35px_rgba(56,161,199,0.4)]"
+            className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-all duration-200 text-lg shadow-[0_0_25px_rgba(193,168,125,0.3)] hover:shadow-[0_0_35px_rgba(193,168,125,0.4)]"
           >
             Start your free trial
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

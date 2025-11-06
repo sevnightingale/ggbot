@@ -2,7 +2,7 @@
 
 export default function Demo() {
   return (
-    <section id="demo" className="py-12 bg-charcoal-800">
+    <section id="demo" className="py-12 bg-carbon">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
 
         {/* Demo Container - Arcade Embed */}
@@ -24,7 +24,7 @@ export default function Demo() {
         <div className="text-center mt-12">
           <a
             href="https://app.ggbots.ai"
-            className="inline-flex items-center gap-2 bg-agents-decision hover:bg-agents-decision/90 text-bone-200 px-8 py-4 rounded-sm font-medium transition-all duration-200 shadow-[0_0_25px_rgba(44,190,119,0.3)] hover:shadow-[0_0_35px_rgba(44,190,119,0.4)]"
+            className="inline-flex items-center gap-2 bg-brass hover:bg-brass-light text-obsidian px-8 py-4 rounded-sm font-medium transition-all duration-200 shadow-[0_0_25px_rgba(193,168,125,0.3)] hover:shadow-[0_0_35px_rgba(193,168,125,0.4)]"
           >
             Try it yourself
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">

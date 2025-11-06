@@ -38,10 +38,10 @@ export default function FAQ() {
   ]
 
   return (
-    <section className="py-20 bg-charcoal-900">
+    <section className="py-20 bg-obsidian">
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold text-bone-200 mb-6 font-display">
+          <h2 className="text-3xl md:text-4xl font-bold text-ivory mb-6 font-display">
             Frequently asked questions
           </h2>
         </div>
@@ -49,38 +49,38 @@ export default function FAQ() {
         <div className="space-y-4">
           {faqItems.map((item, index) => {
             const isOpen = openItems.includes(index)
-            
+
             return (
               <div
                 key={index}
-                className="bg-charcoal-800 border border-bone-200/20 rounded-sm overflow-hidden"
+                className="bg-carbon border border-ivory/20 rounded-sm overflow-hidden"
               >
                 {/* Question Button */}
                 <button
                   onClick={() => toggleItem(index)}
-                  className="w-full p-6 text-left flex items-center justify-between hover:bg-charcoal-700 transition-colors group"
+                  className="w-full p-6 text-left flex items-center justify-between hover:bg-[#1a1a1c] transition-colors group"
                 >
-                  <h3 className="text-lg font-medium text-bone-200 pr-4 group-hover:text-bone-100 transition-colors">
+                  <h3 className="text-lg font-medium text-ivory pr-4 group-hover:text-ivory/90 transition-colors">
                     {item.question}
                   </h3>
                   <div className="flex-shrink-0">
                     {isOpen ? (
-                      <ChevronUp className="text-bone-200/60 group-hover:text-bone-200 transition-colors" size={20} />
+                      <ChevronUp className="text-ivory/60 group-hover:text-ivory transition-colors" size={20} />
                     ) : (
-                      <ChevronDown className="text-bone-200/60 group-hover:text-bone-200 transition-colors" size={20} />
+                      <ChevronDown className="text-ivory/60 group-hover:text-ivory transition-colors" size={20} />
                     )}
                   </div>
                 </button>
 
                 {/* Answer Content */}
                 <div className={`transition-all duration-300 ease-in-out ${
-                  isOpen 
-                    ? 'max-h-96 opacity-100' 
+                  isOpen
+                    ? 'max-h-96 opacity-100'
                     : 'max-h-0 opacity-0'
                 } overflow-hidden`}>
                   <div className="px-6 pb-6">
-                    <div className="border-t border-bone-200/10 pt-4">
-                      <p className="text-bone-200/70 leading-relaxed">
+                    <div className="border-t border-ivory/10 pt-4">
+                      <p className="text-ivory/70 leading-relaxed">
                         {item.answer}
                       </p>
                     </div>
@@ -92,13 +92,13 @@ export default function FAQ() {
         </div>
 
         {/* Still have questions CTA */}
-        <div className="text-center mt-12 p-8 bg-charcoal-800 border border-bone-200/20 rounded-sm">
-          <p className="text-bone-200/70 mb-6">
+        <div className="text-center mt-12 p-8 bg-carbon border border-ivory/20 rounded-sm">
+          <p className="text-ivory/70 mb-6">
             Still have questions? Reach out to me through email. Your feedback is quintessential to the future of ggbots.
           </p>
           <a
             href="mailto:redacted@example.com"
-            className="text-agents-extraction hover:text-agents-extraction/80 transition-colors font-medium"
+            className="text-brass hover:text-brass-light transition-colors font-medium"
           >
             Contact sev →
           </a>
