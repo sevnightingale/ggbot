@@ -228,36 +228,6 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
   const info = metadata;
 
-  // Loading state
-  if (loading && !metadata) {
-    return (
-      <div className="w-full h-screen flex items-center justify-center" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
-        <div className="text-center">
-          <div className="text-xl mb-2">Loading Timeline...</div>
-          <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
-            Fetching activity data
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // Error state
-  if (error) {
-    return (
-      <div className="w-full h-screen flex items-center justify-center" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
-        <div className="max-w-md mx-auto text-center">
-          <div className="text-xl mb-2" style={{ color: VIBE.ember }}>
-            Failed to Load Timeline
-          </div>
-          <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
-            {error}
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="relative w-full min-h-screen font-sans" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
       {/* HEADER */}
@@ -298,8 +268,34 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
       {/* CHART */}
       <section className="max-w-7xl mx-auto px-4 sm:px-5 pb-5">
-        <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: 'calc(100vh - 280px)', minHeight: '400px' }}>
+        <div className="rounded-xl border overflow-hidden relative" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: 'calc(100vh - 280px)', minHeight: '400px' }}>
           <div ref={setChartContainer} style={{ width: '100%', height: '100%' }} />
+
+          {/* Loading overlay */}
+          {loading && !metadata && (
+            <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(11,11,12,0.8)' }}>
+              <div className="text-center">
+                <div className="text-xl mb-2">Loading Timeline...</div>
+                <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  Fetching activity data
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Error overlay */}
+          {error && (
+            <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(11,11,12,0.8)' }}>
+              <div className="max-w-md mx-auto text-center">
+                <div className="text-xl mb-2" style={{ color: VIBE.ember }}>
+                  Failed to Load Timeline
+                </div>
+                <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  {error}
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </section>
     </div>
