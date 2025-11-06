@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Crown } from 'lucide-react'
+import { Crown, BarChart2, Loader2, Circle } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
 import { usePermissions } from '@/lib/permissions'
@@ -71,7 +71,7 @@ export function BotRail({
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-3">
         <div className="mb-4 flex items-center justify-between">
           <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
-            <div className="h-4 w-4">📊</div>
+            <BarChart2 className="h-4 w-4" />
             <div className="flex items-center gap-2">
               <span>Bots</span>
               <span className="text-xs text-[var(--text-muted)] font-normal">
@@ -86,7 +86,11 @@ export function BotRail({
               atLimit && !isPro ? 'hover:opacity-80 opacity-60' : 'hover:bg-[var(--bg-tertiary)]'
             }`}
           >
-            {isCreatingNew ? '⟳ Creating...' : atLimit && !isPro ? (
+            {isCreatingNew ? (
+              <span className="flex items-center gap-1">
+                <Loader2 className="h-3 w-3 animate-spin" /> Creating...
+              </span>
+            ) : atLimit && !isPro ? (
               <span className="flex items-center gap-1">
                 + New <Crown className="h-3 w-3" />
               </span>
@@ -178,9 +182,9 @@ function BotRow({
       >
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
-            <div className={`h-3 w-3 ${bot.state === 'active' ? 'text-emerald-400' : 'text-[var(--text-muted)]'}`}>
-              {bot.state === 'active' ? '●' : '○'}
-            </div>
+            <Circle
+              className={`h-3 w-3 ${bot.state === 'active' ? 'text-[var(--accent)] fill-[var(--accent)]' : 'text-[var(--text-muted)]'}`}
+            />
             <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
           </div>
           {(onRename || onDuplicate || onDuplicateAsLive || onDelete || onResetAccount) && (

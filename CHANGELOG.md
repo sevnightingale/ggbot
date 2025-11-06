@@ -6,32 +6,20 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ## 2025-11-06 - Brand Refresh: Ceremonial Brutalism Design System
 
-**Design System Overhaul** (Inspired by trade37):
-- **Color Palette**: Replaced charcoal/bone with obsidian/ivory/brass ceremonial brutalism palette
-  - Dark mode: `#0b0b0c` (obsidian) background, `#edebe7` (ivory) text, `#c1a87d` (brass) accent
-  - Light mode: `#f8f7f4` (warm parchment) background, `#1a1816` (near-black) text, `#8a7859` (dark brass) accent
-  - Signal colors: `#3ca6e0` (blue), `#d74a1f` (ember red)
-- **Typography**: Replaced Inter/Kanit with premium editorial fonts
-  - Display (headlines): Bodoni Moda serif
-  - Sans (body): Space Grotesk geometric sans
-  - Mono (technical): IBM Plex Mono
-- **Accent Strategy**: Brass as primary accent throughout, replacing multi-color agent system (extraction/decision/trading blues/greens/oranges)
+Complete platform rebrand to match trade37's ceremonial brutalism aesthetic. Replaced colorful multi-agent system with unified brass accent, upgraded to premium editorial fonts, and converted all 56 emojis to professional Lucide icons.
 
-**Files Changed**:
-- `frontend/app/globals.css`: Theme system overhaul with new CSS variables for both dark and light modes (lines 535-566)
-- `frontend/app/layout.tsx`: Font imports updated to Bodoni Moda, Space Grotesk, IBM Plex Mono (lines 1-23, 36)
-- `frontend/tailwind.config.ts`: Added ceremonial color tokens (obsidian, carbon, ivory, brass, signal, ember) while preserving legacy colors for backwards compatibility
-- `frontend/components/new-landing/Hero.tsx`: Updated to use brass accent for highlighted words and CTAs, ivory text, obsidian background
-- `frontend/components/new-landing/Header.tsx`: "Launch App" button updated to brass, navigation uses ivory text
-- `frontend/app/landing/page.tsx`: Background changed from charcoal-900 to obsidian
+**Key Changes**:
+- **Colors**: Obsidian/ivory/brass palette with dual dark/light themes ("obsidian and metal" / "parchment and stone")
+- **Typography**: Bodoni Moda (display), Space Grotesk (sans), IBM Plex Mono (mono)
+- **Icons**: All emojis replaced with Lucide React icons (tree-shakeable, scalable, consistent)
+- **Buttons**: Emerald → brass throughout forge, brass text on obsidian for contrast
+- **Pipeline**: Agent extraction/decision/trading now use light/medium/dark brass variants
 
-**Design Philosophy**:
-- Dark mode: "Obsidian and metal" - deep blacks with warm brass highlights
-- Light mode: "Parchment and stone" - aged paper warmth with rich dark brass accents
-- Unified brand identity with trade37 championship platform
-- Premium, editorial feel appropriate for professional trading platform
+**Files Modified**: 18 files (design system, landing page, forge components)
 
-**Status**: ✅ Build successful, ceremonial brutalism aesthetic deployed across landing and forge pages
+**Status**: ✅ Build successful, production-ready
+
+**Full Documentation**: See `DOCS/completed/REBRAND.md` for complete implementation details, icon mappings, and migration guide.
 
 ---
 

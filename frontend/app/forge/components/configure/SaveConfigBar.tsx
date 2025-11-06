@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Save, X, RotateCcw } from 'lucide-react'
+import { Save, X, RotateCcw, Clock, CheckSquare, Bot } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 
 interface SaveConfigBarProps {
@@ -36,19 +36,19 @@ export function SaveConfigBar({
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-[var(--border)] bg-[var(--bg-primary)]">
             {currentBotType === 'scheduled_trading' && (
               <>
-                <span className="text-lg">⏰</span>
+                <Clock className="h-4 w-4 text-[var(--text-secondary)]" />
                 <span className="text-sm font-medium text-[var(--text-primary)]">Scheduled Trading</span>
               </>
             )}
             {currentBotType === 'signal_validation' && (
               <>
-                <span className="text-lg">✓</span>
+                <CheckSquare className="h-4 w-4 text-[var(--text-secondary)]" />
                 <span className="text-sm font-medium text-[var(--text-primary)]">Signal Validation</span>
               </>
             )}
             {currentBotType === 'agent' && (
               <>
-                <span className="text-lg">🤖</span>
+                <Bot className="h-4 w-4 text-[var(--text-secondary)]" />
                 <span className="text-sm font-medium text-[var(--text-primary)]">Agent</span>
               </>
             )}

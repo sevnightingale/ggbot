@@ -277,37 +277,71 @@ git push origin main
 
 ## 🎨 Design System
 
+**Ceremonial Brutalism** - Inspired by trade37, creating a premium, sophisticated trading environment with unified brass accents.
+
 ### **Theme Architecture**
 ```typescript
 // /lib/theme.tsx - Complete dark/light mode system
 const [theme, setTheme] = useState<'light' | 'dark'>('dark')
 
-// CSS Variables (charcoal/bone palette)
+// CSS Variables - Ceremonial Brutalism Palette
 [data-theme="dark"] {
-  --bg-primary: #161618;      /* charcoal-900 */
-  --bg-secondary: #1f1f23;    /* charcoal-800 */
-  --text-primary: #e3e5e6;    /* bone-200 */
-  --border: #36363d;          /* charcoal-600 */
+  --bg-primary: #0b0b0c;       /* obsidian - deep black */
+  --bg-secondary: #141416;     /* carbon */
+  --text-primary: #edebe7;     /* ivory - warm off-white */
+  --accent: #c1a87d;           /* brass - primary accent */
+  --border: #2a2a2d;           /* subtle borders */
 }
 
 [data-theme="light"] {
-  --bg-primary: #f0f2f3;      /* bone-100 */
-  --bg-secondary: white;
-  --text-primary: #1f1f23;    /* charcoal-800 */
-  --border: #d6d8da;          /* bone-300 */
+  --bg-primary: #f8f7f4;       /* warm parchment */
+  --bg-secondary: #edebe7;     /* ivory background */
+  --text-primary: #1a1816;     /* near-black with warmth */
+  --accent: #8a7859;           /* dark brass accent */
+  --border: #c8c4bc;           /* warm gray borders */
 }
 ```
 
-### **Agent Color System**
+### **Typography** (2025-11-06 Update)
+```typescript
+// Premium editorial fonts
+Display: Bodoni Moda serif      // Headlines, dramatic impact
+Sans: Space Grotesk             // Body text, geometric clarity
+Mono: IBM Plex Mono            // Technical data, code
+```
+
+### **Brass Pipeline System**
 ```css
 :root {
-  --agent-extraction: #38a1c7;  /* Blue - data extraction */
-  --agent-decision: #2cbe77;    /* Green - AI decision making */
-  --agent-trading: #be6a47;     /* Orange - trade execution */
-  --success: #10b981;           /* emerald-400 - Profit/success */
-  --danger: #f43f5e;            /* rose-400 - Loss/error */
+  --agent-extraction: #d4bc91;  /* Light brass - extraction phase */
+  --agent-decision: #c1a87d;    /* Medium brass - decision phase */
+  --agent-trading: #a89168;     /* Dark brass - trading phase */
+  --signal: #3ca6e0;            /* Signal blue */
+  --ember: #d74a1f;             /* Ember red */
+  --success: #10b981;           /* Profit/success (semantic) */
+  --danger: #ef4444;            /* Loss/error (semantic) */
 }
 ```
+
+### **Icon System** (2025-11-06 Update)
+All UI uses **Lucide React** icons (56 emojis replaced):
+- Professional, scalable, stroke-based icons
+- Tree-shakeable (only bundles used icons)
+- Customizable size, color, stroke-width
+- Brass accent coloring for active/selected states
+
+**Example:**
+```tsx
+import { Bot, Settings, BarChart3 } from 'lucide-react'
+
+<Bot className="h-5 w-5 text-[var(--accent)]" />
+```
+
+### **Design Philosophy**
+- **Dark Mode:** "Obsidian and metal" - deep blacks with warm brass highlights
+- **Light Mode:** "Parchment and stone" - aged paper warmth with rich dark brass
+- **Unified Brand:** Consistent with trade37 championship platform
+- **Premium Feel:** Editorial typography + ceremonial color palette
 
 ---
 

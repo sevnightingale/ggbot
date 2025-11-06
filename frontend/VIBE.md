@@ -1,213 +1,370 @@
-# GGBot Frontend Design System & Visual Standards
+# ggbots Frontend Design System - Ceremonial Brutalism
+
+**Last Updated:** 2025-11-06 (Rebrand Complete)
 
 ## Core Design Philosophy
 
-**Brutalist Command Center Aesthetic** - A sophisticated, industrial interface that conveys precision, control, and advanced technical capabilities. Think mission control meets high-end trading terminal.
+**Ceremonial Brutalism** - A premium, sophisticated interface inspired by trade37 that merges the precision of brutalist design with the warmth of ceremonial brass accents. Think prestigious financial institutions meets modern trading terminal - elegant, authoritative, and technical.
+
+**Design Principles:**
+- Border-based architecture over shadows
+- Unified brass accent system
+- Professional Lucide icons throughout
+- Premium editorial typography
+- Dual theme support (dark/light)
+
+---
 
 ## Color Palette
 
-### Primary Colors
-- **Charcoal-900** (`#161618`) - Primary background, deepest dark
-- **Charcoal-800** (`#1f1f23`) - Secondary backgrounds, cards
-- **Charcoal-700** (`#2a2a30`) - Borders, dividers
-- **Charcoal-600** (`#36363d`) - Interactive element borders
+### Ceremonial Dark Mode: "Obsidian and Metal"
+Deep blacks with warm brass highlights, creating a premium nighttime trading environment.
 
-### Text Colors
-- **Bone-200** (`#e3e5e6`) - Primary text, headers
-- **Bone-100** (`#f0f2f3`) - Emphasized text, hover states
-- **Bone-300** (`#d6d8da`) - Secondary text
-- **Gray-400/500** (`#9ca3af`, `#6b7280`) - Muted text, placeholders
-- **Gray-600** (`#4b5563`) - Disabled text
+```css
+[data-theme="dark"] {
+  /* Backgrounds */
+  --bg-primary: #0b0b0c;       /* obsidian - deepest black */
+  --bg-secondary: #141416;     /* carbon - secondary surfaces */
+  --bg-tertiary: #1a1a1c;      /* darker variations */
 
-### Agent Colors (Status & Accents)
-- **Agent-Extraction** (`#38a1c7`) - Blue, data extraction
-- **Agent-Decision** (`#2cbe77`) - Green, AI decision making  
-- **Agent-Trading** (`#be6a47`) - Orange, trade execution
+  /* Text */
+  --text-primary: #edebe7;     /* ivory - warm off-white */
+  --text-secondary: #d6d3ce;   /* muted ivory */
+  --text-muted: #8a8781;       /* warm gray */
 
-### Status Colors
-- **Green-400** (`#10b981`) - Profit, success, active
-- **Red-400** (`#ef4444`) - Loss, error, inactive
-- **Orange-400** (`#f97316`) - Warning, pending
-- **Yellow-400** (`#eab308`) - Caution, neutral
+  /* Borders */
+  --border: #2a2a2d;           /* subtle borders */
+  --border-hover: #3a3a3d;     /* hover states */
 
-## Typography Scale
+  /* Accent - Brass */
+  --accent: #c1a87d;           /* brass - primary accent */
+  --accent-hover: #d4bc91;     /* lighter brass for hover */
 
-### Font Sizes (Tailwind Classes)
-- **Headers**: `text-subheader` - Section titles, bot names
-- **Body**: `text-footnote` - Primary text, descriptions
-- **Small**: `text-xs` - Meta info, labels, secondary text
-- **Tiny**: `text-[10px]` - Timestamps, fine details
+  /* Status Colors */
+  --signal: #3ca6e0;           /* signal blue */
+  --ember: #d74a1f;            /* ember red */
+}
+```
 
-### Font Weights
-- **Medium** (`font-medium`) - Headers, emphasized text
-- **Normal** (`font-normal`) - Body text, descriptions
+### Ceremonial Light Mode: "Parchment and Stone"
+Aged paper warmth with rich dark brass accents, evoking historical financial documents.
+
+```css
+[data-theme="light"] {
+  /* Backgrounds */
+  --bg-primary: #f8f7f4;       /* warm parchment */
+  --bg-secondary: #edebe7;     /* ivory surfaces */
+  --bg-tertiary: #e6e3de;      /* cream variations */
+
+  /* Text */
+  --text-primary: #1a1816;     /* near-black with warmth */
+  --text-secondary: #3a3734;   /* medium brown-gray */
+  --text-muted: #6b6661;       /* lighter brown */
+
+  /* Borders */
+  --border: #c8c4bc;           /* warm gray borders */
+  --border-hover: #b5aea5;     /* darker hover */
+
+  /* Accent - Dark Brass */
+  --accent: #8a7859;           /* dark brass accent */
+  --accent-hover: #9d8b6a;     /* lighter brass hover */
+
+  /* Status Colors */
+  --signal: #3ca6e0;           /* signal blue (same) */
+  --ember: #d74a1f;            /* ember red (same) */
+}
+```
+
+### Brass Pipeline System
+The three-phase trading pipeline uses brass variants instead of multi-color agents:
+
+```css
+:root {
+  /* Agent Pipeline - Brass Variants */
+  --agent-extraction: #d4bc91;  /* Light brass - market data extraction */
+  --agent-decision: #c1a87d;    /* Medium brass - AI decision making */
+  --agent-trading: #a89168;     /* Dark brass - trade execution */
+
+  /* Semantic Status Colors (Trading-specific) */
+  --profit-color: #10b981;      /* green - profit, wins, long positions */
+  --loss-color: #ef4444;        /* red - loss, losses, short positions */
+  --neutral-color: #8a8781;     /* gray - neutral, no change */
+}
+```
+
+**Usage:**
+- Brass variants show the progression from data → decision → execution
+- Keep profit/loss colors semantic (green/red) for trading clarity
+- Use brass for all accent colors, highlights, CTAs, and active states
+
+---
+
+## Typography System
+
+### Font Stack (Premium Editorial)
+Replaced utilitarian fonts with sophisticated editorial typefaces:
+
+```typescript
+// Font Imports (app/layout.tsx)
+import { Bodoni_Moda, Space_Grotesk, IBM_Plex_Mono } from 'next/font/google'
+
+const bodoniModa = Bodoni_Moda({
+  subsets: ['latin'],
+  variable: '--font-display',
+  display: 'swap',
+})
+
+const spaceGrotesk = Space_Grotesk({
+  subsets: ['latin'],
+  variable: '--font-sans',
+  display: 'swap',
+})
+
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ['latin'],
+  weight: ['400', '500', '600'],
+  variable: '--font-mono',
+  display: 'swap',
+})
+```
+
+### Typography Usage
+- **Display (Headlines):** Bodoni Moda - Elegant serif for section titles, headlines, dramatic impact
+- **Sans (Body):** Space Grotesk - Geometric sans for body text, navigation, clarity
+- **Mono (Technical):** IBM Plex Mono - Monospace for code, data, technical precision
+
+### Font Scale (Tailwind Classes)
+- **Headers:** `text-lg`, `text-xl`, `text-2xl` with `font-display`
+- **Body:** `text-sm`, `text-base` with `font-sans`
+- **Small:** `text-xs`, `text-[10px]` for meta information
+- **Mono:** `font-mono` for numeric data, timestamps, technical details
+
+**Font Weights:**
+- `font-semibold` (600) - Headlines, emphasized text
+- `font-medium` (500) - Subheaders, labels
+- `font-normal` (400) - Body text, descriptions
+
+---
+
+## Icon System
+
+### Lucide React Integration
+All 56 emojis replaced with professional Lucide icons (v0.513.0):
+
+**Installation:**
+```bash
+npm install lucide-react
+```
+
+**Usage:**
+```tsx
+import { Bot, Settings, BarChart3, Clock, CheckSquare } from 'lucide-react'
+
+// Standard icon with brass accent
+<Bot className="h-5 w-5 text-[var(--accent)]" />
+
+// Size variants
+<Icon className="h-3.5 w-3.5" />  // Small (menu items)
+<Icon className="h-4 w-4" />      // Standard (tabs, controls)
+<Icon className="h-5 w-5" />      // Medium (headers)
+<Icon className="h-16 w-16" />    // Large (empty states)
+
+// With hover effect
+<Icon className="h-4 w-4 text-[var(--accent)] hover:text-[var(--accent-hover)] transition-colors" />
+```
+
+### Common Icon Mappings
+```tsx
+// Bot Types
+Clock        // Scheduled Trading (⏰ replaced)
+CheckSquare  // Signal Validation (✓ replaced)
+Bot          // Agent (🤖 replaced)
+
+// Navigation & UI
+BarChart3    // Market Data (📊 replaced)
+Brain        // Strategy (🧠 replaced)
+Settings     // Settings (⚙️ replaced)
+Radio        // Signals (📡 replaced)
+
+// Actions
+Edit2        // Rename (✏️ replaced)
+Copy         // Duplicate (📋 replaced)
+Zap          // Deploy/Action (⚡ replaced)
+RefreshCw    // Reset (🔄 replaced)
+Check        // Confirm (✓ replaced)
+Trash2       // Delete (🗑️ replaced)
+
+// Status
+Circle       // Active/Inactive indicator (●/○ replaced)
+Loader2      // Loading state (⟳ replaced)
+MoreHorizontal // Menu (⋯ replaced)
+
+// Communication
+MessageSquare // Chat (💬 replaced)
+FileText      // Documents (📋 replaced)
+```
+
+**Benefits:**
+- ✅ Scalable vector graphics (no pixelation)
+- ✅ Tree-shakeable (optimized bundle size)
+- ✅ Customizable (size, color, stroke-width)
+- ✅ Consistent geometric style
+- ✅ Better accessibility
+
+---
 
 ## Layout System
 
 ### Grid Structure
 ```css
-/* 3-Column Dashboard Layout */
-grid-cols-[1fr_400px_1fr]  /* Left data | Center bot | Right data */
+/* Forge App Layout */
+.forge-container {
+  display: grid;
+  grid-template-columns: 280px 1fr;  /* Sidebar | Main content */
+  gap: 24px;
+}
 
-/* Responsive Breakpoints */
-hidden lg:block  /* Hide on mobile, show on large screens */
-max-w-[1680px]   /* Maximum container width */
+/* Responsive breakpoints */
+@media (max-width: 768px) {
+  .forge-container {
+    grid-template-columns: 1fr;  /* Stack on mobile */
+  }
+}
 ```
 
 ### Spacing Standards
-- **Component Padding**: `p-3` (12px), `p-6` (24px), `p-8` (32px)
-- **Section Gaps**: `gap-6` (24px), `gap-8` (32px)
-- **Element Margins**: `mb-4` (16px), `mb-6` (24px), `mb-8` (32px)
+```css
+/* Component spacing */
+--spacing-xs: 8px;     /* gap-2, p-2 */
+--spacing-sm: 12px;    /* gap-3, p-3 */
+--spacing-md: 16px;    /* gap-4, p-4 */
+--spacing-lg: 24px;    /* gap-6, p-6 */
+--spacing-xl: 32px;    /* gap-8, p-8 */
+
+/* Border radius */
+--radius-sm: 8px;      /* rounded-lg */
+--radius-md: 12px;     /* rounded-xl */
+--radius-lg: 16px;     /* rounded-2xl */
+```
+
+---
 
 ## Component Design Patterns
 
-### 1. Neumorphic Interactive Elements
+### 1. Border-Based Cards (Replacing Neumorphism)
+Ceremonial brutalism uses clean borders instead of shadows:
 
-**GGBot Circle** - Central bot selector with depth and dimensionality:
-```css
-.ggbot-circle {
-  /* Dual-shadow neumorphic effect */
-  box-shadow: 
-    8px 8px 16px rgba(0, 0, 0, 0.9),      /* Dark shadow (bottom-right) */
-    -8px -8px 16px rgba(255, 255, 255, 0.08); /* Light shadow (top-left) */
-  
-  /* 4-quadrant gradient borders */
-  background: radial-gradient(circle at 30% 30%, rgba(227, 229, 230, 0.15), transparent 50%);
-}
+```tsx
+<div className="rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
+  {/* Card content */}
+</div>
 ```
 
-**Floating Action Buttons** - Circular controls with hover states:
-```css
-.floating-action-btn {
-  /* Matching neumorphic shadows */
-  box-shadow: 
-    4px 4px 8px rgba(0, 0, 0, 0.9),
-    -4px -4px 8px rgba(255, 255, 255, 0.08);
-  
-  /* Agent-specific hover colors */
-  &:hover { background-color: rgba(56, 161, 199, 0.1); } /* extraction blue */
-}
+**Hover States:**
+```tsx
+<button className="border border-[var(--border)] hover:border-[var(--border-hover)] transition-colors">
+  {/* Button content */}
+</button>
 ```
 
-### 2. Sharp Geometric Containers
+### 2. Brass Accent Buttons
+Primary action buttons use brass with obsidian text for contrast:
 
-**Dashboard Cards** - Angular containers with corner brackets:
-```css
-.corner-top-left {
-  position: relative;
-  background: #1f1f23; /* charcoal-800 */
-}
+```tsx
+// Primary action (brass)
+<button className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-obsidian font-medium px-4 py-2 rounded-lg transition-colors">
+  Activate
+</button>
 
-.corner-top-left::before {
-  content: '';
-  position: absolute;
-  top: 0; left: 0;
-  width: 70%; height: 70%;
-  background: 
-    linear-gradient(to right, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) top/100% 2px no-repeat,
-    linear-gradient(to bottom, #e3e5e6 0%, #e3e5e6 30%, transparent 100%) left/2px 100% no-repeat;
-}
+// Danger action (red)
+<button className="bg-rose-600 hover:bg-rose-700 text-white px-4 py-2 rounded-lg">
+  Stop
+</button>
+
+// Secondary action (border only)
+<button className="border border-[var(--border)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] px-4 py-2 rounded-lg">
+  Cancel
+</button>
 ```
 
-**Sharp Dividers** - Gradient separators:
-```css
-.gradient-divider {
-  height: 1px;
-  background: linear-gradient(to right, transparent 0%, #e3e5e6 20%, #e3e5e6 80%, transparent 100%);
-  opacity: 0.6;
-}
+### 3. Glass Morphism Effects
+Subtle backdrop blur for overlays:
+
+```tsx
+<div className="bg-[var(--bg-secondary)]/80 backdrop-blur-sm border border-[var(--border)]">
+  {/* Header or overlay content */}
+</div>
 ```
 
-### 3. Accordion/Collapsible Sections
+### 4. Active State Indicators
+Brass-colored status dots and highlights:
 
-**Agent Configuration Panels** - Expandable sections with neumorphic styling:
-```css
-.ggbot-accordion-btn {
-  /* Interactive neumorphic styling */
-  box-shadow: 
-    8px 8px 16px rgba(0, 0, 0, 0.9),
-    -8px -8px 16px rgba(255, 255, 255, 0.08);
-  
-  /* Corner bracket system for visual hierarchy */
-  &::before { /* Top-left corner bracket */ }
-  &::after  { /* Bottom-right corner bracket */ }
-}
+```tsx
+// Active bot indicator
+<Circle className={`h-3 w-3 ${isActive ? 'text-[var(--accent)] fill-[var(--accent)]' : 'text-[var(--text-muted)]'}`} />
 
-.ggbot-accordion-expanded {
-  /* Flat styling for expanded content */
-  background: #161618; /* charcoal-900 */
-  border: 1px solid #36363d; /* charcoal-600 */
-}
+// Tab active state
+<button className={`${isActive ? 'border-[var(--accent)] text-[var(--accent)]' : 'border-transparent text-[var(--text-muted)]'}`}>
+  {/* Tab content */}
+</button>
 ```
 
-### 4. Form Controls & Inputs
+### 5. Form Controls
+Clean, minimal inputs with brass focus states:
 
-**Search/Input Fields**:
-```css
-input[type="text"] {
-  background: #1f1f23;      /* charcoal-800 */
-  border: 1px solid #36363d; /* charcoal-600 */
-  color: #e3e5e6;           /* bone-200 */
-  
-  &:focus {
-    border-color: #38a1c7;   /* agent-extraction */
-    transition: border-color 0.2s;
-  }
-}
+```tsx
+<input
+  type="text"
+  className="bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg px-3 py-2 text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] transition-colors"
+/>
 ```
 
-**Checkbox/Selection Controls**:
-```css
-.selection-checkbox {
-  width: 16px; height: 16px;
-  border: 2px solid #6b7280;  /* gray-600 */
-  border-radius: 2px;
-  
-  &.selected {
-    background: #38a1c7;      /* agent-extraction */
-    border-color: #38a1c7;
-  }
-}
+### 6. Data Display Components
+
+**Trade Tables with Semantic Colors:**
+```tsx
+<div className="rounded-xl border border-[var(--border)] overflow-hidden">
+  <table>
+    <tr>
+      <td className={pnl > 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'}>
+        {pnl > 0 ? '+' : ''}{pnl.toFixed(2)}%
+      </td>
+    </tr>
+  </table>
+</div>
 ```
 
-### 5. Data Display Components
+**Status Badges:**
+```tsx
+// Success (brass)
+<span className="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-[var(--accent)]/20 text-[var(--accent)] text-xs">
+  <Check className="h-3 w-3" />
+  Active
+</span>
 
-**Trade Tables**:
-```css
-.trade-table {
-  /* Alternating row backgrounds */
-  tr:nth-child(even) {
-    background: rgba(128, 128, 128, 0.3);
-  }
-  
-  /* Color-coded data */
-  .profit { color: #10b981; }  /* green-400 */
-  .loss   { color: #ef4444; }  /* red-400 */
-  .neutral { color: #e3e5e6; } /* bone-200 */
-}
+// Profit (green - semantic)
+<span className="text-[var(--profit-color)]">
+  +$234.56
+</span>
+
+// Loss (red - semantic)
+<span className="text-[var(--loss-color)]">
+  -$89.23
+</span>
 ```
 
-**Status Indicators**:
-```css
-.status-indicator {
-  /* Colored dots with glow effect */
-  &.active   { color: #10b981; text-shadow: 0 0 4px rgba(16, 185, 129, 0.5); }
-  &.warning  { color: #f97316; text-shadow: 0 0 4px rgba(249, 115, 22, 0.5); }
-  &.error    { color: #ef4444; text-shadow: 0 0 4px rgba(239, 68, 68, 0.5); }
-  &.inactive { color: #6b7280; }
-}
-```
+---
 
 ## Animation Standards
 
 ### Micro-Interactions
 ```css
-/* Standard transition timing */
+/* Standard transitions */
 transition: all 0.2s ease;
 
-/* Hover states */
+/* Hover effects */
 &:hover {
-  transform: translateY(-1px);
+  transform: scale(1.02);
   transition-duration: 0.15s;
 }
 
@@ -217,80 +374,109 @@ transition: all 0.2s ease;
 }
 ```
 
-### Modal/Sheet Transitions
-```css
-/* Bottom sheet slide animation */
-.sheet-enter {
-  transform: translateY(100%);
-  transition: transform 500ms ease-out;
-}
+### Lucide Icon Animations
+```tsx
+// Spinning loader
+<Loader2 className="h-4 w-4 animate-spin" />
 
-.sheet-enter-active {
-  transform: translateY(0);
-}
+// Pulse effect
+<Circle className="h-3 w-3 animate-pulse" />
 ```
+
+---
 
 ## Visual Hierarchy Rules
 
-### 1. Element Classification
+### 1. Color Usage Priority
+1. **Brass accent** - Primary actions, active states, highlights
+2. **Semantic colors** - Profit/loss data (green/red), status indicators
+3. **Text hierarchy** - Primary/secondary/muted text colors
+4. **Borders** - Subtle definition without shadows
 
-**Interactive Elements** (clickable):
-- Use neumorphic styling with dual shadows
-- Apply hover effects and transitions
-- Examples: GGBot circle, floating buttons, accordions
+### 2. Element Classification
 
-**Display Elements** (informational):
-- Use corner bracket styling
-- Minimal shadows, focus on content
-- Examples: Dashboard cards, data tables
+**Interactive Elements:**
+- Use brass accent for active/hover states
+- Apply smooth transitions
+- Include Lucide icons for clarity
+- Examples: Buttons, tabs, toggles
 
-### 2. Color Usage Priority
-
-1. **Agent colors** for primary actions and status
-2. **Status colors** for data states (profit/loss, active/inactive)
-3. **Bone colors** for text hierarchy
-4. **Gray colors** for secondary information
+**Display Elements:**
+- Use border-based styling
+- Minimal effects, focus on content
+- Examples: Cards, tables, data displays
 
 ### 3. Spacing Consistency
+- **32px gaps** between major sections
+- **24px gaps** between related components
+- **16px gaps** within component groups
+- **8-12px gaps** for fine adjustments
 
-- **Large gaps** (32px) between major sections
-- **Medium gaps** (24px) between related components  
-- **Small gaps** (16px) within component groups
-- **Micro gaps** (8px, 12px) for fine adjustments
-
-## Component Relationships
-
-### Layout Nesting Patterns
-```
-Dashboard Container (charcoal-900)
-├── Section Cards (charcoal-800 + corner brackets)
-│   ├── Headers (bone-200, text-subheader)
-│   ├── Dividers (gradient-divider)
-│   └── Content (text-footnote, bone-200)
-└── Interactive Overlays (neumorphic styling)
-    ├── GGBot Circle (central focal point)
-    ├── Floating Buttons (contextual actions)
-    └── Modal Sheets (configuration panels)
-```
-
-### State Communication
-- **Visual feedback** through color changes
-- **Depth changes** via shadow intensity
-- **Border highlights** for focus states
-- **Subtle animations** for state transitions
+---
 
 ## Responsive Design
 
 ### Breakpoint Strategy
-- **Mobile-first** approach with progressive enhancement
-- **Hide complex elements** on small screens (`hidden lg:block`)
-- **Maintain core functionality** across all device sizes
-- **Preserve visual hierarchy** at different scales
+```css
+/* Mobile-first approach */
+sm: 640px   /* Small devices */
+md: 768px   /* Medium devices */
+lg: 1024px  /* Large screens */
+xl: 1280px  /* Extra large */
+```
 
-### Content Prioritization
-1. **Central bot display** always visible
-2. **Critical controls** accessible on mobile
-3. **Data tables** become scrollable
-4. **Secondary information** hidden on small screens
+### Mobile Adaptations
+- **Hide sidebar** on small screens, show via drawer
+- **Stack layouts** vertically
+- **Maintain brass accents** for consistency
+- **Preserve icon clarity** at all sizes
 
-This design system creates a cohesive, professional interface that conveys the sophisticated nature of AI-powered trading while maintaining excellent usability and visual appeal.
+---
+
+## Migration from Old System
+
+### Deprecated Elements (2025-11-06)
+❌ **Old Agent Colors:** Blue (#38a1c7), Green (#2cbe77), Orange (#be6a47)
+❌ **Old Fonts:** Inter, Kanit
+❌ **Emojis:** All 56 replaced with Lucide icons
+❌ **Neumorphic shadows:** Replaced with border-based design
+❌ **Multi-color system:** Unified to brass accent
+
+### Current Standards (2025-11-06)
+✅ **Brass variants:** Light/Medium/Dark brass for pipeline
+✅ **Premium fonts:** Bodoni Moda, Space Grotesk, IBM Plex Mono
+✅ **Lucide icons:** Professional, scalable, consistent
+✅ **Border-based design:** Clean, brutalist aesthetic
+✅ **Ceremonial palette:** Obsidian/ivory/brass
+
+---
+
+## Best Practices
+
+### Do's ✅
+- Use CSS variables for all colors
+- Apply brass accent for primary actions
+- Use Lucide icons consistently
+- Maintain border-based design
+- Keep profit/loss colors semantic (green/red)
+- Use premium typography hierarchy
+- Apply smooth transitions (0.2s ease)
+
+### Don'ts ❌
+- Don't use hardcoded color values
+- Don't mix emojis with Lucide icons
+- Don't use emerald/blue/orange for accents
+- Don't add heavy shadows (use borders)
+- Don't use Comic Sans (obviously)
+
+---
+
+## Related Documentation
+- **Complete Rebrand Details:** `/DOCS/completed/REBRAND.md`
+- **Frontend README:** `/frontend/README.md`
+- **trade37 Design Reference:** `/home/sev/trade37/CLAUDE.md`
+- **Main Changelog:** `/CHANGELOG.md`
+
+---
+
+This design system creates a cohesive, premium interface that conveys the prestigious nature of autonomous AI trading while maintaining excellent usability and professional appeal across all device sizes.

@@ -775,6 +775,78 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                     ))}
                   </div>
                  )}
+
+                {/* Display actual market data received */}
+                {detailActivity.data.details && (detailActivity.data.details as Record<string, unknown>).market_data && (
+                  <div className="mt-4">
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Market Data Received
+                    </div>
+
+                    {/* Technical Indicators */}
+                    {((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>)?.technicals &&
+                     (((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>).technicals as Record<string, unknown>)?.indicators ? (
+                      <div className="mb-4">
+                        <div className="text-xs font-semibold mb-2" style={{ color: VIBE.brass }}>
+                          Technical Indicators:
+                        </div>
+                        {Object.entries((((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>).technicals as Record<string, unknown>).indicators as Record<string, unknown>).map(([indName, indData]: [string, unknown]) => {
+                          const indicator = indData as Record<string, unknown>;
+                          return (
+                          <div key={indName} className="mb-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(193, 168, 125, 0.1)' }}>
+                            <div className="font-semibold mb-1" style={{ color: VIBE.brass }}>{indName}</div>
+
+                            {/* Current Value */}
+                            {indicator.current && (
+                              <div className="text-sm mb-1">
+                                Value: <span className="font-mono">{typeof indicator.current === 'object' ? JSON.stringify((indicator.current as Record<string, unknown>).value || indicator.current) : String(indicator.current)}</span>
+                              </div>
+                            )}
+
+                            {/* Trend */}
+                            {indicator.context && typeof indicator.context === 'object' && (indicator.context as Record<string, unknown>).trend && (
+                              <div className="text-sm mb-1">
+                                Trend: <span className="font-mono">{String(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).direction)}</span>
+                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength && <span className="ml-2">({(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength) * 100).toFixed(1)}%)</span>}
+                              </div>
+                            )}
+
+                            {/* Patterns */}
+                            {indicator.patterns && typeof indicator.patterns === 'object' && Object.keys(indicator.patterns as Record<string, unknown>).length > 0 && (
+                              <div className="text-sm">
+                                Patterns: {Object.keys(indicator.patterns as Record<string, unknown>).map(p => (
+                                  <span key={p} className="inline-block px-2 py-0.5 mr-1 rounded text-xs" style={{ backgroundColor: 'rgba(193, 168, 125, 0.3)' }}>
+                                    {p}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        );
+                        })}
+                      </div>
+                    ) : null}
+
+                    {/* Market Intelligence */}
+                    {(((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>)?.market_intelligence) ? (
+                      <div>
+                        <div className="text-xs font-semibold mb-2" style={{ color: VIBE.signal }}>
+                          Market Intelligence:
+                        </div>
+                        {Object.entries(((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>).market_intelligence as Record<string, unknown>).map(([source, data]: [string, unknown]) => (
+                          <div key={source} className="mb-2 p-3 rounded-lg" style={{ backgroundColor: 'rgba(60, 166, 224, 0.1)' }}>
+                            <div className="font-semibold mb-1 text-sm" style={{ color: VIBE.signal }}>
+                              {source.replace(/_/g, ' ').toUpperCase()}
+                            </div>
+                            <pre className="text-xs font-mono overflow-x-auto" style={{ color: VIBE.ivory }}>
+                              {JSON.stringify(data, null, 2)}
+                            </pre>
+                          </div>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                )}
               </>
             ) : null}
 

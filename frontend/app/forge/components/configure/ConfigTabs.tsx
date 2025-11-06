@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { BarChart3, Brain, Settings, Radio, LucideIcon } from 'lucide-react'
 
 export type ConfigTabType = 'market-data' | 'strategy' | 'trade-settings' | 'signals'
 
@@ -15,11 +16,11 @@ export function ConfigTabs({
   onTabChange,
   className = ''
 }: ConfigTabsProps) {
-  const tabs = [
-    { id: 'market-data' as ConfigTabType, label: 'Market Data', icon: '📊' },
-    { id: 'strategy' as ConfigTabType, label: 'Strategy', icon: '🧠' },
-    { id: 'trade-settings' as ConfigTabType, label: 'Trade Settings', icon: '⚙️' },
-    { id: 'signals' as ConfigTabType, label: 'Signals', icon: '📡' },
+  const tabs: Array<{ id: ConfigTabType; label: string; Icon: LucideIcon }> = [
+    { id: 'market-data' as ConfigTabType, label: 'Market Data', Icon: BarChart3 },
+    { id: 'strategy' as ConfigTabType, label: 'Strategy', Icon: Brain },
+    { id: 'trade-settings' as ConfigTabType, label: 'Trade Settings', Icon: Settings },
+    { id: 'signals' as ConfigTabType, label: 'Signals', Icon: Radio },
   ]
 
   return (
@@ -31,11 +32,11 @@ export function ConfigTabs({
             onClick={() => onTabChange?.(tab.id)}
             className={`flex items-center gap-2 whitespace-nowrap border-b-2 py-4 px-2 md:px-1 text-sm font-medium transition-colors flex-shrink-0 ${
               activeTab === tab.id
-                ? 'border-[var(--agent-extraction)] text-[var(--agent-extraction)]'
+                ? 'border-[var(--accent)] text-[var(--accent)]'
                 : 'border-transparent text-[var(--text-muted)] hover:border-[var(--border)] hover:text-[var(--text-secondary)]'
             }`}
           >
-            <span className="text-base">{tab.icon}</span>
+            <tab.Icon className="h-4 w-4" />
             <span className="hidden sm:inline">{tab.label}</span>
             <span className="sm:hidden">{tab.label.split(' ')[0]}</span>
           </button>

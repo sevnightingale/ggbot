@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect, useRef, useState } from 'react'
-import { Send } from 'lucide-react'
+import { Send, Bot, MessageSquare, FileText } from 'lucide-react'
 
 interface Message {
   role: 'user' | 'agent'
@@ -59,7 +59,7 @@ export function AgentConfigurator({
         {/* Chat Header */}
         <div className="px-4 py-3 border-b border-[var(--border)] bg-[var(--bg-primary)]">
           <div className="flex items-center gap-2">
-            <div className="text-xl">🤖</div>
+            <Bot className="h-5 w-5 text-[var(--accent)]" />
             <div>
               <div className="font-medium text-[var(--text-primary)]">Strategy Definition</div>
               <div className="text-xs text-[var(--text-muted)]">
@@ -73,7 +73,7 @@ export function AgentConfigurator({
         <div className="flex-1 overflow-y-auto p-4 space-y-4">
           {messages.length === 0 && (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="text-4xl mb-4">💬</div>
+              <MessageSquare className="h-16 w-16 text-[var(--text-muted)] mb-4" />
               <div className="text-lg font-medium text-[var(--text-primary)] mb-2">
                 Start Strategy Discussion
               </div>
@@ -91,7 +91,7 @@ export function AgentConfigurator({
               <div
                 className={`max-w-[80%] px-4 py-2 rounded-lg ${
                   msg.role === 'user'
-                    ? 'bg-emerald-600 text-white'
+                    ? 'bg-[var(--accent)] text-obsidian'
                     : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                 }`}
               >
@@ -189,7 +189,7 @@ export function AgentConfigurator({
         <div className="p-4 overflow-y-auto h-[calc(600px-57px)]">
           {!currentStrategy ? (
             <div className="flex flex-col items-center justify-center h-full text-center">
-              <div className="text-4xl mb-4">📋</div>
+              <FileText className="h-16 w-16 text-[var(--text-muted)] mb-4" />
               <div className="text-lg font-medium text-[var(--text-primary)] mb-2">
                 No Strategy Yet
               </div>

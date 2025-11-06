@@ -1,9 +1,10 @@
 'use client'
 
 import React from 'react'
+import { LucideIcon, Bot } from 'lucide-react'
 
 interface EmptyStateProps {
-  icon?: string
+  Icon?: LucideIcon
   title: string
   description?: string
   actionLabel?: string
@@ -12,7 +13,7 @@ interface EmptyStateProps {
 }
 
 export function EmptyState({
-  icon = '🤖',
+  Icon = Bot,
   title,
   description,
   actionLabel,
@@ -21,7 +22,9 @@ export function EmptyState({
 }: EmptyStateProps) {
   return (
     <div className={`flex flex-col items-center justify-center p-8 text-center ${className}`}>
-      <div className="text-4xl mb-4">{icon}</div>
+      <div className="mb-4">
+        <Icon className="h-16 w-16 text-[var(--text-muted)]" />
+      </div>
       <h3 className="text-lg font-medium text-[var(--text-primary)] mb-2">{title}</h3>
       {description && (
         <p className="text-sm text-[var(--text-muted)] mb-4 max-w-md">{description}</p>
@@ -29,7 +32,7 @@ export function EmptyState({
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="rounded-xl bg-cyan-600 px-4 py-2 text-sm font-medium text-white hover:bg-cyan-700 transition-colors"
+          className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-obsidian hover:bg-[var(--accent-hover)] transition-colors"
         >
           {actionLabel}
         </button>

@@ -20,6 +20,7 @@ import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { AgentConfigurator } from './components/configure/AgentConfigurator'
 import { DuplicateAsLiveModal } from '@/components/DuplicateAsLiveModal'
 import { BotCreationModal } from './components/modals/BotCreationModal'
+import { Wrench } from 'lucide-react'
 
 interface Position {
   trade_id: string
@@ -1581,9 +1582,9 @@ function ForgeApp() {
                 )
               ) : (
                 <EmptyState
+                  Icon={Wrench}
                   title="Setting up your ggbot"
                   description="Please wait while we create your bot..."
-                  icon="🔧"
                 />
               )}
             </div>

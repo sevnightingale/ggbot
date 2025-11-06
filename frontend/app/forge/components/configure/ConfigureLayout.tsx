@@ -9,6 +9,7 @@ import { SignalsConfiguration } from './SignalsConfiguration'
 import { StrategyEditor } from './StrategyEditor'
 import { TradeSettings } from './TradeSettings'
 import { EmptyState } from '../shared/EmptyState'
+import { Settings } from 'lucide-react'
 
 // DataSource will be passed from parent page.tsx
 interface ConfigureLayoutProps {
@@ -46,9 +47,9 @@ export function ConfigureLayout({
     return (
       <div className={className}>
         <EmptyState
+          Icon={Settings}
           title="Select a Bot"
           description="Choose a bot from the sidebar to configure its settings"
-          icon="⚙️"
         />
       </div>
     )
