@@ -89,8 +89,8 @@ export default function BottomSheet({ isOpen, onClose, children, title }: Bottom
               </div>
             )}
 
-            {/* Content */}
-            <div className="overflow-y-auto" style={{ maxHeight: 'calc(80vh - 120px)' }}>
+            {/* Content - Scrollable */}
+            <div className="overflow-y-auto overflow-x-hidden">
               {children}
             </div>
           </motion.div>

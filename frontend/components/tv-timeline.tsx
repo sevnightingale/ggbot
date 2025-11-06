@@ -6,6 +6,7 @@ import type { IChartApi, ISeriesApi, LineData, Time, SeriesMarker } from 'lightw
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Session } from '@supabase/supabase-js';
 import BottomSheet from './bottom-sheet';
+import ReactMarkdown from 'react-markdown';
 
 // Trade37 palette (hardwired)
 const VIBE = {
@@ -36,6 +37,11 @@ interface Activity {
     importance?: number;
     trade_id?: string;
     trade_type?: string;
+    confidence?: number;
+    leverage?: number;
+    entry_price?: number;
+    stop_loss_price?: number;
+    take_profit_price?: number;
   };
 }
 
@@ -137,7 +143,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
       console.log('Chart created:', !!chart);
 
       const lineSeries = chart.addLineSeries({
-        color: VIBE.signal,
+        color: VIBE.brass,  // Changed from signal (blue) to brass
         lineWidth: 2,
         crosshairMarkerVisible: true,
         crosshairMarkerRadius: 4,
@@ -159,8 +165,8 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
         const activity = activitiesMapRef.current.get(timestamp);
 
-        if (activity && (activity.type === 'trade_entry_long' || activity.type === 'trade_entry_short')) {
-          // Only highlight trade entries for now
+        if (activity) {
+          // Highlight all activity types
           setSelectedActivity(activity);
           setCrosshairPosition({ x: param.point.x, y: param.point.y });
         } else {
@@ -176,7 +182,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
         const activity = activitiesMapRef.current.get(timestamp);
 
-        if (activity && (activity.type === 'trade_entry_long' || activity.type === 'trade_entry_short')) {
+        if (activity) {
           console.log('Clicked activity:', activity);
           setDetailActivity(activity);
         }
@@ -327,44 +333,68 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           console.log('Setting data on chart...');
           lineSeriesRef.current.setData(chartData);
 
-          // Build activities lookup map and create markers for trade entries
+          // Build activities lookup map and create markers for all activity types
           activitiesMapRef.current.clear();
-          const tradeMarkers: SeriesMarker<Time>[] = [];
+          const markers: SeriesMarker<Time>[] = [];
 
           activities.forEach((activity) => {
             const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
             activitiesMapRef.current.set(timestamp, activity);
 
-            // Only create markers for trade entries
+            // Create markers based on activity type
             if (activity.type === 'trade_entry_long') {
-              tradeMarkers.push({
+              markers.push({
                 time: timestamp as Time,
                 position: 'belowBar',
                 color: '#16a34a', // green-600
                 shape: 'arrowUp',
-                text: 'LONG',
               });
             } else if (activity.type === 'trade_entry_short') {
-              tradeMarkers.push({
+              markers.push({
                 time: timestamp as Time,
                 position: 'aboveBar',
                 color: '#dc2626', // red-600
                 shape: 'arrowDown',
-                text: 'SHORT',
+              });
+            } else if (activity.type === 'market_query') {
+              markers.push({
+                time: timestamp as Time,
+                position: 'belowBar',
+                color: VIBE.signal, // blue
+                shape: 'circle',
+              });
+            } else if (activity.type === 'analysis') {
+              markers.push({
+                time: timestamp as Time,
+                position: 'belowBar',
+                color: VIBE.lilac, // lilac
+                shape: 'circle',
+              });
+            } else if (activity.type === 'agent_wait') {
+              markers.push({
+                time: timestamp as Time,
+                position: 'belowBar',
+                color: VIBE.ivory, // ivory
+                shape: 'circle',
               });
             }
           });
 
           // Set markers on the line series
-          if (tradeMarkers.length > 0) {
+          if (markers.length > 0) {
             // CRITICAL: Markers must be sorted by time in ascending order
-            const sortedMarkers = tradeMarkers.sort((a, b) => {
+            const sortedMarkers = markers.sort((a, b) => {
               const timeA = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
               const timeB = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
               return timeA - timeB;
             });
             lineSeriesRef.current.setMarkers(sortedMarkers);
-            console.log('Trade markers added:', sortedMarkers.length);
+            console.log('Markers added:', sortedMarkers.length, {
+              trade_entries: sortedMarkers.filter(m => m.shape === 'arrowUp' || m.shape === 'arrowDown').length,
+              market_queries: sortedMarkers.filter(m => m.color === VIBE.signal).length,
+              analysis: sortedMarkers.filter(m => m.color === VIBE.lilac).length,
+              waits: sortedMarkers.filter(m => m.color === VIBE.ivory).length,
+            });
           }
 
           // Only fit content on first load, preserve user zoom/pan on subsequent updates
@@ -479,9 +509,16 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                 }}
               >
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
-                  {selectedActivity.type === 'trade_entry_long' ? '↑ LONG ENTRY' : '↓ SHORT ENTRY'}
+                  {selectedActivity.type === 'trade_entry_long' && '↑ LONG ENTRY'}
+                  {selectedActivity.type === 'trade_entry_short' && '↓ SHORT ENTRY'}
+                  {selectedActivity.type === 'market_query' && '📊 MARKET QUERY'}
+                  {selectedActivity.type === 'analysis' && '💭 ANALYSIS'}
+                  {selectedActivity.type === 'agent_wait' && '⏸ WAITING'}
                 </div>
-                <div className="text-sm mb-1">{selectedActivity.data.summary || 'Trade entry'}</div>
+                <div className="text-sm mb-1">
+                  {selectedActivity.data.summary && selectedActivity.data.summary.slice(0, 100)}
+                  {selectedActivity.data.summary && selectedActivity.data.summary.length > 100 && '...'}
+                </div>
                 <div className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>
                   {new Date(selectedActivity.timestamp).toLocaleString()}
                 </div>
@@ -505,13 +542,20 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                 >
                   <div
                     style={{
-                      fontSize: '40px',
-                      color: selectedActivity.type === 'trade_entry_long' ? '#16a34a' : '#dc2626',
+                      fontSize: selectedActivity.type.includes('trade_entry') ? '40px' : '20px',
+                      color: selectedActivity.type === 'trade_entry_long' ? '#16a34a' :
+                             selectedActivity.type === 'trade_entry_short' ? '#dc2626' :
+                             selectedActivity.type === 'market_query' ? VIBE.signal :
+                             selectedActivity.type === 'analysis' ? VIBE.lilac : VIBE.ivory,
                       lineHeight: 1,
                       animation: 'markerPulse 1.5s ease-in-out infinite'
                     }}
                   >
-                    {selectedActivity.type === 'trade_entry_long' ? '▲' : '▼'}
+                    {selectedActivity.type === 'trade_entry_long' && '▲'}
+                    {selectedActivity.type === 'trade_entry_short' && '▼'}
+                    {(selectedActivity.type === 'market_query' ||
+                      selectedActivity.type === 'analysis' ||
+                      selectedActivity.type === 'agent_wait') && '●'}
                   </div>
                 </div>
               )}
@@ -550,16 +594,32 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
       <BottomSheet
         isOpen={!!detailActivity}
         onClose={() => setDetailActivity(null)}
-        title={detailActivity?.type === 'trade_entry_long' ? 'Long Entry' : detailActivity?.type === 'trade_entry_short' ? 'Short Entry' : 'Activity'}
+        title={
+          detailActivity?.type === 'trade_entry_long' ? 'Long Entry' :
+          detailActivity?.type === 'trade_entry_short' ? 'Short Entry' :
+          detailActivity?.type === 'market_query' ? 'Market Query' :
+          detailActivity?.type === 'analysis' ? 'Analysis' :
+          detailActivity?.type === 'agent_wait' ? 'Agent Waiting' :
+          'Activity'
+        }
       >
         {detailActivity && (
-          <div className="px-6 py-4 space-y-4">
+          <div className="px-6 py-4 space-y-4 max-h-[calc(80vh-120px)] overflow-y-auto">
             {/* Activity Type Badge */}
             <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
-              backgroundColor: detailActivity.type === 'trade_entry_long' ? '#16a34a' : '#dc2626',
-              color: VIBE.ivory
+              backgroundColor:
+                detailActivity.type === 'trade_entry_long' ? '#16a34a' :
+                detailActivity.type === 'trade_entry_short' ? '#dc2626' :
+                detailActivity.type === 'market_query' ? VIBE.signal :
+                detailActivity.type === 'analysis' ? VIBE.lilac :
+                detailActivity.type === 'agent_wait' ? VIBE.ivory : VIBE.brass,
+              color: detailActivity.type === 'agent_wait' ? VIBE.obsidian : VIBE.ivory
             }}>
-              {detailActivity.type === 'trade_entry_long' ? '↑ Long Entry' : '↓ Short Entry'}
+              {detailActivity.type === 'trade_entry_long' && '↑ Long Entry'}
+              {detailActivity.type === 'trade_entry_short' && '↓ Short Entry'}
+              {detailActivity.type === 'market_query' && '📊 Market Query'}
+              {detailActivity.type === 'analysis' && '💭 Analysis'}
+              {detailActivity.type === 'agent_wait' && '⏸ Waiting'}
             </div>
 
             {/* Timestamp */}
@@ -575,20 +635,185 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
               </div>
             </div>
 
-            {/* Symbol */}
-            {detailActivity.data.symbol && (
-              <div>
-                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                  Symbol
-                </div>
-                <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
-                  {detailActivity.data.symbol}
-                </div>
-              </div>
-            )}
+            {/* Type-specific content */}
 
-            {/* Summary */}
-            {detailActivity.data.summary && (
+            {/* TRADE ENTRY SPECIFIC FIELDS */}
+            {(detailActivity.type === 'trade_entry_long' || detailActivity.type === 'trade_entry_short') ? (
+              <>
+                {detailActivity.data.confidence !== undefined ? (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Confidence
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <div className="flex-1 bg-black bg-opacity-30 rounded-full h-2 overflow-hidden">
+                        <div
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${(detailActivity.data.confidence || 0) * 100}%`,
+                            backgroundColor: VIBE.signal
+                          }}
+                        />
+                      </div>
+                      <span className="text-sm font-semibold">{Math.round((detailActivity.data.confidence || 0) * 100)}%</span>
+                    </div>
+                  </div>
+                 ) : null}
+
+                {detailActivity.data.leverage ? (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Leverage
+                    </div>
+                    <div className="text-lg font-semibold">{detailActivity.data.leverage}x</div>
+                  </div>
+                 ) : null}
+
+                {detailActivity.data.entry_price ? (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Entry Price
+                    </div>
+                    <div className="text-lg font-mono">${detailActivity.data.entry_price.toLocaleString()}</div>
+                  </div>
+                 ) : null}
+
+                <div className="grid grid-cols-2 gap-4">
+                  {detailActivity.data.stop_loss_price ? (
+                    <div>
+                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                        Stop Loss
+                      </div>
+                      <div className="text-sm font-mono" style={{ color: VIBE.ember }}>
+                        ${detailActivity.data.stop_loss_price.toLocaleString()}
+                      </div>
+                    </div>
+                  ) : null}
+
+                  {detailActivity.data.take_profit_price ? (
+                    <div>
+                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                        Take Profit
+                      </div>
+                      <div className="text-sm font-mono" style={{ color: VIBE.signal }}>
+                        ${detailActivity.data.take_profit_price.toLocaleString()}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              </>
+            ) : null}
+
+            {/* MARKET QUERY SPECIFIC FIELDS */}
+            {detailActivity.type === 'market_query' && detailActivity.data.details ? (
+              <>
+                {detailActivity.data.details.timeframe && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Timeframe
+                    </div>
+                    <div className="text-sm">{String(detailActivity.data.details.timeframe)}</div>
+                  </div>
+                 )}
+
+                {detailActivity.data.details.categories && typeof detailActivity.data.details.categories === 'object' && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Data Requested
+                    </div>
+                    {Object.entries(detailActivity.data.details.categories).map(([category, indicators]) => (
+                      <div key={category} className="mb-2">
+                        <div className="text-xs font-semibold mb-1" style={{ color: VIBE.signal }}>
+                          {category}:
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {Array.isArray(indicators) && indicators.map((ind: unknown, i: number) => (
+                            <span
+                              key={i}
+                              className="px-2 py-1 rounded text-xs"
+                              style={{ backgroundColor: 'rgba(0, 217, 255, 0.2)', color: VIBE.signal }}
+                            >
+                              {String(ind)}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                 )}
+              </>
+            ) : null}
+
+            {/* ANALYSIS SPECIFIC FIELDS */}
+            {detailActivity.type === 'analysis' && detailActivity.data.details?.thought ? (
+              <div>
+                <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  Agent Thought
+                </div>
+                <div
+                  className="prose prose-invert prose-sm max-w-none"
+                  style={{ color: VIBE.ivory }}
+                >
+                  <ReactMarkdown>{String(detailActivity.data.details.thought)}</ReactMarkdown>
+                </div>
+
+                {detailActivity.data.details.balance && typeof detailActivity.data.details.balance === 'number' ? (
+                  <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: 'rgba(0, 217, 255, 0.1)' }}>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Balance at Time
+                    </div>
+                    <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
+                      ${detailActivity.data.details.balance.toFixed(2)}
+                    </div>
+                  </div>
+                 ) : null}
+              </div>
+            ) : null}
+
+            {/* AGENT WAIT SPECIFIC FIELDS */}
+            {detailActivity.type === 'agent_wait' && detailActivity.data.details ? (
+              <>
+                {detailActivity.data.details.duration_minutes && typeof detailActivity.data.details.duration_minutes === 'number' && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Wait Duration
+                    </div>
+                    <div className="text-lg font-semibold">{detailActivity.data.details.duration_minutes} minutes</div>
+                  </div>
+                 )}
+
+                {detailActivity.data.details.next_check_at && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Next Check
+                    </div>
+                    <div className="text-sm font-mono">
+                      {new Date(String(detailActivity.data.details.next_check_at)).toLocaleString('en-US', {
+                        dateStyle: 'medium',
+                        timeStyle: 'medium'
+                      })}
+                    </div>
+                  </div>
+                 )}
+
+                {detailActivity.data.details.reason && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Reason
+                    </div>
+                    <div
+                      className="prose prose-invert prose-sm max-w-none"
+                      style={{ color: VIBE.ivory }}
+                    >
+                      <ReactMarkdown>{String(detailActivity.data.details.reason)}</ReactMarkdown>
+                    </div>
+                  </div>
+                 )}
+              </>
+            ) : null}
+
+            {/* Summary (for all types that have it) */}
+            {detailActivity.data.summary ? (
               <div>
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                   Summary
@@ -597,56 +822,8 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                   {detailActivity.data.summary}
                 </div>
               </div>
-            )}
+            ) : null}
 
-            {/* Trade ID */}
-            {detailActivity.data.trade_id && (
-              <div>
-                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                  Trade ID
-                </div>
-                <div className="text-sm font-mono" style={{ color: VIBE.brass }}>
-                  {detailActivity.data.trade_id}
-                </div>
-              </div>
-            )}
-
-            {/* Details (if present) */}
-            {detailActivity.data.details && Object.keys(detailActivity.data.details).length > 0 && (
-              <div>
-                <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                  Details
-                </div>
-                <div className="bg-black bg-opacity-30 rounded-lg p-3 overflow-auto">
-                  <pre className="text-xs font-mono" style={{ color: VIBE.ivory }}>
-                    {JSON.stringify(detailActivity.data.details, null, 2)}
-                  </pre>
-                </div>
-              </div>
-            )}
-
-            {/* Importance Level */}
-            {detailActivity.data.importance !== undefined && (
-              <div>
-                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                  Importance
-                </div>
-                <div className="flex items-center gap-2">
-                  <div className="flex gap-1">
-                    {[1, 2, 3, 4, 5].map((level) => (
-                      <div
-                        key={level}
-                        className="w-8 h-2 rounded"
-                        style={{
-                          backgroundColor: level <= (detailActivity.data.importance || 0) ? VIBE.brass : 'rgba(237,235,231,0.2)'
-                        }}
-                      />
-                    ))}
-                  </div>
-                  <span className="text-sm">{detailActivity.data.importance}/5</span>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </BottomSheet>
