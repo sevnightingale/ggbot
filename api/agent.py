@@ -564,10 +564,16 @@ async def get_account_status(
             # Get all open orders (TP/SL/Limit orders)
             open_orders = await aster_service.get_open_orders() or []
 
+            # Calculate total equity properly
+            # Total Equity = Wallet Balance + Unrealized P&L
+            wallet_balance = float(usdt_balance.get('balance', 0))
+            unrealized_pnl = float(usdt_balance.get('unrealizedProfit', 0))
+            total_equity = wallet_balance + unrealized_pnl
+
             account = {
-                "balance": float(usdt_balance.get('availableBalance', 0)),
-                "margin_balance": float(usdt_balance.get('balance', 0)),
-                "unrealized_pnl": float(usdt_balance.get('unrealizedProfit', 0)),
+                "balance": total_equity,  # Total equity (what agent should see)
+                "margin_balance": wallet_balance,  # Wallet balance (for reference)
+                "unrealized_pnl": unrealized_pnl,
                 "open_positions": len(positions),
                 "open_orders": open_orders,  # Include all open orders
                 "total_trades": 0,  # Not tracked for Aster

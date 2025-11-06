@@ -205,23 +205,27 @@ class AsterDEXV3LiveTradingService:
                 self._log.warning("Could not query account balance, using minimum quantity")
                 return 0.001
 
-            # Get USDT available balance (the margin/collateral asset for futures)
-            # Note: USDT is the margin asset, don't sum with USDC (they show same availableBalance = total equity)
-            available_balance = 0.0
+            # Get USDT balance for position sizing (use total equity, not just available)
+            # Total Equity = Wallet Balance + Unrealized P&L
+            wallet_balance = 0.0
+            unrealized_pnl = 0.0
             for asset in balance_data:
                 if asset.get("asset") == "USDT":
-                    available_balance = float(asset.get("availableBalance", 0))
+                    wallet_balance = float(asset.get("balance", 0))
+                    unrealized_pnl = float(asset.get("unrealizedProfit", 0))
                     break
 
-            if available_balance <= 0:
-                self._log.warning("No USDT available balance, using minimum quantity")
+            total_equity = wallet_balance + unrealized_pnl
+
+            if total_equity <= 0:
+                self._log.warning("No USDT equity, using minimum quantity")
                 return 0.001
 
-            self._log.info(f"Available balance (USDT margin): ${available_balance:.2f}")
+            self._log.info(f"Total equity: ${total_equity:.2f} (wallet: ${wallet_balance:.2f}, unrealized P&L: ${unrealized_pnl:.2f})")
 
             # Step 2: Calculate USD position size using config
             # This returns notional position size (margin × leverage)
-            position_size_usd = config.get_position_size(confidence, available_balance)
+            position_size_usd = config.get_position_size(confidence, total_equity)
 
             self._log.info(f"Target position size: ${position_size_usd:.2f} (confidence={confidence:.3f})")
 
@@ -580,7 +584,7 @@ class AsterDEXV3LiveTradingService:
                         'take_profit_order_id': tp_order_id,
                         'confidence': confidence
                     },
-                    trade_id=order_id,
+                    trade_id=None,  # AsterDEX uses numeric order IDs, not UUIDs
                     trade_type='aster',
                     related_symbol=symbol,
                     priority=1,
