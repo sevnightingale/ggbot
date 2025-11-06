@@ -41,6 +41,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
+  const isFirstLoadRef = useRef<boolean>(true);
 
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
@@ -72,6 +73,9 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
       const containerHeight = chartContainer.clientHeight;
 
       console.log('Creating chart with dimensions:', { width: containerWidth, height: containerHeight });
+
+      // Reset first load flag when creating new chart
+      isFirstLoadRef.current = true;
 
       const chart = createChart(chartContainer, {
         width: containerWidth,
@@ -229,8 +233,15 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         if (lineSeriesRef.current && chartData.length > 0) {
           console.log('Setting data on chart...');
           lineSeriesRef.current.setData(chartData);
-          chartRef.current?.timeScale().fitContent();
-          console.log('Data set successfully');
+
+          // Only fit content on first load, preserve user zoom/pan on subsequent updates
+          if (isFirstLoadRef.current) {
+            chartRef.current?.timeScale().fitContent();
+            isFirstLoadRef.current = false;
+            console.log('Data set successfully (initial load, fitted content)');
+          } else {
+            console.log('Data set successfully (update, preserved zoom/pan)');
+          }
         } else {
           console.warn('Cannot set data:', {
             hasLineSeries: !!lineSeriesRef.current,
