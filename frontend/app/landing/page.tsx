@@ -9,7 +9,7 @@ import Pricing from '@/components/new-landing/Pricing'
 
 export default function NewLandingPage() {
   return (
-    <main className="min-h-screen bg-charcoal-900">
+    <main className="min-h-screen bg-obsidian">
       <Header />
       <Hero />
       <Demo />

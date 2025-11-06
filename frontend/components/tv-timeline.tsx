@@ -73,8 +73,8 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
   const [crosshairPosition, setCrosshairPosition] = useState<{ x: number; y: number } | null>(null);
 
-  // Map to lookup activities by timestamp
-  const activitiesMapRef = useRef<Map<number, Activity>>(new Map());
+  // Map to lookup activities by timestamp (can have multiple activities at same time)
+  const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
 
   // Get session for auth
   useEffect(() => {
@@ -137,6 +137,9 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
             style: LineStyle.Dashed,
           },
         },
+        localization: {
+          priceFormatter: (price: number) => `$${price.toFixed(2)}`,
+        },
       });
 
       chartRef.current = chart;
@@ -148,7 +151,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         crosshairMarkerVisible: true,
         crosshairMarkerRadius: 4,
         lastValueVisible: true,
-        priceLineVisible: true,
+        priceLineVisible: false,  // Remove the dashed price line
       });
 
       lineSeriesRef.current = lineSeries;
@@ -163,11 +166,11 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         }
 
         const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
-        const activity = activitiesMapRef.current.get(timestamp);
+        const activities = activitiesMapRef.current.get(timestamp);
 
-        if (activity) {
-          // Highlight all activity types
-          setSelectedActivity(activity);
+        if (activities && activities.length > 0) {
+          // For tooltip, show the first/primary activity
+          setSelectedActivity(activities[0]);
           setCrosshairPosition({ x: param.point.x, y: param.point.y });
         } else {
           setSelectedActivity(null);
@@ -180,11 +183,12 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         if (!param.time) return;
 
         const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
-        const activity = activitiesMapRef.current.get(timestamp);
+        const activities = activitiesMapRef.current.get(timestamp);
 
-        if (activity) {
-          console.log('Clicked activity:', activity);
-          setDetailActivity(activity);
+        if (activities && activities.length > 0) {
+          console.log('Clicked activities:', activities);
+          // For now, show the first activity (we'll update bottom sheet to show all)
+          setDetailActivity(activities[0]);
         }
       });
 
@@ -333,49 +337,71 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           console.log('Setting data on chart...');
           lineSeriesRef.current.setData(chartData);
 
-          // Build activities lookup map and create markers for all activity types
+          // Build activities lookup map - group by timestamp
           activitiesMapRef.current.clear();
-          const markers: SeriesMarker<Time>[] = [];
+          const groupedByTimestamp = new Map<number, Activity[]>();
 
           activities.forEach((activity) => {
             const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
-            activitiesMapRef.current.set(timestamp, activity);
+            if (!groupedByTimestamp.has(timestamp)) {
+              groupedByTimestamp.set(timestamp, []);
+            }
+            groupedByTimestamp.get(timestamp)!.push(activity);
+          });
 
-            // Create markers based on activity type
-            if (activity.type === 'trade_entry_long') {
+          // Set the grouped activities in the ref
+          activitiesMapRef.current = groupedByTimestamp;
+
+          // Create one marker per timestamp based on priority
+          const markers: SeriesMarker<Time>[] = [];
+
+          groupedByTimestamp.forEach((activitiesAtTime, timestamp) => {
+            // Determine marker type based on priority
+            const hasTradeLong = activitiesAtTime.some(a => a.type === 'trade_entry_long');
+            const hasTradeShort = activitiesAtTime.some(a => a.type === 'trade_entry_short');
+            const hasAnalysis = activitiesAtTime.some(a => a.type === 'analysis');
+            const hasMarketQuery = activitiesAtTime.some(a => a.type === 'market_query');
+            const hasAgentWait = activitiesAtTime.some(a => a.type === 'agent_wait');
+
+            if (hasTradeLong) {
               markers.push({
                 time: timestamp as Time,
                 position: 'belowBar',
                 color: '#16a34a', // green-600
                 shape: 'arrowUp',
+                size: 2, // Make arrows bigger
               });
-            } else if (activity.type === 'trade_entry_short') {
+            } else if (hasTradeShort) {
               markers.push({
                 time: timestamp as Time,
                 position: 'aboveBar',
                 color: '#dc2626', // red-600
                 shape: 'arrowDown',
+                size: 2, // Make arrows bigger
               });
-            } else if (activity.type === 'market_query') {
+            } else if (hasAnalysis) {
+              markers.push({
+                time: timestamp as Time,
+                position: 'aboveBar',
+                color: 'rgba(193, 168, 125, 0.6)', // brass with transparency
+                shape: 'circle',
+                size: 0.5, // Smaller circles
+              });
+            } else if (hasMarketQuery) {
               markers.push({
                 time: timestamp as Time,
                 position: 'belowBar',
-                color: VIBE.signal, // blue
+                color: 'rgba(60, 166, 224, 0.5)', // signal blue with transparency
                 shape: 'circle',
+                size: 0.5, // Smaller circles
               });
-            } else if (activity.type === 'analysis') {
+            } else if (hasAgentWait) {
               markers.push({
                 time: timestamp as Time,
                 position: 'belowBar',
-                color: VIBE.lilac, // lilac
+                color: 'rgba(237, 235, 231, 0.4)', // ivory with transparency
                 shape: 'circle',
-              });
-            } else if (activity.type === 'agent_wait') {
-              markers.push({
-                time: timestamp as Time,
-                position: 'belowBar',
-                color: VIBE.ivory, // ivory
-                shape: 'circle',
+                size: 0.5, // Smaller circles
               });
             }
           });
@@ -391,9 +417,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
             lineSeriesRef.current.setMarkers(sortedMarkers);
             console.log('Markers added:', sortedMarkers.length, {
               trade_entries: sortedMarkers.filter(m => m.shape === 'arrowUp' || m.shape === 'arrowDown').length,
-              market_queries: sortedMarkers.filter(m => m.color === VIBE.signal).length,
-              analysis: sortedMarkers.filter(m => m.color === VIBE.lilac).length,
-              waits: sortedMarkers.filter(m => m.color === VIBE.ivory).length,
+              circles: sortedMarkers.filter(m => m.shape === 'circle').length,
             });
           }
 
@@ -512,7 +536,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                   {selectedActivity.type === 'trade_entry_long' && '↑ LONG ENTRY'}
                   {selectedActivity.type === 'trade_entry_short' && '↓ SHORT ENTRY'}
                   {selectedActivity.type === 'market_query' && '📊 MARKET QUERY'}
-                  {selectedActivity.type === 'analysis' && '💭 ANALYSIS'}
+                  {selectedActivity.type === 'analysis' && '💭 AGENT THOUGHT'}
                   {selectedActivity.type === 'agent_wait' && '⏸ WAITING'}
                 </div>
                 <div className="text-sm mb-1">
@@ -546,7 +570,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                       color: selectedActivity.type === 'trade_entry_long' ? '#16a34a' :
                              selectedActivity.type === 'trade_entry_short' ? '#dc2626' :
                              selectedActivity.type === 'market_query' ? VIBE.signal :
-                             selectedActivity.type === 'analysis' ? VIBE.lilac : VIBE.ivory,
+                             selectedActivity.type === 'analysis' ? VIBE.brass : VIBE.ivory,
                       lineHeight: 1,
                       animation: 'markerPulse 1.5s ease-in-out infinite'
                     }}
@@ -598,7 +622,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           detailActivity?.type === 'trade_entry_long' ? 'Long Entry' :
           detailActivity?.type === 'trade_entry_short' ? 'Short Entry' :
           detailActivity?.type === 'market_query' ? 'Market Query' :
-          detailActivity?.type === 'analysis' ? 'Analysis' :
+          detailActivity?.type === 'analysis' ? 'Agent Thought' :
           detailActivity?.type === 'agent_wait' ? 'Agent Waiting' :
           'Activity'
         }
@@ -611,14 +635,14 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                 detailActivity.type === 'trade_entry_long' ? '#16a34a' :
                 detailActivity.type === 'trade_entry_short' ? '#dc2626' :
                 detailActivity.type === 'market_query' ? VIBE.signal :
-                detailActivity.type === 'analysis' ? VIBE.lilac :
+                detailActivity.type === 'analysis' ? VIBE.brass :
                 detailActivity.type === 'agent_wait' ? VIBE.ivory : VIBE.brass,
               color: detailActivity.type === 'agent_wait' ? VIBE.obsidian : VIBE.ivory
             }}>
               {detailActivity.type === 'trade_entry_long' && '↑ Long Entry'}
               {detailActivity.type === 'trade_entry_short' && '↓ Short Entry'}
               {detailActivity.type === 'market_query' && '📊 Market Query'}
-              {detailActivity.type === 'analysis' && '💭 Analysis'}
+              {detailActivity.type === 'analysis' && '💭 Agent Thought'}
               {detailActivity.type === 'agent_wait' && '⏸ Waiting'}
             </div>
 

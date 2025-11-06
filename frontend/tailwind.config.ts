@@ -9,6 +9,7 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Legacy charcoal colors (keep for backwards compatibility)
         charcoal: {
           900: '#161618',
           800: '#1a1a1c',
@@ -16,6 +17,7 @@ const config: Config = {
           600: '#222224',
           500: '#4a4a50',
         },
+        // Legacy bone colors (keep for backwards compatibility)
         bone: {
           50: '#fafafa',
           100: '#f5f5f5',
@@ -24,6 +26,19 @@ const config: Config = {
           400: '#a8abac',
           500: '#6b6f71',
         },
+        // New ceremonial brutalism palette (trade37 inspired)
+        obsidian: '#0b0b0c',
+        carbon: '#141416',
+        ivory: '#edebe7',
+        alloy: '#8a8781',
+        brass: {
+          DEFAULT: '#c1a87d',     // Dark mode accent
+          light: '#d4bc91',       // Hover state
+          dark: '#8a7859',        // Light mode accent
+        },
+        signal: '#3ca6e0',
+        ember: '#d74a1f',
+        // Legacy agent colors (deprecated - use brass instead)
         agents: {
           extraction: '#38a1c7',
           decision: '#2cbe77',
@@ -36,8 +51,9 @@ const config: Config = {
         }
       },
       fontFamily: {
-        sans: ['Inter', 'system-ui', 'sans-serif'],
-        display: ['Kanit', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-sans)', 'system-ui', 'sans-serif'],
+        display: ['var(--font-display)', 'serif'],
+        mono: ['var(--font-mono)', 'monospace'],
       },
       animation: {
         'pulse-glow': 'pulse-glow 2s ease-in-out infinite',

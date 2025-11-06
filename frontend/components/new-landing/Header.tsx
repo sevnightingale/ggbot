@@ -16,7 +16,7 @@ export default function Header() {
   }
 
   return (
-    <header className="sticky top-0 z-50 bg-charcoal-900/95 backdrop-blur-sm border-b border-bone-200/10">
+    <header className="sticky top-0 z-50 bg-obsidian/95 backdrop-blur-sm border-b border-ivory/10">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
@@ -35,25 +35,25 @@ export default function Header() {
             <div className="flex items-center space-x-8">
               <button
                 onClick={() => scrollToSection('demo')}
-                className="text-bone-200/80 hover:text-bone-200 transition-colors text-sm font-medium"
+                className="text-ivory/80 hover:text-ivory transition-colors text-sm font-medium"
               >
                 Demo
               </button>
               <button
                 onClick={() => scrollToSection('process')}
-                className="text-bone-200/80 hover:text-bone-200 transition-colors text-sm font-medium"
+                className="text-ivory/80 hover:text-ivory transition-colors text-sm font-medium"
               >
                 How It Works
               </button>
               <button
                 onClick={() => scrollToSection('features')}
-                className="text-bone-200/80 hover:text-bone-200 transition-colors text-sm font-medium"
+                className="text-ivory/80 hover:text-ivory transition-colors text-sm font-medium"
               >
                 Features
               </button>
               <button
                 onClick={() => scrollToSection('pricing')}
-                className="text-bone-200/80 hover:text-bone-200 transition-colors text-sm font-medium"
+                className="text-ivory/80 hover:text-ivory transition-colors text-sm font-medium"
               >
                 Pricing
               </button>
@@ -65,7 +65,7 @@ export default function Header() {
             {/* Launch App CTA */}
             <a
               href="https://app.ggbots.ai"
-              className="bg-agents-extraction hover:bg-agents-extraction/90 text-bone-200 px-6 py-2 rounded-sm font-medium transition-colors text-sm"
+              className="bg-brass hover:bg-brass-light text-obsidian px-6 py-2 rounded-sm font-medium transition-colors text-sm"
             >
               Launch App
             </a>
@@ -73,7 +73,7 @@ export default function Header() {
             {/* Mobile Menu Button */}
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="md:hidden p-2 text-bone-200/80 hover:text-bone-200"
+              className="md:hidden p-2 text-ivory/80 hover:text-ivory"
             >
               {isMenuOpen ? <X size={20} /> : <Menu size={20} />}
             </button>
@@ -82,29 +82,29 @@ export default function Header() {
 
         {/* Mobile Navigation Menu */}
         {isMenuOpen && (
-          <div className="md:hidden border-t border-bone-200/10">
+          <div className="md:hidden border-t border-ivory/10">
             <div className="py-4 space-y-3">
               <button
                 onClick={() => scrollToSection('demo')}
-                className="block w-full text-left px-4 py-2 text-bone-200/80 hover:text-bone-200 hover:bg-bone-200/5 rounded-sm transition-colors"
+                className="block w-full text-left px-4 py-2 text-ivory/80 hover:text-ivory hover:bg-ivory/5 rounded-sm transition-colors"
               >
                 Demo
               </button>
               <button
                 onClick={() => scrollToSection('process')}
-                className="block w-full text-left px-4 py-2 text-bone-200/80 hover:text-bone-200 hover:bg-bone-200/5 rounded-sm transition-colors"
+                className="block w-full text-left px-4 py-2 text-ivory/80 hover:text-ivory hover:bg-ivory/5 rounded-sm transition-colors"
               >
                 How It Works
               </button>
               <button
                 onClick={() => scrollToSection('features')}
-                className="block w-full text-left px-4 py-2 text-bone-200/80 hover:text-bone-200 hover:bg-bone-200/5 rounded-sm transition-colors"
+                className="block w-full text-left px-4 py-2 text-ivory/80 hover:text-ivory hover:bg-ivory/5 rounded-sm transition-colors"
               >
                 Features
               </button>
               <button
                 onClick={() => scrollToSection('pricing')}
-                className="block w-full text-left px-4 py-2 text-bone-200/80 hover:text-bone-200 hover:bg-bone-200/5 rounded-sm transition-colors"
+                className="block w-full text-left px-4 py-2 text-ivory/80 hover:text-ivory hover:bg-ivory/5 rounded-sm transition-colors"
               >
                 Pricing
               </button>

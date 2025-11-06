@@ -532,28 +532,36 @@ body {
   z-index: 1;
 }
 
-/* Theme System - Dark/Light Mode Support */
+/* Theme System - Ceremonial Brutalism (trade37 inspired) */
 [data-theme="dark"] {
-  --bg-primary: #161618;       /* charcoal-900 */
-  --bg-secondary: #1f1f23;     /* charcoal-800 */
-  --bg-tertiary: #2a2a30;      /* charcoal-700 */
-  --text-primary: #e3e5e6;     /* bone-200 */
-  --text-secondary: #d6d8da;   /* bone-300 */
-  --text-muted: #9ca3af;       /* gray-400 */
-  --border: #36363d;           /* charcoal-600 */
-  --border-hover: #4a4a50;     /* charcoal-500 */
+  --bg-primary: #0b0b0c;       /* obsidian - deep black */
+  --bg-secondary: #141416;     /* carbon - dark secondary */
+  --bg-tertiary: #1a1a1c;      /* darker variation */
+  --text-primary: #edebe7;     /* ivory - warm off-white */
+  --text-secondary: #d6d3ce;   /* muted ivory */
+  --text-muted: #8a8781;       /* warm gray */
+  --border: #2a2a2d;           /* subtle border */
+  --border-hover: #3a3a3d;     /* hover state */
+  --accent: #c1a87d;           /* brass - primary accent */
+  --accent-hover: #d4bc91;     /* lighter brass for hover */
+  --signal: #3ca6e0;           /* signal blue */
+  --ember: #d74a1f;            /* ember red */
   --logo-invert: 89%;          /* Light logo for dark theme */
 }
 
 [data-theme="light"] {
-  --bg-primary: #f0f2f3;       /* bone-100 */
-  --bg-secondary: white;
-  --bg-tertiary: #e3e5e6;      /* bone-200 */
-  --text-primary: #1f1f23;     /* charcoal-800 */
-  --text-secondary: #2a2a30;   /* charcoal-700 */
-  --text-muted: #6b7280;       /* gray-500 */
-  --border: #d6d8da;           /* bone-300 */
-  --border-hover: #c1c5c7;     /* darker bone for hover */
+  --bg-primary: #f8f7f4;       /* warm parchment */
+  --bg-secondary: #edebe7;     /* ivory background */
+  --bg-tertiary: #e6e3de;      /* cream tertiary */
+  --text-primary: #1a1816;     /* near-black with warmth */
+  --text-secondary: #3a3734;   /* medium brown-gray */
+  --text-muted: #6b6661;       /* lighter brown */
+  --border: #c8c4bc;           /* warm gray border */
+  --border-hover: #b5aea5;     /* darker border hover */
+  --accent: #8a7859;           /* dark brass accent */
+  --accent-hover: #9d8b6a;     /* lighter brass hover */
+  --signal: #3ca6e0;           /* signal blue (same) */
+  --ember: #d74a1f;            /* ember red (same) */
   --logo-invert: 12%;          /* Dark logo for light theme */
 }
 
@@ -596,15 +604,15 @@ body {
   overflow-x: hidden;
   background: var(--charcoal-900);
   color: var(--bone-200);
-  font-family: var(--font-inter), system-ui, sans-serif;
+  font-family: var(--font-sans), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Typography */
+/* Typography - Ceremonial Brutalism */
 h1, h2, h3, h4, h5, h6 {
-  font-family: var(--font-kanit), system-ui, sans-serif;
-  font-weight: 700;
+  font-family: var(--font-display), serif;
+  font-weight: 600;
   letter-spacing: -0.02em;
 }
 
