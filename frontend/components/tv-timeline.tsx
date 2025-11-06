@@ -65,6 +65,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
+  const [crosshairPosition, setCrosshairPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Map to lookup activities by timestamp
   const activitiesMapRef = useRef<Map<number, Activity>>(new Map());
@@ -149,8 +150,9 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
       // Crosshair move handler - highlight activity when crosshair snaps to it
       chart.subscribeCrosshairMove((param) => {
-        if (!param.time) {
+        if (!param.time || !param.point) {
           setSelectedActivity(null);
+          setCrosshairPosition(null);
           return;
         }
 
@@ -160,8 +162,10 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         if (activity && (activity.type === 'trade_entry_long' || activity.type === 'trade_entry_short')) {
           // Only highlight trade entries for now
           setSelectedActivity(activity);
+          setCrosshairPosition({ x: param.point.x, y: param.point.y });
         } else {
           setSelectedActivity(null);
+          setCrosshairPosition(null);
         }
       });
 
@@ -407,6 +411,18 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
   return (
     <div className="relative w-full min-h-screen font-sans" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
+      <style>{`
+        @keyframes markerPulse {
+          0%, 100% {
+            opacity: 1;
+            filter: drop-shadow(0 0 8px currentColor);
+          }
+          50% {
+            opacity: 0.8;
+            filter: drop-shadow(0 0 16px currentColor);
+          }
+        }
+      `}</style>
       {/* HEADER */}
       <section className="max-w-7xl mx-auto px-4 sm:px-5 pt-5 pb-4">
         <div className="rounded-xl border p-4 sm:p-6" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair }}>
@@ -450,29 +466,56 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
           {/* Activity hover tooltip */}
           {selectedActivity && (
-            <div
-              className="absolute top-4 left-4 rounded-lg border px-4 py-3 pointer-events-none"
-              style={{
-                backgroundColor: VIBE.carbon,
-                borderColor: VIBE.brass,
-                borderWidth: '2px',
-                maxWidth: '300px',
-                zIndex: 10
-              }}
-            >
-              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
-                {selectedActivity.type === 'trade_entry_long' ? '↑ LONG ENTRY' : '↓ SHORT ENTRY'}
+            <>
+              {/* Tooltip card */}
+              <div
+                className="absolute top-4 left-4 rounded-lg border px-4 py-3 pointer-events-none"
+                style={{
+                  backgroundColor: VIBE.carbon,
+                  borderColor: VIBE.brass,
+                  borderWidth: '2px',
+                  maxWidth: '300px',
+                  zIndex: 10
+                }}
+              >
+                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
+                  {selectedActivity.type === 'trade_entry_long' ? '↑ LONG ENTRY' : '↓ SHORT ENTRY'}
+                </div>
+                <div className="text-sm mb-1">{selectedActivity.data.summary || 'Trade entry'}</div>
+                <div className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                  {new Date(selectedActivity.timestamp).toLocaleString()}
+                </div>
+                {selectedActivity.data.symbol && (
+                  <div className="text-xs mt-2" style={{ color: VIBE.signal }}>
+                    {selectedActivity.data.symbol}
+                  </div>
+                )}
               </div>
-              <div className="text-sm mb-1">{selectedActivity.data.summary || 'Trade entry'}</div>
-              <div className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                {new Date(selectedActivity.timestamp).toLocaleString()}
-              </div>
-              {selectedActivity.data.symbol && (
-                <div className="text-xs mt-2" style={{ color: VIBE.signal }}>
-                  {selectedActivity.data.symbol}
+
+              {/* Highlighted marker overlay - shows larger version at crosshair position */}
+              {crosshairPosition && (
+                <div
+                  className="absolute pointer-events-none"
+                  style={{
+                    left: `${crosshairPosition.x}px`,
+                    top: `${crosshairPosition.y}px`,
+                    transform: 'translate(-50%, -50%)',
+                    zIndex: 5
+                  }}
+                >
+                  <div
+                    style={{
+                      fontSize: '40px',
+                      color: selectedActivity.type === 'trade_entry_long' ? '#16a34a' : '#dc2626',
+                      lineHeight: 1,
+                      animation: 'markerPulse 1.5s ease-in-out infinite'
+                    }}
+                  >
+                    {selectedActivity.type === 'trade_entry_long' ? '▲' : '▼'}
+                  </div>
                 </div>
               )}
-            </div>
+            </>
           )}
 
           {/* Loading overlay */}
