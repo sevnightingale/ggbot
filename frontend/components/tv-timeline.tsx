@@ -38,7 +38,7 @@ interface TimelineProps {
 }
 
 export default function TVTimeline({ configId, title }: TimelineProps) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
 
@@ -59,21 +59,21 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
   // Fetch data and initialize chart
   useEffect(() => {
-    console.log('useEffect running', { configId, hasContainer: !!chartContainerRef.current, hasSession: !!session });
+    console.log('useEffect running', { configId, hasContainer: !!chartContainer, hasSession: !!session });
 
-    if (!configId || !chartContainerRef.current) {
+    if (!configId || !chartContainer) {
       console.log('Early return - missing configId or container');
       return;
     }
 
     // Create chart if it doesn't exist
     if (!chartRef.current) {
-      const containerWidth = chartContainerRef.current.clientWidth;
-      const containerHeight = chartContainerRef.current.clientHeight;
+      const containerWidth = chartContainer.clientWidth;
+      const containerHeight = chartContainer.clientHeight;
 
       console.log('Creating chart with dimensions:', { width: containerWidth, height: containerHeight });
 
-      const chart = createChart(chartContainerRef.current, {
+      const chart = createChart(chartContainer, {
         width: containerWidth,
         height: containerHeight,
         layout: {
@@ -123,10 +123,10 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
       console.log('Line series created:', !!lineSeries);
 
       const handleResize = () => {
-        if (chartContainerRef.current && chartRef.current) {
+        if (chartContainer && chartRef.current) {
           chartRef.current.applyOptions({
-            width: chartContainerRef.current.clientWidth,
-            height: chartContainerRef.current.clientHeight,
+            width: chartContainer.clientWidth,
+            height: chartContainer.clientHeight,
           });
         }
       };
@@ -224,7 +224,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         lineSeriesRef.current = null;
       }
     };
-  }, [configId, session]);
+  }, [configId, session, chartContainer]);
 
   const info = metadata;
 
@@ -299,7 +299,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
       {/* CHART */}
       <section className="max-w-7xl mx-auto px-4 sm:px-5 pb-5">
         <div className="rounded-xl border overflow-hidden" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: 'calc(100vh - 280px)', minHeight: '400px' }}>
-          <div ref={chartContainerRef} style={{ width: '100%', height: '100%' }} />
+          <div ref={setChartContainer} style={{ width: '100%', height: '100%' }} />
         </div>
       </section>
     </div>
