@@ -23,6 +23,21 @@ interface BalancePoint {
   balance: number;
 }
 
+interface Activity {
+  id: string;
+  timestamp: string;
+  type: string;
+  priority: number;
+  data: {
+    summary?: string;
+    details?: Record<string, unknown>;
+    symbol?: string;
+    importance?: number;
+    trade_id?: string;
+    trade_type?: string;
+  };
+}
+
 interface ActivityMetadata {
   botName: string;
   startingBalance: number;
@@ -149,32 +164,40 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           : {};
 
         console.log('Fetching from API...');
-        const [balanceSeriesRes, metadataRes] = await Promise.all([
+        const [balanceSeriesRes, activitiesRes, metadataRes] = await Promise.all([
           fetch(`/api/v2/activities/${configId}/balance-series?mode=pnl`, { headers }),
+          fetch(`/api/v2/activities/${configId}`, { headers }),
           fetch(`/api/v2/activities/${configId}/metadata`, { headers }),
         ]);
 
         console.log('API responses:', {
           balanceOk: balanceSeriesRes.ok,
           balanceStatus: balanceSeriesRes.status,
+          activitiesOk: activitiesRes.ok,
+          activitiesStatus: activitiesRes.status,
           metadataOk: metadataRes.ok,
           metadataStatus: metadataRes.status
         });
 
-        if (!balanceSeriesRes.ok || !metadataRes.ok) {
+        if (!balanceSeriesRes.ok || !activitiesRes.ok || !metadataRes.ok) {
           const balanceError = await balanceSeriesRes.text();
+          const activitiesError = await activitiesRes.text();
           const metadataError = await metadataRes.text();
-          console.error('API errors:', { balanceError, metadataError });
-          throw new Error(`Failed to fetch timeline data: ${balanceSeriesRes.status}, ${metadataRes.status}`);
+          console.error('API errors:', { balanceError, activitiesError, metadataError });
+          throw new Error(`Failed to fetch timeline data`);
         }
 
-        const [balanceSeries, metadataData] = await Promise.all([
+        const [balanceSeries, activitiesData, metadataData] = await Promise.all([
           balanceSeriesRes.json(),
+          activitiesRes.json(),
           metadataRes.json(),
         ]);
 
         const balancePoints: BalancePoint[] = balanceSeries.balance_series || [];
-        console.log('Raw balance points sample:', balancePoints.slice(0, 2));
+        const activities: Activity[] = activitiesData.activities || [];
+
+        console.log('Raw balance points:', balancePoints.length);
+        console.log('Raw activities:', activities.length);
 
         setMetadata({
           botName: metadataData.metadata?.botName || metadataData.bot_name || metadataData.botName || 'Unknown Bot',
@@ -185,49 +208,63 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           performance: metadataData.metadata?.performance || metadataData.performance || 0,
         });
 
-        // Transform and validate data
-        const validatedData: LineData[] = balancePoints
-          .map((point) => {
-            // Convert to unix timestamp (seconds) and round to integer
-            // TradingView may not handle fractional seconds correctly
-            const timestamp = Math.floor(new Date(point.timestamp).getTime() / 1000);
-            return {
-              time: timestamp as Time,
-              value: point.balance,
-            };
-          })
-          .filter((point) => {
-            // Filter out invalid data points
-            const timeNum = typeof point.time === 'number' ? point.time : parseFloat(point.time as string);
-            const isValid = !isNaN(timeNum) && point.value !== null && point.value !== undefined && !isNaN(point.value);
-            if (!isValid) {
-              console.warn('Filtered out invalid data point:', point);
-            }
-            return isValid;
-          })
-          .sort((a, b) => {
-            const aTime = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
-            const bTime = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
-            return aTime - bTime;
-          }); // TradingView requires sorted data
+        // Step 1: Create lookup map of balance by timestamp
+        const balanceMap = new Map<string, number>();
+        balancePoints.forEach((point) => {
+          balanceMap.set(point.timestamp, point.balance);
+        });
 
-        // Deduplicate by time - keep last value for each timestamp
-        // TradingView requires unique timestamps
+        console.log('Balance map created:', balanceMap.size, 'entries');
+
+        // Step 2: Sort activities by timestamp
+        const sortedActivities = [...activities].sort((a, b) =>
+          new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+        );
+
+        console.log('Activities sorted:', sortedActivities.length);
+
+        // Step 3: Merge activities with P&L using carry-forward
+        let currentPnl = 0.0; // Start at $0 for P&L mode
+        const mergedData: LineData[] = [];
+
+        sortedActivities.forEach((activity) => {
+          // Check if this activity has a balance point
+          if (balanceMap.has(activity.timestamp)) {
+            currentPnl = balanceMap.get(activity.timestamp)!;
+          }
+          // Otherwise carry forward current P&L
+
+          // Convert to unix timestamp (seconds)
+          const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
+
+          mergedData.push({
+            time: timestamp as Time,
+            value: currentPnl,
+          });
+        });
+
+        console.log('Merged data:', mergedData.length, 'points');
+
+        // Step 4: Deduplicate by timestamp (keep last value)
+        // Some activities might have same timestamp
         const timeMap = new Map<number, number>();
-        validatedData.forEach((point) => {
+        mergedData.forEach((point) => {
           const timeNum = typeof point.time === 'number' ? point.time : parseFloat(point.time as string);
           timeMap.set(timeNum, point.value);
         });
 
-        const chartData: LineData[] = Array.from(timeMap.entries()).map(([time, value]) => ({
-          time: time as Time,
-          value,
-        }));
+        const chartData: LineData[] = Array.from(timeMap.entries())
+          .map(([time, value]) => ({
+            time: time as Time,
+            value,
+          }))
+          .sort((a, b) => {
+            const aTime = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
+            const bTime = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
+            return aTime - bTime;
+          });
 
-        console.log('Balance points:', balancePoints.length);
-        console.log('After validation:', validatedData.length);
-        console.log('After deduplication:', chartData.length);
-        console.log('Removed duplicates:', validatedData.length - chartData.length);
+        console.log('Final chart data:', chartData.length, 'points');
         console.log('First 3 points:', chartData.slice(0, 3));
         console.log('Last 3 points:', chartData.slice(-3));
 
