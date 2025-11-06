@@ -170,6 +170,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         ]);
 
         const balancePoints: BalancePoint[] = balanceSeries.balance_series || [];
+        console.log('Raw balance points sample:', balancePoints.slice(0, 2));
 
         setMetadata({
           botName: metadataData.metadata?.botName || metadataData.bot_name || metadataData.botName || 'Unknown Bot',
@@ -180,13 +181,34 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
           performance: metadataData.metadata?.performance || metadataData.performance || 0,
         });
 
-        const chartData: LineData[] = balancePoints.map((point) => ({
-          time: (new Date(point.timestamp).getTime() / 1000) as Time,
-          value: point.balance,
-        }));
+        // Transform and validate data
+        const chartData: LineData[] = balancePoints
+          .map((point) => {
+            const timestamp = new Date(point.timestamp).getTime() / 1000;
+            return {
+              time: timestamp as Time,
+              value: point.balance,
+            };
+          })
+          .filter((point) => {
+            // Filter out invalid data points
+            const timeNum = typeof point.time === 'number' ? point.time : parseFloat(point.time as string);
+            const isValid = !isNaN(timeNum) && point.value !== null && point.value !== undefined && !isNaN(point.value);
+            if (!isValid) {
+              console.warn('Filtered out invalid data point:', point);
+            }
+            return isValid;
+          })
+          .sort((a, b) => {
+            const aTime = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
+            const bTime = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
+            return aTime - bTime;
+          }); // TradingView requires sorted data
 
         console.log('Balance points:', balancePoints.length);
-        console.log('Chart data:', chartData.length, chartData.slice(0, 3));
+        console.log('Chart data after validation:', chartData.length);
+        console.log('First 3 points:', chartData.slice(0, 3));
+        console.log('Last 3 points:', chartData.slice(-3));
         console.log('Line series ref exists:', !!lineSeriesRef.current);
 
         if (lineSeriesRef.current && chartData.length > 0) {
