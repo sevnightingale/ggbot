@@ -224,7 +224,30 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
         console.log('Activities sorted:', sortedActivities.length);
 
         // Step 3: Merge activities with P&L using carry-forward
-        let currentPnl = 0.0; // Start at $0 for P&L mode
+        // Find the P&L value at the time of the first activity
+        // by looking at the most recent balance point before it
+        let currentPnl = 0.0;
+
+        if (sortedActivities.length > 0 && balancePoints.length > 0) {
+          const firstActivityTime = new Date(sortedActivities[0].timestamp);
+
+          // Sort balance points by time and find the last one before first activity
+          const sortedBalancePoints = [...balancePoints].sort((a, b) =>
+            new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+          );
+
+          for (const balancePoint of sortedBalancePoints) {
+            const balanceTime = new Date(balancePoint.timestamp);
+            if (balanceTime <= firstActivityTime) {
+              currentPnl = balancePoint.balance;
+            } else {
+              break;
+            }
+          }
+
+          console.log('Starting P&L (from last balance before first activity):', currentPnl);
+        }
+
         const mergedData: LineData[] = [];
 
         sortedActivities.forEach((activity) => {
