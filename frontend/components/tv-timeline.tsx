@@ -70,7 +70,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
   const [session, setSession] = useState<Session | null>(null);
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
-  const [detailActivity, setDetailActivity] = useState<Activity | null>(null);
+  const [detailActivities, setDetailActivities] = useState<Activity[]>([]);
   const [crosshairPosition, setCrosshairPosition] = useState<{ x: number; y: number } | null>(null);
 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
@@ -187,8 +187,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
         if (activities && activities.length > 0) {
           console.log('Clicked activities:', activities);
-          // For now, show the first activity (we'll update bottom sheet to show all)
-          setDetailActivity(activities[0]);
+          setDetailActivities(activities);
         }
       });
 
@@ -539,10 +538,15 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                   {selectedActivity.type === 'analysis' && '💭 AGENT THOUGHT'}
                   {selectedActivity.type === 'agent_wait' && '⏸ WAITING'}
                 </div>
-                <div className="text-sm mb-1">
-                  {selectedActivity.data.summary && selectedActivity.data.summary.slice(0, 100)}
-                  {selectedActivity.data.summary && selectedActivity.data.summary.length > 100 && '...'}
-                </div>
+                {selectedActivity.data.summary && (
+                  <div className="text-sm mb-1 prose prose-invert prose-sm max-w-none" style={{ color: VIBE.ivory }}>
+                    <ReactMarkdown>
+                      {selectedActivity.data.summary.length > 100
+                        ? selectedActivity.data.summary.slice(0, 100) + '...'
+                        : selectedActivity.data.summary}
+                    </ReactMarkdown>
+                  </div>
+                )}
                 <div className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>
                   {new Date(selectedActivity.timestamp).toLocaleString()}
                 </div>
@@ -616,50 +620,56 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
       {/* Activity Detail Bottom Sheet */}
       <BottomSheet
-        isOpen={!!detailActivity}
-        onClose={() => setDetailActivity(null)}
+        isOpen={detailActivities.length > 0}
+        onClose={() => setDetailActivities([])}
         title={
-          detailActivity?.type === 'trade_entry_long' ? 'Long Entry' :
-          detailActivity?.type === 'trade_entry_short' ? 'Short Entry' :
-          detailActivity?.type === 'market_query' ? 'Market Query' :
-          detailActivity?.type === 'analysis' ? 'Agent Thought' :
-          detailActivity?.type === 'agent_wait' ? 'Agent Waiting' :
-          'Activity'
+          detailActivities.length === 1
+            ? detailActivities[0].type === 'trade_entry_long' ? 'Long Entry' :
+              detailActivities[0].type === 'trade_entry_short' ? 'Short Entry' :
+              detailActivities[0].type === 'market_query' ? 'Market Query' :
+              detailActivities[0].type === 'analysis' ? 'Agent Thought' :
+              detailActivities[0].type === 'agent_wait' ? 'Agent Waiting' :
+              'Activity'
+            : `${detailActivities.length} Activities`
         }
       >
-        {detailActivity && (
-          <div className="px-6 py-4 space-y-4 max-h-[calc(80vh-120px)] overflow-y-auto">
-            {/* Activity Type Badge */}
-            <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
-              backgroundColor:
-                detailActivity.type === 'trade_entry_long' ? '#16a34a' :
-                detailActivity.type === 'trade_entry_short' ? '#dc2626' :
-                detailActivity.type === 'market_query' ? VIBE.signal :
-                detailActivity.type === 'analysis' ? VIBE.brass :
-                detailActivity.type === 'agent_wait' ? VIBE.ivory : VIBE.brass,
-              color: detailActivity.type === 'agent_wait' ? VIBE.obsidian : VIBE.ivory
-            }}>
-              {detailActivity.type === 'trade_entry_long' && '↑ Long Entry'}
-              {detailActivity.type === 'trade_entry_short' && '↓ Short Entry'}
-              {detailActivity.type === 'market_query' && '📊 Market Query'}
-              {detailActivity.type === 'analysis' && '💭 Agent Thought'}
-              {detailActivity.type === 'agent_wait' && '⏸ Waiting'}
-            </div>
-
-            {/* Timestamp */}
+        {detailActivities.length > 0 && (
+          <div className="px-6 py-4 space-y-6 max-h-[calc(80vh-120px)] overflow-y-auto">
+            {/* Show timestamp once at top if all activities share same timestamp */}
             <div>
               <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                 Timestamp
               </div>
               <div className="text-sm font-mono">
-                {new Date(detailActivity.timestamp).toLocaleString('en-US', {
+                {new Date(detailActivities[0].timestamp).toLocaleString('en-US', {
                   dateStyle: 'medium',
                   timeStyle: 'medium'
                 })}
               </div>
             </div>
 
-            {/* Type-specific content */}
+            {/* Loop through all activities */}
+            {detailActivities.map((detailActivity, index) => (
+              <div key={detailActivity.id || index} className="pb-6 border-b last:border-b-0" style={{ borderColor: VIBE.hair }}>
+                {/* Activity Type Badge */}
+                <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold mb-4" style={{
+                  backgroundColor:
+                    detailActivity.type === 'trade_entry_long' ? '#16a34a' :
+                    detailActivity.type === 'trade_entry_short' ? '#dc2626' :
+                    detailActivity.type === 'market_query' ? VIBE.signal :
+                    detailActivity.type === 'analysis' ? VIBE.brass :
+                    detailActivity.type === 'agent_wait' ? VIBE.ivory : VIBE.brass,
+                  color: detailActivity.type === 'agent_wait' ? VIBE.obsidian : VIBE.ivory
+                }}>
+                  {detailActivity.type === 'trade_entry_long' && '↑ Long Entry'}
+                  {detailActivity.type === 'trade_entry_short' && '↓ Short Entry'}
+                  {detailActivity.type === 'market_query' && '📊 Market Query'}
+                  {detailActivity.type === 'analysis' && '💭 Agent Thought'}
+                  {detailActivity.type === 'agent_wait' && '⏸ Waiting'}
+                </div>
+
+                {/* Type-specific content */}
+                <div className="space-y-4">
 
             {/* TRADE ENTRY SPECIFIC FIELDS */}
             {(detailActivity.type === 'trade_entry_long' || detailActivity.type === 'trade_entry_short') ? (
@@ -842,12 +852,14 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                   Summary
                 </div>
-                <div className="text-sm leading-relaxed">
-                  {detailActivity.data.summary}
+                <div className="prose prose-invert prose-sm max-w-none" style={{ color: VIBE.ivory }}>
+                  <ReactMarkdown>{detailActivity.data.summary}</ReactMarkdown>
                 </div>
               </div>
             ) : null}
-
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </BottomSheet>
