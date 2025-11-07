@@ -11,11 +11,11 @@ export function middleware(request: NextRequest) {
 
     // Route root to the specific vibe trader's activity timeline
     if (pathname === '/') {
-      return NextResponse.rewrite(new URL(`/timeline-v2/${ASTER_VIBE_TRADER_CONFIG_ID}`, request.url))
+      return NextResponse.rewrite(new URL(`/view/${ASTER_VIBE_TRADER_CONFIG_ID}`, request.url))
     }
 
-    // Allow direct access to the timeline page
-    if (pathname.startsWith('/timeline-v2/')) {
+    // Allow direct access to the view page
+    if (pathname.startsWith('/view/')) {
       return NextResponse.next()
     }
 
