@@ -4,6 +4,36 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-07 - TradingView Activity Timeline with Live Agent Status
+
+**Consolidated Timeline System**: Replaced basic activity viewer with professional TradingView Lightweight Charts integration featuring live status indicators, activity markers, and comprehensive market data display.
+
+**Key Features**:
+- **TradingView Integration**: Financial-grade line chart showing P&L over time with 700+ data points
+- **Activity Markers**: Trade entries (green ↑/red ↓ arrows), market queries (blue ○), agent thoughts (brass ○), waits (ivory ○)
+- **Live Status**: Pulsing colored dot showing current agent activity with countdown timers for waits
+- **Market Data Display**: Bottom sheet showing preprocessed technical indicators (trend, patterns, levels) and market intelligence
+- **Grouped Activities**: Multiple activities at same timestamp consolidated into single marker with list view
+- **Interactive**: Click markers to view full details, hover for tooltips, markdown rendering for analysis
+
+**Backend Enhancements**:
+- **Enhanced Activity Logging**: Market queries now log full preprocessed data (200-500 analytical fields per query)
+- **Total Equity Calculation**: Fixed AsterDEX balance reporting (wallet + unrealized P&L instead of just available balance)
+- **Bug Fixes**: Agent crash on None result, activity logging UUID errors, position sizing accuracy
+
+**Technical Implementation**:
+- **Chart**: TradingView Lightweight Charts v4.2.0 with brass color scheme, $ formatting, no price line
+- **Markers**: Priority-based (trades > thoughts > queries > waits), sorted chronologically, size/color differentiated
+- **Bottom Sheet**: Framer Motion slide-up drawer with drag-to-dismiss, type-specific field rendering
+- **Status System**: Real-time updates every second, colored by activity type, countdown for agent waits
+- **Routing**: Consolidated `/timeline-v2/` → `/view/`, `aster.ggbots.ai` routes to new timeline
+
+**Files Changed**: 8 files (tv-timeline.tsx, bottom-sheet.tsx, middleware.ts, aster_service_v3.py, api/agent.py, mcp_server.py, run_agent.py, routing consolidation)
+
+**Impact**: Professional trading analytics experience, full transparency into agent decision-making process, competition-ready monitoring for AsterDEX trading.
+
+---
+
 ## 2025-11-06 - Brand Refresh: Ceremonial Brutalism Design System
 
 Complete platform rebrand to match trade37's ceremonial brutalism aesthetic. Replaced colorful multi-agent system with unified brass accent, upgraded to premium editorial fonts, and converted all 56 emojis to professional Lucide icons.

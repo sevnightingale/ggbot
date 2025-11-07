@@ -519,4 +519,347 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 
 ---
 
+## 📊 TradingView Activity Timeline (`/view/[config_id]`)
+
+### **Overview**
+
+The Activity Timeline provides professional-grade trading analytics using TradingView Lightweight Charts v4.2.0. It displays P&L evolution over time with interactive markers for all agent activities, live status indicators, and comprehensive market data insights.
+
+**Production URL**: `aster.ggbots.ai` → `/view/{config_id}`
+
+### **Architecture**
+
+```typescript
+/components/
+├── tv-timeline.tsx          # Main timeline component (870 lines)
+└── bottom-sheet.tsx         # Activity detail drawer (100 lines)
+
+/app/view/[config_id]/
+└── page.tsx                 # Route wrapper component
+```
+
+### **Key Features**
+
+#### **1. TradingView Chart Integration**
+- **Library**: TradingView Lightweight Charts v4.2.0 (NOT v5 - API breaking changes)
+- **Chart Type**: Line series with brass color (#C9A962), 2px stroke width
+- **Data**: P&L snapshots from trade closes + unrealized P&L carry-forward between activities
+- **Y-Axis**: Formatted with `$` symbol, automatic scaling
+- **X-Axis**: Time-based with automatic date formatting
+- **Interaction**: Crosshair mode with dashed brass lines (#C9A962)
+
+**Chart Configuration**:
+```typescript
+const chart = createChart(container, {
+  layout: {
+    background: { type: ColorType.Solid, color: '#1A1D23' }, // VIBE.carbon
+    textColor: '#3a3a3c', // VIBE.hair
+  },
+  rightPriceScale: { borderColor: '#3a3a3c' },
+  timeScale: { borderColor: '#3a3a3c', timeVisible: true, secondsVisible: false },
+  localization: {
+    priceFormatter: (price: number) => `$${price.toFixed(2)}`,
+  },
+  crosshair: {
+    mode: 1, // Magnet to data points
+    vertLine: { color: '#C9A962', width: 1, style: LineStyle.Dashed },
+    horzLine: { color: '#C9A962', width: 1, style: LineStyle.Dashed },
+  },
+})
+
+const lineSeries = chart.addLineSeries({
+  color: '#C9A962', // VIBE.brass
+  lineWidth: 2,
+  priceLineVisible: false, // Hide dashed price line
+})
+```
+
+#### **2. Activity Markers**
+
+**Marker Types** (sorted chronologically, grouped by timestamp):
+- **Trade Entries**:
+  - Long: Green arrow up (▲, #16a34a, belowBar, size: 2)
+  - Short: Red arrow down (▼, #dc2626, aboveBar, size: 2)
+- **Agent Thoughts**: Brass circles (●, rgba(193,168,125,0.6), aboveBar, size: 0.5)
+- **Market Queries**: Blue circles (●, rgba(60,166,224,0.5), belowBar, size: 0.5)
+- **Agent Waits**: Ivory circles (●, rgba(237,235,231,0.4), belowBar, size: 0.5)
+
+**Priority System**: When multiple activities occur at same timestamp, show single marker by priority:
+1. Trade entries (long/short)
+2. Agent thoughts
+3. Market queries
+4. Agent waits
+
+**Critical Implementation Detail**: Markers must be sorted by time in ascending order or they disappear on zoom:
+```typescript
+markers.sort((a, b) => (a.time as number) - (b.time as number))
+lineSeries.setMarkers(markers)
+```
+
+#### **3. Live Status Indicator**
+
+Replaces static "ARENA STATUS • DATE" line with real-time agent status.
+
+**Display Format**:
+```
+[Pulsing Dot] STATUS TEXT
+```
+
+**Status Types**:
+- `⏸ WAITING • Next check in 2m 15s` (ivory dot) - countdown to next check
+- `↑ LONG ENTERED • 3m ago` (green dot) - time since trade entry
+- `↓ SHORT ENTERED • 1m ago` (red dot) - time since trade entry
+- `📊 QUERIED MARKET • 5m ago` (blue dot) - time since query
+- `💭 ANALYZING • 30s ago` (brass dot) - time since thought
+
+**Implementation**:
+```typescript
+// Track latest activity
+const [latestActivity, setLatestActivity] = useState<Activity | null>(null)
+const [statusText, setStatusText] = useState<string>('')
+
+// Update every second
+useEffect(() => {
+  if (!latestActivity) return
+
+  const updateStatus = () => {
+    const now = new Date()
+    const activityTime = new Date(latestActivity.timestamp)
+
+    // For agent_wait, show countdown
+    if (latestActivity.type === 'agent_wait' && latestActivity.data.details?.next_check_at) {
+      const nextCheck = new Date(String(details.next_check_at))
+      const remainingMs = nextCheck.getTime() - now.getTime()
+      const mins = Math.floor(remainingMs / 60000)
+      const secs = Math.floor((remainingMs % 60000) / 1000)
+      setStatusText(`⏸ WAITING • Next check in ${mins}m ${secs}s`)
+    } else {
+      // For others, show time ago
+      const diffMs = now.getTime() - activityTime.getTime()
+      const diffMins = Math.floor(diffMs / 60000)
+      const diffSecs = Math.floor((diffMs % 60000) / 1000)
+      const timeAgo = diffMins > 0 ? `${diffMins}m ago` : `${diffSecs}s ago`
+      setStatusText(`${icon} ${label} • ${timeAgo}`)
+    }
+  }
+
+  updateStatus()
+  const interval = setInterval(updateStatus, 1000)
+  return () => clearInterval(interval)
+}, [latestActivity])
+```
+
+**CSS Animation**:
+```css
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(1.2); }
+}
+```
+
+#### **4. Interactive Hover Tooltips**
+
+**Crosshair Detection**: Using `subscribeCrosshairMove()` to detect when user hovers near markers:
+```typescript
+chart.subscribeCrosshairMove((param) => {
+  if (!param.time || !param.point) {
+    setSelectedActivity(null)
+    return
+  }
+
+  const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string)
+  const activities = activitiesMapRef.current.get(timestamp)
+
+  if (activities && activities.length > 0) {
+    setSelectedActivity(activities[0]) // Show first activity for tooltip
+    setCrosshairPosition({ x: param.point.x, y: param.point.y })
+  }
+})
+```
+
+**Tooltip Content** (positioned at crosshair):
+- Activity type badge with color
+- Summary text (truncated to 100 chars for market queries)
+- Symbol if available
+- Markdown rendering for analysis/thoughts
+
+#### **5. Bottom Sheet Detail View**
+
+**Trigger**: Click on any marker opens bottom sheet with full details.
+
+**Implementation**: Framer Motion slide-up drawer
+```typescript
+<BottomSheet
+  isOpen={detailActivities.length > 0}
+  onClose={() => setDetailActivities([])}
+  title={detailActivities.length === 1 ? 'Activity Type' : `${detailActivities.length} Activities`}
+>
+  {/* Scrollable content with type-specific rendering */}
+</BottomSheet>
+```
+
+**Features**:
+- Drag handle at top (swipe down to dismiss on mobile)
+- Max height: 80vh with overflow scroll
+- Multiple activities shown as list when grouped
+- Type-specific field rendering:
+  - **Trade entries**: Symbol, side, entry price, leverage, confidence, SL/TP
+  - **Market queries**: Timeframe, categories list, **preprocessed market data**
+  - **Agent thoughts**: Markdown-rendered thought content
+  - **Agent waits**: Wait duration, next check time, reason
+
+**Market Data Display** (NEW - 2025-11-07):
+
+Market queries now display the actual preprocessed data that agents receive:
+
+```typescript
+// Technical Indicators (brass boxes)
+{details.market_data.technicals?.indicators &&
+  Object.entries(indicators).map(([name, data]) => (
+    <div className="p-3 rounded-lg bg-brass-10">
+      <div className="font-semibold">{name}</div>
+      <div>Value: {data.current.value}</div>
+      <div>Trend: {data.context.trend.direction} ({data.context.trend.strength * 100}%)</div>
+      <div>Patterns: {Object.keys(data.patterns).map(p => <Badge>{p}</Badge>)}</div>
+    </div>
+  ))
+}
+
+// Market Intelligence (blue boxes)
+{details.market_data.market_intelligence &&
+  Object.entries(intelligence).map(([source, data]) => (
+    <div className="p-3 rounded-lg bg-signal-10">
+      <div className="font-semibold">{source.toUpperCase()}</div>
+      <pre>{JSON.stringify(data, null, 2)}</pre>
+    </div>
+  ))
+}
+```
+
+This shows the **200-500 analytical fields** (trend strength, divergence patterns, momentum velocity, etc.) that influence agent decisions.
+
+#### **6. Data Fetching & Management**
+
+**API Endpoints**:
+```typescript
+// Balance series (P&L snapshots at trade closes)
+GET /api/v2/activities/{config_id}/balance-series?mode=pnl
+
+// All activities (trades, queries, thoughts, waits)
+GET /api/v2/activities/{config_id}
+
+// Bot metadata (name, status)
+GET /api/v2/activities/{config_id}/metadata
+```
+
+**Data Transformation**:
+1. Fetch balance series (P&L snapshots)
+2. Fetch all activities (500+ items)
+3. Sort activities chronologically
+4. Merge with carry-forward P&L:
+   ```typescript
+   const chartPoints = []
+   let currentPnl = 0.0
+
+   for (const activity of sortedActivities) {
+     // Update P&L if this activity has a balance point
+     if (balanceMap.has(activity.timestamp)) {
+       currentPnl = balanceMap.get(activity.timestamp)
+     }
+
+     chartPoints.push({
+       time: timestamp,
+       value: currentPnl, // Carry forward P&L
+     })
+   }
+   ```
+
+**Activity Grouping** (by timestamp):
+```typescript
+const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map())
+
+// Group activities by timestamp
+const groupedByTimestamp = new Map<number, Activity[]>()
+activities.forEach(activity => {
+  const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000)
+  if (!groupedByTimestamp.has(timestamp)) {
+    groupedByTimestamp.set(timestamp, [])
+  }
+  groupedByTimestamp.get(timestamp).push(activity)
+})
+
+// Create one marker per timestamp
+groupedByTimestamp.forEach((activitiesAtTime, timestamp) => {
+  // Priority: trades > thoughts > queries > waits
+  const hasTradeLong = activitiesAtTime.some(a => a.type === 'trade_entry_long')
+  if (hasTradeLong) {
+    markers.push({ time: timestamp, shape: 'arrowUp', color: '#16a34a', size: 2 })
+  }
+  // ... etc
+})
+```
+
+### **Integration with Backend**
+
+#### **Enhanced Activity Logging** (2025-11-07)
+
+Market query activities now capture the full preprocessed data:
+
+**Backend** (`agent/mcp_server.py:220-234`):
+```python
+# Extract market data for activity logging
+market_data = {}
+if result.get('data', {}).get('technicals'):
+    market_data['technicals'] = result['data']['technicals']
+if result.get('data', {}).get('market_intelligence'):
+    market_data['market_intelligence'] = result['data']['market_intelligence']
+
+log_activity_safe(
+    config_id=agent_context.config_id,
+    user_id=agent_context.user_id,
+    activity_type='market_query',
+    details={
+        'symbol': symbol,
+        'categories': categories,
+        'timeframe': timeframe,
+        'market_data': market_data  # NEW: Full preprocessed data (200-500 fields)
+    },
+    related_symbol=symbol,
+)
+```
+
+This enables complete transparency into agent decision-making by showing the exact data that influenced each trade.
+
+### **Performance Considerations**
+
+1. **Chart Initialization**: Heavy operation, only run once in useEffect
+2. **Marker Updates**: Batch updates instead of individual calls
+3. **Activity Grouping**: Pre-compute timestamp → activities map
+4. **Memory**: Store only necessary data in refs, avoid duplicating chart data
+5. **Rendering**: Use React.memo for BottomSheet to prevent unnecessary re-renders
+
+### **Common Issues & Solutions**
+
+**Issue**: Markers disappear when zooming in
+**Solution**: Markers must be sorted by time in ascending order before calling `setMarkers()`
+
+**Issue**: TypeScript errors with conditional rendering
+**Solution**: Use ternary operators `? :` instead of `&&` for JSX conditionals to avoid `unknown` type
+
+**Issue**: Chart doesn't resize on window change
+**Solution**: Use ResizeObserver to detect container size changes and call `chart.applyOptions({ width, height })`
+
+**Issue**: Bottom sheet not scrollable
+**Solution**: Set `overflow-y-auto` on content div with max-height constraint
+
+### **Future Enhancements**
+
+- **Zoom to activity**: Double-click marker to zoom timeline to that time range
+- **Filter by type**: Toggle visibility of different activity markers
+- **Export data**: Download P&L chart as CSV or PNG
+- **Annotations**: Add manual notes/markers to timeline
+- **Comparison mode**: Overlay multiple bot timelines for performance comparison
+
+---
+
 **The Forge architecture represents a complete, production-ready autonomous trading platform with elegant local state management, comprehensive real-time features, and sophisticated permission-based monetization capabilities.** 🚀

@@ -89,6 +89,7 @@
 |---------|-----|--------|---------|
 | **V2 Orchestrator** | `https://ggbots-api.nightingale.business` | ✅ | Main backend API |
 | **Frontend** | `https://ggbot-app.vercel.app` | ✅ | Next.js application |
+| **Timeline Viewer** | `aster.ggbots.ai` | ✅ | Real-time activity timeline with TradingView charts |
 
 ### Core API Endpoints
 
@@ -138,6 +139,11 @@
 - `POST /api/v2/agent/trade-observations` - Record post-trade reflection
 - `POST /api/v2/agent/trade-observations/query` - Query past trade observations
 - `POST /api/v2/agent/query-market-data` - Query market data with category structure
+
+**Activity Timeline & Monitoring**
+- `GET /api/v2/activities/{config_id}` - Get all activities (trades, queries, thoughts, waits)
+- `GET /api/v2/activities/{config_id}/balance-series` - Get P&L snapshots for chart
+- `GET /api/v2/activities/{config_id}/metadata` - Get bot metadata (name, symbols, status)
 
 **User Management**
 - `GET /api/v2/user/profile` - User profile with subscription details

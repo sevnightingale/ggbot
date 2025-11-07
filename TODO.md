@@ -233,26 +233,6 @@
 
 ---
 
-## 📊 **Activity Timeline Integration** ✅ COMPLETE (2025-11-06)
-
-**Status**: Production-ready activity logging for all bot types (agents, scheduled, signal validation)
-**See**: [DOCS/todo/ACTIVITY_TIMELINE.md](DOCS/todo/ACTIVITY_TIMELINE.md) for full implementation details
-
-**Completed Features**:
-- ✅ Activities table with RLS, indexes, priority-based grouping
-- ✅ Activity logger helper with auto-logging from 11 agent MCP tools
-- ✅ 3 API endpoints (activities, balance-series, metadata)
-- ✅ Aster P&L integration (combines paper + live trades)
-- ✅ Frontend Activity Timeline with real data, 10s polling
-- ✅ UI polish (trade_win/loss icons, live status, responsive layout)
-
-**Optional Future Enhancements**:
-- Scheduled bot activity logging (orchestrator integration)
-- Trade lifecycle linking with click highlighting
-- "View Configuration" modal for competition
-- Active Positions section at bottom of timeline
-
----
 
 ## 🤖 **HIGH PRIORITY - Autonomous Trading Agent** [AGENT.md] ✅ OPERATIONAL
 
