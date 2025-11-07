@@ -40,7 +40,9 @@ logger.add(
     level="DEBUG",
     format="{time:YYYY-MM-DD HH:mm:ss.SSS} | {level: <8} | {name}:{function}:{line} - {message}",
     backtrace=True,
-    diagnose=True
+    diagnose=True,
+    enqueue=True,  # Thread-safe async logging
+    catch=True     # Catch exceptions in logging sink
 )
 
 from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ResultMessage
@@ -213,6 +215,23 @@ Be disciplined and execute the strategy faithfully.
         try:
             # Create MCP server
             mcp_server = create_mcp_server()
+
+            # LOG: Tool descriptions from MCP server
+            logger.info("=" * 80)
+            logger.info("📚 MCP TOOL DESCRIPTIONS BEING SENT TO AGENT:")
+            logger.info("=" * 80)
+
+            # Access the MCP server's tools to log their full descriptions
+            if hasattr(mcp_server, 'tools'):
+                tools_list = mcp_server.tools()
+                for tool in tools_list:
+                    logger.info(f"\n🔧 TOOL: {tool.name}")
+                    logger.info(f"   Description (first 500 chars):")
+                    logger.info(f"   {tool.description[:500] if tool.description else 'No description'}...")
+                    if len(tool.description or "") > 500:
+                        logger.debug(f"   Full description: {tool.description}")
+
+            logger.info("=" * 80)
 
             # Build system prompt and log it
             system_prompt = self._build_system_prompt()
@@ -540,47 +559,96 @@ Begin autonomous execution:
 Start now.
 """)
 
-        # Process indefinitely
-        async for message in client.receive_messages():
-            # Handle AssistantMessage (streaming responses with TextBlocks)
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock):
-                        # Log all agent activity
-                        logger.info(f"Agent: {block.text}")
+        # Process indefinitely with retry logic
+        max_retries = 10
+        retry_count = 0
+        base_delay = 5  # seconds
 
-                        # Save agent thoughts to activity timeline
-                        log_activity_safe(
-                            config_id=self.config_id,
-                            user_id=self.user_id,
-                            activity_type='analysis',
-                            activity_source='agent',
-                            summary=block.text[:200],  # Truncate for summary
-                            details={'thought': block.text}
-                        )
+        while True:  # Infinite retry loop for resilience
+            try:
+                async for message in client.receive_messages():
+                    # Reset retry counter on successful message
+                    retry_count = 0
 
-            # Handle ResultMessage (final consolidated response)
-            elif isinstance(message, ResultMessage):
-                logger.info(f"Agent: {message.result}")
+                    # Handle AssistantMessage (streaming responses with TextBlocks)
+                    if isinstance(message, AssistantMessage):
+                        for block in message.content:
+                            if isinstance(block, TextBlock):
+                                # Log all agent activity
+                                logger.info(f"Agent: {block.text}")
 
-                # Save agent thoughts to activity timeline (only if result is not None)
-                if message.result:
-                    log_activity_safe(
-                        config_id=self.config_id,
-                        user_id=self.user_id,
-                        activity_type='analysis',
-                        activity_source='agent',
-                        summary=message.result[:200],  # Truncate for summary
-                        details={'thought': message.result}
-                    )
-                else:
-                    logger.warning("Agent returned None result, skipping activity log")
+                                # Save agent thoughts to activity timeline
+                                log_activity_safe(
+                                    config_id=self.config_id,
+                                    user_id=self.user_id,
+                                    activity_type='analysis',
+                                    activity_source='agent',
+                                    summary=block.text[:200],  # Truncate for summary
+                                    details={'thought': block.text}
+                                )
 
-            # Check for compaction
-            if hasattr(message, 'type') and getattr(message, 'type', None) == 'system':
-                if hasattr(message, 'subtype') and getattr(message, 'subtype', None) == 'compact_boundary':
-                    logger.info("Context compaction occurred")
-                    # Phase 4: Inject fresh trading context here
+                    # Handle ResultMessage (final consolidated response)
+                    elif isinstance(message, ResultMessage):
+                        logger.info(f"Agent: {message.result}")
+
+                        # Save agent thoughts to activity timeline (only if result is not None)
+                        if message.result:
+                            log_activity_safe(
+                                config_id=self.config_id,
+                                user_id=self.user_id,
+                                activity_type='analysis',
+                                activity_source='agent',
+                                summary=message.result[:200],  # Truncate for summary
+                                details={'thought': message.result}
+                            )
+                        else:
+                            logger.warning("Agent returned None result, skipping activity log")
+
+                    # Check for compaction
+                    if hasattr(message, 'type') and getattr(message, 'type', None) == 'system':
+                        if hasattr(message, 'subtype') and getattr(message, 'subtype', None) == 'compact_boundary':
+                            logger.info("Context compaction occurred")
+                            # Phase 4: Inject fresh trading context here
+
+                # If we exit the async for loop normally (stream ended), log it and retry
+                logger.warning("Message stream ended unexpectedly, restarting agent loop...")
+                retry_count += 1
+                delay = min(base_delay * (2 ** retry_count), 300)  # Max 5 min backoff
+                logger.info(f"Retry {retry_count}/{max_retries} in {delay}s...")
+                await asyncio.sleep(delay)
+
+                # Restart the client query to resume autonomous mode
+                await client.query("Continue autonomous trading from where you left off.")
+
+            except KeyboardInterrupt:
+                logger.info("Agent stopped by user (KeyboardInterrupt)")
+                raise
+            except Exception as e:
+                retry_count += 1
+                logger.error(f"Agent loop error (retry {retry_count}/{max_retries}): {e}", exc_info=True)
+
+                if retry_count >= max_retries:
+                    logger.critical(f"Max retries ({max_retries}) exceeded, agent stopping")
+                    raise
+
+                # Exponential backoff: 5s, 10s, 20s, 40s, 80s, 160s, 300s (max)
+                delay = min(base_delay * (2 ** retry_count), 300)
+                logger.info(f"Retrying in {delay}s...")
+
+                # Log retry to activity timeline
+                log_activity_safe(
+                    config_id=self.config_id,
+                    user_id=self.user_id,
+                    activity_type='analysis',
+                    activity_source='agent',
+                    summary=f"Agent encountered error, retrying in {delay}s (attempt {retry_count}/{max_retries})",
+                    details={'error': str(e), 'retry_count': retry_count}
+                )
+
+                await asyncio.sleep(delay)
+
+                # Restart the client query to resume autonomous mode
+                await client.query("Continue autonomous trading. Check current positions and market state.")
 
 
 async def main():

@@ -98,14 +98,21 @@ TIMEFRAMES (for technical_analysis):
 Technical indicators support 7 timeframes: "5m", "15m", "30m", "1h", "4h", "1d", "1w"
 Default: "1h". Other categories use latest available data regardless of timeframe.
 
+GGSHOT SCAN MODE (NEW - for dynamic symbol discovery):
+To find which symbols have recent ggshot signals, omit the symbol parameter:
+{"categories": {"trading_signals": ["ggshot"]}, "scan_days": 2}
+Returns list of symbols with signals from last N days (AsterDEX-compatible only).
+Use this to discover active trading opportunities, then query full history for those symbols.
+
 EXAMPLES:
 {"symbol": "BTC", "categories": {"technical_analysis": ["RSI"]}}
 {"symbol": "BTC", "categories": {"technical_analysis": ["RSI", "MACD"]}, "timeframe": "15m"}
 {"symbol": "ETH", "categories": {"technical_analysis": ["Stochastic"], "sentiment_social": ["twitter_sentiment"]}, "timeframe": "4h"}
+{"categories": {"trading_signals": ["ggshot"]}, "scan_days": 2}  # Scan mode - find active symbols
 
 Symbol formats: "BTC", "BTCUSDT", "BTC/USDT" all work. Indicators are case-insensitive.
-Params: symbol (required), categories (dict), timeframe (optional, default '1h')""",
-    {"symbol": str, "categories": dict, "timeframe": str}
+Params: symbol (optional for scan mode), categories (dict), timeframe (optional, default '1h'), scan_days (optional, for ggshot scan mode)""",
+    {"symbol": str, "categories": dict, "timeframe": str, "scan_days": int}
 )
 async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -149,15 +156,126 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
         logger.debug(f"🔧 query_market_data CALLED")
         logger.debug(f"   Args received: {json.dumps(args, indent=2)}")
 
-        symbol = args["symbol"]
+        symbol = args.get("symbol")  # Optional now for scan mode
         categories_raw = args.get("categories", {})
         timeframe = args.get("timeframe", "1h")
+        scan_days = args.get("scan_days", 2)  # Default 2 days for scan mode
 
         # Handle JSON string if SDK serializes the dict
         if isinstance(categories_raw, str):
             categories = json.loads(categories_raw)
         else:
             categories = categories_raw
+
+        # SCAN MODE: No symbol provided + ggshot requested = find active symbols
+        if not symbol and "trading_signals" in categories and "ggshot" in categories.get("trading_signals", []):
+            logger.debug(f"   SCAN MODE: Finding symbols with ggshot signals from last {scan_days} days")
+
+            # Query database for recent ggshot signals
+            from core.common.db import get_db_connection
+            from core.symbols.standardizer import UniversalSymbolStandardizer
+            from core.config.repository import get_configuration
+
+            standardizer = UniversalSymbolStandardizer()
+            trading_signals_source_id = '556e0a48-8f57-4c46-a537-ad645ceb21b3'
+
+            # Get agent's trading mode from config_data (raw JSONB)
+            trading_mode = 'paper'  # default
+            with get_db_connection() as config_conn:
+                with config_conn.cursor() as config_cur:
+                    config_cur.execute("""
+                        SELECT config_data
+                        FROM configurations
+                        WHERE config_id = %s AND user_id = %s
+                    """, (agent_context.config_id, agent_context.user_id))
+
+                    config_row = config_cur.fetchone()
+                    if config_row and config_row[0]:
+                        trading_mode = config_row[0].get('trading_mode', 'paper')
+
+            logger.debug(f"   Trading mode: {trading_mode}")
+
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT DISTINCT symbol, COUNT(*) as signal_count, MAX(updated_at) as last_signal
+                        FROM market_data
+                        WHERE data_source = %s
+                        AND updated_at >= NOW() - INTERVAL '%s days'
+                        AND data_points->'ggshot_signal'->>'direction' IS NOT NULL
+                        GROUP BY symbol
+                        ORDER BY last_signal DESC
+                    """, (trading_signals_source_id, scan_days))
+
+                    results = cur.fetchall()
+
+                    # Filter based on trading mode
+                    active_symbols = []
+                    for row in results:
+                        db_symbol = row[0]  # e.g., "BTC/USDT"
+
+                        # Apply filter based on trading mode
+                        is_compatible = False
+                        if trading_mode == 'aster':
+                            is_compatible = standardizer.is_aster_compatible(db_symbol, format_type="ccxt")
+                        elif trading_mode == 'symphony':
+                            is_compatible = standardizer.is_symphony_compatible(db_symbol, format_type="ccxt")
+                        else:  # paper mode - all symbols supported
+                            is_compatible = True
+
+                        if is_compatible:
+                            active_symbols.append({
+                                "symbol": db_symbol,
+                                "signal_count": row[1],
+                                "last_signal": str(row[2])
+                            })
+
+                    # Dynamic response based on trading mode
+                    mode_label = {
+                        'aster': 'AsterDEX-compatible',
+                        'symphony': 'Symphony-compatible',
+                        'paper': 'available'
+                    }.get(trading_mode, 'available')
+
+                    response_text = f"🔍 Active Trading Symbols (Last {scan_days} Days)\n\n"
+                    response_text += f"Trading Mode: {trading_mode.upper()}\n"
+                    response_text += f"Found {len(active_symbols)} {mode_label} symbols with recent ggshot signals:\n\n"
+
+                    for s in active_symbols:
+                        response_text += f"• {s['symbol']}: {s['signal_count']} signals, last at {s['last_signal']}\n"
+
+                    response_text += f"\nNext step: Query full ggshot history for these symbols to see all timeframes and signals."
+
+                    # Log activity
+                    log_activity_safe(
+                        config_id=agent_context.config_id,
+                        user_id=agent_context.user_id,
+                        activity_type='market_query',
+                        activity_source='agent_tool',
+                        summary=f"Scanned ggshot signals: {len(active_symbols)} active symbols",
+                        details={
+                            'scan_mode': True,
+                            'scan_days': scan_days,
+                            'active_symbols': [s['symbol'] for s in active_symbols]
+                        },
+                        importance=6
+                    )
+
+                    return {
+                        "content": [{
+                            "type": "text",
+                            "text": response_text
+                        }]
+                    }
+
+        # Validate symbol is provided for non-scan mode
+        if not symbol:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": "❌ Symbol required for market data query. Use scan mode (omit symbol + request ggshot) to find active symbols first."
+                }]
+            }
 
         # Validate category names
         VALID_CATEGORIES = {

@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-06 09:44:49 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-07 08:08:39 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -27,8 +27,8 @@
   - Total P&L: $-16,000.65
 - **Recent Activity**:
   - Last 24 hours: 0 trades
-  - Last 7 days: 490 trades
-  - Last 30 days: 4125 trades
+  - Last 7 days: 223 trades
+  - Last 30 days: 4090 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -49,7 +49,7 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 24 decisions (avg confidence: 15.0%)
+- **wait**: 24 decisions (avg confidence: 21.9%)
 
 ### System Health
 - **Decisions (last hour)**: 1
@@ -61,23 +61,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 27MB | 1d 0h | 38 |
-| x-bot | 🟢 online | 0% | 26MB | 1d 0h | 38 |
-| error-alerts | 🟢 online | 0% | 21MB | 1d 0h | 45 |
-| market-data-ws | 🟢 online | 1.3% | 138MB | 1d 0h | 40 |
-| ggbot | 🟢 online | 2% | 252MB | 23h 42m | 104 |
-| agent-bb2560fd-b053-464f-8a58-8e254e4d36fa | 🟢 online | 0% | 64MB | 17h 38m | 14 |
-| agent-60256e2c-11c3-4802-aec1-36d1387ce76b | 🟢 online | 0% | 64MB | 20h 38m | 0 |
+| signal-listener | 🟢 online | 0% | 16MB | 19h 21m | 39 |
+| x-bot | 🟢 online | 0% | 9MB | 19h 21m | 39 |
+| error-alerts | 🟢 online | 0% | 19MB | 19h 21m | 46 |
+| market-data-ws | 🟢 online | 2.3% | 117MB | 19h 21m | 41 |
+| ggbot | 🟢 online | 0.7% | 255MB | 10h 3m | 106 |
+| agent-bb2560fd-b053-464f-8a58-8e254e4d36fa | 🟢 online | 0% | 65MB | 2h 29m | 1 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (46%)
-- **Memory**: 2.2Gi / 3.8Gi
-- **CPU Load**: 0.24 / 0.12 / 0.03 (1m/5m/15m)
+- **Memory**: 2.0Gi / 3.8Gi
+- **CPU Load**: 0.56 / 0.34 / 0.19 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 13.16M)
+- **Redis**: 🟢 connected (Memory: 12.90M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -348,7 +347,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-06 09:44:50 UTC
+**Last Updated**: 2025-11-07 08:08:40 UTC
 
 ---
 
@@ -1075,7 +1074,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-06 09:44:50 UTC
+**Last Updated**: 2025-11-07 08:08:40 UTC
 
 ---
 

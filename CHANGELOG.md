@@ -4,6 +4,17 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-07 - Agent Strategy v4: Dynamic Symbol Discovery
+
+- **Agent**: Hardcoded 7 pairs → dynamic discovery via ggshot scan (last 2 days), auto-filtered to Aster/Symphony/Paper compatibility
+- **MCP Tool**: query_market_data scan mode returns active symbols when omitting symbol param, reads trading_mode from config_data
+- **Bug Fixes**: Anthropic 500 retry logic + exponential backoff, trade_observation 422 Dict[str,Any], AsterDEX balance (all stablecoins)
+- **Strategy**: Leverage 5-20x, check freq 15-60m/5-30m, position close discretion, SL/TP from current price emphasis
+- **Files**: agent/mcp_server.py (scan mode), agent/run_agent.py (retry+logging), api/agent.py (balance+422 fix)
+- **Docs**: DOCS/completed/strategy-v4-dynamic-symbol-discovery.md
+
+---
+
 ## 2025-11-07 - TradingView Activity Timeline with Live Agent Status
 
 **Consolidated Timeline System**: Replaced basic activity viewer with professional TradingView Lightweight Charts integration featuring live status indicators, activity markers, and comprehensive market data display.
