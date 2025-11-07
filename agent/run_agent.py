@@ -563,15 +563,18 @@ Start now.
             elif isinstance(message, ResultMessage):
                 logger.info(f"Agent: {message.result}")
 
-                # Save agent thoughts to activity timeline
-                log_activity_safe(
-                    config_id=self.config_id,
-                    user_id=self.user_id,
-                    activity_type='analysis',
-                    activity_source='agent',
-                    summary=message.result[:200],  # Truncate for summary
-                    details={'thought': message.result}
-                )
+                # Save agent thoughts to activity timeline (only if result is not None)
+                if message.result:
+                    log_activity_safe(
+                        config_id=self.config_id,
+                        user_id=self.user_id,
+                        activity_type='analysis',
+                        activity_source='agent',
+                        summary=message.result[:200],  # Truncate for summary
+                        details={'thought': message.result}
+                    )
+                else:
+                    logger.warning("Agent returned None result, skipping activity log")
 
             # Check for compaction
             if hasattr(message, 'type') and getattr(message, 'type', None) == 'system':
