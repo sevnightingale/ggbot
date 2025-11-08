@@ -160,8 +160,6 @@ function BotRow({
     'Autonomous trading'
   const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
   const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
-  const balance = account?.current_balance ?? 10000
-  const balanceText = `$${balance.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   const isLive = bot.trading_mode === 'live'
   const isAster = bot.trading_mode === 'aster'
 
@@ -199,17 +197,14 @@ function BotRow({
           <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
             {configType === 'Signal validation' ? 'Signal' : configType === 'Agent strategy' ? 'Agent' : 'Auto'}
           </span>
-          {isLive ? (
+          {isLive && (
             <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-xs font-semibold text-red-500">
               SYMPHONY
             </span>
-          ) : isAster ? (
+          )}
+          {isAster && (
             <span className="rounded-full bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 text-xs font-semibold text-purple-500">
               ASTERDEX
-            </span>
-          ) : (
-            <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
-              {balanceText}
             </span>
           )}
         </div>

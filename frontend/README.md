@@ -141,6 +141,154 @@ const updateEditingConfig = (updates: Partial<ConfigData>) => {
 
 ---
 
+## 📐 Forge Page Layout Architecture
+
+### **Container Hierarchy**
+
+```
+<div className="min-h-screen bg-[var(--bg-primary)]">
+  <Header />  // Fixed height: ~64px
+
+  {/* 12-column grid container */}
+  <div className="grid max-w-7xl grid-cols-12 gap-4 px-4 py-4 min-h-[calc(100vh-64px)]">
+
+    {/* BotRail - LEFT COLUMN (25% width on desktop) */}
+    <BotRail className="col-span-12 hidden md:col-span-3 md:block" />
+
+    {/* Main Content - RIGHT COLUMN (75% width on desktop) */}
+    <main className="col-span-12 md:col-span-9 flex flex-col pb-16 md:pb-0">
+      <ActivationBar />        // Height: ~80-120px (dynamic based on status)
+      <TabNavigation />        // Height: ~48px
+
+      {/* Tab Content Area */}
+      <div className="flex-1 mt-4 pb-32">
+        {activeTab === 'monitor' ? (
+          <div className="space-y-4">
+            <TVTimeline variant="embedded" />  // Height: 600px fixed
+            <PositionsTable />                 // Height: Variable (auto)
+          </div>
+        ) : (
+          <ConfigureLayout />  // Height: Variable (scrollable)
+        )}
+      </div>
+    </main>
+  </div>
+
+  <MobileNav className="md:hidden" />  // Fixed at bottom on mobile
+</div>
+```
+
+### **Width & Spacing Constraints**
+
+```typescript
+// Container widths
+max-w-7xl          // 1280px maximum container width
+px-4               // 16px horizontal padding (mobile)
+gap-4              // 16px grid gap between columns
+
+// Column distribution (desktop)
+BotRail:    col-span-3 (3/12 = 25%)  // ~320px @ 1280px container
+Main:       col-span-9 (9/12 = 75%)  // ~960px @ 1280px container
+
+// Timeline in main content
+- Full width of main column: 960px available
+- Embedded height: 600px fixed
+- Enough space for readable TradingView chart
+```
+
+### **Height Constraints**
+
+```typescript
+// Viewport calculations
+min-h-screen                     // 100vh (full viewport)
+Header:                          // ~64px
+Grid container:                  // min-h-[calc(100vh-64px)]
+
+// Main content area
+pb-32                            // 128px bottom padding (for readability)
+Available for content:           // ~calc(100vh - 64px - 128px - 48px)
+                                 // = ~calc(100vh - 240px) accounting for tabs
+
+// Component heights
+ActivationBar:      ~80-120px (dynamic)
+TabNavigation:      ~48px
+TVTimeline:         600px (embedded mode)
+PositionsTable:     Variable (auto, based on open positions)
+```
+
+### **Responsive Breakpoints**
+
+```typescript
+// Tailwind breakpoints
+sm:   640px   // Small devices
+md:   768px   // Tablets (BotRail shows, grid activates)
+lg:   1024px  // Desktops
+xl:   1280px  // Large desktops
+2xl:  1536px  // Extra large
+
+// Layout behavior by breakpoint
+Mobile (<md):
+  - BotRail: hidden (shows as bottom drawer via MobileNav)
+  - Main: col-span-12 (100% width)
+  - Grid: Single column, vertical stacking
+  - Timeline: 600px height maintained, responsive width
+
+Tablet (md):
+  - BotRail: col-span-3 (25%, shows sidebar)
+  - Main: col-span-9 (75%)
+  - Grid: 12-column activated
+  - Timeline: 600px height, ~75% container width
+
+Desktop (lg+):
+  - Same as tablet
+  - More horizontal space for chart readability
+  - Timeline benefits from wider viewport
+```
+
+### **Component Spacing Pattern**
+
+```typescript
+// Vertical rhythm
+space-y-4          // 16px vertical gap between major sections (Timeline, Positions)
+mt-4               // 16px margin-top for tab content
+pb-32              // 128px bottom padding for scroll-past readability
+
+// Example: Monitor tab vertical spacing
+<div className="space-y-4">
+  <TVTimeline />     // 600px height
+  {/* 16px gap */}
+  <PositionsTable /> // Variable height
+  {/* 128px bottom padding for scrolling past */}
+</div>
+```
+
+### **Why pb-32 Bottom Padding?**
+
+The 128px (`pb-32`) bottom padding on the main content area is intentional for **readability**:
+- Allows users to scroll content past the viewport bottom
+- Prevents PositionsTable from being cut off at screen edge
+- Provides comfortable reading position for bottom content
+- Mobile nav drawer (fixed position) doesn't overlap content
+
+### **Mobile-Specific Behavior**
+
+```typescript
+// Mobile navigation drawer
+<MobileNav className="md:hidden" />  // Only visible on mobile
+- Fixed at bottom of viewport
+- 70% width slide-in drawer for bot switching
+- Touch gestures for closing (swipe right)
+- Bottom tab triggers for opening
+
+// Main content on mobile
+- Full width (100%)
+- Vertical stacking of all components
+- Timeline maintains 600px height
+- Responsive KPI grid (2 cols → 3 cols → 5 cols based on width)
+```
+
+---
+
 ## 🔐 Permission System & Monetization
 
 ### **Subscription Tier Architecture**
@@ -442,6 +590,7 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 **Overall Rating**: 🟢 Production-ready with clean Forge architecture
 
 **Recent Fixes Applied:**
+- ✅ **Activity Timeline Integration** (2025-11-08): Replaced DecisionFeed + PerformanceChart with full-width TVTimeline in Monitor tab
 - ✅ **Critical routing fix**: Updated middleware to redirect `app.ggbots.ai` to `/forge` instead of non-existent `/dashboard`
 - ✅ **Legacy API cleanup**: Removed duplicate API client, single authenticated client architecture
 - ✅ **Complete component cleanup**: All unused legacy components archived to `/archive/frontend-*`
@@ -521,23 +670,32 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 
 ---
 
-## 📊 TradingView Activity Timeline (`/view/[config_id]`)
+## 📊 TradingView Activity Timeline
 
 ### **Overview**
 
 The Activity Timeline provides professional-grade trading analytics using TradingView Lightweight Charts v4.2.0. It displays P&L evolution over time with interactive markers for all agent activities, live status indicators, and comprehensive market data insights.
 
-**Production URL**: `aster.ggbots.ai` → `/view/{config_id}`
+**Dual-Mode Component**:
+- **Standalone**: `aster.ggbots.ai` → `/view/{config_id}` (full viewport, 100vh - 280px)
+- **Embedded**: `/forge` Monitor tab (fixed 600px height, full width)
+
+**Integration** (2025-11-08): Timeline replaced DecisionFeed + PerformanceChart in Forge Monitor tab, consolidating KPIs, P&L chart, and activity history into single comprehensive view.
 
 ### **Architecture**
 
 ```typescript
 /components/
 ├── tv-timeline.tsx          # Main timeline component (870 lines)
+│                            # - variant prop: 'standalone' | 'embedded'
+│                            # - Self-contained: own data fetching, polling
 └── bottom-sheet.tsx         # Activity detail drawer (100 lines)
 
-/app/view/[config_id]/
-└── page.tsx                 # Route wrapper component
+/app/view/[config_id]/       # Standalone route
+└── page.tsx                 # <TVTimeline variant="standalone" />
+
+/app/forge/page.tsx          # Embedded in Monitor tab
+└── Monitor tab              # <TVTimeline variant="embedded" />
 ```
 
 ### **Key Features**
