@@ -7,23 +7,10 @@ import { BotManagementMenu } from './BotManagementMenu'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 
-interface Account {
-  config_id: string
-  account_id: string
-  current_balance: number
-  total_pnl: number
-  total_trades: number
-  win_trades: number
-  loss_trades: number
-  open_positions: number
-  updated_at: string
-}
-
 interface BotRailProps {
   bots: BotConfiguration[]
   selectedId: string | null
   onSelect: (configId: string) => void
-  accounts?: Account[]
   onCreateNew?: () => void
   isCreatingNew?: boolean
   onRename?: (configId: string, newName: string) => void
@@ -38,7 +25,6 @@ export function BotRail({
   bots,
   selectedId,
   onSelect,
-  accounts = [],
   onCreateNew,
   isCreatingNew = false,
   onRename,
@@ -106,7 +92,6 @@ export function BotRail({
               <BotRow
                 key={bot.config_id}
                 bot={bot}
-                account={accounts.find(acc => acc.config_id === bot.config_id)}
                 isSelected={bot.config_id === selectedId}
                 onClick={() => onSelect(bot.config_id)}
                 onRename={onRename}
@@ -131,7 +116,6 @@ export function BotRail({
 
 interface BotRowProps {
   bot: BotConfiguration
-  account?: Account
   isSelected: boolean
   onClick: () => void
   onRename?: (configId: string, newName: string) => void
@@ -143,7 +127,6 @@ interface BotRowProps {
 
 function BotRow({
   bot,
-  account,
   isSelected,
   onClick,
   onRename,

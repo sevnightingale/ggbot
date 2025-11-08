@@ -5,35 +5,12 @@ import { Bot, X } from 'lucide-react'
 import { BotRail } from './BotRail'
 import { BotConfiguration } from '@/lib/api'
 
-interface Account {
-  config_id: string
-  account_id: string
-  current_balance: number
-  total_pnl: number
-  total_trades: number
-  win_trades: number
-  loss_trades: number
-  open_positions: number
-  updated_at: string
-  unrealized_pnl?: number
-  current_pnl?: number  // Aggregate unrealized P&L of open positions
-  portfolio_return_pct?: number  // Total P&L as % of initial balance
-  total_balance?: number
-  win_rate?: number
-  avg_win?: number
-  avg_loss?: number
-  largest_win?: number
-  largest_loss?: number
-  sharpe_ratio?: number
-}
-
 interface MobileNavProps {
   className?: string
   // Bot rail props that need to be passed through
   bots: BotConfiguration[]
   selectedId: string | null
   onSelect: (configId: string) => void
-  accounts: Account[]
   onCreateNew: () => void
   isCreatingNew: boolean
   onRename: (configId: string, newName: string) => void
@@ -47,7 +24,6 @@ export function MobileNav({
   bots,
   selectedId,
   onSelect,
-  accounts,
   onCreateNew,
   isCreatingNew,
   onRename,
@@ -103,7 +79,6 @@ export function MobileNav({
                   onSelect(configId)
                   setIsDrawerOpen(false) // Close drawer after selection
                 }}
-                accounts={accounts}
                 onCreateNew={onCreateNew}
                 isCreatingNew={isCreatingNew}
                 onRename={onRename}

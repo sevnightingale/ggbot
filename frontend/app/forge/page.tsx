@@ -45,28 +45,6 @@ function ForgeApp() {
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [dataSources, setDataSources] = useState<DataSource[]>([])
-  const [accounts, setAccounts] = useState<Array<{
-    config_id: string
-    account_id: string
-    current_balance: number
-    total_pnl: number
-    total_trades: number
-    win_trades: number
-    loss_trades: number
-    open_positions: number
-    updated_at: string
-    // Enhanced portfolio analytics from SSE
-    unrealized_pnl?: number
-    current_pnl?: number  // Aggregate unrealized P&L of open positions
-    portfolio_return_pct?: number
-    total_balance?: number
-    win_rate?: number
-    avg_win?: number
-    avg_loss?: number
-    largest_win?: number
-    largest_loss?: number
-    sharpe_ratio?: number
-  }>>([])
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [isManualTriggering, setIsManualTriggering] = useState(false)
@@ -428,11 +406,6 @@ function ForgeApp() {
             if (data.positions) {
               const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === currentSelectedId)
               setPositions(myPositions)
-            }
-
-            // Update accounts data
-            if (data.accounts) {
-              setAccounts(data.accounts)
             }
 
           } catch (error) {
@@ -1340,7 +1313,6 @@ function ForgeApp() {
             bots={allBots}
             selectedId={selectedConfigId}
             onSelect={handleBotSelection}
-            accounts={accounts}
             onCreateNew={() => setBotCreationModalOpen(true)}
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
@@ -1440,7 +1412,6 @@ function ForgeApp() {
         bots={allBots}
         selectedId={selectedConfigId}
         onSelect={handleBotSelection}
-        accounts={accounts}
         onCreateNew={() => setBotCreationModalOpen(true)}
         isCreatingNew={isCreatingNew}
         onRename={handleRenameBot}
