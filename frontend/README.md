@@ -51,8 +51,6 @@ Legacy/Archive (Moved to /archive/):
 │
 ├── monitor/                 # Real-time operational dashboard
 │   ├── ActivationBar.tsx   # Bot status/control with agent pipeline visualization
-│   ├── MetricsBar.tsx      # Portfolio KPIs (balance, P&L, win rate, positions)
-│   ├── DecisionFeed.tsx    # AI decision carousel with reasoning expansion
 │   └── PositionsTable.tsx  # Live trading positions with real-time P&L
 │
 ├── configure/               # Bot configuration system
@@ -69,6 +67,8 @@ Legacy/Archive (Moved to /archive/):
     └── LoadingSkeleton.tsx # Loading placeholders
 
 /components/                 # Global components
+├── tv-timeline.tsx         # TradingView activity timeline with P&L chart, markers, live status
+├── bottom-sheet.tsx        # Framer Motion slide-up drawer for activity details
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
 ├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
 ├── UpgradeModal.tsx        # Stripe checkout modal with monthly/annual pricing toggle
@@ -111,7 +111,6 @@ eventSource.onmessage = (event) => {
   // Filter for currently selected bot
   if (data.config_id === selectedConfigIdRef.current) {
     setPositions(data.positions)
-    setDecisions(data.decisions)
     setAccounts(data.accounts)
     setExecutionStatus(data.execution_status)
   }
@@ -360,10 +359,13 @@ import { Bot, Settings, BarChart3 } from 'lucide-react'
 - **Trading Settings**: Symbol selection (141 pairs), position sizing, risk management, Telegram integration
 
 ### **Real-time Monitoring**
-- **Live Positions**: Real-time P&L updates with color-coded performance
-- **AI Decisions**: Decision carousel with expandable reasoning and confidence scores
-- **Portfolio Metrics**: Balance, daily P&L, win rate, and position tracking
-- **Execution Pipeline**: Visual extraction → decision → trading status tracking
+- **Activity Timeline**: TradingView Lightweight Charts integration with P&L evolution, interactive activity markers, and live status indicators
+- **Timeline Features**: Trade entries (↑↓ arrows), market queries (○), agent thoughts (○), wait periods (○) with click-to-expand details
+- **Live Status**: Pulsing colored dot showing current agent state with countdown timers ("⏸ WAITING • Next check in 2m 15s")
+- **KPI Header**: Real-time Balance, P&L, Trades, Win Rate metrics integrated into timeline view
+- **Bottom Sheet**: Framer Motion drawer with comprehensive activity details, preprocessed market data, and markdown-rendered analysis
+- **Live Positions**: Real-time P&L updates with color-coded performance in positions table
+- **Execution Pipeline**: Visual extraction → decision → trading status tracking in activation bar
 
 ### **Trading Settings Validation**
 ```typescript
