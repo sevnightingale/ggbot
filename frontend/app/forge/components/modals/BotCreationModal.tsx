@@ -134,7 +134,7 @@ export function BotCreationModal({
       Icon: Rocket,
       label: 'Symphony Live',
       description: 'Real trades via Symphony.io',
-      color: '#ef4444', // red-500
+      color: 'var(--signal)', // signal blue
       available: hasLiveTrading,
       tier: 'Pro',
       requiresConnection: true,
@@ -145,7 +145,7 @@ export function BotCreationModal({
       Icon: Bot,
       label: 'AsterDEX',
       description: 'Real trades on AsterDEX',
-      color: '#9333ea', // purple-600
+      color: 'var(--ember)', // ember red
       available: hasLiveTrading,
       tier: 'Pro',
       requiresConnection: true,
@@ -200,7 +200,7 @@ export function BotCreationModal({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Create New Bot</DialogTitle>
           <DialogDescription>

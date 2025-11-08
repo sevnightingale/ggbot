@@ -181,12 +181,30 @@ function BotRow({
             {configType === 'Signal validation' ? 'Signal' : configType === 'Agent strategy' ? 'Agent' : 'Auto'}
           </span>
           {isLive && (
-            <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-xs font-semibold text-red-500">
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-semibold"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--signal) 10%, transparent)',
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: 'color-mix(in srgb, var(--signal) 30%, transparent)',
+                color: 'var(--signal)'
+              }}
+            >
               SYMPHONY
             </span>
           )}
           {isAster && (
-            <span className="rounded-full bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 text-xs font-semibold text-purple-500">
+            <span
+              className="rounded-full px-2 py-0.5 text-xs font-semibold"
+              style={{
+                backgroundColor: 'color-mix(in srgb, var(--ember) 10%, transparent)',
+                borderWidth: '1px',
+                borderStyle: 'solid',
+                borderColor: 'color-mix(in srgb, var(--ember) 30%, transparent)',
+                color: 'var(--ember)'
+              }}
+            >
               ASTERDEX
             </span>
           )}
