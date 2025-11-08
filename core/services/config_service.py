@@ -182,25 +182,26 @@ class ConfigService:
         self,
         user_id: str,
         config_name: str,
-        config_data: Dict[str, Any]
+        config_data: Dict[str, Any],
+        trading_mode: str = "paper",
+        symphony_agent_id: Optional[str] = None
     ) -> Optional[BotConfigV2]:
         """
         Create a new bot configuration for user.
-        
+
         Args:
             user_id: User ID from auth
             config_name: User-friendly name for the configuration
             config_data: Configuration dictionary
-            
+            trading_mode: Trading mode ('paper', 'live', 'aster')
+            symphony_agent_id: Symphony agent ID (required for live trading)
+
         Returns:
             BotConfigV2 instance if successful, None otherwise
         """
         try:
             config_id = str(uuid.uuid4())
-
-            # Determine trading mode based on config type
             config_type = config_data.get("config_type", "autonomous_trading")
-            trading_mode = "aster" if config_type == "agent" else "paper"
 
             # Create config object
             config = BotConfigV2(
@@ -218,31 +219,32 @@ class ConfigService:
                 telegram_integration=config_data.get("telegram_integration", {}),
                 trading_mode=trading_mode
             )
-            
+
             # Validate configuration
             errors = config.validate()
             if errors:
                 self._log.error(f"Configuration validation failed: {errors}")
                 return None
-            
+
             # Store in database
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
                         INSERT INTO configurations
-                        (config_id, user_id, config_type, config_name, config_data, trading_mode, created_at, updated_at)
-                        VALUES (%s, %s, %s, %s, %s, %s, NOW(), NOW())
+                        (config_id, user_id, config_type, config_name, config_data, trading_mode, symphony_agent_id, created_at, updated_at)
+                        VALUES (%s, %s, %s, %s, %s, %s, %s, NOW(), NOW())
                     """, (
                         config_id,
                         user_id,
                         config.config_type,  # Use actual config_type from BotConfigV2
                         config_name,
                         json.dumps(config.to_jsonb()),
-                        config.trading_mode
+                        config.trading_mode,
+                        symphony_agent_id
                     ))
                 conn.commit()
-            
-            self._log.info(f"Created config {config_id} for user {user_id}")
+
+            self._log.info(f"Created {trading_mode} config {config_id} for user {user_id}")
             return config
             
         except Exception as e:
@@ -298,6 +300,7 @@ class ConfigService:
                             "schema_version": inner_config.get("schema_version", "2.1"),
                             "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                             "telegram_integration": inner_config.get("telegram_integration", {}),
+                            "agent_strategy": inner_config.get("agent_strategy"),  # Include agent strategy
                             "trading_mode": trading_mode,
                             "symphony_agent_id": symphony_agent_id,
                             "created_at": result[1].isoformat() if result[1] else None,
@@ -370,6 +373,7 @@ class ConfigService:
                                 "schema_version": inner_config.get("schema_version", "2.1"),
                                 "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                                 "telegram_integration": inner_config.get("telegram_integration", {}),
+                                "agent_strategy": inner_config.get("agent_strategy"),  # Include agent strategy
                                 "state": state or "inactive",
                                 "trading_mode": trading_mode or "paper",
                                 "symphony_agent_id": symphony_agent_id,
@@ -441,6 +445,7 @@ class ConfigService:
                 schema_version=config_data.get("schema_version", existing_config.schema_version),
                 llm_config=config_data.get("llm_config", existing_config.llm_config),
                 telegram_integration=config_data.get("telegram_integration", existing_config.telegram_integration),
+                agent_strategy=config_data.get("agent_strategy", existing_config.agent_strategy),  # Include agent strategy
                 trading_mode=existing_config.trading_mode,  # Preserve trading mode (paper vs live)
                 symphony_agent_id=existing_config.symphony_agent_id,  # Preserve Symphony agent ID
                 created_at=existing_config.created_at,

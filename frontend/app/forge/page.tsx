@@ -11,14 +11,10 @@ import { TabNavigation } from './components/layout/TabNavigation'
 import { MobileNav } from './components/layout/MobileNav'
 import { EmptyState } from './components/shared/EmptyState'
 import { ActivationBar } from './components/monitor/ActivationBar'
-// import { MetricsBar } from './components/monitor/MetricsBar' // Replaced with PerformanceChart
-import { PerformanceChart } from './components/monitor/PerformanceChart'
-import { DecisionFeed } from './components/monitor/DecisionFeed'
 import { PositionsTable } from './components/monitor/PositionsTable'
-import { TradeHistoryModal } from './components/monitor/TradeHistoryModal'
+import TVTimeline from '@/components/tv-timeline'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { AgentConfigurator } from './components/configure/AgentConfigurator'
-import { DuplicateAsLiveModal } from '@/components/DuplicateAsLiveModal'
 import { BotCreationModal } from './components/modals/BotCreationModal'
 import { Wrench } from 'lucide-react'
 
@@ -35,16 +31,6 @@ interface Position {
   leverage: number
 }
 
-interface Decision {
-  decision_id: string
-  symbol: string
-  action: string
-  confidence: number
-  reasoning: string
-  created_at: string
-}
-
-
 function ForgeApp() {
   const [user, setUser] = useState<{ id: string } | null>(null)
   const [loading, setLoading] = useState(true)
@@ -58,7 +44,6 @@ function ForgeApp() {
   const [allBots, setAllBots] = useState<BotConfiguration[]>([])
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
-  const [decisions, setDecisions] = useState<Decision[]>([])
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [accounts, setAccounts] = useState<Array<{
     config_id: string
@@ -87,10 +72,7 @@ function ForgeApp() {
   const [isManualTriggering, setIsManualTriggering] = useState(false)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
-  const [isTradeHistoryModalOpen, setIsTradeHistoryModalOpen] = useState(false)
-  const [duplicateAsLiveModalOpen, setDuplicateAsLiveModalOpen] = useState(false)
   const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
-  const [sourceBotForLive, setSourceBotForLive] = useState<BotConfiguration | null>(null)
 
   // Use ref to track selectedConfigId for SSE filtering without causing reconnections
   const selectedConfigIdRef = useRef(selectedConfigId)
@@ -101,13 +83,7 @@ function ForgeApp() {
     ? allBots.find(bot => bot.config_id === selectedConfigId) || null
     : null
 
-  // Get account data for selected bot
-  const selectedAccount = selectedBot
-    ? accounts.find(account => account.config_id === selectedBot.config_id) || null
-    : null
 
-
-  
   // Real-time status tracking
   const [executionStatus, setExecutionStatus] = useState<'idle' | 'extraction' | 'decision' | 'trading'>('idle')
   const [statusMessage, setStatusMessage] = useState<string>('')
@@ -135,7 +111,10 @@ function ForgeApp() {
   }>>([])
   const [agentInputValue, setAgentInputValue] = useState('')
   const [isWaitingForAgent, setIsWaitingForAgent] = useState(false)
-  const [showConfirmButton, setShowConfirmButton] = useState(false)
+  const [agentStarted, setAgentStarted] = useState(false)
+
+  // Debounce timer for auto-save
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Start editing mode when configure tab is activated
   useEffect(() => {
@@ -160,7 +139,6 @@ function ForgeApp() {
     if (selectedConfigId && selectedBot) {
       // Clear operational data that should be bot-specific
       setPositions([])
-      setDecisions([])
       setExecutionStatus('idle')
       setStatusMessage('')
       setCountdown('')
@@ -191,13 +169,18 @@ function ForgeApp() {
   }
 
   // Create default bot with RSI strategy using proper API client
-  const createDefaultBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading'): Promise<BotConfiguration> => {
+  const createDefaultBot = async (
+    botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading',
+    tradingMode: 'paper' | 'symphony' | 'aster' = 'paper',
+    symphonyAgentId?: string
+  ): Promise<BotConfiguration> => {
     // Base config for all types
     const baseConfig = {
       schema_version: '2.1',
       config_type: botType,
+      trading_mode: tradingMode,
+      symphony_agent_id: symphonyAgentId,
       trading: {
-        execution_mode: 'paper',
         leverage: 1,
         position_sizing: {
           method: 'fixed_usd',
@@ -221,8 +204,7 @@ function ForgeApp() {
       const agentConfig = {
         ...baseConfig,
         trading: {
-          ...baseConfig.trading,
-          execution_mode: 'aster'  // Agents use Aster DEX for live trading
+          ...baseConfig.trading
         },
         decision: {
           analysis_frequency: 'agent_driven'
@@ -264,7 +246,6 @@ function ForgeApp() {
         use_own_key: false
       },
       trading: {
-        execution_mode: 'paper',
         leverage: 1,
         position_sizing: {
           method: 'fixed_usd',
@@ -424,18 +405,29 @@ function ForgeApp() {
                 setNextRun(null)
                 setCountdown('Waiting for next run...')
               }
+
+              // Update agent strategy if changed (for real-time collaborative editing)
+              if (myBot?.config_data?.agent_strategy && editingConfigData) {
+                const newStrategyContent = myBot.config_data.agent_strategy.content
+                const currentStrategyContent = editingConfigData.agent_strategy?.content
+
+                if (newStrategyContent !== currentStrategyContent) {
+                  console.log('📝 Agent strategy updated via SSE')
+                  setEditingConfigData(prev => {
+                    if (!prev) return null
+                    return {
+                      ...prev,
+                      agent_strategy: myBot.config_data.agent_strategy
+                    }
+                  })
+                }
+              }
             }
 
             // Update live positions with P&L
             if (data.positions) {
               const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === currentSelectedId)
               setPositions(myPositions)
-            }
-
-            // Update recent decisions
-            if (data.decisions) {
-              const myDecisions = data.decisions.filter((d: { config_id: string }) => d.config_id === currentSelectedId)
-              setDecisions(myDecisions.slice(0, 10)) // Keep last 10
             }
 
             // Update accounts data
@@ -864,21 +856,26 @@ function ForgeApp() {
   }
 
   // Handler function for creating new bot
-  const handleCreateNewBot = async (botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading') => {
+  const handleCreateNewBot = async (
+    botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading',
+    tradingMode: 'paper' | 'symphony' | 'aster' = 'paper',
+    symphonyAgentId?: string
+  ) => {
     setIsCreatingNew(true)
 
     try {
-      // Generate a unique name for the new bot based on type
+      // Generate a unique name for the new bot based on type and mode
       const botCount = allBots.length + 1
       const typeNames = {
         scheduled_trading: 'ggbot',
         signal_validation: 'signal validator',
         agent: 'agent'
       }
-      const newBotName = `${typeNames[botType]} ${botCount}`
+      const modeLabel = tradingMode === 'symphony' ? ' (Symphony)' : tradingMode === 'aster' ? ' (Aster)' : ''
+      const newBotName = `${typeNames[botType]} ${botCount}${modeLabel}`
 
-      // Create new bot with specified type
-      const newBot = await createDefaultBot(botType)
+      // Create new bot with specified type and trading mode
+      const newBot = await createDefaultBot(botType, tradingMode, symphonyAgentId)
 
       // Update name to be more descriptive
       const updatedBot = await apiClient.updateConfig(newBot.config_id, {}, newBotName)
@@ -962,21 +959,6 @@ function ForgeApp() {
     } finally {
       setIsBotAction(false)
     }
-  }
-
-  // Handler function for duplicating bot as live
-  const handleDuplicateAsLive = (configId: string) => {
-    const sourceBot = allBots.find(bot => bot.config_id === configId)
-    if (sourceBot) {
-      setSourceBotForLive(sourceBot)
-      setDuplicateAsLiveModalOpen(true)
-    }
-  }
-
-  // Handler for when live bot is successfully created
-  const handleLiveBotCreated = async () => {
-    // Refresh bot list to show new live bot
-    await refreshBotList()
   }
 
   // Handler function for deleting bot
@@ -1069,155 +1051,94 @@ function ForgeApp() {
     }
   }
 
-  // Handler for starting strategy discussion
-  const handleStartStrategyDiscussion = async () => {
-    console.log('🎯 handleStartStrategyDiscussion called')
-    console.log('🎯 selectedConfigId:', selectedConfigId)
-    console.log('🎯 user?.id:', user?.id)
+  // Handler for strategy content changes (with debounced auto-save)
+  const handleStrategyChange = async (newContent: string) => {
+    if (!selectedConfigId) return
 
-    if (!selectedConfigId || !user?.id) {
-      console.error('❌ Early return: missing selectedConfigId or user.id')
-      return
+    // Update local editing state immediately for responsive UI
+    setEditingConfigData(prev => {
+      if (!prev) return null
+      return {
+        ...prev,
+        agent_strategy: {
+          content: newContent,
+          autonomously_editable: prev.agent_strategy?.autonomously_editable ?? false,
+          version: prev.agent_strategy?.version ?? 1,
+          last_updated_at: prev.agent_strategy?.last_updated_at ?? new Date().toISOString(),
+          last_updated_by: prev.agent_strategy?.last_updated_by ?? 'user',
+          performance_log: prev.agent_strategy?.performance_log ?? []
+        }
+      }
+    })
+
+    // Clear existing timer
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
     }
+
+    // Set new timer for auto-save (1 second debounce)
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        console.log('💾 Auto-saving strategy...')
+        await apiClient.updateConfig(selectedConfigId, {
+          agent_strategy: {
+            content: newContent
+          }
+        })
+        console.log('✅ Strategy auto-saved')
+      } catch (error) {
+        console.error('❌ Failed to auto-save strategy:', error)
+      }
+    }, 1000)
+  }
+
+  // Handler for starting strategy builder agent
+  const handleStartStrategyBuilder = async () => {
+    if (!selectedConfigId) return
 
     try {
       const token = await getAuthToken()
-      console.log('🎯 Got auth token:', token ? 'yes' : 'no')
 
-      // Check agent status first
-      const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status`, {
+      // Start agent in strategy_definition mode
+      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition`, {
+        method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`
         }
       })
 
-      if (!statusResponse.ok) {
-        console.error('Failed to check agent status')
-        return
+      if (!response.ok) {
+        throw new Error('Failed to start strategy builder')
       }
 
-      const statusData = await statusResponse.json()
-      console.log('🎯 Agent status:', statusData.status)
+      setAgentStarted(true)
+      console.log('✅ Strategy builder started')
 
-      // Start agent in strategy_definition mode if not running
-      if (statusData.status === 'inactive' || statusData.status === 'stopped') {
-        console.log('🤖 Agent is stopped, starting in strategy_definition mode...')
+      // Send initial greeting if no existing strategy
+      const currentStrategy = editingConfigData?.agent_strategy?.content
+      const greetingMessage = currentStrategy
+        ? `Here is my current strategy:\n\n${currentStrategy}\n\nI'd like to refine or update it. What improvements would you suggest?`
+        : "Hi! I'm ready to build a trading strategy. What do you recommend based on the available data sources?"
 
-        const startResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition`, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-
-        if (!startResponse.ok) {
-          console.error('Failed to start agent')
-          return
-        }
-
-        console.log('✅ Agent started successfully')
-        // Wait a moment for agent to initialize
-        await new Promise(resolve => setTimeout(resolve, 2000))
-      } else {
-        console.log('✅ Agent is already running')
-      }
-
-      // Send context message if there's an existing strategy
-      if (editingConfigData?.agent_strategy?.content) {
-        console.log('📤 Sending existing strategy as context...')
-
-        const contextMessage = `Here is my current strategy:\n\n${editingConfigData.agent_strategy.content}\n\nI'd like to refine or update it. What improvements would you suggest?`
-
-        const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ message: contextMessage })
-        })
-
-        console.log('📤 Message sent, status:', messageResponse.status)
-
-        // Add user message to display
-        setAgentMessages(prev => {
-          const updated = [...prev, {
-            role: 'user' as const,
-            content: contextMessage,
-            timestamp: new Date().toISOString()
-          }]
-          console.log('📤 Updated agentMessages:', updated.length, 'messages')
-          return updated
-        })
-
-        setIsWaitingForAgent(true)
-        console.log('📤 UI state updated, waiting for agent response...')
-      } else {
-        // No existing strategy - send greeting to start conversation
-        console.log('📤 No existing strategy, sending initial greeting...')
-
-        const greetingMessage = "Hi! I'm ready to build a trading strategy. What do you recommend based on the available data sources?"
-
-        const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`
-          },
-          body: JSON.stringify({ message: greetingMessage })
-        })
-
-        console.log('📤 Greeting sent, status:', messageResponse.status)
-
-        // Add user message to display
-        setAgentMessages([{
-          role: 'user' as const,
-          content: greetingMessage,
-          timestamp: new Date().toISOString()
-        }])
-
-        setIsWaitingForAgent(true)
-      }
-    } catch (error) {
-      console.error('Error starting strategy discussion:', error)
-    }
-  }
-
-  // Handler for confirming strategy
-  const handleConfirmStrategy = async (autonomouslyEditable: boolean) => {
-    if (!selectedConfigId) return
-
-    try {
-      // Send confirmation with autonomously_editable setting as JSON
-      const token = await getAuthToken()
-      const confirmationData = {
-        confirm: true,
-        autonomously_editable: autonomouslyEditable
-      }
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
+      const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ message: JSON.stringify(confirmationData) })  // Stringify once for the message field
+        body: JSON.stringify({ message: greetingMessage })
       })
 
-      if (!response.ok) {
-        throw new Error('Failed to confirm strategy')
+      if (messageResponse.ok) {
+        setAgentMessages([{
+          role: 'user' as const,
+          content: greetingMessage,
+          timestamp: new Date().toISOString()
+        }])
+        setIsWaitingForAgent(true)
       }
-
-      setShowConfirmButton(false)
-      console.log('✅ Strategy confirmed')
-
-      // Refresh the bot config to get updated strategy
-      setTimeout(async () => {
-        const refreshedBots = await apiClient.listConfigs()
-        setAllBots(refreshedBots)
-      }, 2000)
     } catch (error) {
-      console.error('❌ Failed to confirm strategy:', error)
+      console.error('❌ Failed to start strategy builder:', error)
     }
   }
 
@@ -1308,9 +1229,10 @@ function ForgeApp() {
           setIsWaitingForAgent(false)
 
           // Check for confirmation button flag
-          if (data.show_confirm_button) {
-            setShowConfirmButton(true)
-          }
+          // TODO: Re-enable when showConfirmButton state is added
+          // if (data.show_confirm_button) {
+          //   setShowConfirmButton(true)
+          // }
         }
       } catch (error) {
         console.error('❌ Poll agent response failed:', error)
@@ -1423,7 +1345,6 @@ function ForgeApp() {
             isCreatingNew={isCreatingNew}
             onRename={handleRenameBot}
             onDuplicate={handleDuplicateBot}
-            onDuplicateAsLive={handleDuplicateAsLive}
             onDelete={handleDeleteBot}
             onResetAccount={handleResetAccount}
             isBotAction={isBotAction}
@@ -1457,27 +1378,12 @@ function ForgeApp() {
               {selectedBot ? (
                 activeTab === 'monitor' ? (
                   <div className="space-y-4">
-                    {/* Top Row: DecisionFeed + PerformanceChart side-by-side */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                      {/* DecisionFeed - Decision carousel */}
-                      <DecisionFeed
-                        decisions={decisions}
-                      />
-
-                      {/* PerformanceChart - Equity curve with trade markers */}
-                      <PerformanceChart
-                        account={selectedAccount}
-                        configId={selectedConfigId ?? ''}
-                      />
-
-                      {/* Old MetricsBar - Keeping code for reference
-                      <MetricsBar
-                        account={selectedAccount}
-                        positions={positions}
-                        onTotalTradesClick={() => setIsTradeHistoryModalOpen(true)}
-                      />
-                      */}
-                    </div>
+                    {/* Activity Timeline - Full Width */}
+                    <TVTimeline
+                      configId={selectedConfigId || ''}
+                      title={selectedBot.config_name}
+                      variant="embedded"
+                    />
 
                     {/* PositionsTable - Active trades (full width) */}
                     <PositionsTable
@@ -1490,80 +1396,18 @@ function ForgeApp() {
                     />
                   </div>
                 ) : editingTableFields?.config_type === 'agent' ? (
-                  // Agent mode: State machine based on strategy existence and agent activity
-                  <div className="space-y-4">
-                    {/* State 1-3: Show button + optional strategy display */}
-                    {agentMessages.length === 0 ? (
-                      <div className="flex flex-col items-center justify-center rounded-xl border border-[var(--border)] bg-[var(--bg-secondary)] p-12">
-                        {/* Show existing strategy if available */}
-                        {editingConfigData?.agent_strategy ? (
-                          <div className="w-full max-w-3xl space-y-6">
-                            {/* Strategy Display */}
-                            <div className="rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] p-6">
-                              <h3 className="text-lg font-medium text-[var(--text-primary)] mb-3 flex items-center gap-2">
-                                <span>📋</span>
-                                <span>Current Strategy</span>
-                              </h3>
-                              <div className="prose prose-sm dark:prose-invert max-w-none">
-                                <div className="whitespace-pre-wrap text-[var(--text-secondary)]">
-                                  {editingConfigData.agent_strategy.content}
-                                </div>
-                              </div>
-                              <div className="mt-4 pt-4 border-t border-[var(--border)] text-xs text-[var(--text-muted)] space-y-1">
-                                <div>Version: {editingConfigData.agent_strategy.version || 1}</div>
-                                <div>Autonomously editable: {editingConfigData.agent_strategy.autonomously_editable ? 'Yes' : 'No'}</div>
-                              </div>
-                            </div>
-
-                            {/* Start Discussion Button */}
-                            <button
-                              onClick={handleStartStrategyDiscussion}
-                              disabled={selectedBot?.state === 'active'}
-                              className={`w-full py-4 rounded-lg font-medium transition-colors ${
-                                selectedBot?.state === 'active'
-                                  ? 'bg-gray-400 cursor-not-allowed opacity-60'
-                                  : 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                              }`}
-                              title={selectedBot?.state === 'active' ? 'Deactivate bot first to edit strategy' : 'Start conversation to refine strategy'}
-                            >
-                              {selectedBot?.state === 'active' ? '🔒 Bot Active - Deactivate to Edit' : '💬 Refine Strategy'}
-                            </button>
-                          </div>
-                        ) : (
-                          // No strategy yet
-                          <div className="text-center space-y-6">
-                            <div className="text-6xl">🤖</div>
-                            <div>
-                              <h3 className="text-xl font-medium text-[var(--text-primary)] mb-2">
-                                Define Your Trading Strategy
-                              </h3>
-                              <p className="text-sm text-[var(--text-muted)] max-w-md">
-                                Start a conversation with your AI agent to build a custom trading strategy
-                              </p>
-                            </div>
-                            <button
-                              onClick={handleStartStrategyDiscussion}
-                              className="px-6 py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium transition-colors"
-                            >
-                              Start Strategy Discussion
-                            </button>
-                          </div>
-                        )}
-                      </div>
-                    ) : (
-                      // State 4: Agent is running - show chat interface
-                      <AgentConfigurator
-                        messages={agentMessages}
-                        inputValue={agentInputValue}
-                        isWaiting={isWaitingForAgent}
-                        showConfirmButton={showConfirmButton}
-                        currentStrategy={null}
-                        onSendMessage={handleSendAgentMessage}
-                        onConfirmStrategy={handleConfirmStrategy}
-                        onInputChange={setAgentInputValue}
-                      />
-                    )}
-                  </div>
+                  // Agent mode: Always show 2-column collaborative editor
+                  <AgentConfigurator
+                    messages={agentMessages}
+                    inputValue={agentInputValue}
+                    isWaiting={isWaitingForAgent}
+                    strategyContent={editingConfigData?.agent_strategy?.content || ''}
+                    onSendMessage={handleSendAgentMessage}
+                    onInputChange={setAgentInputValue}
+                    onStrategyChange={handleStrategyChange}
+                    onStartAgent={handleStartStrategyBuilder}
+                    agentStarted={agentStarted}
+                  />
                 ) : (
                   // Normal mode: Show regular config tabs
                   <ConfigureLayout
@@ -1603,25 +1447,6 @@ function ForgeApp() {
         onDuplicate={handleDuplicateBot}
         onDelete={handleDeleteBot}
         isBotAction={isBotAction}
-      />
-
-      {/* Trade History Modal */}
-      {selectedBot && selectedAccount && (
-        <TradeHistoryModal
-          configId={selectedBot.config_id}
-          isOpen={isTradeHistoryModalOpen}
-          onClose={() => setIsTradeHistoryModalOpen(false)}
-          totalTrades={selectedAccount.total_trades || 0}
-          winRate={selectedAccount.win_rate || 0}
-        />
-      )}
-
-      {/* Duplicate as Live Modal */}
-      <DuplicateAsLiveModal
-        open={duplicateAsLiveModalOpen}
-        onOpenChange={setDuplicateAsLiveModalOpen}
-        sourceBot={sourceBotForLive}
-        onSuccess={handleLiveBotCreated}
       />
 
       {/* Bot Creation Modal */}

@@ -370,6 +370,173 @@ class VaultManager:
             logger.bind(user_id=user_id).error(f"Failed to delete Symphony credential: {e}")
             return False
 
+    @staticmethod
+    async def store_aster_credential(
+        user_id: str,
+        user_wallet: str,
+        aster_wallet: str,
+        private_key: str
+    ) -> bool:
+        """
+        Store AsterDEX credentials in Vault and wallet addresses in user_profiles.
+
+        Note: Requires database migration to add columns:
+        - aster_vault_id UUID (nullable)
+        - aster_user_wallet VARCHAR(42) (nullable)
+        - aster_wallet VARCHAR(42) (nullable)
+
+        Args:
+            user_id: UUID of the user
+            user_wallet: User's Ethereum wallet address (0x...)
+            aster_wallet: AsterDEX wallet address (0x...)
+            private_key: AsterDEX wallet private key to encrypt and store
+
+        Returns:
+            True if stored successfully, False otherwise
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Create unique vault secret name for Aster private key
+                    vault_secret_name = f"aster_{user_id}".replace("-", "_")
+
+                    # Store private key in Vault (returns vault secret ID)
+                    cur.execute(
+                        "SELECT vault.create_secret(%s, %s) as secret_id;",
+                        (private_key, vault_secret_name)
+                    )
+                    vault_secret_id = cur.fetchone()[0]
+
+                    # Update user_profiles with vault reference and wallet addresses
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET aster_vault_id = %s,
+                            aster_user_wallet = %s,
+                            aster_wallet = %s,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                    """, (vault_secret_id, user_wallet, aster_wallet, user_id))
+
+                    if cur.rowcount == 0:
+                        logger.bind(user_id=user_id).error("User profile not found")
+                        return False
+
+                    conn.commit()
+
+                    logger.bind(user_id=user_id).info(
+                        "Stored AsterDEX credentials securely"
+                    )
+                    return True
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to store Aster credential: {e}")
+            return False
+
+    @staticmethod
+    async def get_aster_credential(user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Retrieve AsterDEX credentials from Vault.
+
+        Args:
+            user_id: UUID of the user
+
+        Returns:
+            Dict with 'user_wallet', 'aster_wallet', and 'private_key', or None if not found
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Get vault secret ID and wallet addresses from user_profiles
+                    cur.execute("""
+                        SELECT aster_vault_id, aster_user_wallet, aster_wallet
+                        FROM user_profiles
+                        WHERE user_id = %s;
+                    """, (user_id,))
+
+                    result = cur.fetchone()
+                    if not result or not result[0]:
+                        return None
+
+                    vault_secret_id, user_wallet, aster_wallet = result
+
+                    # Retrieve decrypted private key from Vault
+                    cur.execute("""
+                        SELECT decrypted_secret
+                        FROM vault.decrypted_secrets
+                        WHERE id = %s;
+                    """, (vault_secret_id,))
+
+                    vault_result = cur.fetchone()
+                    if not vault_result:
+                        logger.bind(user_id=user_id).error(
+                            "Vault secret not found for Aster credential"
+                        )
+                        return None
+
+                    private_key = vault_result[0]
+                    return {
+                        'user_wallet': user_wallet,
+                        'aster_wallet': aster_wallet,
+                        'private_key': private_key
+                    }
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to retrieve Aster credential: {e}")
+            return None
+
+    @staticmethod
+    async def delete_aster_credential(user_id: str) -> bool:
+        """
+        Delete AsterDEX credentials and disable aster trading for all user's bots.
+
+        Sets aster_vault_id = NULL and updates all configurations to paper mode.
+        This ensures no aster trading can occur without valid credentials.
+
+        Args:
+            user_id: UUID of the user
+
+        Returns:
+            True if deleted successfully, False otherwise
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Clear Aster credentials from user_profiles
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET aster_vault_id = NULL,
+                            aster_user_wallet = NULL,
+                            aster_wallet = NULL,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                    """, (user_id,))
+
+                    if cur.rowcount == 0:
+                        logger.bind(user_id=user_id).warning("User profile not found")
+                        return False
+
+                    # Disable aster trading on all user's bots
+                    cur.execute("""
+                        UPDATE configurations
+                        SET trading_mode = 'paper',
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                        AND trading_mode = 'aster'
+                    """, (user_id,))
+
+                    disabled_bots = cur.rowcount
+
+                    conn.commit()
+
+                    logger.bind(user_id=user_id).info(
+                        f"Deleted Aster credentials and disabled {disabled_bots} aster bot(s)"
+                    )
+                    return True
+
+        except Exception as e:
+            logger.bind(user_id=user_id).error(f"Failed to delete Aster credential: {e}")
+            return False
+
 
 # Convenience functions for common operations
 async def store_credential(user_id: str, name: str, provider: str, api_key: str) -> Optional[str]:
@@ -399,3 +566,15 @@ async def get_symphony_credential(user_id: str) -> Optional[Dict[str, Any]]:
 async def delete_symphony_credential(user_id: str) -> bool:
     """Delete Symphony credential. Convenience wrapper."""
     return await VaultManager.delete_symphony_credential(user_id)
+
+async def store_aster_credential(user_id: str, user_wallet: str, aster_wallet: str, private_key: str) -> bool:
+    """Store AsterDEX credential. Convenience wrapper."""
+    return await VaultManager.store_aster_credential(user_id, user_wallet, aster_wallet, private_key)
+
+async def get_aster_credential(user_id: str) -> Optional[Dict[str, Any]]:
+    """Get AsterDEX credential. Convenience wrapper."""
+    return await VaultManager.get_aster_credential(user_id)
+
+async def delete_aster_credential(user_id: str) -> bool:
+    """Delete AsterDEX credential. Convenience wrapper."""
+    return await VaultManager.delete_aster_credential(user_id)

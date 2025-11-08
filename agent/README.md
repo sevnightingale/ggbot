@@ -1,15 +1,15 @@
 # Autonomous Trading Agent
 
-**Status**: Phase 3 Complete - Production Ready for Paper & Aster Trading
-**Last Updated**: 2025-11-06
+**Status**: Phase 3 Complete - Production Ready with Session Persistence
+**Last Updated**: 2025-11-08
 
 ---
 
 ## 🎯 Overview
 
-The ggbots autonomous trading agent enables 24/7 AI-powered trading with full control over strategy execution, position management, and self-directed timing. Built on Claude Agent SDK with 12 specialized MCP tools.
+The ggbots autonomous trading agent enables 24/7 AI-powered trading with full control over strategy execution, position management, and self-directed timing. Built on Claude Agent SDK with 12 specialized MCP tools and **conversation persistence** across crashes and restarts.
 
-**Architecture**: Two-mode system (Strategy Definition → Autonomous Trading)
+**Architecture**: Two-mode system (Strategy Definition → Autonomous Trading) with SDK-powered session resumption
 
 **Current Support**:
 - ✅ **Paper Trading** - 142 symbols, full simulation with $10k accounts
@@ -347,7 +347,64 @@ Save strategy and exit strategy definition mode.
 - Agent controls timing (no scheduled runs)
 - Full position lifecycle management
 - Automatic activity logging to timeline
-- Compaction-aware (context refreshes at 95% token usage)
+- **Session persistence** - survives crashes, restarts, and compaction with full memory intact
+- Health monitoring via periodic heartbeat updates
+
+---
+
+## 🔄 Session Persistence & Recovery
+
+**Problem Solved**: Agents now remember their conversation history across crashes and restarts.
+
+### How It Works
+
+**Session Storage** (`agent_sessions` table):
+- Stores Claude SDK `session_id` for each bot
+- Tracks `last_active_at` for health monitoring
+- Updates every 10 messages as heartbeat
+
+**First Run**:
+1. Agent starts, no session exists
+2. SDK creates new session
+3. Agent captures `session_id` from init message
+4. Saves to database
+
+**After Restart/Crash**:
+1. Agent loads `session_id` from database
+2. Passes to SDK via `ClaudeAgentOptions(resume=session_id)`
+3. SDK automatically restores full conversation history
+4. Agent continues from where it left off (not cold start!)
+
+**After Auto-Compaction**:
+- SDK compacts context at 95% token usage (summarizes old messages)
+- Compacted state persists in session
+- If agent crashes after compaction, resume loads compacted state
+- Agent retains summarized context instead of complete amnesia
+
+**Benefits**:
+- ✅ Full conversation memory across restarts
+- ✅ No more "amnesiac agent" problem
+- ✅ Resilient to PM2 restarts and crashes
+- ✅ Compaction doesn't erase history
+- ✅ Continuous learning from past analysis
+
+**Database Schema**:
+```sql
+CREATE TABLE agent_sessions (
+    config_id UUID PRIMARY KEY,
+    session_id VARCHAR(255) NOT NULL,  -- SDK session ID
+    last_active_at TIMESTAMP,          -- Health monitoring
+    created_at TIMESTAMP,
+    updated_at TIMESTAMP
+);
+```
+
+**Health Monitoring**:
+- Agent updates `last_active_at` every 10 messages
+- Can detect hung agents (no activity >30 minutes)
+- Foundation for future auto-restart systems
+
+**Documentation**: See `DOCS/completed/agent-session-resumption-implementation.md` for complete implementation details and testing instructions.
 
 ---
 
@@ -839,13 +896,17 @@ python agent/run_agent.py --config-id=<symphony-config> --mode=autonomous
 
 ---
 
-## 🎯 Current Limitations
+## 🎯 Current Limitations & Known Issues
 
 1. **Single Agent Per Bot**: Multi-agent support (closure pattern) planned for Phase 4
-2. **Symphony Integration**: Pending API fixes (balance endpoint)
-3. **Compaction Context**: Manual injection not yet implemented (SDK auto-compacts)
-4. **Frontend Integration**: Agent chat UI pending (Redis queues work via CLI)
-5. **PM2 Management**: Manual start/stop (API endpoints planned)
+2. **Symphony Integration**: Pending API fixes (balance endpoint) - see Symphony section for details
+3. **Session Longevity**: Unknown if sessions expire after extended periods (needs testing)
+4. **Frontend Integration**: Agent chat UI complete, but strategy builder UX pending refinement
+
+**Fixed in 2025-11-08**:
+- ✅ **Session Persistence**: Agents now survive crashes/restarts with full memory (was: context loss on restart)
+- ✅ **AsterDEX UUID Bug**: Trade close events now log correctly (was: invalid UUID errors)
+- ✅ **Compaction Recovery**: SDK handles compaction gracefully with session resumption (was: manual context injection)
 
 ---
 

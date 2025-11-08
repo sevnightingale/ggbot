@@ -107,6 +107,16 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         FROM live_trades lt
         INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
         WHERE lt.closed_at IS NULL AND bc.trading_mode = 'live'
+
+        UNION ALL
+
+        -- Aster trading positions (batch_ids only - details fetched from AsterDEX)
+        SELECT lt.config_id, lt.batch_id::text AS position_id, NULL AS symbol, NULL AS side, NULL AS size_usd,
+               NULL AS entry_price, NULL AS current_price, NULL AS unrealized_pnl, lt.created_at AS opened_at,
+               NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'aster' AS source
+        FROM live_trades lt
+        INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
+        WHERE lt.closed_at IS NULL AND bc.trading_mode = 'aster'
         ORDER BY opened_at DESC
     ),
     recent_decisions AS (
@@ -149,7 +159,8 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                     'decision', bc.config_data->'decision',
                     'trading', bc.config_data->'trading',
                     'llm_config', bc.config_data->'llm_config',
-                    'telegram_integration', bc.config_data->'telegram_integration'
+                    'telegram_integration', bc.config_data->'telegram_integration',
+                    'agent_strategy', bc.config_data->'agent_strategy'
                 ),
                 'created_at', bc.created_at,
                 'updated_at', bc.updated_at
@@ -280,23 +291,27 @@ async def _enrich_live_positions_and_accounts(
     accounts: List[Dict[str, Any]]
 ) -> tuple:
     """
-    Fetch Symphony data for live bots and merge with SSE response.
+    Fetch Symphony and AsterDEX data for live/aster bots and merge with SSE response.
 
     Args:
         bots: List of bot configurations
-        positions: List of positions from database (may include live batch_ids)
+        positions: List of positions from database (may include live/aster batch_ids)
         accounts: List of accounts from database (paper only)
 
     Returns:
         tuple: (enriched_positions, enriched_accounts)
     """
     from trading.live.symphony_service import SymphonyLiveTradingService
+    from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
 
     symphony = SymphonyLiveTradingService()
+    aster = AsterDEXV3LiveTradingService()
 
-    # Filter for live bots only
+    # Filter for live and aster bots
     live_bots = [b for b in bots if b.get('trading_mode') == 'live']
-    if not live_bots:
+    aster_bots = [b for b in bots if b.get('trading_mode') == 'aster']
+
+    if not live_bots and not aster_bots:
         return positions, accounts
 
     enriched_positions = list(positions)
@@ -357,8 +372,49 @@ async def _enrich_live_positions_and_accounts(
             elif isinstance(positions_result, Exception):
                 logger.warning(f"Failed to fetch Symphony positions for {config_id}: {positions_result}")
 
+        # Fetch AsterDEX data for aster bots (similar pattern)
+        aster_tasks = []
+        for bot in aster_bots:
+            config_id = bot['config_id']
+            # Aster service doesn't have account_metrics yet, so just fetch positions
+            aster_tasks.append(aster.get_open_positions(config_id))
+
+        if aster_tasks:
+            aster_results = await asyncio.gather(*aster_tasks, return_exceptions=True)
+
+            for i, bot in enumerate(aster_bots):
+                config_id = bot['config_id']
+                positions_result = aster_results[i]
+
+                if isinstance(positions_result, list):
+                    # Remove placeholder aster positions from DB
+                    enriched_positions = [
+                        p for p in enriched_positions
+                        if not (p.get('config_id') == config_id and p.get('source') == 'aster')
+                    ]
+
+                    # Add enriched Aster positions
+                    for pos in positions_result:
+                        enriched_positions.append({
+                            'config_id': config_id,
+                            'position_id': pos.get('batch_id') or pos.get('order_id'),
+                            'symbol': pos.get('symbol'),
+                            'side': pos.get('side'),
+                            'size_usd': pos.get('size_usd'),
+                            'entry_price': pos.get('entry_price'),
+                            'current_price': pos.get('current_price'),
+                            'unrealized_pnl': pos.get('unrealized_pnl'),
+                            'opened_at': pos.get('opened_at'),
+                            'stop_loss': pos.get('stop_loss'),
+                            'take_profit': pos.get('take_profit'),
+                            'leverage': pos.get('leverage'),
+                            'source': 'aster'
+                        })
+                elif isinstance(positions_result, Exception):
+                    logger.warning(f"Failed to fetch Aster positions for {config_id}: {positions_result}")
+
     except Exception as e:
-        logger.error(f"Failed to enrich live positions and accounts: {e}")
+        logger.error(f"Failed to enrich live/aster positions and accounts: {e}")
         # Return original data on error
 
     return enriched_positions, enriched_accounts

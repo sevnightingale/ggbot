@@ -109,6 +109,8 @@ class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
     config_type: str = "autonomous_trading"
+    trading_mode: str = "paper"  # 'paper' | 'symphony' | 'aster'
+    symphony_agent_id: Optional[str] = None  # Required when trading_mode='symphony'
     selected_pair: Optional[str] = "BTC/USDT"  # Optional for agents
     extraction: Optional[Dict[str, Any]] = None  # Optional for agents and signal_validation
     decision: Optional[Dict[str, Any]] = None  # Optional for agents
@@ -1450,13 +1452,64 @@ async def create_config(
     request: ConfigCreateRequest,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Create a new bot configuration and corresponding paper trading account."""
-    # Extract config_type separately for table field, exclude from JSONB data
-    request_data = request.dict(exclude={"config_name"})
+    """Create a new bot configuration with specified trading mode."""
+    # Extract fields that go in table columns, not JSONB
+    request_data = request.dict(exclude={"config_name", "trading_mode", "symphony_agent_id"})
     config_type = request_data.pop("config_type", "autonomous_trading")
+    trading_mode = request.trading_mode
+    symphony_agent_id = request.symphony_agent_id
+
+    # Validate trading mode
+    if trading_mode not in ["paper", "symphony", "aster"]:
+        raise HTTPException(status_code=400, detail="Invalid trading_mode. Must be 'paper', 'symphony', or 'aster'")
+
+    # Check Pro subscription for live trading modes
+    if trading_mode in ["symphony", "aster"]:
+        profile = await user_service.get_profile(current_user.user_id)
+        if not profile.can_use_live_trading:
+            raise HTTPException(
+                status_code=403,
+                detail="Pro subscription required for live trading. Please upgrade to continue."
+            )
+
+    # Symphony-specific validations
+    if trading_mode == "symphony":
+        # Check Symphony credentials
+        from core.auth.vault_utils import VaultManager
+        credentials = await VaultManager.get_symphony_credential(current_user.user_id)
+        if not credentials:
+            raise HTTPException(
+                status_code=400,
+                detail="Symphony account not connected. Please connect in Settings first."
+            )
+
+        # Validate symphony_agent_id is provided
+        if not symphony_agent_id or not symphony_agent_id.strip():
+            raise HTTPException(
+                status_code=400,
+                detail="Symphony Agent ID is required for Symphony live trading."
+            )
+
+        # Validate symphony_agent_id format (UUID)
+        import re
+        if not re.match(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$", symphony_agent_id, re.IGNORECASE):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid Symphony Agent ID format (should be a UUID)."
+            )
+
+    # Aster-specific validations
+    if trading_mode == "aster":
+        # Check Aster credentials
+        from core.auth.vault_utils import VaultManager
+        credentials = await VaultManager.get_aster_credential(current_user.user_id)
+        if not credentials:
+            raise HTTPException(
+                status_code=400,
+                detail="AsterDEX account not connected. Please connect in Settings first."
+            )
 
     # Validate symbol has real-time price data (WebSocket cached)
-    # This is required for autonomous trading bots to function properly
     selected_pair = request_data.get("selected_pair")
     if selected_pair:
         from core.symbols.registry import is_websocket_cached, get_websocket_cached_count
@@ -1472,30 +1525,59 @@ async def create_config(
                 )
             )
 
+        # Check symbol compatibility with trading mode
+        if trading_mode == "symphony":
+            from core.symbols import UniversalSymbolStandardizer
+            standardizer = UniversalSymbolStandardizer()
+            if not standardizer.is_symphony_compatible(selected_pair, "ccxt"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Symbol {selected_pair} is not compatible with Symphony live trading."
+                )
+
+        if trading_mode == "aster":
+            from core.symbols import UniversalSymbolStandardizer
+            standardizer = UniversalSymbolStandardizer()
+            if not standardizer.is_aster_compatible(selected_pair, "ccxt"):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Symbol {selected_pair} is not compatible with AsterDEX trading."
+                )
+
     # Add config_type back to config_data for BotConfigV2 constructor
     request_data["config_type"] = config_type
+
+    # Map 'symphony' -> 'live' for database (backwards compatibility)
+    db_trading_mode = 'live' if trading_mode == 'symphony' else trading_mode
 
     config = await config_service.create_config(
         user_id=current_user.user_id,
         config_name=request.config_name,
-        config_data=request_data
+        config_data=request_data,
+        trading_mode=db_trading_mode,
+        symphony_agent_id=symphony_agent_id if trading_mode == "symphony" else None
     )
 
     if not config:
         raise HTTPException(status_code=400, detail="Failed to create configuration")
 
-    # Create paper trading account for the new config
-    try:
-        from trading.paper.supabase_service import SupabasePaperTradingService
-        trading_service = SupabasePaperTradingService()
-        account = await trading_service.get_or_create_paper_account(
-            config_id=config.config_id,
-            user_id=current_user.user_id
-        )
-        logger.info(f"Created paper account {account.account_id} for new config {config.config_id}")
-    except Exception as e:
-        logger.error(f"Failed to create paper account for config {config.config_id}: {e}")
-        # Don't fail the config creation - account can be created later
+    # Only create paper account for paper trading mode
+    if trading_mode == "paper":
+        try:
+            from trading.paper.supabase_service import SupabasePaperTradingService
+            trading_service = SupabasePaperTradingService()
+            account = await trading_service.get_or_create_paper_account(
+                config_id=config.config_id,
+                user_id=current_user.user_id
+            )
+            logger.info(f"Created paper account {account.account_id} for new config {config.config_id}")
+        except Exception as e:
+            logger.error(f"Failed to create paper account for config {config.config_id}: {e}")
+            # Don't fail the config creation - account can be created later
+
+    logger.bind(user_id=current_user.user_id).info(
+        f"Created {trading_mode} bot '{request.config_name}' (config_id={config.config_id})"
+    )
 
     return {
         "status": "success",
@@ -2333,6 +2415,148 @@ async def disconnect_symphony_account(
         )
 
 
+@app.post("/api/v2/aster/setup")
+async def setup_aster_account(
+    request: Dict[str, str],
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Store AsterDEX credentials for live trading.
+
+    Request body:
+        - user_wallet: User's Ethereum wallet address (0x...)
+        - aster_wallet: AsterDEX wallet address (0x...)
+        - private_key: AsterDEX wallet private key (0x... or without 0x prefix)
+    """
+    try:
+        user_wallet = request.get("user_wallet", "").strip()
+        aster_wallet = request.get("aster_wallet", "").strip()
+        private_key = request.get("private_key", "").strip()
+
+        # Validate user wallet format
+        import re
+        if not re.match(r"^0x[a-fA-F0-9]{40}$", user_wallet):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid user wallet address. Should be a valid Ethereum address (0x...)"
+            )
+
+        # Validate aster wallet format
+        if not re.match(r"^0x[a-fA-F0-9]{40}$", aster_wallet):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid aster wallet address. Should be a valid Ethereum address (0x...)"
+            )
+
+        # Validate private key format (with or without 0x prefix)
+        if not re.match(r"^(0x)?[a-fA-F0-9]{64}$", private_key):
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid private key format. Should be 64 hex characters (with or without 0x prefix)"
+            )
+
+        # Store credentials in Vault
+        from core.auth.vault_utils import VaultManager
+        success = await VaultManager.store_aster_credential(
+            user_id=current_user.user_id,
+            user_wallet=user_wallet,
+            aster_wallet=aster_wallet,
+            private_key=private_key
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to store AsterDEX credentials"
+            )
+
+        logger.bind(user_id=current_user.user_id).info("AsterDEX account connected successfully")
+
+        return {
+            "status": "success",
+            "message": "AsterDEX account connected successfully"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to setup AsterDEX account: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to setup AsterDEX account: {str(e)}"
+        )
+
+
+@app.get("/api/v2/aster/status")
+async def get_aster_status(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Check if user has AsterDEX account connected."""
+    try:
+        from core.auth.vault_utils import VaultManager
+
+        credentials = await VaultManager.get_aster_credential(current_user.user_id)
+
+        if credentials:
+            return {
+                "connected": True,
+                "user_wallet": credentials.get("user_wallet"),
+                "aster_wallet": credentials.get("aster_wallet")
+            }
+        else:
+            return {
+                "connected": False,
+                "user_wallet": None,
+                "aster_wallet": None
+            }
+
+    except Exception as e:
+        logger.error(f"Failed to check AsterDEX status: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to check AsterDEX status: {str(e)}"
+        )
+
+
+@app.post("/api/v2/aster/disconnect")
+async def disconnect_aster_account(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Disconnect AsterDEX account and disable all aster trading bots.
+
+    This will:
+    - Remove AsterDEX credentials from Vault
+    - Set all user's aster bots to paper mode
+    """
+    try:
+        from core.auth.vault_utils import VaultManager
+
+        success = await VaultManager.delete_aster_credential(current_user.user_id)
+
+        if not success:
+            raise HTTPException(
+                status_code=500,
+                detail="Failed to disconnect AsterDEX account"
+            )
+
+        logger.bind(user_id=current_user.user_id).info("AsterDEX account disconnected")
+
+        return {
+            "status": "success",
+            "message": "AsterDEX account disconnected. All aster bots have been disabled."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to disconnect AsterDEX account: {e}")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to disconnect AsterDEX account: {str(e)}"
+        )
+
+
 @app.get("/api/v2/positions/live/{config_id}")
 async def get_live_positions(
     config_id: str,
@@ -2594,119 +2818,6 @@ async def get_live_trade_history(
             detail=f"Failed to get live trade history: {str(e)}"
         )
 
-
-@app.post("/api/v2/config/duplicate-as-live")
-async def duplicate_config_as_live(
-    request: Dict[str, Any],
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-) -> Dict[str, Any]:
-    """
-    Duplicate a paper trading bot as a live trading bot.
-
-    Request body:
-        - source_config_id: UUID of paper bot to duplicate
-        - live_bot_name: Name for the new live bot
-        - symphony_agent_id: Symphony agent ID for live trading
-    """
-    try:
-        source_config_id = request.get("source_config_id")
-        live_bot_name = request.get("live_bot_name")
-        symphony_agent_id = request.get("symphony_agent_id")
-
-        if not source_config_id or not live_bot_name or not symphony_agent_id:
-            raise HTTPException(
-                status_code=400,
-                detail="Missing required fields: source_config_id, live_bot_name, symphony_agent_id"
-            )
-
-        # Load source configuration
-        source_config = await config_service.get_config(source_config_id, current_user.user_id)
-        if not source_config:
-            raise HTTPException(status_code=404, detail="Source configuration not found")
-
-        # Check if source is paper trading
-        if getattr(source_config, 'trading_mode', 'paper') == 'live':
-            raise HTTPException(
-                status_code=400,
-                detail="Source bot is already a live trading bot. Can only duplicate paper bots."
-            )
-
-        # Check if user has Symphony connected
-        from core.auth.vault_utils import VaultManager
-        credentials = await VaultManager.get_symphony_credential(current_user.user_id)
-        if not credentials:
-            raise HTTPException(
-                status_code=400,
-                detail="Symphony account not connected. Please connect in Settings first."
-            )
-
-        # Check if symbol is Symphony-compatible
-        from core.symbols import UniversalSymbolStandardizer
-        standardizer = UniversalSymbolStandardizer()
-        if not standardizer.is_symphony_compatible(source_config.selected_pair, "ccxt"):
-            raise HTTPException(
-                status_code=400,
-                detail=f"Symbol {source_config.selected_pair} is not compatible with Symphony live trading"
-            )
-
-        # Create new config with live trading mode
-        from core.common.db import get_db_connection
-        import uuid
-        import json
-
-        new_config_id = str(uuid.uuid4())
-
-        # Get source config data as dict
-        config_data = {
-            "extraction": source_config.extraction if hasattr(source_config, 'extraction') else {},
-            "decision": source_config.decision if hasattr(source_config, 'decision') else {},
-            "trading": source_config.trading if hasattr(source_config, 'trading') else {},
-            "llm_config": source_config.llm_config if hasattr(source_config, 'llm_config') else {},
-            "telegram_integration": source_config.telegram_integration if hasattr(source_config, 'telegram_integration') else None,
-            "selected_pair": source_config.selected_pair,
-            "schema_version": "2.1"
-        }
-
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    INSERT INTO configurations
-                    (config_id, user_id, config_type, config_name, config_data, state,
-                     symphony_agent_id, trading_mode, created_at, updated_at)
-                    VALUES (%s, %s, %s, %s, %s, 'inactive', %s, 'live', NOW(), NOW())
-                    RETURNING config_id
-                """, (
-                    new_config_id,
-                    current_user.user_id,
-                    source_config.config_type,
-                    live_bot_name,
-                    json.dumps(config_data),
-                    symphony_agent_id
-                ))
-                conn.commit()
-
-        logger.bind(
-            user_id=current_user.user_id,
-            source_config_id=source_config_id,
-            new_config_id=new_config_id
-        ).info(f"Duplicated paper bot as live bot: {live_bot_name}")
-
-        return {
-            "status": "success",
-            "config_id": new_config_id,
-            "config_name": live_bot_name,
-            "trading_mode": "live",
-            "message": f"Live trading bot '{live_bot_name}' created successfully"
-        }
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"Failed to duplicate config as live: {e}")
-        raise HTTPException(
-            status_code=500,
-            detail=f"Failed to duplicate config as live: {str(e)}"
-        )
 
 
 # Bot Data Endpoints for Dashboard

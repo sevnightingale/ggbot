@@ -55,14 +55,13 @@ export interface ConfigData {
   }
   agent_strategy?: {  // Only for agent configs
     content: string
-    autonomously_editable: boolean
-    version: number
-    last_updated_at: string
-    last_updated_by: 'user' | 'agent'
-    performance_log: Array<Record<string, unknown>>
+    autonomously_editable?: boolean
+    version?: number
+    last_updated_at?: string
+    last_updated_by?: 'user' | 'agent'
+    performance_log?: Array<Record<string, unknown>>
   }
   trading: {
-    execution_mode: string
     leverage: number
     position_sizing: {
       method: string
@@ -726,7 +725,6 @@ export function createDefaultConfigData(): ConfigData {
       use_own_key: false
     },
     trading: {
-      execution_mode: "paper",
       leverage: 1,
       position_sizing: {
         method: "fixed_usd", // Simple fixed amount for beginners

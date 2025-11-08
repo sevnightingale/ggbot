@@ -30,6 +30,17 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const [loading, setLoading] = useState(true)
   const [storedSmartAccount, setStoredSmartAccount] = useState('')
 
+  // AsterDEX connection state
+  const [asterConnected, setAsterConnected] = useState(false)
+  const [asterUserWallet, setAsterUserWallet] = useState('')
+  const [asterWallet, setAsterWallet] = useState('')
+  const [asterPrivateKey, setAsterPrivateKey] = useState('')
+  const [asterConnecting, setAsterConnecting] = useState(false)
+  const [asterError, setAsterError] = useState('')
+  const [asterLoading, setAsterLoading] = useState(true)
+  const [storedAsterUserWallet, setStoredAsterUserWallet] = useState('')
+  const [storedAsterWallet, setStoredAsterWallet] = useState('')
+
   // Upgrade modal state
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
 
@@ -174,6 +185,158 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
     } catch (e) {
       console.error('Disconnect error:', e)
       setError('Disconnect failed. Please try again.')
+    }
+  }
+
+  // Check Aster connection status on mount
+  useEffect(() => {
+    if (open) {
+      checkAsterStatus()
+    }
+  }, [open])
+
+  const checkAsterStatus = async () => {
+    try {
+      setAsterLoading(true)
+
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setAsterLoading(false)
+        return
+      }
+
+      const response = await fetch('/api/v2/aster/status', {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        setAsterConnected(data.connected || false)
+        if (data.user_wallet) {
+          setStoredAsterUserWallet(data.user_wallet)
+        }
+        if (data.aster_wallet) {
+          setStoredAsterWallet(data.aster_wallet)
+        }
+      }
+    } catch (e) {
+      console.error('Failed to check Aster status:', e)
+    } finally {
+      setAsterLoading(false)
+    }
+  }
+
+  const validateWalletAddress = (address: string): boolean => {
+    const pattern = /^0x[a-fA-F0-9]{40}$/
+    return pattern.test(address.trim())
+  }
+
+  const validatePrivateKey = (key: string): boolean => {
+    const pattern = /^(0x)?[a-fA-F0-9]{64}$/
+    return pattern.test(key.trim())
+  }
+
+  const handleAsterConnect = async () => {
+    setAsterConnecting(true)
+    setAsterError('')
+
+    if (!validateWalletAddress(asterUserWallet)) {
+      setAsterError('Invalid user wallet address. Should be a valid Ethereum address (0x...)')
+      setAsterConnecting(false)
+      return
+    }
+
+    if (!validateWalletAddress(asterWallet)) {
+      setAsterError('Invalid Aster wallet address. Should be a valid Ethereum address (0x...)')
+      setAsterConnecting(false)
+      return
+    }
+
+    if (!validatePrivateKey(asterPrivateKey)) {
+      setAsterError('Invalid private key format. Should be 64 hex characters (with or without 0x prefix)')
+      setAsterConnecting(false)
+      return
+    }
+
+    try {
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setAsterError('Authentication required. Please log in again.')
+        setAsterConnecting(false)
+        return
+      }
+
+      const response = await fetch('/api/v2/aster/setup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify({
+          user_wallet: asterUserWallet.trim(),
+          aster_wallet: asterWallet.trim(),
+          private_key: asterPrivateKey.trim()
+        })
+      })
+
+      if (response.ok) {
+        setAsterConnected(true)
+        setStoredAsterUserWallet(asterUserWallet.trim())
+        setStoredAsterWallet(asterWallet.trim())
+        setAsterUserWallet('')
+        setAsterWallet('')
+        setAsterPrivateKey('')
+        setAsterError('')
+      } else {
+        const data = await response.json()
+        setAsterError(data.detail || 'Failed to connect AsterDEX account')
+      }
+    } catch (e) {
+      console.error('AsterDEX connection error:', e)
+      setAsterError('Connection error. Please try again.')
+    } finally {
+      setAsterConnecting(false)
+    }
+  }
+
+  const handleAsterDisconnect = async () => {
+    if (!confirm('Disconnect AsterDEX account? Your aster trading bots will stop working.')) {
+      return
+    }
+
+    try {
+      const supabase = (await import('@/lib/supabase')).createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        setAsterError('Authentication required. Please log in again.')
+        return
+      }
+
+      const response = await fetch('/api/v2/aster/disconnect', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      if (response.ok) {
+        setAsterConnected(false)
+        setStoredAsterUserWallet('')
+        setStoredAsterWallet('')
+        setAsterError('')
+      } else {
+        setAsterError('Failed to disconnect. Please try again.')
+      }
+    } catch (e) {
+      console.error('Aster disconnect error:', e)
+      setAsterError('Disconnect failed. Please try again.')
     }
   }
 
@@ -341,6 +504,122 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     </div>
                     <button
                       onClick={handleDisconnect}
+                      className="text-sm text-red-600 dark:text-red-400 hover:underline font-medium"
+                    >
+                      Disconnect
+                    </button>
+                  </div>
+                </div>
+              )}
+            </section>
+
+            {/* AsterDEX Trading Section */}
+            <section>
+              <h3 className="text-sm font-semibold mb-3 text-[var(--text-primary)]">AsterDEX Trading</h3>
+
+              {asterLoading ? (
+                <div className="flex items-center justify-center p-8 border border-dashed border-[var(--border)] rounded-lg">
+                  <Loader2 className="h-5 w-5 animate-spin text-[var(--text-secondary)]" />
+                </div>
+              ) : !asterConnected ? (
+                <div className="border border-dashed border-[var(--border)] rounded-lg p-6">
+                  <div className="flex items-start gap-3 mb-4">
+                    <Link2 className="h-5 w-5 text-[var(--text-secondary)] mt-0.5 flex-shrink-0" />
+                    <div>
+                      <p className="font-medium text-[var(--text-primary)] mb-1">Connect AsterDEX Account</p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        Execute real trades on AsterDEX with your AI strategies
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5 text-[var(--text-primary)]">
+                        User Wallet Address *
+                      </label>
+                      <input
+                        value={asterUserWallet}
+                        onChange={(e) => setAsterUserWallet(e.target.value)}
+                        placeholder="0x..."
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono text-sm"
+                      />
+                      <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                        Your main Ethereum wallet address
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5 text-[var(--text-primary)]">
+                        Aster Wallet Address *
+                      </label>
+                      <input
+                        value={asterWallet}
+                        onChange={(e) => setAsterWallet(e.target.value)}
+                        placeholder="0x..."
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono text-sm"
+                      />
+                      <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+                        AsterDEX trading wallet address (agent-controlled)
+                      </p>
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-medium mb-1.5 text-[var(--text-primary)]">
+                        Private Key *
+                      </label>
+                      <input
+                        type="password"
+                        value={asterPrivateKey}
+                        onChange={(e) => setAsterPrivateKey(e.target.value)}
+                        placeholder="0x... or 64 hex characters"
+                        className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono text-sm"
+                      />
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        🔒 Stored securely in encrypted vault. Never shared.
+                      </p>
+                    </div>
+
+                    {asterError && (
+                      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-red-700 dark:text-red-300">{asterError}</p>
+                      </div>
+                    )}
+
+                    <button
+                      onClick={handleAsterConnect}
+                      disabled={asterConnecting || !asterUserWallet || !asterWallet || !asterPrivateKey}
+                      className="w-full px-4 py-2 bg-purple-600 hover:bg-purple-700 disabled:bg-[var(--bg-tertiary)] disabled:text-[var(--text-muted)] disabled:cursor-not-allowed text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                    >
+                      {asterConnecting ? (
+                        <>
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                          Connecting...
+                        </>
+                      ) : (
+                        'Connect Account'
+                      )}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="border border-[var(--border)] rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
+                  <div className="flex items-start gap-3">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div className="flex-1">
+                      <p className="font-medium text-green-900 dark:text-green-100 mb-1">
+                        AsterDEX Connected
+                      </p>
+                      <p className="text-sm text-green-700 dark:text-green-300 mb-1">
+                        User Wallet: {storedAsterUserWallet.slice(0, 6)}...{storedAsterUserWallet.slice(-4)}
+                      </p>
+                      <p className="text-sm text-green-700 dark:text-green-300">
+                        Aster Wallet: {storedAsterWallet.slice(0, 6)}...{storedAsterWallet.slice(-4)}
+                      </p>
+                    </div>
+                    <button
+                      onClick={handleAsterDisconnect}
                       className="text-sm text-red-600 dark:text-red-400 hover:underline font-medium"
                     >
                       Disconnect

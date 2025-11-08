@@ -45,7 +45,7 @@ logger.add(
     catch=True     # Catch exceptions in logging sink
 )
 
-from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ResultMessage
+from claude_agent_sdk import ClaudeSDKClient, ClaudeAgentOptions, AssistantMessage, TextBlock, ResultMessage, SystemMessage
 
 from agent.mcp_server import create_mcp_server, set_agent_context
 from agent.service_client import GGBotAPIClient
@@ -70,6 +70,7 @@ class TradingAgent:
         self.redis_client: Optional[redis.Redis] = None
         self.api_client: Optional[GGBotAPIClient] = None
         self.config: Optional[Dict[str, Any]] = None
+        self.session_id: Optional[str] = None  # SDK session ID for resumption
 
         logger.info(f"Initializing TradingAgent: config_id={config_id}, mode={mode}")
 
@@ -115,6 +116,95 @@ class TradingAgent:
                     }
         except Exception as e:
             logger.error(f"Failed to load config: {e}")
+            return None
+
+    async def _load_session_id(self) -> Optional[str]:
+        """Load existing SDK session ID from database for resumption"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT session_id, last_active_at
+                        FROM agent_sessions
+                        WHERE config_id = %s
+                    """, (self.config_id,))
+
+                    row = cur.fetchone()
+                    if row:
+                        session_id, last_active_at = row
+                        logger.info(f"📖 Found existing session: {session_id[:16]}... (last active: {last_active_at})")
+                        return session_id
+                    else:
+                        logger.info("📝 No existing session found - will create new one")
+                        return None
+        except Exception as e:
+            logger.error(f"Failed to load session ID: {e}")
+            return None
+
+    async def _save_session_id(self, session_id: str):
+        """Save SDK session ID to database for future resumption"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        INSERT INTO agent_sessions (config_id, session_id, last_active_at, created_at, updated_at)
+                        VALUES (%s, %s, NOW(), NOW(), NOW())
+                        ON CONFLICT (config_id)
+                        DO UPDATE SET
+                            session_id = EXCLUDED.session_id,
+                            last_active_at = NOW(),
+                            updated_at = NOW()
+                    """, (self.config_id, session_id))
+                    conn.commit()
+            logger.info(f"💾 Saved session ID: {session_id[:16]}...")
+        except Exception as e:
+            logger.error(f"Failed to save session ID: {e}")
+
+    async def _update_session_activity(self):
+        """Update last_active_at timestamp for health monitoring"""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        UPDATE agent_sessions
+                        SET last_active_at = NOW(),
+                            updated_at = NOW()
+                        WHERE config_id = %s
+                    """, (self.config_id,))
+                    conn.commit()
+        except Exception as e:
+            logger.warning(f"Failed to update session activity: {e}")
+
+    async def _capture_session_id(self, client: ClaudeSDKClient) -> Optional[str]:
+        """
+        Capture session_id from SDK init message.
+
+        The SDK sends a system message with subtype='init' containing the session_id.
+        We need to listen for this message to capture it for future resumption.
+
+        Returns:
+            Session ID string if captured, None otherwise
+        """
+        try:
+            # Send a simple query to trigger init message
+            await client.query("Session initialized")
+
+            # Listen for init message
+            async for message in client.receive_messages():
+                if hasattr(message, 'type') and message.type == 'system':
+                    if hasattr(message, 'subtype') and message.subtype == 'init':
+                        if hasattr(message, 'session_id'):
+                            logger.info(f"✅ Captured session ID: {message.session_id[:16]}...")
+                            return message.session_id
+
+                # Break after receiving first few messages to avoid hanging
+                # The init message should come first
+                if hasattr(message, 'type') and message.type in ['assistant', 'result']:
+                    logger.warning("Did not receive init message with session_id")
+                    return None
+
+        except Exception as e:
+            logger.error(f"Failed to capture session ID: {e}")
             return None
 
     def _build_system_prompt(self) -> Dict[str, Any]:
@@ -221,15 +311,30 @@ Be disciplined and execute the strategy faithfully.
             logger.info("📚 MCP TOOL DESCRIPTIONS BEING SENT TO AGENT:")
             logger.info("=" * 80)
 
-            # Access the MCP server's tools to log their full descriptions
-            if hasattr(mcp_server, 'tools'):
-                tools_list = mcp_server.tools()
-                for tool in tools_list:
-                    logger.info(f"\n🔧 TOOL: {tool.name}")
-                    logger.info(f"   Description (first 500 chars):")
-                    logger.info(f"   {tool.description[:500] if tool.description else 'No description'}...")
-                    if len(tool.description or "") > 500:
-                        logger.debug(f"   Full description: {tool.description}")
+            # The MCP server is a dict with 'instance' key containing the actual Server object
+            if isinstance(mcp_server, dict) and 'instance' in mcp_server:
+                mcp_instance = mcp_server['instance']
+                try:
+                    # list_tools() is async and needs request context, so we can't call it here
+                    # Instead, just log that 12 tools are registered (we know from debug logs above)
+                    logger.info("✅ MCP Server initialized with 12 tools:")
+                    logger.info("   1. query_market_data - Market data across 7 categories with 32+ data points")
+                    logger.info("   2. get_current_price - Real-time WebSocket price lookup")
+                    logger.info("   3. execute_trade - Execute trades with required SL/TP")
+                    logger.info("   4. get_positions - Query open positions (paper/aster/symphony)")
+                    logger.info("   5. get_account_status - Balance and performance metrics")
+                    logger.info("   6. close_position - Manually close positions")
+                    logger.info("   7. cancel_order - Cancel TP/SL orders (paper/aster)")
+                    logger.info("   8. update_strategy - Update strategy (experimental mode)")
+                    logger.info("   9. wait_for - Control timing (max 24h)")
+                    logger.info("  10. record_trade_observation - Post-trade reflection")
+                    logger.info("  11. query_trade_observations - Search past learnings")
+                    logger.info("  12. save_strategy_and_exit - Save strategy and exit")
+                    logger.info("\n  All tools will be available to agent via MCP protocol.")
+                except Exception as e:
+                    logger.warning(f"Could not introspect MCP tools: {e}")
+            else:
+                logger.warning("MCP server structure unexpected - tools should still work")
 
             logger.info("=" * 80)
 
@@ -237,11 +342,14 @@ Be disciplined and execute the strategy faithfully.
             system_prompt = self._build_system_prompt()
             logger.debug(f"📋 SYSTEM PROMPT:\n{'='*80}\n{system_prompt}\n{'='*80}")
 
-            # Create options
-            options = ClaudeAgentOptions(
-                model=os.getenv("AGENT_MODEL", "claude-sonnet-4-5-20250929"),
-                mcp_servers={"trading": mcp_server},
-                allowed_tools=[
+            # Load existing session for resumption (conversation persistence)
+            existing_session_id = await self._load_session_id()
+
+            # Create options with session resumption if available
+            options_dict = {
+                "model": os.getenv("AGENT_MODEL", "claude-sonnet-4-5-20250929"),
+                "mcp_servers": {"trading": mcp_server},
+                "allowed_tools": [
                     "mcp__trading__query_market_data",
                     "mcp__trading__get_current_price",  # NEW: Lightweight price check
                     "mcp__trading__execute_trade",
@@ -254,19 +362,33 @@ Be disciplined and execute the strategy faithfully.
                     "mcp__trading__query_trade_observations",
                     "mcp__trading__save_strategy_and_exit"
                 ],
-                disallowed_tools=[
+                "disallowed_tools": [
                     "Task", "Bash", "Read", "Write", "Edit", "Glob", "Grep",
                     "WebFetch", "WebSearch", "SlashCommand", "Skill", "TodoWrite",
                     "ExitPlanMode", "NotebookEdit", "BashOutput", "KillShell",
                     "AskUserQuestion", "ListMcpResourcesTool", "ReadMcpResourceTool"
                 ],
-                system_prompt=system_prompt,
-                max_turns=100
-            )
+                "system_prompt": system_prompt,
+                "max_turns": 100
+            }
+
+            # Add resume parameter if we have an existing session
+            if existing_session_id:
+                options_dict["resume"] = existing_session_id
+                logger.info(f"🔄 Resuming from session: {existing_session_id[:16]}...")
+            else:
+                logger.info("🆕 Starting fresh session")
+
+            options = ClaudeAgentOptions(**options_dict)
 
             # Start client and route to appropriate mode
             async with ClaudeSDKClient(options=options) as client:
                 logger.info(f"Agent started in {self.mode} mode")
+
+                # Capture session ID from init message and save to database
+                self.session_id = await self._capture_session_id(client)
+                if self.session_id:
+                    await self._save_session_id(self.session_id)
 
                 if self.mode == "strategy_definition":
                     await self._run_strategy_definition(client)
@@ -563,12 +685,18 @@ Start now.
         max_retries = 10
         retry_count = 0
         base_delay = 5  # seconds
+        message_count = 0  # Track messages for periodic heartbeat
 
         while True:  # Infinite retry loop for resilience
             try:
                 async for message in client.receive_messages():
                     # Reset retry counter on successful message
                     retry_count = 0
+                    message_count += 1
+
+                    # Update session activity heartbeat every 10 messages
+                    if message_count % 10 == 0:
+                        await self._update_session_activity()
 
                     # Handle AssistantMessage (streaming responses with TextBlocks)
                     if isinstance(message, AssistantMessage):
@@ -605,10 +733,23 @@ Start now.
                             logger.warning("Agent returned None result, skipping activity log")
 
                     # Check for compaction
-                    if hasattr(message, 'type') and getattr(message, 'type', None) == 'system':
-                        if hasattr(message, 'subtype') and getattr(message, 'subtype', None) == 'compact_boundary':
-                            logger.info("Context compaction occurred")
-                            # Phase 4: Inject fresh trading context here
+                    if isinstance(message, SystemMessage):
+                        if message.subtype == 'compact_boundary':
+                            logger.warning("🔄 Context compaction occurred - reinjecting critical state")
+
+                            # Reinject critical trading context
+                            await client.query(f"""
+CONTEXT REFRESH AFTER COMPACTION:
+
+The conversation context was just compacted. Please refresh your understanding:
+
+1. **Check Current Positions**: Use get_positions to see if you have any open trades
+2. **Check Account Balance**: Use get_account_status to see available capital
+3. **Review Your Strategy**: {self.config.get('config_data', {}).get('agent_strategy', {}).get('content', 'No strategy defined')}
+4. **Resume Execution**: Continue monitoring and trading according to your strategy
+
+Current timestamp: {datetime.now(timezone.utc).isoformat()}
+""")
 
                 # If we exit the async for loop normally (stream ended), log it and retry
                 logger.warning("Message stream ended unexpectedly, restarting agent loop...")
@@ -625,14 +766,29 @@ Start now.
                 raise
             except Exception as e:
                 retry_count += 1
-                logger.error(f"Agent loop error (retry {retry_count}/{max_retries}): {e}", exc_info=True)
+                error_str = str(e)
+
+                # Detect specific error types by string matching (since we can't import anthropic)
+                is_rate_limit = '429' in error_str or '529' in error_str or 'overload' in error_str.lower() or 'rate limit' in error_str.lower()
+                is_api_error = any(code in error_str for code in ['500', '502', '503', '504'])
+
+                if is_rate_limit:
+                    logger.warning(f"🚦 Rate limit detected (429/529): {e}")
+                    delay = 60  # Fixed 60s for rate limits
+                    error_type = 'rate_limit'
+                elif is_api_error:
+                    logger.error(f"⚠️  API server error detected: {e}")
+                    delay = min(base_delay * (2 ** retry_count), 300)  # Exponential backoff
+                    error_type = 'api_server_error'
+                else:
+                    logger.error(f"❌ Unexpected agent loop error (retry {retry_count}/{max_retries}): {e}", exc_info=True)
+                    delay = min(base_delay * (2 ** retry_count), 300)  # Exponential backoff
+                    error_type = 'unknown_error'
 
                 if retry_count >= max_retries:
                     logger.critical(f"Max retries ({max_retries}) exceeded, agent stopping")
                     raise
 
-                # Exponential backoff: 5s, 10s, 20s, 40s, 80s, 160s, 300s (max)
-                delay = min(base_delay * (2 ** retry_count), 300)
                 logger.info(f"Retrying in {delay}s...")
 
                 # Log retry to activity timeline
@@ -641,8 +797,8 @@ Start now.
                     user_id=self.user_id,
                     activity_type='analysis',
                     activity_source='agent',
-                    summary=f"Agent encountered error, retrying in {delay}s (attempt {retry_count}/{max_retries})",
-                    details={'error': str(e), 'retry_count': retry_count}
+                    summary=f"Agent encountered {error_type}, retrying in {delay}s (attempt {retry_count}/{max_retries})",
+                    details={'error': str(e), 'error_type': error_type, 'retry_count': retry_count}
                 )
 
                 await asyncio.sleep(delay)

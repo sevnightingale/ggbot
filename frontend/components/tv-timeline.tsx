@@ -57,9 +57,10 @@ interface ActivityMetadata {
 interface TimelineProps {
   configId: string;
   title?: string;
+  variant?: 'standalone' | 'embedded';
 }
 
-export default function TVTimeline({ configId, title }: TimelineProps) {
+export default function TVTimeline({ configId, title, variant = 'standalone' }: TimelineProps) {
   const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -621,7 +622,7 @@ export default function TVTimeline({ configId, title }: TimelineProps) {
 
       {/* CHART */}
       <section className="max-w-7xl mx-auto px-4 sm:px-5 pb-5">
-        <div className="rounded-xl border overflow-hidden relative" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: 'calc(100vh - 280px)', minHeight: '400px' }}>
+        <div className="rounded-xl border overflow-hidden relative" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: variant === 'embedded' ? '600px' : 'calc(100vh - 280px)', minHeight: '400px' }}>
           <div ref={setChartContainer} style={{ width: '100%', height: '100%' }} />
 
           {/* Activity hover tooltip */}

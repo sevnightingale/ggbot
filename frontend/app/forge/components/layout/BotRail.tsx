@@ -28,7 +28,6 @@ interface BotRailProps {
   isCreatingNew?: boolean
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
-  onDuplicateAsLive?: (configId: string) => void
   onDelete?: (configId: string) => void
   onResetAccount?: (configId: string) => void
   isBotAction?: boolean
@@ -44,7 +43,6 @@ export function BotRail({
   isCreatingNew = false,
   onRename,
   onDuplicate,
-  onDuplicateAsLive,
   onDelete,
   onResetAccount,
   isBotAction = false,
@@ -113,7 +111,6 @@ export function BotRail({
                 onClick={() => onSelect(bot.config_id)}
                 onRename={onRename}
                 onDuplicate={onDuplicate}
-                onDuplicateAsLive={onDuplicateAsLive}
                 onDelete={onDelete}
                 onResetAccount={onResetAccount}
                 isBotAction={isBotAction}
@@ -139,7 +136,6 @@ interface BotRowProps {
   onClick: () => void
   onRename?: (configId: string, newName: string) => void
   onDuplicate?: (configId: string) => void
-  onDuplicateAsLive?: (configId: string) => void
   onDelete?: (configId: string) => void
   onResetAccount?: (configId: string) => void
   isBotAction: boolean
@@ -152,7 +148,6 @@ function BotRow({
   onClick,
   onRename,
   onDuplicate,
-  onDuplicateAsLive,
   onDelete,
   onResetAccount,
   isBotAction
@@ -187,12 +182,11 @@ function BotRow({
             />
             <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
           </div>
-          {(onRename || onDuplicate || onDuplicateAsLive || onDelete || onResetAccount) && (
+          {(onRename || onDuplicate || onDelete || onResetAccount) && (
             <BotManagementMenu
               bot={bot}
               onRename={onRename || (() => {})}
               onDuplicate={onDuplicate || (() => {})}
-              onDuplicateAsLive={onDuplicateAsLive}
               onDelete={onDelete || (() => {})}
               onResetAccount={onResetAccount}
               isBotAction={isBotAction}
@@ -207,11 +201,11 @@ function BotRow({
           </span>
           {isLive ? (
             <span className="rounded-full bg-red-500/10 border border-red-500/30 px-2 py-0.5 text-xs font-semibold text-red-500">
-              LIVE TRADING
+              SYMPHONY
             </span>
           ) : isAster ? (
             <span className="rounded-full bg-purple-500/10 border border-purple-500/30 px-2 py-0.5 text-xs font-semibold text-purple-500">
-              ASTER
+              ASTERDEX
             </span>
           ) : (
             <span className="rounded-full bg-[var(--agent-extraction)]/10 border border-[var(--agent-extraction)]/30 px-2 py-0.5 text-xs" style={{ color: 'var(--agent-extraction)' }}>
