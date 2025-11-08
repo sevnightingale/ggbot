@@ -558,8 +558,8 @@ body {
   --text-muted: #6b6661;       /* lighter brown */
   --border: #c8c4bc;           /* warm gray border */
   --border-hover: #b5aea5;     /* darker border hover */
-  --accent: #8a7859;           /* dark brass accent */
-  --accent-hover: #9d8b6a;     /* lighter brass hover */
+  --accent: #c1a87d;           /* brass - same as dark mode */
+  --accent-hover: #d4bc91;     /* lighter brass - same as dark mode */
   --signal: #3ca6e0;           /* signal blue (same) */
   --ember: #d74a1f;            /* ember red (same) */
   --logo-invert: 12%;          /* Dark logo for light theme */

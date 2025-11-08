@@ -7,18 +7,33 @@ import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Session } from '@supabase/supabase-js';
 import BottomSheet from './bottom-sheet';
 import ReactMarkdown from 'react-markdown';
+import { useTheme } from '@/lib/theme';
 
-// Trade37 palette (hardwired)
-const VIBE = {
-  obsidian: '#0B0B0C',   // page background
-  carbon: '#141416',     // card surface
-  ivory: '#EDEBE7',      // main text
-  hair: 'rgba(237,235,231,0.16)', // hairline borders
-  brass: '#C1A87D',      // accent / primary (buttons)
-  signal: '#3CA6E0',     // equity line, data highlights
-  ember: '#D74A1F',      // negative
-  lilac: '#8B7CF2',      // thoughts
-} as const;
+// Theme-aware color palette
+const getThemeColors = (isDark: boolean) => ({
+  // Dark mode colors
+  dark: {
+    obsidian: '#0B0B0C',   // page background
+    carbon: '#141416',     // card surface
+    ivory: '#EDEBE7',      // main text
+    hair: 'rgba(237,235,231,0.16)', // hairline borders
+    brass: '#C1A87D',      // accent / primary (buttons)
+    signal: '#3CA6E0',     // equity line, data highlights
+    ember: '#D74A1F',      // negative
+    lilac: '#8B7CF2',      // thoughts
+  },
+  // Light mode colors
+  light: {
+    obsidian: '#f8f7f4',   // page background (warm parchment)
+    carbon: '#edebe7',     // card surface (ivory)
+    ivory: '#1a1816',      // main text (near-black)
+    hair: 'rgba(26,24,22,0.16)', // hairline borders (inverted)
+    brass: '#C1A87D',      // accent (same as dark)
+    signal: '#3CA6E0',     // equity line (same as dark)
+    ember: '#D74A1F',      // negative (same as dark)
+    lilac: '#8B7CF2',      // thoughts (same as dark)
+  }
+})[isDark ? 'dark' : 'light'];
 
 interface BalancePoint {
   timestamp: string;
@@ -61,6 +76,7 @@ interface TimelineProps {
 }
 
 export default function TVTimeline({ configId, title, variant = 'standalone' }: TimelineProps) {
+  const { theme } = useTheme();
   const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -79,6 +95,9 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
   const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
 
+  // Get theme colors
+  const VIBE = getThemeColors(theme === 'dark');
+
   // Get session for auth
   useEffect(() => {
     const supabase = createClientComponentClient();
@@ -88,6 +107,46 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
     };
     getSession();
   }, []);
+
+  // Update chart colors when theme changes
+  useEffect(() => {
+    if (!chartRef.current) return;
+
+    const colors = getThemeColors(theme === 'dark');
+
+    // Update chart layout colors
+    chartRef.current.applyOptions({
+      layout: {
+        background: { type: ColorType.Solid, color: colors.carbon },
+        textColor: colors.hair,
+      },
+      grid: {
+        vertLines: { color: colors.hair },
+        horzLines: { color: colors.hair },
+      },
+      rightPriceScale: {
+        borderColor: colors.hair,
+      },
+      timeScale: {
+        borderColor: colors.hair,
+      },
+      crosshair: {
+        vertLine: {
+          color: colors.brass,
+        },
+        horzLine: {
+          color: colors.brass,
+        },
+      },
+    });
+
+    // Update line series color
+    if (lineSeriesRef.current) {
+      lineSeriesRef.current.applyOptions({
+        color: colors.brass,
+      });
+    }
+  }, [theme]);
 
   // Fetch data and initialize chart
   useEffect(() => {
