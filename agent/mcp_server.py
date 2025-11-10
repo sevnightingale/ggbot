@@ -445,36 +445,39 @@ async def get_current_price(args: Dict[str, Any]) -> Dict[str, Any]:
 
 @tool(
     "execute_trade",
-    "Execute a trade with REQUIRED stop loss and take profit. Params: symbol, side (long/short), stop_loss_price, take_profit_price (all required). Optional: confidence (0-1), size_usd (total position size in USD, NOT margin - e.g., 1000 with 10x leverage means $1000 position using $100 margin), leverage (1-20x multiplier)",
-    {"symbol": str, "side": str, "confidence": float, "size_usd": float, "leverage": int, "stop_loss_price": float, "take_profit_price": float}
+    "Execute trade with AUTOMATIC position sizing based on confidence. REQUIRED: symbol, side (long/short), confidence (0.0-1.0), stop_loss_price, take_profit_price. System calculates position size automatically using: margin = confidence × max_position_percent × account_balance, then applies leverage. Your job: assess trade quality and provide confidence score. Confidence scale: 0.2-0.4 (weak/testing), 0.4-0.6 (decent), 0.6-0.8 (strong), 0.8-1.0 (exceptional). Higher confidence = larger position within risk limits.",
+    {"symbol": str, "side": str, "confidence": float, "stop_loss_price": float, "take_profit_price": float}
 )
 async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Execute trade with optional position sizing overrides.
+    Execute trade with automatic confidence-based position sizing.
 
-    Agents can control position size and leverage:
-    - size_usd: Total position size in USD (NOTIONAL, not margin/collateral)
-      Example: size_usd=1000 with leverage=10 means $1000 position using $100 margin
-      Example: size_usd=500 with leverage=5 means $500 position using $100 margin
-    - leverage: Leverage multiplier (e.g., 10 = 10x leverage)
-      Actual capital at risk = size_usd / leverage
+    The system automatically:
+    1. Queries your account balance
+    2. Calculates position size: margin = confidence × max_position_percent × balance
+    3. Applies leverage from bot config (e.g., 20x)
+    4. Validates stop loss distance and R/R ratio
+    5. Ensures margin doesn't exceed 95% of available balance
+    6. Executes trade on configured platform (paper/aster/symphony)
 
-    If not specified, uses bot config defaults for position sizing.
+    Your responsibility:
+    - Identify good trade setups
+    - Assess conviction (confidence 0.0-1.0)
+    - Determine stop loss price (technical level)
+    - Determine take profit price (target level)
 
-    IMPORTANT: size_usd is the FULL POSITION SIZE, not the margin.
-    To calculate margin: margin = size_usd / leverage
+    Do NOT calculate position sizes or margins - the system handles this.
+    Focus on: Is this a good trade? How confident am I?
     """
     try:
         symbol = args["symbol"]
         side = args["side"]
-        confidence = args.get("confidence", 0.7)
+        confidence = args["confidence"]
         stop_loss_price = args["stop_loss_price"]
         take_profit_price = args["take_profit_price"]
 
-        # Extract position sizing overrides (optional)
-        size_usd = args.get("size_usd")
-        leverage = args.get("leverage")
-
+        # Position sizing is handled by backend based on confidence
+        # No manual size_usd or leverage overrides
         result = await agent_context.api_client.execute_trade(
             config_id=agent_context.config_id,
             symbol=symbol,
@@ -482,8 +485,8 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
             confidence=confidence,
             stop_loss_price=stop_loss_price,
             take_profit_price=take_profit_price,
-            size_usd=size_usd,
-            leverage=leverage
+            size_usd=None,  # Let backend calculate from confidence
+            leverage=None   # Use bot config leverage
         )
 
         # Check if API call succeeded AND trade actually executed
@@ -519,7 +522,7 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
                     'side': side,
                     'entry_price': trade.get('entry_price'),
                     'size_usd': trade.get('size_usd'),
-                    'leverage': leverage,
+                    'leverage': trade.get('leverage'),  # Get from trade result, not agent input
                     'stop_loss_price': stop_loss_price,
                     'take_profit_price': take_profit_price,
                     'confidence': confidence
