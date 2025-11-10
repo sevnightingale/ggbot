@@ -46,27 +46,31 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - ❌ **No Email Alerts**: Not day 1 (add if users request)
 - ❌ **No Fancy Charts**: Just total + per-bot list
 
-### **Phase 0: OpenRouter Migration** (1 day)
-- [ ] **Research & Validation**
-  - [ ] Sign up for OpenRouter
-  - [ ] Verify all models available (GPT-4/5, Claude Opus/Sonnet/Haiku, DeepSeek, Grok)
-  - [ ] Check pricing (compare to direct API)
-  - [ ] Test token tracking format
+### **Phase 0: OpenRouter Migration** (1 day) - ✅ **MOSTLY COMPLETE**
+- [x] **Research & Validation**
+  - [x] Sign up for OpenRouter
+  - [x] Verify all models available (7 models: Grok, Claude, Gemini, DeepSeek, GPT, Kimi, Qwen)
+  - [x] Check pricing (verified via OpenRouter API)
+  - [x] Test token tracking format (standardized across all models)
 
-- [ ] **Implementation**
-  - [ ] Create `decision/llm_providers/openrouter_provider.py`
-  - [ ] Add `OPENROUTER_API_KEY` to .env
-  - [ ] Implement model name mapping (internal → OpenRouter format)
+- [x] **Implementation**
+  - [x] Create `decision/llm_providers/openrouter_provider.py` (14 variants: 7 models × 2 thinking modes)
+  - [x] Add `OPENROUTER_API_KEY` to .env
+  - [x] Implement model name mapping (user-friendly names → OpenRouter IDs)
+  - [x] Create `llm_models` reference table with pricing
+  - [x] Add API endpoint `GET /api/v2/llm-models`
+  - [x] Update Pydantic schemas for OpenRouter support
 
 - [ ] **Migration**
-  - [ ] Update `decision/engine_v2.py` to use OpenRouter
+  - [ ] Update bot configs to use `provider: 'openrouter'`
+  - [ ] Test with real bot execution (decision engine)
   - [ ] Update `agent/run_agent.py` if needed
-  - [ ] Keep old providers as fallback (don't delete)
+  - [x] Keep old providers as fallback (not deleted)
 
-- [ ] **Testing**
-  - [ ] Create test script (`scripts/test_openrouter.py`)
-  - [ ] Test all 6-7 models
-  - [ ] Verify token counts accurate
+- [x] **Testing**
+  - [x] Create test scripts (`test_14_models.py`, `test_model_parameters.py`)
+  - [x] Test all 14 model variants (7 models × 2 thinking modes)
+  - [x] Verify token counts accurate and standardized
   - [ ] Run 3 real bot executions
   - [ ] Monitor for 24 hours
 
@@ -382,19 +386,6 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 
 ## 🔧 **System Improvements**
 
-### **User Settings & API Key Management**
-- [ ] Complete API key management interface for LLM credentials
-- [ ] Add secure credential storage using Supabase Vault
-- [ ] Implement credential validation and testing
-- [ ] Support OpenAI, DeepSeek, Anthropic, XAI credentials
-- [ ] Add subscription downgrade workflow
-
-### **Trading System Completeness**
-- [ ] Verify SL/TP values read from configuration properly
-- [ ] Verify trade monitoring triggers TP/SL execution automatically
-- [ ] Validate risk management parameters enforced
-- [ ] Implement open position limits per configuration
-
 ### **System Robustness**
 - [ ] Add comprehensive error boundaries to frontend
 - [ ] Implement graceful API failure handling with retries
@@ -460,3 +451,4 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 - **Current Status**: `ACTIVE.md` - Production system status
 - **Complete History**: `CHANGELOG.md` - All completed features and fixes
 - **Architecture**: `README.md` - Platform overview
+

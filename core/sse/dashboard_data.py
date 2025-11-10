@@ -147,7 +147,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                 'config_id', bc.config_id,
                 'user_id', bc.user_id,
                 'config_name', bc.config_name,
-                'config_type', 'autonomous_trading',
+                'config_type', bc.config_type,
                 'state', bc.state,
                 'trading_mode', bc.trading_mode,
                 'symphony_agent_id', bc.symphony_agent_id,

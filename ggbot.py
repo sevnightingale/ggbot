@@ -108,7 +108,7 @@ from core.domain import Decision, DecisionAction, DecisionStatus, UserProfile, S
 class ConfigCreateRequest(BaseModel):
     config_name: str
     schema_version: str = "2.1"
-    config_type: str = "autonomous_trading"
+    config_type: str = "scheduled_trading"
     trading_mode: str = "paper"  # 'paper' | 'symphony' | 'aster'
     symphony_agent_id: Optional[str] = None  # Required when trading_mode='symphony'
     selected_pair: Optional[str] = "BTC/USDT"  # Optional for agents
@@ -961,7 +961,7 @@ class GGBotOrchestrator:
             confidence = decision_result.get("confidence", 0.0)
 
             # For signal_validation configs: gate trades with confidence threshold
-            # For autonomous_trading configs: trust the bot's decision (no confidence gating)
+            # For scheduled_trading configs: trust the bot's decision (no confidence gating)
             if config.config_type == "signal_validation":
                 if config.telegram_integration and config.telegram_integration.get("publisher"):
                     publisher_config = config.telegram_integration.get("publisher", {})
@@ -1227,8 +1227,8 @@ async def reconcile_active_bots():
                     config_id, user_id, config_type, config_data = row
 
                     try:
-                        actual_config_type = config_type or 'autonomous_trading'
-                        if actual_config_type != 'autonomous_trading':
+                        actual_config_type = config_type or 'scheduled_trading'
+                        if actual_config_type != 'scheduled_trading':
                             logger.info(f"Skipping {actual_config_type} config {config_id} - not scheduling signal_validation configs")
                             continue
 
@@ -1260,11 +1260,11 @@ def extract_timeframe_from_config(config: Dict[str, Any]) -> str:
     if "config_data" in config:
         inner_config = config["config_data"]
         decision_config = inner_config.get("decision", {})
-        config_type = config.get("config_type", "autonomous_trading")  # Use table field
+        config_type = config.get("config_type", "scheduled_trading")  # Use table field
     else:
         # Handle flat config structure
         decision_config = config.get("decision", {})
-        config_type = config.get("config_type", "autonomous_trading")
+        config_type = config.get("config_type", "scheduled_trading")
 
     analysis_frequency = decision_config.get("analysis_frequency", "1h")
 
@@ -1455,7 +1455,7 @@ async def create_config(
     """Create a new bot configuration with specified trading mode."""
     # Extract fields that go in table columns, not JSONB
     request_data = request.dict(exclude={"config_name", "trading_mode", "symphony_agent_id"})
-    config_type = request_data.pop("config_type", "autonomous_trading")
+    config_type = request_data.pop("config_type", "scheduled_trading")
     trading_mode = request.trading_mode
     symphony_agent_id = request.symphony_agent_id
 
@@ -2167,6 +2167,74 @@ async def get_data_sources_with_points(
     except Exception as e:
         logger.error(f"Failed to get data sources with points: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get data sources: {str(e)}")
+
+
+@app.get("/api/v2/llm-models")
+async def get_llm_models(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """Get all available LLM models for OpenRouter."""
+    try:
+        from core.common.db import get_db_connection
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Get all enabled models
+                cur.execute("""
+                    SELECT
+                        model_id,
+                        display_name,
+                        provider,
+                        openrouter_model_id,
+                        supports_thinking,
+                        enabled,
+                        max_context_tokens,
+                        context_display,
+                        pricing_input_per_1m,
+                        pricing_output_per_1m,
+                        cost_per_decision_standard,
+                        cost_per_decision_thinking,
+                        description,
+                        sort_order
+                    FROM llm_models
+                    WHERE enabled = true
+                    ORDER BY sort_order ASC
+                """)
+
+                rows = cur.fetchall()
+
+                models = []
+                for row in rows:
+                    models.append({
+                        "model_id": row[0],
+                        "display_name": row[1],
+                        "provider": row[2],
+                        "openrouter_model_id": row[3],
+                        "supports_thinking": row[4],
+                        "enabled": row[5],
+                        "max_context_tokens": row[6],
+                        "context_display": row[7],
+                        "pricing": {
+                            "input_per_1m": float(row[8]),
+                            "output_per_1m": float(row[9])
+                        },
+                        "cost_per_decision": {
+                            "standard": float(row[10]),
+                            "thinking": float(row[11])
+                        },
+                        "description": row[12],
+                        "sort_order": row[13]
+                    })
+
+                return {
+                    "status": "success",
+                    "models": models,
+                    "count": len(models)
+                }
+
+    except Exception as e:
+        logger.error(f"Failed to get LLM models: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get LLM models: {str(e)}")
 
 
 # LLM Credential Management Endpoints

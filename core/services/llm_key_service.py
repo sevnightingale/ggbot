@@ -124,7 +124,8 @@ class LLMKeyService:
             'deepseek': 'DEEPSEEK_API_KEY',
             'anthropic': 'ANTHROPIC_API_KEY',
             'xai': 'XAI_API_KEY',
-            'grok': 'XAI_API_KEY'
+            'grok': 'XAI_API_KEY',
+            'openrouter': 'OPENROUTER_API_KEY'
         }
 
         env_var = env_var_map.get(provider.lower())

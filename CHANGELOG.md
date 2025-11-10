@@ -4,6 +4,31 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-10 - Configuration System Cleanup & Schema v2.2 Migration
+
+**Technical Debt Elimination**: Comprehensive cleanup of config system accumulated over 6 months - migrated 373 bots to canonical naming, removed field duplication, fixed 3 critical bugs, added database constraints.
+
+- **Naming Migration**: All 373 `autonomous_trading` bots → `scheduled_trading` (single source of truth)
+- **Duplication Removed**: Deleted `trading.execution_mode` from JSONB (use table `trading_mode` only), removed `trading.exchange_config` legacy bloat, removed `trading.provider` from agents
+- **Critical Fixes**: Agent strategy deep merge (metadata preserved), config_name query bug (no more "Untitled Bot"), SSE hardcoded config_type bug (now reads from table)
+- **Database**: One-shot SQL migration (378 configs in 10s), bumped `schema_version` to 2.2, added CHECK constraints on `config_type`/`trading_mode`/`state`, made `trading_mode` NOT NULL
+- **Backend**: Updated `core/config/schemas.py` (removed legacy classes, simplified validation), updated defaults in ConfigService/ggbot.py, removed ~150 lines dead code
+- **Analysis**: Used code-scout to audit entire system, created 4 reference docs (2,000+ lines) documenting issues and future improvements
+
+**Impact**: Cleaner architecture, eliminated 3 duplication bugs, prepared foundation for Pydantic discriminated union migration (v3.0)
+
+**Files Modified**: 7 backend files, 3 frontend files, 1 database migration script
+**Docs Created**: CONFIG_REVIEW.md, CONFIG_SCHEMA_ANALYSIS.md, CONFIG_ARCHITECTURE_PROPOSAL.md, CONFIG_MIGRATION_PLAN.md
+**Details**: See [DOCS/completed/2025-11-10_config_system_cleanup.md](DOCS/completed/2025-11-10_config_system_cleanup.md)
+
+---
+
+## 2025-11-10 - OpenRouter LLM Integration (Phase 0)
+
+**Unified LLM API**: Integrated OpenRouter for standardized access to 7 LLM providers (Grok, DeepSeek, Kimi, Qwen, Gemini, GPT-5, Claude Sonnet 4.5) with 14 total variants (thinking mode flag). Created `llm_models` reference table with pricing, added `GET /api/v2/llm-models` API endpoint, built `OpenRouterProvider` with automatic parameter handling (temperature, reasoning, max_tokens). Updated Pydantic schemas to validate OpenRouter configs. Standardized token tracking format across all models. **Not yet in production** - awaiting bot config migration and real execution testing.
+
+---
+
 ## 2025-11-10 - Confidence-Based Position Sizing (Incomplete)
 
 **Agent MCP Tool Simplified**: Removed manual position sizing parameters (`size_usd`, `leverage`) from `execute_trade` tool. Agents now provide only confidence score (0.0-1.0); system auto-calculates position sizes using `margin = confidence × max_position_percent × balance`. Updated ggAster bot config to `confidence_based` method with 20x leverage, 5-25% risk range. **NOT TESTED** - implementation flawed, needs review and proper testing approach. See [DOCS/completed/2025-11-10_confidence_based_position_sizing.md](DOCS/completed/2025-11-10_confidence_based_position_sizing.md).

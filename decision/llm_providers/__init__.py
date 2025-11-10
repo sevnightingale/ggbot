@@ -9,6 +9,7 @@ from decision.llm_providers.deepseek_provider import DeepSeekProvider
 from decision.llm_providers.openai_provider import OpenAIProvider
 from decision.llm_providers.anthropic_provider import AnthropicProvider
 from decision.llm_providers.xai_provider import XAIProvider
+from decision.llm_providers.openrouter_provider import OpenRouterProvider
 from decision.llm_providers.factory import get_llm_provider, get_available_providers
 
 __all__ = [
@@ -16,6 +17,7 @@ __all__ = [
     'OpenAIProvider',
     'AnthropicProvider',
     'XAIProvider',
+    'OpenRouterProvider',
     'get_llm_provider',
     'get_available_providers'
 ]

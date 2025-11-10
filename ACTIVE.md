@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-10 11:22:15 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-10 21:57:00 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -27,8 +27,8 @@
   - Total P&L: $-16,000.65
 - **Recent Activity**:
   - Last 24 hours: 0 trades
-  - Last 7 days: 1 trades
-  - Last 30 days: 3991 trades
+  - Last 7 days: 0 trades
+  - Last 30 days: 3979 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -49,7 +49,7 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 24 decisions (avg confidence: 15.8%)
+- **wait**: 24 decisions (avg confidence: 10.0%)
 
 ### System Health
 - **Decisions (last hour)**: 1
@@ -61,21 +61,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 63MB | 1h 35m | 45 |
-| x-bot | 🟢 online | 0% | 41MB | 1h 35m | 45 |
-| error-alerts | 🟢 online | 0% | 33MB | 1h 35m | 52 |
-| market-data-ws | 🟢 online | 2.6% | 126MB | 1h 35m | 47 |
-| ggbot | 🟢 online | 1% | 254MB | 1h 35m | 114 |
+| signal-listener | 🟢 online | 0% | 63MB | 12h 10m | 45 |
+| x-bot | 🟢 online | 0% | 40MB | 12h 10m | 45 |
+| error-alerts | 🟢 online | 0% | 33MB | 12h 10m | 52 |
+| market-data-ws | 🟢 online | 1.9% | 125MB | 12h 10m | 47 |
+| ggbot | 🟢 online | 0.4% | 246MB | 20m | 116 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (46%)
-- **Memory**: 2.1Gi / 3.8Gi
-- **CPU Load**: 0.27 / 0.11 / 0.09 (1m/5m/15m)
+- **Memory**: 1.8Gi / 3.8Gi
+- **CPU Load**: 0.37 / 0.44 / 0.34 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 9.06M)
+- **Redis**: 🟢 connected (Memory: 8.38M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -346,7 +346,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-10 11:22:16 UTC
+**Last Updated**: 2025-11-10 21:57:00 UTC
 
 ---
 
@@ -441,7 +441,7 @@ df -h
 | `updated_at` | timestamp with time zone |  | now() |
 | `state` | text |  | 'inactive'::text |
 | `symphony_agent_id` | character varying(255) | ✓ |  |
-| `trading_mode` | character varying(20) | ✓ | 'paper'::character varying |
+| `trading_mode` | character varying(20) |  | 'paper'::character varying |
 
 ### `data_points` (11 columns)
 
@@ -557,6 +557,36 @@ df -h
 | `stop_loss_order_id` | character varying(50) | ✓ |  |
 | `take_profit_order_id` | character varying(50) | ✓ |  |
 | `symbol` | character varying(20) | ✓ |  |
+
+### `llm_models` (16 columns)
+
+**Primary Key**: `model_id`
+
+**Indexes**:
+- `idx_llm_models_enabled` on (enabled, sort_order)
+- `idx_llm_models_provider` on (provider)
+- `llm_models_openrouter_model_id_key` on (openrouter_model_id)
+
+**Unique Constraints**: `openrouter_model_id`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `model_id` | character varying(50) |  |  |
+| `display_name` | character varying(100) |  |  |
+| `provider` | character varying(50) |  |  |
+| `openrouter_model_id` | character varying(100) |  |  |
+| `supports_thinking` | boolean |  | true |
+| `enabled` | boolean |  | true |
+| `max_context_tokens` | integer |  |  |
+| `context_display` | character varying(20) |  |  |
+| `pricing_input_per_1m` | numeric |  |  |
+| `pricing_output_per_1m` | numeric |  |  |
+| `cost_per_decision_standard` | numeric |  |  |
+| `cost_per_decision_thinking` | numeric |  |  |
+| `description` | text | ✓ |  |
+| `sort_order` | integer |  |  |
+| `created_at` | timestamp with time zone |  | now() |
+| `updated_at` | timestamp with time zone |  | now() |
 
 ### `logs` (6 columns)
 
@@ -1095,7 +1125,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-10 11:22:16 UTC
+**Last Updated**: 2025-11-10 21:57:00 UTC
 
 ---
 

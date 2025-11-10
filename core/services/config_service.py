@@ -26,8 +26,8 @@ class BotConfigV2:
         extraction: Optional[Dict[str, Any]] = None,
         decision: Optional[Dict[str, Any]] = None,
         trading: Optional[Dict[str, Any]] = None,
-        config_type: str = "autonomous_trading",
-        schema_version: str = "2.1",
+        config_type: str = "scheduled_trading",
+        schema_version: str = "2.2",
         llm_config: Optional[Dict[str, Any]] = None,
         telegram_integration: Optional[Dict[str, Any]] = None,
         agent_strategy: Optional[Dict[str, Any]] = None,
@@ -109,7 +109,7 @@ class BotConfigV2:
             extraction=data.get("extraction"),
             decision=data.get("decision"),
             trading=data.get("trading"),
-            config_type=data.get("config_type", "autonomous_trading"),
+            config_type=data.get("config_type", "scheduled_trading"),
             schema_version=data.get("schema_version", "2.1"),
             llm_config=data.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
             telegram_integration=data.get("telegram_integration", {}),
@@ -201,7 +201,7 @@ class ConfigService:
         """
         try:
             config_id = str(uuid.uuid4())
-            config_type = config_data.get("config_type", "autonomous_trading")
+            config_type = config_data.get("config_type", "scheduled_trading")
 
             # Create config object
             config = BotConfigV2(
@@ -270,7 +270,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id
+                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -279,10 +279,11 @@ class ConfigService:
                     if not result:
                         return None
 
-                    config_data = json.loads(result[0]) if isinstance(result[0], str) else result[0]
-                    db_config_type = result[3] or "autonomous_trading"  # Use config_type from database
-                    trading_mode = result[4] or "paper"
-                    symphony_agent_id = result[5]
+                    db_config_name = result[0] or "Untitled Bot"  # Config name from table column
+                    config_data = json.loads(result[1]) if isinstance(result[1], str) else result[1]
+                    db_config_type = result[4] or "scheduled_trading"  # Use config_type from database
+                    trading_mode = result[5] or "paper"
+                    symphony_agent_id = result[6]
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -291,7 +292,7 @@ class ConfigService:
                         flattened_config = {
                             "config_id": config_id,
                             "user_id": user_id,
-                            "config_name": config_data.get("config_name", "Untitled Bot"),
+                            "config_name": db_config_name,  # Use name from table column
                             "selected_pair": inner_config.get("selected_pair", "BTC/USDT"),
                             "extraction": inner_config.get("extraction", {}),
                             "decision": inner_config.get("decision", {}),
@@ -369,7 +370,7 @@ class ConfigService:
                                 "extraction": inner_config.get("extraction", {}),
                                 "decision": inner_config.get("decision", {}),
                                 "trading": inner_config.get("trading", {}),
-                                "config_type": db_config_type or "autonomous_trading",
+                                "config_type": db_config_type or "scheduled_trading",
                                 "schema_version": inner_config.get("schema_version", "2.1"),
                                 "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                                 "telegram_integration": inner_config.get("telegram_integration", {}),
@@ -388,7 +389,7 @@ class ConfigService:
                             if config_name and "config_name" not in flattened_config:
                                 flattened_config["config_name"] = config_name
                             flattened_config["state"] = state or "inactive"
-                            flattened_config["config_type"] = db_config_type or "autonomous_trading"
+                            flattened_config["config_type"] = db_config_type or "scheduled_trading"
                             flattened_config["trading_mode"] = trading_mode or "paper"
                             flattened_config["symphony_agent_id"] = symphony_agent_id
                             if created_at:
@@ -562,7 +563,6 @@ class ConfigService:
                 "user_prompt": "My trading strategy:\nEnter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods.\n\nCurrent market analysis:\n{MARKET_DATA}\n\nDecision: Based on the above data, should I ENTER, WAIT, or EXIT this position?"
             },
             "trading": {
-                "execution_mode": "paper",
                 "leverage": 1,
                 "position_sizing": {
                     "method": "confidence_based",

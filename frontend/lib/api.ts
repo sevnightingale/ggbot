@@ -46,8 +46,9 @@ export interface ConfigData {
     user_prompt?: string
   }
   llm_config?: {  // Optional for agent and signal_validation configs
-    provider: string  // 'default' | 'openai' | 'deepseek' | 'anthropic' | 'xai'
+    provider: string  // 'default' | 'openai' | 'deepseek' | 'anthropic' | 'xai' | 'openrouter'
     model?: string    // Model name for the provider
+    thinking_mode?: boolean  // Enable extended reasoning mode (higher cost, better quality)
     use_platform_keys: boolean
     use_own_key: boolean
     // API keys are NOT stored here - they go to user_llm_credentials table via Vault
@@ -328,10 +329,10 @@ export class ApiClient {
     return await response.json()
   }
 
-  // Data Sources Management  
+  // Data Sources Management
   async getDataSourcesWithPoints(): Promise<DataSource[]> {
     console.log('🔍 API Call: getDataSourcesWithPoints to', `${this.baseUrl}/api/v2/data-sources-with-points`)
-    
+
     try {
       const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/data-sources-with-points`)
       console.log('📡 Response status:', response.status, response.statusText)
@@ -345,6 +346,44 @@ export class ApiClient {
       const result = await response.json()
       console.log('✅ Data sources loaded:', result)
       return result.data_sources
+    } catch (err) {
+      console.error('💥 Network error:', err)
+      throw err
+    }
+  }
+
+  // LLM Models Management
+  async getLLMModels(): Promise<Array<{
+    model_id: string
+    display_name: string
+    provider: string
+    openrouter_model_id: string
+    supports_thinking: boolean
+    enabled: boolean
+    max_context_tokens: number
+    context_display: string
+    pricing_input_per_1m: number
+    pricing_output_per_1m: number
+    cost_per_decision_standard: number
+    cost_per_decision_thinking: number
+    description: string
+    sort_order: number
+  }>> {
+    console.log('🔍 API Call: getLLMModels to', `${this.baseUrl}/api/v2/llm-models`)
+
+    try {
+      const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/llm-models`)
+      console.log('📡 Response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ API Error:', error)
+        throw new Error(`Failed to load LLM models: ${error}`)
+      }
+
+      const result = await response.json()
+      console.log('✅ LLM models loaded:', result)
+      return result.models
     } catch (err) {
       console.error('💥 Network error:', err)
       throw err
@@ -678,7 +717,7 @@ export const apiClient = new ApiClient()
 // Helper function to create default config data structure
 export function createDefaultConfigData(): ConfigData {
   return {
-    schema_version: "2.1",
+    schema_version: "2.2",
     config_type: "scheduled_trading", // Default to scheduled trading for all users
     selected_pair: "BTC/USDT",
     extraction: {
@@ -721,6 +760,7 @@ export function createDefaultConfigData(): ConfigData {
     llm_config: {
       provider: "default",
       model: "default", // Backend resolves to current default model
+      thinking_mode: false, // Standard mode by default
       use_platform_keys: true, // Use platform-managed keys by default
       use_own_key: false
     },

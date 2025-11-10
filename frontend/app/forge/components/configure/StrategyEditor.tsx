@@ -3,8 +3,19 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { Crown } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
-import { ConfigData } from '@/lib/api'
+import { ConfigData, apiClient } from '@/lib/api'
 import { UpgradeModal } from '@/components/UpgradeModal'
+
+interface LLMModel {
+  model_id: string
+  display_name: string
+  provider: string
+  cost_per_decision_standard: number
+  cost_per_decision_thinking: number
+  context_display: string
+  supports_thinking: boolean
+  enabled: boolean
+}
 
 interface StrategyEditorProps {
   configData?: ConfigData
@@ -22,11 +33,16 @@ export function StrategyEditor({
   const { canAccess } = usePermissions()
   const currentStrategy = configData?.decision?.user_prompt || ''
   const analysisFrequency = configData?.decision?.analysis_frequency || '1h'
-  const llmProvider = configData?.llm_config?.provider || 'default'
+  const llmModel = configData?.llm_config?.model || 'default'
+  const thinkingMode = configData?.llm_config?.thinking_mode || false
   const currentConfigType = configType || configData?.config_type || 'scheduled_trading'
 
   // Check premium access once to avoid repeated permission checks
   const hasPremiumAccess = canAccess('premium_llms')
+
+  // State for LLM models
+  const [llmModels, setLLMModels] = useState<LLMModel[]>([])
+  const [modelsLoading, setModelsLoading] = useState(true)
 
   // State for collapsible sections
   const [showSystemSections, setShowSystemSections] = useState(false)
@@ -34,6 +50,25 @@ export function StrategyEditor({
 
   // Ref for textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Fetch available LLM models on mount
+  useEffect(() => {
+    const fetchModels = async () => {
+      try {
+        setModelsLoading(true)
+        const models = await apiClient.getLLMModels()
+        setLLMModels(models.filter(m => m.enabled))
+      } catch (error) {
+        console.error('Failed to fetch LLM models:', error)
+        // Fallback to empty array on error
+        setLLMModels([])
+      } finally {
+        setModelsLoading(false)
+      }
+    }
+
+    fetchModels()
+  }, [])
 
   // Auto-resize textarea when content changes or component mounts
   useEffect(() => {
@@ -91,37 +126,32 @@ export function StrategyEditor({
     handleStrategyChange(textarea.value)
   }
 
-  // Handle LLM provider change
-  const handleProviderChange = (provider: string) => {
-    // Check if user has access to premium LLMs (frontier reasoning models)
-    if (provider !== 'default' && !hasPremiumAccess) {
+  // Handle model selection (OpenRouter)
+  const handleModelChange = (modelId: string) => {
+    // Check if user has access to premium LLMs (non-default models)
+    if (modelId !== 'default' && !hasPremiumAccess) {
       setUpgradeModalOpen(true)
       return
     }
 
-    // Set appropriate model for each provider
-    // Default uses basic non-reasoning model
-    // Pro providers use best reasoning models
-    let model
-    if (provider === 'openai') {
-      model = 'gpt-5'  // Frontier reasoning
-    } else if (provider === 'deepseek') {
-      model = 'deepseek-reasoner'  // Frontier reasoning
-    } else if (provider === 'anthropic') {
-      model = 'claude-opus-4-1-20250805'  // Frontier reasoning
-    } else if (provider === 'xai') {
-      model = 'grok-4-fast-reasoning'  // Frontier reasoning
-    } else {
-      model = 'default'  // Basic intelligence (grok-4-fast-non-reasoning)
-    }
-
     onUpdate?.({
       llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false }),  // Guard with defaults
-        provider,
-        model,
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, thinking_mode: false }),
+        provider: modelId === 'default' ? 'default' : 'openrouter',
+        model: modelId,
+        thinking_mode: configData?.llm_config?.thinking_mode || false,
         use_platform_keys: true,
         use_own_key: false
+      }
+    })
+  }
+
+  // Handle thinking mode toggle
+  const handleThinkingModeChange = (enabled: boolean) => {
+    onUpdate?.({
+      llm_config: {
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'default', model: 'default' }),
+        thinking_mode: enabled
       }
     })
   }
@@ -304,7 +334,7 @@ export function StrategyEditor({
         )}
       </div>
 
-      {/* LLM Provider */}
+      {/* LLM Model Selection */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           AI Decision Engine
@@ -314,135 +344,109 @@ export function StrategyEditor({
         </p>
 
         <div className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-            {/* Default Model - Always visible */}
-            <button
-              onClick={() => handleProviderChange('default')}
-              className={`p-4 rounded-xl border text-left transition-all ${
-                llmProvider === 'default'
-                  ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                  : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-              }`}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <div className="font-medium">Default Model</div>
-                <span className="text-xs px-2 py-1 rounded-full bg-[var(--profit-color)]/20 text-[var(--profit-color)]">
-                  Free
-                </span>
-              </div>
-              <div className="text-xs text-[var(--text-muted)]">
-                Basic intelligence for standard trading strategies
-              </div>
-            </button>
-
-            {/* Frontier Models - Conditional based on subscription */}
-            {!hasPremiumAccess ? (
-              // Free users: Locked "Frontier Reasoning Models" card
+          {modelsLoading ? (
+            <div className="p-4 text-center text-[var(--text-muted)]">Loading models...</div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
+              {/* Default Model - Always first */}
               <button
-                onClick={() => setUpgradeModalOpen(true)}
-                className="p-4 rounded-xl border text-left transition-all bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 hover:opacity-80"
+                onClick={() => handleModelChange('default')}
+                className={`p-4 rounded-xl border text-left transition-all ${
+                  llmModel === 'default'
+                    ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                    : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                }`}
               >
                 <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium flex items-center gap-2">
-                    Frontier Reasoning Models
-                    <Crown className="h-3 w-3" />
-                  </div>
+                  <div className="font-medium">Default Model</div>
+                  <span className="text-xs px-2 py-1 rounded-full bg-[var(--profit-color)]/20 text-[var(--profit-color)]">
+                    Free
+                  </span>
                 </div>
                 <div className="text-xs text-[var(--text-muted)]">
-                  Advanced AI models with enhanced reasoning capabilities
+                  Basic intelligence for standard trading strategies
                 </div>
               </button>
-            ) : (
-              // Pro users: Individual provider cards
-              <>
+
+              {/* Premium Models - Conditional */}
+              {!hasPremiumAccess ? (
                 <button
-                  onClick={() => handleProviderChange('openai')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    llmProvider === 'openai'
-                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                  }`}
+                  onClick={() => setUpgradeModalOpen(true)}
+                  className="p-4 rounded-xl border text-left transition-all bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 hover:opacity-80"
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-medium flex items-center gap-2">
-                      ChatGPT / OpenAI
-                      <Crown className="h-3 w-3 text-amber-500" />
+                      7 Premium Models
+                      <Crown className="h-3 w-3" />
                     </div>
                   </div>
                   <div className="text-xs text-[var(--text-muted)]">
-                    GPT-5 with advanced reasoning
+                    Grok, Claude, Gemini, DeepSeek, GPT, Kimi, Qwen
                   </div>
                 </button>
+              ) : (
+                llmModels.map((model) => (
+                  <button
+                    key={model.model_id}
+                    onClick={() => handleModelChange(model.model_id)}
+                    className={`p-4 rounded-xl border text-left transition-all ${
+                      llmModel === model.model_id
+                        ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                        : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="font-medium flex items-center gap-2">
+                        {model.display_name}
+                        <Crown className="h-3 w-3 text-amber-500" />
+                      </div>
+                      <span className="text-xs text-[var(--text-muted)]">
+                        {model.context_display}
+                      </span>
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)]">
+                      ${(thinkingMode ? model.cost_per_decision_thinking : model.cost_per_decision_standard).toFixed(3)}/decision
+                    </div>
+                  </button>
+                ))
+              )}
+            </div>
+          )}
 
+          {/* Thinking Mode Toggle - Below model selection */}
+          {llmModel !== 'default' && hasPremiumAccess && (
+            <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
+              <div className="flex items-center justify-between">
+                <div className="flex-1">
+                  <div className="text-sm font-medium text-[var(--text-primary)] mb-1">
+                    Extended Reasoning Mode
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    Enables deeper analysis with longer thinking time (higher cost, better quality)
+                  </div>
+                </div>
                 <button
-                  onClick={() => handleProviderChange('anthropic')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    llmProvider === 'anthropic'
-                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                  onClick={() => handleThinkingModeChange(!thinkingMode)}
+                  className={`ml-4 relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                    thinkingMode ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
                   }`}
                 >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium flex items-center gap-2">
-                      Claude / Anthropic
-                      <Crown className="h-3 w-3 text-amber-500" />
-                    </div>
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    Claude Opus 4 with deep analysis
-                  </div>
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                      thinkingMode ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
                 </button>
+              </div>
+            </div>
+          )}
 
-                <button
-                  onClick={() => handleProviderChange('xai')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    llmProvider === 'xai'
-                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium flex items-center gap-2">
-                      Grok / XAI
-                      <Crown className="h-3 w-3 text-amber-500" />
-                    </div>
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    Grok 4 Fast with reasoning
-                  </div>
-                </button>
-
-                <button
-                  onClick={() => handleProviderChange('deepseek')}
-                  className={`p-4 rounded-xl border text-left transition-all ${
-                    llmProvider === 'deepseek'
-                      ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                      : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium flex items-center gap-2">
-                      DeepSeek
-                      <Crown className="h-3 w-3 text-amber-500" />
-                    </div>
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    DeepSeek R1 reasoner
-                  </div>
-                </button>
-              </>
-            )}
-          </div>
-
-          {/* Current Selection */}
+          {/* Current Selection Display */}
           <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
             <div className="text-sm text-[var(--text-muted)]">
               Current: <span className="text-[var(--text-primary)] font-medium">
-                {llmProvider === 'default' ? 'Default Model (basic intelligence)' :
-                 llmProvider === 'openai' ? 'ChatGPT / OpenAI' :
-                 llmProvider === 'deepseek' ? 'DeepSeek' :
-                 llmProvider === 'anthropic' ? 'Claude / Anthropic' :
-                 llmProvider === 'xai' ? 'Grok / XAI' : 'Default Model'}
+                {llmModel === 'default' ? 'Default Model' : llmModels.find(m => m.model_id === llmModel)?.display_name || llmModel}
+                {thinkingMode && llmModel !== 'default' && <span className="text-[var(--text-muted)]"> (Thinking Mode)</span>}
               </span>
             </div>
           </div>
