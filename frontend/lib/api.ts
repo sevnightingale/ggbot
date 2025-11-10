@@ -362,10 +362,14 @@ export class ApiClient {
     enabled: boolean
     max_context_tokens: number
     context_display: string
-    pricing_input_per_1m: number
-    pricing_output_per_1m: number
-    cost_per_decision_standard: number
-    cost_per_decision_thinking: number
+    pricing: {
+      input_per_1m: number
+      output_per_1m: number
+    }
+    cost_per_decision: {
+      standard: number
+      thinking: number
+    }
     description: string
     sort_order: number
   }>> {

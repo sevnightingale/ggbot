@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useRef } from 'react'
+import Image from 'next/image'
 import { Crown } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
 import { ConfigData, apiClient } from '@/lib/api'
@@ -10,11 +11,24 @@ interface LLMModel {
   model_id: string
   display_name: string
   provider: string
-  cost_per_decision_standard: number
-  cost_per_decision_thinking: number
   context_display: string
   supports_thinking: boolean
   enabled: boolean
+  cost_per_decision: {
+    standard: number
+    thinking: number
+  }
+}
+
+// Logo mapping for LLM models
+const MODEL_LOGOS: Record<string, string> = {
+  'grok': '/Grok_logo.png',
+  'claude': '/Claude_logo.png',
+  'gemini': '/Gemini_logo.png',
+  'deepseek': '/deepseek_logo.png',
+  'gpt': '/GPT_logo.png',
+  'kimi': '/kimi-color.png',
+  'qwen': '/qwen_logo.png',
 }
 
 interface StrategyEditorProps {
@@ -385,30 +399,45 @@ export function StrategyEditor({
                   </div>
                 </button>
               ) : (
-                llmModels.map((model) => (
-                  <button
-                    key={model.model_id}
-                    onClick={() => handleModelChange(model.model_id)}
-                    className={`p-4 rounded-xl border text-left transition-all ${
-                      llmModel === model.model_id
-                        ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                        : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                    }`}
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="font-medium flex items-center gap-2">
-                        {model.display_name}
-                        <Crown className="h-3 w-3 text-amber-500" />
+                llmModels.map((model) => {
+                  const logoPath = MODEL_LOGOS[model.model_id]
+                  return (
+                    <button
+                      key={model.model_id}
+                      onClick={() => handleModelChange(model.model_id)}
+                      className={`p-4 rounded-xl border text-left transition-all ${
+                        llmModel === model.model_id
+                          ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                          : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                      }`}
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="font-medium flex items-center gap-2">
+                          {logoPath && (
+                            <Image
+                              src={logoPath}
+                              alt={`${model.display_name} logo`}
+                              width={20}
+                              height={20}
+                              className="object-contain"
+                            />
+                          )}
+                          {model.display_name}
+                          <Crown className="h-3 w-3 text-amber-500" />
+                        </div>
+                        <span className="text-xs text-[var(--text-muted)]">
+                          {model.context_display || 'N/A'}
+                        </span>
                       </div>
-                      <span className="text-xs text-[var(--text-muted)]">
-                        {model.context_display}
-                      </span>
-                    </div>
-                    <div className="text-xs text-[var(--text-muted)]">
-                      ${(thinkingMode ? model.cost_per_decision_thinking : model.cost_per_decision_standard).toFixed(3)}/decision
-                    </div>
-                  </button>
-                ))
+                      <div className="text-xs text-[var(--text-muted)]">
+                        {(() => {
+                          const cost = thinkingMode ? model.cost_per_decision?.thinking : model.cost_per_decision?.standard
+                          return cost != null ? `$${cost.toFixed(3)}/decision` : 'Pricing unavailable'
+                        })()}
+                      </div>
+                    </button>
+                  )
+                })
               )}
             </div>
           )}
