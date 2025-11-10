@@ -83,7 +83,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     # Optimized single query using CTEs with proper filtering and limits
     query = """
     WITH bot_configs AS (
-        SELECT c.config_id, c.user_id, c.config_name, c.state, c.config_data,
+        SELECT c.config_id, c.user_id, c.config_name, c.config_type, c.state, c.config_data,
                c.trading_mode, c.symphony_agent_id,
                c.created_at, c.updated_at
         FROM configurations c

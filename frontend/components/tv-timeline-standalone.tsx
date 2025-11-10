@@ -226,6 +226,12 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
 
     const fetchData = async () => {
       try {
+        // Guard: Don't fetch if component is unmounted or chart destroyed
+        if (!chartRef.current || !lineSeriesRef.current) {
+          console.log('fetchData skipped - chart or line series destroyed');
+          return;
+        }
+
         console.log('fetchData starting...', { configId, hasSession: !!session });
         setLoading(true);
         setError(null);

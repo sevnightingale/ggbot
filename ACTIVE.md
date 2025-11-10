@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-10 21:57:00 UTC (Auto-updated by status_check.py)
-**System Health**: 🟢 HEALTHY
+**Last Updated**: 2025-11-10 22:55:20 UTC (Auto-updated by status_check.py)
+**System Health**: 🟡 LOW ACTIVITY
 
 ## 📊 Live Platform Metrics
 
@@ -28,7 +28,7 @@
 - **Recent Activity**:
   - Last 24 hours: 0 trades
   - Last 7 days: 0 trades
-  - Last 30 days: 3979 trades
+  - Last 30 days: 3978 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -49,11 +49,11 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 24 decisions (avg confidence: 10.0%)
+- **wait**: 23 decisions (avg confidence: 9.6%)
 
 ### System Health
-- **Decisions (last hour)**: 1
-- **Status**: 🟢 HEALTHY
+- **Decisions (last hour)**: 0
+- **Status**: 🟡 LOW ACTIVITY
 
 ## 🖥️ System Resources
 
@@ -61,21 +61,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 63MB | 12h 10m | 45 |
-| x-bot | 🟢 online | 0% | 40MB | 12h 10m | 45 |
-| error-alerts | 🟢 online | 0% | 33MB | 12h 10m | 52 |
-| market-data-ws | 🟢 online | 1.9% | 125MB | 12h 10m | 47 |
-| ggbot | 🟢 online | 0.4% | 246MB | 20m | 116 |
+| signal-listener | 🟢 online | 0% | 63MB | 12m | 46 |
+| x-bot | 🟢 online | 0% | 41MB | 12m | 46 |
+| error-alerts | 🟢 online | 0.1% | 33MB | 12m | 53 |
+| market-data-ws | 🟢 online | 2.3% | 156MB | 11m | 48 |
+| ggbot | 🟢 online | 0.6% | 246MB | 11m | 117 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (46%)
-- **Memory**: 1.8Gi / 3.8Gi
-- **CPU Load**: 0.37 / 0.44 / 0.34 (1m/5m/15m)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 0.30 / 0.33 / 0.34 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 8.38M)
+- **Redis**: 🟢 connected (Memory: 14.89M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -346,7 +346,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-10 21:57:00 UTC
+**Last Updated**: 2025-11-10 22:55:21 UTC
 
 ---
 
@@ -1125,7 +1125,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-10 21:57:00 UTC
+**Last Updated**: 2025-11-10 22:55:21 UTC
 
 ---
 

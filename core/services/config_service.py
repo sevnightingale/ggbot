@@ -304,8 +304,8 @@ class ConfigService:
                             "agent_strategy": inner_config.get("agent_strategy"),  # Include agent strategy
                             "trading_mode": trading_mode,
                             "symphony_agent_id": symphony_agent_id,
-                            "created_at": result[1].isoformat() if result[1] else None,
-                            "updated_at": result[2].isoformat() if result[2] else None
+                            "created_at": result[2].isoformat() if result[2] else None,
+                            "updated_at": result[3].isoformat() if result[3] else None
                         }
                     else:
                         # Legacy flat structure - ensure required fields
@@ -318,10 +318,10 @@ class ConfigService:
                         flattened_config["config_type"] = db_config_type
                         flattened_config["trading_mode"] = trading_mode
                         flattened_config["symphony_agent_id"] = symphony_agent_id
-                        if "created_at" not in flattened_config and result[1]:
-                            flattened_config["created_at"] = result[1].isoformat()
-                        if "updated_at" not in flattened_config and result[2]:
-                            flattened_config["updated_at"] = result[2].isoformat()
+                        if "created_at" not in flattened_config and result[2]:
+                            flattened_config["created_at"] = result[2].isoformat()
+                        if "updated_at" not in flattened_config and result[3]:
+                            flattened_config["updated_at"] = result[3].isoformat()
 
                     return BotConfigV2.from_dict(flattened_config)
                     

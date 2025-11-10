@@ -72,6 +72,7 @@ class LLMProvider(str, Enum):
     DEEPSEEK = "deepseek"
     ANTHROPIC = "anthropic"
     XAI = "xai"
+    OPENROUTER = "openrouter"
 
 
 class LLMConfig(BaseModel):
