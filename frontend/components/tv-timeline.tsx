@@ -528,6 +528,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         lineSeriesRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configId, session, chartContainer]);
 
   // Track latest activity and update status text

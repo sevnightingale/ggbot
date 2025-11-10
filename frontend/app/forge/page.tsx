@@ -546,7 +546,8 @@ function ForgeApp() {
         setHasUnsavedChanges(false)
       }
     }
-  }, [selectedConfigId, selectedBot, isEditingConfig, editingConfigData, originalConfig])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedConfigId, selectedBot, isEditingConfig, originalConfig])
 
   // Start bot function using proper API client
   const startBot = async () => {

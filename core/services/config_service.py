@@ -432,6 +432,15 @@ class ConfigService:
                 self._log.warning(f"Config {config_id} not found for user {user_id}")
                 return None
             
+            # Deep merge agent_strategy if partially updating
+            merged_agent_strategy = existing_config.agent_strategy
+            if "agent_strategy" in config_data and config_data["agent_strategy"]:
+                if existing_config.agent_strategy:
+                    # Merge new fields into existing strategy
+                    merged_agent_strategy = {**existing_config.agent_strategy, **config_data["agent_strategy"]}
+                else:
+                    merged_agent_strategy = config_data["agent_strategy"]
+
             # Create updated config
             updated_config = BotConfigV2(
                 config_id=config_id,
@@ -445,7 +454,7 @@ class ConfigService:
                 schema_version=config_data.get("schema_version", existing_config.schema_version),
                 llm_config=config_data.get("llm_config", existing_config.llm_config),
                 telegram_integration=config_data.get("telegram_integration", existing_config.telegram_integration),
-                agent_strategy=config_data.get("agent_strategy", existing_config.agent_strategy),  # Include agent strategy
+                agent_strategy=merged_agent_strategy,  # Use deep-merged agent strategy
                 trading_mode=existing_config.trading_mode,  # Preserve trading mode (paper vs live)
                 symphony_agent_id=existing_config.symphony_agent_id,  # Preserve Symphony agent ID
                 created_at=existing_config.created_at,

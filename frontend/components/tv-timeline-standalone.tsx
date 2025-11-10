@@ -76,7 +76,6 @@ interface TimelineProps {
 
 export default function TVTimelineStandalone({ configId, title, variant = 'standalone' }: TimelineProps) {
   // Hardcoded to dark theme for standalone usage
-  const theme = 'dark';
   const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
   const chartRef = useRef<IChartApi | null>(null);
   const lineSeriesRef = useRef<ISeriesApi<'Line'> | null>(null);
@@ -488,6 +487,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
         lineSeriesRef.current = null;
       }
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configId, session, chartContainer]);
 
   // Track latest activity and update status text
