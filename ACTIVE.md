@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-08 11:36:04 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-08 18:26:50 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,23 +12,23 @@
 - **Users with Bots**: 252 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 377
+- **Total Bots**: 378
 - **Active Bots**: 3 (0.8%)
   - Paper Trading: 2
   - Live Trading: 0
-- **Inactive Bots**: 374
+- **Inactive Bots**: 375
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,452
+- **Total Trades (All Time)**: 5,453
   - Wins: 1,635
-  - Losses: 3,817
-  - Platform Win Rate: 29.99%
-  - Total P&L: $-16,000.65
+  - Losses: 3,818
+  - Platform Win Rate: 29.98%
+  - Total P&L: $-16,000.78
 - **Recent Activity**:
-  - Last 24 hours: 0 trades
-  - Last 7 days: 19 trades
-  - Last 30 days: 4063 trades
+  - Last 24 hours: 1 trades
+  - Last 7 days: 2 trades
+  - Last 30 days: 4045 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -37,7 +37,7 @@
 - **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,926.33
+- **Average Balance**: $9,926.53
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
@@ -49,7 +49,8 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 24 decisions (avg confidence: 5.8%)
+- **wait**: 24 decisions (avg confidence: 8.3%)
+- **enter**: 1 decisions (avg confidence: 70.0%)
 
 ### System Health
 - **Decisions (last hour)**: 1
@@ -61,21 +62,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 57MB | 13h 46m | 42 |
-| x-bot | 🟢 online | 0% | 41MB | 13h 46m | 42 |
-| error-alerts | 🟢 online | 0% | 32MB | 13h 46m | 49 |
-| market-data-ws | 🟢 online | 2.3% | 163MB | 13h 46m | 44 |
-| ggbot | 🟢 online | 2.1% | 246MB | 13h 46m | 111 |
+| signal-listener | 🟢 online | 0% | 58MB | 1h 46m | 43 |
+| x-bot | 🟢 online | 0% | 29MB | 1h 46m | 43 |
+| error-alerts | 🟢 online | 0% | 31MB | 1h 46m | 50 |
+| market-data-ws | 🟢 online | 1.8% | 143MB | 1h 46m | 45 |
+| ggbot | 🟢 online | 0.8% | 245MB | 1h 46m | 112 |
+| agent-bb2560fd-b053-464f-8a58-8e254e4d36fa | 🟢 online | 0% | 65MB | 3m | 1 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (46%)
-- **Memory**: 2.8Gi / 3.8Gi
-- **CPU Load**: 0.80 / 0.63 / 0.38 (1m/5m/15m)
+- **Memory**: 2.2Gi / 3.8Gi
+- **CPU Load**: 0.58 / 0.39 / 0.37 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 11.43M)
+- **Redis**: 🟢 connected (Memory: 9.39M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -346,7 +348,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-08 11:36:05 UTC
+**Last Updated**: 2025-11-08 18:26:51 UTC
 
 ---
 
@@ -375,13 +377,32 @@ df -h
 | `activity_source` | text |  |  |
 | `summary` | text |  |  |
 | `details` | jsonb |  | '{}'::jsonb |
-| `trade_id` | uuid | ✓ |  |
+| `trade_id` | text | ✓ |  |
 | `trade_type` | text | ✓ |  |
 | `decision_id` | uuid | ✓ |  |
 | `related_symbol` | text | ✓ |  |
 | `priority` | integer |  | 2 |
 | `importance` | integer |  | 5 |
 | `created_at` | timestamp with time zone |  | now() |
+
+### `agent_sessions` (5 columns)
+
+**Primary Key**: `config_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+
+**Indexes**:
+- `idx_agent_sessions_last_active` on (last_active_at)
+- `idx_agent_sessions_session_id` on (session_id)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `config_id` | uuid |  |  |
+| `session_id` | character varying(255) |  |  |
+| `last_active_at` | timestamp without time zone | ✓ | now() |
+| `created_at` | timestamp without time zone | ✓ | now() |
+| `updated_at` | timestamp without time zone | ✓ | now() |
 
 ### `bot_telegram_channels` (6 columns)
 
@@ -762,7 +783,7 @@ df -h
 | `created_at` | timestamp with time zone | ✓ | now() |
 | `updated_at` | timestamp with time zone | ✓ | now() |
 
-### `user_profiles` (15 columns)
+### `user_profiles` (18 columns)
 
 **Primary Key**: `user_id`
 
@@ -789,6 +810,9 @@ df -h
 | `paid_data_points` | ARRAY | ✓ | ARRAY[]::text[] |
 | `symphony_vault_id` | uuid | ✓ |  |
 | `symphony_smart_account` | character varying(42) | ✓ |  |
+| `aster_vault_id` | uuid | ✓ |  |
+| `aster_user_wallet` | character varying(42) | ✓ |  |
+| `aster_wallet` | character varying(42) | ✓ |  |
 
 ---
 
@@ -1073,7 +1097,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-08 11:36:05 UTC
+**Last Updated**: 2025-11-08 18:26:51 UTC
 
 ---
 

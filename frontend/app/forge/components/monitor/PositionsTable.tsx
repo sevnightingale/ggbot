@@ -6,7 +6,7 @@ import { apiClient } from '@/lib/api'
 
 interface Position {
   trade_id?: string
-  position_id?: string  // Unified ID field (trade_id for paper, batch_id for live)
+  position_id?: string  // Unified ID field (trade_id for paper, batch_id for live/aster)
   symbol: string
   side: string
   size_usd: number
@@ -18,7 +18,7 @@ interface Position {
   stop_loss?: number
   take_profit?: number
   leverage: number
-  source?: 'paper' | 'live'  // Track position source
+  source?: 'paper' | 'live' | 'aster'  // Track position source
 }
 
 interface PositionsTableProps {
@@ -68,8 +68,8 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     return `${sign}${change.toFixed(2)}%`
   }
 
-  // Handle closing a position (paper or live)
-  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' = 'paper') => {
+  // Handle closing a position (paper, live, or aster)
+  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' | 'aster' = 'paper') => {
     if (!selectedConfigId) {
       console.error('No config ID selected')
       return
@@ -82,10 +82,11 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     try {
       setClosingPositions(prev => ({ ...prev, [positionId]: true }))
 
+      const headers = await apiClient.getAuthHeaders()
+      const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+
       if (source === 'live') {
         // Close live position via Symphony
-        const headers = await apiClient.getAuthHeaders()
-        const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
         const response = await fetch(`${baseUrl}/api/v2/positions/live/${positionId}/close`, {
           method: 'POST',
           headers
@@ -93,12 +94,27 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
 
         if (!response.ok) {
           const error = await response.text()
-          throw new Error(`Failed to close live position: ${error}`)
+          throw new Error(`Failed to close Symphony position: ${error}`)
         }
 
         const result = await response.json()
-        console.log('Live position closed:', result)
-        alert('✅ Live position closed successfully!')
+        console.log('Symphony position closed:', result)
+        alert('✅ Symphony position closed successfully!')
+      } else if (source === 'aster') {
+        // Close Aster position via AsterDEX
+        const response = await fetch(`${baseUrl}/api/v2/positions/aster/${positionId}/close`, {
+          method: 'POST',
+          headers
+        })
+
+        if (!response.ok) {
+          const error = await response.text()
+          throw new Error(`Failed to close Aster position: ${error}`)
+        }
+
+        const result = await response.json()
+        console.log('Aster position closed:', result)
+        alert('✅ Aster position closed successfully!')
       } else {
         // Close paper position (existing logic)
         const result = await apiClient.closePosition(selectedConfigId, positionId)

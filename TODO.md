@@ -4,6 +4,151 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
+## 💳 **CRITICAL - Metered Billing & Pricing Overhaul** [metered_billing.md]
+
+**Status**: Planning (2025-11-08)
+**Planning Doc**: [DOCS/todo/metered_billing.md](DOCS/todo/metered_billing.md)
+
+**Goal**: Complete platform pricing overhaul from freemium to usage-based billing + premium subscription.
+
+### **Business Model**
+- **Eliminate free tier** - all users pay based on consumption
+- **Usage tier**: Pay-as-you-go, charged monthly for LLM token consumption (70% markup)
+- **Premium tier**: $100/month unlocks agents + base usage allowance + premium features
+- **Low barrier to test**: Estimated $2-5/month for minimal usage (DeepSeek, 1h frequency)
+
+### **Phase 1: Token Tracking Infrastructure** (2 days)
+- [ ] **Database Schema**
+  - [ ] Create `token_usage` table (user_id, config_id, provider, model, tokens, costs)
+  - [ ] Create `llm_model_pricing` table (provider, model, input/output rates, effective_date)
+  - [ ] Create `usage_alerts` table (threshold tracking for email alerts)
+  - [ ] Add indexes for monthly aggregation and Stripe reporting queries
+
+- [ ] **Token Tracking Service**
+  - [ ] Create `TokenTrackingService` class (record_usage, get_current_month_spend, get_unreported_usage)
+  - [ ] Implement cost calculator (70% markup, model-specific pricing)
+  - [ ] Add token tracking wrapper to all LLM calls (decision, agent, extraction, signal validation)
+
+- [ ] **LLM Pricing Research**
+  - [ ] Research current token rates: GPT-4, GPT-5, Claude Opus 4, DeepSeek R1, Grok 4
+  - [ ] Seed `llm_model_pricing` table with current rates
+  - [ ] Document pricing sources and update schedule
+
+- [ ] **OpenRouter Investigation**
+  - [ ] Research: Are all current models available via OpenRouter?
+  - [ ] Test token tracking: Verify `usage` object in responses
+  - [ ] Compare pricing: OpenRouter rates vs direct API + 70% markup
+  - [ ] Test latency: Direct API vs OpenRouter proxy (<500ms overhead acceptable)
+  - [ ] Decision: Migrate immediately or after metered billing stabilizes?
+
+### **Phase 2: Stripe Metered Billing Setup** (1 day)
+- [ ] **Stripe Product Configuration**
+  - [ ] Create "ggbots Usage-Based Billing" product in Stripe
+  - [ ] Create metered price ($1 per unit, quantity = dollars spent)
+  - [ ] Set billing threshold: $20 OR monthly, whichever comes first
+
+- [ ] **Subscription Management**
+  - [ ] Implement `create_metered_subscription()` on user signup (requires credit card)
+  - [ ] Add payment method requirement to signup flow
+  - [ ] Update webhook handlers for metered invoices
+
+- [ ] **Usage Reporting**
+  - [ ] Create hourly background job to report usage to Stripe
+  - [ ] Implement idempotency keys (timestamp-based)
+  - [ ] Add Stripe usage record API integration
+  - [ ] Mark usage records as reported in database
+
+- [ ] **Payment Failure Handling**
+  - [ ] Auto-pause all bots on payment failure
+  - [ ] Send email notification to user
+  - [ ] Auto-resume bots when payment resolved
+
+### **Phase 3: Premium Subscription** (0.5 days)
+- [ ] **Database Schema**
+  - [ ] Add `premium_subscription_id`, `premium_tier_active` to user_profiles
+  - [ ] Add `premium_base_allowance_usd`, `premium_base_allowance_used_usd`
+
+- [ ] **Stripe Product**
+  - [ ] Create "ggbots Pro - Agent Access" product ($100/month recurring)
+  - [ ] Implement combined subscription (metered + fixed $100)
+  - [ ] Add upgrade flow (add fixed item to existing metered subscription)
+
+- [ ] **Base Allowance Logic**
+  - [ ] Implement allowance calculation (e.g., $30 included with Pro)
+  - [ ] Deduct allowance from billable usage before Stripe reporting
+  - [ ] Reset allowance monthly
+
+- [ ] **Permission Updates**
+  - [ ] Add `can_use_agents` property to UserProfile
+  - [ ] Update frontend agent creation gate (require Pro)
+  - [ ] Determine other premium-only features
+
+### **Phase 4: Usage Estimator** (1.5 days)
+- [ ] **Backend Calculator**
+  - [ ] Create `UsageEstimator` service
+  - [ ] Calculate monthly executions from analysis_frequency
+  - [ ] Estimate tokens per execution (historical avg or template-based)
+  - [ ] Apply model pricing + 70% markup
+  - [ ] Return range (low/high with ±25% variance)
+
+- [ ] **API Endpoint**
+  - [ ] `POST /api/v2/estimate-cost` (accepts bot config, returns estimate)
+  - [ ] Support draft configs (not yet saved)
+
+- [ ] **Frontend Integration**
+  - [ ] Add cost estimator to bot creation/edit modal
+  - [ ] Real-time updates as user changes model/frequency (debounced)
+  - [ ] Display: "Estimated cost: $X-Y/month"
+
+### **Phase 5: Usage Dashboard** (1 day)
+- [ ] **Backend API**
+  - [ ] `GET /api/v2/usage/current-month` (total, breakdown by bot/model, estimate)
+  - [ ] `GET /api/v2/usage/history` (past N months)
+  - [ ] `POST /api/v2/usage/set-hard-cap` (optional spending limit)
+
+- [ ] **Frontend Component**
+  - [ ] Create `UsageDashboard` component
+  - [ ] Current month spend (big number)
+  - [ ] Breakdown by bot (pie chart)
+  - [ ] Breakdown by model (bar chart)
+  - [ ] Historical trend (line chart, 6 months)
+  - [ ] Hard cap settings (input + save)
+  - [ ] Link to Stripe billing portal (invoices)
+
+### **Phase 6: Alerts & Safeguards** (0.5 days)
+- [ ] **Email Alerts**
+  - [ ] Create `UsageAlertService`
+  - [ ] Trigger alerts at $10, $20, $50, $100 thresholds
+  - [ ] Resend email templates (usage_alert.html)
+  - [ ] Hourly background job to check and send alerts
+
+- [ ] **Hard Cap Enforcement**
+  - [ ] Background job (every 5 min) to check hard caps
+  - [ ] Auto-pause all bots when hard cap exceeded
+  - [ ] Send email notification
+  - [ ] Auto-resume when new billing cycle starts or cap raised
+
+### **Testing & Launch** (2 days)
+- [ ] **Stripe Test Mode**
+  - [ ] Test subscription creation with credit card
+  - [ ] Test usage reporting (send test records)
+  - [ ] Test billing threshold (trigger $20 mid-cycle invoice)
+  - [ ] Test payment failure flow (card decline)
+
+- [ ] **End-to-End Flows**
+  - [ ] New user: signup → add card → create bot → run → verify invoice
+  - [ ] Existing user: upgrade to Premium → verify $100 + usage
+  - [ ] Hard cap: set $10 cap → run bot → verify pause at limit
+
+- [ ] **Launch Prep**
+  - [ ] Create pricing page on ggbots.ai
+  - [ ] Draft user communication (pricing changes)
+  - [ ] Prepare FAQ/support docs
+  - [ ] Switch Stripe to live mode
+  - [ ] Deploy to production
+
+---
+
 ## 🤖 **Agent - Session Persistence Testing & Monitoring**
 
 **Status**: Session resumption implemented (2025-11-08), needs production validation
@@ -27,6 +172,66 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
   - [ ] Test real-time collaborative editing (user + agent editing same strategy)
   - [ ] Verify SSE updates push agent edits to frontend
   - [ ] Test debounced auto-save (1s delay)
+
+---
+
+## 🏗️ **Agent Architecture - Builder/Executor Separation**
+
+**Status**: Planning (2025-11-08)
+**Planning Doc**: [DOCS/todo/strategy_builder_agent.md](DOCS/todo/strategy_builder_agent.md)
+
+**Goal**: Split agent into two distinct services:
+- **Strategy Builder** (shared, multi-user) - Configuration assistant always available
+- **Autonomous Traders** (dedicated, per-bot) - Execution-only agents
+
+### **Phase 1: Create Builder Service** (No Breaking Changes)
+- [ ] **Database**
+  - [ ] Create `strategy_builder_sessions` table
+  - [ ] Rename `agent_sessions` → `trading_agent_sessions`
+  - [ ] Run migration (backward-compatible)
+
+- [ ] **Builder Service Implementation**
+  - [ ] Create `agent/builder_service.py` (session pool manager)
+  - [ ] Create `agent/builder_mcp_server.py` (6 configuration tools)
+  - [ ] Create `api/builder.py` (WebSocket endpoints)
+  - [ ] Start as PM2 service: `pm2 start agent/builder_service.py --name strategy-builder`
+
+- [ ] **Frontend Integration**
+  - [ ] Add WebSocket connection to builder service
+  - [ ] Update chat interface to always connect (no "Start" button)
+  - [ ] Add feature flag: `ENABLE_BUILDER_SERVICE`
+
+- [ ] **Testing**
+  - [ ] Test 10+ concurrent users chatting with builder
+  - [ ] Verify session resumption across reconnects
+  - [ ] Validate zero cross-user session contamination
+  - [ ] Test update_bot_config saves correctly
+
+### **Phase 2: Clean Up Trading Agents** (Breaking Change)
+- [ ] **Remove Mode Switching**
+  - [ ] Delete `strategy_definition` mode from `run_agent.py`
+  - [ ] Remove mode parameter from API endpoints
+  - [ ] Remove builder tools from trading agent MCP server
+  - [ ] Add startup validation (strategy must exist)
+
+- [ ] **Update Frontend**
+  - [ ] Remove "Start Strategy Builder" button
+  - [ ] Update "Activate" button to validate strategy exists
+  - [ ] Update status display (builder always available)
+
+- [ ] **Communication**
+  - [ ] Notify users about simplified UX (no mode switching)
+  - [ ] Update `agent/README.md` documentation
+
+### **Phase 3: Expand Builder Scope** (Enhancement)
+- [ ] **Scheduled Bot Configuration**
+  - [ ] Add `update_bot_config` support for `extraction`, `decision`, `trading` sections
+  - [ ] Add validation for scheduled bot configs
+  - [ ] Update builder system prompt with scheduled guidance
+
+- [ ] **Frontend Integration**
+  - [ ] Enable builder chat for scheduled bot config pages
+  - [ ] Add context detection (agent vs scheduled)
 
 ---
 
@@ -55,9 +260,9 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 - [ ] **Dashboard Display**
   - [ ] Add SSE enrichment for `trading_mode === 'aster'` (SSE already supports this, verify frontend)
-  - [ ] Route close button to Aster service
+  - [x] Route close button to Aster service
   - [ ] Show "Track on AsterDEX" for balance
-  - [ ] Add AsterDEX icon/badge to active positions
+  - [x] Add AsterDEX icon/badge to active positions
 
 ### **API Endpoints**
 - [ ] `POST /api/v2/aster/setup` (store credentials)

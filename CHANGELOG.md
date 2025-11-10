@@ -4,7 +4,7 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
-## 2025-01-08 - Trading Mode Architecture Refactor
+## 2025-11-08 - Trading Mode Architecture Refactor
 
 **Simplified Bot Creation + AsterDEX Integration**: Eliminated "duplicate as live" workaround, removed dead code duplication, added first-class AsterDEX support with upfront trading mode selection during bot creation.
 
@@ -18,6 +18,11 @@ Complete history of features, fixes, and improvements. For current status see AC
 - **Migration**: Added `user_profiles.aster_vault_id`, `aster_user_wallet`, `aster_wallet` columns (nullable), backwards compatible with existing live bots
 
 **Impact**: Bot creation flow reduced 5→3 steps, trading mode immutable at creation (prevents confusion), Aster equal to Symphony (no second-class citizen), 450 lines dead code removed
+
+**Follow-up** (same day):
+- **Theme Consistency**: Brass color (#c1a87d) now consistent across light/dark themes, TradingView timeline + bottom sheet theme-aware with smooth transitions
+- **Position Closing**: Fixed PositionsTable to route Aster close button to `/api/v2/positions/aster/{order_id}/close` (was falling through to paper logic)
+- **Color Updates**: Changed Symphony badge to signal blue, Aster badge to ember red (from VIBE.md design system)
 
 **Files**: 18 modified (10 frontend, 7 backend, 1 deleted) - See [DOCS/completed/trading-mode-refactor.md](DOCS/completed/trading-mode-refactor.md) for full details
 

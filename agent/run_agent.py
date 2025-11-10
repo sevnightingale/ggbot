@@ -175,38 +175,6 @@ class TradingAgent:
         except Exception as e:
             logger.warning(f"Failed to update session activity: {e}")
 
-    async def _capture_session_id(self, client: ClaudeSDKClient) -> Optional[str]:
-        """
-        Capture session_id from SDK init message.
-
-        The SDK sends a system message with subtype='init' containing the session_id.
-        We need to listen for this message to capture it for future resumption.
-
-        Returns:
-            Session ID string if captured, None otherwise
-        """
-        try:
-            # Send a simple query to trigger init message
-            await client.query("Session initialized")
-
-            # Listen for init message
-            async for message in client.receive_messages():
-                if hasattr(message, 'type') and message.type == 'system':
-                    if hasattr(message, 'subtype') and message.subtype == 'init':
-                        if hasattr(message, 'session_id'):
-                            logger.info(f"✅ Captured session ID: {message.session_id[:16]}...")
-                            return message.session_id
-
-                # Break after receiving first few messages to avoid hanging
-                # The init message should come first
-                if hasattr(message, 'type') and message.type in ['assistant', 'result']:
-                    logger.warning("Did not receive init message with session_id")
-                    return None
-
-        except Exception as e:
-            logger.error(f"Failed to capture session ID: {e}")
-            return None
-
     def _build_system_prompt(self) -> Dict[str, Any]:
         """Build system prompt with mode and strategy context"""
         strategy_content = self.config.get("config_data", {}).get("agent_strategy", {}).get("content", "Not yet defined")
@@ -345,6 +313,15 @@ Be disciplined and execute the strategy faithfully.
             # Load existing session for resumption (conversation persistence)
             existing_session_id = await self._load_session_id()
 
+            # Use separate API key for agents to avoid mixing with interactive Claude Code sessions
+            # SDK reads from ANTHROPIC_API_KEY env var, so we override it if AGENT_ANTHROPIC_API_KEY is set
+            agent_api_key = os.getenv("AGENT_ANTHROPIC_API_KEY")
+            if agent_api_key:
+                os.environ["ANTHROPIC_API_KEY"] = agent_api_key
+                logger.info("🔑 Using separate AGENT_ANTHROPIC_API_KEY (isolated from Claude Code sessions)")
+            else:
+                logger.warning("⚠️  AGENT_ANTHROPIC_API_KEY not set - will use default ANTHROPIC_API_KEY (sessions will mix with Claude Code)")
+
             # Create options with session resumption if available
             options_dict = {
                 "model": os.getenv("AGENT_MODEL", "claude-sonnet-4-5-20250929"),
@@ -385,10 +362,8 @@ Be disciplined and execute the strategy faithfully.
             async with ClaudeSDKClient(options=options) as client:
                 logger.info(f"Agent started in {self.mode} mode")
 
-                # Capture session ID from init message and save to database
-                self.session_id = await self._capture_session_id(client)
-                if self.session_id:
-                    await self._save_session_id(self.session_id)
+                # Session ID will be captured in the message loop
+                # (can't capture here - receive_messages() can only be iterated once)
 
                 if self.mode == "strategy_definition":
                     await self._run_strategy_definition(client)
@@ -421,6 +396,9 @@ Be disciplined and execute the strategy faithfully.
         #   - User's existing strategy (for refinement)
         #   - User's goals (for new strategy creation)
         # Agent responds appropriately to whatever arrives first
+
+        # Session capture flag
+        session_captured = False
 
         # Main conversation loop
         while True:
@@ -455,6 +433,16 @@ Be disciplined and execute the strategy faithfully.
 
                 # Collect response
                 async for message in client.receive_response():
+                    # Capture session ID from init message (happens once at startup)
+                    if not session_captured:
+                        if hasattr(message, 'type') and message.type == 'system':
+                            if hasattr(message, 'subtype') and message.subtype == 'init':
+                                if hasattr(message, 'session_id'):
+                                    self.session_id = message.session_id
+                                    logger.info(f"✅ Captured session ID: {self.session_id[:16]}...")
+                                    await self._save_session_id(self.session_id)
+                                    session_captured = True
+
                     # LOG: Full message structure
                     logger.debug(f"🤖 AGENT MESSAGE RECEIVED: {message}")
 
@@ -686,10 +674,36 @@ Start now.
         retry_count = 0
         base_delay = 5  # seconds
         message_count = 0  # Track messages for periodic heartbeat
+        session_captured = False  # Track if we've captured session ID
 
         while True:  # Infinite retry loop for resilience
             try:
                 async for message in client.receive_messages():
+                    # DEBUG: Log ALL message types for troubleshooting
+                    msg_type = type(message).__name__
+                    if message_count < 5:  # Only log first 5 messages to avoid spam
+                        logger.debug(f"🔍 Message received: type={msg_type}, has_type_attr={hasattr(message, 'type')}")
+                        if hasattr(message, 'type'):
+                            logger.debug(f"   message.type={message.type}, has_subtype={hasattr(message, 'subtype')}")
+                            if hasattr(message, 'subtype'):
+                                logger.debug(f"   message.subtype={message.subtype}, has_session_id={hasattr(message, 'session_id')}")
+
+                    # Capture session ID from init message (happens once at startup)
+                    if not session_captured:
+                        if hasattr(message, 'type') and message.type == 'system':
+                            if hasattr(message, 'subtype') and message.subtype == 'init':
+                                if hasattr(message, 'session_id'):
+                                    self.session_id = message.session_id
+                                    logger.info(f"✅ Captured session ID: {self.session_id[:16]}...")
+                                    await self._save_session_id(self.session_id)
+                                    session_captured = True
+                                else:
+                                    logger.warning("⚠️ Found system init message but no session_id attribute!")
+                            else:
+                                logger.debug(f"📋 System message with subtype: {getattr(message, 'subtype', 'none')}")
+                        elif isinstance(message, SystemMessage):
+                            logger.debug(f"📋 SystemMessage instance detected: {message}")
+
                     # Reset retry counter on successful message
                     retry_count = 0
                     message_count += 1
