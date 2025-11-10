@@ -435,7 +435,16 @@ Be disciplined and execute the strategy faithfully.
                 async for message in client.receive_response():
                     # Capture session ID from init message (happens once at startup)
                     if not session_captured:
-                        if hasattr(message, 'type') and message.type == 'system':
+                        # Check for SystemMessage type (SDK uses this class)
+                        if isinstance(message, SystemMessage):
+                            if hasattr(message, 'subtype') and message.subtype == 'init':
+                                if hasattr(message, 'data') and 'session_id' in message.data:
+                                    self.session_id = message.data['session_id']
+                                    logger.info(f"✅ Captured session ID: {self.session_id[:16]}...")
+                                    await self._save_session_id(self.session_id)
+                                    session_captured = True
+                        # Fallback: check for direct attributes (if SDK structure changes)
+                        elif hasattr(message, 'type') and message.type == 'system':
                             if hasattr(message, 'subtype') and message.subtype == 'init':
                                 if hasattr(message, 'session_id'):
                                     self.session_id = message.session_id
@@ -690,19 +699,25 @@ Start now.
 
                     # Capture session ID from init message (happens once at startup)
                     if not session_captured:
-                        if hasattr(message, 'type') and message.type == 'system':
+                        # Check for SystemMessage type (SDK uses this class)
+                        if isinstance(message, SystemMessage):
+                            logger.debug(f"📋 SystemMessage instance detected: {message}")
+                            if hasattr(message, 'subtype') and message.subtype == 'init':
+                                if hasattr(message, 'data') and 'session_id' in message.data:
+                                    self.session_id = message.data['session_id']
+                                    logger.info(f"✅ Captured session ID: {self.session_id[:16]}...")
+                                    await self._save_session_id(self.session_id)
+                                    session_captured = True
+                                else:
+                                    logger.warning("⚠️ Found SystemMessage init but no session_id in data!")
+                        # Fallback: check for direct attributes (if SDK structure changes)
+                        elif hasattr(message, 'type') and message.type == 'system':
                             if hasattr(message, 'subtype') and message.subtype == 'init':
                                 if hasattr(message, 'session_id'):
                                     self.session_id = message.session_id
                                     logger.info(f"✅ Captured session ID: {self.session_id[:16]}...")
                                     await self._save_session_id(self.session_id)
                                     session_captured = True
-                                else:
-                                    logger.warning("⚠️ Found system init message but no session_id attribute!")
-                            else:
-                                logger.debug(f"📋 System message with subtype: {getattr(message, 'subtype', 'none')}")
-                        elif isinstance(message, SystemMessage):
-                            logger.debug(f"📋 SystemMessage instance detected: {message}")
 
                     # Reset retry counter on successful message
                     retry_count = 0
