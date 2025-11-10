@@ -1,23 +1,27 @@
-# Metered Billing Implementation Plan
+# Metered Billing Implementation Plan (Simplified)
 
 **Status**: Planning
 **Created**: 2025-11-08
-**Target**: Complete pricing model overhaul with usage-based billing
+**Updated**: 2025-11-10 (Added Phase 0: OpenRouter Migration)
+**Target**: 6-day implementation (1 day OpenRouter + 5 days billing)
 
 ---
 
 ## Executive Summary
 
-Complete platform pricing overhaul from freemium (Free + $29 Pro) to pure usage-based + premium subscription model:
+Complete platform pricing overhaul from freemium to usage-based billing with minimal complexity:
 
+- **Phase 0 Prerequisite**: Migrate to OpenRouter (unified LLM API gateway) BEFORE billing
 - **Usage Tier**: Pay-as-you-go, charged monthly based on LLM token consumption with 70% markup
-- **Premium Tier**: $100/month subscription unlocks agents + includes base usage allowance + premium features
-- **No Free Tier**: All users pay for consumption, low barrier to test (estimated $2-5 for minimal usage)
-- **Billing**: Post-paid monthly with $20 threshold for mid-cycle invoicing
+- **Premium Tier**: $100/month subscription unlocks agents (no base allowance - keeps it simple)
+- **No Free Tier**: All users pay for consumption, low barrier to test ($2-5 for minimal usage)
+- **Billing**: Post-paid monthly with $20 threshold for mid-cycle invoicing via Stripe Meter
+- **Per-Bot Tracking**: Essential for user value - see which bots cost what
+- **Estimator**: Build AFTER launch based on real measured costs (Phase 6)
 
 ---
 
-## Pricing Model Design
+## Pricing Model
 
 ### Usage Tier (All Users)
 
@@ -33,8 +37,8 @@ User Cost = (Provider Token Cost × 1.70) per token
 
 **Billing Mechanics**:
 - User adds credit card at signup (required)
-- Platform tracks token consumption in real-time
-- Usage reported to Stripe throughout billing cycle
+- Platform tracks token consumption per-call with per-bot detail
+- Daily job aggregates usage and reports to Stripe Meter
 - Stripe invoices at **end of month** OR **$20 threshold**, whichever comes first
 - Failed payment = bots pause until resolved
 
@@ -43,105 +47,442 @@ User Cost = (Provider Token Cost × 1.70) per token
 - Medium usage (GPT-4, 3 bots, 15m frequency): $20-30/month
 - Heavy usage (GPT-5, 5 bots, 5m frequency): $60-100/month
 
-**User Controls**:
-- Real-time usage dashboard showing current month spend
-- Email alerts at $10, $20, $50 milestones
-- Optional hard cap: user sets max monthly spend (e.g., $50), bots pause when hit
-- Usage estimator shows "Estimated $X-Y/month" based on config settings
-
 ### Premium Tier ($100/month)
 
 **Core Feature**: Agent access (strategy builder + autonomous trading agents)
 
 **Additional Premium Features** (TBD):
-- Base usage allowance included (e.g., $20-30 worth of tokens free per month)
 - Priority support
 - Telegram signal publishing
 - Advanced market intelligence (future premium data sources)
 - Early access to new features
 
 **Billing**:
-- Fixed $100/month recurring charge (separate Stripe line item)
+- Fixed $100/month recurring charge (separate from metered usage)
 - Usage charges continue to accrue on top
-- Total monthly invoice: $100 + usage overages
-- Example: $100 (sub) + $47.23 (usage) = $147.23
+- Total monthly invoice: $100 (sub) + $47.23 (usage) = $147.23
+- **No base allowance included** (simplifies accounting, cleaner pricing)
 
 **NOT Premium** (Available to Usage Tier):
-- Live trading (Symphony, AsterDEX) - anyone can connect
+- Live trading (Symphony, AsterDEX)
 - Signal validation mode
 - Paper trading
 - All market intelligence currently available
 
 ---
 
-## LLM Provider Strategy: OpenRouter
+## Stripe Meter Research Results
 
-### Current Architecture
-- Direct API integration with 4 providers: OpenAI, Anthropic, DeepSeek, XAI
-- Separate credential management per provider
-- Different API response formats
-- Inconsistent token tracking methods
+### The Constraint
 
-### Proposed: OpenRouter Centralization
+**Stripe Meter cannot apply variable pricing based on event metadata.**
 
-**OpenRouter** provides unified API for 200+ models with consistent response format.
+You can send metadata (model name, token counts), but Stripe won't apply different rates per model. All usage in one meter gets charged at the same fixed rate.
+
+### Our Approach: Pre-Computed Costs (Option B)
+
+**We calculate the dollar amount ourselves, Stripe aggregates and invoices.**
+
+```python
+# Calculate cost for each LLM call
+input_cost = (input_tokens / 1000) * model_input_rate
+output_cost = (output_tokens / 1000) * model_output_rate
+total_cost = (input_cost + output_cost) * 1.70  # 70% markup
+
+# Send to Stripe Meter as dollar amount
+stripe.billing.meter_event.create(
+    event_name="llm_usage_cost",
+    payload={
+        "stripe_customer_id": customer_id,
+        "value": total_cost  # Already in dollars
+    }
+)
+```
+
+**Stripe Setup**:
+- One meter: "LLM API Usage Cost"
+- One price: $1.00 per unit (where 1 unit = $1)
+- Stripe sums all events: 0.0234 + 0.0156 + 0.0891 + ... = monthly total
+- Invoice shows: "LLM API Usage: $47.23"
 
 **Advantages**:
-- ✅ Single API key management (no per-provider credentials)
-- ✅ Standardized response format with token usage
-- ✅ Automatic fallback routing (if model unavailable)
-- ✅ Built-in rate limiting and error handling
-- ✅ Transparent pricing pass-through
+- ✅ Simple Stripe setup (one meter, one price)
+- ✅ Clean invoice (one line item)
+- ✅ Full control over pricing logic (no Stripe product updates when rates change)
+- ✅ Per-bot tracking still in our database
+- ✅ Users see detailed breakdown in our UI, simplified invoice from Stripe
 
-**Token Tracking Compatibility**:
-- OpenRouter returns usage data in OpenAI-compatible format:
-  ```json
-  {
-    "usage": {
-      "prompt_tokens": 150,
-      "completion_tokens": 75,
-      "total_tokens": 225
-    }
-  }
-  ```
-- Also includes cost data: `"total_cost": 0.00234`
-- We can validate our markup calculation against OpenRouter's reported cost
+**Rejected Alternative**: Multiple meters per model/token type
+- Would need 10+ subscription line items per user
+- Complex Stripe management
+- Cluttered invoices
+- Hard to maintain
 
-**Migration Path**:
-1. Add OpenRouter as provider option alongside existing direct integrations
-2. Test token tracking accuracy (compare direct API vs OpenRouter)
-3. Gradually migrate models to OpenRouter
-4. Eventually deprecate direct integrations (keep as fallback)
+---
 
-**Research Needed**:
-- ✅ Verify all current models available via OpenRouter
-- ✅ Test token usage reporting accuracy
-- ✅ Compare latency (direct API vs OpenRouter proxy)
-- ✅ Confirm cost transparency (can we see per-model pricing?)
+## Why OpenRouter First (Phase 0)
+
+**OpenRouter is a unified API gateway for 200+ LLM models.**
+
+### Current Architecture Problem
+We maintain separate integrations for each provider:
+- `decision/llm_providers/openai_provider.py`
+- `decision/llm_providers/anthropic_provider.py`
+- `decision/llm_providers/deepseek_provider.py`
+- `decision/llm_providers/xai_provider.py`
+
+Each has different:
+- API response formats
+- Token usage reporting
+- Error handling
+- Rate limiting
+
+### OpenRouter Solution
+**Single API, standardized responses:**
+```python
+# One client for all models
+openrouter_client = OpenAI(
+    base_url="https://openrouter.ai/api/v1",
+    api_key=os.getenv("OPENROUTER_API_KEY")
+)
+
+# Use any model with same interface
+response = openrouter_client.chat.completions.create(
+    model="openai/gpt-4",  # or anthropic/claude-opus-4, x-ai/grok-4
+    messages=[...]
+)
+
+# Always standardized usage format
+tokens = {
+    'prompt_tokens': response.usage.prompt_tokens,
+    'completion_tokens': response.usage.completion_tokens,
+    'total_tokens': response.usage.total_tokens
+}
+```
+
+### Benefits for Metered Billing
+
+1. **Simplified Token Tracking**
+   - All models return identical `usage` format
+   - No provider-specific parsing logic
+   - Token tracking wrapper becomes trivial
+
+2. **Pricing Validation**
+   - OpenRouter shows per-model costs
+   - Verify our 70% markup calculations
+   - May include cost data in API response
+
+3. **One API Key**
+   - Platform-managed (not per-user)
+   - Simpler credential management
+   - Better rate limiting
+
+4. **Cleaner Codebase**
+   - One provider class instead of 4+
+   - Less maintenance burden
+   - Easier to add new models
+
+5. **Makes Phase 1 Easier**
+   - Token tracking code is simpler
+   - No need to handle different response formats
+   - Standardized model names
+
+### Migration Strategy
+
+**Approach**: Keep old providers as fallback during migration
+- Don't delete existing provider code immediately
+- Run OpenRouter in parallel first
+- Validate responses identical
+- Gradually deprecate old providers
 
 ---
 
 ## Technical Architecture
 
-### Phase 1: Token Tracking Infrastructure
+### Phase 0: OpenRouter Migration (1 day)
 
-**Database Schema** (`token_usage` table):
+**Goal**: Replace 4 separate LLM provider integrations with unified OpenRouter API
+
+#### 0.1 Research & Validation
+
+**Tasks**:
+- [ ] Sign up for OpenRouter account
+- [ ] Verify model availability:
+  - [ ] `openai/gpt-4`
+  - [ ] `openai/gpt-5` (or latest GPT model)
+  - [ ] `anthropic/claude-opus-4`
+  - [ ] `anthropic/claude-sonnet-4.5`
+  - [ ] `anthropic/claude-haiku-4.5`
+  - [ ] `deepseek/deepseek-chat`
+  - [ ] `x-ai/grok-4` (or `x-ai/grok-beta`)
+
+- [ ] Check pricing transparency:
+  - [ ] Compare OpenRouter rates vs direct API rates
+  - [ ] Calculate OpenRouter markup (if any)
+  - [ ] Determine if we need to adjust our 70% markup
+
+- [ ] Test API:
+  - [ ] Create test script with 5 models
+  - [ ] Verify `usage` object format (OpenAI-compatible)
+  - [ ] Measure latency (acceptable if <500ms overhead)
+  - [ ] Test error handling
+
+**Deliverable**: Confirmation that all models available and token tracking works
+
+#### 0.2 Implementation
+
+**File**: `decision/llm_providers/openrouter_provider.py`
+
+```python
+"""OpenRouter unified LLM provider."""
+
+import os
+from typing import Dict, Any, Optional
+from openai import AsyncOpenAI
+from core.common.logger import logger
+
+
+class OpenRouterProvider:
+    """Unified provider for all LLM models via OpenRouter."""
+
+    # Model name mapping (internal → OpenRouter format)
+    MODEL_MAP = {
+        'gpt-4': 'openai/gpt-4',
+        'gpt-5': 'openai/gpt-5',  # Adjust based on OpenRouter's naming
+        'claude-opus-4': 'anthropic/claude-opus-4',
+        'claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
+        'claude-haiku-4.5': 'anthropic/claude-haiku-4.5',
+        'deepseek-chat': 'deepseek/deepseek-chat',
+        'grok-4': 'x-ai/grok-4',
+    }
+
+    def __init__(self):
+        self.client = AsyncOpenAI(
+            base_url="https://openrouter.ai/api/v1",
+            api_key=os.getenv("OPENROUTER_API_KEY")
+        )
+        self._log = logger.bind(component="openrouter_provider")
+
+    async def generate(
+        self,
+        model: str,
+        messages: list[Dict[str, str]],
+        temperature: float = 0.7,
+        max_tokens: int = 2000,
+        **kwargs
+    ) -> Dict[str, Any]:
+        """
+        Generate completion using OpenRouter.
+
+        Args:
+            model: Internal model name (e.g., 'gpt-4', 'claude-opus-4')
+            messages: Chat messages in OpenAI format
+            temperature: Sampling temperature
+            max_tokens: Maximum completion tokens
+            **kwargs: Additional parameters
+
+        Returns:
+            {
+                "content": "...",
+                "model": "openai/gpt-4",  # OpenRouter model name
+                "provider": "openrouter",
+                "usage": {
+                    "prompt_tokens": 150,
+                    "completion_tokens": 75,
+                    "total_tokens": 225
+                }
+            }
+        """
+        try:
+            # Map internal model name to OpenRouter format
+            openrouter_model = self.MODEL_MAP.get(model, model)
+
+            # Make API call
+            response = await self.client.chat.completions.create(
+                model=openrouter_model,
+                messages=messages,
+                temperature=temperature,
+                max_tokens=max_tokens,
+                **kwargs
+            )
+
+            self._log.info(
+                f"OpenRouter API call: model={openrouter_model}, "
+                f"tokens={response.usage.total_tokens}"
+            )
+
+            return {
+                "content": response.choices[0].message.content,
+                "model": openrouter_model,
+                "provider": "openrouter",
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                }
+            }
+
+        except Exception as e:
+            self._log.error(f"OpenRouter API error: {e}")
+            raise
+
+
+# Singleton instance
+openrouter_provider = OpenRouterProvider()
+```
+
+#### 0.3 Migration
+
+**Files to Update**:
+
+1. **decision/engine_v2.py**:
+```python
+# Before
+from decision.llm_providers.factory import get_llm_provider
+llm_provider = get_llm_provider(config.llm_provider)
+
+# After
+from decision.llm_providers.openrouter_provider import openrouter_provider
+llm_provider = openrouter_provider
+```
+
+2. **agent/run_agent.py**:
+```python
+# Agent uses Claude SDK, but for any custom LLM calls:
+from decision.llm_providers.openrouter_provider import openrouter_provider
+```
+
+3. **core/services/llm_service.py**:
+```python
+# Update to use OpenRouter instead of per-provider clients
+# Keep old logic as fallback for now
+```
+
+**Tasks**:
+- [ ] Update `decision/engine_v2.py` to use OpenRouter
+- [ ] Update `agent/run_agent.py` if it has custom LLM calls
+- [ ] Update `signals/listener_service.py` if it uses LLMs
+- [ ] Add `OPENROUTER_API_KEY` to `.env`
+- [ ] Keep old provider code (don't delete, just unused)
+
+#### 0.4 Testing
+
+**Test Script**: `scripts/test_openrouter.py`
+
+```python
+"""Test OpenRouter integration across all models."""
+
+import asyncio
+from decision.llm_providers.openrouter_provider import openrouter_provider
+
+MODELS = [
+    'gpt-4',
+    'gpt-5',
+    'claude-opus-4',
+    'claude-sonnet-4.5',
+    'deepseek-chat',
+    'grok-4'
+]
+
+async def test_model(model: str):
+    """Test one model."""
+    messages = [
+        {"role": "user", "content": "Say hello in exactly 5 words."}
+    ]
+
+    try:
+        response = await openrouter_provider.generate(
+            model=model,
+            messages=messages,
+            max_tokens=50
+        )
+
+        print(f"\n✅ {model}")
+        print(f"   Content: {response['content'][:50]}...")
+        print(f"   Tokens: {response['usage']['total_tokens']}")
+        print(f"   Provider: {response['provider']}")
+
+        return True
+
+    except Exception as e:
+        print(f"\n❌ {model}: {e}")
+        return False
+
+async def main():
+    """Test all models."""
+    print("Testing OpenRouter integration...\n")
+
+    results = []
+    for model in MODELS:
+        success = await test_model(model)
+        results.append((model, success))
+        await asyncio.sleep(1)  # Rate limiting
+
+    print("\n" + "="*50)
+    print("RESULTS:")
+    for model, success in results:
+        status = "✅" if success else "❌"
+        print(f"{status} {model}")
+
+    success_rate = sum(1 for _, s in results if s) / len(results)
+    print(f"\nSuccess rate: {success_rate*100:.0f}%")
+
+if __name__ == "__main__":
+    asyncio.run(main())
+```
+
+**Run**:
+```bash
+cd /home/sev/ggbot
+source .venv/bin/activate
+python scripts/test_openrouter.py
+```
+
+**Validation**:
+- [ ] All models return responses
+- [ ] Token counts present in all responses
+- [ ] No errors or timeouts
+- [ ] Latency acceptable (<2s per call)
+
+#### 0.5 Production Testing
+
+**Tasks**:
+- [ ] Run 3 real bot executions (decision engine)
+- [ ] Verify decisions identical to old provider
+- [ ] Check logs for any errors
+- [ ] Measure latency impact
+
+**If successful**:
+- [ ] Update all configs to use OpenRouter by default
+- [ ] Monitor for 24 hours
+- [ ] Mark old providers as deprecated (but keep code)
+
+**If issues**:
+- [ ] Rollback to old providers
+- [ ] Debug OpenRouter integration
+- [ ] Re-test before proceeding to Phase 1
+
+---
+
+### Database Schema
+
+**Token Usage Table** (per-call tracking with per-bot detail):
 ```sql
 CREATE TABLE token_usage (
     usage_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL REFERENCES auth.users(id),
-    config_id UUID REFERENCES configurations(config_id),
+    config_id UUID REFERENCES configurations(config_id),  -- Per-bot tracking
 
     -- LLM metadata
-    provider VARCHAR(50) NOT NULL,  -- 'openai', 'anthropic', 'openrouter', etc.
-    model VARCHAR(100) NOT NULL,    -- 'gpt-4', 'claude-opus-4', etc.
+    provider VARCHAR(50) NOT NULL,  -- 'openai', 'anthropic', 'deepseek', 'xai'
+    model VARCHAR(100) NOT NULL,    -- 'gpt-4', 'claude-opus-4', 'deepseek-chat', 'grok-4'
 
     -- Token consumption
     input_tokens INTEGER NOT NULL,
     output_tokens INTEGER NOT NULL,
     total_tokens INTEGER NOT NULL,
 
-    -- Cost calculation
+    -- Cost calculation (pre-computed with 70% markup)
     provider_cost_usd NUMERIC(10, 6) NOT NULL,  -- Raw provider cost
     platform_cost_usd NUMERIC(10, 6) NOT NULL,  -- With 70% markup
     markup_percentage NUMERIC(5, 2) DEFAULT 70.00,
@@ -153,20 +494,19 @@ CREATE TABLE token_usage (
     -- Billing
     stripe_reported BOOLEAN DEFAULT FALSE,
     stripe_reported_at TIMESTAMP WITH TIME ZONE,
-    billing_period VARCHAR(7),  -- 'YYYY-MM' for easy aggregation
 
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- Indexes
-CREATE INDEX idx_token_usage_user_period ON token_usage(user_id, billing_period);
-CREATE INDEX idx_token_usage_config ON token_usage(config_id, created_at);
-CREATE INDEX idx_token_usage_stripe_pending ON token_usage(user_id, stripe_reported, created_at)
+CREATE INDEX idx_token_usage_user_month ON token_usage(user_id, DATE_TRUNC('month', created_at));
+CREATE INDEX idx_token_usage_config_date ON token_usage(config_id, created_at);
+CREATE INDEX idx_token_usage_stripe_pending ON token_usage(user_id, stripe_reported, DATE(created_at))
     WHERE stripe_reported = FALSE;
-CREATE INDEX idx_token_usage_billing_period ON token_usage(billing_period, created_at);
+CREATE INDEX idx_token_usage_billing_period ON token_usage(DATE(created_at), stripe_reported);
 ```
 
-**Model Pricing Table** (`llm_model_pricing`):
+**Model Pricing Table** (our source of truth for cost calculations):
 ```sql
 CREATE TABLE llm_model_pricing (
     pricing_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -190,24 +530,83 @@ CREATE TABLE llm_model_pricing (
     UNIQUE(provider, model, effective_date)
 );
 
--- Example data
+-- Current pricing (to be researched and populated)
 INSERT INTO llm_model_pricing (provider, model, input_cost_per_1k, output_cost_per_1k, effective_date, source_url)
 VALUES
     ('openai', 'gpt-4', 0.030, 0.060, '2025-01-01', 'https://openai.com/pricing'),
     ('openai', 'gpt-5', 0.050, 0.100, '2025-01-01', 'https://openai.com/pricing'),
     ('anthropic', 'claude-opus-4', 0.015, 0.075, '2025-01-01', 'https://anthropic.com/pricing'),
-    ('deepseek', 'deepseek-chat', 0.0005, 0.002, '2025-01-01', 'https://deepseek.com/pricing');
+    ('anthropic', 'claude-sonnet-4.5', 0.003, 0.015, '2025-01-01', 'https://anthropic.com/pricing'),
+    ('anthropic', 'claude-haiku-4.5', 0.001, 0.005, '2025-01-01', 'https://anthropic.com/pricing'),
+    ('deepseek', 'deepseek-chat', 0.0005, 0.002, '2025-01-01', 'https://deepseek.com/pricing'),
+    ('xai', 'grok-4', 0.005, 0.015, '2025-01-01', 'https://x.ai/pricing');
 ```
 
-**Token Tracking Service** (`core/services/token_tracking_service.py`):
+**User Profiles Updates** (for Premium tier):
+```sql
+ALTER TABLE user_profiles
+    ADD COLUMN premium_subscription_id VARCHAR(100),
+    ADD COLUMN premium_tier_active BOOLEAN DEFAULT FALSE;
+```
+
+---
+
+### Phase 1: Token Tracking Infrastructure (2 days)
+
+**Goal**: Track every LLM call with per-bot detail and pre-calculated costs
+
+#### 1.1 Database Setup
+
+**Tasks**:
+- [ ] Create `token_usage` table with indexes
+- [ ] Create `llm_model_pricing` table
+- [ ] Run migration
+
+**Migration Script** (`database/migrations/metered_billing_schema.sql`):
+```sql
+-- Create token_usage table
+CREATE TABLE token_usage (
+    -- [Full schema from above]
+);
+
+-- Create indexes
+CREATE INDEX idx_token_usage_user_month ...;
+CREATE INDEX idx_token_usage_config_date ...;
+-- [All indexes from above]
+
+-- Create llm_model_pricing table
+CREATE TABLE llm_model_pricing (
+    -- [Full schema from above]
+);
+
+-- Seed initial pricing data
+INSERT INTO llm_model_pricing ...;
+```
+
+#### 1.2 Token Tracking Service
+
+**File**: `core/services/token_tracking_service.py`
+
 ```python
+"""Token tracking service for metered billing."""
+
+from typing import Optional, Dict, Any
+from decimal import Decimal
+from datetime import datetime
+from core.common.db import get_db_connection
+from core.common.logger import logger
+
+
 class TokenTrackingService:
     """Service for tracking LLM token usage and calculating costs."""
+
+    def __init__(self):
+        self._log = logger.bind(component="token_tracking")
 
     async def record_usage(
         self,
         user_id: str,
-        config_id: str,
+        config_id: Optional[str],
         provider: str,
         model: str,
         input_tokens: int,
@@ -216,7 +615,17 @@ class TokenTrackingService:
         decision_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
-        Record token usage and calculate costs with markup.
+        Record token usage and calculate costs with 70% markup.
+
+        Args:
+            user_id: User ID
+            config_id: Bot configuration ID (if applicable)
+            provider: LLM provider ('openai', 'anthropic', 'deepseek', 'xai')
+            model: Model name ('gpt-4', 'claude-opus-4', etc.)
+            input_tokens: Number of input tokens
+            output_tokens: Number of output tokens
+            execution_type: Context ('decision', 'agent_chat', 'extraction', etc.)
+            decision_id: Optional decision ID for traceability
 
         Returns:
             {
@@ -226,204 +635,439 @@ class TokenTrackingService:
                 "markup_applied": 70.0
             }
         """
-        # Get current pricing for model
-        pricing = await self._get_model_pricing(provider, model)
+        try:
+            # Get current pricing for model
+            pricing = await self._get_model_pricing(provider, model)
 
-        # Calculate raw provider cost
-        input_cost = (input_tokens / 1000) * pricing['input_cost_per_1k']
-        output_cost = (output_tokens / 1000) * pricing['output_cost_per_1k']
-        provider_cost = input_cost + output_cost
+            # Calculate raw provider cost
+            input_cost = (Decimal(input_tokens) / 1000) * pricing['input_cost_per_1k']
+            output_cost = (Decimal(output_tokens) / 1000) * pricing['output_cost_per_1k']
+            provider_cost = input_cost + output_cost
 
-        # Apply 70% markup
-        platform_cost = provider_cost * 1.70
+            # Apply 70% markup
+            platform_cost = provider_cost * Decimal('1.70')
 
-        # Store in database
-        usage_id = await self._insert_usage_record(...)
+            # Store in database
+            usage_id = await self._insert_usage_record(
+                user_id=user_id,
+                config_id=config_id,
+                provider=provider,
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                total_tokens=input_tokens + output_tokens,
+                provider_cost=provider_cost,
+                platform_cost=platform_cost,
+                execution_type=execution_type,
+                decision_id=decision_id
+            )
 
-        return {
-            "usage_id": usage_id,
-            "provider_cost_usd": provider_cost,
-            "platform_cost_usd": platform_cost,
-            "markup_applied": 70.0
-        }
+            self._log.info(
+                f"Tracked usage: user={user_id}, model={model}, "
+                f"tokens={input_tokens + output_tokens}, cost=${platform_cost:.4f}"
+            )
+
+            return {
+                "usage_id": usage_id,
+                "provider_cost_usd": float(provider_cost),
+                "platform_cost_usd": float(platform_cost),
+                "markup_applied": 70.0
+            }
+
+        except Exception as e:
+            self._log.error(f"Failed to record usage: {e}")
+            # Don't fail the LLM call if tracking fails
+            return {"error": str(e)}
+
+    async def _get_model_pricing(self, provider: str, model: str) -> Dict[str, Decimal]:
+        """Get current pricing for a model."""
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT input_cost_per_1k, output_cost_per_1k
+                    FROM llm_model_pricing
+                    WHERE provider = %s
+                      AND model = %s
+                      AND is_active = TRUE
+                    ORDER BY effective_date DESC
+                    LIMIT 1
+                """, (provider, model))
+
+                result = cur.fetchone()
+                if not result:
+                    raise ValueError(f"No pricing found for {provider}/{model}")
+
+                return {
+                    'input_cost_per_1k': Decimal(str(result[0])),
+                    'output_cost_per_1k': Decimal(str(result[1]))
+                }
+
+    async def _insert_usage_record(self, **kwargs) -> str:
+        """Insert usage record into database."""
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO token_usage (
+                        user_id, config_id, provider, model,
+                        input_tokens, output_tokens, total_tokens,
+                        provider_cost_usd, platform_cost_usd,
+                        execution_type, decision_id
+                    ) VALUES (
+                        %(user_id)s, %(config_id)s, %(provider)s, %(model)s,
+                        %(input_tokens)s, %(output_tokens)s, %(total_tokens)s,
+                        %(provider_cost)s, %(platform_cost)s,
+                        %(execution_type)s, %(decision_id)s
+                    )
+                    RETURNING usage_id
+                """, kwargs)
+
+                usage_id = cur.fetchone()[0]
+                conn.commit()
+                return str(usage_id)
 
     async def get_current_month_spend(self, user_id: str) -> Decimal:
         """Get total spend for current billing period."""
-        current_period = datetime.now().strftime('%Y-%m')
-
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT COALESCE(SUM(platform_cost_usd), 0)
                     FROM token_usage
-                    WHERE user_id = %s AND billing_period = %s
-                """, (user_id, current_period))
-                return cur.fetchone()[0]
+                    WHERE user_id = %s
+                      AND DATE_TRUNC('month', created_at) = DATE_TRUNC('month', CURRENT_TIMESTAMP)
+                """, (user_id,))
+                return Decimal(str(cur.fetchone()[0]))
 
-    async def get_unreported_usage(self, user_id: str) -> List[Dict]:
-        """Get usage not yet reported to Stripe."""
+    async def get_per_bot_spend(self, user_id: str) -> list[Dict[str, Any]]:
+        """Get current month spend breakdown by bot."""
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     SELECT
-                        usage_id,
-                        platform_cost_usd,
-                        created_at
-                    FROM token_usage
-                    WHERE user_id = %s
-                      AND stripe_reported = FALSE
-                    ORDER BY created_at
+                        c.config_id,
+                        c.config_name,
+                        COUNT(*) as executions,
+                        SUM(tu.platform_cost_usd) as total_cost,
+                        tu.model,
+                        tu.provider
+                    FROM token_usage tu
+                    JOIN configurations c ON tu.config_id = c.config_id
+                    WHERE tu.user_id = %s
+                      AND DATE_TRUNC('month', tu.created_at) = DATE_TRUNC('month', CURRENT_TIMESTAMP)
+                    GROUP BY c.config_id, c.config_name, tu.model, tu.provider
+                    ORDER BY total_cost DESC
                 """, (user_id,))
-                return cur.fetchall()
+
+                results = cur.fetchall()
+                return [{
+                    'config_id': row[0],
+                    'config_name': row[1],
+                    'executions': row[2],
+                    'total_cost': float(row[3]),
+                    'model': row[4],
+                    'provider': row[5]
+                } for row in results]
+
+
+# Singleton instance
+token_tracking_service = TokenTrackingService()
 ```
 
-**LLM Client Wrapper** (modify all decision/agent/extraction LLM calls):
+#### 1.3 LLM Call Wrapper
+
+**Integration Points** (wrap every LLM call):
+
 ```python
-# Before (current)
-response = await llm_client.generate_completion(prompt)
+# decision/engine_v2.py
+from core.services.token_tracking_service import token_tracking_service
 
-# After (with tracking)
-response = await llm_client.generate_completion(prompt)
+async def generate_decision(...):
+    # Make LLM call
+    response = await llm_provider.generate(prompt)
 
-# Track token usage
-await token_tracking_service.record_usage(
-    user_id=user_id,
-    config_id=config_id,
-    provider=response['provider'],
-    model=response['model'],
-    input_tokens=response['usage']['prompt_tokens'],
-    output_tokens=response['usage']['completion_tokens'],
-    execution_type='decision',
-    decision_id=decision_id
-)
+    # Track usage
+    await token_tracking_service.record_usage(
+        user_id=user_id,
+        config_id=config_id,
+        provider=response['provider'],
+        model=response['model'],
+        input_tokens=response['usage']['prompt_tokens'],
+        output_tokens=response['usage']['completion_tokens'],
+        execution_type='decision',
+        decision_id=decision_id
+    )
+
+    return response
 ```
 
-**Integration Points** (every LLM call needs tracking):
-- ✅ `decision/engine_v2.py` - Decision generation
-- ✅ `extraction/v2/` - Market intelligence (if using LLMs)
-- ✅ `agent/run_agent.py` - Agent conversations
-- ✅ `signals/listener_service.py` - Signal validation
+**Files to Update**:
+- `decision/engine_v2.py` - Decision generation
+- `agent/run_agent.py` - Agent conversations
+- `signals/listener_service.py` - Signal validation
+- Any extraction that uses LLMs (currently none, but future-proof)
+
+#### 1.4 LLM Pricing Research
+
+**Task**: Research current token rates for all models
+
+**Models to Research**:
+1. OpenAI GPT-4 (input/output rates)
+2. OpenAI GPT-5 (input/output rates)
+3. Anthropic Claude Opus 4 (input/output rates)
+4. Anthropic Claude Sonnet 4.5 (input/output rates)
+5. Anthropic Claude Haiku 4.5 (input/output rates)
+6. DeepSeek R1 / deepseek-chat (input/output rates)
+7. XAI Grok 4 (input/output rates)
+
+**Deliverable**: Populated `llm_model_pricing` table with current rates and source URLs
 
 ---
 
-### Phase 2: Stripe Metered Billing Setup
+### Phase 2: Stripe Metered Billing Setup (1 day)
 
-**Product Configuration in Stripe**:
-```
-Product: "ggbots Usage-Based Billing"
-Price: Metered billing
-  - Billing period: Monthly
-  - Usage aggregation: Sum
-  - Unit: "USD spent"
-  - Unit price: $1.00 per unit
+**Goal**: Configure Stripe Meter and implement daily usage reporting
 
-Example: User consumes $47.23 → report quantity=47.23 → Stripe charges $47.23
-```
+#### 2.1 Stripe Product Configuration
 
-**Subscription Creation** (on user signup):
+**Manual Steps in Stripe Dashboard**:
+
+1. **Create Meter**:
+   - Name: "LLM API Usage Cost"
+   - Event name: `llm_usage_cost`
+   - Aggregation: Sum
+   - Value settings: Decimal (for dollar amounts)
+
+2. **Create Price**:
+   - Product: "ggbots Usage-Based Billing"
+   - Pricing model: Usage-based
+   - Meter: "LLM API Usage Cost"
+   - Unit price: $1.00 per unit (where 1 unit = $1)
+   - Billing period: Monthly
+
+3. **Configure Billing Threshold**:
+   - Set threshold: $20 USD
+   - When usage charges reach $20, automatically invoice
+
+4. **Save Price ID**:
+   - Add to `.env`: `STRIPE_METERED_PRICE_ID=price_xxxxx`
+
+#### 2.2 Subscription Creation (on Signup)
+
+**File**: `ggbot.py` (add new endpoint)
+
 ```python
-async def create_metered_subscription(user_id: str, email: str):
-    """Create Stripe subscription with metered usage."""
+@app.post("/api/v2/create-metered-subscription")
+async def create_metered_subscription(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """
+    Create Stripe subscription with metered usage.
+    Called after user adds payment method during signup.
+    """
+    from core.common.db import get_db_connection
 
-    # Get or create Stripe customer
-    customer = stripe.Customer.create(
-        email=email,
-        metadata={'user_id': user_id}
-    )
+    try:
+        # Get or create Stripe customer
+        customer = await get_or_create_stripe_customer(
+            current_user.user_id,
+            current_user.email
+        )
 
-    # Create subscription with metered line item
-    subscription = stripe.Subscription.create(
-        customer=customer.id,
-        items=[{
-            'price': os.getenv('STRIPE_METERED_PRICE_ID'),
-        }],
-        billing_thresholds={
-            'amount_gte': 2000  # Invoice at $20 threshold (in cents)
-        },
-        metadata={
-            'user_id': user_id,
-            'subscription_type': 'usage_based'
+        # Create subscription with metered line item
+        subscription = stripe.Subscription.create(
+            customer=customer.id,
+            items=[{
+                'price': os.getenv('STRIPE_METERED_PRICE_ID'),
+            }],
+            billing_thresholds={
+                'amount_gte': 2000  # $20 threshold (in cents)
+            },
+            metadata={
+                'user_id': str(current_user.user_id),
+                'subscription_type': 'usage_based'
+            }
+        )
+
+        # Store in database
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE user_profiles
+                    SET stripe_customer_id = %s,
+                        stripe_subscription_id = %s,
+                        subscription_tier = 'usage_based',
+                        updated_at = NOW()
+                    WHERE user_id = %s
+                """, (customer.id, subscription.id, str(current_user.user_id)))
+                conn.commit()
+
+        logger.bind(user_id=str(current_user.user_id)).info(
+            f"Created metered subscription: {subscription.id}"
+        )
+
+        return {
+            'subscription_id': subscription.id,
+            'status': subscription.status
         }
-    )
 
-    # Store in database
-    await user_service.update_stripe_info(
-        user_id=user_id,
-        stripe_customer_id=customer.id,
-        stripe_subscription_id=subscription.id,
-        subscription_tier='usage_based'
-    )
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating subscription: {e}")
+        raise HTTPException(500, f"Payment system error: {str(e)}")
 ```
 
-**Usage Reporting Job** (hourly background task):
+#### 2.3 Daily Usage Reporting Job
+
+**File**: `scripts/report_stripe_usage.py`
+
 ```python
-async def report_usage_to_stripe():
-    """
-    Aggregate unreported token usage and send to Stripe.
-    Run every hour via APScheduler.
-    """
-    # Get all users with unreported usage
-    users_with_usage = await get_users_with_unreported_usage()
+"""
+Daily job to report token usage to Stripe Meter.
+Run via cron: 0 1 * * * (1am daily)
+"""
 
-    for user_id in users_with_usage:
-        # Get unreported usage
-        unreported = await token_tracking_service.get_unreported_usage(user_id)
+import os
+import asyncio
+from datetime import datetime, timedelta
+import stripe
+from core.common.db import get_db_connection
+from core.common.logger import logger
 
-        if not unreported:
-            continue
+stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
 
-        # Sum total cost
-        total_cost = sum(row['platform_cost_usd'] for row in unreported)
 
-        # Get subscription item ID
-        subscription_item_id = await get_stripe_subscription_item_id(user_id)
+async def report_daily_usage():
+    """Aggregate yesterday's usage and report to Stripe."""
 
-        # Report to Stripe (quantity = dollars spent)
-        timestamp = int(time.time())
-        idempotency_key = f"usage-{user_id}-{timestamp}"
+    yesterday = (datetime.now() - timedelta(days=1)).date()
+    logger.info(f"Reporting usage for {yesterday}")
 
-        stripe.SubscriptionItem.create_usage_record(
-            subscription_item_id,
-            quantity=int(total_cost * 100) / 100,  # Round to 2 decimals
-            timestamp=timestamp,
-            action='set',  # or 'increment'
-            idempotency_key=idempotency_key
-        )
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Get per-user totals for yesterday (unreported only)
+            cur.execute("""
+                SELECT
+                    user_id,
+                    SUM(platform_cost_usd) as total_cost,
+                    COUNT(*) as event_count,
+                    ARRAY_AGG(usage_id) as usage_ids
+                FROM token_usage
+                WHERE DATE(created_at) = %s
+                  AND stripe_reported = FALSE
+                GROUP BY user_id
+            """, (yesterday,))
 
-        # Mark as reported
-        await token_tracking_service.mark_as_reported(
-            usage_ids=[row['usage_id'] for row in unreported],
-            reported_at=datetime.now()
-        )
+            results = cur.fetchall()
+            logger.info(f"Found {len(results)} users with unreported usage")
 
-        logger.info(f"Reported ${total_cost:.2f} usage for user {user_id}")
+            for user_id, total_cost, event_count, usage_ids in results:
+                try:
+                    # Get Stripe customer ID
+                    cur.execute("""
+                        SELECT stripe_customer_id
+                        FROM user_profiles
+                        WHERE user_id = %s
+                    """, (user_id,))
+
+                    customer_result = cur.fetchone()
+                    if not customer_result or not customer_result[0]:
+                        logger.warning(f"No Stripe customer for user {user_id}")
+                        continue
+
+                    stripe_customer_id = customer_result[0]
+
+                    # Send to Stripe Meter
+                    stripe.billing.meter_event.create(
+                        event_name="llm_usage_cost",
+                        payload={
+                            "stripe_customer_id": stripe_customer_id,
+                            "value": str(total_cost),  # Dollar amount as string
+                        },
+                        timestamp=int(datetime.now().timestamp())
+                    )
+
+                    # Mark as reported
+                    cur.execute("""
+                        UPDATE token_usage
+                        SET stripe_reported = TRUE,
+                            stripe_reported_at = NOW()
+                        WHERE usage_id = ANY(%s)
+                    """, (usage_ids,))
+
+                    conn.commit()
+
+                    logger.info(
+                        f"Reported ${total_cost:.2f} for user {user_id} "
+                        f"({event_count} LLM calls)"
+                    )
+
+                except stripe.error.StripeError as e:
+                    logger.error(f"Stripe error for user {user_id}: {e}")
+                    conn.rollback()
+                except Exception as e:
+                    logger.error(f"Error reporting usage for user {user_id}: {e}")
+                    conn.rollback()
+
+
+if __name__ == "__main__":
+    asyncio.run(report_daily_usage())
 ```
 
-**Webhook Handlers** (update existing):
+**Cron Setup**:
+```bash
+# Add to crontab
+0 1 * * * cd /home/sev/ggbot && source .venv/bin/activate && python scripts/report_stripe_usage.py
+```
+
+#### 2.4 Webhook Updates
+
+**Update existing webhook handler** (`ggbot.py`):
+
 ```python
 @app.post("/api/v2/stripe-webhook")
 async def stripe_webhook(request: Request):
     """Handle Stripe webhook events."""
 
-    # Existing events: checkout.session.completed, subscription.updated, etc.
+    # Existing code for signature verification...
 
-    # New events to handle:
-    if event_type == 'invoice.payment_succeeded':
-        await handle_usage_invoice_paid(event['data']['object'])
+    event_type = event['type']
 
-    elif event_type == 'invoice.payment_failed':
+    # Existing handlers...
+
+    # NEW: Handle usage invoice payment failures
+    if event_type == 'invoice.payment_failed':
         await handle_usage_payment_failed(event['data']['object'])
 
-    elif event_type == 'customer.subscription.updated':
-        # Check if threshold was hit (mid-cycle invoice)
-        await handle_threshold_invoice(event['data']['object'])
+    return {'received': True}
+
 
 async def handle_usage_payment_failed(invoice):
-    """Pause all bots when payment fails."""
-    user_id = invoice['metadata']['user_id']
+    """Pause all bots when usage payment fails."""
+    from core.common.db import get_db_connection
 
-    # Mark user as payment_failed
-    await user_service.mark_payment_failed(user_id)
+    # Get user from customer ID
+    customer_id = invoice['customer']
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT user_id FROM user_profiles
+                WHERE stripe_customer_id = %s
+            """, (customer_id,))
+
+            result = cur.fetchone()
+            if not result:
+                logger.warning(f"No user found for customer {customer_id}")
+                return
+
+            user_id = result[0]
+
+            # Mark as payment failed
+            cur.execute("""
+                UPDATE user_profiles
+                SET subscription_status = 'past_due',
+                    updated_at = NOW()
+                WHERE user_id = %s
+            """, (user_id,))
+            conn.commit()
 
     # Stop all active bots
     configs = await config_service.get_user_configs(user_id)
@@ -431,791 +1075,538 @@ async def handle_usage_payment_failed(invoice):
         if config['state'] == 'active':
             await stop_bot(config['config_id'], user_id)
 
-    # Send email notification
-    await email_service.send_payment_failed_notification(user_id, invoice['amount_due'] / 100)
+    logger.bind(user_id=user_id).warning(
+        f"Payment failed - paused all bots. Amount due: ${invoice['amount_due'] / 100}"
+    )
+
+    # TODO: Send email notification
 ```
 
 ---
 
-### Phase 3: Premium Subscription ($100/month)
+### Phase 3: Premium Subscription ($100/month) (0.5 days)
 
-**Database Schema Updates**:
+**Goal**: Add fixed $100/month subscription for agent access
+
+#### 3.1 Database Schema
+
 ```sql
--- Update user_profiles to track premium subscription separately
 ALTER TABLE user_profiles
     ADD COLUMN premium_subscription_id VARCHAR(100),
-    ADD COLUMN premium_tier_active BOOLEAN DEFAULT FALSE,
-    ADD COLUMN premium_base_allowance_usd NUMERIC(10, 2) DEFAULT 0.00,
-    ADD COLUMN premium_base_allowance_used_usd NUMERIC(10, 2) DEFAULT 0.00;
+    ADD COLUMN premium_tier_active BOOLEAN DEFAULT FALSE;
 ```
 
-**Stripe Product**:
-```
-Product: "ggbots Pro - Agent Access"
-Price: $100/month (recurring, NOT metered)
-Features:
-  - Agent creation unlocked
-  - $30 base usage allowance included
-  - Priority support
-  - Early access to new features
-```
+#### 3.2 Stripe Product
 
-**Combined Subscription** (user can upgrade from usage-based):
+**Manual Steps in Stripe Dashboard**:
+
+1. **Create Product**:
+   - Name: "ggbots Pro - Agent Access"
+   - Description: "Unlock autonomous trading agents"
+
+2. **Create Price**:
+   - Product: "ggbots Pro - Agent Access"
+   - Pricing model: Recurring
+   - Price: $100.00 USD
+   - Billing period: Monthly
+
+3. **Save Price ID**:
+   - Add to `.env`: `STRIPE_PREMIUM_PRICE_ID=price_xxxxx`
+
+#### 3.3 Upgrade Endpoint
+
+**File**: `ggbot.py`
+
 ```python
-async def upgrade_to_premium(user_id: str):
+@app.post("/api/v2/upgrade-to-premium")
+async def upgrade_to_premium(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
     """Add premium tier to existing usage-based subscription."""
+    from core.common.db import get_db_connection
 
     # Get existing subscription
-    subscription = await get_stripe_subscription(user_id)
+    profile = await user_service.get_profile(current_user.user_id)
 
-    # Add premium line item
-    stripe.Subscription.modify(
-        subscription.id,
-        items=[
-            {'id': subscription.items.data[0].id},  # Keep metered item
-            {'price': os.getenv('STRIPE_PREMIUM_PRICE_ID')}  # Add fixed $100 item
-        ]
-    )
+    if not profile.stripe_subscription_id:
+        raise HTTPException(400, "No active subscription found")
 
-    # Update database
-    await user_service.activate_premium_tier(user_id)
+    try:
+        # Add premium line item to existing subscription
+        subscription = stripe.Subscription.modify(
+            profile.stripe_subscription_id,
+            items=[
+                # Keep existing metered item (get from subscription.items)
+                # Add premium fixed item
+                {'price': os.getenv('STRIPE_PREMIUM_PRICE_ID')}
+            ],
+            proration_behavior='always_invoice'  # Charge immediately for upgrade
+        )
+
+        # Update database
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE user_profiles
+                    SET premium_tier_active = TRUE,
+                        premium_subscription_id = %s,
+                        updated_at = NOW()
+                    WHERE user_id = %s
+                """, (subscription.id, str(current_user.user_id)))
+                conn.commit()
+
+        logger.bind(user_id=str(current_user.user_id)).info(
+            "Upgraded to Premium tier"
+        )
+
+        return {
+            'premium_active': True,
+            'subscription_id': subscription.id
+        }
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error upgrading to premium: {e}")
+        raise HTTPException(500, f"Upgrade failed: {str(e)}")
 ```
 
-**Base Allowance Logic**:
+#### 3.4 Permission Updates
+
+**File**: `core/domain/user_profile.py`
+
 ```python
-async def calculate_billable_usage(user_id: str, period: str) -> Decimal:
-    """
-    Calculate billable usage after applying premium base allowance.
-
-    Example:
-        Total usage: $47.23
-        Premium allowance: $30.00
-        Billable: $17.23 (only this gets metered)
-    """
-    profile = await user_service.get_profile(user_id)
-
-    total_usage = await token_tracking_service.get_period_spend(user_id, period)
-
-    if profile.premium_tier_active:
-        allowance = profile.premium_base_allowance_usd
-        billable = max(0, total_usage - allowance)
-    else:
-        billable = total_usage
-
-    return billable
-```
-
-**Permission Updates**:
-```python
-# core/domain/user_profile.py
-
 @property
 def can_use_agents(self) -> bool:
     """Check if user can create and use agents."""
     return self.premium_tier_active
 
+
 @property
-def remaining_base_allowance(self) -> Decimal:
-    """Get remaining base usage allowance for current month."""
-    if not self.premium_tier_active:
-        return Decimal('0.00')
-
-    return max(0, self.premium_base_allowance_usd - self.premium_base_allowance_used_usd)
+def can_use_premium_features(self) -> bool:
+    """Check if user can access premium features."""
+    return self.premium_tier_active and self.has_active_subscription
 ```
 
----
+**File**: `ggbot.py` (update /me endpoint)
 
-### Phase 4: Usage Estimator
-
-**Estimation Service** (`core/services/usage_estimator.py`):
 ```python
-class UsageEstimator:
-    """Estimate monthly costs based on bot configuration."""
-
-    async def estimate_monthly_cost(
-        self,
-        config: BotConfigV2
-    ) -> Dict[str, Any]:
-        """
-        Estimate monthly cost for a bot configuration.
-
-        Returns:
-            {
-                "estimated_low": 15.23,
-                "estimated_high": 28.45,
-                "executions_per_month": 1440,
-                "avg_tokens_per_execution": 2500,
-                "breakdown": {
-                    "extraction": 5.00,
-                    "decision": 20.00,
-                    "total": 25.00
-                }
-            }
-        """
-        # Calculate monthly executions
-        frequency = config.decision.analysis_frequency
-        executions_per_month = self._calc_executions(frequency)  # e.g., 5m = 8640/month
-
-        # Estimate tokens per execution
-        avg_tokens = await self._estimate_tokens_per_execution(config)
-
-        # Get model pricing
-        model = config.llm_config.provider
-        pricing = await self._get_model_pricing(model)
-
-        # Calculate cost
-        cost_per_execution = (avg_tokens / 1000) * pricing['avg_cost_per_1k']
-        monthly_cost = cost_per_execution * executions_per_month
-
-        # Apply 70% markup
-        platform_cost = monthly_cost * 1.70
-
-        # Add variance (+/- 25%)
-        estimated_low = platform_cost * 0.75
-        estimated_high = platform_cost * 1.25
-
-        return {
-            "estimated_low": round(estimated_low, 2),
-            "estimated_high": round(estimated_high, 2),
-            "executions_per_month": executions_per_month,
-            "avg_tokens_per_execution": avg_tokens,
-            "model": model
-        }
-
-    async def _estimate_tokens_per_execution(self, config: BotConfigV2) -> int:
-        """
-        Estimate tokens consumed per bot execution.
-
-        Method 1: Use historical averages for similar configs
-        Method 2: Calculate from prompt templates + market data size
-        """
-        # Get historical data
-        similar_configs = await self._find_similar_configs(config)
-        if similar_configs:
-            avg_tokens = await self._get_avg_tokens_for_configs(similar_configs)
-            return avg_tokens
-
-        # Fallback: estimate from templates
-        # Extraction: ~500 tokens (market data is mostly JSON, not counted as input)
-        # Decision prompt: ~2000 tokens (system prompt + market data formatting + user strategy)
-        # Decision output: ~300 tokens
-
-        return 2800  # Reasonable default
-
-    def _calc_executions(self, frequency: str) -> int:
-        """Calculate monthly executions from analysis frequency."""
-        freq_map = {
-            '5m': 8640,   # 288 per day × 30
-            '15m': 2880,  # 96 per day × 30
-            '30m': 1440,  # 48 per day × 30
-            '1h': 720,    # 24 per day × 30
-            '4h': 180,    # 6 per day × 30
-            '1d': 30      # 1 per day × 30
-        }
-        return freq_map.get(frequency, 720)  # Default to 1h
-```
-
-**API Endpoint**:
-```python
-@app.post("/api/v2/estimate-cost")
-async def estimate_cost(
-    config: BotConfigV2,
+@app.get("/api/v2/me")
+async def get_current_user_profile(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
-    """
-    Estimate monthly cost for bot configuration.
-
-    Request: Bot config (can be unsaved draft)
-    Response: {
-        "estimated_low": 15.23,
-        "estimated_high": 28.45,
-        "note": "Actual costs may vary based on market conditions and trade frequency"
-    }
-    """
-    estimator = UsageEstimator()
-    estimate = await estimator.estimate_monthly_cost(config)
+    """Get current user's profile with subscription info."""
+    profile = await current_user.load_profile()
 
     return {
-        **estimate,
-        "note": "Actual costs may vary based on market conditions and trade frequency"
+        "user_id": current_user.user_id,
+        "email": current_user.email,
+        "subscription_tier": profile.subscription_tier.value,
+        "subscription_status": profile.subscription_status.value,
+        "can_use_premium_features": profile.can_use_premium_features,
+        "can_use_agents": profile.can_use_agents,  # NEW
+        "can_use_live_trading": profile.can_use_live_trading,
+        # ... existing fields
     }
-```
-
-**Frontend Integration**:
-```typescript
-// Real-time cost estimator in bot config UI
-const [costEstimate, setCostEstimate] = useState<{low: number, high: number} | null>(null)
-
-useEffect(() => {
-  // Debounce config changes
-  const timer = setTimeout(async () => {
-    const estimate = await apiClient.estimateCost(currentConfig)
-    setCostEstimate(estimate)
-  }, 1000)
-
-  return () => clearTimeout(timer)
-}, [currentConfig.llm_config.provider, currentConfig.decision.analysis_frequency])
-
-// Display in UI
-<div className="cost-estimate">
-  <InfoIcon />
-  <span>Estimated cost: ${costEstimate.low} - ${costEstimate.high}/month</span>
-</div>
 ```
 
 ---
 
-### Phase 5: Usage Dashboard
+### Phase 4: Minimal UI (0.5 days)
 
-**Backend API Endpoints**:
+**Goal**: Show current spend + per-bot breakdown
+
+#### 4.1 Backend API
+
+**File**: `ggbot.py`
+
 ```python
 @app.get("/api/v2/usage/current-month")
 async def get_current_month_usage(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
-    """
-    Get current month's usage breakdown.
-
-    Response: {
-        "total_spend": 47.23,
-        "billing_period": "2025-11",
-        "days_in_period": 8,
-        "estimated_month_end": 176.11,
-        "breakdown_by_bot": [...],
-        "breakdown_by_model": [...],
-        "next_invoice_date": "2025-12-01",
-        "hard_cap": 100.00,
-        "hard_cap_remaining": 52.77
-    }
-    """
-    current_period = datetime.now().strftime('%Y-%m')
+    """Get current month's usage with per-bot breakdown."""
+    from core.services.token_tracking_service import token_tracking_service
 
     # Get total spend
-    total_spend = await token_tracking_service.get_current_month_spend(current_user.user_id)
+    total_spend = await token_tracking_service.get_current_month_spend(
+        current_user.user_id
+    )
 
-    # Get breakdown by bot
-    breakdown_by_bot = await get_usage_by_config(current_user.user_id, current_period)
+    # Get per-bot breakdown
+    per_bot = await token_tracking_service.get_per_bot_spend(
+        current_user.user_id
+    )
 
-    # Get breakdown by model
-    breakdown_by_model = await get_usage_by_model(current_user.user_id, current_period)
-
-    # Estimate month-end spend (linear projection)
-    days_elapsed = datetime.now().day
-    days_in_month = calendar.monthrange(datetime.now().year, datetime.now().month)[1]
-    estimated_month_end = total_spend * (days_in_month / days_elapsed)
-
-    # Get hard cap
-    profile = await user_service.get_profile(current_user.user_id)
-    hard_cap = profile.usage_hard_cap_usd
+    # Calculate estimated month-end
+    current_day = datetime.now().day
+    days_in_month = calendar.monthrange(
+        datetime.now().year,
+        datetime.now().month
+    )[1]
+    estimated_month_end = float(total_spend) * (days_in_month / current_day) if current_day > 0 else 0
 
     return {
         "total_spend": float(total_spend),
-        "billing_period": current_period,
-        "days_in_period": days_elapsed,
-        "estimated_month_end": float(estimated_month_end),
-        "breakdown_by_bot": breakdown_by_bot,
-        "breakdown_by_model": breakdown_by_model,
-        "next_invoice_date": ...,
-        "hard_cap": float(hard_cap) if hard_cap else None,
-        "hard_cap_remaining": float(hard_cap - total_spend) if hard_cap else None
+        "days_elapsed": current_day,
+        "estimated_month_end": estimated_month_end,
+        "per_bot_breakdown": per_bot
     }
-
-@app.get("/api/v2/usage/history")
-async def get_usage_history(
-    months: int = Query(6, le=12),
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-):
-    """
-    Get historical usage for past N months.
-
-    Response: [
-        {"period": "2025-11", "total_spend": 47.23, "executions": 1440},
-        {"period": "2025-10", "total_spend": 62.18, "executions": 2100},
-        ...
-    ]
-    """
-    history = await token_tracking_service.get_usage_history(
-        current_user.user_id,
-        months=months
-    )
-    return history
-
-@app.post("/api/v2/usage/set-hard-cap")
-async def set_hard_cap(
-    hard_cap: Optional[float] = None,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-):
-    """
-    Set monthly spending hard cap.
-
-    Request: {"hard_cap": 100.00}  (null to disable)
-    """
-    await user_service.set_usage_hard_cap(current_user.user_id, hard_cap)
-    return {"hard_cap": hard_cap, "status": "updated"}
 ```
 
-**Frontend Component** (`frontend/components/UsageDashboard.tsx`):
+#### 4.2 Frontend Component
+
+**File**: `frontend/app/forge/components/UsageDisplay.tsx`
+
 ```typescript
-export function UsageDashboard() {
+'use client'
+
+import { useEffect, useState } from 'react'
+import { apiClient } from '@/lib/api'
+
+interface BotUsage {
+  config_id: string
+  config_name: string
+  executions: number
+  total_cost: number
+  model: string
+  provider: string
+}
+
+interface CurrentMonthUsage {
+  total_spend: number
+  days_elapsed: number
+  estimated_month_end: number
+  per_bot_breakdown: BotUsage[]
+}
+
+export function UsageDisplay() {
   const [usage, setUsage] = useState<CurrentMonthUsage | null>(null)
-  const [history, setHistory] = useState<UsageHistory[]>([])
+  const [loading, setLoading] = useState(true)
 
-  // Fetch current month
   useEffect(() => {
-    apiClient.getCurrentMonthUsage().then(setUsage)
+    loadUsage()
+    // Refresh every 30 seconds
+    const interval = setInterval(loadUsage, 30000)
+    return () => clearInterval(interval)
   }, [])
 
-  // Fetch history
-  useEffect(() => {
-    apiClient.getUsageHistory(6).then(setHistory)
-  }, [])
+  const loadUsage = async () => {
+    try {
+      const data = await apiClient.getCurrentMonthUsage()
+      setUsage(data)
+    } catch (err) {
+      console.error('Failed to load usage:', err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  if (loading || !usage) {
+    return <div>Loading usage...</div>
+  }
 
   return (
-    <div className="usage-dashboard">
-      {/* Current Month Spend (Big Number) */}
-      <div className="current-spend">
-        <h2>Current Month</h2>
-        <div className="amount">${usage.total_spend.toFixed(2)}</div>
-        <div className="subtitle">
-          {usage.days_in_period} days elapsed
-          • Est. month-end: ${usage.estimated_month_end.toFixed(2)}
+    <div className="space-y-4">
+      {/* Current Month Total */}
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+        <h3 className="text-sm text-[var(--text-secondary)] mb-2">
+          Current Month
+        </h3>
+        <div className="text-4xl font-bold text-[var(--text-primary)]">
+          ${usage.total_spend.toFixed(2)}
         </div>
-
-        {/* Hard Cap Progress Bar */}
-        {usage.hard_cap && (
-          <div className="hard-cap-bar">
-            <div
-              className="progress"
-              style={{width: `${(usage.total_spend / usage.hard_cap) * 100}%`}}
-            />
-            <span>${usage.hard_cap_remaining.toFixed(2)} remaining of ${usage.hard_cap} cap</span>
-          </div>
-        )}
-      </div>
-
-      {/* Breakdown by Bot (Pie Chart) */}
-      <div className="breakdown-bots">
-        <h3>Spend by Bot</h3>
-        <PieChart data={usage.breakdown_by_bot} />
-      </div>
-
-      {/* Breakdown by Model (Bar Chart) */}
-      <div className="breakdown-models">
-        <h3>Spend by Model</h3>
-        <BarChart data={usage.breakdown_by_model} />
-      </div>
-
-      {/* Historical Trend (Line Chart) */}
-      <div className="historical-trend">
-        <h3>6-Month Trend</h3>
-        <LineChart data={history} />
-      </div>
-
-      {/* Hard Cap Settings */}
-      <div className="hard-cap-settings">
-        <h3>Spending Limit</h3>
-        <input
-          type="number"
-          value={hardCap ?? ''}
-          onChange={(e) => setHardCap(parseFloat(e.target.value))}
-          placeholder="No limit"
-        />
-        <button onClick={saveHardCap}>Save Limit</button>
-        <p className="help-text">
-          Bots will pause when this limit is reached. Leave blank for no limit.
+        <p className="text-sm text-[var(--text-muted)] mt-2">
+          {usage.days_elapsed} days elapsed • Est. month-end: ${usage.estimated_month_end.toFixed(2)}
         </p>
       </div>
 
-      {/* Download Invoices */}
-      <div className="invoices">
-        <h3>Past Invoices</h3>
-        <button onClick={() => openStripeBillingPortal()}>
-          View & Download Invoices
-        </button>
-      </div>
+      {/* Per-Bot Breakdown */}
+      {usage.per_bot_breakdown.length > 0 && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+          <h3 className="text-sm text-[var(--text-secondary)] mb-4">
+            Spend by Bot
+          </h3>
+          <div className="space-y-3">
+            {usage.per_bot_breakdown.map(bot => (
+              <div
+                key={bot.config_id}
+                className="flex items-center justify-between p-3 rounded-lg bg-[var(--bg-tertiary)]"
+              >
+                <div className="flex-1">
+                  <div className="font-medium text-[var(--text-primary)]">
+                    {bot.config_name}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    {bot.model} • {bot.executions} runs
+                  </div>
+                </div>
+                <div className="text-lg font-semibold text-[var(--text-primary)]">
+                  ${bot.total_cost.toFixed(2)}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Link to Stripe Billing Portal */}
+      <button
+        onClick={async () => {
+          const { portal_url } = await apiClient.createPortalSession()
+          window.location.href = portal_url
+        }}
+        className="w-full p-3 rounded-lg border border-[var(--border)] hover:bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+      >
+        View Invoices & Payment Details →
+      </button>
     </div>
   )
 }
 ```
 
+**Integration**: Add to Settings modal or create dedicated "Usage" tab
+
 ---
 
-### Phase 6: Alerts & Safeguards
+### Phase 5: Estimator Based on Real Data (1 day)
 
-**Email Alerts** (Resend integration):
+**Goal**: Build cost estimator AFTER launch using actual measured costs
+
+#### 5.1 Collect Real Data
+
+**Process**:
+1. Launch metered billing (Phases 1-4 complete)
+2. Run test bots for 24-48 hours with various configs:
+   - GPT-5, 5m frequency, medium market data
+   - GPT-5, 15m frequency, medium market data
+   - GPT-4, 15m frequency, medium market data
+   - Claude Opus 4, 15m frequency, medium market data
+   - DeepSeek, 1h frequency, light market data
+   - etc.
+
+3. Query actual costs from database:
+   ```sql
+   SELECT
+       model,
+       config_data->>'decision'->>'analysis_frequency' as frequency,
+       AVG(platform_cost_usd) as avg_cost_per_execution,
+       COUNT(*) as sample_size
+   FROM token_usage tu
+   JOIN configurations c ON tu.config_id = c.config_id
+   WHERE tu.created_at > NOW() - INTERVAL '48 hours'
+   GROUP BY model, frequency
+   ORDER BY model, frequency;
+   ```
+
+4. Build lookup table from results
+
+#### 5.2 Estimator Service
+
+**File**: `core/services/usage_estimator.py`
+
 ```python
-# core/services/alert_service.py
+"""Cost estimator based on real measured data."""
 
-class UsageAlertService:
-    """Service for sending usage alerts to users."""
+from typing import Dict, Any
 
-    ALERT_THRESHOLDS = [10, 20, 50, 100]  # USD
+# Populated from real bot runs (to be filled after testing)
+DAILY_COST_LOOKUP = {
+    ('gpt-5', '5m'): 3.20,    # $3.20 per day (actual measured)
+    ('gpt-5', '15m'): 1.07,   # $1.07 per day
+    ('gpt-4', '15m'): 0.64,   # $0.64 per day
+    ('claude-opus-4', '15m'): 0.32,
+    ('deepseek-chat', '1h'): 0.12,
+    # ... add more as we collect data
+}
 
-    async def check_and_send_alerts(self, user_id: str):
+
+class UsageEstimator:
+    """Estimate costs based on real measured bot performance."""
+
+    def estimate_daily_cost(
+        self,
+        model: str,
+        frequency: str
+    ) -> Dict[str, float]:
         """
-        Check current spend and send alerts at milestones.
-        Run hourly via background job.
-        """
-        current_spend = await token_tracking_service.get_current_month_spend(user_id)
+        Estimate daily cost for a bot configuration.
 
-        # Get last alert sent
-        last_alert = await self._get_last_alert_threshold(user_id)
-
-        # Find next threshold
-        for threshold in self.ALERT_THRESHOLDS:
-            if current_spend >= threshold and (last_alert is None or last_alert < threshold):
-                # Send alert
-                await self._send_usage_alert(user_id, threshold, current_spend)
-
-                # Record alert sent
-                await self._record_alert_sent(user_id, threshold)
-
-                break
-
-    async def _send_usage_alert(self, user_id: str, threshold: float, current_spend: Decimal):
-        """Send usage alert email."""
-        profile = await user_service.get_profile(user_id)
-
-        # Estimate month-end
-        days_elapsed = datetime.now().day
-        days_in_month = calendar.monthrange(datetime.now().year, datetime.now().month)[1]
-        estimated_month_end = current_spend * (days_in_month / days_elapsed)
-
-        await resend_service.send_email(
-            to=profile.email,
-            template='usage_alert',
-            context={
-                'threshold': threshold,
-                'current_spend': float(current_spend),
-                'estimated_month_end': float(estimated_month_end),
-                'days_elapsed': days_elapsed,
-                'dashboard_url': f"{os.getenv('FRONTEND_URL')}/usage"
+        Returns:
+            {
+                "daily_cost": 2.50,
+                "monthly_cost": 75.00,
+                "based_on_data": True  # or False if interpolated
             }
-        )
+        """
+        # Direct lookup
+        key = (model, frequency)
+        if key in DAILY_COST_LOOKUP:
+            daily_cost = DAILY_COST_LOOKUP[key]
+            return {
+                "daily_cost": daily_cost,
+                "monthly_cost": daily_cost * 30,
+                "based_on_data": True
+            }
+
+        # Interpolation logic for missing configs
+        # (can be sophisticated or simple)
+        estimated = self._interpolate_cost(model, frequency)
+
+        return {
+            "daily_cost": estimated,
+            "monthly_cost": estimated * 30,
+            "based_on_data": False
+        }
+
+    def _interpolate_cost(self, model: str, frequency: str) -> float:
+        """Interpolate cost for configs we haven't tested."""
+        # Simple heuristic: find similar model/frequency and adjust
+        # This can be refined with more data
+        return 1.50  # Placeholder
+
+
+estimator_service = UsageEstimator()
 ```
 
-**Hard Cap Enforcement** (background job every 5 minutes):
+#### 5.3 API Endpoint
+
 ```python
-async def enforce_hard_caps():
-    """
-    Check all users with hard caps and pause bots if exceeded.
-    Run every 5 minutes via APScheduler.
-    """
-    users_with_caps = await get_users_with_hard_caps()
+@app.post("/api/v2/estimate-cost")
+async def estimate_cost(
+    model: str,
+    frequency: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """Estimate daily/monthly cost for bot config."""
+    from core.services.usage_estimator import estimator_service
 
-    for user in users_with_caps:
-        current_spend = await token_tracking_service.get_current_month_spend(user.user_id)
+    estimate = estimator_service.estimate_daily_cost(model, frequency)
 
-        if current_spend >= user.usage_hard_cap_usd:
-            # Hard cap exceeded - pause all bots
-            logger.warning(f"User {user.user_id} exceeded hard cap: ${current_spend} >= ${user.usage_hard_cap_usd}")
-
-            # Get all active bots
-            configs = await config_service.get_user_configs(user.user_id)
-            for config in configs:
-                if config['state'] == 'active':
-                    await stop_bot(config['config_id'], user.user_id)
-
-            # Mark user as hard cap exceeded
-            await user_service.mark_hard_cap_exceeded(user.user_id)
-
-            # Send notification
-            await email_service.send_hard_cap_exceeded_notification(
-                user.user_id,
-                current_spend,
-                user.usage_hard_cap_usd
-            )
+    return estimate
 ```
 
-**Database Schema for Alerts**:
-```sql
-CREATE TABLE usage_alerts (
-    alert_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID NOT NULL REFERENCES auth.users(id),
-    billing_period VARCHAR(7) NOT NULL,
-    threshold_usd NUMERIC(10, 2) NOT NULL,
-    current_spend_usd NUMERIC(10, 2) NOT NULL,
-    sent_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+#### 5.4 Frontend Integration
 
-    UNIQUE(user_id, billing_period, threshold_usd)
-);
+```typescript
+// Real-time estimate in bot config UI
+const [estimate, setEstimate] = useState<{daily: number, monthly: number} | null>(null)
 
--- Add to user_profiles
-ALTER TABLE user_profiles
-    ADD COLUMN usage_hard_cap_usd NUMERIC(10, 2),
-    ADD COLUMN hard_cap_exceeded BOOLEAN DEFAULT FALSE;
+useEffect(() => {
+  const timer = setTimeout(async () => {
+    if (currentModel && currentFrequency) {
+      const est = await apiClient.estimateCost(currentModel, currentFrequency)
+      setEstimate(est)
+    }
+  }, 500)  // Debounce
+
+  return () => clearTimeout(timer)
+}, [currentModel, currentFrequency])
+
+// Display
+{estimate && (
+  <div className="text-sm text-[var(--text-secondary)]">
+    Est. ${estimate.daily.toFixed(2)}/day (${estimate.monthly.toFixed(0)}/month)
+  </div>
+)}
 ```
 
 ---
 
-## User Experience Flows
+## Timeline
 
-### New User Signup
-1. User signs up via Supabase Auth
-2. **Redirect to payment setup**: "Add payment method to start using ggbots"
-3. Stripe Checkout (setup mode, $0 charge)
-4. Create metered subscription on success
-5. Redirect to bot creation: "Create your first bot - estimated $3-5/month"
-6. User configures bot (sees live cost estimate)
-7. Save & activate bot
-8. Bot runs, tokens consumed, dashboard shows "$0.47 spent this month"
+**Total: 6 days** (assumes full-time focus)
 
-### Existing User Testing Platform
-1. User with low budget wants to test
-2. Creates bot with:
-   - Model: DeepSeek (cheapest)
-   - Frequency: 1h (low frequency)
-   - Symbols: BTC/USDT (single symbol)
-3. Cost estimator shows: "Estimated $2-4/month"
-4. Runs for 1 week
-5. Usage dashboard: "$1.23 spent (7 days) - Est. month-end: $5.29"
-6. Total invoice at month-end: $5.29
+- **Day 1**: Phase 0 (OpenRouter migration + testing)
+- **Day 2-3**: Phase 1 (Token tracking + LLM pricing research)
+- **Day 4**: Phase 2 (Stripe Meter setup + daily reporting)
+- **Day 4.5**: Phase 3 (Premium subscription)
+- **Day 5**: Phase 4 (Minimal UI)
+- **Day 6**: Testing & deployment
 
-### Power User Scaling Up
-1. User wants to test multiple strategies
-2. Creates 5 bots:
-   - 2 with GPT-5, 5m frequency (expensive, high frequency)
-   - 2 with Claude Opus 4, 15m frequency (medium)
-   - 1 with DeepSeek, 1h frequency (cheap, low frequency)
-3. Cost estimator shows: "Total estimated $60-90/month"
-4. Day 3: Alert email "You've spent $10 this month"
-5. Day 7: Alert email "You've spent $25 - Est. month-end: $107"
-6. Day 10: Hits $20 threshold → mid-cycle invoice for $20
-7. Day 20: Alert email "You've spent $50"
-8. Day 30: Final invoice for $67.23 (total $87.23 for month)
-9. User reviews breakdown: GPT-5 bots consumed 70% of spend
-
-### Premium Tier Upgrade
-1. User wants to create agents
-2. Clicks "Create Agent" → blocked: "Upgrade to Pro to unlock agents"
-3. Clicks "Upgrade to Pro" → Stripe Checkout for $100/month
-4. Subscription updated: now has 2 line items (metered + $100 fixed)
-5. Agent creation unlocked
-6. Usage continues to accrue (but first $30 covered by base allowance)
-7. Month-end invoice: $100 (Pro) + $17.23 (usage over allowance) = $117.23
-
-### Hard Cap Protection
-1. User sets hard cap: $50/month
-2. Creates 3 bots, runs for 2 weeks
-3. Day 14: Current spend $48.67
-4. Day 15: Bot execution pushes spend to $50.12
-5. Background job detects hard cap exceeded
-6. **All bots automatically paused**
-7. Email sent: "Your bots have been paused - $50 spending limit reached"
-8. User can:
-   - Raise hard cap in settings
-   - Wait for next billing cycle (bots auto-resume)
-   - Review usage breakdown to optimize costs
-
----
-
-## Migration Strategy
-
-### Existing Users (258 total, 3 Pro)
-
-**No Automated Migration** (user will handle manually):
-- User will communicate pricing changes to existing users
-- Existing Pro users ($29/month): TBD by user (grandfather? convert?)
-- Existing free users: TBD by user (grace period? forced upgrade?)
-
-**Technical Requirements** (support manual migration):
-```python
-# Admin script to convert user to new model
-async def migrate_user_to_metered(user_id: str, preserve_pro: bool = False):
-    """
-    Migrate existing user to metered billing model.
-
-    Args:
-        user_id: User to migrate
-        preserve_pro: If True, keep existing Pro subscription alongside metered
-    """
-    # Get current subscription
-    profile = await user_service.get_profile(user_id)
-
-    if not profile.stripe_customer_id:
-        # New customer - create metered subscription
-        await create_metered_subscription(user_id, profile.email)
-    else:
-        # Existing customer - modify subscription
-        subscription_id = profile.stripe_subscription_id
-
-        if preserve_pro:
-            # Add metered item to existing Pro subscription
-            stripe.Subscription.modify(
-                subscription_id,
-                items=[
-                    {'id': ...},  # Keep existing Pro item
-                    {'price': os.getenv('STRIPE_METERED_PRICE_ID')}  # Add metered
-                ]
-            )
-        else:
-            # Replace Pro with metered
-            stripe.Subscription.modify(
-                subscription_id,
-                items=[
-                    {'id': ..., 'deleted': True},  # Remove Pro item
-                    {'price': os.getenv('STRIPE_METERED_PRICE_ID')}  # Add metered
-                ]
-            )
-
-    logger.info(f"Migrated user {user_id} to metered billing (preserve_pro={preserve_pro})")
-```
-
-### Database Schema Updates
-
-**New Tables**:
-- `token_usage` (metered billing records)
-- `llm_model_pricing` (pricing reference)
-- `usage_alerts` (alert history)
-
-**Updated Tables**:
-```sql
--- user_profiles
-ALTER TABLE user_profiles
-    ADD COLUMN premium_subscription_id VARCHAR(100),
-    ADD COLUMN premium_tier_active BOOLEAN DEFAULT FALSE,
-    ADD COLUMN premium_base_allowance_usd NUMERIC(10, 2) DEFAULT 0.00,
-    ADD COLUMN premium_base_allowance_used_usd NUMERIC(10, 2) DEFAULT 0.00,
-    ADD COLUMN usage_hard_cap_usd NUMERIC(10, 2),
-    ADD COLUMN hard_cap_exceeded BOOLEAN DEFAULT FALSE;
-
--- No changes to configurations or other tables
-```
+**Phase 5 (Estimator)**: +1 day after 24-48 hours of live data collection
 
 ---
 
 ## Testing Strategy
 
-### Phase 1: Token Tracking Accuracy
-- ✅ Run 100 test bot executions across all models
-- ✅ Verify token counts match LLM API responses
-- ✅ Verify cost calculations match model pricing
-- ✅ Test 70% markup applied correctly
-- ✅ Verify database storage and retrieval
+### Phase 1: Token Tracking
+- [ ] Run 50 test bot executions across all models
+- [ ] Verify token counts match LLM API responses
+- [ ] Verify cost calculations (check markup applied correctly)
+- [ ] Verify database storage (all fields populated)
 
 ### Phase 2: Stripe Integration
-- ✅ Test subscription creation (dev mode)
-- ✅ Test usage reporting (send test records)
-- ✅ Verify Stripe invoices generate correctly
-- ✅ Test billing threshold (trigger $20 mid-cycle invoice)
-- ✅ Test webhook handling (payment success/failure)
+- [ ] Test subscription creation (Stripe test mode)
+- [ ] Manually trigger daily reporting job with test data
+- [ ] Verify Stripe Meter events received
+- [ ] Test billing threshold (send enough events to hit $20)
+- [ ] Verify webhook handling (payment success/failure)
 
-### Phase 3: Cost Estimator
-- ✅ Compare estimates vs actual costs for 10 configs
-- ✅ Verify estimates within 25% variance
-- ✅ Test all frequency settings (5m, 15m, 30m, 1h, 4h, 1d)
-- ✅ Test all LLM models
+### Phase 3: Premium Tier
+- [ ] Test upgrade flow (add fixed $100 item to subscription)
+- [ ] Verify agent creation blocked without premium
+- [ ] Verify agent creation allowed with premium
 
-### Phase 4: Hard Cap Enforcement
-- ✅ Set hard cap $10, run bot until exceeded
-- ✅ Verify bots pause automatically
-- ✅ Verify email notification sent
-- ✅ Verify bots resume after cap raised
+### Phase 4: UI
+- [ ] Verify total spend calculation
+- [ ] Verify per-bot breakdown
+- [ ] Test Stripe billing portal link
 
-### Phase 5: End-to-End Flow
-- ✅ New user signup → add payment → create bot → run 1 week → verify invoice
-- ✅ Existing user upgrade to Premium → verify $100 charge + usage
-- ✅ User hits $20 threshold → verify mid-cycle invoice
-
----
-
-## OpenRouter Research Checklist
-
-Before implementing LLM provider migration:
-
-- [ ] **Model Availability**: Verify all current models available
-  - [ ] GPT-4, GPT-5
-  - [ ] Claude Haiku 4.5, Sonnet 4.5, Opus 4
-  - [ ] DeepSeek R1
-  - [ ] Grok 4
-
-- [ ] **Token Tracking**: Test response format
-  - [ ] Confirm `usage` object present in all responses
-  - [ ] Verify `prompt_tokens`, `completion_tokens`, `total_tokens` accuracy
-  - [ ] Check if `total_cost` field available
-
-- [ ] **Pricing Transparency**:
-  - [ ] Verify per-model pricing visible in OpenRouter docs
-  - [ ] Compare OpenRouter rates vs direct API rates
-  - [ ] Calculate OpenRouter markup vs our 70% markup
-
-- [ ] **Performance**:
-  - [ ] Latency test: Direct API vs OpenRouter proxy
-  - [ ] Acceptable latency threshold: <500ms overhead
-
-- [ ] **Reliability**:
-  - [ ] Fallback routing: Does OpenRouter auto-retry failed models?
-  - [ ] Rate limiting: How does OpenRouter handle rate limits?
-  - [ ] Error handling: Are provider-specific errors passed through?
-
-- [ ] **Cost Implications**:
-  - [ ] Does OpenRouter charge extra fees beyond model costs?
-  - [ ] Are there volume discounts available?
+### End-to-End
+- [ ] New user: signup → add card → create bot → run for 1 day → verify invoice preview
+- [ ] Existing user: upgrade to Premium → verify $100 charge
+- [ ] Payment failure: decline card → verify bots paused
 
 ---
 
 ## Launch Checklist
 
 ### Pre-Launch
-- [ ] Complete Phases 1-6 implementation
+- [ ] Complete Phases 1-4 implementation
 - [ ] Test all flows in Stripe test mode
-- [ ] Create pricing page on ggbots.ai
-- [ ] Draft user communication email
-- [ ] Prepare support docs/FAQ
-- [ ] Set up monitoring/alerting for billing errors
+- [ ] Verify no breaking changes to existing users
+- [ ] Draft user communication email (pricing changes)
+- [ ] Prepare FAQ/support docs
+- [ ] Set up monitoring for billing errors
 
 ### Launch Day
-- [ ] Switch Stripe to live mode
-- [ ] Deploy backend with metered billing
-- [ ] Deploy frontend with usage dashboard
+- [ ] Switch Stripe to live mode (update API keys)
+- [ ] Deploy backend with token tracking
+- [ ] Deploy frontend with usage display
 - [ ] Send user communication email
-- [ ] Monitor for billing issues
+- [ ] Monitor logs for billing issues
 - [ ] Be available for user support
 
 ### Post-Launch (Week 1)
 - [ ] Monitor token tracking accuracy
-- [ ] Monitor Stripe usage reporting
+- [ ] Monitor Stripe Meter event delivery
 - [ ] Monitor user signups and payment success rate
 - [ ] Gather user feedback on pricing
-- [ ] Adjust hard cap defaults if needed
-- [ ] Monitor cost estimator accuracy
+- [ ] Start collecting data for estimator (Phase 5)
 
-### Post-Launch (Month 1)
-- [ ] Review first month's invoices
-- [ ] Analyze user spending patterns
-- [ ] Optimize cost estimator based on actual data
-- [ ] Refine premium tier features based on feedback
-- [ ] Consider OpenRouter migration if direct API issues
+### Post-Launch (Week 2-3)
+- [ ] Run test bots for estimator data collection
+- [ ] Build and deploy estimator (Phase 5)
+- [ ] Refine estimates based on user feedback
 
 ---
 
 ## Open Questions
 
-1. **OpenRouter Migration Timeline**:
-   - Implement immediately or after metered billing stabilizes?
-   - Recommendation: After Phase 1-2, before full launch
+1. **OpenRouter Migration**: Implement immediately or after billing stabilizes?
+   - Recommendation: After Phase 2, before Phase 5
 
-2. **Premium Base Allowance Amount**:
-   - $20, $30, or $50 included with $100/month?
-   - Recommendation: $30 (30% of subscription price)
+2. **Currency Support**: USD only or support other currencies?
+   - Recommendation: USD only initially
 
-3. **Free Trial Period**:
-   - Offer 7-day trial with $10 credit?
-   - Or no trial, just low barrier to test?
-   - Recommendation: No trial, emphasize "$2-5 to test fully"
+3. **Tax Handling**: Enable Stripe Tax?
+   - Recommendation: Yes, enable Stripe Tax for automatic calculation
 
-4. **Model Pricing Updates**:
-   - How often to sync model pricing table?
-   - Manual updates or automated?
-   - Recommendation: Manual updates quarterly, automated alerts for price changes
+4. **Premium Features Beyond Agents**: What else should be premium-only?
+   - Current: Just agents
+   - TBD: Priority support, advanced data sources, etc.
 
-5. **Currency Support**:
-   - USD only or support other currencies?
-   - Recommendation: USD only initially, expand later
-
-6. **Tax Handling**:
-   - Enable Stripe Tax for automatic tax calculation?
-   - Recommendation: Yes, enable Stripe Tax
+5. **Existing Users**: Migration strategy for 258 users, 3 Pro subscribers?
+   - User will handle manually (no automated migration)
 
 ---
 
@@ -1223,46 +1614,38 @@ Before implementing LLM provider migration:
 
 ### Financial
 - **Revenue per user**: Target $30-50 average
+- **Payment success rate**: >95%
 - **Churn rate**: <10% monthly
-- **Failed payment rate**: <5%
-- **Hard cap hit rate**: <15% of users
 
 ### Technical
 - **Token tracking accuracy**: >99%
-- **Stripe reporting success rate**: >99.9%
+- **Stripe event delivery**: >99.9%
 - **Billing error rate**: <0.1%
-- **Cost estimator variance**: <25% from actual
 
 ### User Experience
 - **Signup completion rate**: >80%
 - **Payment method addition rate**: >70%
 - **Usage dashboard engagement**: >40% weekly active users
-- **Hard cap adoption**: >30% of users set caps
 
 ---
 
-## Timeline Estimate
+## What We Cut (And Can Add Later)
 
-**Total: 7-10 days** (assuming full-time work)
+**Not building initially** (add only if users request):
+- ❌ Email usage alerts ($10, $20, $50 thresholds)
+- ❌ Hard spending caps with auto-pause
+- ❌ Detailed usage charts (pie, bar, line graphs)
+- ❌ Base allowance with premium ($100 flat is simpler)
+- ❌ Historical usage analytics beyond current month
+- ❌ Per-execution cost breakdown
 
-- Phase 1: Token Tracking - 2 days
-- Phase 2: Stripe Metered Billing - 1 day
-- Phase 3: Premium Subscription - 0.5 days
-- Phase 4: Usage Estimator - 1.5 days
-- Phase 5: Usage Dashboard - 1 day
-- Phase 6: Alerts & Safeguards - 0.5 days
-- OpenRouter Research - 0.5 days
-- Testing & QA - 1.5 days
-- Launch Prep - 0.5 days
-
-**Recommended Approach**: Ship Phases 1-3 first (core billing), then iterate on Phases 4-6 (UX improvements)
+**Rationale**: Ship minimal billing, iterate based on real user feedback
 
 ---
 
 ## Next Steps
 
-1. **Confirm strategy** with user (this document)
-2. **Research OpenRouter** (model availability, token tracking, pricing)
-3. **LLM pricing research** (get current rates for all models)
-4. **Start Phase 1**: Token tracking infrastructure
-5. **Iterate** based on testing and feedback
+1. **Confirm plan** with user
+2. **Research LLM pricing** for all models (populate pricing table)
+3. **Start Phase 1**: Token tracking implementation
+4. **Iterate** based on testing and user feedback

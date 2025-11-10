@@ -4,148 +4,171 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 💳 **CRITICAL - Metered Billing & Pricing Overhaul** [metered_billing.md]
+## ⚠️ **URGENT - Fix Confidence-Based Position Sizing Implementation**
 
-**Status**: Planning (2025-11-08)
+**Status**: Needs Review & Testing (2025-11-10)
+**Completion Doc**: [DOCS/completed/2025-11-10_confidence_based_position_sizing.md](DOCS/completed/2025-11-10_confidence_based_position_sizing.md)
+
+**Problem**: MCP tool updated to use automatic confidence-based position sizing, but implementation is flawed and untested.
+
+**Tasks:**
+- [ ] Review implementation approach and identify all issues
+- [ ] Fix test script design (hardcoded config_id won't work for multi-mode testing)
+- [ ] Create proper testing strategy for paper/aster/symphony modes
+- [ ] Execute actual tests and verify position sizing calculations
+- [ ] Validate that nothing broke (balance display, strategy content, etc.)
+- [ ] Test with live agent execution to ensure tool works as intended
+
+**What Was Changed:**
+- Removed `size_usd` and `leverage` from `execute_trade` MCP tool
+- Updated ggAster bot config to `confidence_based` method, 20x leverage, 25% max position
+- Fixed session capture bug (separate issue, may be working)
+- Added separate API key for agents (separate issue, may be working)
+
+---
+
+## 💳 **CRITICAL - Metered Billing & Pricing Overhaul (Simplified)** [metered_billing.md]
+
+**Status**: Planning (2025-11-10)
 **Planning Doc**: [DOCS/todo/metered_billing.md](DOCS/todo/metered_billing.md)
+**Timeline**: 6 days (1 day OpenRouter + 5 days billing)
 
-**Goal**: Complete platform pricing overhaul from freemium to usage-based billing + premium subscription.
+**Goal**: Minimal usage-based billing with per-bot tracking, no overengineering.
 
-### **Business Model**
-- **Eliminate free tier** - all users pay based on consumption
-- **Usage tier**: Pay-as-you-go, charged monthly for LLM token consumption (70% markup)
-- **Premium tier**: $100/month unlocks agents + base usage allowance + premium features
-- **Low barrier to test**: Estimated $2-5/month for minimal usage (DeepSeek, 1h frequency)
+### **Key Decisions**
+- ✅ **OpenRouter First**: Unified LLM API (simplifies token tracking)
+- ✅ **Stripe Meter**: Pre-computed costs (we calculate, Stripe aggregates/invoices)
+- ✅ **Per-Bot Tracking**: Essential for user value
+- ✅ **No Base Allowance**: $100 flat (simpler)
+- ✅ **Daily Reporting**: Once per day (not hourly)
+- ✅ **Estimator Last**: Build after launch with real measured costs
+- ❌ **No Hard Caps**: Not day 1 (add if users request)
+- ❌ **No Email Alerts**: Not day 1 (add if users request)
+- ❌ **No Fancy Charts**: Just total + per-bot list
+
+### **Phase 0: OpenRouter Migration** (1 day)
+- [ ] **Research & Validation**
+  - [ ] Sign up for OpenRouter
+  - [ ] Verify all models available (GPT-4/5, Claude Opus/Sonnet/Haiku, DeepSeek, Grok)
+  - [ ] Check pricing (compare to direct API)
+  - [ ] Test token tracking format
+
+- [ ] **Implementation**
+  - [ ] Create `decision/llm_providers/openrouter_provider.py`
+  - [ ] Add `OPENROUTER_API_KEY` to .env
+  - [ ] Implement model name mapping (internal → OpenRouter format)
+
+- [ ] **Migration**
+  - [ ] Update `decision/engine_v2.py` to use OpenRouter
+  - [ ] Update `agent/run_agent.py` if needed
+  - [ ] Keep old providers as fallback (don't delete)
+
+- [ ] **Testing**
+  - [ ] Create test script (`scripts/test_openrouter.py`)
+  - [ ] Test all 6-7 models
+  - [ ] Verify token counts accurate
+  - [ ] Run 3 real bot executions
+  - [ ] Monitor for 24 hours
 
 ### **Phase 1: Token Tracking Infrastructure** (2 days)
-- [ ] **Database Schema**
-  - [ ] Create `token_usage` table (user_id, config_id, provider, model, tokens, costs)
-  - [ ] Create `llm_model_pricing` table (provider, model, input/output rates, effective_date)
-  - [ ] Create `usage_alerts` table (threshold tracking for email alerts)
-  - [ ] Add indexes for monthly aggregation and Stripe reporting queries
+- [ ] **Database**
+  - [ ] Create `token_usage` table (with config_id for per-bot tracking)
+  - [ ] Create `llm_model_pricing` table
+  - [ ] Run migration
 
 - [ ] **Token Tracking Service**
-  - [ ] Create `TokenTrackingService` class (record_usage, get_current_month_spend, get_unreported_usage)
-  - [ ] Implement cost calculator (70% markup, model-specific pricing)
-  - [ ] Add token tracking wrapper to all LLM calls (decision, agent, extraction, signal validation)
+  - [ ] Create `core/services/token_tracking_service.py`
+  - [ ] Implement `record_usage()` (calculates cost with 70% markup)
+  - [ ] Implement `get_current_month_spend(user_id)`
+  - [ ] Implement `get_per_bot_spend(user_id)` (per-bot breakdown)
 
 - [ ] **LLM Pricing Research**
-  - [ ] Research current token rates: GPT-4, GPT-5, Claude Opus 4, DeepSeek R1, Grok 4
+  - [ ] Research token rates: GPT-4, GPT-5, Claude Opus/Sonnet/Haiku, DeepSeek, Grok
   - [ ] Seed `llm_model_pricing` table with current rates
-  - [ ] Document pricing sources and update schedule
 
-- [ ] **OpenRouter Investigation**
-  - [ ] Research: Are all current models available via OpenRouter?
-  - [ ] Test token tracking: Verify `usage` object in responses
-  - [ ] Compare pricing: OpenRouter rates vs direct API + 70% markup
-  - [ ] Test latency: Direct API vs OpenRouter proxy (<500ms overhead acceptable)
-  - [ ] Decision: Migrate immediately or after metered billing stabilizes?
+- [ ] **Integration**
+  - [ ] Wrap all LLM calls with token tracking:
+    - [ ] `decision/engine_v2.py`
+    - [ ] `agent/run_agent.py`
+    - [ ] `signals/listener_service.py`
 
-### **Phase 2: Stripe Metered Billing Setup** (1 day)
-- [ ] **Stripe Product Configuration**
-  - [ ] Create "ggbots Usage-Based Billing" product in Stripe
-  - [ ] Create metered price ($1 per unit, quantity = dollars spent)
-  - [ ] Set billing threshold: $20 OR monthly, whichever comes first
+### **Phase 2: Stripe Metered Billing** (1 day)
+- [ ] **Stripe Configuration**
+  - [ ] Create Meter: "LLM API Usage Cost" (event: `llm_usage_cost`)
+  - [ ] Create Price: $1/unit (where 1 unit = $1)
+  - [ ] Set billing threshold: $20 OR monthly
 
-- [ ] **Subscription Management**
-  - [ ] Implement `create_metered_subscription()` on user signup (requires credit card)
-  - [ ] Add payment method requirement to signup flow
-  - [ ] Update webhook handlers for metered invoices
+- [ ] **Subscription Creation**
+  - [ ] Add `POST /api/v2/create-metered-subscription` endpoint
+  - [ ] Update signup flow (require credit card)
 
-- [ ] **Usage Reporting**
-  - [ ] Create hourly background job to report usage to Stripe
-  - [ ] Implement idempotency keys (timestamp-based)
-  - [ ] Add Stripe usage record API integration
-  - [ ] Mark usage records as reported in database
+- [ ] **Daily Reporting Job**
+  - [ ] Create `scripts/report_stripe_usage.py`
+  - [ ] Aggregate yesterday's usage per user
+  - [ ] Send to Stripe Meter (dollar amounts)
+  - [ ] Mark as reported in database
+  - [ ] Add to crontab (1am daily)
 
-- [ ] **Payment Failure Handling**
-  - [ ] Auto-pause all bots on payment failure
-  - [ ] Send email notification to user
-  - [ ] Auto-resume bots when payment resolved
+- [ ] **Webhook Updates**
+  - [ ] Add `invoice.payment_failed` handler (pause bots)
 
 ### **Phase 3: Premium Subscription** (0.5 days)
-- [ ] **Database Schema**
-  - [ ] Add `premium_subscription_id`, `premium_tier_active` to user_profiles
-  - [ ] Add `premium_base_allowance_usd`, `premium_base_allowance_used_usd`
+- [ ] **Database**
+  - [ ] Add `premium_tier_active` to user_profiles
 
-- [ ] **Stripe Product**
-  - [ ] Create "ggbots Pro - Agent Access" product ($100/month recurring)
-  - [ ] Implement combined subscription (metered + fixed $100)
-  - [ ] Add upgrade flow (add fixed item to existing metered subscription)
+- [ ] **Stripe**
+  - [ ] Create product: "ggbots Pro - Agent Access" ($100/month)
 
-- [ ] **Base Allowance Logic**
-  - [ ] Implement allowance calculation (e.g., $30 included with Pro)
-  - [ ] Deduct allowance from billable usage before Stripe reporting
-  - [ ] Reset allowance monthly
-
-- [ ] **Permission Updates**
+- [ ] **Backend**
+  - [ ] Add `POST /api/v2/upgrade-to-premium` endpoint
   - [ ] Add `can_use_agents` property to UserProfile
-  - [ ] Update frontend agent creation gate (require Pro)
-  - [ ] Determine other premium-only features
+  - [ ] Update `/api/v2/me` endpoint (include can_use_agents)
 
-### **Phase 4: Usage Estimator** (1.5 days)
-- [ ] **Backend Calculator**
-  - [ ] Create `UsageEstimator` service
-  - [ ] Calculate monthly executions from analysis_frequency
-  - [ ] Estimate tokens per execution (historical avg or template-based)
-  - [ ] Apply model pricing + 70% markup
-  - [ ] Return range (low/high with ±25% variance)
+- [ ] **Frontend**
+  - [ ] Gate agent creation behind premium check
 
-- [ ] **API Endpoint**
-  - [ ] `POST /api/v2/estimate-cost` (accepts bot config, returns estimate)
-  - [ ] Support draft configs (not yet saved)
-
-- [ ] **Frontend Integration**
-  - [ ] Add cost estimator to bot creation/edit modal
-  - [ ] Real-time updates as user changes model/frequency (debounced)
-  - [ ] Display: "Estimated cost: $X-Y/month"
-
-### **Phase 5: Usage Dashboard** (1 day)
+### **Phase 4: Minimal UI** (0.5 days)
 - [ ] **Backend API**
-  - [ ] `GET /api/v2/usage/current-month` (total, breakdown by bot/model, estimate)
-  - [ ] `GET /api/v2/usage/history` (past N months)
-  - [ ] `POST /api/v2/usage/set-hard-cap` (optional spending limit)
+  - [ ] `GET /api/v2/usage/current-month` (total + per-bot breakdown)
 
 - [ ] **Frontend Component**
-  - [ ] Create `UsageDashboard` component
-  - [ ] Current month spend (big number)
-  - [ ] Breakdown by bot (pie chart)
-  - [ ] Breakdown by model (bar chart)
-  - [ ] Historical trend (line chart, 6 months)
-  - [ ] Hard cap settings (input + save)
-  - [ ] Link to Stripe billing portal (invoices)
+  - [ ] Create `UsageDisplay` component
+  - [ ] Show: Current month total (big number)
+  - [ ] Show: Per-bot breakdown (list with costs)
+  - [ ] Show: Estimated month-end
+  - [ ] Link to Stripe billing portal
 
-### **Phase 6: Alerts & Safeguards** (0.5 days)
-- [ ] **Email Alerts**
-  - [ ] Create `UsageAlertService`
-  - [ ] Trigger alerts at $10, $20, $50, $100 thresholds
-  - [ ] Resend email templates (usage_alert.html)
-  - [ ] Hourly background job to check and send alerts
+- [ ] **Integration**
+  - [ ] Add to Settings modal or create "Usage" tab
 
-- [ ] **Hard Cap Enforcement**
-  - [ ] Background job (every 5 min) to check hard caps
-  - [ ] Auto-pause all bots when hard cap exceeded
-  - [ ] Send email notification
-  - [ ] Auto-resume when new billing cycle starts or cap raised
+### **Phase 6: Estimator (Post-Launch)** (+1 day after 24-48h data collection)
+- [ ] **Collect Real Data**
+  - [ ] Run test bots for 24-48 hours (various configs)
+  - [ ] Query actual costs from `token_usage` table
+  - [ ] Build lookup table of daily costs per (model, frequency)
 
-### **Testing & Launch** (2 days)
-- [ ] **Stripe Test Mode**
-  - [ ] Test subscription creation with credit card
-  - [ ] Test usage reporting (send test records)
-  - [ ] Test billing threshold (trigger $20 mid-cycle invoice)
-  - [ ] Test payment failure flow (card decline)
+- [ ] **Estimator Service**
+  - [ ] Create `core/services/usage_estimator.py` (lookup-based)
+  - [ ] Add `POST /api/v2/estimate-cost` endpoint
 
-- [ ] **End-to-End Flows**
-  - [ ] New user: signup → add card → create bot → run → verify invoice
-  - [ ] Existing user: upgrade to Premium → verify $100 + usage
-  - [ ] Hard cap: set $10 cap → run bot → verify pause at limit
+- [ ] **Frontend Integration**
+  - [ ] Real-time estimate in bot config UI (debounced)
+  - [ ] Display: "Est. $X/day ($Y/month)"
 
-- [ ] **Launch Prep**
-  - [ ] Create pricing page on ggbots.ai
-  - [ ] Draft user communication (pricing changes)
-  - [ ] Prepare FAQ/support docs
-  - [ ] Switch Stripe to live mode
-  - [ ] Deploy to production
+### **Testing** (Throughout)
+- [ ] Test token tracking (50 executions, verify accuracy)
+- [ ] Test Stripe integration (test mode)
+- [ ] Test daily reporting job
+- [ ] Test billing threshold ($20 trigger)
+- [ ] Test payment failure (bots pause)
+- [ ] Test Premium upgrade
+- [ ] End-to-end: new user → add card → bot → invoice
+
+### **Launch**
+- [ ] Switch Stripe to live mode
+- [ ] Deploy backend + frontend
+- [ ] Monitor for 48 hours
+- [ ] Collect estimator data
 
 ---
 

@@ -4,6 +4,12 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-10 - Confidence-Based Position Sizing (Incomplete)
+
+**Agent MCP Tool Simplified**: Removed manual position sizing parameters (`size_usd`, `leverage`) from `execute_trade` tool. Agents now provide only confidence score (0.0-1.0); system auto-calculates position sizes using `margin = confidence × max_position_percent × balance`. Updated ggAster bot config to `confidence_based` method with 20x leverage, 5-25% risk range. **NOT TESTED** - implementation flawed, needs review and proper testing approach. See [DOCS/completed/2025-11-10_confidence_based_position_sizing.md](DOCS/completed/2025-11-10_confidence_based_position_sizing.md).
+
+---
+
 ## 2025-11-08 - Trading Mode Architecture Refactor
 
 **Simplified Bot Creation + AsterDEX Integration**: Eliminated "duplicate as live" workaround, removed dead code duplication, added first-class AsterDEX support with upfront trading mode selection during bot creation.

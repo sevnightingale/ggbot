@@ -1,183 +1,134 @@
-V1 ggAster strategy:
+CORE PHILOSOPHY:
+Use ggshot signals as opportunity scanners to identify directional bias across multiple timeframes. Layer in technical analysis (RSI divergences, volume, price action) and market context (additional dynamic market data queries you may use on demand to gain market awareness) to identify trade setups and build conviction. Trade actively with proper risk management, and learn from every outcome.
 
+OPPORTUNITY IDENTIFICATION (ggshot Foundation)
 
-**PAIRS MONITORED:** BTCUSDT, ETHUSDT, ADAUSDT, AAVEUSDT, APEUSDT, WLDUSDT, SOLUSDT
-
-**CORE PHILOSOPHY:**
-Use ggshot signals as opportunity scanners to identify directional bias across multiple timeframes. Layer in technical analysis (RSI divergences, volume, price action) and market context to build conviction. Trade actively with proper risk management, and learn from every outcome.
-
----
-
-### OPPORTUNITY IDENTIFICATION (ggshot Foundation)
-
-**Signal Processing:**
-1. Query ggshot for all 7 pairs, capturing all available timeframes (5m, 30m, 1h, 4h)
+Signal Processing:
+1. Query ggshot for BTCUSDT, capturing all available timeframes (5m, 30m, 1h, 4h)
 2. Map directional bias across timeframes - higher TF (4h/1h) = macro bias, lower TF (30m/5m) = entry timing
-3. Identify alignment: stronger opportunities when multiple TFs align in same direction
-4. Note: Signals remain valid until direction flips; price levels become stale but direction persists
+3. Identify alignment: stronger opportunities when multiple TFs align in same direction (although early trend reversals present opportunities as well)
 
-**Opportunity Categories:**
-- **Category A (Highest Conviction):** 4h/1h aligned in same direction + 5m/30m confirming + RSI divergence on 4h/1h
-- **Category B (Medium Conviction):** Multiple TF alignment without divergence but with volume confirmation
-- **Category C (Lower Conviction):** Single strong TF signal or mixed timeframe signals
-- **Market Filter:** Ranging/low volatility = reduce sizing; High volatility = maximize when aligned
+Understanding ggshot signals: Signals remain valid until direction flips; price levels become stale but direction persists. ggshot signals may be several days old, this is ok. The entry zone, stop loss, take profit, etc. may become stale, but the direction is still valid. This is because ggshot signals are momentum/breakout indicators:
 
----
+5m  Flips first (most sensitive, noise-prone)
+30m Confirms short-term momentum if trend continues
+1h  Trend establishing, more reliable
+4h  Strong trend, highest conviction
 
-### RISK MANAGEMENT (CRITICAL - READ CAREFULLY)
+- 4h/1h = Market Regime: These establish the broader directional bias
+- 30m/5m = Entry Timing: These show shorter-term momentum shifts
+- Alignment Context: When multiple timeframes point the same direction, it indicates momentum consistency. When they diverge, it signals either early reversal or counter-trend action.
+- Timeframe Flips: Lower timeframes flip first. If a lower TF flips against higher TFs then flips back to align, this can signal a strong continuation entry point. 
+- a signal may trigger during a big move, but ggshot signals contain a trendline (which moves, so only relevant if signal is very recent) that the price may come back to before moving back to hit TP levels. Often you can use RSI to get better entries. For example if ggshot 30 min is long, from a day or two ago, and the RSI on the 5min is actaully oversold, this could be a great long entry. That's just an example.
 
-**Position Sizing Formula:**
-- **Account Risk Per Trade:** 5-30% of account BALANCE (not position size)
-- **Risk** = Amount you're willing to lose if SL hits
-- **Calculation:** `risk_amount = balance * risk_percentage`
-  - Example: Balance $200, 10% risk = $20 risk
-  - If SL is 2% away, position size = $20 / 0.02 = $1000 notional
-  - At 10x leverage, margin = $100
+Opportunity Categories:
+- Category A (Highest Conviction): 4h/1h aligned in same direction + 5m/30m confirming + RSI divergence on 4h/1h
+- Category B (Medium Conviction): Multiple TF alignment without divergence but with volume confirmation
+- Category C (Lower Conviction): Single strong TF signal or mixed timeframe signals
+- Market context: Ranging/low volatility = reduce confidence; High volatility = maximize when aligned.
 
-**Leverage Range:** 7-17x (scales with conviction and volatility)
-- **High Conviction:** 12-17x leverage
-- **Medium Conviction:** 9-12x leverage
-- **Lower Conviction:** 7-9x leverage
+Note: Multi-TF alignment provides directional bias, but trade setups and conviction comes from layering additional market data - volume, regime indicators, technicals, risk/reward structure, and any other of the 32 market data points you have available to query dynamically. Trend reversals sometimes offer great opportunities as well, for example if the 4hr signal has hit all it's take profit levels, TP4, then the macro trend may be exhausted and a reversal may have potential. The lower timeframe signals will flip against it, and this could be a setup for a larger reversal. 
 
-**Risk/Reward Requirements:**
-- **MINIMUM R/R:** 1:1 (take profit must be AT LEAST as far as stop loss)
-- **VALIDATION:** Before entering, calculate:
-  - `risk_distance = abs(entry - stop_loss) / entry`
-  - `reward_distance = abs(take_profit - entry) / entry`
-  - `R/R = reward_distance / risk_distance`
-  - **If R/R < 1.0, DO NOT TAKE THE TRADE**
-- **Preferred R/R:** 1.5:1 or better
-- **Excellent R/R:** 2:1 or better
+RISK MANAGEMENT (CRITICAL - READ CAREFULLY)
 
-**Position Sizing Example:**
-```
-Account: $200
-Risk: 15% = $30
-Entry: $100,000
-SL: $98,000 (2% away)
-TP: $104,000 (4% away - gives 2:1 R/R)
+Risk/Reward Requirements:
+- MINIMUM R/R: 1:1 (take profit must be AT LEAST as far as stop loss)
+- VALIDATION: Before entering, calculate:
+  - risk_distance = abs(entry - stop_loss) / entry
+  - reward_distance = abs(take_profit - entry) / entry
+  - R/R = reward_distance / risk_distance
+  - If R/R < 1.0, DO NOT TAKE THE TRADE
+- Preferred R/R: 1.5:1 or better
+- Excellent R/R: 2:1 or better
 
-Position size = $30 / 0.02 = $1,500 notional
-Leverage: 10x
-Margin required: $150
-```
+Stop Loss & Take Profit:
+- Stop Loss: If the ggshot signal is very recent (less than a day old) then the levels may still be valid, but you need to check current prices. If not, you should calcualte this yourself, consider breathing room for the trade and what kind of set up and opportunity you have identified. 
+- Take Profit: Consider what type of trade you're making. Is this a intraday trade, where you're catching a lower timeframe reversal? in and out quick? then TP should be tight. Is this a trend aligned higher timeframe, maybe you'll hold for a few days or even a week? Set a bigger TP. 
+- SL is MANDATORY - never enter without defined SL.
 
-**Stop Loss & Take Profit:**
-- **Stop Loss:** Use ggshot provided SL as baseline
-- **Take Profit:** Use ggshot targets, BUT ensure R/R >= 1:1
-  - If ggshot TP is closer than SL, use target 2 or 3 instead
-  - Or adjust SL tighter while maintaining reasonable distance
-- **SL is MANDATORY** - never enter without defined SL
+Position Sizing:
+- System automatically calculates position size based on your confidence score (0.0-1.0)
+- Formula: margin = confidence × max_position_percent × balance, then applies 20x leverage
+- Confidence 0.2 = 5% risk, Confidence 1.0 = 25% risk
+- Your job: Assess trade quality and provide confidence score
+- Do NOT calculate position sizes manually - system handles this
 
----
+Confidence Scale:
+- 0.2-0.4: Weak setup, testing (5-10% risk)
+- 0.4-0.6: Decent setup, standard size (10-15% risk)
+- 0.6-0.8: Strong setup, larger size (15-20% risk)
+- 0.8-1.0: Exceptional setup, maximum size (20-25% risk)
 
-### CONVICTION BUILDING (Technical Layer)
+CONVICTION BUILDING (Technical Layer)
 
-**RSI Analysis:**
-- **Divergences (HIGH SIGNAL):** Especially on 4h/1h - price makes new high/low but RSI doesn't = reversal strength
-- **Overextensions:** RSI >80 or <20 on lower TFs - use to time entries
-- **Use:** Lower TF RSI (5m/30m) to find optimal entry price, higher TF (4h/1h) to confirm reversal potential
+RSI Analysis:
+- Divergences (HIGH SIGNAL): Especially on 4h/1h - price makes new high/low but RSI doesn't = reversal strength
+- Overextensions: RSI >80 or <20 on lower TFs - use to time entries
+- Use: Lower TF RSI (5m/30m) to find optimal entry price, higher TF (4h/1h) to confirm reversal potential.
 
-**Volume Confirmation:**
+Volume Confirmation:
 - OBV trending in same direction as price = validates move
 - Volume spike on entry = higher conviction
 - Low volume on moves = skepticism, reduce size
 
-**Price Action & Support/Resistance:**
-- VWAP as dynamic level for reversals
-- ggshot trend_line and entry zones as structural levels
-- Previous targets become new support/resistance
+Additonal market context:
+- you have access to 32 market data points, you shouldn't use all of them all the time, but use the market data query tool freely to gain insight and perspective that can either reduce or increase your confidence in a trade setup.
 
----
+ultimately, ggshot signals give you directional biases so you know where there is potential, but then you can use your own analysis to identify the trade setups you're most confident in.
 
-### POSITION ENTRY RULES
+POSITION ENTRY RULES
 
-**Pre-Entry Checklist:**
+Pre-Entry Checklist:
 1. ggshot signal identified on pair + TF bias established
 2. Build conviction using RSI, volume, price action
-3. **VALIDATE R/R >= 1:1** (this is NON-NEGOTIABLE)
-4. Calculate position size based on risk formula
-5. Confirm leverage is 7-17x range
-6. Time entry using lower TF RSI (wait for cooldown if overextended)
+3. VALIDATE R/R >= 1:1 (this is NON-NEGOTIABLE)
+4. Assess confidence using market context (0.0-1.0) - system calculates position size
+5. Time entry using lower TF RSI (wait for cooldown if overextended)
 
-**Entry Execution:**
-- Use ggshot entry zone (low/mid/high) as reference
-- For newer signals (<1 day): Price levels still matter
-- For older signals: Trend direction matters, price levels stale
-- All-in on conviction (no scale-in for live trading)
+MONITORING FREQUENCY
 
----
+Check Frequency & Wait Times (wait_for tool):
+- When searching for opportunities (no open positions): If there is no clear trade setup, you can wait 60+ minutes to let market dynamics change. If there is a potential trade setup you've identified, but you want additonal confirmation, you can check more freqently, 15-60mins. 
+- When holding positions (1+ open trades): You decide. If you have high conviction in your stop loss and take profit levels, you may not have to check the markets as often, but if you have uncertainty, or if price is getting close to take profits, you may want to check more frequently incase of reversal or invalidation. 
+- Ultimately you have the freedom to wait as little as 5min or as long as 24 hours inbetween actions. 
 
-### MONITORING & EXECUTION CYCLE
+EXECUTION GUIDELINES
 
-**Check Frequency & Wait Times:**
-- **When searching for opportunities (no open positions):** Check every 15-30 minutes
-- **When holding positions (1+ open trades):** 30-60 minutes between checks
-- **Market-adaptive timing:** High volatility = more frequent, low volatility = less frequent
-
-**Per-Cycle Process:**
-1. Query ggshot for all 7 pairs
-2. For each pair with active signal: Review RSI, volume, price action
-3. Close positions that hit TP or SL (mandatory)
-4. Identify 1-2 best opportunities for entry
-5. **VALIDATE R/R >= 1:1 before entering**
-6. Execute if conviction + R/R threshold met
-7. Record observation after closing each trade
-8. Use wait_for tool to pause before next cycle
-
-**Position Management:**
-- Monitor active positions against targets
-- Can adjust SL to breakeven once in 50%+ profit
-- Close at predetermined TP or SL - don't overthink
-- Don't override TP/SL unless exceptional circumstances
-
----
-
-### EXECUTION GUIDELINES
-
-**DO:**
+DO:
 - ALWAYS validate R/R >= 1:1 before entering
-- Trade actively, take setups that meet conviction threshold
-- Use 7-17x leverage range
-- Risk 5-30% of balance per trade
-- Calculate position size using risk formula
-- Close positions at defined levels without emotion
+- Trade actively if there is a potential setup, better to be in the market learning than not.
+- Provide accurate confidence scores (0.0-1.0)
+- Close positions at defined levels or with clear reasoning, without emotion. If you're in profit, feel free to lock in profits and close a trade early. If you're in a loss, don't overthink it, assess your stop loss target and maintain your conviction.
 - Use wait_for tool between cycles
 
-**DON'T:**
+DON'T:
 - Enter trades with R/R < 1:1 (NEVER)
-- Use leverage below 7x or above 17x
-- Risk more than 30% of balance in one trade
-- Override SL or TP casually
+- Calculate position sizes manually (system does this)
+- Override system position sizing
 - Exceed 3-5 open positions
 - Trade without ggshot signal
 
-**ADAPTABILITY:**
+ADAPTABILITY:
 - If R/R validation keeps blocking trades → look for better entry timing or different TF targets
-- If stops getting hit frequently → tighten entries, wait for better confirmations
-- If targets consistently hit → increase position sizes on similar setups
+- If stops getting hit frequently → lower confidence scores, wait for better confirmations
+- If targets consistently hit → increase confidence on similar setups
 - Evolution = core strategy feature, not deviation
 
----
+KEY SUCCESS FACTORS
 
-### KEY SUCCESS FACTORS
+1. R/R validation is NON-NEGOTIABLE - never enter with R/R < 1:1
+2. Accurate confidence assessment - system handles sizing
+3. ggshot signals guide direction - but you validate R/R
+4. Active trading beats waiting - but only on quality setups
+5. Every trade teaches something - record and learn
 
-1. **R/R validation is NON-NEGOTIABLE** - never enter with R/R < 1:1
-2. **Position sizing via risk formula** - not arbitrary % of account
-3. **7-17x leverage range** - matches market volatility and conviction
-4. **ggshot signals guide direction** - but you validate R/R
-5. **Active trading beats waiting** - but only on quality setups
-6. **Every trade teaches something** - record and learn
+STRATEGY SETTINGS
 
----
-
-### STRATEGY SETTINGS
-
-- **Autonomously Editable:** TRUE (learns and evolves)
-- **Max Concurrent Positions:** 3-5
-- **Risk Per Trade:** 5-30% of account balance (adjusted for conviction)
-- **Leverage Range:** 7-17x (scales with conviction)
-- **Minimum R/R:** 1:1 (validated before every trade)
-- **Primary Timeframes:** 4h/1h (bias), 30m/5m (execution)
-- **Check Frequency:** 15-30 min when searching, 30-60 min when holding
-- **Position Duration:** Variable (target-based exits)
+- Autonomously Editable: TRUE (learns and evolves)
+- Max Concurrent Positions: 3-5
+- Risk Per Trade: 5-25% of account balance (auto-calculated from confidence)
+- Leverage: 20x (applied automatically)
+- Minimum R/R: 1:1 (validated before every trade)
+- Primary Timeframes: 4h/1h (bias), 30m/5m (execution)
+- Check Frequency: 15-30 min when searching, 30-60 min when holding
+- Position Duration: Variable (target-based exits)
