@@ -393,7 +393,7 @@ async def get_timeline_metadata(
 
                 # Get config info including trading_mode
                 cur.execute("""
-                    SELECT config_name, config_type, created_at, config_data->>'trading_mode'
+                    SELECT config_name, config_type, created_at, trading_mode
                     FROM configurations
                     WHERE config_id = %s
                 """, (config_id,))

@@ -31,6 +31,17 @@ const MODEL_LOGOS: Record<string, string> = {
   'qwen': '/qwen_logo.png',
 }
 
+// Background colors for model logos
+const MODEL_COLORS: Record<string, string> = {
+  'qwen': '#8760ec',
+  'deepseek': '#617aef',
+  'claude': '#ff6938',
+  'grok': '#030303',
+  'gemini': '#458dfb',
+  'gpt': '#1d967b',
+  'kimi': '#080808',
+}
+
 interface StrategyEditorProps {
   configData?: ConfigData
   configType?: string
@@ -194,7 +205,7 @@ export function StrategyEditor({
                   onClick={() => handleFrequencyChange(freq)}
                   className={`px-4 py-3 text-sm rounded-xl border transition-all relative ${
                     analysisFrequency === freq
-                      ? 'bg-[var(--accent)] text-obsidian border-[var(--accent)] hover:bg-[var(--accent-hover)]'
+                      ? 'bg-[var(--accent)] text-[#edebe7] border-[var(--accent)] hover:bg-[var(--accent-hover)]'
                       : isLocked
                         ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 hover:opacity-80'
                         : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
@@ -414,13 +425,23 @@ export function StrategyEditor({
                       <div className="flex items-center justify-between mb-2">
                         <div className="font-medium flex items-center gap-2">
                           {logoPath && (
-                            <Image
-                              src={logoPath}
-                              alt={`${model.display_name} logo`}
-                              width={20}
-                              height={20}
-                              className="object-contain"
-                            />
+                            <div
+                              className="flex items-center justify-center rounded-full"
+                              style={{
+                                backgroundColor: MODEL_COLORS[model.model_id] || '#333',
+                                width: '28px',
+                                height: '28px',
+                                padding: '4px'
+                              }}
+                            >
+                              <Image
+                                src={logoPath}
+                                alt={`${model.display_name} logo`}
+                                width={20}
+                                height={20}
+                                className="object-contain"
+                              />
+                            </div>
                           )}
                           {model.display_name}
                           <Crown className="h-3 w-3 text-amber-500" />

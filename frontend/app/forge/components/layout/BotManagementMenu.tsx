@@ -118,7 +118,7 @@ export function BotManagementMenu({
             <button
               onClick={handleRenameSubmit}
               disabled={isBotAction}
-              className="inline-flex items-center gap-1.5 px-3 py-2 bg-[var(--accent)] text-obsidian rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 text-xs font-medium"
+              className="inline-flex items-center gap-1.5 px-3 py-2 bg-[var(--accent)] text-[#edebe7] rounded hover:bg-[var(--accent-hover)] disabled:opacity-50 text-xs font-medium"
             >
               <Check className="h-3.5 w-3.5" />
               Save

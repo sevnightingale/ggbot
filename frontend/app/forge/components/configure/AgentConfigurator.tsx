@@ -97,7 +97,7 @@ export function AgentConfigurator({
                   <div
                     className={`max-w-[80%] px-4 py-2 rounded-lg ${
                       msg.role === 'user'
-                        ? 'bg-[var(--accent)] text-obsidian'
+                        ? 'bg-[var(--accent)] text-[#edebe7]'
                         : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)]'
                     }`}
                   >

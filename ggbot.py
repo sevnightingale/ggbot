@@ -1020,9 +1020,9 @@ class GGBotOrchestrator:
                 "reasoning": decision_result.get("reasoning", "V2 Decision Engine decision")
             }
             
-            # Determine trading mode (paper vs live)
+            # Determine trading mode (paper vs symphony vs aster)
             trading_mode = getattr(config, 'trading_mode', 'paper')
-            is_live = trading_mode == 'live'
+            is_live = trading_mode == 'symphony'
             is_aster = trading_mode == 'aster'
 
             if trading_action == "close":
@@ -1547,14 +1547,12 @@ async def create_config(
     # Add config_type back to config_data for BotConfigV2 constructor
     request_data["config_type"] = config_type
 
-    # Map 'symphony' -> 'live' for database (backwards compatibility)
-    db_trading_mode = 'live' if trading_mode == 'symphony' else trading_mode
-
+    # Use symphony/aster directly - no more 'live' mapping (Schema v2.2+)
     config = await config_service.create_config(
         user_id=current_user.user_id,
         config_name=request.config_name,
         config_data=request_data,
-        trading_mode=db_trading_mode,
+        trading_mode=trading_mode,
         symphony_agent_id=symphony_agent_id if trading_mode == "symphony" else None
     )
 
@@ -2637,11 +2635,11 @@ async def get_live_positions(
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
-        # Check if it's a live trading bot
-        if getattr(config, 'trading_mode', 'paper') != 'live':
+        # Check if it's a Symphony live trading bot
+        if getattr(config, 'trading_mode', 'paper') != 'symphony':
             return {
                 "positions": [],
-                "message": "Not a live trading bot"
+                "message": "Not a Symphony live trading bot"
             }
 
         # Get positions from Symphony service
@@ -2812,11 +2810,11 @@ async def get_live_account_metrics(
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
-        # Check if it's a live trading bot
-        if getattr(config, 'trading_mode', 'paper') != 'live':
+        # Check if it's a Symphony live trading bot
+        if getattr(config, 'trading_mode', 'paper') != 'symphony':
             raise HTTPException(
                 status_code=400,
-                detail="Not a live trading bot"
+                detail="Not a Symphony live trading bot"
             )
 
         # Get metrics from Symphony service
@@ -2862,11 +2860,11 @@ async def get_live_trade_history(
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
 
-        # Check if it's a live trading bot
-        if getattr(config, 'trading_mode', 'paper') != 'live':
+        # Check if it's a Symphony live trading bot
+        if getattr(config, 'trading_mode', 'paper') != 'symphony':
             raise HTTPException(
                 status_code=400,
-                detail="Not a live trading bot"
+                detail="Not a Symphony live trading bot"
             )
 
         # Get trade history from Symphony service
@@ -3258,7 +3256,7 @@ async def agent_execute_trade(
 
         # Route to appropriate trading service based on trading_mode
         trading_mode = getattr(config, 'trading_mode', 'paper')
-        is_live = trading_mode == 'live'
+        is_live = trading_mode == 'symphony'
         is_aster = trading_mode == 'aster'
 
         if is_aster:

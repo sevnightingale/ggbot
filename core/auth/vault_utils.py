@@ -323,7 +323,8 @@ class VaultManager:
         """
         Delete Symphony credentials and disable live trading for all user's bots.
 
-        Sets symphony_vault_id = NULL and updates all configurations to paper mode.
+        Deletes the vault secret and sets symphony_vault_id = NULL.
+        Updates all configurations to paper mode.
         This ensures no live trading can occur without valid credentials.
 
         Args:
@@ -335,6 +336,29 @@ class VaultManager:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    # Get vault secret ID before clearing
+                    cur.execute("""
+                        SELECT symphony_vault_id
+                        FROM user_profiles
+                        WHERE user_id = %s
+                    """, (user_id,))
+
+                    result = cur.fetchone()
+                    vault_secret_id = result[0] if result else None
+
+                    # Delete the vault secret if it exists
+                    if vault_secret_id:
+                        try:
+                            cur.execute("""
+                                DELETE FROM vault.secrets
+                                WHERE id = %s
+                            """, (vault_secret_id,))
+                        except Exception as vault_error:
+                            # Log but don't fail if vault deletion fails
+                            logger.bind(user_id=user_id).warning(
+                                f"Could not delete vault secret: {vault_error}"
+                            )
+
                     # Clear Symphony credentials from user_profiles
                     cur.execute("""
                         UPDATE user_profiles
@@ -354,7 +378,7 @@ class VaultManager:
                         SET trading_mode = 'paper',
                             updated_at = NOW()
                         WHERE user_id = %s
-                        AND trading_mode = 'live'
+                        AND trading_mode = 'symphony'
                     """, (user_id,))
 
                     disabled_bots = cur.rowcount

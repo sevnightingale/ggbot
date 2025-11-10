@@ -32,7 +32,7 @@ export function EmptyState({
       {actionLabel && onAction && (
         <button
           onClick={onAction}
-          className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-obsidian hover:bg-[var(--accent-hover)] transition-colors"
+          className="rounded-xl bg-[var(--accent)] px-4 py-2 text-sm font-medium text-[#edebe7] hover:bg-[var(--accent-hover)] transition-colors"
         >
           {actionLabel}
         </button>

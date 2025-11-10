@@ -4,9 +4,9 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
-## 2025-11-10 - CRITICAL FIXES: Config Save 404, SSE Dashboard, OpenRouter, Timeline Race
+## 2025-11-10 - CRITICAL FIXES: Config Save, SSE Dashboard, OpenRouter, Timeline, Aster Metrics
 
-**Critical Bugfixes**: Fixed 4 errors (3 backend, 1 frontend):
+**Critical Bugfixes**: Fixed 5 errors (4 backend, 1 frontend):
 
 1. **Config Save 404**: When `config_name` was added to SELECT statement in `get_config()`, all result array indices shifted by 1, but lines 307-308 and 321-324 weren't updated. Code was calling `result[1].isoformat()` on config_data JSON instead of `result[2]` (created_at timestamp), causing exception → `get_config()` returned `None` → 404 error. **All config saves were broken**.
    - **Fix**: Updated result indices to use correct positions (`result[2]` for created_at, `result[3]` for updated_at)
@@ -20,11 +20,14 @@ Complete history of features, fixes, and improvements. For current status see AC
 4. **TradingView Timeline Race Condition**: Frontend console error "Cannot set data: {hasLineSeries: false, dataLength: 2}". Polling interval from previous render fired after chart cleanup nulled refs, attempting to set data on destroyed chart.
    - **Fix**: Added guard in `fetchData()` to bail early if `chartRef.current` or `lineSeriesRef.current` are null
 
-**Impact**: All errors resolved. Config saves work, dashboard SSE streams cleanly, OpenRouter configs validate correctly, timeline charts render without warnings.
+5. **Aster Bot Metrics Showing Zero**: Timeline metadata endpoint for Aster bots returned all zeros (balance, trades, win rate). Query read `trading_mode` from JSONB `config_data->>'trading_mode'` which was removed during Config System Cleanup, returned NULL, defaulted to 'paper', executed wrong code branch.
+   - **Fix**: Changed query to read from table column `trading_mode` instead of JSONB field
 
-**Root Cause**: Backend - Index offset bug and missing fields from 2025-11-10 Config System Cleanup. Frontend - Interval race condition during component cleanup.
+**Impact**: All errors resolved. Config saves work, dashboard SSE streams cleanly, OpenRouter configs validate correctly, timeline charts render without warnings, Aster bot metrics display correctly.
 
-**Files Modified**: `core/services/config_service.py`, `core/sse/dashboard_data.py`, `core/config/models.py`, `frontend/components/tv-timeline.tsx`, `frontend/components/tv-timeline-standalone.tsx`
+**Root Cause**: Backend - Index offset bug and missing fields from 2025-11-10 Config System Cleanup (trading_mode moved from JSONB to table column). Frontend - Interval race condition during component cleanup.
+
+**Files Modified**: `core/services/config_service.py`, `core/sse/dashboard_data.py`, `core/config/models.py`, `api/activities.py`, `frontend/components/tv-timeline.tsx`, `frontend/components/tv-timeline-standalone.tsx`
 
 ---
 
