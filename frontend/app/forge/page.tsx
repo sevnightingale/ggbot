@@ -182,7 +182,12 @@ function ForgeApp() {
       const agentConfig = {
         ...baseConfig,
         trading: {
-          ...baseConfig.trading
+          ...baseConfig.trading,
+          leverage: 10,  // Higher default for agents
+          position_sizing: {
+            method: 'confidence_based',  // Always use confidence-based for agents
+            max_position_percent: 25.0   // Allow up to 25% risk per trade
+          }
         },
         decision: {
           analysis_frequency: 'agent_driven'
