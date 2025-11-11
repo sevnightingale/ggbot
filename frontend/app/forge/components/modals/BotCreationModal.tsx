@@ -377,7 +377,7 @@ export function BotCreationModal({
 
           <button
             onClick={handleConfirm}
-            className="px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#edebe7] font-medium transition-colors"
+            className="px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#edebe7] dark:text-[#1a1816] font-medium transition-colors"
           >
             {botTypes.find(t => t.type === selectedType)?.available ? 'Create Bot' : 'Upgrade to Create'}
           </button>
