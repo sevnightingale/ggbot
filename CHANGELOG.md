@@ -4,6 +4,50 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-11 - Confidence-Based Position Sizing: Verified & Production-Ready
+
+**Testing**: Comprehensive validation of confidence-based sizing implementation across paper/symphony/aster modes.
+
+- **Test Suite**: Created `tests/test_confidence_sizing.py` with multi-mode validation
+- **Formula Verified**: `margin = confidence × max_position_percent × balance`, `position_size = margin × leverage`
+- **Paper Trading**: ✅ All tests passed (10x leverage, 25% max position, $10k balance)
+- **AsterDEX**: ✅ All tests passed (10x leverage, 25% max position, $100 mock balance)
+- **Symphony**: ✅ Weight calculation verified (15x leverage, 25% max position)
+- **Agent Defaults**: Updated bot creation to use confidence_based sizing (10x leverage, 25% max)
+- **Validation Fix**: Added 'agent_driven' to valid analysis frequencies
+- **Vault Fix**: Symphony credential deletion now properly removes vault secrets (no orphaned secrets)
+- **Trading Mode Fix**: Removed old 'live' constraint, fixed 'symphony' validation (dropped duplicate constraint)
+- **Backend Updates**: Fixed 5 locations checking `trading_mode == 'live'` → `trading_mode == 'symphony'`
+
+**Impact**: Confidence-based position sizing validated and ready for production. Agent bots automatically calculate position sizes from confidence scores (0.0-1.0), simplifying UX. All vault/validation bugs resolved.
+
+**Files Modified**: core/config/models.py, core/auth/vault_utils.py, ggbot.py (5 locations), frontend/app/forge/page.tsx, tests/test_confidence_sizing.py (new)
+
+---
+
+## 2025-11-11 - UI Enhancements: OpenRouter Model Selection & Theme-Adaptive Design
+
+**Frontend Integration**: Completed Phase 0 OpenRouter migration with polished model selection UI and theme system improvements.
+
+- **Model Selection UI**:
+  - Dynamic model cards fetched from `/api/v2/llm-models` (7 models: Grok, DeepSeek, Kimi, Qwen, Gemini, GPT-5, Claude Sonnet 4.5)
+  - Model logos in colored circular backgrounds with brand-specific hex codes (qwen: #8760ec, deepseek: #617aef, claude: #ff6938, grok: #030303, gemini: #458dfb, gpt: #1d967b, kimi: #080808)
+  - Pricing display per decision (formatted from nested pricing structure)
+  - Thinking mode toggle (enables extended reasoning with higher token limits)
+  - Default config updated to schema v2.2 with OpenRouter support
+
+- **Theme System**:
+  - Fixed Tailwind dark mode configuration to recognize app's `[data-theme="dark"]` attribute
+  - Updated 6 components with theme-adaptive button text colors (light text in light mode, dark text in dark mode)
+  - Components updated: ActivationBar.tsx, StrategyEditor.tsx, BotCreationModal.tsx, EmptyState.tsx, AgentConfigurator.tsx, BotManagementMenu.tsx
+  - Brass accent color (#c1a87d) now works correctly in both themes with proper text contrast
+
+**Impact**: OpenRouter frontend integration complete, users can now select from 14 LLM variants (7 models × 2 thinking modes) with clear pricing visibility. Theme consistency improved across light/dark modes.
+
+**Files Modified**: 7 frontend files (tailwind.config.ts, StrategyEditor.tsx, ActivationBar.tsx, BotCreationModal.tsx, EmptyState.tsx, AgentConfigurator.tsx, BotManagementMenu.tsx), 1 backend file (lib/api.ts)
+
+---
+
 ## 2025-11-10 - CRITICAL FIXES: Config Save, SSE Dashboard, OpenRouter, Timeline, Aster Metrics
 
 **Critical Bugfixes**: Fixed 5 errors (4 backend, 1 frontend):

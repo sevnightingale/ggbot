@@ -59,7 +59,7 @@ class DecisionConfig(BaseModel):
     @classmethod
     def validate_analysis_frequency(cls, v):
         """Validate analysis frequency format."""
-        valid_frequencies = ["5m", "15m", "30m", "1h", "4h", "1d", "1w", "signal_driven"]
+        valid_frequencies = ["5m", "15m", "30m", "1h", "4h", "1d", "1w", "signal_driven", "agent_driven"]
         if v not in valid_frequencies:
             raise ValueError(f"Invalid analysis frequency: {v}. Must be one of {valid_frequencies}")
         return v
