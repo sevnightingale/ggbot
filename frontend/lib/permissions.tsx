@@ -93,6 +93,13 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
   const canAccess = (feature: string): boolean => {
     if (!userProfile) return false // Default to no access if profile not loaded
 
+    // SIMPLIFIED PERMISSION MODEL
+    // Only 3 features are gated:
+    // 1. bot_activation - requires paid subscription
+    // 2. agents - requires PRO tier
+    // 3. ggshot - requires special data point access
+    // Everything else is available to all users (configure, view, etc.)
+
     switch (feature) {
       case 'bot_activation':
         return userProfile.can_activate_bots
@@ -100,36 +107,13 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
       case 'agents':
         return userProfile.can_use_agents
 
-      case 'signals':
-        return userProfile.can_use_signal_validation
-
       case 'ggshot':
         return userProfile.paid_data_points.includes('ggshot')
 
-      case 'telegram_publishing':
-        return userProfile.can_publish_telegram_signals
-
-      case 'premium_llms':
-      case 'openai_gpt4':
-        const hasAccess = userProfile.can_use_premium_features && !userProfile.requires_own_llm_keys
-        console.log('premium_llms permission check:', {
-          can_use_premium_features: userProfile.can_use_premium_features,
-          requires_own_llm_keys: userProfile.requires_own_llm_keys,
-          hasAccess
-        })
-        return hasAccess
-
-      case 'platform_llm_keys':
-        return userProfile.can_use_premium_features && !userProfile.requires_own_llm_keys
-
-      case 'signal_validation_mode':
-        return userProfile.can_use_signal_validation
-
-      case 'live_trading':
-        return userProfile.can_use_live_trading
-
       default:
-        return true // Allow access to basic features by default
+        // All other features available to everyone
+        // (LLM models, frequencies, telegram, signal validation, live trading, etc.)
+        return true
     }
   }
 

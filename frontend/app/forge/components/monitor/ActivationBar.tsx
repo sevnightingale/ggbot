@@ -44,6 +44,14 @@ export function ActivationBar({
     onStart()
   }
 
+  const handleManualTrigger = () => {
+    if (!canAccess('bot_activation')) {
+      setUpgradeModalOpen(true)
+      return
+    }
+    onManualTrigger()
+  }
+
   return (
     <>
       <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">
@@ -77,11 +85,15 @@ export function ActivationBar({
           {/* Action Buttons */}
           <div className="flex items-center gap-2">
             <button
-              onClick={onManualTrigger}
+              onClick={handleManualTrigger}
               disabled={isManualTriggering || isStarting || isStopping}
               className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              <Zap className="h-4 w-4" />
+              {!canAccess('bot_activation') ? (
+                <Crown className="h-4 w-4" />
+              ) : (
+                <Zap className="h-4 w-4" />
+              )}
               {isManualTriggering ? 'Triggering...' : 'Run once'}
             </button>
 

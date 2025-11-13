@@ -338,6 +338,21 @@ class GGBotOrchestrator:
             config = await self.config_service.get_config(config_id, user_id)
             if not config:
                 raise HTTPException(status_code=404, detail="Configuration not found")
+
+            # Permission check: Verify user can still activate/run bots
+            user_profile = await self.user_service.get_profile(user_id)
+            if not user_profile.can_activate_bots:
+                self._log.warning(
+                    f"Blocking bot execution for config {config_id} - "
+                    f"user {user_id} lost activation permission (tier: {user_profile.subscription_tier.value})"
+                )
+                # Auto-deactivate bot if user lost permission
+                await self.config_service.update_state(config_id, user_id, "inactive")
+                raise HTTPException(
+                    status_code=403,
+                    detail="Bot activation requires an active subscription. Please upgrade to continue."
+                )
+
             self._log.info(f"🔍 DEBUG: config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
 
             if config.config_type == "signal_validation":
@@ -3827,14 +3842,17 @@ async def create_checkout_session(
         # Get or create Stripe customer
         customer_id = await get_or_create_stripe_customer(current_user.user_id, current_user.email)
 
+        # Build line items - metered billing doesn't use quantity
+        if request.plan == 'usage':
+            line_items = [{'price': price_ids[request.plan]}]
+        else:
+            line_items = [{'price': price_ids[request.plan], 'quantity': 1}]
+
         # Build checkout session params
         checkout_params = {
             'customer': customer_id,
             'mode': 'subscription',
-            'line_items': [{
-                'price': price_ids[request.plan],
-                'quantity': 1
-            }],
+            'line_items': line_items,
             'success_url': f"{os.environ['FRONTEND_URL']}/success?session_id={{CHECKOUT_SESSION_ID}}",
             'cancel_url': f"{os.environ['FRONTEND_URL']}/forge",
             'client_reference_id': str(current_user.user_id),

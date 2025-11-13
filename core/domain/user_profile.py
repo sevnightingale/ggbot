@@ -74,11 +74,6 @@ class UserProfile:
         return self.subscription_tier == SubscriptionTier.PRO
 
     @property
-    def is_premium_user(self) -> bool:
-        """Check if user has any paid subscription (PRO tier only)."""
-        return self.subscription_tier == SubscriptionTier.PRO
-    
-    @property
     def has_active_subscription(self) -> bool:
         """Check if user has active subscription."""
         return (
@@ -86,7 +81,7 @@ class UserProfile:
             (self.subscription_expires_at is None or
              self.subscription_expires_at > datetime.now(timezone.utc))
         )
-    
+
     @property
     def subscription_expired(self) -> bool:
         """Check if subscription has expired."""
@@ -94,45 +89,66 @@ class UserProfile:
             self.subscription_expires_at is not None and
             self.subscription_expires_at <= datetime.now(timezone.utc)
         )
-    
-    @property
-    def can_use_premium_features(self) -> bool:
-        """Check if user can access premium features."""
-        return (
-            self.is_premium_user and 
-            self.has_active_subscription and
-            not self.subscription_expired
-        )
-    
-    @property
-    def requires_own_llm_keys(self) -> bool:
-        """Check if user must provide their own LLM API keys."""
-        return self.is_free_tier or not self.can_use_premium_features
-    
-    @property
-    def can_publish_telegram_signals(self) -> bool:
-        """Check if user can publish signals to Telegram."""
-        return self.can_use_premium_features
-    
-    @property
-    def can_use_signal_validation(self) -> bool:
-        """Check if user can use signal validation mode."""
-        return self.can_use_premium_features
 
-    @property
-    def can_use_live_trading(self) -> bool:
-        """Check if user can use Symphony live trading."""
-        return self.can_use_premium_features
+    # =========================================================================
+    # SIMPLIFIED PERMISSION MODEL
+    # Single source of truth: can_activate_bots
+    # All paid features available to USAGE_BASED and PRO tiers
+    # =========================================================================
 
     @property
     def can_activate_bots(self) -> bool:
-        """Check if user can activate bots (requires paid subscription)."""
-        return self.subscription_tier in [SubscriptionTier.USAGE_BASED, SubscriptionTier.PRO]
+        """
+        MASTER PERMISSION: Check if user can activate/run bots.
+
+        This is the single source of truth for all paid features.
+        True for USAGE_BASED and PRO tiers with active subscriptions.
+        """
+        return (
+            self.subscription_tier in [SubscriptionTier.USAGE_BASED, SubscriptionTier.PRO] and
+            self.has_active_subscription and
+            not self.subscription_expired
+        )
 
     @property
     def can_use_agents(self) -> bool:
         """Check if user can create and use agents (PRO tier only)."""
-        return self.subscription_tier == SubscriptionTier.PRO
+        return self.subscription_tier == SubscriptionTier.PRO and self.can_activate_bots
+
+    # =========================================================================
+    # LEGACY PROPERTIES - All delegate to can_activate_bots
+    # Kept for backward compatibility, will be phased out
+    # =========================================================================
+
+    @property
+    def is_premium_user(self) -> bool:
+        """DEPRECATED: Use can_activate_bots instead."""
+        return self.can_activate_bots
+
+    @property
+    def can_use_premium_features(self) -> bool:
+        """DEPRECATED: Use can_activate_bots instead."""
+        return self.can_activate_bots
+
+    @property
+    def requires_own_llm_keys(self) -> bool:
+        """DEPRECATED: Platform provides LLM keys for all paid users."""
+        return not self.can_activate_bots
+
+    @property
+    def can_publish_telegram_signals(self) -> bool:
+        """DEPRECATED: Use can_activate_bots instead."""
+        return self.can_activate_bots
+
+    @property
+    def can_use_signal_validation(self) -> bool:
+        """DEPRECATED: Use can_activate_bots instead."""
+        return self.can_activate_bots
+
+    @property
+    def can_use_live_trading(self) -> bool:
+        """DEPRECATED: Use can_activate_bots instead."""
+        return self.can_activate_bots
 
     def has_data_point_access(self, data_point_name: str) -> bool:
         """Check if user has access to specific premium data point."""

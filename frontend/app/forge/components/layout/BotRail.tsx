@@ -1,11 +1,9 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Crown, BarChart2, Loader2, Circle } from 'lucide-react'
+import React from 'react'
+import { BarChart2, Loader2, Circle } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
-import { usePermissions } from '@/lib/permissions'
-import { UpgradeModal } from '@/components/UpgradeModal'
 
 interface BotRailProps {
   bots: BotConfiguration[]
@@ -34,17 +32,13 @@ export function BotRail({
   isBotAction = false,
   className = ''
 }: BotRailProps) {
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
-  const { hasSubscription } = usePermissions()
-
-  const isPro = hasSubscription('pro')
-  const botLimit = isPro ? 10 : 1
+  const botLimit = 10  // Everyone gets 10 bots
   const currentBotCount = bots.length
   const atLimit = currentBotCount >= botLimit
 
   const handleCreateNew = () => {
-    if (atLimit && !isPro) {
-      setUpgradeModalOpen(true)
+    if (atLimit) {
+      alert('You have reached the maximum of 10 bots. Please delete a bot to create a new one.')
       return
     }
     onCreateNew?.()
@@ -65,18 +59,12 @@ export function BotRail({
           </div>
           <button
             onClick={handleCreateNew}
-            disabled={isCreatingNew}
-            className={`rounded-xl border border-[var(--border)] px-2 py-1 text-xs transition-all text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed ${
-              atLimit && !isPro ? 'hover:opacity-80 opacity-60' : 'hover:bg-[var(--bg-tertiary)]'
-            }`}
+            disabled={isCreatingNew || atLimit}
+            className="rounded-xl border border-[var(--border)] px-2 py-1 text-xs transition-all text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-tertiary)]"
           >
             {isCreatingNew ? (
               <span className="flex items-center gap-1">
                 <Loader2 className="h-3 w-3 animate-spin" /> Creating...
-              </span>
-            ) : atLimit && !isPro ? (
-              <span className="flex items-center gap-1">
-                + New <Crown className="h-3 w-3" />
               </span>
             ) : '+ New'}
           </button>
@@ -104,12 +92,6 @@ export function BotRail({
           )}
         </div>
       </div>
-
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        open={upgradeModalOpen}
-        onOpenChange={setUpgradeModalOpen}
-      />
     </aside>
   )
 }

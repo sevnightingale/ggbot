@@ -33,15 +33,9 @@ export function BotCreationModal({
   const [symphonyConnected, setSymphonyConnected] = useState(false)
   const [asterConnected, setAsterConnected] = useState(false)
   const [checkingConnections, setCheckingConnections] = useState(true)
-  const { canAccess, userProfile } = usePermissions()
+  const { canAccess } = usePermissions()
 
-  const hasSignalValidation = canAccess('signal_validation')
-  const hasLiveTrading = canAccess('live_trading')
-
-  // Check for whitelist access (agent is whitelisted only for now)
-  const whitelistUserId = process.env.NEXT_PUBLIC_WHITELIST_USER_ID
-  const isWhitelisted = userProfile?.user_id === whitelistUserId
-  const hasAgentAccess = isWhitelisted
+  const hasAgentAccess = canAccess('agents')
 
   // Check Symphony and Aster connection status on mount
   useEffect(() => {
@@ -104,8 +98,8 @@ export function BotCreationModal({
       label: 'Signal Validation',
       description: 'Validate external signals (Telegram, webhooks) with AI analysis',
       color: 'var(--agent-decision)',
-      available: hasSignalValidation,
-      tier: 'Pro'
+      available: true,
+      tier: 'Free'
     },
     {
       type: 'agent' as const,
@@ -114,7 +108,7 @@ export function BotCreationModal({
       description: 'Autonomous AI agent that defines its own trading strategy through conversation',
       color: '#9333ea', // purple-600
       available: hasAgentAccess,
-      tier: 'Whitelist'
+      tier: 'Pro'
     }
   ]
 
@@ -135,8 +129,8 @@ export function BotCreationModal({
       label: 'Symphony Live',
       description: 'Real trades via Symphony.io',
       color: 'var(--signal)', // signal blue
-      available: hasLiveTrading,
-      tier: 'Pro',
+      available: true,
+      tier: 'Free',
       requiresConnection: true,
       connected: symphonyConnected
     },
@@ -146,8 +140,8 @@ export function BotCreationModal({
       label: 'AsterDEX',
       description: 'Real trades on AsterDEX',
       color: 'var(--ember)', // ember red
-      available: hasLiveTrading,
-      tier: 'Pro',
+      available: true,
+      tier: 'Free',
       requiresConnection: true,
       connected: asterConnected
     }

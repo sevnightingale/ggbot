@@ -246,21 +246,28 @@ async def get_balance_series(
         # Add Aster trades (account-wide, only with non-zero P&L)
         if is_aster:
             aster_service = AsterDEXV3LiveTradingService()
-            aster_trades_raw = await aster_service.get_user_trades(limit=1000)
 
-            for aster_trade in (aster_trades_raw or []):
-                realized_pnl = float(aster_trade.get('realizedPnl', 0))
+            # Use income endpoint (more complete than userTrades)
+            # userTrades only shows recent ~7 days, income shows full history
+            income_records = await aster_service.get_income_history(
+                income_type="REALIZED_PNL",
+                start_time=int(config_created_at.timestamp() * 1000),  # From bot creation
+                limit=1000
+            )
 
-                # Only include trades with actual P&L (position closes)
-                if realized_pnl != 0:
-                    # Aster trades have 'time' in milliseconds
-                    trade_time_ms = aster_trade.get('time', 0)
-                    trade_time = datetime.fromtimestamp(trade_time_ms / 1000, tz=timezone.utc) if trade_time_ms else None
+            for income_record in (income_records or []):
+                income_amount = float(income_record.get('income', 0))
 
-                    if trade_time:
+                # Only include non-zero P&L records
+                if income_amount != 0:
+                    # Income records have 'time' in milliseconds
+                    income_time_ms = income_record.get('time', 0)
+                    income_time = datetime.fromtimestamp(income_time_ms / 1000, tz=timezone.utc) if income_time_ms else None
+
+                    if income_time:
                         all_trades.append({
-                            "timestamp": trade_time,
-                            "pnl": realized_pnl
+                            "timestamp": income_time,
+                            "pnl": income_amount
                         })
 
         # Sort all trades by timestamp
@@ -477,18 +484,21 @@ async def get_timeline_metadata(
                         # crossWalletBalance = settled balance + unrealized P&L for this asset
                         current_balance += float(asset.get('crossWalletBalance', 0))
 
-            # Get ALL Aster trades for this account
-            # Note: Aster doesn't distinguish between configs - it's account-wide
-            # So we calculate total P&L across all trades
-            all_aster_trades = await aster_service.get_user_trades(limit=1000)
+            # Get ALL Aster income records (more complete than userTrades)
+            # userTrades only shows recent ~7 days, income shows full history
+            income_records = await aster_service.get_income_history(
+                income_type="REALIZED_PNL",
+                start_time=int(created_at.timestamp() * 1000),  # From bot creation
+                limit=1000
+            )
 
-            # Calculate account-wide metrics
-            total_pnl = sum(float(t.get('realizedPnl', 0)) for t in (all_aster_trades or []))
+            # Calculate account-wide metrics from income records
+            total_pnl = sum(float(r.get('income', 0)) for r in (income_records or []))
 
-            # Count only trades with non-zero P&L (actual position closes)
-            closed_trades = [t for t in (all_aster_trades or []) if float(t.get('realizedPnl', 0)) != 0]
-            total_trades = len(closed_trades)
-            win_trades = sum(1 for t in closed_trades if float(t.get('realizedPnl', 0)) > 0)
+            # Count only non-zero P&L records (actual position closes)
+            closed_records = [r for r in (income_records or []) if float(r.get('income', 0)) != 0]
+            total_trades = len(closed_records)
+            win_trades = sum(1 for r in closed_records if float(r.get('income', 0)) > 0)
             win_rate = (win_trades / total_trades * 100) if total_trades > 0 else 0
 
             # Calculate starting balance
