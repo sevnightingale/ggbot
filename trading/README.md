@@ -147,6 +147,11 @@ CREATE TABLE live_trades (
 **Dashboard Integration**:
 - `GET /api/dashboard-stream` - SSE stream enriched with Symphony data for live bots
 
+**Activity Timeline** (2025-11-13):
+- `GET /api/v2/activities/{config_id}/balance-series` - P&L chart from Symphony trade history
+- `GET /api/v2/activities/{config_id}/metadata` - Win rate, trades, P&L from Symphony API
+- `GET /api/v2/activities/{config_id}` - Activity feed (universal, works for all modes)
+
 ### Symphony Data Enrichment
 
 The SSE dashboard stream automatically enriches live bot data:
@@ -403,6 +408,11 @@ CREATE INDEX idx_live_trades_provider_open ON live_trades(provider, config_id, c
 **Metrics & Analytics**:
 - `GET /api/v2/account/aster/{config_id}` - Account balance and position metrics
 - `GET /api/v2/trades/aster/{config_id}` - Closed trade history
+
+**Activity Timeline** (2025-11-13):
+- `GET /api/v2/activities/{config_id}/balance-series` - P&L chart from Aster API + paper trades
+- `GET /api/v2/activities/{config_id}/metadata` - Balance, win rate, trades from Aster API
+- `GET /api/v2/activities/{config_id}` - Activity feed (universal, works for all modes)
 
 ### Symbol Compatibility
 

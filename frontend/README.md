@@ -900,17 +900,30 @@ This shows the **200-500 analytical fields** (trend strength, divergence pattern
 
 #### **6. Data Fetching & Management**
 
-**API Endpoints**:
+**API Endpoints** (Multi-Mode Support):
 ```typescript
 // Balance series (P&L snapshots at trade closes)
+// - Paper: Queries paper_trades table
+// - Symphony: Queries Symphony API get_trade_history()
+// - Aster: Queries Aster API get_user_trades() + paper_trades
 GET /api/v2/activities/{config_id}/balance-series?mode=pnl
 
 // All activities (trades, queries, thoughts, waits)
+// - Universal: Works for all trading modes (activities table)
 GET /api/v2/activities/{config_id}
 
-// Bot metadata (name, status)
+// Bot metadata (name, balance, win rate, performance)
+// - Paper: Calculated from paper_trades (per-bot)
+// - Symphony: Queries Symphony API get_account_metrics() (account-wide)
+// - Aster: Queries Aster API balance + trades (account-wide)
 GET /api/v2/activities/{config_id}/metadata
 ```
+
+**Multi-Mode Architecture** (2025-11-13):
+All three trading modes (paper, Symphony, Aster) fully supported with smart backend routing:
+- **Paper Trading**: Per-bot isolated metrics from `paper_trades` table
+- **Symphony Live**: Account-wide metrics from Symphony API (shared wallet design)
+- **AsterDEX Live**: Account-wide metrics from Aster API (shared wallet design)
 
 **Data Transformation**:
 1. Fetch balance series (P&L snapshots)
