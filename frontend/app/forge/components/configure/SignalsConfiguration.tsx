@@ -48,7 +48,7 @@ export function SignalsConfiguration({
   const toggleGgShot = (enabled: boolean) => {
     // Check permission before enabling
     if (enabled && !isGgShotSubscribed) {
-      alert('ggShot signals require a ggbase subscription. Upgrade to access external signal sources!')
+      alert('ggShot signals require a paid subscription. Upgrade to access external signal sources!')
       return
     }
     const currentConfig = configData?.extraction?.selected_data_sources || {}

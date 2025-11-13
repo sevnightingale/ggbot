@@ -83,7 +83,7 @@ export function UserProfile({}: UserProfileProps) {
   }
 
   // Check if user is Pro
-  const isPro = hasSubscription('ggbase')
+  const isPro = hasSubscription('pro')
 
   // Get display name from user metadata
   const getDisplayName = () => {

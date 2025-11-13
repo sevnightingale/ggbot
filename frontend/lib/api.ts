@@ -136,13 +136,15 @@ export interface DataPoint {
 
 export interface UserProfile {
   user_id: string
-  subscription_tier: 'free' | 'ggbase'
+  subscription_tier: 'free' | 'usage_based' | 'pro'
   subscription_status: 'active' | 'cancelled' | 'past_due'
   can_use_premium_features: boolean
   requires_own_llm_keys: boolean
   can_publish_telegram_signals: boolean
   can_use_signal_validation: boolean
   can_use_live_trading: boolean
+  can_activate_bots: boolean
+  can_use_agents: boolean
   paid_data_points: string[]
 }
 
@@ -568,7 +570,7 @@ export class ApiClient {
 
   // Stripe Subscription Management
   async createCheckoutSession(params: {
-    plan: 'monthly' | 'annual'
+    plan: 'usage' | 'monthly' | 'annual'
     coupon?: string
   }): Promise<{ checkout_url: string }> {
     console.log('🔍 API Call: createCheckoutSession', params)

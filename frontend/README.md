@@ -298,7 +298,7 @@ interface PermissionContextType {
   userProfile: UserProfile | null
   loading: boolean
   canAccess: (feature: string) => boolean
-  hasSubscription: (tier: 'ggbase') => boolean
+  hasSubscription: (tier: 'usage_based' | 'pro') => boolean
   hasPaidDataPoint: (dataPoint: string) => boolean
 }
 

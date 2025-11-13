@@ -37,7 +37,7 @@ export function BotRail({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const { hasSubscription } = usePermissions()
 
-  const isPro = hasSubscription('ggbase')
+  const isPro = hasSubscription('pro')
   const botLimit = isPro ? 10 : 1
   const currentBotCount = bots.length
   const atLimit = currentBotCount >= botLimit

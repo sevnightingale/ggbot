@@ -19,7 +19,7 @@ interface SettingsModalProps {
 
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { userProfile } = usePermissions()
-  const isPro = userProfile?.subscription_tier === 'ggbase'
+  const isPro = userProfile?.subscription_tier === 'pro'
 
   // Symphony connection state
   const [symphonyConnected, setSymphonyConnected] = useState(false)

@@ -377,13 +377,13 @@ export function TradeSettings({
               </div>
             </div>
             <div className="text-sm text-[var(--text-muted)] mb-4">
-              Telegram signal publishing is available with a ggbase subscription. Upgrade to automatically publish your bot&apos;s trading decisions to your Telegram channel.
+              Telegram signal publishing is available with a paid subscription. Upgrade to automatically publish your bot&apos;s trading decisions to your Telegram channel.
             </div>
             <button
               onClick={() => window.open('/pricing', '_blank')}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[var(--agent-decision)] text-white text-sm font-medium hover:opacity-90 transition-opacity"
             >
-              Upgrade to ggbase →
+              Upgrade to activate →
             </button>
           </div>
         ) : (
