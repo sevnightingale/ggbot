@@ -4,6 +4,47 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-13 - Metered Billing Infrastructure & Subscription Tier Updates
+
+**Stripe Integration**: Completed core metered billing infrastructure with daily usage reporting and subscription tier architecture.
+
+- **LLM Pricing Service Fix**:
+  - Fixed schema mismatch in `llm_pricing_service.py` (queried non-existent `pricing_input_per_1m_thinking` column)
+  - Updated to query actual schema: `pricing_input_per_1m` and `pricing_output_per_1m` from `llm_models` table
+  - Token prices same regardless of thinking mode (extended reasoning uses more tokens, not different rates)
+
+- **Stripe Meter Reporting**:
+  - Created `billing/stripe_meter_reporter.py` for daily usage aggregation and reporting
+  - Uses existing `STRIPE_SECRET_KEY` from .env (no new credentials needed)
+  - Integrated with APScheduler (midnight UTC daily job, not cron)
+  - Reports pre-computed dollar amounts to Stripe Meter API (`llm_tokens_usd` event)
+  - Query aggregates unreported `platform_cost_usd` by user_id from activities table
+
+- **Billing API Endpoints**:
+  - Added `/api/v2/billing/usage` - current billing period summary (total cost, token breakdown, model breakdown)
+  - Added `/api/v2/billing/usage/breakdown` - detailed analysis (by_bot, by_day, with optional filters)
+  - Both endpoints query activities table with billing indexes for fast aggregation
+
+- **Subscription Tier Architecture**:
+  - **FREE**: Can browse and configure bots, cannot activate (no LLM calls)
+  - **USAGE_BASED**: Pay per LLM call with 70% markup, no base fee (new tier)
+  - **PRO**: $29/month + usage + agent access (renamed from 'ggbase')
+  - Updated `user_profile.py` with `can_activate_bots()` and `can_use_agents()` permissions
+  - Created SQL migration in `SQL.md` (adds 'usage_based' and 'pro' tiers, migrates existing users)
+
+- **End-to-End Validation**:
+  - Ran live bot execution showing accurate token tracking in activities table
+  - Verified: OpenRouter returns tokens → llm_pricing_service calculates costs → activities logged with billing columns
+  - Example: 2,251 tokens tracked with $0.000675 provider cost, $0.001148 platform cost
+
+**Impact**: Core metered billing infrastructure operational. Every LLM call tracked with costs and ready for Stripe reporting. Subscription tier model ready for frontend checkout integration.
+
+**Files Modified**: core/services/llm_pricing_service.py, core/domain/user_profile.py, billing/stripe_meter_reporter.py (new), billing/__init__.py (new), ggbot.py (scheduler + 2 endpoints), SQL.md (migration), TODO.md, CHANGELOG.md
+
+**Pending**: Webhook handler for `invoice.payment_failed` event, frontend checkout flow updates
+
+---
+
 ## 2025-11-13 - Symphony Timeline Support: Multi-Mode Activity Tracking
 
 **Timeline API**: Added full Symphony support to activity timeline endpoints, enabling unified timeline view across all trading modes.
@@ -20,6 +61,42 @@ Complete history of features, fixes, and improvements. For current status see AC
 **Files Modified**: api/activities.py (3 endpoints), tests/test_symphony_timeline.py (new)
 
 **Note**: Aster & Symphony use account-wide metrics (shared wallets), paper trading is per-bot.
+
+---
+
+## 2025-11-12 - Activities Unification & Token Tracking Infrastructure
+
+**Backend Integration**: Implemented metered billing foundation with unified activity logging and per-call LLM cost tracking.
+
+- **Schema Migration**:
+  - Removed `priority` column from activities table (design mistake)
+  - Added 10 token tracking columns (provider, model, thinking_mode, input_tokens, output_tokens, reasoning_tokens, provider_cost_usd, platform_cost_usd, stripe_reported, stripe_reported_at)
+  - Created 2 billing indexes (user-level and per-bot aggregation)
+
+- **Activity Logger Refactor**:
+  - Removed all priority logic
+  - Added `log_llm_activity()` function for LLM calls with token tracking
+  - Added `log_llm_activity_safe()` non-blocking wrapper
+  - Updated activity types taxonomy (removed old types, added: market_query, llm_thought, trade_entry, trade_exit, trade_update, agent_wait, observation_recorded, strategy_updated, signal_received)
+
+- **LLM Pricing Service**:
+  - Created `core/services/llm_pricing_service.py`
+  - Queries `llm_models` table for current pricing
+  - Calculates provider cost and platform cost with 70% markup
+  - Handles thinking mode pricing (extended reasoning costs more)
+
+- **Decision Engine Integration**:
+  - Updated `_call_llm()` to return (response, metadata) tuple
+  - Added `_log_llm_activity()` helper method for consistent token tracking
+  - Updated 3 LLM callsites: signal validation, opportunity analysis, position management
+  - Updated 3 save methods to log `llm_thought` activities with full cost tracking
+  - Backward compatible: Still writes to `decisions` table (marked deprecated)
+
+**Impact**: Every LLM call in scheduled_trading and signal_validation bots now tracked with costs. Foundation ready for Stripe Meter integration.
+
+**Files Modified**: 3 backend files (activity_logger.py, llm_pricing_service.py [new], engine_v2.py)
+
+**Database**: activities table now 23 columns with billing indexes
 
 ---
 

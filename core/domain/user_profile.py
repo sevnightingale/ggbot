@@ -13,9 +13,10 @@ import uuid
 
 
 class SubscriptionTier(Enum):
-    """Available subscription tiers for the freemium business model."""
-    FREE = "free"      # Free tier: paper trading with user's LLM keys
-    GGBASE = "ggbase"  # Paid tier: hosted LLM + Telegram signal publishing
+    """Available subscription tiers for the business model."""
+    FREE = "free"                # Free tier: Can browse, cannot activate bots
+    USAGE_BASED = "usage_based"  # Usage tier: Pay per LLM call, no base fee
+    PRO = "pro"                  # Premium tier: $29/month + usage + agent access
 
 
 class SubscriptionStatus(Enum):
@@ -68,14 +69,14 @@ class UserProfile:
         return self.subscription_tier == SubscriptionTier.FREE
     
     @property
-    def is_ggbase_tier(self) -> bool:
-        """Check if user has ggbase subscription."""
-        return self.subscription_tier == SubscriptionTier.GGBASE
-    
+    def is_pro_tier(self) -> bool:
+        """Check if user has pro subscription."""
+        return self.subscription_tier == SubscriptionTier.PRO
+
     @property
     def is_premium_user(self) -> bool:
-        """Check if user has any premium subscription."""
-        return self.subscription_tier in [SubscriptionTier.GGBASE]
+        """Check if user has any paid subscription (PRO tier only)."""
+        return self.subscription_tier == SubscriptionTier.PRO
     
     @property
     def has_active_subscription(self) -> bool:
@@ -123,6 +124,16 @@ class UserProfile:
         """Check if user can use Symphony live trading."""
         return self.can_use_premium_features
 
+    @property
+    def can_activate_bots(self) -> bool:
+        """Check if user can activate bots (requires paid subscription)."""
+        return self.subscription_tier in [SubscriptionTier.USAGE_BASED, SubscriptionTier.PRO]
+
+    @property
+    def can_use_agents(self) -> bool:
+        """Check if user can create and use agents (PRO tier only)."""
+        return self.subscription_tier == SubscriptionTier.PRO
+
     def has_data_point_access(self, data_point_name: str) -> bool:
         """Check if user has access to specific premium data point."""
         return data_point_name in self.paid_data_points
@@ -156,14 +167,14 @@ class UserProfile:
         """Check if user has Stripe customer record."""
         return self.stripe_customer_id is not None
     
-    def upgrade_to_signals_tier(
+    def upgrade_to_pro_tier(
         self,
         stripe_customer_id: str,
         stripe_subscription_id: str,
         expires_at: Optional[datetime] = None
     ) -> None:
-        """Upgrade user to signals tier with Stripe integration."""
-        self.subscription_tier = SubscriptionTier.GGBASE
+        """Upgrade user to Pro tier with Stripe integration."""
+        self.subscription_tier = SubscriptionTier.PRO
         self.subscription_status = SubscriptionStatus.ACTIVE
         self.stripe_customer_id = stripe_customer_id
         self.stripe_subscription_id = stripe_subscription_id

@@ -5,13 +5,15 @@ import { apiClient } from '@/lib/api'
 
 interface UserProfile {
   user_id: string
-  subscription_tier: 'free' | 'ggbase'
+  subscription_tier: 'free' | 'usage_based' | 'pro'
   subscription_status: 'active' | 'cancelled' | 'past_due'
   can_use_premium_features: boolean
   requires_own_llm_keys: boolean
   can_publish_telegram_signals: boolean
   can_use_signal_validation: boolean
   can_use_live_trading: boolean
+  can_activate_bots: boolean
+  can_use_agents: boolean
   paid_data_points: string[]
 }
 
@@ -75,6 +77,8 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
           can_publish_telegram_signals: false,
           can_use_signal_validation: false,
           can_use_live_trading: false,
+          can_activate_bots: false,
+          can_use_agents: false,
           paid_data_points: []
         })
       } finally {
@@ -90,6 +94,12 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     if (!userProfile) return false // Default to no access if profile not loaded
 
     switch (feature) {
+      case 'bot_activation':
+        return userProfile.can_activate_bots
+
+      case 'agents':
+        return userProfile.can_use_agents
+
       case 'signals':
         return userProfile.can_use_signal_validation
 
@@ -123,7 +133,7 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
     }
   }
 
-  const hasSubscription = (tier: 'ggbase'): boolean => {
+  const hasSubscription = (tier: 'usage_based' | 'pro'): boolean => {
     if (!userProfile) return false
     return userProfile.subscription_tier === tier && userProfile.subscription_status === 'active'
   }

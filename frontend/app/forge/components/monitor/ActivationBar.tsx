@@ -1,8 +1,10 @@
 'use client'
 
-import React from 'react'
-import { Activity, Circle, Clock, Play, PauseCircle, Zap } from 'lucide-react'
+import React, { useState } from 'react'
+import { Activity, Circle, Clock, Play, PauseCircle, Zap, Crown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
+import { usePermissions } from '@/lib/permissions'
+import { UpgradeModal } from '@/components/UpgradeModal'
 
 interface ActivationBarProps {
   selectedBot: BotConfiguration
@@ -31,9 +33,20 @@ export function ActivationBar({
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
+  const { canAccess } = usePermissions()
+  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+
+  const handleActivate = () => {
+    if (!canAccess('bot_activation')) {
+      setUpgradeModalOpen(true)
+      return
+    }
+    onStart()
+  }
 
   return (
-    <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">
+    <>
+      <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">
       {/* Single Row: Pipeline + Controls */}
       <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
         {/* Pipeline Group */}
@@ -73,7 +86,7 @@ export function ActivationBar({
             </button>
 
             <button
-              onClick={isActive ? onStop : onStart}
+              onClick={isActive ? onStop : handleActivate}
               disabled={isStarting || isStopping}
               className={`inline-flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm font-medium shadow-sm ring-1 ring-inset transition ${
                 isActive
@@ -88,7 +101,11 @@ export function ActivationBar({
                 </>
               ) : (
                 <>
-                  <Play className="h-4 w-4" />
+                  {!canAccess('bot_activation') ? (
+                    <Crown className="h-4 w-4" />
+                  ) : (
+                    <Play className="h-4 w-4" />
+                  )}
                   {isStarting ? 'Activating...' : 'Activate'}
                 </>
               )}
@@ -97,6 +114,13 @@ export function ActivationBar({
         </div>
       </div>
     </div>
+
+      {/* Upgrade Modal */}
+      <UpgradeModal
+        open={upgradeModalOpen}
+        onOpenChange={setUpgradeModalOpen}
+      />
+    </>
   )
 }
 

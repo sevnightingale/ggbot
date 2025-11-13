@@ -226,15 +226,30 @@ async def lifespan(app: FastAPI):
         if enable_scheduler:
             scheduler.start()
             logger.info("✅ APScheduler started")
+
+            # Schedule daily Stripe meter reporting (midnight UTC)
+            from billing.stripe_meter_reporter import run_daily_report
+            from apscheduler.triggers.cron import CronTrigger
+
+            scheduler.add_job(
+                func=run_daily_report,
+                trigger=CronTrigger(hour=0, minute=0),  # Midnight UTC daily
+                id="stripe_meter_reporting",
+                replace_existing=True,
+                max_instances=1,
+                coalesce=True,
+                misfire_grace_time=3600  # 1 hour grace period
+            )
+            logger.info("✅ Stripe meter reporting scheduled (daily at midnight UTC)")
         else:
             logger.info("⏸️  APScheduler disabled (ENABLE_SCHEDULER=false)")
-        
+
         # Start monitoring service (positions only - no WebSocket spam!)
         from core.monitoring.service import MonitoringService
         monitoring_service = MonitoringService()
         monitoring_task = asyncio.create_task(monitoring_service.start())
         logger.info("✅ Monitoring service started (positions only - no WebSocket spam!)")
-        
+
         # Reconcile active bots from database
         await reconcile_active_bots()
         
@@ -2350,6 +2365,199 @@ async def delete_llm_credential(
         raise HTTPException(status_code=500, detail=f"Failed to delete credential: {str(e)}")
 
 
+# Billing & Usage Endpoints
+@app.get("/api/v2/billing/usage")
+async def get_billing_usage(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Get current billing period LLM token usage for the authenticated user.
+
+    Returns total unreported costs and breakdown by activity type.
+    """
+    try:
+        from core.common.db import get_db_connection
+
+        user_id = current_user.user_id
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Get total unreported usage
+                cur.execute("""
+                    SELECT
+                        SUM(platform_cost_usd) as total_cost,
+                        SUM(input_tokens) as total_input_tokens,
+                        SUM(output_tokens) as total_output_tokens,
+                        SUM(reasoning_tokens) as total_reasoning_tokens,
+                        COUNT(*) as activity_count
+                    FROM activities
+                    WHERE user_id = %s
+                      AND platform_cost_usd IS NOT NULL
+                      AND platform_cost_usd > 0
+                      AND stripe_reported = FALSE
+                """, (user_id,))
+
+                result = cur.fetchone()
+                total_cost = float(result[0]) if result[0] else 0.0
+                total_input = int(result[1]) if result[1] else 0
+                total_output = int(result[2]) if result[2] else 0
+                total_reasoning = int(result[3]) if result[3] else 0
+                activity_count = int(result[4]) if result[4] else 0
+
+                # Get breakdown by model
+                cur.execute("""
+                    SELECT
+                        model,
+                        provider,
+                        thinking_mode,
+                        SUM(platform_cost_usd) as cost,
+                        SUM(input_tokens) as input_tokens,
+                        SUM(output_tokens) as output_tokens,
+                        COUNT(*) as call_count
+                    FROM activities
+                    WHERE user_id = %s
+                      AND platform_cost_usd IS NOT NULL
+                      AND platform_cost_usd > 0
+                      AND stripe_reported = FALSE
+                    GROUP BY model, provider, thinking_mode
+                    ORDER BY cost DESC
+                """, (user_id,))
+
+                model_breakdown = []
+                for row in cur.fetchall():
+                    model_breakdown.append({
+                        "model": row[0],
+                        "provider": row[1],
+                        "thinking_mode": row[2],
+                        "cost_usd": float(row[3]) if row[3] else 0.0,
+                        "input_tokens": int(row[4]) if row[4] else 0,
+                        "output_tokens": int(row[5]) if row[5] else 0,
+                        "call_count": int(row[6])
+                    })
+
+                return {
+                    "status": "success",
+                    "usage": {
+                        "total_cost_usd": total_cost,
+                        "total_input_tokens": total_input,
+                        "total_output_tokens": total_output,
+                        "total_reasoning_tokens": total_reasoning,
+                        "activity_count": activity_count,
+                        "model_breakdown": model_breakdown
+                    }
+                }
+
+    except Exception as e:
+        logger.error(f"Failed to get billing usage: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get billing usage: {str(e)}")
+
+
+@app.get("/api/v2/billing/usage/breakdown")
+async def get_billing_breakdown(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2),
+    config_id: Optional[str] = None,
+    days: int = 30
+) -> Dict[str, Any]:
+    """
+    Get detailed billing breakdown with optional filters.
+
+    Query params:
+        - config_id: Filter by specific bot/agent configuration
+        - days: Number of days to include (default 30)
+    """
+    try:
+        from core.common.db import get_db_connection
+        from datetime import datetime, timedelta
+
+        user_id = current_user.user_id
+        start_date = datetime.utcnow() - timedelta(days=days)
+
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Build query with optional config_id filter
+                config_filter = "AND config_id = %s" if config_id else ""
+                params = [user_id, start_date, config_id] if config_id else [user_id, start_date]
+
+                # Get breakdown by bot/agent
+                cur.execute(f"""
+                    SELECT
+                        a.config_id,
+                        c.name as config_name,
+                        c.config_type,
+                        SUM(a.platform_cost_usd) as total_cost,
+                        SUM(a.input_tokens) as input_tokens,
+                        SUM(a.output_tokens) as output_tokens,
+                        COUNT(*) as call_count,
+                        MIN(a.created_at) as first_activity,
+                        MAX(a.created_at) as last_activity
+                    FROM activities a
+                    LEFT JOIN configurations c ON a.config_id = c.config_id
+                    WHERE a.user_id = %s
+                      AND a.created_at >= %s
+                      AND a.platform_cost_usd IS NOT NULL
+                      AND a.platform_cost_usd > 0
+                      {config_filter}
+                    GROUP BY a.config_id, c.name, c.config_type
+                    ORDER BY total_cost DESC
+                """, params)
+
+                bot_breakdown = []
+                for row in cur.fetchall():
+                    bot_breakdown.append({
+                        "config_id": row[0],
+                        "config_name": row[1],
+                        "config_type": row[2],
+                        "total_cost_usd": float(row[3]) if row[3] else 0.0,
+                        "input_tokens": int(row[4]) if row[4] else 0,
+                        "output_tokens": int(row[5]) if row[5] else 0,
+                        "call_count": int(row[6]),
+                        "first_activity": row[7].isoformat() if row[7] else None,
+                        "last_activity": row[8].isoformat() if row[8] else None
+                    })
+
+                # Get daily aggregation
+                cur.execute(f"""
+                    SELECT
+                        DATE(created_at) as date,
+                        SUM(platform_cost_usd) as daily_cost,
+                        SUM(input_tokens) as input_tokens,
+                        SUM(output_tokens) as output_tokens,
+                        COUNT(*) as call_count
+                    FROM activities
+                    WHERE user_id = %s
+                      AND created_at >= %s
+                      AND platform_cost_usd IS NOT NULL
+                      AND platform_cost_usd > 0
+                      {config_filter}
+                    GROUP BY DATE(created_at)
+                    ORDER BY date DESC
+                """, params)
+
+                daily_breakdown = []
+                for row in cur.fetchall():
+                    daily_breakdown.append({
+                        "date": row[0].isoformat() if row[0] else None,
+                        "cost_usd": float(row[1]) if row[1] else 0.0,
+                        "input_tokens": int(row[2]) if row[2] else 0,
+                        "output_tokens": int(row[3]) if row[3] else 0,
+                        "call_count": int(row[4])
+                    })
+
+                return {
+                    "status": "success",
+                    "breakdown": {
+                        "by_bot": bot_breakdown,
+                        "by_day": daily_breakdown,
+                        "days": days,
+                        "config_id": config_id
+                    }
+                }
+
+    except Exception as e:
+        logger.error(f"Failed to get billing breakdown: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to get billing breakdown: {str(e)}")
+
+
 # Symphony Live Trading Endpoints
 @app.post("/api/v2/symphony/setup")
 async def setup_symphony_account(
@@ -3592,7 +3800,7 @@ stripe.api_key = os.environ.get('STRIPE_SECRET_KEY')
 
 # Request models
 class CheckoutRequest(BaseModel):
-    plan: str  # 'monthly' or 'annual'
+    plan: str  # 'usage', 'monthly', or 'annual'
     coupon: Optional[str] = None
 
 @app.post("/api/v2/create-checkout-session")
@@ -3600,19 +3808,20 @@ async def create_checkout_session(
     request: CheckoutRequest,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
-    """Create Stripe Checkout session for Pro Plan upgrade."""
+    """Create Stripe Checkout session for subscription upgrade."""
 
     # Map plan to price ID
     price_ids = {
-        'monthly': os.environ['STRIPE_PRICE_ID_MONTHLY'],
+        'usage': os.environ.get('STRIPE_PRICE_ID_USAGE'),
+        'monthly': os.environ.get('STRIPE_PRICE_ID_MONTHLY'),
     }
 
     # Add annual if available
     if os.environ.get('STRIPE_PRICE_ID_ANNUAL'):
         price_ids['annual'] = os.environ['STRIPE_PRICE_ID_ANNUAL']
 
-    if request.plan not in price_ids:
-        raise HTTPException(400, "Invalid plan. Must be 'monthly' or 'annual'")
+    if request.plan not in price_ids or not price_ids[request.plan]:
+        raise HTTPException(400, f"Invalid plan: {request.plan}")
 
     try:
         # Get or create Stripe customer
@@ -3630,7 +3839,6 @@ async def create_checkout_session(
             'cancel_url': f"{os.environ['FRONTEND_URL']}/forge",
             'client_reference_id': str(current_user.user_id),
             'subscription_data': {
-                'trial_period_days': 14,
                 'metadata': {
                     'user_id': str(current_user.user_id),
                     'plan': request.plan
@@ -3639,8 +3847,12 @@ async def create_checkout_session(
             'metadata': {
                 'user_id': str(current_user.user_id)
             },
-            'allow_promotion_codes': True,
+            'allow_promotion_codes': request.plan != 'usage',  # No promos for usage plan
         }
+
+        # Add trial only for monthly/annual plans (not usage-based)
+        if request.plan in ['monthly', 'annual']:
+            checkout_params['subscription_data']['trial_period_days'] = 14
 
         # Add coupon if provided
         if request.coupon:
@@ -3758,7 +3970,12 @@ async def get_current_user_profile(
         "subscription_status": profile.subscription_status.value,
         "can_use_premium_features": profile.can_use_premium_features,
         "can_publish_telegram_signals": profile.can_publish_telegram_signals,
+        "can_use_signal_validation": profile.can_use_signal_validation,
         "can_use_live_trading": profile.can_use_live_trading,
+        "can_activate_bots": profile.can_activate_bots,
+        "can_use_agents": profile.can_use_agents,
+        "requires_own_llm_keys": profile.requires_own_llm_keys,
+        "paid_data_points": profile.paid_data_points,
         "has_stripe_integration": profile.has_stripe_integration,
         "subscription_expires_at": profile.subscription_expires_at.isoformat() if profile.subscription_expires_at else None
     }
@@ -3769,12 +3986,23 @@ async def get_current_user_profile(
 # =============================================================================
 
 async def handle_checkout_completed(session):
-    """Handle successful checkout - activate Pro subscription."""
+    """Handle successful checkout - activate subscription."""
     from core.common.db import get_db_connection
 
     user_id = session['metadata']['user_id']
     customer_id = session['customer']
     subscription_id = session['subscription']
+
+    # Get plan from session metadata
+    plan = session.get('subscription_data', {}).get('metadata', {}).get('plan', 'usage')
+
+    # Map plan to subscription tier
+    tier_map = {
+        'usage': 'usage_based',
+        'monthly': 'pro',
+        'annual': 'pro'
+    }
+    subscription_tier = tier_map.get(plan, 'usage_based')
 
     # For ongoing subscriptions, subscription_expires_at should be NULL
     # Only set expiration date when subscription is cancelled
@@ -3782,18 +4010,18 @@ async def handle_checkout_completed(session):
         with conn.cursor() as cur:
             cur.execute("""
                 UPDATE user_profiles
-                SET subscription_tier = 'ggbase',
+                SET subscription_tier = %s,
                     subscription_status = 'active',
                     stripe_customer_id = %s,
                     stripe_subscription_id = %s,
                     subscription_expires_at = NULL,
                     updated_at = NOW()
                 WHERE user_id = %s
-            """, (customer_id, subscription_id, user_id))
+            """, (subscription_tier, customer_id, subscription_id, user_id))
             conn.commit()
 
     logger.bind(user_id=user_id).info(
-        f"Pro subscription activated. Customer: {customer_id}, Subscription: {subscription_id}"
+        f"Subscription activated: tier={subscription_tier}, plan={plan}, Customer: {customer_id}, Subscription: {subscription_id}"
     )
 
 

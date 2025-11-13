@@ -45,14 +45,14 @@ class LLMPricingService:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    # Try exact match first (model_id + provider)
+                    # Query pricing (same token prices regardless of thinking mode)
                     cur.execute("""
                         SELECT
-                            CASE WHEN %s THEN pricing_input_per_1m_thinking ELSE pricing_input_per_1m END,
-                            CASE WHEN %s THEN pricing_output_per_1m_thinking ELSE pricing_output_per_1m END
+                            pricing_input_per_1m,
+                            pricing_output_per_1m
                         FROM llm_models
                         WHERE model_id = %s AND enabled = TRUE
-                    """, (thinking_mode, thinking_mode, model))
+                    """, (model,))
 
                     result = cur.fetchone()
 

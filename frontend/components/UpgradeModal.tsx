@@ -17,35 +17,39 @@ interface UpgradeModalProps {
 }
 
 export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
-  const [billingPeriod, setBillingPeriod] = useState<'monthly' | 'annual'>('monthly')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
-
-  const pricing = {
-    monthly: { price: 29, period: 'month' },
-    annual: { price: 279, period: 'year', savings: '20% off' }
-  }
 
   const features = [
     {
       icon: '🧠',
       title: 'Frontier reasoning models',
-      description: 'Tuned for market analysis and trading decisions'
+      description: 'Access to Claude, GPT-5, Grok, Gemini, and more'
     },
     {
       icon: '⚡',
       title: 'High frequency analysis',
-      description: 'Run your ggbots more often so you never miss an opportunity'
+      description: 'Run your ggbots as often as you need'
     },
     {
       icon: '📱',
-      title: 'Telegram publishing',
-      description: 'Receive your ggbot\'s decisions to use as signals for full autonomous trading'
+      title: 'Telegram signal publishing',
+      description: 'Receive your ggbot\'s decisions as trading signals'
     },
     {
       icon: '🤖',
-      title: 'Multiple bots',
-      description: 'Up to 10 active ggbots so you can A/B test several strategies at once'
+      title: 'Multiple active bots',
+      description: 'Run up to 10 ggbots simultaneously'
+    },
+    {
+      icon: '🔍',
+      title: 'Signal validation mode',
+      description: 'Validate external signals before execution'
+    },
+    {
+      icon: '📊',
+      title: 'Live trading (Symphony)',
+      description: 'Execute real trades on supported exchanges'
     }
   ]
 
@@ -54,9 +58,9 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
       setLoading(true)
       setError(null)
 
-      // Call backend to create Stripe checkout session
+      // Call backend to create Stripe checkout session for usage-based plan
       const { checkout_url } = await apiClient.createCheckoutSession({
-        plan: billingPeriod
+        plan: 'usage'
       })
 
       // Redirect to Stripe checkout
@@ -77,63 +81,27 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
               <Sparkles className="h-5 w-5 text-[var(--text-primary)]" />
             </div>
-            <DialogTitle className="text-2xl">Upgrade to Pro Plan</DialogTitle>
+            <DialogTitle className="text-2xl">Activate Your ggbots</DialogTitle>
           </div>
           <DialogDescription>
-            Unlock advanced features and take your trading to the next level
+            Pay only for what you use - simple, transparent pricing
           </DialogDescription>
         </DialogHeader>
 
-        {/* Billing Period Toggle */}
-        <div className="flex items-center justify-center gap-2 my-3">
-          <button
-            onClick={() => setBillingPeriod('monthly')}
-            className={`px-6 py-2 rounded-lg font-medium transition-all ${
-              billingPeriod === 'monthly'
-                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-hover)]'
-                : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)]'
-            }`}
-          >
-            Monthly
-          </button>
-          <button
-            onClick={() => setBillingPeriod('annual')}
-            className={`px-6 py-2 rounded-lg font-medium transition-all relative ${
-              billingPeriod === 'annual'
-                ? 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border-hover)]'
-                : 'bg-[var(--bg-secondary)] text-[var(--text-muted)] hover:bg-[var(--bg-tertiary)] border border-[var(--border)]'
-            }`}
-          >
-            Annual
-            {billingPeriod === 'annual' && (
-              <span className="absolute -top-2 -right-2 bg-[var(--profit-color)] text-white text-xs px-2 py-0.5 rounded-full">
-                Save 20%
-              </span>
-            )}
-          </button>
-        </div>
-
         {/* Pricing Display */}
-        <div className="text-center mb-3 p-3 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
-          <div className="flex items-baseline justify-center gap-2 mb-1">
-            <span className="text-xl font-medium text-[var(--text-muted)] line-through">
-              ${pricing[billingPeriod].price}
-            </span>
-            <span className="text-3xl font-bold text-[var(--profit-color)]">
-              ${pricing[billingPeriod].price / 2}
-            </span>
-            <span className="text-[var(--text-secondary)]">
-              / {pricing[billingPeriod].period}
+        <div className="text-center mb-3 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
+          <div className="flex items-baseline justify-center gap-2 mb-2">
+            <span className="text-4xl font-bold text-[var(--text-primary)]">
+              Usage-Based
             </span>
           </div>
-          <p className="text-sm text-[var(--profit-color)] font-medium">
-            🎉 50% off for first 100 customers!
+          <p className="text-lg text-[var(--text-secondary)] mb-3">
+            No monthly fee • Pay per LLM call
           </p>
-          {billingPeriod === 'annual' && (
-            <p className="text-xs text-[var(--text-secondary)] mt-1">
-              Just $11.63/month when billed annually
-            </p>
-          )}
+          <div className="text-sm text-[var(--text-muted)] space-y-1">
+            <p>Typical costs: <span className="font-semibold text-[var(--text-primary)]">~$0.05 per decision</span></p>
+            <p className="text-xs">Exact cost depends on model choice and market data complexity</p>
+          </div>
         </div>
 
         {/* Features List - 2 column grid */}
@@ -174,18 +142,15 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             </>
           ) : (
             <>
-              Start 14-Day Free Trial
+              Subscribe & Activate Bots
             </>
           )}
         </button>
 
-        {/* Coupon Note & Footer */}
-        <div className="text-center mt-3 space-y-1">
-          <p className="text-xs text-[var(--text-secondary)]">
-            💡 Use code <span className="font-semibold text-[var(--profit-color)]">FIRST100</span> at checkout for 50% off
-          </p>
+        {/* Footer */}
+        <div className="text-center mt-3">
           <p className="text-xs text-[var(--text-tertiary)]">
-            14-day free trial • No credit card required • Secure payment by Stripe
+            Secure payment by Stripe • Cancel anytime
           </p>
         </div>
       </DialogContent>

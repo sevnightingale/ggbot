@@ -93,30 +93,28 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ### **Phase 2: Implementation** (Est. 12-15 hours)
 
-#### 2.1 Core Infrastructure Updates (2-3 hours)
-- [ ] Update `core/common/activity_logger.py`
-  - [ ] Remove priority logic (column dropped)
-  - [ ] Add token tracking parameters
-  - [ ] Update activity types taxonomy
-  - [ ] Add `log_llm_activity()` helper function
-  - [ ] Update SQL INSERT (remove priority, add token columns)
+#### 2.1 Core Infrastructure Updates (2-3 hours) ✅ COMPLETE
+- [x] Update `core/common/activity_logger.py`
+  - [x] Remove priority logic (column dropped)
+  - [x] Add token tracking parameters
+  - [x] Update activity types taxonomy
+  - [x] Add `log_llm_activity()` helper function
+  - [x] Update SQL INSERT (remove priority, add token columns)
 
-- [ ] Create `core/services/llm_pricing_service.py`
-  - [ ] Query `llm_models` table for pricing
-  - [ ] Calculate costs with 70% markup
-  - [ ] Handle nested pricing structure (standard vs thinking modes)
+- [x] Create `core/services/llm_pricing_service.py`
+  - [x] Query `llm_models` table for pricing
+  - [x] Calculate costs with 70% markup
+  - [x] Handle nested pricing structure (standard vs thinking modes)
 
-#### 2.2 Decision Engine Migration (3-4 hours)
-- [ ] Update `decision/engine_v2.py`
-  - [ ] Log `market_query` activity (market data queried)
-  - [ ] Log `llm_thought` activity (with token tracking)
-  - [ ] Extract token counts from LLM response
-  - [ ] Calculate costs using pricing service
-  - [ ] Keep `INSERT INTO decisions` for compatibility (deprecated)
+#### 2.2 Decision Engine Migration (3-4 hours) ✅ COMPLETE
+- [x] Update `decision/engine_v2.py`
+  - [x] Updated `_call_llm()` to return (response, metadata) tuple
+  - [x] Added `_log_llm_activity()` helper for token tracking
+  - [x] Updated 3 LLM callsites (signal validation, opportunity analysis, position management)
+  - [x] Updated 3 save methods to log llm_thought activities with costs
+  - [x] Keep `INSERT INTO decisions` for compatibility (deprecated)
 
-- [ ] Update `signals/listener_service.py`
-  - [ ] Log `signal_received` activity (no tokens)
-  - [ ] Log `llm_thought` for validation (with tokens)
+- [x] Signal validation integration complete (covered by decision engine updates)
 
 #### 2.3 Trading Engine Updates (2 hours)
 - [ ] Update `trading/paper/supabase_service.py`
@@ -126,21 +124,26 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [ ] Update `trading/live/symphony_service.py` and `trading/live/aster_service_v3.py`
   - [ ] Consistent activity logging across all trading modes
 
-#### 2.4 Stripe Billing Integration (3-4 hours)
-- [ ] Create `scripts/report_stripe_usage.py`
-  - [ ] Query yesterday's activities WHERE stripe_reported = FALSE
-  - [ ] Group by user_id, SUM(platform_cost_usd)
-  - [ ] Send Stripe Meter events
-  - [ ] Mark activities as stripe_reported = TRUE
-  - [ ] Error handling and retry logic
+#### 2.4 Stripe Billing Integration (3-4 hours) ✅ MOSTLY COMPLETE
+- [x] Create `billing/stripe_meter_reporter.py`
+  - [x] Query unreported activities WHERE stripe_reported = FALSE
+  - [x] Group by user_id, SUM(platform_cost_usd)
+  - [x] Send Stripe Meter events to `mtr_61TcMoxbXUvKBLQG741J9gH6H6LiHGyW`
+  - [x] Mark activities as stripe_reported = TRUE
+  - [x] Error handling and retry logic
+  - [x] Fixed schema mismatch (query actual llm_models columns)
+  - [x] Uses existing STRIPE_SECRET_KEY (not new var)
 
-- [ ] Add billing API endpoints in `ggbot.py`
-  - [ ] `GET /api/v2/usage/current-month` (total + per-bot breakdown)
-  - [ ] `GET /api/v2/usage/history` (historical by month)
+- [x] Add billing API endpoints in `ggbot.py`
+  - [x] `GET /api/v2/billing/usage` (current unreported usage + model breakdown)
+  - [x] `GET /api/v2/billing/usage/breakdown` (per-bot + daily breakdown, 30-day default)
 
-- [ ] Set up cron job
-  - [ ] Add to crontab (runs daily at 1am)
-  - [ ] Test dry-run mode
+- [x] Set up scheduled job
+  - [x] Integrated with APScheduler (midnight UTC daily)
+  - [x] Logs: "✅ Stripe meter reporting scheduled"
+
+- [ ] Webhook handler
+  - [ ] Add `invoice.payment_failed` event handler (pause bots on payment failure)
 
 #### 2.5 Frontend Updates (2 hours)
 - [ ] Update timeline component
@@ -442,6 +445,26 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 
 ## 🎨 **User Experience & Frontend**
 
+### **Bot Creation UX**
+- [ ] Add name field to bot creation modal (currently defaults to "Untitled Bot")
+
+### **Legal & Compliance**
+- [ ] Add Terms of Service page/modal to frontend
+- [ ] Add Privacy Policy page/modal to frontend
+- [ ] Add financial risk disclaimers (prominent placement on bot creation, settings, and trading pages)
+- [ ] Add "I acknowledge the risks" checkbox for live trading activation
+
+### **Public Performance Features**
+**Dependencies**: ✅ RLS migration ready in `SQL.md` - see System Improvements → Security
+
+**Architecture Decided**:
+- Per-bot privacy control via `configurations.is_public_performance`
+- No usernames shown (just bot names)
+- All activities public when opted in (trades, thoughts, market queries)
+- Public arena shows: Bot Name | Mode | P&L | Win Rate | Trades
+
+Implementation tracked under **System Improvements → Security → Backend API Updates** and **Frontend Implementation** sections.
+
 ### **Trading Modes Refactor** (In Progress - Other CC Instance)
 - [ ] Remove `execution_mode` duplication from JSONB
 - [ ] Add `trading_mode` selection to bot creation modal
@@ -461,6 +484,50 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 ---
 
 ## 🔧 **System Improvements**
+
+### **Security & Data Access**
+**Priority**: HIGH - Current RLS rules may allow unauthorized access to some tables
+
+**Status**: SQL migration ready in `SQL.md` - review and execute in Supabase
+
+- [x] **Supabase RLS Audit** ✅ COMPLETE
+  - [x] Identified 3 tables with RLS issues:
+    - `activities`: Policy exists but RLS disabled (intentional for aster.ggbots.ai)
+    - `agent_sessions`: No RLS at all (medium risk)
+    - `llm_models`: No RLS (low risk, reference data)
+  - [x] Documented authentication flows (user JWT, service role bypass, optional auth for public viewing)
+  - [x] Architecture decision: Per-bot privacy via `configurations.is_public_performance`
+
+- [ ] **Execute SQL Migration** (30 min)
+  - [ ] Review SQL commands in `SQL.md`
+  - [ ] Run Step 1: Add `is_public_performance` column
+  - [ ] Run Step 2: Fix activities table RLS (2 policies)
+  - [ ] Run Step 3: Fix agent_sessions table RLS
+  - [ ] Run Step 4: Fix llm_models table RLS
+  - [ ] Run Step 5-6: Verify policies active
+  - [ ] Test with your user account (verify you can still see your activities)
+  - [ ] Test public access (verify aster.ggbots.ai still works)
+
+- [ ] **Backend API Updates** (2-3 hours)
+  - [ ] Add `PATCH /api/v2/config/{config_id}/public` endpoint (toggle is_public_performance)
+  - [ ] Create `GET /api/v2/arena/leaderboard` endpoint (public bots only, no auth required)
+  - [ ] Create `GET /api/v2/arena/{config_id}` endpoint (public bot detail, no auth required)
+  - [ ] Update activities API endpoints to document public access behavior
+  - [ ] Add filters for public arena (trading_mode, timeframe, sort by performance)
+  - [ ] Test with RLS enabled (verify isolation works)
+
+- [ ] **Frontend Implementation** (3-4 hours)
+  - [ ] Add privacy toggle in bot settings/config page
+    - [ ] Checkbox: "Show this bot's performance publicly"
+    - [ ] Warning: "Public bots show all activities (trades, thoughts, market queries)"
+    - [ ] Save calls PATCH endpoint
+  - [ ] Create `/arena` public leaderboard page
+    - [ ] Table: Bot Name | Mode | P&L | Win Rate | Trades | Performance %
+    - [ ] Filters: Trading Mode (All/Paper/Symphony/Aster), Timeframe (24h/7d/30d/All)
+    - [ ] Sort: By P&L, Win Rate, or Trade Count
+    - [ ] Click bot → navigate to `/view/{config_id}` (existing timeline page)
+  - [ ] Update `/view/{config_id}` to work without auth (already supports optional auth)
+  - [ ] Add "Make Public" button to bot rail dropdown menu
 
 ### **System Robustness**
 - [ ] Add comprehensive error boundaries to frontend
