@@ -1117,8 +1117,8 @@ class AsterDEXV3LiveTradingService:
     async def get_account_metrics(self, config_id: str, user_id: str) -> Dict[str, Any]:
         """Get account metrics from AsterDEX."""
         try:
-            balance_data = await self._get_account_balance()
-            if not balance_data:
+            account_data = await self._get_account_balance()
+            if not account_data:
                 return {
                     "status": "failed",
                     "reason": "Could not query account balance"
@@ -1127,32 +1127,16 @@ class AsterDEXV3LiveTradingService:
             positions = await self.get_open_positions(config_id)
             total_unrealized_pnl = sum(pos.get("unrealized_pnl", 0) for pos in positions)
 
-            # Sum balances from both USDT and USDC (Aster pays profits in USDT, but capital may be in USDC)
-            total_equity = 0.0
-            available_balance = 0.0
-            cross_unrealized_pnl = 0.0
-
-            for asset in balance_data:
-                if asset.get("asset") in ["USDT", "USDC"]:
-                    # crossWalletBalance = settled balance + unrealized P&L for this asset
-                    total_equity += float(asset.get("crossWalletBalance", 0))
-                    cross_unrealized_pnl += float(asset.get("crossUnPnl", 0))
-
-            # availableBalance from one asset shows total USD value (they should be similar)
-            # We'll use this as a sanity check
-            for asset in balance_data:
-                if asset.get("asset") == "USDT":
-                    available_balance = float(asset.get("availableBalance", 0))
-                    break
+            # Extract account totals from /fapi/v3/account response
+            available_balance = float(account_data.get("availableBalance", 0))
+            position_margin = float(account_data.get("totalPositionInitialMargin", 0))
+            total_equity = available_balance + position_margin
 
             return {
                 "status": "success",
-                "balance": total_equity,  # TOTAL EQUITY for charts (realized + unrealized)
+                "balance": total_equity,  # TOTAL EQUITY for charts (available + locked)
                 "available_balance": available_balance,  # Free cash (for trading checks)
-                "settled_balance": float(usdt_balance.get("balance", 0)),  # Settled balance only
-                "cross_wallet_balance": total_equity,  # Same as total equity
-                "cross_unrealized_pnl": cross_unrealized_pnl,  # Unrealized P&L
-                "total_unrealized_pnl": total_unrealized_pnl,  # From positions endpoint (should match)
+                "total_unrealized_pnl": total_unrealized_pnl,  # From positions endpoint
                 "positions_count": len(positions),
                 "positions": positions
             }

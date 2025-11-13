@@ -293,10 +293,10 @@ async def get_balance_series(
             current_balance = 0.0
 
             if account_data:
-                # Use totalWalletBalance + totalUnrealizedProfit for total account value
-                wallet_balance = float(account_data.get('totalWalletBalance', 0))
-                unrealized_pnl = float(account_data.get('totalUnrealizedProfit', 0))
-                current_balance = wallet_balance + unrealized_pnl
+                # Total account value = available + locked margin
+                available_balance = float(account_data.get('availableBalance', 0))
+                position_margin = float(account_data.get('totalPositionInitialMargin', 0))
+                current_balance = available_balance + position_margin
 
             if not all_trades:
                 # No trades yet - show flat line at current balance
@@ -477,10 +477,10 @@ async def get_timeline_metadata(
             current_balance = 0.0
 
             if account_data:
-                # Use totalWalletBalance + totalUnrealizedProfit for total account value
-                wallet_balance = float(account_data.get('totalWalletBalance', 0))
-                unrealized_pnl = float(account_data.get('totalUnrealizedProfit', 0))
-                current_balance = wallet_balance + unrealized_pnl
+                # Total account value = available + locked margin
+                available_balance = float(account_data.get('availableBalance', 0))
+                position_margin = float(account_data.get('totalPositionInitialMargin', 0))
+                current_balance = available_balance + position_margin
 
             # Get ALL Aster income records (more complete than userTrades)
             # userTrades only shows recent ~7 days, income shows full history

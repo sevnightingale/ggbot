@@ -551,14 +551,20 @@ async def get_account_status(
             account_data = await aster_service._get_account_balance()
 
             # Extract totals (all in USDT equivalent)
-            total_wallet_balance = 0.0
-            total_unrealized_pnl = 0.0
+            total_equity = 0.0
+
+            available_balance = 0.0
+            position_margin = 0.0
+            unrealized_pnl = 0.0
 
             if account_data:
-                total_wallet_balance = float(account_data.get('totalWalletBalance', 0))
-                total_unrealized_pnl = float(account_data.get('totalUnrealizedProfit', 0))
+                # Total account value = available + locked margin
+                available_balance = float(account_data.get('availableBalance', 0))
+                position_margin = float(account_data.get('totalPositionInitialMargin', 0))
+                unrealized_pnl = float(account_data.get('totalUnrealizedProfit', 0))
+                total_equity = available_balance + position_margin
 
-                logger.debug(f"AsterDEX account: wallet=${total_wallet_balance:.2f}, unrealized=${total_unrealized_pnl:.2f}")
+                logger.debug(f"AsterDEX account: available=${available_balance:.2f}, margin=${position_margin:.2f}, total=${total_equity:.2f}")
 
             # Get open positions to calculate metrics
             positions = await aster_service.get_open_positions(config_id)
@@ -566,16 +572,12 @@ async def get_account_status(
             # Get all open orders (TP/SL/Limit orders)
             open_orders = await aster_service.get_open_orders() or []
 
-            # Calculate total equity across all stablecoins
-            # Total Equity = Sum(All Stablecoin Wallets) + Sum(All Unrealized P&L)
-            total_equity = total_wallet_balance + total_unrealized_pnl
-
-            logger.info(f"AsterDEX Total Equity: ${total_equity:.2f} (wallet: ${total_wallet_balance:.2f}, unrealized: ${total_unrealized_pnl:.2f})", user_id=user_id)
+            logger.info(f"AsterDEX Total Equity: ${total_equity:.2f}", user_id=user_id)
 
             account = {
-                "balance": total_equity,  # Total equity across all stablecoins
-                "margin_balance": total_wallet_balance,  # Total wallet balance
-                "unrealized_pnl": total_unrealized_pnl,  # Total unrealized P&L
+                "balance": total_equity,  # Total equity (available + locked)
+                "margin_balance": position_margin,  # Margin locked in positions
+                "unrealized_pnl": unrealized_pnl,  # Total unrealized P&L
                 "open_positions": len(positions),
                 "open_orders": open_orders,  # Include all open orders
                 "total_trades": 0,  # Not tracked for Aster
