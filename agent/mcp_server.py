@@ -24,7 +24,7 @@ from claude_agent_sdk import tool, create_sdk_mcp_server
 
 # Local imports (HTTP client, not direct ggbot imports)
 from agent.service_client import GGBotAPIClient
-from core.common.activity_logger import log_activity_safe, ACTIVITY_PRIORITY
+from core.common.activity_logger import log_activity_safe
 
 
 # ============================================================================

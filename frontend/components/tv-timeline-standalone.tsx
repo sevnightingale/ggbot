@@ -841,7 +841,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Entry Price
                     </div>
-                    <div className="text-lg font-mono">${detailActivity.data.entry_price.toLocaleString()}</div>
+                    <div className="text-lg font-mono">${Number(detailActivity.data.entry_price || 0).toLocaleString()}</div>
                   </div>
                  ) : null}
 
@@ -852,7 +852,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
                         Stop Loss
                       </div>
                       <div className="text-sm font-mono" style={{ color: VIBE.ember }}>
-                        ${detailActivity.data.stop_loss_price.toLocaleString()}
+                        ${Number(detailActivity.data.stop_loss_price || 0).toLocaleString()}
                       </div>
                     </div>
                   ) : null}
@@ -863,7 +863,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
                         Take Profit
                       </div>
                       <div className="text-sm font-mono" style={{ color: VIBE.signal }}>
-                        ${detailActivity.data.take_profit_price.toLocaleString()}
+                        ${Number(detailActivity.data.take_profit_price || 0).toLocaleString()}
                       </div>
                     </div>
                   ) : null}

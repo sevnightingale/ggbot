@@ -2067,7 +2067,7 @@ async def get_user_profile(
 ) -> Dict[str, Any]:
     """Get current user profile."""
     profile = await current_user.load_profile()
-    
+
     return {
         "status": "success",
         "profile": {
@@ -2079,6 +2079,8 @@ async def get_user_profile(
             "can_publish_telegram_signals": profile.can_publish_telegram_signals,
             "can_use_signal_validation": profile.can_use_signal_validation,
             "can_use_live_trading": profile.can_use_live_trading,
+            "can_activate_bots": profile.can_activate_bots,
+            "can_use_agents": profile.can_use_agents,
             "paid_data_points": profile.paid_data_points
         }
     }
@@ -3980,6 +3982,9 @@ async def get_current_user_profile(
 ):
     """Get current user's profile with subscription info."""
     profile = await current_user.load_profile()
+
+    # Debug logging
+    logger.info(f"🔍 /me endpoint - user: {current_user.user_id}, tier: {profile.subscription_tier.value}, can_activate: {profile.can_activate_bots}, can_agents: {profile.can_use_agents}")
 
     return {
         "user_id": current_user.user_id,

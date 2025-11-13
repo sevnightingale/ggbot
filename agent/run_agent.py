@@ -21,7 +21,7 @@ import argparse
 import asyncio
 import json
 from typing import Optional, Dict, Any
-from datetime import datetime
+from datetime import datetime, timezone
 
 # Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -516,7 +516,6 @@ Be disciplined and execute the strategy faithfully.
                                     activity_source='agent_tool',
                                     summary=summary,
                                     details={'thought': response_text},
-                                    priority=2,
                                     importance=5
                                 )
                             except Exception as e:

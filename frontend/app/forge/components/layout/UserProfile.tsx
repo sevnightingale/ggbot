@@ -31,7 +31,7 @@ export function UserProfile({}: UserProfileProps) {
   const [settingsOpen, setSettingsOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
-  const { hasSubscription } = usePermissions()
+  const { userProfile } = usePermissions()
 
   // Fetch user data
   useEffect(() => {
@@ -82,8 +82,17 @@ export function UserProfile({}: UserProfileProps) {
     }
   }
 
-  // Check if user is Pro
-  const isPro = hasSubscription('pro')
+  // Check if user has paid subscription (usage_based or pro)
+  const hasPaidTier = userProfile?.can_activate_bots || false
+  const isPro = userProfile?.subscription_tier === 'pro'
+  const isUsageBased = userProfile?.subscription_tier === 'usage_based'
+
+  // Get tier display name
+  const getTierName = () => {
+    if (isPro) return 'Pro Plan'
+    if (isUsageBased) return 'Usage-Based'
+    return 'Free Plan'
+  }
 
   // Get display name from user metadata
   const getDisplayName = () => {
@@ -147,11 +156,15 @@ export function UserProfile({}: UserProfileProps) {
                 {isPro ? (
                   <div className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-medium text-amber-500">
                     <Crown className="h-3 w-3" />
-                    Pro Plan
+                    {getTierName()}
+                  </div>
+                ) : isUsageBased ? (
+                  <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-500">
+                    {getTierName()}
                   </div>
                 ) : (
                   <div className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-tertiary)] px-2 py-0.5 text-xs font-medium text-[var(--text-secondary)]">
-                    Free Plan
+                    {getTierName()}
                   </div>
                 )}
               </div>
@@ -167,7 +180,7 @@ export function UserProfile({}: UserProfileProps) {
                   setSettingsOpen(true)
                 }}
               />
-              {isPro ? (
+              {hasPaidTier ? (
                 <MenuButton
                   icon={CreditCard}
                   label="Manage Billing"
@@ -176,7 +189,7 @@ export function UserProfile({}: UserProfileProps) {
               ) : (
                 <MenuButton
                   icon={Crown}
-                  label="Upgrade to Pro"
+                  label="Subscribe"
                   onClick={() => {
                     setIsOpen(false)
                     setUpgradeModalOpen(true)

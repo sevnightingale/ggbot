@@ -594,9 +594,29 @@ class AsterDEXV3LiveTradingService:
             except Exception as e:
                 self._log.warning(f"Failed to log activity (non-critical): {e}")
 
+            # Get current account balance for response
+            balance_data = await self._get_account_balance()
+            current_balance = 0.0
+            if balance_data:
+                stablecoins = ['USDT', 'USDC', 'BUSD', 'USDF', 'USDCE', 'USDBC']
+                for asset in balance_data:
+                    if asset.get('asset') in stablecoins:
+                        current_balance += float(asset.get('crossWalletBalance', 0))
+
             return {
-                "status": "success",
-                "batch_id": order_id,
+                "status": "executed",
+                "trade_id": order_id,  # Use order_id as trade_id
+                "symbol": symbol,  # Universal format (BTC/USDT)
+                "side": action.lower(),  # "long" or "short"
+                "entry_price": entry_price,
+                "size_usd": notional_value,
+                "size_contracts": quantity,
+                "fees": 0.0,  # Aster doesn't provide immediate fee info
+                "confidence_score": confidence,
+                "stop_loss": stop_loss,  # Price, not order ID
+                "take_profit": take_profit,  # Price, not order ID
+                "account_balance": current_balance,
+                "batch_id": order_id,  # Keep for backward compat
                 "stop_loss_order_id": sl_order_id,
                 "take_profit_order_id": tp_order_id
             }

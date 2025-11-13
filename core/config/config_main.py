@@ -31,8 +31,8 @@ def get_configuration(user_id=None, config_type=None, config_name=None, config_i
                 # First try to get unified user config
                 if config_id:
                     cur.execute("""
-                        SELECT config_data 
-                        FROM configurations 
+                        SELECT config_data, trading_mode, config_name, state
+                        FROM configurations
                         WHERE user_id = %s AND config_id = %s
                     """, [user_id, config_id])
                 else:
@@ -45,12 +45,24 @@ def get_configuration(user_id=None, config_type=None, config_name=None, config_i
                     """, [user_id])
                 
                 result = cur.fetchone()
-                
+
                 if result:
                     # Found unified config
                     unified_config = result[0]
+                    trading_mode = result[1] if len(result) > 1 else None
+                    config_name_db = result[2] if len(result) > 2 else None
+                    state = result[3] if len(result) > 3 else None
+
                     log.info(f"Retrieved unified configuration from database for user {user_id}")
-                    
+
+                    # Add table-level fields to config dict if available
+                    if trading_mode:
+                        unified_config['trading_mode'] = trading_mode
+                    if config_name_db:
+                        unified_config['config_name'] = config_name_db
+                    if state:
+                        unified_config['state'] = state
+
                     # If a specific module config_type was requested, extract it
                     if config_type and config_type != 'user':
                         if config_type in unified_config:
