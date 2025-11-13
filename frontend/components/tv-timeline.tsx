@@ -200,7 +200,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           },
         },
         localization: {
-          priceFormatter: (price: number) => `$${price.toFixed(2)}`,
+          priceFormatter: (price: number) => `$${Number(price || 0).toFixed(2)}`,
         },
       });
 
@@ -1043,7 +1043,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                       Balance at Time
                     </div>
                     <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
-                      ${detailActivity.data.details.balance.toFixed(2)}
+                      ${Number(detailActivity.data.details.balance || 0).toFixed(2)}
                     </div>
                   </div>
                  ) : null}
