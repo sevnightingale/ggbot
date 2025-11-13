@@ -288,16 +288,15 @@ async def get_balance_series(
         # Balance mode: Show account balance over time (reconstructed from current balance)
         # Only supported for Aster (Symphony doesn't provide balance)
         if mode == "balance" and is_aster:
-            # Get current Aster balance (sum USDT + USDC)
-            balance_data = await aster_service._get_account_balance()
+            # Get current Aster account balance
+            account_data = await aster_service._get_account_balance()
             current_balance = 0.0
 
-            if balance_data:
-                # Sum both USDT and USDC (Aster pays profits in USDT, capital may be in USDC)
-                for asset in balance_data:
-                    if asset.get('asset') in ['USDT', 'USDC']:
-                        # crossWalletBalance = settled balance + unrealized P&L for this asset
-                        current_balance += float(asset.get('crossWalletBalance', 0))
+            if account_data:
+                # Use totalWalletBalance + totalUnrealizedProfit for total account value
+                wallet_balance = float(account_data.get('totalWalletBalance', 0))
+                unrealized_pnl = float(account_data.get('totalUnrealizedProfit', 0))
+                current_balance = wallet_balance + unrealized_pnl
 
             if not all_trades:
                 # No trades yet - show flat line at current balance
@@ -473,16 +472,15 @@ async def get_timeline_metadata(
 
         if trading_mode == 'aster' and aster_trade_ids:
             # ASTER BOT: Use actual account balance
-            # Get current Aster balance (sum USDT + USDC)
-            balance_data = await aster_service._get_account_balance()
+            # Get current Aster account balance
+            account_data = await aster_service._get_account_balance()
             current_balance = 0.0
 
-            if balance_data:
-                # Sum both USDT and USDC (Aster pays profits in USDT, capital may be in USDC)
-                for asset in balance_data:
-                    if asset.get('asset') in ['USDT', 'USDC']:
-                        # crossWalletBalance = settled balance + unrealized P&L for this asset
-                        current_balance += float(asset.get('crossWalletBalance', 0))
+            if account_data:
+                # Use totalWalletBalance + totalUnrealizedProfit for total account value
+                wallet_balance = float(account_data.get('totalWalletBalance', 0))
+                unrealized_pnl = float(account_data.get('totalUnrealizedProfit', 0))
+                current_balance = wallet_balance + unrealized_pnl
 
             # Get ALL Aster income records (more complete than userTrades)
             # userTrades only shows recent ~7 days, income shows full history

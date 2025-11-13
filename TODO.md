@@ -69,13 +69,14 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🎯 **Activities Unification & Token Tracking**
+## ✅ **COMPLETED - Activities Unification & Metered Billing System**
 
-**Status**: In Progress (2025-11-12)
-**Timeline**: 3 days (12-15 hours total)
-**Goal**: Unified activity logging with token tracking for metered billing
+**Status**: Production Ready (2025-11-13)
+**Completion Doc**: [DOCS/completed/METERED_BILLING_IMPLEMENTATION.md](DOCS/completed/METERED_BILLING_IMPLEMENTATION.md)
 
-**Architecture Decision**: Use `activities` table for everything (no separate `token_usage` table). More elegant, simpler queries, powers timeline + billing from one source.
+**Summary**: Complete metered billing infrastructure with daily Stripe meter reporting, simplified permission model, and production-tested usage tracking.
+
+**Architecture**: `activities` table powers both timeline UI and billing from one source (no separate token_usage table).
 
 ### **Key Decisions**
 - ✅ **OpenRouter First**: Unified LLM API (simplifies token tracking)
@@ -207,113 +208,35 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 **Documentation**: See `DOCS/completed/METERED_BILLING_IMPLEMENTATION.md` for complete implementation guide, testing results, monitoring procedures, and troubleshooting.
 
-#### 2.5 Frontend Updates (2 hours)
-- [ ] Update timeline component
-  - [ ] Handle unified `trade_entry` with `details.side`
+### **Remaining Enhancements** (Future Work)
+
+#### Frontend Timeline Updates
+- [ ] Update timeline component for new activity types
   - [ ] Add token cost display for `llm_thought` activities
   - [ ] Show market data in `market_query` activities
+  - [ ] Polish activity type icons and formatting
 
-#### 2.6 Agent Integration (1 hour)
-- [ ] Verify `agent/mcp_server.py` and `agent/run_agent.py`
-  - [ ] Ensure agent LLM calls log with token tracking
-  - [ ] Verify agent tools already log correctly
+#### Agent LLM Tracking
+- [ ] Verify agent LLM calls log with token tracking
+  - [ ] Check `agent/run_agent.py` uses activity logger
+  - [ ] Verify agent tool calls logged correctly
 
-#### 2.7 Testing & Validation (2-3 hours)
-- [ ] Test scheduled bot execution (market_query + llm_thought created)
-- [ ] Test agent execution (all actions logged correctly)
-- [ ] Test signal validation (signal_received + llm_thought)
-- [ ] Verify token tracking (costs calculated correctly with 70% markup)
-- [ ] Test Stripe reporting (dry-run mode first)
-- [ ] Query per-bot breakdown (verify costs grouped by config_id)
-- [ ] Test frontend timeline (new activity types display correctly)
+#### Usage Dashboard (Nice to Have)
+- [ ] Build usage dashboard page
+  - [ ] Current month total (big number)
+  - [ ] Per-bot breakdown chart
+  - [ ] Daily usage timeline
+  - [ ] Model-level breakdown
+- [ ] Add to Settings modal or create "Usage" tab
+- [ ] Link to Stripe billing portal
 
-- [ ] **LLM Pricing Research**
-  - [ ] Research token rates: GPT-4, GPT-5, Claude Opus/Sonnet/Haiku, DeepSeek, Grok
-  - [ ] Seed `llm_model_pricing` table with current rates
-
-- [ ] **Integration**
-  - [ ] Wrap all LLM calls with token tracking:
-    - [ ] `decision/engine_v2.py`
-    - [ ] `agent/run_agent.py`
-    - [ ] `signals/listener_service.py`
-
-### **Phase 2: Stripe Metered Billing** (1 day)
-- [ ] **Stripe Configuration**
-  - [ ] Create Meter: "LLM API Usage Cost" (event: `llm_usage_cost`)
-  - [ ] Create Price: $1/unit (where 1 unit = $1)
-  - [ ] Set billing threshold: $20 OR monthly
-
-- [ ] **Subscription Creation**
-  - [ ] Add `POST /api/v2/create-metered-subscription` endpoint
-  - [ ] Update signup flow (require credit card)
-
-- [ ] **Daily Reporting Job**
-  - [ ] Create `scripts/report_stripe_usage.py`
-  - [ ] Aggregate yesterday's usage per user
-  - [ ] Send to Stripe Meter (dollar amounts)
-  - [ ] Mark as reported in database
-  - [ ] Add to crontab (1am daily)
-
-- [ ] **Webhook Updates**
-  - [ ] Add `invoice.payment_failed` handler (pause bots)
-
-### **Phase 3: Premium Subscription** (0.5 days)
-- [ ] **Database**
-  - [ ] Add `premium_tier_active` to user_profiles
-
-- [ ] **Stripe**
-  - [ ] Create product: "ggbots Pro - Agent Access" ($100/month)
-
-- [ ] **Backend**
-  - [ ] Add `POST /api/v2/upgrade-to-premium` endpoint
-  - [ ] Add `can_use_agents` property to UserProfile
-  - [ ] Update `/api/v2/me` endpoint (include can_use_agents)
-
-- [ ] **Frontend**
-  - [ ] Gate agent creation behind premium check
-
-### **Phase 4: Minimal UI** (0.5 days)
-- [ ] **Backend API**
-  - [ ] `GET /api/v2/usage/current-month` (total + per-bot breakdown)
-
-- [ ] **Frontend Component**
-  - [ ] Create `UsageDisplay` component
-  - [ ] Show: Current month total (big number)
-  - [ ] Show: Per-bot breakdown (list with costs)
-  - [ ] Show: Estimated month-end
-  - [ ] Link to Stripe billing portal
-
-- [ ] **Integration**
-  - [ ] Add to Settings modal or create "Usage" tab
-
-### **Phase 6: Estimator (Post-Launch)** (+1 day after 24-48h data collection)
-- [ ] **Collect Real Data**
-  - [ ] Run test bots for 24-48 hours (various configs)
-  - [ ] Query actual costs from `token_usage` table
-  - [ ] Build lookup table of daily costs per (model, frequency)
-
-- [ ] **Estimator Service**
-  - [ ] Create `core/services/usage_estimator.py` (lookup-based)
-  - [ ] Add `POST /api/v2/estimate-cost` endpoint
-
-- [ ] **Frontend Integration**
-  - [ ] Real-time estimate in bot config UI (debounced)
-  - [ ] Display: "Est. $X/day ($Y/month)"
-
-### **Testing** (Throughout)
-- [ ] Test token tracking (50 executions, verify accuracy)
-- [ ] Test Stripe integration (test mode)
-- [ ] Test daily reporting job
-- [ ] Test billing threshold ($20 trigger)
-- [ ] Test payment failure (bots pause)
-- [ ] Test Premium upgrade
-- [ ] End-to-end: new user → add card → bot → invoice
-
-### **Launch**
-- [ ] Switch Stripe to live mode
-- [ ] Deploy backend + frontend
-- [ ] Monitor for 48 hours
-- [ ] Collect estimator data
+#### Cost Estimator (Post-Launch)
+- [ ] Collect real usage data (24-48h)
+- [ ] Build lookup table of costs per (model, frequency)
+- [ ] Create `core/services/usage_estimator.py`
+- [ ] Add `POST /api/v2/estimate-cost` endpoint
+- [ ] Show real-time estimate in bot config UI
+- [ ] Display: "Est. $X/day ($Y/month)"
 
 ---
 
@@ -508,7 +431,7 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 ## 🎨 **User Experience & Frontend**
 
 ### **Bot Creation UX**
-- [ ] Add name field to bot creation modal (currently defaults to "Untitled Bot")
+- [x] Add name field to bot creation modal (completed 2025-11-13)
 
 ### **Legal & Compliance**
 - [ ] Add Terms of Service page/modal to frontend
