@@ -1226,6 +1226,66 @@ class AsterDEXV3LiveTradingService:
             self._log.error(f"Exception querying user trades: {e}")
             return None
 
+    async def get_income_history(
+        self,
+        income_type: str = "REALIZED_PNL",
+        start_time: Optional[int] = None,
+        end_time: Optional[int] = None,
+        limit: int = 1000
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Get income history (realized P&L, funding fees, etc.) via GET /fapi/v3/income.
+
+        This endpoint provides complete P&L history, unlike userTrades which only shows recent trades.
+        Essential for accurate balance series reconstruction.
+
+        Args:
+            income_type: "REALIZED_PNL", "FUNDING_FEE", "COMMISSION", etc. (default: "REALIZED_PNL")
+            start_time: Timestamp in ms to get funding from (INCLUSIVE)
+            end_time: Timestamp in ms to get funding until (INCLUSIVE)
+            limit: Max records (default 1000, max 1000)
+
+        Returns:
+            List of income records:
+            - symbol: Trading symbol (e.g., "BTCUSDT")
+            - incomeType: Type of income ("REALIZED_PNL", etc.)
+            - income: Income amount (can be negative for losses)
+            - asset: Asset symbol (e.g., "USDT")
+            - time: Timestamp in ms
+            - tranId: Transaction ID (unique per incomeType)
+            - tradeId: Trade ID if applicable
+        """
+        nonce = math.trunc(time.time() * 1000000)
+        params = {
+            'incomeType': income_type,
+            'limit': str(min(limit, 1000))
+        }
+
+        if start_time:
+            params['startTime'] = str(start_time)
+        if end_time:
+            params['endTime'] = str(end_time)
+
+        signed_params = self._generate_signature(params, nonce)
+        url = f"{self.base_url}/fapi/v3/income"
+
+        try:
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    url,
+                    params=signed_params,
+                    timeout=aiohttp.ClientTimeout(total=self.timeout)
+                ) as response:
+                    if response.status == 200:
+                        return await response.json()
+                    else:
+                        error_text = await response.text()
+                        self._log.error(f"Income history query failed: {response.status} - {error_text}")
+                        return None
+        except Exception as e:
+            self._log.error(f"Exception querying income history: {e}")
+            return None
+
     async def get_open_orders(self, symbol: Optional[str] = None) -> Optional[List[Dict[str, Any]]]:
         """
         Get all open orders for the account.
