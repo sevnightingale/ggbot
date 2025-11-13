@@ -45,6 +45,20 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-13 - Agent fixes, RLS security, Aster position sizing
+
+- **Security**: RLS migration executed - `activities`, `agent_sessions`, `llm_models` tables secured, public bot performance via `is_public_performance` flag
+- **Agent**: Fixed startup crashes - removed `ACTIVITY_PRIORITY` import, `priority` param from log_activity calls, added `timezone` import
+- **Agent**: Fixed trading mode detection - `get_configuration()` now returns `trading_mode` column, agents start in correct mode (aster/paper/symphony)
+- **Aster**: Switched to `/fapi/v3/account` endpoint - proper equity calculation, position sizing now works correctly
+- **Aster**: Fixed position sizing - uses `availableBalance + totalPositionInitialMargin` instead of negative wallet balance
+- **Aster**: Complete income history - switched from `userTrades` to `income` endpoint, recovered 26 missing trades (Nov 4-6), correct cumulative P&L ($-5.89 vs incorrect $-43.52)
+- **Aster**: Fixed execute_trade response format - now matches paper trading with complete fields (trade_id, entry_price, size_usd, account_balance, etc)
+- **Frontend**: Null safety for price fields - added `Number(x || 0)` guards to prevent `.toLocaleString()` crashes on null values in PositionsTable, PerformanceChart, TradeHistoryModal, timeline components
+- **Files**: core/config/config_main.py, agent/run_agent.py, agent/mcp_server.py, trading/live/aster_service_v3.py, api/agent.py, api/activities.py, frontend components
+
+---
+
 ## 2025-11-13 - Symphony Timeline Support: Multi-Mode Activity Tracking
 
 **Timeline API**: Added full Symphony support to activity timeline endpoints, enabling unified timeline view across all trading modes.

@@ -488,7 +488,7 @@ Implementation tracked under **System Improvements → Security → Backend API 
 ### **Security & Data Access**
 **Priority**: HIGH - Current RLS rules may allow unauthorized access to some tables
 
-**Status**: SQL migration ready in `SQL.md` - review and execute in Supabase
+**Status**: ✅ SQL migration executed and verified
 
 - [x] **Supabase RLS Audit** ✅ COMPLETE
   - [x] Identified 3 tables with RLS issues:
@@ -498,15 +498,15 @@ Implementation tracked under **System Improvements → Security → Backend API 
   - [x] Documented authentication flows (user JWT, service role bypass, optional auth for public viewing)
   - [x] Architecture decision: Per-bot privacy via `configurations.is_public_performance`
 
-- [ ] **Execute SQL Migration** (30 min)
-  - [ ] Review SQL commands in `SQL.md`
-  - [ ] Run Step 1: Add `is_public_performance` column
-  - [ ] Run Step 2: Fix activities table RLS (2 policies)
-  - [ ] Run Step 3: Fix agent_sessions table RLS
-  - [ ] Run Step 4: Fix llm_models table RLS
-  - [ ] Run Step 5-6: Verify policies active
-  - [ ] Test with your user account (verify you can still see your activities)
-  - [ ] Test public access (verify aster.ggbots.ai still works)
+- [x] **Execute SQL Migration** ✅ COMPLETE (2025-11-13)
+  - [x] Reviewed SQL commands in `SQL.md`
+  - [x] Executed Step 1: Add `is_public_performance` column
+  - [x] Executed Step 2: Fix activities table RLS (2 policies)
+  - [x] Executed Step 3: Fix agent_sessions table RLS
+  - [x] Executed Step 4: Fix llm_models table RLS
+  - [x] Verified Step 5-6: Policies active and working
+  - [x] Tested with user account (activities visible)
+  - [x] Tested public access (aster.ggbots.ai working)
 
 - [ ] **Backend API Updates** (2-3 hours)
   - [ ] Add `PATCH /api/v2/config/{config_id}/public` endpoint (toggle is_public_performance)
