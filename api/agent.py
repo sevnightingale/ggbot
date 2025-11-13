@@ -547,25 +547,18 @@ async def get_account_status(
             from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
             aster_service = AsterDEXV3LiveTradingService()
 
-            # Get account balance (returns list of balance objects)
-            balance_list = await aster_service._get_account_balance()
+            # Get account info (returns account object with totals)
+            account_data = await aster_service._get_account_balance()
 
-            # Sum ALL stablecoin balances (USDT, USDC, BUSD, etc.)
-            stablecoins = ['USDT', 'USDC', 'BUSD', 'USDF', 'USDCE', 'USDBC']
+            # Extract totals (all in USDT equivalent)
             total_wallet_balance = 0.0
             total_unrealized_pnl = 0.0
 
-            if balance_list:
-                for balance in balance_list:
-                    asset = balance.get('asset', '')
-                    if asset in stablecoins:
-                        wallet = float(balance.get('balance', 0))
-                        unrealized = float(balance.get('crossUnPnl', 0))
+            if account_data:
+                total_wallet_balance = float(account_data.get('totalWalletBalance', 0))
+                total_unrealized_pnl = float(account_data.get('totalUnrealizedProfit', 0))
 
-                        total_wallet_balance += wallet
-                        total_unrealized_pnl += unrealized
-
-                        logger.debug(f"AsterDEX {asset}: wallet=${wallet:.2f}, unrealized=${unrealized:.2f}")
+                logger.debug(f"AsterDEX account: wallet=${total_wallet_balance:.2f}, unrealized=${total_unrealized_pnl:.2f}")
 
             # Get open positions to calculate metrics
             positions = await aster_service.get_open_positions(config_id)

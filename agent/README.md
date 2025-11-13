@@ -1,7 +1,7 @@
 # Autonomous Trading Agent
 
 **Status**: Phase 3 Complete - Production Ready with Session Persistence
-**Last Updated**: 2025-11-08
+**Last Updated**: 2025-11-13
 
 ---
 
@@ -206,7 +206,7 @@ Get account balance and performance metrics.
 
 **Mode Differences**:
 - **Paper**: Full simulation with accurate balance
-- **Aster**: Real-time balance from API (`availableBalance`)
+- **Aster**: Real-time balance from /fapi/v3/account endpoint (`availableBalance` + `totalPositionInitialMargin`)
 - **Symphony**: Balance NOT available (API limitation)
 
 ---
@@ -902,6 +902,12 @@ python agent/run_agent.py --config-id=<symphony-config> --mode=autonomous
 2. **Symphony Integration**: Pending API fixes (balance endpoint) - see Symphony section for details
 3. **Session Longevity**: Unknown if sessions expire after extended periods (needs testing)
 4. **Frontend Integration**: Agent chat UI complete, but strategy builder UX pending refinement
+
+**Fixed in 2025-11-13**:
+- ✅ **Trading Mode Detection**: Agent now correctly loads trading_mode from database (was: always started in paper mode)
+- ✅ **Aster Position Sizing**: Switched to /fapi/v3/account endpoint with accurate equity calculation (was: "No USDT equity" warnings)
+- ✅ **Agent Startup**: Fixed ImportError and timezone issues preventing agent activation
+- ✅ **Activity Logging**: Removed invalid priority parameter from log_activity calls
 
 **Fixed in 2025-11-08**:
 - ✅ **Session Persistence**: Agents now survive crashes/restarts with full memory (was: context loss on restart)

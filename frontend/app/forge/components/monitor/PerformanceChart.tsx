@@ -471,7 +471,7 @@ function TradeDetailPopover({ trade, onClose }: TradeDetailPopoverProps) {
 
           <div className="flex justify-between">
             <span className="text-[var(--text-muted)]">Size:</span>
-            <span className="text-[var(--text-secondary)]">${trade.size_usd.toLocaleString()}</span>
+            <span className="text-[var(--text-secondary)]">${Number(trade.size_usd || 0).toLocaleString()}</span>
           </div>
 
           <div className="flex justify-between">

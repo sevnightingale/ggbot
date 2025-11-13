@@ -109,7 +109,7 @@ def report_to_stripe(user_id: str, stripe_customer_id: str, total_cost: Decimal)
         value = str(total_cost)
 
         # Create meter event
-        event = stripe.billing.meter_events.create(
+        event = stripe.billing.MeterEvent.create(
             event_name=STRIPE_EVENT_NAME,
             payload={
                 "stripe_customer_id": stripe_customer_id,

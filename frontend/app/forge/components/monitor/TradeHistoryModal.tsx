@@ -240,7 +240,7 @@ export function TradeHistoryModal({ configId, isOpen, onClose, totalTrades, winR
                               {formatPrice(trade.entry_price)}
                             </td>
                             <td className="py-3 px-4 text-right text-sm text-[var(--text-secondary)]">
-                              ${trade.size_usd.toLocaleString()}
+                              ${Number(trade.size_usd || 0).toLocaleString()}
                             </td>
                             <td className={`py-3 px-4 text-right text-sm font-semibold ${getPnLColor(trade.realized_pnl)}`}>
                               {formatPnL(trade.realized_pnl)}

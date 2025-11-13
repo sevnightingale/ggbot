@@ -268,7 +268,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                   <td className="py-3 px-2">
                     <div className="space-y-0.5">
                       <div className="text-sm text-[var(--text-primary)]">
-                        ${position.size_usd.toLocaleString()}
+                        ${Number(position.size_usd || 0).toLocaleString()}
                       </div>
                       <div className="text-xs text-[var(--text-muted)]">
                         {position.leverage}x leverage
@@ -372,7 +372,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
                 <span className="text-[var(--text-muted)]">Size:</span>
-                <span className="text-[var(--text-secondary)]">${position.size_usd.toLocaleString()}</span>
+                <span className="text-[var(--text-secondary)]">${Number(position.size_usd || 0).toLocaleString()}</span>
               </div>
 
               <div className="flex justify-between">
@@ -382,7 +382,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
 
               <div className="flex justify-between">
                 <span className="text-[var(--text-muted)]">Collateral:</span>
-                <span className="text-[var(--text-secondary)]">${(position.size_usd / position.leverage).toLocaleString()}</span>
+                <span className="text-[var(--text-secondary)]">${(Number(position.size_usd || 0) / Number(position.leverage || 1)).toLocaleString()}</span>
               </div>
 
               <div className="flex justify-between">

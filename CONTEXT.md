@@ -1,22 +1,110 @@
-🔄 Poll skipped: {selectedConfigId: null, configType: undefined, userId: undefined}
-page-0551f915e775faa8.js:1 🔄 Poll skipped: {selectedConfigId: null, configType: undefined, userId: undefined}
-page-0551f915e775faa8.js:1 🔄 Poll skipped: {selectedConfigId: null, configType: undefined, userId: undefined}
-page-0551f915e775faa8.js:1 🔍 API Call: getUserProfile to https://ggbots-api.nightingale.business/api/v2/user/profile
-page-0551f915e775faa8.js:1 🔄 Poll skipped: {selectedConfigId: null, configType: undefined, userId: '00000000-0000-0000-0000-000000000000'}
-page-0551f915e775faa8.js:1 📡 Response status: 200 OK
-page-0551f915e775faa8.js:1 ✅ User profile loaded: {status: 'success', profile: {…}}profile: can_publish_telegram_signals: truecan_use_live_trading: truecan_use_premium_features: truecan_use_signal_validation: truepaid_data_points: Array(1)0: "ggshot"length: 1[[Prototype]]: Array(0)requires_own_llm_keys: falsesubscription_status: "active"subscription_tier: "usage_based"user_id: "00000000-0000-0000-0000-000000000000"[[Prototype]]: Objectstatus: "success"[[Prototype]]: Object
-page-0551f915e775faa8.js:1 ✅ SSE connected
-page-0551f915e775faa8.js:1 🔍 API Call: getDataSourcesWithPoints to https://ggbots-api.nightingale.business/api/v2/data-sources-with-points
-page-0551f915e775faa8.js:1 useEffect running {configId: '84d2b5d2-5985-4bbb-acbd-04bd541051c9', hasContainer: false, hasSession: false}
-page-0551f915e775faa8.js:1 Early return - missing configId or container
-page-0551f915e775faa8.js:1 🔄 Switched to bot: 84d2b5d2-5985-4bbb-acbd-04bd541051c9 ggbot 3
-page-0551f915e775faa8.js:1 🔄 Poll skipped: {selectedConfigId: '84d2b5d2-5985-4bbb-acbd-04bd541051c9', configType: undefined, userId: '00000000-0000-0000-0000-000000000000'}
-page-0551f915e775faa8.js:1 useEffect running {configId: '84d2b5d2-5985-4bbb-acbd-04bd541051c9', hasContainer: true, hasSession: false}
-page-0551f915e775faa8.js:1 Creating chart with dimensions: {width: 898, height: 598}
-page-0551f915e775faa8.js:1 Chart created: true
-page-0551f915e775faa8.js:1 Line series created: true
-page-0551f915e775faa8.js:1 About to call fetchData...
-page-0551f915e775faa8.js:1 fetchData starting... {configId: '84d2b5d2-5985-4bbb-acbd-04bd541051c9', hasSession: false}
-page-0551f915e775faa8.js:1 Fetching from API...
-page-0551f915e775faa8.js:1 Setting up polling interval...
-page-0551f915e775faa8.js:1 useEffect running {configId: '84d2b5d2-5985-4bbb-acbd-04bd541051c9', hasContainer: true, hasSession: true}
+Futures Account Balance v3 (USER_DATA)
+Response:
+
+[
+ 	{
+ 		"accountAlias": "SgsR",    // unique account code
+ 		"asset": "USDT",  	// asset name
+ 		"balance": "122607.35137903", // wallet balance
+ 		"crossWalletBalance": "23.72469206", // crossed wallet balance
+  		"crossUnPnl": "0.00000000"  // unrealized profit of crossed positions
+  		"availableBalance": "23.72469206",       // available balance
+  		"maxWithdrawAmount": "23.72469206",     // maximum amount for transfer out
+  		"marginAvailable": true,    // whether the asset can be used as margin in Multi-Assets mode
+  		"updateTime": 1617939110373
+	}
+]
+GET /fapi/v3/balance (HMAC SHA256)
+
+Weight: 5
+
+Parameters:
+
+Name	Type	Mandatory	Description
+recvWindow	LONG	NO	
+timestamp	LONG	YES	
+Account Information v3 (USER_DATA)
+Response:
+
+{
+	"feeTier": 0,  		// account commisssion tier 
+ 	"canTrade": true,  	// if can trade
+ 	"canDeposit": true,  	// if can transfer in asset
+ 	"canWithdraw": true, 	// if can transfer out asset
+ 	"updateTime": 0,
+ 	"totalInitialMargin": "0.00000000",    // total initial margin required with current mark price (useless with isolated positions), only for USDT asset
+ 	"totalMaintMargin": "0.00000000",  	  // total maintenance margin required, only for USDT asset
+ 	"totalWalletBalance": "23.72469206",     // total wallet balance, only for USDT asset
+ 	"totalUnrealizedProfit": "0.00000000",   // total unrealized profit, only for USDT asset
+ 	"totalMarginBalance": "23.72469206",     // total margin balance, only for USDT asset
+ 	"totalPositionInitialMargin": "0.00000000",    // initial margin required for positions with current mark price, only for USDT asset
+ 	"totalOpenOrderInitialMargin": "0.00000000",   // initial margin required for open orders with current mark price, only for USDT asset
+ 	"totalCrossWalletBalance": "23.72469206",      // crossed wallet balance, only for USDT asset
+ 	"totalCrossUnPnl": "0.00000000",	  // unrealized profit of crossed positions, only for USDT asset
+ 	"availableBalance": "23.72469206",       // available balance, only for USDT asset
+ 	"maxWithdrawAmount": "23.72469206"     // maximum amount for transfer out, only for USDT asset
+ 	"assets": [
+ 		{
+ 			"asset": "USDT",			// asset name
+		   	"walletBalance": "23.72469206",      // wallet balance
+		   	"unrealizedProfit": "0.00000000",    // unrealized profit
+		   	"marginBalance": "23.72469206",      // margin balance
+		   	"maintMargin": "0.00000000",	    // maintenance margin required
+		   	"initialMargin": "0.00000000",    // total initial margin required with current mark price 
+		   	"positionInitialMargin": "0.00000000",    //initial margin required for positions with current mark price
+		   	"openOrderInitialMargin": "0.00000000",   // initial margin required for open orders with current mark price
+		   	"crossWalletBalance": "23.72469206",      // crossed wallet balance
+		   	"crossUnPnl": "0.00000000"       // unrealized profit of crossed positions
+		   	"availableBalance": "23.72469206",       // available balance
+		   	"maxWithdrawAmount": "23.72469206",     // maximum amount for transfer out
+		   	"marginAvailable": true,    // whether the asset can be used as margin in Multi-Assets mode
+		   	"updateTime": 1625474304765 // last update time 
+		},
+		{
+ 			"asset": "BUSD",			// asset name
+		   	"walletBalance": "103.12345678",      // wallet balance
+		   	"unrealizedProfit": "0.00000000",    // unrealized profit
+		   	"marginBalance": "103.12345678",      // margin balance
+		   	"maintMargin": "0.00000000",	    // maintenance margin required
+		   	"initialMargin": "0.00000000",    // total initial margin required with current mark price 
+		   	"positionInitialMargin": "0.00000000",    //initial margin required for positions with current mark price
+		   	"openOrderInitialMargin": "0.00000000",   // initial margin required for open orders with current mark price
+		   	"crossWalletBalance": "103.12345678",      // crossed wallet balance
+		   	"crossUnPnl": "0.00000000"       // unrealized profit of crossed positions
+		   	"availableBalance": "103.12345678",       // available balance
+		   	"maxWithdrawAmount": "103.12345678",     // maximum amount for transfer out
+		   	"marginAvailable": true,    // whether the asset can be used as margin in Multi-Assets mode
+		   	"updateTime": 1625474304765 // last update time
+		}
+	],
+ 	"positions": [  // positions of all symbols in the market are returned
+ 		// only "BOTH" positions will be returned with One-way mode
+ 		// only "LONG" and "SHORT" positions will be returned with Hedge mode
+ 		{
+		 	"symbol": "BTCUSDT",  	// symbol name
+		   	"initialMargin": "0",	// initial margin required with current mark price 
+		   	"maintMargin": "0",		// maintenance margin required
+		   	"unrealizedProfit": "0.00000000",  // unrealized profit
+		   	"positionInitialMargin": "0",      // initial margin required for positions with current mark price
+		   	"openOrderInitialMargin": "0",     // initial margin required for open orders with current mark price
+		   	"leverage": "100",		// current initial leverage
+		   	"isolated": true,  		// if the position is isolated
+		   	"entryPrice": "0.00000",  	// average entry price
+		   	"maxNotional": "250000",  	// maximum available notional with current leverage
+		   	"positionSide": "BOTH",  	// position side
+		   	"positionAmt": "0",			// position amount
+		   	"updateTime": 0           // last update time
+		}
+  	]
+}
+GET /fapi/v3/account (HMAC SHA256)
+
+Get current account information.
+
+Weight: 5
+
+Parameters:
+
+Name	Type	Mandatory	Description
+recvWindow	LONG	NO	
+timestamp	LONG	YES	

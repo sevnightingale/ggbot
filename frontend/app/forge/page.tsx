@@ -838,26 +838,29 @@ function ForgeApp() {
   const handleCreateNewBot = async (
     botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading',
     tradingMode: 'paper' | 'symphony' | 'aster' = 'paper',
-    symphonyAgentId?: string
+    symphonyAgentId?: string,
+    botName?: string
   ) => {
     setIsCreatingNew(true)
 
     try {
-      // Generate a unique name for the new bot based on type and mode
-      const botCount = allBots.length + 1
-      const typeNames = {
-        scheduled_trading: 'ggbot',
-        signal_validation: 'signal validator',
-        agent: 'agent'
-      }
-      const modeLabel = tradingMode === 'symphony' ? ' (Symphony)' : tradingMode === 'aster' ? ' (Aster)' : ''
-      const newBotName = `${typeNames[botType]} ${botCount}${modeLabel}`
+      // Use provided name or generate default (fallback shouldn't be needed since modal provides it)
+      const finalBotName = botName?.trim() || (() => {
+        const botCount = allBots.length + 1
+        const typeNames = {
+          scheduled_trading: 'ggbot',
+          signal_validation: 'signal validator',
+          agent: 'agent'
+        }
+        const modeLabel = tradingMode === 'symphony' ? ' (Symphony)' : tradingMode === 'aster' ? ' (Aster)' : ''
+        return `${typeNames[botType]} ${botCount}${modeLabel}`
+      })()
 
       // Create new bot with specified type and trading mode
       const newBot = await createDefaultBot(botType, tradingMode, symphonyAgentId)
 
-      // Update name to be more descriptive
-      const updatedBot = await apiClient.updateConfig(newBot.config_id, {}, newBotName)
+      // Update name
+      const updatedBot = await apiClient.updateConfig(newBot.config_id, {}, finalBotName)
 
       // Verify bot was created successfully by fetching it back
       try {
@@ -1431,6 +1434,7 @@ function ForgeApp() {
         open={botCreationModalOpen}
         onOpenChange={setBotCreationModalOpen}
         onConfirm={handleCreateNewBot}
+        existingBotCount={allBots.length}
       />
     </div>
   )

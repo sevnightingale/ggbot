@@ -198,33 +198,32 @@ class AsterDEXV3LiveTradingService:
             Position quantity in base asset (e.g., 0.001 BTC)
         """
         try:
-            # Step 1: Query Aster account balance
-            self._log.info("Querying AsterDEX account balance for position sizing...")
-            balance_data = await self._get_account_balance()
-            if not balance_data:
-                self._log.warning("Could not query account balance, using minimum quantity")
+            # Step 1: Query Aster account info
+            self._log.info("Querying AsterDEX account for position sizing...")
+            account_data = await self._get_account_balance()
+            if not account_data:
+                self._log.warning("Could not query account, using minimum quantity")
                 return 0.001
 
-            # Get USDT balance for position sizing (use total equity, not just available)
-            # Total Equity = Wallet Balance + Unrealized P&L
-            wallet_balance = 0.0
-            unrealized_pnl = 0.0
-            for asset in balance_data:
-                if asset.get("asset") == "USDT":
-                    wallet_balance = float(asset.get("balance", 0))
-                    unrealized_pnl = float(asset.get("unrealizedProfit", 0))
-                    break
+            # Extract account totals (all in USDT equivalent)
+            wallet_balance = float(account_data.get("totalWalletBalance", 0))
+            unrealized_pnl = float(account_data.get("totalUnrealizedProfit", 0))
+            available_balance = float(account_data.get("availableBalance", 0))
+            margin_balance = float(account_data.get("totalMarginBalance", 0))
+            position_margin = float(account_data.get("totalPositionInitialMargin", 0))
 
-            total_equity = wallet_balance + unrealized_pnl
+            # Total account value = available + locked margin
+            total_equity = available_balance + position_margin
 
             if total_equity <= 0:
-                self._log.warning("No USDT equity, using minimum quantity")
+                self._log.warning("No account equity found, using minimum quantity")
                 return 0.001
 
-            self._log.info(f"Total equity: ${total_equity:.2f} (wallet: ${wallet_balance:.2f}, unrealized P&L: ${unrealized_pnl:.2f})")
+            self._log.info(f"Account equity: ${total_equity:.2f} (available: ${available_balance:.2f}, in positions: ${position_margin:.2f}, wallet: ${wallet_balance:.2f}, unrealized: ${unrealized_pnl:.2f})")
 
             # Step 2: Calculate USD position size using config
             # This returns notional position size (margin × leverage)
+            # Use total_equity (available + locked) as the base for sizing
             position_size_usd = config.get_position_size(confidence, total_equity)
 
             self._log.info(f"Target position size: ${position_size_usd:.2f} (confidence={confidence:.3f})")
@@ -429,13 +428,9 @@ class AsterDEXV3LiveTradingService:
                 leverage = max(leverage, 1)
 
             # Validate position against account balance
-            balance_data = await self._get_account_balance()
-            if balance_data:
-                available_balance = 0.0
-                for asset in balance_data:
-                    if asset.get("asset") == "USDT":
-                        available_balance = float(asset.get("availableBalance", 0))
-                        break
+            account_data = await self._get_account_balance()
+            if account_data:
+                available_balance = float(account_data.get("availableBalance", 0))
 
                 if available_balance > 0:
                     # Get current price for margin calculation
@@ -587,7 +582,6 @@ class AsterDEXV3LiveTradingService:
                     trade_id=None,  # AsterDEX uses numeric order IDs, not UUIDs
                     trade_type='aster',
                     related_symbol=symbol,
-                    priority=1,
                     importance=9
                 )
                 self._log.info(f"Activity logged for trade {order_id}")
@@ -595,13 +589,11 @@ class AsterDEXV3LiveTradingService:
                 self._log.warning(f"Failed to log activity (non-critical): {e}")
 
             # Get current account balance for response
-            balance_data = await self._get_account_balance()
+            account_data = await self._get_account_balance()
             current_balance = 0.0
-            if balance_data:
-                stablecoins = ['USDT', 'USDC', 'BUSD', 'USDF', 'USDCE', 'USDBC']
-                for asset in balance_data:
-                    if asset.get('asset') in stablecoins:
-                        current_balance += float(asset.get('crossWalletBalance', 0))
+            if account_data:
+                # Use totalMarginBalance (wallet + unrealized PnL)
+                current_balance = float(account_data.get('totalMarginBalance', 0))
 
             return {
                 "status": "executed",
@@ -979,7 +971,6 @@ class AsterDEXV3LiveTradingService:
                     trade_id=batch_id,
                     trade_type='aster',
                     related_symbol=symbol,
-                    priority=1,
                     importance=9
                 )
                 self._log.info(f"Activity logged for close {batch_id}")
@@ -1173,14 +1164,23 @@ class AsterDEXV3LiveTradingService:
                 "reason": str(e)
             }
 
-    async def _get_account_balance(self) -> Optional[List[Dict[str, Any]]]:
-        """Query account balance via GET /fapi/v3/balance."""
+    async def _get_account_balance(self) -> Optional[Dict[str, Any]]:
+        """
+        Query account info via GET /fapi/v3/account.
+
+        Returns account object with:
+        - totalWalletBalance: Total wallet balance across all assets (in USDT)
+        - totalUnrealizedProfit: Total unrealized profit (in USDT)
+        - totalMarginBalance: totalWalletBalance + totalUnrealizedProfit
+        - availableBalance: Available balance for new orders
+        - assets: Array of individual asset balances
+        """
         nonce = math.trunc(time.time() * 1000000)
         params = {}
 
         signed_params = self._generate_signature(params, nonce)
 
-        url = f"{self.base_url}/fapi/v3/balance"
+        url = f"{self.base_url}/fapi/v3/account"
 
         try:
             async with aiohttp.ClientSession() as session:
@@ -1193,10 +1193,10 @@ class AsterDEXV3LiveTradingService:
                         return await response.json()
                     else:
                         error_text = await response.text()
-                        self._log.error(f"Account balance query failed: {response.status} - {error_text}")
+                        self._log.error(f"Account query failed: {response.status} - {error_text}")
                         return None
         except Exception as e:
-            self._log.error(f"Exception querying account balance: {e}")
+            self._log.error(f"Exception querying account: {e}")
             return None
 
     async def get_user_trades(self, symbol: Optional[str] = None, limit: int = 100) -> Optional[List[Dict[str, Any]]]:
@@ -1379,7 +1379,6 @@ class AsterDEXV3LiveTradingService:
                 },
                 trade_type='aster',
                 related_symbol=symbol,
-                priority=2,
                 importance=5
             )
 

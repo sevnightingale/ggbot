@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { Crown, Clock, CheckSquare, Bot, Rocket, Loader2, AlertCircle, Zap } from 'lucide-react'
 import {
   Dialog,
@@ -18,17 +18,20 @@ type TradingMode = 'paper' | 'symphony' | 'aster'
 interface BotCreationModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  onConfirm: (botType: BotType, tradingMode: TradingMode, symphonyAgentId?: string) => void
+  onConfirm: (botType: BotType, tradingMode: TradingMode, symphonyAgentId?: string, botName?: string) => void
+  existingBotCount: number
 }
 
 export function BotCreationModal({
   open,
   onOpenChange,
-  onConfirm
+  onConfirm,
+  existingBotCount
 }: BotCreationModalProps) {
   const [selectedType, setSelectedType] = useState<BotType>('scheduled_trading')
   const [tradingMode, setTradingMode] = useState<TradingMode>('paper')
   const [symphonyAgentId, setSymphonyAgentId] = useState('')
+  const [botName, setBotName] = useState('')
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [symphonyConnected, setSymphonyConnected] = useState(false)
   const [asterConnected, setAsterConnected] = useState(false)
@@ -37,12 +40,25 @@ export function BotCreationModal({
 
   const hasAgentAccess = canAccess('agents')
 
-  // Check Symphony and Aster connection status on mount
+  // Generate default bot name based on type and mode
+  const generateDefaultName = useCallback(() => {
+    const botCount = existingBotCount + 1
+    const typeNames = {
+      scheduled_trading: 'ggbot',
+      signal_validation: 'signal validator',
+      agent: 'agent'
+    }
+    const modeLabel = tradingMode === 'symphony' ? ' (Symphony)' : tradingMode === 'aster' ? ' (Aster)' : ''
+    return `${typeNames[selectedType]} ${botCount}${modeLabel}`
+  }, [existingBotCount, tradingMode, selectedType])
+
+  // Update bot name when modal opens or type/mode changes
   useEffect(() => {
     if (open) {
+      setBotName(generateDefaultName())
       checkConnectionStatus()
     }
-  }, [open])
+  }, [open, generateDefaultName])
 
   const checkConnectionStatus = async () => {
     try {
@@ -184,12 +200,13 @@ export function BotCreationModal({
       }
     }
 
-    onConfirm(selectedType, tradingMode, symphonyAgentId.trim() || undefined)
+    onConfirm(selectedType, tradingMode, symphonyAgentId.trim() || undefined, botName.trim() || undefined)
     onOpenChange(false)
 
     // Reset form
     setTradingMode('paper')
     setSymphonyAgentId('')
+    setBotName('')
   }
 
   return (
@@ -202,60 +219,85 @@ export function BotCreationModal({
           </DialogDescription>
         </DialogHeader>
 
-        <div className="space-y-3 py-4">
-          {botTypes.map(({ type, Icon, label, description, color, available, tier }) => (
-            <button
-              key={type}
-              onClick={() => setSelectedType(type)}
-              className={`w-full p-4 rounded-xl border-2 transition-all text-left ${
-                selectedType === type
-                  ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                  : 'border-[var(--border)] hover:border-[var(--border-hover)]'
-              } ${!available ? 'opacity-60' : ''}`}
-            >
-              <div className="flex items-start gap-3">
-                <div
-                  className="flex-shrink-0 w-12 h-12 rounded-lg flex items-center justify-center"
-                  style={{ backgroundColor: available ? `${color}20` : 'var(--bg-tertiary)' }}
-                >
-                  <Icon className="h-6 w-6" style={{ color: available ? color : 'var(--text-muted)' }} />
-                </div>
-
-                <div className="flex-1">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-medium text-[var(--text-primary)]">
-                      {label}
-                    </span>
-                    {!available && tier === 'Pro' && (
-                      <Crown className="h-3 w-3 text-[var(--text-muted)]" />
-                    )}
-                    <span className="text-xs px-2 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
-                      {tier}
-                    </span>
-                  </div>
-
-                  <p className="text-sm text-[var(--text-secondary)]">
-                    {description}
-                  </p>
-                </div>
-
-                <div className={`flex-shrink-0 w-5 h-5 rounded-full border-2 mt-1 ${
-                  selectedType === type
-                    ? 'border-[var(--accent)] bg-[var(--accent)]'
-                    : 'border-[var(--border)]'
-                }`}>
-                  {selectedType === type && (
-                    <div className="w-full h-full flex items-center justify-center text-obsidian">
-                      <Crown className="h-3 w-3" />
-                    </div>
-                  )}
-                </div>
-              </div>
-            </button>
-          ))}
+        {/* Bot Name Input */}
+        <div className="pt-4">
+          <label className="block text-sm font-medium mb-2 text-[var(--text-primary)]">
+            Bot Name
+          </label>
+          <input
+            type="text"
+            value={botName}
+            onChange={(e) => setBotName(e.target.value)}
+            placeholder="e.g., BTC Scalper, ETH Long-term"
+            className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] placeholder:opacity-50 focus:outline-none focus:ring-2 focus:ring-[var(--accent)]/50"
+          />
+          <p className="text-xs text-[var(--text-secondary)] mt-1.5">
+            Auto-generated based on type and mode, but you can customize it
+          </p>
         </div>
 
-        {/* Step 2: Trading Mode Selection */}
+        {/* Bot Type Selection */}
+        <div className="space-y-3 py-4 border-t border-[var(--border)]">
+          <div className="mb-3">
+            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Bot Type</h3>
+            <p className="text-xs text-[var(--text-secondary)]">Choose what kind of bot to create</p>
+          </div>
+
+          <div className="space-y-2">
+            {botTypes.map(({ type, Icon, label, description, color, available, tier }) => (
+              <button
+                key={type}
+                onClick={() => setSelectedType(type)}
+                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
+                  selectedType === type
+                    ? 'border-[var(--accent)] bg-[var(--accent)]/10'
+                    : 'border-[var(--border)] hover:border-[var(--border-hover)]'
+                } ${!available ? 'opacity-60' : ''}`}
+              >
+                <div className="flex items-center gap-3">
+                  <div
+                    className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
+                    style={{ backgroundColor: available ? `${color}20` : 'var(--bg-tertiary)' }}
+                  >
+                    <Icon className="h-5 w-5" style={{ color: available ? color : 'var(--text-muted)' }} />
+                  </div>
+
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-0.5">
+                      <span className="text-sm font-medium text-[var(--text-primary)]">
+                        {label}
+                      </span>
+                      {!available && tier === 'Pro' && (
+                        <Crown className="h-3 w-3 text-[var(--text-muted)]" />
+                      )}
+                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
+                        {tier}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-[var(--text-secondary)]">
+                      {description}
+                    </p>
+                  </div>
+
+                  <div className={`flex-shrink-0 w-4 h-4 rounded-full border-2 ${
+                    selectedType === type
+                      ? 'border-[var(--accent)] bg-[var(--accent)]'
+                      : 'border-[var(--border)]'
+                  }`}>
+                    {selectedType === type && (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="w-1.5 h-1.5 rounded-full bg-obsidian"></div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Trading Mode Selection */}
         <div className="space-y-3 py-4 border-t border-[var(--border)]">
           <div className="mb-3">
             <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Trading Mode</h3>

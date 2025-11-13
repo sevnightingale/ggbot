@@ -20,6 +20,14 @@ interface SettingsModalProps {
 export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { userProfile } = usePermissions()
   const isPro = userProfile?.subscription_tier === 'pro'
+  const isUsageBased = userProfile?.subscription_tier === 'usage_based'
+
+  // Get tier display name
+  const getTierName = () => {
+    if (isPro) return 'Pro Plan'
+    if (isUsageBased) return 'Usage-Based'
+    return 'Free Plan'
+  }
 
   // Symphony connection state
   const [symphonyConnected, setSymphonyConnected] = useState(false)
@@ -376,16 +384,20 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     {isPro ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/20 px-2 py-1 text-xs font-medium text-amber-500">
                         <Crown className="h-3 w-3" />
-                        Pro Plan
+                        {getTierName()}
+                      </span>
+                    ) : isUsageBased ? (
+                      <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-1 text-xs font-medium text-emerald-500">
+                        {getTierName()}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-1 rounded-full bg-[var(--bg-tertiary)] px-2 py-1 text-xs font-medium text-[var(--text-secondary)]">
-                        Free Plan
+                        {getTierName()}
                       </span>
                     )}
                   </div>
                 </div>
-                {isPro ? (
+                {isPro || isUsageBased ? (
                   <button
                     onClick={handleManageBilling}
                     className="text-sm text-blue-500 hover:text-blue-600 font-medium transition-colors"
@@ -400,7 +412,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                     }}
                     className="px-4 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-lg text-sm font-medium transition-colors"
                   >
-                    Upgrade to Pro
+                    Subscribe
                   </button>
                 )}
               </div>
