@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-10 22:55:20 UTC (Auto-updated by status_check.py)
-**System Health**: 🟡 LOW ACTIVITY
+**Last Updated**: 2025-11-12 11:06:22 UTC (Auto-updated by status_check.py)
+**System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
@@ -12,23 +12,23 @@
 - **Users with Bots**: 252 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 378
+- **Total Bots**: 380
 - **Active Bots**: 3 (0.8%)
   - Paper Trading: 2
   - Live Trading: 0
-- **Inactive Bots**: 375
+- **Inactive Bots**: 377
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,452
+- **Total Trades (All Time)**: 5,453
   - Wins: 1,635
-  - Losses: 3,817
-  - Platform Win Rate: 29.99%
-  - Total P&L: $-16,000.65
+  - Losses: 3,818
+  - Platform Win Rate: 29.98%
+  - Total P&L: $-16,003.03
 - **Recent Activity**:
-  - Last 24 hours: 0 trades
-  - Last 7 days: 0 trades
-  - Last 30 days: 3978 trades
+  - Last 24 hours: 1 trades
+  - Last 7 days: 1 trades
+  - Last 30 days: 3901 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -49,11 +49,13 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 23 decisions (avg confidence: 9.6%)
+- **wait**: 22 decisions (avg confidence: 21.8%)
+- **enter**: 1 decisions (avg confidence: 75.0%)
+- **exit**: 1 decisions (avg confidence: 85.0%)
 
 ### System Health
-- **Decisions (last hour)**: 0
-- **Status**: 🟡 LOW ACTIVITY
+- **Decisions (last hour)**: 1
+- **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
 
@@ -61,21 +63,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 63MB | 12m | 46 |
-| x-bot | 🟢 online | 0% | 41MB | 12m | 46 |
-| error-alerts | 🟢 online | 0.1% | 33MB | 12m | 53 |
-| market-data-ws | 🟢 online | 2.3% | 156MB | 11m | 48 |
-| ggbot | 🟢 online | 0.6% | 246MB | 11m | 117 |
+| signal-listener | 🟢 online | 0% | 18MB | 1d 12h | 46 |
+| x-bot | 🟢 online | 0% | 25MB | 1d 12h | 46 |
+| error-alerts | 🟢 online | 0% | 20MB | 1d 12h | 53 |
+| market-data-ws | 🟢 online | 1.9% | 39MB | 1d 12h | 48 |
+| ggbot | 🟢 online | 1.1% | 244MB | 1h 26m | 123 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (46%)
-- **Memory**: 2.5Gi / 3.8Gi
-- **CPU Load**: 0.30 / 0.33 / 0.34 (1m/5m/15m)
+- **Memory**: 3.1Gi / 3.8Gi
+- **CPU Load**: 0.42 / 0.20 / 0.15 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 14.89M)
+- **Redis**: 🟢 connected (Memory: 11.68M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -346,42 +348,54 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-10 22:55:21 UTC
+**Last Updated**: 2025-11-12 11:06:22 UTC
 
 ---
 
-### `activities` (14 columns)
+### `activities` (23 columns)
+
+**Purpose**: Unified activity timeline for all bots and agents. Records all bot/agent actions, tool uses, market queries, trades, and LLM interactions with token tracking for metered billing. Powers the Activity Timeline viewer.
 
 **Primary Key**: `activity_id`
 
 **Foreign Keys**:
-- `config_id` → `configurations(config_id)`
+- `config_id` → `configurations(config_id)` (NOT NULL - every activity tied to a bot/agent)
 
 **Indexes**:
+- `idx_activities_billing` on (user_id, created_at, stripe_reported)
+- `idx_activities_config_billing` on (config_id, created_at)
 - `idx_activities_config_time` on (config_id, created_at)
 - `idx_activities_decision` on (decision_id)
-- `idx_activities_priority` on (config_id, priority, created_at)
 - `idx_activities_symbol` on (config_id, related_symbol, created_at)
 - `idx_activities_trade` on (trade_id)
 - `idx_activities_type` on (config_id, activity_type, created_at)
 - `idx_activities_user` on (user_id, created_at)
 
-| Column | Type | Nullable | Default |
-|--------|------|----------|---------|
-| `activity_id` | uuid |  | gen_random_uuid() |
-| `config_id` | uuid |  |  |
-| `user_id` | uuid |  |  |
-| `activity_type` | text |  |  |
-| `activity_source` | text |  |  |
-| `summary` | text |  |  |
-| `details` | jsonb |  | '{}'::jsonb |
-| `trade_id` | text | ✓ |  |
-| `trade_type` | text | ✓ |  |
-| `decision_id` | uuid | ✓ |  |
-| `related_symbol` | text | ✓ |  |
-| `priority` | integer |  | 2 |
-| `importance` | integer |  | 5 |
-| `created_at` | timestamp with time zone |  | now() |
+| Column | Type | Nullable | Default | Description |
+|--------|------|----------|---------|-------------|
+| `activity_id` | uuid |  | gen_random_uuid() |  |
+| `config_id` | uuid |  |  | Bot/agent that performed this activity (NOT NULL) |
+| `user_id` | uuid |  |  | Owner user ID |
+| `activity_type` | text |  |  | Type of activity (e.g., market_query, llm_thought, trade_entry) |
+| `activity_source` | text |  |  | scheduled_bot, agent_tool, signal_validation |
+| `summary` | text |  |  | Brief title for timeline display (max 200 chars) |
+| `details` | jsonb |  | '{}'::jsonb | Full activity data (type-specific structure) |
+| `trade_id` | text | ✓ |  | Links to paper_trades.trade_id or live_trades.batch_id |
+| `trade_type` | text | ✓ |  | paper, symphony, or aster |
+| `decision_id` | uuid | ✓ |  | Legacy link to decisions table (deprecated) |
+| `related_symbol` | text | ✓ |  | Trading symbol context (e.g., BTC/USDT) |
+| `importance` | integer |  | 5 | User-facing importance (1-10) |
+| `created_at` | timestamp with time zone |  | now() |  |
+| `provider` | character varying(50) | ✓ |  | LLM provider (openrouter, openai, anthropic) |
+| `model` | character varying(100) | ✓ |  | LLM model (grok, claude, gpt-5, etc.) |
+| `thinking_mode` | boolean | ✓ |  | Whether thinking mode was enabled |
+| `input_tokens` | integer | ✓ |  | Input tokens consumed |
+| `output_tokens` | integer | ✓ |  | Output tokens consumed |
+| `reasoning_tokens` | integer | ✓ |  | Reasoning tokens (if applicable) |
+| `provider_cost_usd` | numeric | ✓ |  | Raw provider cost |
+| `platform_cost_usd` | numeric | ✓ |  | Cost with 70% markup (billed to user) |
+| `stripe_reported` | boolean | ✓ | false | Whether usage reported to Stripe |
+| `stripe_reported_at` | timestamp with time zone | ✓ |  | Timestamp of Stripe reporting |
 
 ### `agent_sessions` (5 columns)
 
@@ -1125,7 +1139,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-10 22:55:21 UTC
+**Last Updated**: 2025-11-12 11:06:22 UTC
 
 ---
 

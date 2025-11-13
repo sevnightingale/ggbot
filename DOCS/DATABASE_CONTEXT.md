@@ -208,31 +208,89 @@ This document explains the **why** behind our database schema design decisions.
 
 ---
 
-### `decisions` - AI Decision Audit Log
-**Why**: Capture every AI reasoning step for transparency and debugging.
+### `activities` - Unified Activity Timeline & Token Tracking
+**Why**: Single source of truth for all bot/agent actions, tool uses, market queries, trades, and LLM interactions. Replaces fragmented logging across multiple systems and enables metered billing.
 
 **Key Fields**:
-- `prompt` - exact text sent to LLM (OpenAI, Anthropic, DeepSeek, etc.)
+- `config_id` - Bot/agent that performed activity (NOT NULL - every activity tied to a config)
+- `activity_type` - Type of activity (market_query, llm_thought, trade_entry, trade_exit, agent_wait, etc.)
+- `activity_source` - Where activity originated (scheduled_bot, agent_tool, signal_validation)
+- `summary` - Brief title for timeline display (max 200 chars)
+- `details` - JSONB with full activity data (type-specific structure)
+- `importance` - User-facing importance (1-10) for filtering
+
+**Token Tracking Fields** (populated for LLM activities only):
+- `provider` - LLM provider (openrouter, openai, anthropic)
+- `model` - Model used (grok, claude, gpt-5, deepseek, etc.)
+- `thinking_mode` - Whether extended reasoning was enabled
+- `input_tokens`, `output_tokens`, `reasoning_tokens` - Token consumption
+- `provider_cost_usd` - Raw provider cost
+- `platform_cost_usd` - Cost with 70% markup (billed to user)
+- `stripe_reported` - Whether usage reported to Stripe for billing
+- `stripe_reported_at` - Timestamp of Stripe reporting
+
+**Design Benefits**:
+1. **Unified Timeline**: All bot/agent actions in one table, chronological order
+2. **Metered Billing**: Every LLM call tracked with costs for Stripe usage-based billing
+3. **Cross-Config Type**: Works for scheduled_trading, signal_validation, and agent configs
+4. **Frontend Ready**: Powers Activity Timeline viewer without complex joins
+5. **Audit Trail**: Complete record of what bots/agents did and why
+
+**Activity Types**:
+- `market_query` - Queried technical indicators, prices, or signals (no tokens)
+- `llm_thought` - LLM reasoning/analysis (has token tracking)
+- `trade_entry` - Position opened (includes reasoning in details)
+- `trade_exit` - Position closed with P&L
+- `trade_update` - Modified SL/TP on existing position
+- `agent_wait` - Agent self-scheduled pause
+- `observation_recorded` - Post-trade reflection
+- `strategy_updated` - Agent modified bot config
+- `signal_received` - External signal ingested (ggShot, TradingView)
+
+**Replaces**: `decisions` table (being phased out - legacy scheduled_trading bots only)
+
+---
+
+### `decisions` - LEGACY AI Decision Audit Log
+**Status**: DEPRECATED - Being phased out in favor of `activities` table
+
+**Why it existed**: Captured LLM decision reasoning for scheduled_trading bots.
+
+**Key Fields**:
+- `prompt` - exact text sent to LLM (includes all market data)
 - `reasoning` - AI's natural language explanation
-- `decision_data` - JSONB with market context (indicator values, signal data, etc.)
-- `created_by` - tracks whether decision came from decision_engine_v2 or autonomous agent
+- `decision_data` - JSONB with market context
+- `created_by` - 'decision_engine_v2' or 'agent'
 - `parent_decision_id` - links monitoring decisions to entry decisions
 
-**Future**: Confidence calibration analysis (did 0.8 confidence really mean 80% win rate?).
+**Why deprecating**:
+1. Duplicates data with activities table (both store reasoning)
+2. Only used by scheduled_trading bots (agents already use activities)
+3. Storing full prompt wastes space (better to log market queries separately)
+4. No token tracking (can't bill for LLM usage)
+
+**Migration Plan**:
+- Keep table for now (historical data + backward compatibility)
+- New code writes to activities table instead
+- Eventually migrate historical decisions → activities and drop table
 
 ---
 
 ### `configurations` - Bot Configuration Store
-**Why**: Central registry of all user bots with flexible JSONB config.
+**Why**: Central registry of all user bots with flexible JSONB config. **Everything is a config** - scheduled bots, signal validators, and autonomous agents all use this table.
 
 **Key Fields**:
-- `config_type` - 'autonomous' (normal bot) | 'signal_validation' (ggShot validator) | 'agent' (autonomous agent)
-- `state` - 'active' | 'inactive' (for scheduler)
-- `trading_mode` - 'paper' | 'live'
-- `config_data` - JSONB with all bot settings
-- `symphony_agent_id` - for live trading linkage
+- `config_type` - 'scheduled_trading' (extraction→decision→trading on schedule) | 'signal_validation' (validate external signals) | 'agent' (autonomous Claude SDK agent)
+- `state` - 'active' | 'inactive' | 'archived'
+- `trading_mode` - 'paper' | 'symphony' | 'aster'
+- `config_data` - JSONB with all bot settings (extraction, decision, trading configs)
+- `symphony_agent_id` - Symphony.io agent UUID (for live trading, NOT related to our agent/ directory)
 
-**Design**: One table for all bot types, differentiated by `config_type`. Simpler than separate tables per type.
+**Design Philosophy**:
+- **Config-Centric Architecture**: Every bot and agent is a configuration record
+- One table for all types, differentiated by `config_type`
+- Simpler than separate tables per type
+- All activities link to `config_id` (NOT NULL foreign key)
 
 ---
 
@@ -316,12 +374,52 @@ This document explains the **why** behind our database schema design decisions.
 
 ---
 
+## Recent Major Changes (November 2025)
+
+### Activities Table Unification
+**What Changed**: Added token tracking columns to `activities` table, removed `priority` column, created billing indexes.
+
+**Why**:
+1. **Metered Billing**: Usage-based pricing requires tracking every LLM call with costs
+2. **Unified Logging**: Bots and agents should log actions the same way
+3. **Timeline Consistency**: Frontend Activity Timeline already uses activities table
+
+**Schema Changes**:
+```sql
+-- Removed (mistake in original design)
+DROP COLUMN priority
+
+-- Added for metered billing
+ADD COLUMN provider VARCHAR(50)
+ADD COLUMN model VARCHAR(100)
+ADD COLUMN thinking_mode BOOLEAN
+ADD COLUMN input_tokens INTEGER
+ADD COLUMN output_tokens INTEGER
+ADD COLUMN reasoning_tokens INTEGER
+ADD COLUMN provider_cost_usd NUMERIC(10, 6)
+ADD COLUMN platform_cost_usd NUMERIC(10, 6)
+ADD COLUMN stripe_reported BOOLEAN DEFAULT FALSE
+ADD COLUMN stripe_reported_at TIMESTAMP WITH TIME ZONE
+
+-- Billing indexes
+CREATE INDEX idx_activities_billing ON activities(user_id, created_at, stripe_reported)
+CREATE INDEX idx_activities_config_billing ON activities(config_id, created_at)
+```
+
+**Impact**:
+- Every LLM call now creates an activity with token costs
+- Scheduled bots will migrate from `decisions` table to `activities` table
+- Daily cron job aggregates costs and reports to Stripe Meter
+- Users see per-bot spend breakdowns in usage dashboard
+
+---
+
 ## Future Enhancements
 
 ### Planned Schema Changes
 - **Trade Timeline**: Add `exit_decision_id` to `paper_trades` and `live_trades` for full lifecycle tracking
-- **Multi-Model Support**: Add `model_used` column to decisions (GPT-4, Claude Opus, DeepSeek R1)
-- **Cost Tracking**: Add `llm_cost_usd` column to decisions for budget management
+- **Decisions Table Removal**: Migrate historical data to activities, drop decisions table
+- **Activity Type Expansion**: Add new types as features evolve (backtesting_result, alert_triggered, etc.)
 
 ### Analytics Tables (Future)
 - `strategy_performance` - aggregated metrics per user strategy template

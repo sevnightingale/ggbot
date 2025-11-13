@@ -13,6 +13,7 @@ from core.auth.supabase_auth import AuthenticatedUser, get_current_user_v2
 from core.common.db import get_db_connection
 from core.common.logger import logger
 from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
+from trading.live.symphony_service import SymphonyLiveTradingService
 
 
 router = APIRouter(prefix="/api/v2/activities", tags=["activities"])
@@ -82,7 +83,7 @@ async def get_activities(
                     SELECT
                         activity_id, activity_type, activity_source, summary, details,
                         trade_id, trade_type, decision_id, related_symbol,
-                        priority, importance, created_at
+                        importance, created_at
                     FROM activities
                     WHERE config_id = %s
                 """
@@ -125,14 +126,14 @@ async def get_activities(
                     "activities": [
                         {
                             "id": str(a[0]),
-                            "timestamp": a[11].isoformat(),
+                            "timestamp": a[10].isoformat(),
                             "type": a[1],
-                            "priority": a[9],
+                            "priority": a[9],  # Use importance as priority for frontend compatibility
                             "data": {
                                 "summary": a[3],
                                 "details": a[4],  # Already JSONB, returns as dict
                                 "symbol": a[8],
-                                "importance": a[10],
+                                "importance": a[9],
                                 "trade_id": str(a[5]) if a[5] else None,
                                 "trade_type": a[6]
                             }
@@ -201,14 +202,16 @@ async def get_balance_series(
                 """, (config_id,))
                 paper_trades = cur.fetchall()
 
-                # Check if this is an Aster bot
+                # Check trading mode
                 cur.execute("""
                     SELECT trading_mode FROM configurations WHERE config_id = %s
                 """, (config_id,))
                 trading_row = cur.fetchone()
-                is_aster = trading_row and trading_row[0] == 'aster'
+                trading_mode = trading_row[0] if trading_row else 'paper'
+                is_aster = trading_mode == 'aster'
+                is_symphony = trading_mode == 'symphony'
 
-        # Get Aster trades from API (if Aster bot)
+        # Get live trades from API (if Aster or Symphony bot)
         all_trades = []
 
         # Add paper trades
@@ -218,6 +221,27 @@ async def get_balance_series(
                 "timestamp": closed_at,
                 "pnl": float(realized_pnl)
             })
+
+        # Add Symphony trades (account-wide for this agent)
+        if is_symphony:
+            symphony_service = SymphonyLiveTradingService()
+            symphony_trades = await symphony_service.get_trade_history(config_id, limit=1000)
+
+            for symphony_trade in (symphony_trades or []):
+                realized_pnl = float(symphony_trade.get('realized_pnl', 0))
+
+                # Only include trades with actual P&L
+                if realized_pnl != 0 and symphony_trade.get('closed_at'):
+                    # Symphony trades have timestamps as ISO strings
+                    try:
+                        trade_time = datetime.fromisoformat(symphony_trade['closed_at'].replace('Z', '+00:00'))
+                    except (ValueError, TypeError):
+                        continue
+
+                    all_trades.append({
+                        "timestamp": trade_time,
+                        "pnl": realized_pnl
+                    })
 
         # Add Aster trades (account-wide, only with non-zero P&L)
         if is_aster:
@@ -255,7 +279,8 @@ async def get_balance_series(
             }
 
         # Balance mode: Show account balance over time (reconstructed from current balance)
-        if mode == "balance":
+        # Only supported for Aster (Symphony doesn't provide balance)
+        if mode == "balance" and is_aster:
             # Get current Aster balance (sum USDT + USDC)
             balance_data = await aster_service._get_account_balance()
             current_balance = 0.0
@@ -410,6 +435,31 @@ async def get_timeline_metadata(
                     WHERE config_id = %s AND provider = 'aster' AND closed_at IS NOT NULL
                 """, (config_id,))
                 aster_trade_ids = {str(row[0]) for row in cur.fetchall()}
+
+        # Check trading mode and route to appropriate service
+        if trading_mode == 'symphony':
+            # SYMPHONY BOT: Use Symphony API for metrics
+            symphony_service = SymphonyLiveTradingService()
+            symphony_metrics = await symphony_service.get_account_metrics(config_id)
+
+            if symphony_metrics:
+                # Symphony doesn't provide balance, so we show cumulative P&L
+                total_pnl = symphony_metrics.get('total_pnl', 0)
+                total_trades = symphony_metrics.get('total_trades', 0)
+                win_rate = symphony_metrics.get('win_rate', 0)
+
+                return {
+                    "status": "success",
+                    "metadata": {
+                        "botName": config_name,
+                        "startingBalance": 0,  # Symphony doesn't provide balance
+                        "currentBalance": total_pnl,  # Show cumulative P&L as "balance"
+                        "totalTrades": total_trades,
+                        "winRate": round(win_rate, 1),
+                        "performance": total_pnl,  # P&L in USD
+                        "createdAt": created_at.isoformat()
+                    }
+                }
 
         # Check if this is an Aster bot
         aster_service = AsterDEXV3LiveTradingService()

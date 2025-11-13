@@ -8,16 +8,31 @@ ggbots is a production-ready platform for creating, customizing, and deploying f
 
 ## Architecture Overview
 
-The ggbots platform implements a **three-agent autonomous trading pipeline** with **autonomous scheduling** and **signal validation** capabilities:
+The ggbots platform is **config-centric**: Every bot and agent is a `configuration` record with a `config_id`. There are **three config types**:
 
+1. **`scheduled_trading`** - Scheduled bots executing Extraction → Decision → Trading on fixed intervals
+2. **`signal_validation`** - Signal-driven bots validating external signals (ggShot, TradingView)
+3. **`agent`** - Autonomous Claude SDK agents with self-directed timing (24/7 trading)
+
+**Scheduled Trading Flow**:
 ```
-Market Data → Extraction Agent → Decision Agent → Trading Agent → Exchange
-     ↑              ↓               ↓              ↓           ↓
-   Sources     Market Analysis   AI Reasoning   Execution   Results
-     
-External Signals → Signal Validation → Decision Agent → Trading Agent → Exchange
-     ↑                    ↓                ↓              ↓           ↓
-  ggShot/TV        4-Pillar Analysis   AI Reasoning   Execution   Results
+Market Data → Extraction → Decision → Trading → Exchange
+     ↑              ↓          ↓          ↓         ↓
+   Sources     Analysis   AI Reasoning  Execution  Results
+```
+
+**Signal Validation Flow**:
+```
+External Signals → Validation → Decision → Trading → Exchange
+     ↑                 ↓           ↓          ↓         ↓
+  ggShot/TV      4-Pillar      AI Reasoning  Execution  Results
+```
+
+**Autonomous Agent Flow**:
+```
+Agent (Claude SDK) → MCP Tools → Market Data / Trading / Observations
+     ↑                   ↓              ↓
+  Self-directed    Tool Execution   Continuous Learning
 ```
 
 ### Core Agent Architecture
@@ -73,7 +88,7 @@ The ggbot repository is organized into the following top-level directories:
 | **x_bot/** | Twitter bot for platform status updates | ✅ Active | Platform tweets at @ggbots_ai |
 | **archive/** | Legacy code preserved for reference | 🔒 Archived | 15 archived directories (includes ggshot/) |
 
-**Note**: The `agent/` directory contains fully autonomous AI trading agents with 12 MCP tools for 24/7 trading (Phase 3 complete, Phase 4a frontend integration operational). See [agent/README.md](agent/README.md) for architecture and usage guide, or [TODO.md](TODO.md) for roadmap.
+**Note**: All bots and agents are stored as `configurations` records. The `agent/` directory contains autonomous Claude SDK agent runners (config_type='agent') with 12 MCP tools for 24/7 trading. See [agent/README.md](agent/README.md) for details.
 
 ---
 

@@ -15,6 +15,8 @@ from core.common.logger import logger
 from core.services.config_service import config_service
 from core.common.db import get_db_connection, DecimalEncoder
 from core.services.llm_key_service import LLMKeyService
+from core.services.llm_pricing_service import llm_pricing_service
+from core.common.activity_logger import log_llm_activity_safe
 from decision.llm_providers import get_llm_provider
 from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
 from decision.prompts.signal_validation import build_signal_validation_prompt
@@ -235,15 +237,15 @@ class DecisionEngineV2:
         )
         
         # Call LLM for validation
-        llm_response = await self._call_llm(prompt)
-        
+        llm_response, metadata = await self._call_llm(prompt)
+
         # Parse response
         decision_data = self._parse_llm_response(llm_response)
-        
+
         # Save signal validation decision to database
         decision_id = await self._save_signal_decision_to_db(
-            symbol, decision_data, signal_data, market_data, 
-            current_price, prompt, llm_response
+            symbol, decision_data, signal_data, market_data,
+            current_price, prompt, llm_response, metadata
         )
         
         # Return signal validation intent
@@ -307,13 +309,13 @@ class DecisionEngineV2:
         prompt = await self._build_opportunity_analysis_prompt(symbol, market_data, current_price, volume_analysis)
         
         # Step 4: Call LLM
-        llm_response = await self._call_llm(prompt)
-        
+        llm_response, metadata = await self._call_llm(prompt)
+
         # Step 5: Parse response
         decision_data = self._parse_llm_response(llm_response)
-        
+
         # Step 6: Save decision to database
-        decision_id = await self._save_decision_to_db(symbol, decision_data, market_data, current_price, prompt, llm_response)
+        decision_id = await self._save_decision_to_db(symbol, decision_data, market_data, current_price, prompt, llm_response, metadata)
         
         # Step 7: Return intent
         return self._create_trading_intent_simple(decision_id, symbol, decision_data)
@@ -517,15 +519,15 @@ class DecisionEngineV2:
         )
         
         # Step 4: Call LLM
-        llm_response = await self._call_llm(prompt)
-        
+        llm_response, metadata = await self._call_llm(prompt)
+
         # Step 5: Parse response
         decision_data = self._parse_llm_response(llm_response)
-        
+
         # Step 6: Save decision to database (with parent decision link)
         decision_id = await self._save_position_decision_to_db(
-            symbol, decision_data, position_data, market_data, 
-            current_price, prompt, llm_response
+            symbol, decision_data, position_data, market_data,
+            current_price, prompt, llm_response, metadata
         )
         
         # Step 7: Return position management intent
@@ -625,12 +627,15 @@ Take Profit: {take_profit_text}
         
         return position_summary
     
-    async def _save_decision_to_db(self, symbol: str, decision_data: Dict[str, Any], 
+    async def _save_decision_to_db(self, symbol: str, decision_data: Dict[str, Any],
                                    market_data: Dict[str, Any], current_price: Decimal,
-                                   prompt: str, llm_response: str) -> str:
-        """Save decision to the decisions table."""
+                                   prompt: str, llm_response: str, metadata: Optional[Dict[str, Any]] = None) -> str:
+        """
+        Save decision to the decisions table (DEPRECATED - kept for compatibility).
+        Also logs llm_thought activity with token tracking for metered billing.
+        """
         decision_id = str(uuid.uuid4())
-        
+
         # Map decision actions to schema-compliant actions
         raw_action = decision_data.get('action', 'no_action')
         if raw_action in ['long', 'short', 'enter']:
@@ -639,8 +644,9 @@ Take Profit: {take_profit_text}
             schema_action = 'exit'
         else:  # wait, no_action, hold, etc.
             schema_action = 'wait'
-        
+
         try:
+            # Save to decisions table (deprecated but kept for compatibility)
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     decision_data_json = {**decision_data, 'raw_action': raw_action}  # Preserve original action
@@ -672,12 +678,108 @@ Take Profit: {take_profit_text}
                 action=decision_data.get('action')
             ).info("Decision saved to database")
 
+            # NEW: Log llm_thought activity with token tracking
+            if metadata:
+                await self._log_llm_activity(
+                    decision_id=decision_id,
+                    symbol=symbol,
+                    decision_data=decision_data,
+                    metadata=metadata
+                )
+
             return decision_id
-                    
+
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save decision: {e}")
             raise DecisionError(f"Failed to save decision to database: {e}")
-    
+
+    async def _log_llm_activity(
+        self,
+        decision_id: str,
+        symbol: str,
+        decision_data: Dict[str, Any],
+        metadata: Dict[str, Any]
+    ) -> None:
+        """
+        Log LLM activity with token tracking for metered billing.
+
+        Args:
+            decision_id: UUID of the decision (for linking)
+            symbol: Trading symbol
+            decision_data: Parsed decision data (action, confidence, reasoning)
+            metadata: LLM response metadata (model, usage, etc.)
+        """
+        try:
+            # Extract provider and model info
+            # Get configured provider info
+            llm_config = self.config.llm_config if hasattr(self.config, 'llm_config') else {}
+            provider = llm_config.get('provider', 'openrouter')
+            model = metadata.get('model', 'unknown')
+
+            # Extract token usage
+            usage = metadata.get('usage', {})
+            input_tokens = usage.get('input_tokens', 0) or usage.get('prompt_tokens', 0)
+            output_tokens = usage.get('output_tokens', 0) or usage.get('completion_tokens', 0)
+            reasoning_tokens = usage.get('reasoning_tokens')
+
+            # Detect thinking mode from metadata or usage
+            thinking_mode = usage.get('thinking_mode', False)
+
+            # Calculate costs with 70% markup
+            provider_cost, platform_cost = llm_pricing_service.calculate_cost(
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                provider=provider,
+                model=model,
+                thinking_mode=thinking_mode
+            )
+
+            # Build activity summary
+            action = decision_data.get('action', 'wait')
+            confidence = decision_data.get('confidence', 0.5)
+            summary = f"Analyzed {symbol}: {action.upper()} (confidence: {confidence:.0%})"
+
+            # Log activity with token tracking
+            log_llm_activity_safe(
+                config_id=self.config_id,
+                user_id=self.user_id,
+                activity_source='scheduled_bot',
+                summary=summary,
+                details={
+                    'reasoning': decision_data.get('reasoning', ''),
+                    'confidence': confidence,
+                    'action': action,
+                    'symbol': symbol,
+                    'stop_loss_price': decision_data.get('stop_loss_price'),
+                    'take_profit_price': decision_data.get('take_profit_price'),
+                },
+                provider=provider,
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                provider_cost_usd=provider_cost,
+                platform_cost_usd=platform_cost,
+                thinking_mode=thinking_mode,
+                reasoning_tokens=reasoning_tokens,
+                decision_id=decision_id,
+                related_symbol=symbol,
+                importance=7  # Decision activities are important
+            )
+
+            logger.bind(
+                config_id=self.config_id,
+                decision_id=decision_id,
+                provider=provider,
+                model=model,
+                input_tokens=input_tokens,
+                output_tokens=output_tokens,
+                platform_cost=f"${platform_cost:.4f}"
+            ).info("LLM activity logged with token tracking")
+
+        except Exception as e:
+            # Non-blocking - don't fail the decision if activity logging fails
+            logger.bind(config_id=self.config_id).warning(f"Failed to log LLM activity: {e}")
+
     def _create_trading_intent_simple(self, decision_id: str, symbol: str, 
                                     decision_data: Dict[str, Any]) -> Dict[str, Any]:
         """Create simplified trading intent."""
@@ -1111,8 +1213,13 @@ Take Profit: {take_profit_text}
 
         return "\n".join(lines)
 
-    async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> str:
-        """Call LLM API using configured provider."""
+    async def _call_llm(self, prompt: str, custom_mode: Optional[str] = None) -> tuple[str, Dict[str, Any]]:
+        """
+        Call LLM API using configured provider.
+
+        Returns:
+            Tuple of (response_text, metadata) where metadata contains usage info
+        """
         if not self.llm_provider:
             await self.initialize()  # Initialize if not already done
 
@@ -1139,7 +1246,7 @@ Take Profit: {take_profit_text}
                 tokens=metadata.get('usage', {}).get('total_tokens', 'unknown')
             ).info("LLM call completed with metadata")
 
-            return response_text
+            return response_text, metadata
 
         except Exception as e:
             logger.bind(config_id=self.config_id, user_id=self.user_id).error(f"LLM API call failed: {e}")
@@ -1249,16 +1356,20 @@ Take Profit: {take_profit_text}
         return parsed
     
     async def _save_signal_decision_to_db(
-        self, 
-        symbol: str, 
+        self,
+        symbol: str,
         decision_data: Dict[str, Any],
         signal_data: Dict,
-        market_data: Dict[str, Any], 
+        market_data: Dict[str, Any],
         current_price: Decimal,
-        prompt: str, 
-        llm_response: str
+        prompt: str,
+        llm_response: str,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> str:
-        """Save signal validation decision to the decisions table."""
+        """
+        Save signal validation decision to the decisions table (DEPRECATED).
+        Also logs llm_thought activity with token tracking for metered billing.
+        """
         decision_id = str(uuid.uuid4())
         
         # Map signal validation actions to schema-compliant actions
@@ -1308,8 +1419,17 @@ Take Profit: {take_profit_text}
                 action=decision_data.get('action')
             ).info("Signal validation decision saved to database")
 
+            # NEW: Log llm_thought activity with token tracking
+            if metadata:
+                await self._log_llm_activity(
+                    decision_id=decision_id,
+                    symbol=symbol,
+                    decision_data=decision_data,
+                    metadata=metadata
+                )
+
             return decision_id
-                    
+
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save signal decision: {e}")
             raise DecisionError(f"Failed to save signal decision to database: {e}")
@@ -1641,16 +1761,20 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
             return None
 
     async def _save_position_decision_to_db(
-        self, 
-        symbol: str, 
+        self,
+        symbol: str,
         decision_data: Dict[str, Any],
         position_data: Dict,
-        market_data: Dict[str, Any], 
+        market_data: Dict[str, Any],
         current_price: Decimal,
-        prompt: str, 
-        llm_response: str
+        prompt: str,
+        llm_response: str,
+        metadata: Optional[Dict[str, Any]] = None
     ) -> str:
-        """Save position management decision to the decisions table with position context."""
+        """
+        Save position management decision to the decisions table (DEPRECATED).
+        Also logs llm_thought activity with token tracking for metered billing.
+        """
         decision_id = str(uuid.uuid4())
         
         # Map position management actions to schema-compliant actions
@@ -1702,8 +1826,17 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                 trade_id=position_data.get('trade_id')
             ).info("Position management decision saved to database")
 
+            # NEW: Log llm_thought activity with token tracking
+            if metadata:
+                await self._log_llm_activity(
+                    decision_id=decision_id,
+                    symbol=symbol,
+                    decision_data=decision_data,
+                    metadata=metadata
+                )
+
             return decision_id
-                    
+
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save position decision: {e}")
             raise DecisionError(f"Failed to save position decision to database: {e}")

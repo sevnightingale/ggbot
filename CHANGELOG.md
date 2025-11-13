@@ -4,6 +4,25 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-13 - Symphony Timeline Support: Multi-Mode Activity Tracking
+
+**Timeline API**: Added full Symphony support to activity timeline endpoints, enabling unified timeline view across all trading modes.
+
+- **Symphony Balance Series**: Queries Symphony API `get_trade_history()` for closed trades with P&L
+- **Symphony Metadata**: Queries Symphony API `get_account_metrics()` for win rate, trade count, cumulative P&L
+- **Activities Endpoint Fix**: Removed non-existent `priority` column from query (use `importance` field)
+- **Multi-Mode Support**: Timeline now works for paper, Symphony, and Aster bots
+- **Account-Wide Metrics**: Symphony & Aster show account-wide performance (shared wallet design)
+- **Test Suite**: Created `tests/test_symphony_timeline.py` validating all 3 endpoints
+
+**Impact**: Symphony bots now display complete activity timelines with trade history and performance metrics from Symphony API. All trading modes (paper/symphony/aster) supported in timeline view.
+
+**Files Modified**: api/activities.py (3 endpoints), tests/test_symphony_timeline.py (new)
+
+**Note**: Aster & Symphony use account-wide metrics (shared wallets), paper trading is per-bot.
+
+---
+
 ## 2025-11-11 - Confidence-Based Position Sizing: Verified & Production-Ready
 
 **Testing**: Comprehensive validation of confidence-based sizing implementation across paper/symphony/aster modes.

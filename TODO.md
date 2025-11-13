@@ -31,13 +31,13 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 💳 **CRITICAL - Metered Billing & Pricing Overhaul (Simplified)** [metered_billing.md]
+## 🎯 **Activities Unification & Token Tracking**
 
-**Status**: Planning (2025-11-10)
-**Planning Doc**: [DOCS/todo/metered_billing.md](DOCS/todo/metered_billing.md)
-**Timeline**: 6 days (1 day OpenRouter + 5 days billing)
+**Status**: In Progress (2025-11-12)
+**Timeline**: 3 days (12-15 hours total)
+**Goal**: Unified activity logging with token tracking for metered billing
 
-**Goal**: Minimal usage-based billing with per-bot tracking, no overengineering.
+**Architecture Decision**: Use `activities` table for everything (no separate `token_usage` table). More elegant, simpler queries, powers timeline + billing from one source.
 
 ### **Key Decisions**
 - ✅ **OpenRouter First**: Unified LLM API (simplifies token tracking)
@@ -86,17 +86,81 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
   - [ ] Run 3 real bot executions (deferred to Phase 1)
   - [ ] Monitor for 24 hours (deferred to Phase 1)
 
-### **Phase 1: Token Tracking Infrastructure** (2 days)
-- [ ] **Database**
-  - [ ] Create `token_usage` table (with config_id for per-bot tracking)
-  - [ ] Create `llm_model_pricing` table
-  - [ ] Run migration
+### **Phase 1: Core Infrastructure** ✅ COMPLETE
+- [x] Extend activities table schema (priority removed, token columns added)
+- [x] Update documentation (README.md, ACTIVE.md, DATABASE_CONTEXT.md)
+- [x] Schema migration successful (23 columns, billing indexes created)
 
-- [ ] **Token Tracking Service**
-  - [ ] Create `core/services/token_tracking_service.py`
-  - [ ] Implement `record_usage()` (calculates cost with 70% markup)
-  - [ ] Implement `get_current_month_spend(user_id)`
-  - [ ] Implement `get_per_bot_spend(user_id)` (per-bot breakdown)
+### **Phase 2: Implementation** (Est. 12-15 hours)
+
+#### 2.1 Core Infrastructure Updates (2-3 hours)
+- [ ] Update `core/common/activity_logger.py`
+  - [ ] Remove priority logic (column dropped)
+  - [ ] Add token tracking parameters
+  - [ ] Update activity types taxonomy
+  - [ ] Add `log_llm_activity()` helper function
+  - [ ] Update SQL INSERT (remove priority, add token columns)
+
+- [ ] Create `core/services/llm_pricing_service.py`
+  - [ ] Query `llm_models` table for pricing
+  - [ ] Calculate costs with 70% markup
+  - [ ] Handle nested pricing structure (standard vs thinking modes)
+
+#### 2.2 Decision Engine Migration (3-4 hours)
+- [ ] Update `decision/engine_v2.py`
+  - [ ] Log `market_query` activity (market data queried)
+  - [ ] Log `llm_thought` activity (with token tracking)
+  - [ ] Extract token counts from LLM response
+  - [ ] Calculate costs using pricing service
+  - [ ] Keep `INSERT INTO decisions` for compatibility (deprecated)
+
+- [ ] Update `signals/listener_service.py`
+  - [ ] Log `signal_received` activity (no tokens)
+  - [ ] Log `llm_thought` for validation (with tokens)
+
+#### 2.3 Trading Engine Updates (2 hours)
+- [ ] Update `trading/paper/supabase_service.py`
+  - [ ] Ensure `trade_entry` activities have unified structure
+  - [ ] Ensure `trade_exit` activities have P&L details
+
+- [ ] Update `trading/live/symphony_service.py` and `trading/live/aster_service_v3.py`
+  - [ ] Consistent activity logging across all trading modes
+
+#### 2.4 Stripe Billing Integration (3-4 hours)
+- [ ] Create `scripts/report_stripe_usage.py`
+  - [ ] Query yesterday's activities WHERE stripe_reported = FALSE
+  - [ ] Group by user_id, SUM(platform_cost_usd)
+  - [ ] Send Stripe Meter events
+  - [ ] Mark activities as stripe_reported = TRUE
+  - [ ] Error handling and retry logic
+
+- [ ] Add billing API endpoints in `ggbot.py`
+  - [ ] `GET /api/v2/usage/current-month` (total + per-bot breakdown)
+  - [ ] `GET /api/v2/usage/history` (historical by month)
+
+- [ ] Set up cron job
+  - [ ] Add to crontab (runs daily at 1am)
+  - [ ] Test dry-run mode
+
+#### 2.5 Frontend Updates (2 hours)
+- [ ] Update timeline component
+  - [ ] Handle unified `trade_entry` with `details.side`
+  - [ ] Add token cost display for `llm_thought` activities
+  - [ ] Show market data in `market_query` activities
+
+#### 2.6 Agent Integration (1 hour)
+- [ ] Verify `agent/mcp_server.py` and `agent/run_agent.py`
+  - [ ] Ensure agent LLM calls log with token tracking
+  - [ ] Verify agent tools already log correctly
+
+#### 2.7 Testing & Validation (2-3 hours)
+- [ ] Test scheduled bot execution (market_query + llm_thought created)
+- [ ] Test agent execution (all actions logged correctly)
+- [ ] Test signal validation (signal_received + llm_thought)
+- [ ] Verify token tracking (costs calculated correctly with 70% markup)
+- [ ] Test Stripe reporting (dry-run mode first)
+- [ ] Query per-bot breakdown (verify costs grouped by config_id)
+- [ ] Test frontend timeline (new activity types display correctly)
 
 - [ ] **LLM Pricing Research**
   - [ ] Research token rates: GPT-4, GPT-5, Claude Opus/Sonnet/Haiku, DeepSeek, Grok
