@@ -1062,11 +1062,17 @@ function ForgeApp() {
     saveTimerRef.current = setTimeout(async () => {
       try {
         console.log('💾 Auto-saving strategy...')
-        await apiClient.updateConfig(selectedConfigId, {
-          agent_strategy: {
-            content: newContent
-          }
-        })
+        // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
+        await apiClient.updateConfig(
+          selectedConfigId,
+          {
+            agent_strategy: {
+              content: newContent
+            }
+          },
+          editingTableFields?.config_name,  // Preserve bot name
+          editingTableFields?.config_type    // Preserve config type
+        )
         console.log('✅ Strategy auto-saved')
       } catch (error) {
         console.error('❌ Failed to auto-save strategy:', error)
