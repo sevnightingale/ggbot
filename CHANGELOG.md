@@ -4,6 +4,24 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-14 - Agent Strategy Auto-Save Fix
+
+**Bug Fix**: Agent strategy auto-save was overwriting bot names with "Untitled Bot". Fixed by always passing `config_name` and `config_type` parameters during auto-save to preserve existing values.
+
+---
+
+## 2025-11-14 - Critical Bug Fixes
+
+**Bug Fixes**: Fixed three production-blocking issues identified in error logs.
+
+- Fixed meter reporter to skip free users gracefully (INFO log instead of ERROR)
+- Fixed orchestrator missing `user_service` attribute (blocking bot execution)
+- Fixed timeline metadata iterating over dict keys instead of assets array
+
+**Files Modified**: `billing/stripe_meter_reporter.py`, `ggbot.py`, `api/activities.py`
+
+---
+
 ## 2025-11-13 - Metered Billing System Production Ready
 
 **Stripe Metered Billing**: Fixed and tested complete end-to-end metered billing system. Daily usage reporting operational, permission system enforces payment status, webhooks handle subscription lifecycle.
