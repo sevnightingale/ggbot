@@ -347,7 +347,7 @@ class GGBotOrchestrator:
                     f"user {user_id} lost activation permission (tier: {user_profile.subscription_tier.value})"
                 )
                 # Auto-deactivate bot if user lost permission
-                await self.config_service.update_state(config_id, user_id, "inactive")
+                await self.config_service.set_bot_state(config_id, user_id, "inactive")
                 raise HTTPException(
                     status_code=403,
                     detail="Bot activation requires an active subscription. Please upgrade to continue."

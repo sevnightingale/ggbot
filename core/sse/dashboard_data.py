@@ -100,13 +100,13 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
 
         UNION ALL
 
-        -- Live trading positions (batch_ids only - details fetched from Symphony)
+        -- Symphony trading positions (batch_ids only - details fetched from Symphony)
         SELECT lt.config_id, lt.batch_id::text AS position_id, NULL AS symbol, NULL AS side, NULL AS size_usd,
                NULL AS entry_price, NULL AS current_price, NULL AS unrealized_pnl, lt.created_at AS opened_at,
-               NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'live' AS source
+               NULL AS stop_loss, NULL AS take_profit, NULL AS leverage, 'symphony' AS source
         FROM live_trades lt
         INNER JOIN bot_configs bc ON lt.config_id = bc.config_id
-        WHERE lt.closed_at IS NULL AND bc.trading_mode = 'live'
+        WHERE lt.closed_at IS NULL AND bc.trading_mode = 'symphony'
 
         UNION ALL
 
@@ -307,19 +307,19 @@ async def _enrich_live_positions_and_accounts(
     symphony = SymphonyLiveTradingService()
     aster = AsterDEXV3LiveTradingService()
 
-    # Filter for live and aster bots
-    live_bots = [b for b in bots if b.get('trading_mode') == 'live']
+    # Filter for symphony and aster bots
+    symphony_bots = [b for b in bots if b.get('trading_mode') == 'symphony']
     aster_bots = [b for b in bots if b.get('trading_mode') == 'aster']
 
-    if not live_bots and not aster_bots:
+    if not symphony_bots and not aster_bots:
         return positions, accounts
 
     enriched_positions = list(positions)
     enriched_accounts = list(accounts)
 
-    # Fetch Symphony data for each live bot (in parallel)
+    # Fetch Symphony data for each symphony bot (in parallel)
     tasks = []
-    for bot in live_bots:
+    for bot in symphony_bots:
         config_id = bot['config_id']
         tasks.append(symphony.get_account_metrics(config_id))
         tasks.append(symphony.get_open_positions(config_id))
@@ -329,7 +329,7 @@ async def _enrich_live_positions_and_accounts(
         results = await asyncio.gather(*tasks, return_exceptions=True)
 
         # Process results (account metrics and positions alternate)
-        for i, bot in enumerate(live_bots):
+        for i, bot in enumerate(symphony_bots):
             config_id = bot['config_id']
 
             # Extract account metrics (even indices: 0, 2, 4, ...)

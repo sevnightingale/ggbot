@@ -1506,8 +1506,8 @@ Take Profit: {take_profit_text}
 
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
-                    if trading_mode == 'live':
-                        # Check live_trades table for open positions
+                    if trading_mode == 'symphony':
+                        # Check live_trades table for open positions (Symphony)
                         cur.execute("""
                             SELECT
                                 lt.batch_id,

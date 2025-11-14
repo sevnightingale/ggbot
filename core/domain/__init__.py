@@ -63,6 +63,9 @@ from .market_data import (
 )
 from .market_data_repository import MarketDataRepository, market_data_repo
 
+# Account snapshots (unified monitoring)
+from .account_snapshot import AccountSnapshot, AccountAdapter
+
 __all__ = [
     # Core domain
     'Account',
@@ -108,9 +111,13 @@ __all__ = [
     
     # Market data
     'MarketDataSnapshot',
-    'DataFreshness', 
+    'DataFreshness',
     'PriceData',
     'VolumeData',
     'MarketDataRepository',
-    'market_data_repo'
+    'market_data_repo',
+
+    # Account snapshots (unified monitoring)
+    'AccountSnapshot',
+    'AccountAdapter'
 ]

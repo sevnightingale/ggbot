@@ -160,8 +160,32 @@ class OpenRouterProvider(LLMProvider):
                 response = await self.client.chat.completions.create(**request_params)
 
                 # Extract response content
-                content = response.choices[0].message.content
+                message = response.choices[0].message
+                content = message.content
                 finish_reason = response.choices[0].finish_reason
+
+                # For thinking models (Kimi K2, DeepSeek R1), response may be in 'reasoning' field
+                if (not content or content.strip() == "") and hasattr(message, 'reasoning') and message.reasoning:
+                    logger.bind(module="decision.openrouter").info(
+                        f"Content empty, using reasoning field from thinking model (length: {len(message.reasoning)})"
+                    )
+                    content = message.reasoning
+
+                # Validate response content is not blank
+                if not content or content.strip() == "":
+                    error_msg = (
+                        f"OpenRouter returned blank/empty content - "
+                        f"finish_reason: {finish_reason}, "
+                        f"model: {self.openrouter_model}, "
+                        f"thinking_mode: {self.thinking_mode}, "
+                        f"prompt_tokens: {response.usage.prompt_tokens}, "
+                        f"completion_tokens: {response.usage.completion_tokens}, "
+                        f"has_reasoning: {hasattr(message, 'reasoning')}"
+                    )
+                    logger.bind(module="decision.openrouter").error(error_msg)
+                    # Log the full response for debugging
+                    logger.bind(module="decision.openrouter").error(f"Full response object: {response}")
+                    raise ValueError(error_msg)
 
                 # Build standardized metadata
                 usage = response.usage

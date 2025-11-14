@@ -87,7 +87,7 @@ class RedisWebSocketAdapter(DataAdapter):
             df = pd.DataFrame(candles)
 
             # Convert timestamp from milliseconds to datetime
-            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms')
+            df['timestamp'] = pd.to_datetime(df['timestamp'], unit='ms', utc=True)
 
             # Sort by timestamp (oldest first)
             df = df.sort_values('timestamp').reset_index(drop=True)

@@ -4555,4 +4555,3 @@ Codes are universal,but messages can vary.
 
 * Price is lower than stop price multiplier floor.
 * Limit price can't be lower than %s.
-

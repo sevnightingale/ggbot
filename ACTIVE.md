@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-13 17:05:30 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-14 09:36:36 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -20,25 +20,25 @@
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,454
-  - Wins: 1,635
+- **Total Trades (All Time)**: 5,457
+  - Wins: 1,638
   - Losses: 3,819
-  - Platform Win Rate: 29.98%
-  - Total P&L: $-16,008.15
+  - Platform Win Rate: 30.02%
+  - Total P&L: $-15,996.58
 - **Recent Activity**:
-  - Last 24 hours: 2 trades
-  - Last 7 days: 3 trades
-  - Last 30 days: 3775 trades
+  - Last 24 hours: 4 trades
+  - Last 7 days: 6 trades
+  - Last 30 days: 3756 trades
 
 ### Open Positions
 - **Open Positions**: 1
 - **Unique Symbols**: 1
 - **Total Exposure**: $100.00
-- **Unrealized P&L**: $2.56
+- **Unrealized P&L**: $-0.48
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,900.43
-- **Lowest Balance**: $167.40
+- **Average Balance**: $9,900.19
+- **Lowest Balance**: $176.38
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
@@ -49,11 +49,11 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 24 decisions (avg confidence: 20.7%)
-- **enter**: 2 decisions (avg confidence: 67.5%)
+- **wait**: 12 decisions (avg confidence: 21.0%)
+- **enter**: 3 decisions (avg confidence: 55.3%)
 
 ### System Health
-- **Decisions (last hour)**: 1
+- **Decisions (last hour)**: 3
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -62,21 +62,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 63MB | 4h 19m | 47 |
-| x-bot | 🟢 online | 0% | 41MB | 4h 19m | 47 |
-| error-alerts | 🟢 online | 0% | 33MB | 4h 19m | 54 |
-| market-data-ws | 🟢 online | 5.3% | 171MB | 4h 19m | 49 |
-| ggbot | 🟢 online | 0.6% | 257MB | 3h 45m | 127 |
+| signal-listener | 🟢 online | 0% | 63MB | 10h 13m | 50 |
+| x-bot | 🟢 online | 0% | 44MB | 10h 13m | 50 |
+| error-alerts | 🟢 online | 0% | 34MB | 10h 13m | 57 |
+| market-data-ws | 🟢 online | 4% | 163MB | 10h 13m | 52 |
+| ggbot | 🟢 online | 1.5% | 257MB | 14m | 151 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (46%)
-- **Memory**: 2.3Gi / 3.8Gi
-- **CPU Load**: 0.81 / 0.31 / 0.21 (1m/5m/15m)
+- **Memory**: 2.1Gi / 3.8Gi
+- **CPU Load**: 1.38 / 0.77 / 0.54 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 11.04M)
+- **Redis**: 🟢 connected (Memory: 10.36M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -347,7 +347,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-13 17:05:31 UTC
+**Last Updated**: 2025-11-14 09:36:37 UTC
 
 ---
 
@@ -433,11 +433,12 @@ df -h
 | `created_at` | timestamp with time zone | ✓ | now() |
 | `updated_at` | timestamp with time zone | ✓ | now() |
 
-### `configurations` (10 columns)
+### `configurations` (11 columns)
 
 **Primary Key**: `config_id`
 
 **Indexes**:
+- `idx_configurations_public` on (is_public_performance)
 - `idx_configurations_type` on (config_type)
 - `idx_configurations_user_id` on (user_id)
 
@@ -453,6 +454,7 @@ df -h
 | `state` | text |  | 'inactive'::text |
 | `symphony_agent_id` | character varying(255) | ✓ |  |
 | `trading_mode` | character varying(20) |  | 'paper'::character varying |
+| `is_public_performance` | boolean | ✓ | false |
 
 ### `data_points` (11 columns)
 
@@ -883,16 +885,19 @@ df -h
 **Business Logic (@property methods)**:
 - `is_free_tier` - Check if user is on free tier.
 - `is_pro_tier` - Check if user has pro subscription.
-- `is_premium_user` - Check if user has any paid subscription (PRO tier only).
 - `has_active_subscription` - Check if user has active subscription.
 - `subscription_expired` - Check if subscription has expired.
-- `can_use_premium_features` - Check if user can access premium features.
-- `requires_own_llm_keys` - Check if user must provide their own LLM API keys.
-- `can_publish_telegram_signals` - Check if user can publish signals to Telegram.
-- `can_use_signal_validation` - Check if user can use signal validation mode.
-- `can_use_live_trading` - Check if user can use Symphony live trading.
-- `can_activate_bots` - Check if user can activate bots (requires paid subscription).
+- `can_activate_bots` - MASTER PERMISSION: Check if user can activate/run bots.
+
+This is the single source of truth for all paid features.
+True for USAGE_BASED and PRO tiers with active subscriptions.
 - `can_use_agents` - Check if user can create and use agents (PRO tier only).
+- `is_premium_user` - DEPRECATED: Use can_activate_bots instead.
+- `can_use_premium_features` - DEPRECATED: Use can_activate_bots instead.
+- `requires_own_llm_keys` - DEPRECATED: Platform provides LLM keys for all paid users.
+- `can_publish_telegram_signals` - DEPRECATED: Use can_activate_bots instead.
+- `can_use_signal_validation` - DEPRECATED: Use can_activate_bots instead.
+- `can_use_live_trading` - DEPRECATED: Use can_activate_bots instead.
 - `has_telegram_integration` - Check if user has Telegram integration configured.
 - `has_stripe_integration` - Check if user has Stripe customer record.
 
@@ -1138,7 +1143,7 @@ df -h
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-13 17:05:31 UTC
+**Last Updated**: 2025-11-14 09:36:37 UTC
 
 ---
 

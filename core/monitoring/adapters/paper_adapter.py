@@ -1,0 +1,129 @@
+"""
+Paper Trading Account Adapter
+
+Queries paper_accounts and paper_trades tables to create account snapshots.
+"""
+
+from datetime import datetime, timezone
+from decimal import Decimal
+from typing import Optional
+from core.domain.account_snapshot import AccountAdapter, AccountSnapshot
+from core.common.db import get_db_connection
+from core.common.logger import logger
+
+
+class PaperAccountAdapter(AccountAdapter):
+    """Adapter for fetching paper trading account state from database."""
+
+    def __init__(self):
+        self._log = logger.bind(adapter="paper_account")
+
+    async def get_current_snapshot(self, config_id: str) -> Optional[AccountSnapshot]:
+        """
+        Get current paper trading account state from database.
+
+        Queries paper_accounts for balance/metrics and calculates live P&L from open positions.
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Get account data
+                    cur.execute("""
+                        SELECT
+                            pa.account_id,
+                            pa.user_id,
+                            pa.current_balance,
+                            pa.total_pnl,
+                            pa.open_positions,
+                            pa.total_trades,
+                            pa.win_trades,
+                            pa.loss_trades,
+                            c.trading_mode
+                        FROM paper_accounts pa
+                        JOIN configurations c ON pa.config_id = c.config_id
+                        WHERE pa.config_id = %s
+                    """, (config_id,))
+
+                    account = cur.fetchone()
+                    if not account:
+                        self._log.warning(f"No paper account found for config {config_id}")
+                        return None
+
+                    (account_id, user_id, current_balance, total_pnl,
+                     open_positions, total_trades, win_trades, loss_trades, trading_mode) = account
+
+                    # Calculate win rate
+                    win_rate = Decimal(win_trades) / Decimal(total_trades) if total_trades > 0 else Decimal('0')
+
+                    # Get unrealized P&L from open positions
+                    cur.execute("""
+                        SELECT
+                            COALESCE(SUM(unrealized_pnl), 0) as unrealized_pnl,
+                            COALESCE(SUM(size_usd), 0) as position_value,
+                            COALESCE(SUM(margin_used), 0) as margin_used
+                        FROM paper_trades
+                        WHERE config_id = %s AND status = 'open'
+                    """, (config_id,))
+
+                    position_data = cur.fetchone()
+                    unrealized_pnl, position_value, margin_used = position_data or (Decimal('0'), Decimal('0'), Decimal('0'))
+
+                    # Calculate realized P&L (total_pnl - unrealized_pnl)
+                    realized_pnl = Decimal(total_pnl) - unrealized_pnl
+
+                    # Calculate available balance (current_balance - margin_used)
+                    available_balance = Decimal(current_balance) - margin_used
+
+                    # Get win/loss stats from closed trades
+                    cur.execute("""
+                        SELECT
+                            AVG(CASE WHEN realized_pnl > 0 THEN realized_pnl END) as avg_win,
+                            AVG(CASE WHEN realized_pnl < 0 THEN realized_pnl END) as avg_loss,
+                            MAX(realized_pnl) as largest_win,
+                            MIN(realized_pnl) as largest_loss
+                        FROM paper_trades
+                        WHERE config_id = %s AND status = 'closed'
+                    """, (config_id,))
+
+                    stats = cur.fetchone()
+                    avg_win, avg_loss, largest_win, largest_loss = stats or (None, None, None, None)
+
+                    # Create snapshot
+                    snapshot = AccountSnapshot(
+                        snapshot_id=None,  # Will be generated on save
+                        config_id=config_id,
+                        user_id=str(user_id),
+                        trading_mode='paper',
+                        timestamp=datetime.now(timezone.utc),
+                        current_balance=Decimal(current_balance),
+                        available_balance=available_balance,
+                        margin_used=margin_used,
+                        total_pnl=Decimal(total_pnl),
+                        realized_pnl=realized_pnl,
+                        unrealized_pnl=unrealized_pnl,
+                        total_trades=total_trades,
+                        win_trades=win_trades,
+                        loss_trades=loss_trades,
+                        win_rate=win_rate,
+                        open_positions=open_positions,
+                        position_value=position_value,
+                        total_exposure=position_value,  # For paper, exposure = position value
+                        avg_win=Decimal(avg_win) if avg_win else None,
+                        avg_loss=Decimal(avg_loss) if avg_loss else None,
+                        largest_win=Decimal(largest_win) if largest_win else None,
+                        largest_loss=Decimal(largest_loss) if largest_loss else None,
+                        raw_data={
+                            'account_id': str(account_id),
+                            'source': 'paper_accounts_table'
+                        }
+                    )
+
+                    return snapshot
+
+        except Exception as e:
+            self._log.error(f"Failed to get paper account snapshot for {config_id}: {e}")
+            return None
+
+    async def supports_balance(self) -> bool:
+        """Paper trading always provides balance data."""
+        return True

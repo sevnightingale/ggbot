@@ -193,8 +193,8 @@ class ConfigService:
             user_id: User ID from auth
             config_name: User-friendly name for the configuration
             config_data: Configuration dictionary
-            trading_mode: Trading mode ('paper', 'live', 'aster')
-            symphony_agent_id: Symphony agent ID (required for live trading)
+            trading_mode: Trading mode ('paper', 'symphony', 'aster')
+            symphony_agent_id: Symphony agent ID (required for Symphony live trading)
 
         Returns:
             BotConfigV2 instance if successful, None otherwise

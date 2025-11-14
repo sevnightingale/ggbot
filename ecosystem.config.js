@@ -144,6 +144,35 @@ module.exports = {
       min_uptime: '30s',
       max_restarts: 50,  // Increased from 20 for resilience
       restart_delay: 5000  // Increased to 5s for backoff
+    },
+    // Universal Account Monitor - Unified monitoring for paper/symphony/aster
+    {
+      name: 'account-monitor',
+      script: '/home/sev/ggbot/core/monitoring/universal_account_monitor.py',
+      interpreter: '/home/sev/ggbot/.venv/bin/python',
+      cwd: '/home/sev/ggbot',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '300M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        DATABASE_URL: process.env.DATABASE_URL,
+        SUPABASE_URL: process.env.SUPABASE_URL,
+        SUPABASE_SERVICE_KEY: process.env.SUPABASE_SERVICE_KEY,
+        REDIS_URL: process.env.REDIS_URL,
+        ASTER_API_KEY: process.env.ASTER_API_KEY,
+        ASTER_API_SECRET: process.env.ASTER_API_SECRET
+      },
+      error_file: 'logs/account-monitor-error.log',
+      out_file: 'logs/account-monitor-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 4000
     }
     // Uncomment when ready to add more services
     /*
