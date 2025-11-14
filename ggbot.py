@@ -340,7 +340,7 @@ class GGBotOrchestrator:
                 raise HTTPException(status_code=404, detail="Configuration not found")
 
             # Permission check: Verify user can still activate/run bots
-            user_profile = await self.user_service.get_profile(user_id)
+            user_profile = await user_service.get_profile(user_id)
             if not user_profile.can_activate_bots:
                 self._log.warning(
                     f"Blocking bot execution for config {config_id} - "

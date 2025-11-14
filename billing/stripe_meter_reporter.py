@@ -70,25 +70,27 @@ def get_stripe_customer_id(user_id: str) -> str:
         Stripe customer ID (cus_xxxxx)
 
     Raises:
-        ValueError: If user has no Stripe customer ID
+        ValueError: If user has no Stripe customer ID (free tier users)
     """
-    try:
-        with get_db_connection() as conn:
-            with conn.cursor() as cur:
-                cur.execute("""
-                    SELECT stripe_customer_id
-                    FROM user_profiles
-                    WHERE user_id = %s
-                """, (user_id,))
-                result = cur.fetchone()
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT stripe_customer_id, subscription_tier
+                FROM user_profiles
+                WHERE user_id = %s
+            """, (user_id,))
+            result = cur.fetchone()
 
-                if not result or not result[0]:
-                    raise ValueError(f"User {user_id} has no stripe_customer_id")
+            if not result:
+                raise ValueError(f"User {user_id} not found in database")
 
-                return result[0]
-    except Exception as e:
-        logger.error(f"Failed to get stripe_customer_id for user {user_id}: {e}")
-        raise
+            customer_id, tier = result
+
+            if not customer_id:
+                # Expected for free tier users - raise without logging error
+                raise ValueError(f"User is on '{tier}' tier (no billing)")
+
+            return customer_id
 
 
 def report_to_stripe(user_id: str, stripe_customer_id: str, total_cost: Decimal) -> bool:
@@ -227,13 +229,12 @@ def run_daily_report() -> Dict[str, any]:
                 activity_count=activity_count
             ).info(f"Processing user usage")
 
-            # Get Stripe customer ID
+            # Get Stripe customer ID (skip free tier users)
             try:
                 stripe_customer_id = get_stripe_customer_id(user_id)
             except ValueError as e:
-                logger.bind(user_id=user_id).warning(f"Skipping user: {e}")
-                stats["users_failed"] += 1
-                stats["errors"].append(f"{user_id}: {str(e)}")
+                # Expected for free tier users - skip silently
+                logger.bind(user_id=user_id).info(f"Skipping user: {e}")
                 continue
 
             # Report to Stripe

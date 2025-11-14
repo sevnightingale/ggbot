@@ -200,7 +200,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           },
         },
         localization: {
-          priceFormatter: (price: number) => `$${Number(price || 0).toFixed(2)}`,
+          priceFormatter: (price: number) => `$${price.toFixed(2)}`,
         },
       });
 
@@ -668,11 +668,11 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           {info && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 mt-4">
               {[
-                { k: 'Balance', v: `$${Math.round(Number(info.currentBalance || 0)).toLocaleString()}` },
-                { k: 'P/L', v: `${(Number(info.currentBalance || 0) - Number(info.startingBalance || 0)) >= 0 ? '+' : ''}${Math.round(Number(info.currentBalance || 0) - Number(info.startingBalance || 0)).toLocaleString()}` },
-                { k: 'Trades', v: String(info.totalTrades || 0) },
-                { k: 'Win Rate', v: `${Math.round(Number(info.winRate || 0))}%` },
-                { k: 'Perf', v: `${typeof info.performance === 'number' ? Number(info.performance).toFixed(2) : (info.performance || 0)}%` },
+                { k: 'Balance', v: `$${Math.round(info.currentBalance).toLocaleString()}` },
+                { k: 'P/L', v: `${info.currentBalance - info.startingBalance >= 0 ? '+' : ''}${Math.round(info.currentBalance - info.startingBalance).toLocaleString()}` },
+                { k: 'Trades', v: String(info.totalTrades) },
+                { k: 'Win Rate', v: `${Math.round(info.winRate)}%` },
+                { k: 'Perf', v: `${typeof info.performance === 'number' ? info.performance.toFixed(2) : info.performance}%` },
               ].map((d, i) => (
                 <div key={i} className="border rounded-lg px-3 py-2" style={{ borderColor: VIBE.hair }}>
                   <div className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'rgba(237,235,231,0.6)' }}>
@@ -1043,7 +1043,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                       Balance at Time
                     </div>
                     <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
-                      ${Number(detailActivity.data.details.balance || 0).toFixed(2)}
+                      ${detailActivity.data.details.balance.toFixed(2)}
                     </div>
                   </div>
                  ) : null}
