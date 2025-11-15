@@ -68,34 +68,30 @@ class AsterAccountAdapter(AccountAdapter):
 
             num_open_positions = len(open_positions)
 
-            # Get income history for realized P&L and trade stats
+            # Use totalWalletBalance directly as realized P&L
+            # (Aster API only returns limited income history, not full trade log)
+            realized_pnl = total_wallet_balance
+
+            # Calculate total P&L (realized + unrealized)
+            total_pnl = total_wallet_balance + total_unrealized_pnl
+
+            # Get recent income history for basic trade stats (limited to what API returns)
             income_records = await self.aster_service.get_income_history(
-                income_type=None,  # All types
-                start_time=None,   # All time
+                income_type='REALIZED_PNL',  # Only realized P&L
+                start_time=None,   # All available
                 limit=1000
             )
 
-            # Calculate realized P&L (sum of REALIZED_PNL income type)
-            realized_pnl = Decimal('0')
+            # Calculate trade statistics from available records
+            # NOTE: These are incomplete - API only returns recent trades
             trade_pnls = []
-
             if income_records:
                 for record in income_records:
-                    income_type = record.get('incomeType')
                     income_amount = Decimal(str(record.get('income', 0)))
+                    if income_amount != 0:
+                        trade_pnls.append(income_amount)
 
-                    # Only count REALIZED_PNL for realized P&L calculation
-                    if income_type == 'REALIZED_PNL':
-                        realized_pnl += income_amount
-                        # Track individual trade P&Ls for stats (non-zero only)
-                        if income_amount != 0:
-                            trade_pnls.append(income_amount)
-
-            # Calculate total P&L (realized + unrealized)
-            total_pnl = realized_pnl + total_unrealized_pnl
-
-            # Calculate trade statistics
-            total_trades = len(trade_pnls)
+            total_trades = len(trade_pnls) if trade_pnls else 0
             wins = [pnl for pnl in trade_pnls if pnl > 0]
             losses = [pnl for pnl in trade_pnls if pnl < 0]
 
