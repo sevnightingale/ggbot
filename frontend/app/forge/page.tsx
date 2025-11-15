@@ -469,6 +469,8 @@ function ForgeApp() {
         clearTimeout(reconnectTimeout)
       }
     }
+    // editingConfigData is intentionally omitted - adding it would cause SSE reconnection on every edit
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]) // Only reconnect when user changes, not when switching bots
 
   // Countdown timer for next run
