@@ -125,7 +125,7 @@ function BotRow({
     'Autonomous trading'
   const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
   const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
-  const isLive = bot.trading_mode === 'live'
+  const isSymphony = bot.trading_mode === 'symphony'
   const isAster = bot.trading_mode === 'aster'
 
   return (
@@ -162,7 +162,7 @@ function BotRow({
           <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
             {configType === 'Signal validation' ? 'Signal' : configType === 'Agent strategy' ? 'Agent' : 'Auto'}
           </span>
-          {isLive && (
+          {isSymphony && (
             <span
               className="rounded-full px-2 py-0.5 text-xs font-semibold"
               style={{
