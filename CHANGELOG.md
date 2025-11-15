@@ -4,6 +4,31 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-15 - Activities Logging Overhaul (Complete)
+
+**Feature**: Complete activity timeline logging system for all trading modes with automatic position monitoring, snapshot integration, and unified type system.
+
+- **Foundation**: `llm_thought` activities standalone (no decision_id), parallel systems for audit + timeline
+- **Snapshot Integration**: `account_balance` and `account_pnl` columns auto-populate from account_snapshots table
+- **Paper Trading (Phase 1)**: `trade_entry` and `trade_exit` logging with trade_id lifecycle linking (coverage 1% → 90%+)
+- **Symphony Trading (Phase 2)**: `trade_entry` and `trade_exit` logging with batch_id tracking, weight %, leverage, P&L
+- **Auto-Close Detection (Phase 3)**: All 3 adapters (paper/symphony/aster) detect position closes every 5 seconds
+  - Paper: Database position cache comparison
+  - Symphony: API position tracking + batch queries
+  - Aster: Income history REALIZED_PNL events
+  - Idempotency protection prevents duplicate logging
+- **Type Migration (Phase 4)**: Unified activity types across entire codebase
+  - Agent code migrated: `analysis` → `llm_thought`, `trade_entry_{side}` → `trade_entry`, `trade_win/loss` → `trade_exit`
+  - Single type system for all bots (agent + scheduled)
+  - Clean filtering and analytics with side/P&L in details
+- **Coverage**: Scheduled bots timeline visibility 1% → 95%+ (decisions + manual trades + auto-closes + snapshots)
+- **Files**: trading/paper/supabase_service.py, trading/live/symphony_service.py, trading/live/aster_service_v3.py, decision/engine_v2.py, core/monitoring/adapters/*.py, agent/run_agent.py, agent/mcp_server.py
+- **Tests**: 100% passing (paper trading test suite)
+
+**Status**: Complete (4/5 phases). Phase 5 (orchestrator cycles) skipped as low priority.
+
+---
+
 ## 2025-11-14 - Universal Account Monitoring System
 
 **New Service**: Unified monitoring service tracking account state (balance, P&L, positions) across all trading modes (paper, Symphony, AsterDEX) with consistent storage and historical snapshots.

@@ -5,9 +5,9 @@ Queries AsterDEX API to create account snapshots.
 Uses /fapi/v3/account and /fapi/v3/income endpoints.
 """
 
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Set, Dict
 from core.domain.account_snapshot import AccountAdapter, AccountSnapshot
 from trading.live.aster_service_v3 import AsterDEXV3LiveTradingService
 from core.common.db import get_db_connection
@@ -20,6 +20,8 @@ class AsterAccountAdapter(AccountAdapter):
     def __init__(self):
         self._log = logger.bind(adapter="aster_account")
         self.aster_service = AsterDEXV3LiveTradingService()
+        self._last_income_check: Dict[str, datetime] = {}  # config_id -> last check timestamp
+        self._logged_closes: Set[str] = set()  # Track already logged tranIds
 
     async def get_current_snapshot(self, config_id: str) -> Optional[AccountSnapshot]:
         """
@@ -141,11 +143,82 @@ class AsterAccountAdapter(AccountAdapter):
                 }
             )
 
+            # Detect and log any closed positions
+            await self._detect_and_log_closes(config_id, user_id)
+
             return snapshot
 
         except Exception as e:
             self._log.error(f"Failed to get Aster account snapshot for {config_id}: {e}")
             return None
+
+    async def _detect_and_log_closes(self, config_id: str, user_id: str):
+        """
+        Detect closed Aster positions via income history.
+
+        Queries /fapi/v3/income for REALIZED_PNL events since last check.
+        """
+        from core.common.activity_logger import log_activity_safe
+
+        try:
+            # Get last check time (default to 1 hour ago on first run)
+            last_check = self._last_income_check.get(
+                config_id,
+                datetime.now(timezone.utc) - timedelta(hours=1)
+            )
+
+            # Query Aster income for REALIZED_PNL since last check
+            start_time = int(last_check.timestamp() * 1000)  # Convert to ms
+            income_records = await self.aster_service.get_income_history(
+                income_type='REALIZED_PNL',
+                start_time=start_time,
+                limit=100
+            )
+
+            # Log each new realized P&L (= closed trade)
+            for record in income_records or []:
+                tran_id = str(record.get('tranId'))
+                if tran_id in self._logged_closes:
+                    continue  # Already logged
+
+                symbol = record.get('symbol', 'N/A')
+                pnl = float(record.get('income', 0))
+                close_time_ms = record.get('time')  # Accurate timestamp from Aster!
+                trade_id = str(record.get('tradeId', tran_id))
+
+                # Calculate P&L display
+                pnl_display = f"{'+' if pnl > 0 else ''}{pnl:.2f}"
+
+                # Log exit activity
+                log_activity_safe(
+                    config_id=config_id,
+                    user_id=user_id,
+                    activity_type='trade_exit',
+                    activity_source='aster_monitor',
+                    summary=f"Auto-closed {symbol}: {pnl_display}",
+                    details={
+                        'symbol': symbol,
+                        'pnl': pnl,
+                        'close_time_ms': close_time_ms,  # Store Aster timestamp
+                        'tran_id': tran_id,
+                        'trade_id': trade_id,
+                        'source': 'position_monitor',
+                        'close_reason': 'auto'
+                    },
+                    trade_id=trade_id,
+                    trade_type='aster',
+                    related_symbol=symbol,
+                    importance=9
+                )
+
+                self._logged_closes.add(tran_id)
+                self._log.info(f"Logged auto-close for Aster trade {trade_id} ({symbol})")
+
+            # Update last check time
+            self._last_income_check[config_id] = datetime.now(timezone.utc)
+
+        except Exception as e:
+            self._log.error(f"Failed to detect Aster closes for {config_id}: {e}")
 
     async def supports_balance(self) -> bool:
         """AsterDEX provides balance data."""

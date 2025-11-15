@@ -508,13 +508,12 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
                 }
 
             # Trade succeeded - log activity to timeline
-            activity_type = f"trade_entry_{side}" if side in ['long', 'short'] else 'trade_entry_long'
             trade_type = agent_context.trading_mode or 'paper'  # 'paper', 'aster', or 'symphony'
 
             log_activity_safe(
                 config_id=agent_context.config_id,
                 user_id=agent_context.user_id,
-                activity_type=activity_type,
+                activity_type='trade_entry',
                 activity_source='agent_tool',
                 summary=f"Opened {side} {symbol} at ${trade.get('entry_price', 'N/A')}",
                 details={
@@ -774,14 +773,13 @@ async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
             pnl_pct = trade.get("realized_pnl_percent", 0)
             symbol = trade.get('symbol', 'N/A')
 
-            # Auto-log activity to timeline (trade_win or trade_loss based on P&L)
-            activity_type = 'trade_win' if pnl >= 0 else 'trade_loss'
+            # Auto-log activity to timeline
             trade_type = agent_context.trading_mode or 'paper'  # 'paper', 'aster', or 'symphony'
 
             log_activity_safe(
                 config_id=agent_context.config_id,
                 user_id=agent_context.user_id,
-                activity_type=activity_type,
+                activity_type='trade_exit',
                 activity_source='agent_tool',
                 summary=f"Closed {symbol}: {'+' if pnl > 0 else ''}{pnl:.2f} ({pnl_pct:.1f}%)",
                 details={

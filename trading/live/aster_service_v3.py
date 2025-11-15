@@ -968,16 +968,13 @@ class AsterDEXV3LiveTradingService:
                         position_value = qty * price
                         pnl_pct = (pnl / position_value) * 100 if position_value > 0 else 0
 
-                # Determine activity type based on P&L
-                activity_type = 'trade_win' if pnl >= 0 else 'trade_loss'
-
                 # Get config_id from trade record for activity log
                 config_id = trade_record.get('config_id')
 
                 log_activity_safe(
                     config_id=config_id,
                     user_id=user_id,
-                    activity_type=activity_type,
+                    activity_type='trade_exit',
                     activity_source='aster_service',
                     summary=f"Closed {symbol}: {'+' if pnl >= 0 else ''}{pnl:.2f} ({pnl_pct:.1f}%)",
                     details={

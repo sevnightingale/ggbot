@@ -6,7 +6,7 @@ Queries paper_accounts and paper_trades tables to create account snapshots.
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional
+from typing import Optional, Set, Dict
 from core.domain.account_snapshot import AccountAdapter, AccountSnapshot
 from core.common.db import get_db_connection
 from core.common.logger import logger
@@ -17,6 +17,8 @@ class PaperAccountAdapter(AccountAdapter):
 
     def __init__(self):
         self._log = logger.bind(adapter="paper_account")
+        self._position_cache: Dict[str, Set[str]] = {}  # config_id -> set of trade_ids
+        self._logged_closes: Set[str] = set()  # Track already logged closes
 
     async def get_current_snapshot(self, config_id: str) -> Optional[AccountSnapshot]:
         """
@@ -118,11 +120,98 @@ class PaperAccountAdapter(AccountAdapter):
                         }
                     )
 
+                    # Detect and log any closed positions
+                    await self._detect_and_log_closes(config_id)
+
                     return snapshot
 
         except Exception as e:
             self._log.error(f"Failed to get paper account snapshot for {config_id}: {e}")
             return None
+
+    async def _detect_and_log_closes(self, config_id: str):
+        """
+        Detect closed positions and log trade_exit activities.
+
+        Compares current open positions to cached positions to find closes.
+        """
+        from core.common.activity_logger import log_activity_safe
+
+        try:
+            # Get currently open positions
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute("""
+                        SELECT trade_id FROM paper_trades
+                        WHERE config_id = %s AND status = 'open'
+                    """, (config_id,))
+                    current_open = {str(row[0]) for row in cur.fetchall()}
+
+            # Get last seen open positions
+            last_open = self._position_cache.get(config_id, set())
+
+            # Find closed positions (in last but not in current)
+            closed_trades = last_open - current_open
+
+            # Log exit for each closed trade
+            for trade_id in closed_trades:
+                if trade_id in self._logged_closes:
+                    continue  # Already logged
+
+                # Query for close details
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            SELECT symbol, side, entry_price, current_price,
+                                   realized_pnl, size_usd, close_reason,
+                                   opened_at, closed_at, user_id, config_id
+                            FROM paper_trades
+                            WHERE trade_id = %s
+                        """, (trade_id,))
+
+                        row = cur.fetchone()
+                        if not row:
+                            continue
+
+                        symbol, side, entry_price, exit_price, pnl, size_usd, \
+                        close_reason, opened_at, closed_at, user_id, trade_config_id = row
+
+                        # Calculate metrics
+                        pnl_pct = (float(pnl) / float(size_usd) * 100) if size_usd else 0
+                        duration = (closed_at - opened_at).total_seconds() if closed_at and opened_at else 0
+
+                        # Log exit activity
+                        log_activity_safe(
+                            config_id=str(trade_config_id),
+                            user_id=str(user_id),
+                            activity_type='trade_exit',
+                            activity_source='paper_monitor',
+                            summary=f"Auto-closed {symbol}: {'+' if pnl > 0 else ''}{float(pnl):.2f} ({pnl_pct:.1f}%)",
+                            details={
+                                'symbol': symbol,
+                                'side': side,
+                                'entry_price': float(entry_price),
+                                'exit_price': float(exit_price),
+                                'pnl': float(pnl),
+                                'pnl_pct': pnl_pct,
+                                'close_reason': close_reason or 'unknown',
+                                'duration_seconds': duration,
+                                'source': 'position_monitor'
+                            },
+                            trade_id=trade_id,
+                            trade_type='paper',
+                            related_symbol=symbol,
+                            importance=9
+                        )
+
+                        self._logged_closes.add(trade_id)
+                        self._log.info(f"Logged auto-close for paper trade {trade_id} ({close_reason})")
+
+            # Update cache
+            self._position_cache[config_id] = current_open
+
+        except Exception as e:
+            self._log.error(f"Failed to detect closes for {config_id}: {e}")
 
     async def supports_balance(self) -> bool:
         """Paper trading always provides balance data."""

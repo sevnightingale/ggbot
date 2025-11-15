@@ -512,7 +512,7 @@ Be disciplined and execute the strategy faithfully.
                                 log_activity(
                                     config_id=self.config_id,
                                     user_id=self.user_id,
-                                    activity_type='analysis',
+                                    activity_type='llm_thought',
                                     activity_source='agent_tool',
                                     summary=summary,
                                     details={'thought': response_text},
@@ -621,7 +621,7 @@ Be disciplined and execute the strategy faithfully.
             log_activity_safe(
                 config_id=self.config_id,
                 user_id=self.user_id,
-                activity_type='analysis',
+                activity_type='llm_thought',
                 activity_source='agent',
                 summary=f"Agent started - Balance: ${balance:.2f}, Open positions: {len(positions)}",
                 details={
@@ -737,7 +737,7 @@ Start now.
                                 log_activity_safe(
                                     config_id=self.config_id,
                                     user_id=self.user_id,
-                                    activity_type='analysis',
+                                    activity_type='llm_thought',
                                     activity_source='agent',
                                     summary=block.text[:200],  # Truncate for summary
                                     details={'thought': block.text}
@@ -752,7 +752,7 @@ Start now.
                             log_activity_safe(
                                 config_id=self.config_id,
                                 user_id=self.user_id,
-                                activity_type='analysis',
+                                activity_type='llm_thought',
                                 activity_source='agent',
                                 summary=message.result[:200],  # Truncate for summary
                                 details={'thought': message.result}
@@ -823,7 +823,7 @@ Current timestamp: {datetime.now(timezone.utc).isoformat()}
                 log_activity_safe(
                     config_id=self.config_id,
                     user_id=self.user_id,
-                    activity_type='analysis',
+                    activity_type='llm_thought',
                     activity_source='agent',
                     summary=f"Agent encountered {error_type}, retrying in {delay}s (attempt {retry_count}/{max_retries})",
                     details={'error': str(e), 'error_type': error_type, 'retry_count': retry_count}

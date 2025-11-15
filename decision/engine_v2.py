@@ -678,10 +678,9 @@ Take Profit: {take_profit_text}
                 action=decision_data.get('action')
             ).info("Decision saved to database")
 
-            # NEW: Log llm_thought activity with token tracking
+            # NEW: Log llm_thought activity with token tracking (standalone)
             if metadata:
                 await self._log_llm_activity(
-                    decision_id=decision_id,
                     symbol=symbol,
                     decision_data=decision_data,
                     metadata=metadata
@@ -695,7 +694,6 @@ Take Profit: {take_profit_text}
 
     async def _log_llm_activity(
         self,
-        decision_id: str,
         symbol: str,
         decision_data: Dict[str, Any],
         metadata: Dict[str, Any]
@@ -703,8 +701,9 @@ Take Profit: {take_profit_text}
         """
         Log LLM activity with token tracking for metered billing.
 
+        Standalone timeline event - not linked to decisions table.
+
         Args:
-            decision_id: UUID of the decision (for linking)
             symbol: Trading symbol
             decision_data: Parsed decision data (action, confidence, reasoning)
             metadata: LLM response metadata (model, usage, etc.)
@@ -739,7 +738,7 @@ Take Profit: {take_profit_text}
             confidence = decision_data.get('confidence', 0.5)
             summary = f"Analyzed {symbol}: {action.upper()} (confidence: {confidence:.0%})"
 
-            # Log activity with token tracking
+            # Log activity with token tracking (standalone - no decision_id)
             log_llm_activity_safe(
                 config_id=self.config_id,
                 user_id=self.user_id,
@@ -761,14 +760,12 @@ Take Profit: {take_profit_text}
                 platform_cost_usd=platform_cost,
                 thinking_mode=thinking_mode,
                 reasoning_tokens=reasoning_tokens,
-                decision_id=decision_id,
                 related_symbol=symbol,
                 importance=7  # Decision activities are important
             )
 
             logger.bind(
                 config_id=self.config_id,
-                decision_id=decision_id,
                 provider=provider,
                 model=model,
                 input_tokens=input_tokens,
@@ -1419,10 +1416,9 @@ Take Profit: {take_profit_text}
                 action=decision_data.get('action')
             ).info("Signal validation decision saved to database")
 
-            # NEW: Log llm_thought activity with token tracking
+            # NEW: Log llm_thought activity with token tracking (standalone)
             if metadata:
                 await self._log_llm_activity(
-                    decision_id=decision_id,
                     symbol=symbol,
                     decision_data=decision_data,
                     metadata=metadata
@@ -1826,10 +1822,9 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                 trade_id=position_data.get('trade_id')
             ).info("Position management decision saved to database")
 
-            # NEW: Log llm_thought activity with token tracking
+            # NEW: Log llm_thought activity with token tracking (standalone)
             if metadata:
                 await self._log_llm_activity(
-                    decision_id=decision_id,
                     symbol=symbol,
                     decision_data=decision_data,
                     metadata=metadata

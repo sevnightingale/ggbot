@@ -412,7 +412,34 @@ class SupabasePaperTradingService:
                 response = self.supabase.table('paper_orders').insert(order_data).execute()
                 if not response.data:
                     logger.warning(f"Failed to create order record for trade {trade_id}")
-                
+
+                # Log trade entry activity
+                from core.common.activity_logger import log_activity_safe
+
+                log_activity_safe(
+                    config_id=config_id,
+                    user_id=user_id,
+                    activity_type='trade_entry',
+                    activity_source='paper_service',
+                    summary=f"Opened {action} {symbol} at ${entry_price:.2f}",
+                    details={
+                        'symbol': symbol,
+                        'side': action,  # 'long' or 'short'
+                        'entry_price': float(entry_price),
+                        'size_usd': float(position_size_usd),
+                        'leverage': leverage,
+                        'stop_loss': float(stop_loss) if stop_loss else None,
+                        'take_profit': float(take_profit) if take_profit else None,
+                        'liquidation_price': float(liquidation_price),
+                        'confidence': confidence,
+                        'margin_used': float(margin_with_fees)
+                    },
+                    trade_id=trade_id,
+                    trade_type='paper',
+                    related_symbol=symbol,
+                    importance=9
+                )
+
             except Exception as e:
                 logger.error(f"Failed to save trade records: {str(e)}")
                 # Rollback account changes
@@ -539,7 +566,38 @@ class SupabasePaperTradingService:
             response = self.supabase.table('paper_orders').insert(order_data).execute()
             if not response.data:
                 logger.warning(f"Failed to create close order record for trade {trade_id}")
-            
+
+            # Log trade exit activity
+            from core.common.activity_logger import log_activity_safe
+
+            pnl_pct = (net_pnl / size_usd * 100) if size_usd > 0 else 0
+            opened_at = datetime.fromisoformat(trade['opened_at'].replace('Z', '+00:00')) if isinstance(trade['opened_at'], str) else trade['opened_at']
+            duration_seconds = (datetime.now(timezone.utc) - opened_at).total_seconds()
+
+            log_activity_safe(
+                config_id=str(trade['config_id']),
+                user_id=str(trade['user_id']),
+                activity_type='trade_exit',
+                activity_source='paper_service',
+                summary=f"Closed {trade['symbol']}: {'+' if net_pnl > 0 else ''}{net_pnl:.2f} ({pnl_pct:.1f}%)",
+                details={
+                    'symbol': trade['symbol'],
+                    'side': side,
+                    'entry_price': entry_price,
+                    'exit_price': close_price,
+                    'pnl': float(net_pnl),
+                    'pnl_pct': pnl_pct,
+                    'close_reason': reason,
+                    'duration_seconds': duration_seconds,
+                    'total_fees': total_fees,
+                    'leverage': leverage
+                },
+                trade_id=trade_id,
+                trade_type='paper',
+                related_symbol=trade['symbol'],
+                importance=9
+            )
+
             # Update account using domain model
             account = await self.account_repo.get_by_config_id(
                 config_id=str(trade["config_id"]), 

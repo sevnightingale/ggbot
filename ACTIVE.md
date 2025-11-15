@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-14 09:36:36 UTC (Auto-updated by status_check.py)
-**System Health**: 🟢 HEALTHY
+**Last Updated**: 2025-11-15 17:58:10 UTC (Auto-updated by status_check.py)
+**System Health**: 🟡 LOW ACTIVITY
 
 ## 📊 Live Platform Metrics
 
@@ -13,10 +13,10 @@
 
 ### Bot Statistics
 - **Total Bots**: 378
-- **Active Bots**: 3 (0.8%)
-  - Paper Trading: 2
+- **Active Bots**: 2 (0.5%)
+  - Paper Trading: 1
   - Live Trading: 0
-- **Inactive Bots**: 375
+- **Inactive Bots**: 376
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
@@ -26,15 +26,15 @@
   - Platform Win Rate: 30.02%
   - Total P&L: $-15,996.58
 - **Recent Activity**:
-  - Last 24 hours: 4 trades
+  - Last 24 hours: 0 trades
   - Last 7 days: 6 trades
-  - Last 30 days: 3756 trades
+  - Last 30 days: 3655 trades
 
 ### Open Positions
 - **Open Positions**: 1
 - **Unique Symbols**: 1
 - **Total Exposure**: $100.00
-- **Unrealized P&L**: $-0.48
+- **Unrealized P&L**: $-1.23
 
 ### Account Balances (Paper Trading)
 - **Average Balance**: $9,900.19
@@ -45,16 +45,13 @@
 
 - **ADA/USDT**: 1 bots
 - **BTC/USDT**: 1 bots
-- **DASH/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 12 decisions (avg confidence: 21.0%)
-- **enter**: 3 decisions (avg confidence: 55.3%)
 
 ### System Health
-- **Decisions (last hour)**: 3
-- **Status**: 🟢 HEALTHY
+- **Decisions (last hour)**: 0
+- **Status**: 🟡 LOW ACTIVITY
 
 ## 🖥️ System Resources
 
@@ -62,22 +59,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| account-monitor | 🟢 online | 0% | 300MB | 10h 13m | 0 |
-| signal-listener | 🟢 online | 0% | 63MB | 10h 13m | 50 |
-| x-bot | 🟢 online | 0% | 44MB | 10h 13m | 50 |
-| error-alerts | 🟢 online | 0% | 34MB | 10h 13m | 57 |
-| market-data-ws | 🟢 online | 4% | 163MB | 10h 13m | 52 |
-| ggbot | 🟢 online | 1.5% | 257MB | 14m | 151 |
+| signal-listener | 🟢 online | 0.1% | 60MB | 41m | 52 |
+| x-bot | 🟢 online | 0% | 38MB | 41m | 52 |
+| error-alerts | 🟢 online | 0% | 32MB | 41m | 59 |
+| market-data-ws | 🟢 online | 1.8% | 172MB | 41m | 54 |
+| ggbot | 🟢 online | 1.6% | 248MB | 41m | 155 |
+| account-monitor | 🟢 online | 0.5% | 102MB | 41m | 5 |
 
 ### VM Resources
 
-- **Disk**: 36G / 78G (46%)
-- **Memory**: 2.1Gi / 3.8Gi
-- **CPU Load**: 1.38 / 0.77 / 0.54 (1m/5m/15m)
+- **Disk**: 36G / 78G (47%)
+- **Memory**: 2.0Gi / 3.8Gi
+- **CPU Load**: 0.23 / 0.15 / 0.21 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 10.36M)
+- **Redis**: 🟢 connected (Memory: 16.37M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -356,9 +353,54 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-14 09:36:37 UTC
+**Last Updated**: 2025-11-15 17:58:11 UTC
 
 ---
+
+### `account_snapshots` (28 columns)
+
+**Primary Key**: `snapshot_id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+
+**Indexes**:
+- `idx_snapshots_config_time` on (config_id, timestamp)
+- `idx_snapshots_heartbeat` on (config_id, timestamp, is_heartbeat)
+- `idx_snapshots_latest` on (config_id, timestamp)
+- `idx_snapshots_mode_time` on (trading_mode, timestamp)
+- `idx_snapshots_user_time` on (user_id, timestamp)
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `snapshot_id` | uuid |  | gen_random_uuid() |
+| `config_id` | uuid |  |  |
+| `user_id` | uuid |  |  |
+| `trading_mode` | character varying(20) |  |  |
+| `timestamp` | timestamp with time zone |  | now() |
+| `current_balance` | numeric | ✓ |  |
+| `available_balance` | numeric | ✓ |  |
+| `margin_used` | numeric | ✓ |  |
+| `total_pnl` | numeric |  |  |
+| `realized_pnl` | numeric | ✓ |  |
+| `unrealized_pnl` | numeric | ✓ |  |
+| `total_trades` | integer |  | 0 |
+| `win_trades` | integer |  | 0 |
+| `loss_trades` | integer |  | 0 |
+| `win_rate` | numeric | ✓ |  |
+| `open_positions` | integer |  | 0 |
+| `position_value` | numeric | ✓ |  |
+| `total_exposure` | numeric | ✓ |  |
+| `avg_win` | numeric | ✓ |  |
+| `avg_loss` | numeric | ✓ |  |
+| `largest_win` | numeric | ✓ |  |
+| `largest_loss` | numeric | ✓ |  |
+| `sharpe_ratio` | numeric | ✓ |  |
+| `max_drawdown` | numeric | ✓ |  |
+| `raw_data` | jsonb | ✓ |  |
+| `balance_change_pct` | numeric | ✓ |  |
+| `is_heartbeat` | boolean | ✓ | false |
+| `created_at` | timestamp with time zone |  | now() |
 
 ### `activities` (23 columns)
 
@@ -1152,7 +1194,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-14 09:36:37 UTC
+**Last Updated**: 2025-11-15 17:58:11 UTC
 
 ---
 

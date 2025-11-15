@@ -26,6 +26,7 @@ from datetime import datetime
 
 from core.common.logger import logger
 from core.common.db import get_db_connection
+from core.common.activity_logger import log_activity_safe
 from core.auth.vault_utils import VaultManager
 from core.symbols import UniversalSymbolStandardizer
 from core.config.models import PositionSizingMethod
@@ -240,6 +241,38 @@ class SymphonyLiveTradingService:
                 decision_id=decision_id
             )
 
+            # Step 10: Log trade_entry activity for timeline
+            try:
+                from trading.paper.live_price_service import LivePriceService
+                price_service = LivePriceService()
+                market_price = await price_service.get_current_price(symbol)
+                entry_price = market_price.mid
+            except Exception as e:
+                self._log.warning(f"Failed to get entry price for activity log: {e}")
+                entry_price = None
+
+            log_activity_safe(
+                config_id=config_id,
+                user_id=user_id,
+                activity_type='trade_entry',
+                activity_source='symphony_service',
+                summary=f"Opened {action} {symbol} ({weight:.1f}% @ {leverage}x)",
+                details={
+                    'symbol': symbol,
+                    'side': action.lower(),
+                    'entry_price': float(entry_price) if entry_price else None,
+                    'weight_percent': float(weight),
+                    'leverage': float(leverage),
+                    'stop_loss': float(stop_loss) if stop_loss else None,
+                    'take_profit': float(take_profit) if take_profit else None,
+                    'confidence': confidence
+                },
+                trade_id=batch_id,
+                trade_type='symphony',
+                related_symbol=symbol,
+                importance=9
+            )
+
             self._log.info(f"Symphony trade executed successfully: batch_id={batch_id}")
             return {
                 "status": "success",
@@ -306,7 +339,18 @@ class SymphonyLiveTradingService:
 
             api_key = credentials['api_key']
 
-            # Step 4: Call Symphony API to close position
+            # Step 4: Get position details before closing (for activity logging)
+            position_details = None
+            try:
+                batch_data = await self._get_batch_positions(api_key, batch_id)
+                positions = batch_data.get('positions', [])
+                if positions:
+                    # Get the first position in the batch
+                    position_details = positions[0]
+            except Exception as e:
+                self._log.warning(f"Failed to get position details before close: {e}")
+
+            # Step 5: Call Symphony API to close position
             success = await self._close_symphony_position(
                 api_key=api_key,
                 agent_id=symphony_agent_id,
@@ -319,7 +363,7 @@ class SymphonyLiveTradingService:
                     "reason": "Symphony API close call failed"
                 }
 
-            # Step 5: Update live_trades table
+            # Step 6: Update live_trades table
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
@@ -328,6 +372,67 @@ class SymphonyLiveTradingService:
                         WHERE batch_id = %s
                     """, (batch_id,))
                     conn.commit()
+
+            # Step 7: Log trade_exit activity for timeline
+            if position_details:
+                symbol = self.standardizer.from_symphony(position_details.get('asset', ''))
+                entry_price = position_details.get('entryPrice', 0)
+                exit_price = position_details.get('currentPrice', 0)
+                pnl = position_details.get('pnlUSD', 0)
+                size_usd = position_details.get('positionSize', 0)
+                leverage = position_details.get('leverage', 1)
+                side = 'long' if position_details.get('isLong') else 'short'
+
+                # Calculate P&L percentage and duration
+                pnl_pct = (pnl / size_usd * 100) if size_usd > 0 else 0
+
+                # Parse timestamps if available
+                duration_seconds = None
+                if position_details.get('createdTimestamp') and position_details.get('lastUpdatedTimestamp'):
+                    try:
+                        from datetime import datetime
+                        created = datetime.fromisoformat(position_details['createdTimestamp'].replace('Z', '+00:00'))
+                        closed = datetime.fromisoformat(position_details['lastUpdatedTimestamp'].replace('Z', '+00:00'))
+                        duration_seconds = (closed - created).total_seconds()
+                    except Exception as e:
+                        self._log.warning(f"Failed to calculate duration: {e}")
+
+                log_activity_safe(
+                    config_id=str(config_id),
+                    user_id=str(user_id),
+                    activity_type='trade_exit',
+                    activity_source='symphony_service',
+                    summary=f"Closed {symbol}: {'+' if pnl > 0 else ''}{pnl:.2f} ({pnl_pct:.1f}%)",
+                    details={
+                        'symbol': symbol,
+                        'side': side,
+                        'entry_price': float(entry_price),
+                        'exit_price': float(exit_price),
+                        'pnl': float(pnl),
+                        'pnl_pct': pnl_pct,
+                        'close_reason': reason,
+                        'duration_seconds': duration_seconds,
+                        'size_usd': float(size_usd),
+                        'leverage': float(leverage)
+                    },
+                    trade_id=batch_id,
+                    trade_type='symphony',
+                    related_symbol=symbol,
+                    importance=9
+                )
+            else:
+                # Log minimal exit activity if we couldn't get position details
+                log_activity_safe(
+                    config_id=str(config_id),
+                    user_id=str(user_id),
+                    activity_type='trade_exit',
+                    activity_source='symphony_service',
+                    summary=f"Closed position (batch {batch_id[:8]}...)",
+                    details={'close_reason': reason},
+                    trade_id=batch_id,
+                    trade_type='symphony',
+                    importance=9
+                )
 
             self._log.info(f"Symphony position closed successfully: batch_id={batch_id}")
             return {

@@ -12,6 +12,50 @@ from typing import Optional, Dict, Any
 from datetime import datetime
 
 
+def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
+    """
+    Get most recent account snapshot for a config (within last 10 minutes).
+
+    Used for populating account_balance and account_pnl fields in activities
+    to enable efficient timeline chart rendering without API calls.
+
+    Args:
+        config_id: Bot configuration ID
+
+    Returns:
+        Dict with 'current_balance' and 'total_pnl' keys, or None if no recent snapshot
+
+    Example:
+        >>> snapshot = get_latest_snapshot("uuid")
+        >>> if snapshot:
+        ...     print(f"Balance: {snapshot['current_balance']}, P&L: {snapshot['total_pnl']}")
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT current_balance, total_pnl
+                    FROM account_snapshots
+                    WHERE config_id = %s
+                      AND timestamp > NOW() - INTERVAL '10 minutes'
+                    ORDER BY timestamp DESC
+                    LIMIT 1
+                """, (config_id,))
+                result = cur.fetchone()
+
+                if result:
+                    return {
+                        'current_balance': float(result[0]) if result[0] is not None else None,
+                        'total_pnl': float(result[1]) if result[1] is not None else None
+                    }
+                return None
+    except Exception as e:
+        # Non-critical - snapshot is optional for activity logging
+        from core.common.logger import logger
+        logger.bind(config_id=config_id).debug(f"Could not fetch latest snapshot: {str(e)}")
+        return None
+
+
 # Activity type definitions (no priority - that was a mistake)
 ACTIVITY_TYPES = {
     # Market Intelligence (no tokens)
@@ -92,19 +136,25 @@ def log_activity(
     if not (1 <= importance <= 10):
         importance = 5
 
+    # Fetch latest snapshot for timeline chart
+    snapshot = get_latest_snapshot(config_id)
+    account_balance = snapshot['current_balance'] if snapshot else None
+    account_pnl = snapshot['total_pnl'] if snapshot else None
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     INSERT INTO activities
                     (config_id, user_id, activity_type, activity_source, summary, details,
-                     trade_id, trade_type, decision_id, related_symbol, importance)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     trade_id, trade_type, decision_id, related_symbol, importance,
+                     account_balance, account_pnl)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING activity_id
                 """, (
                     config_id, user_id, activity_type, activity_source, summary,
                     json.dumps(details), trade_id, trade_type, decision_id,
-                    related_symbol, importance
+                    related_symbol, importance, account_balance, account_pnl
                 ))
                 activity_id = cur.fetchone()[0]
                 conn.commit()
@@ -191,6 +241,11 @@ def log_llm_activity(
     if not (1 <= importance <= 10):
         importance = 5
 
+    # Fetch latest snapshot for timeline chart
+    snapshot = get_latest_snapshot(config_id)
+    account_balance = snapshot['current_balance'] if snapshot else None
+    account_pnl = snapshot['total_pnl'] if snapshot else None
+
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -199,14 +254,16 @@ def log_llm_activity(
                     (config_id, user_id, activity_type, activity_source, summary, details,
                      decision_id, related_symbol, importance,
                      provider, model, thinking_mode, input_tokens, output_tokens,
-                     reasoning_tokens, provider_cost_usd, platform_cost_usd, stripe_reported)
-                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     reasoning_tokens, provider_cost_usd, platform_cost_usd, stripe_reported,
+                     account_balance, account_pnl)
+                    VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING activity_id
                 """, (
                     config_id, user_id, 'llm_thought', activity_source, summary,
                     json.dumps(details), decision_id, related_symbol, importance,
                     provider, model, thinking_mode, input_tokens, output_tokens,
-                    reasoning_tokens, provider_cost_usd, platform_cost_usd, False
+                    reasoning_tokens, provider_cost_usd, platform_cost_usd, False,
+                    account_balance, account_pnl
                 ))
                 activity_id = cur.fetchone()[0]
                 conn.commit()
