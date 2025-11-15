@@ -62,6 +62,7 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
+| account-monitor | 🟢 online | 0% | 300MB | 10h 13m | 0 |
 | signal-listener | 🟢 online | 0% | 63MB | 10h 13m | 50 |
 | x-bot | 🟢 online | 0% | 44MB | 10h 13m | 50 |
 | error-alerts | 🟢 online | 0% | 34MB | 10h 13m | 57 |
@@ -199,6 +200,13 @@
 - **Telegram Publishing**: Signal broadcasting to user channels (APPROVED/REJECTED status)
 - **REST API**: 30+ endpoints for bot control, positions, analytics
 
+### **account-monitor Service**
+- **Universal Account Monitoring**: Unified monitoring for paper, Symphony, and Aster trading accounts
+- **5-Second Check Intervals**: Continuous monitoring with on-change detection
+- **Historical Snapshots**: 5-minute heartbeat storage in account_snapshots table
+- **Adapter Pattern**: Clean architecture for multiple trading mode data sources
+- **Documentation**: Complete implementation guide in DOCS/UNIFIED_ACCOUNT_MONITORING.md
+
 ### **market-data-ws Service**
 - **Real-time Binance WebSocket**: Live prices for 100 symbols × 7 timeframes (700 datasets)
 - **Redis Cache**: Sub-millisecond price access (~1s freshness)
@@ -266,6 +274,7 @@
 
 ## 🔄 Background Tasks
 
+- **Universal Account Monitoring**: ✅ ACTIVE (5-second checks, 5-minute snapshots for all trading modes)
 - **Position Monitoring**: ✅ ACTIVE (3-second cycles monitoring 120+ configs with open positions)
 - **Autonomous Trading**: ✅ ACTIVE (scheduled bot execution across multiple timeframes with APScheduler)
 - **Signal Processing**: ✅ ACTIVE (ggShot signal validation and telegram publishing)

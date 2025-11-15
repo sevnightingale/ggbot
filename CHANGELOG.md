@@ -4,6 +4,20 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-14 - Universal Account Monitoring System
+
+**New Service**: Unified monitoring service tracking account state (balance, P&L, positions) across all trading modes (paper, Symphony, AsterDEX) with consistent storage and historical snapshots.
+
+- **PM2 Service**: `account-monitor` running 5-second checks with 5-minute heartbeat snapshots
+- **Adapter Pattern**: Clean architecture for paper (database), Symphony (API), and Aster (API) data sources
+- **Unified Storage**: `account_snapshots` table with balance, P&L, trade stats, and position metrics
+- **On-Change Detection**: Snapshots stored on position changes or balance >0.1% movement
+- **Documentation**: Complete implementation guide in `DOCS/UNIFIED_ACCOUNT_MONITORING.md`
+
+**Status**: Production operational. Paper and Aster provide full data (balance + P&L). Symphony provides P&L only (balance pending API fix).
+
+---
+
 ## 2025-11-14 - Agent Strategy Auto-Save Fix
 
 **Bug Fix**: Agent strategy auto-save was overwriting bot names with "Untitled Bot". Fixed by always passing `config_name` and `config_type` parameters during auto-save to preserve existing values.

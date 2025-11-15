@@ -4,6 +4,34 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
+## 🎯 **IN PROGRESS - Snapshot-Based Timeline Chart** (2025-11-14)
+
+**Objective**: Improve tv-timeline performance by using account snapshots instead of direct API calls, with proper time-based X-axis.
+
+**Planning Doc**: `DOCS/todo/snapshot_timeline_integration.md`
+
+### **Parallel Workstreams**
+
+**Workstream 1: Activities Table Enhancement** (CC Instance 1)
+- [ ] Add `account_balance` and `account_pnl` columns to activities table
+- [ ] Create database migration with indexes
+- [ ] Update all activity logging locations to fetch latest snapshot
+- [ ] Test activity logging with snapshot values
+
+**Workstream 2: Chart Integration** (CC Instance 2)
+- [ ] Create new `/api/v2/snapshots/{config_id}/balance-series` endpoint
+- [ ] Update tv-timeline.tsx to use snapshot + activity data
+- [ ] Test chart rendering with proper time axis
+- [ ] Validate clickable activities work correctly
+
+### **Integration Testing**
+- [ ] Verify chart shows proper time spacing (5-min intervals)
+- [ ] Confirm activities appear at exact timestamps
+- [ ] Validate step-function behavior (flat → jump → flat)
+- [ ] Test with all trading modes (paper, symphony, aster)
+
+---
+
 ## 🎯 **NEXT SESSION PRIORITIES** (2025-11-13)
 
 ✅ **Metered billing system PRODUCTION READY** - See `DOCS/completed/METERED_BILLING_IMPLEMENTATION.md` for full details.

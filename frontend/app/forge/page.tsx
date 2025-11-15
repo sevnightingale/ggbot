@@ -101,8 +101,17 @@ function ForgeApp() {
       console.log('🔧 Bot data being loaded into editing state:', JSON.stringify(selectedBot, null, 2))
 
       // Enter editing mode - load selected bot config into editing state
+      // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
+      const configDataWithTradingMode = selectedBot.config_data
+        ? {
+            ...JSON.parse(JSON.stringify(selectedBot.config_data)),
+            trading_mode: selectedBot.trading_mode,
+            symphony_agent_id: selectedBot.symphony_agent_id
+          }
+        : null
+
       setIsEditingConfig(true)
-      setEditingConfigData(selectedBot.config_data ? JSON.parse(JSON.stringify(selectedBot.config_data)) : null)
+      setEditingConfigData(configDataWithTradingMode)
       setEditingTableFields({
         config_name: selectedBot.config_name,
         config_type: selectedBot.config_type
@@ -542,7 +551,14 @@ function ForgeApp() {
         console.log('🔄 Bot changed while editing - switching editing state to new bot')
 
         // Load the new bot's config into editing state
-        setEditingConfigData(JSON.parse(JSON.stringify(selectedBot.config_data)))
+        // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
+        const configDataWithTradingMode = {
+          ...JSON.parse(JSON.stringify(selectedBot.config_data)),
+          trading_mode: selectedBot.trading_mode,
+          symphony_agent_id: selectedBot.symphony_agent_id
+        }
+
+        setEditingConfigData(configDataWithTradingMode)
         setEditingTableFields({
           config_name: selectedBot.config_name,
           config_type: selectedBot.config_type

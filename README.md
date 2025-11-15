@@ -135,6 +135,7 @@ The ggbot repository is organized into the following top-level directories:
 - **Validation and suggestions** for format errors and unsupported symbols
 
 **📊 Monitoring & Observability**
+- **Universal Account Monitor** - Unified monitoring service tracking paper, Symphony, and Aster accounts at 5-second intervals with historical snapshots
 - **Position tracking** via database queries with real-time P&L
 - **Performance analytics** with comprehensive trade lifecycle tracking
 - **Health checks** via API endpoints and WebSocket status broadcasts

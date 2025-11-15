@@ -412,17 +412,22 @@ class ConfigService:
         user_id: str,
         config_data: Dict[str, Any],
         config_name: Optional[str] = None,
-        config_type: Optional[str] = None
+        config_type: Optional[str] = None,
+        trading_mode: Optional[str] = None,
+        symphony_agent_id: Optional[str] = None
     ) -> Optional[BotConfigV2]:
         """
         Update bot configuration with user access validation.
-        
+
         Args:
             config_id: Configuration ID
             user_id: User ID for access validation
             config_data: Updated configuration data
             config_name: Optional updated name
-            
+            config_type: Optional updated config type
+            trading_mode: Optional updated trading mode ('paper', 'symphony', 'aster')
+            symphony_agent_id: Optional updated Symphony agent ID
+
         Returns:
             Updated BotConfigV2 instance if successful, None otherwise
         """
@@ -456,8 +461,8 @@ class ConfigService:
                 llm_config=config_data.get("llm_config", existing_config.llm_config),
                 telegram_integration=config_data.get("telegram_integration", existing_config.telegram_integration),
                 agent_strategy=merged_agent_strategy,  # Use deep-merged agent strategy
-                trading_mode=existing_config.trading_mode,  # Preserve trading mode (paper vs live)
-                symphony_agent_id=existing_config.symphony_agent_id,  # Preserve Symphony agent ID
+                trading_mode=trading_mode if trading_mode is not None else existing_config.trading_mode,
+                symphony_agent_id=symphony_agent_id if symphony_agent_id is not None else existing_config.symphony_agent_id,
                 created_at=existing_config.created_at,
                 updated_at=datetime.now()
             )
@@ -473,12 +478,15 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         UPDATE configurations
-                        SET config_name = %s, config_data = %s, config_type = %s, updated_at = NOW()
+                        SET config_name = %s, config_data = %s, config_type = %s,
+                            trading_mode = %s, symphony_agent_id = %s, updated_at = NOW()
                         WHERE config_id = %s AND user_id = %s
                     """, (
                         updated_config.config_name,
                         json.dumps(updated_config.to_jsonb()),
                         updated_config.config_type,
+                        updated_config.trading_mode,
+                        updated_config.symphony_agent_id,
                         config_id,
                         user_id
                     ))

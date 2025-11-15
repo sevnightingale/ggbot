@@ -124,6 +124,8 @@ class ConfigUpdateRequest(BaseModel):
     config_name: Optional[str] = None
     schema_version: Optional[str] = None
     config_type: Optional[str] = None
+    trading_mode: Optional[str] = None  # Allow updating trading mode
+    symphony_agent_id: Optional[str] = None  # Allow updating Symphony agent ID
     selected_pair: Optional[str] = None
     extraction: Optional[Dict[str, Any]] = None
     decision: Optional[Dict[str, Any]] = None
@@ -1735,6 +1737,8 @@ async def update_config(
     update_data = {k: v for k, v in request.dict().items() if v is not None}
     config_name = update_data.pop("config_name", None)
     config_type = update_data.pop("config_type", None)
+    trading_mode = update_data.pop("trading_mode", None)
+    symphony_agent_id = update_data.pop("symphony_agent_id", None)
 
     # Validate symbol has real-time price data if changing selected_pair
     selected_pair = update_data.get("selected_pair")
@@ -1765,7 +1769,9 @@ async def update_config(
         user_id=current_user.user_id,
         config_data=update_data,
         config_name=config_name,
-        config_type=config_type
+        config_type=config_type,
+        trading_mode=trading_mode,
+        symphony_agent_id=symphony_agent_id
     )
     
     if not config:
