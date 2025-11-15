@@ -876,3 +876,15 @@ Complete platform rebrand to match trade37's ceremonial brutalism aesthetic. Rep
 ---
 
 **Documentation**: See README.md (architecture), ACTIVE.md (production status), TODO.md (roadmap)
+
+## 2025-11-15 - Symphony Trading Mode Migration Complete
+
+**Fix**: Complete migration from `trading_mode='live'` to `'symphony'`
+- **Backend**: Updated 3 execution paths (SSE, decision engine, dashboard) to use 'symphony'
+- **Backend**: Fixed config update to accept and save trading_mode/symphony_agent_id changes
+- **Frontend**: Fixed BotRail badge to check for 'symphony' instead of 'live'
+- **Frontend**: Fixed editing state to merge trading_mode/symphony_agent_id into config_data
+- **Result**: Symphony bots now fully functional - positions, accounts, execution all working
+- Files: core/sse/dashboard_data.py:109,311, decision/engine_v2.py:1509, core/services/config_service.py:464,481, ggbot.py:127,1740,1773, frontend/app/forge/page.tsx:105,555, frontend/app/forge/components/layout/BotRail.tsx:128,165
+
+**System**: Three trading modes now properly implemented: paper, symphony, aster
