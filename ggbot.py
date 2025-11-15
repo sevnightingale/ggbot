@@ -295,9 +295,11 @@ app = FastAPI(
 from api.paper_trading import router as paper_trading_router
 from api.agent import router as agent_router
 from api.activities import router as activities_router
+from api.snapshots import router as snapshots_router
 app.include_router(paper_trading_router)
 app.include_router(agent_router)
 app.include_router(activities_router)
+app.include_router(snapshots_router)
 
 
 class GGBotOrchestrator:

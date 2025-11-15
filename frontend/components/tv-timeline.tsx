@@ -283,7 +283,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
         console.log('Fetching from API...');
         const [balanceSeriesRes, activitiesRes, metadataRes] = await Promise.all([
-          fetch(`/api/v2/activities/${configId}/balance-series?mode=pnl`, { headers }),
+          fetch(`/api/v2/snapshots/${configId}/balance-series`, { headers }),  // Using snapshot-based endpoint
           fetch(`/api/v2/activities/${configId}`, { headers }),
           fetch(`/api/v2/activities/${configId}/metadata`, { headers }),
         ]);
@@ -326,61 +326,20 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           performance: metadataData.metadata?.performance || metadataData.performance || 0,
         });
 
-        // Step 1: Create timeline events from both balance points and activities
-        interface TimelineEvent {
-          timestamp: number; // unix seconds
-          type: 'balance' | 'activity';
-          value?: number; // P&L value (only for balance events)
-        }
-
-        const timelineEvents: TimelineEvent[] = [];
-
-        // Add balance points
-        balancePoints.forEach((point) => {
-          timelineEvents.push({
-            timestamp: Math.floor(new Date(point.timestamp).getTime() / 1000),
-            type: 'balance',
-            value: point.balance,
+        // Simplified: Backend already merges snapshots + activities
+        // Just convert timestamps and use balance values directly
+        const chartData: LineData[] = balancePoints
+          .map(point => ({
+            time: Math.floor(new Date(point.timestamp).getTime() / 1000) as Time,
+            value: point.balance
+          }))
+          .sort((a, b) => {
+            const timeA = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
+            const timeB = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
+            return timeA - timeB;
           });
-        });
 
-        // Add activities
-        activities.forEach((activity) => {
-          timelineEvents.push({
-            timestamp: Math.floor(new Date(activity.timestamp).getTime() / 1000),
-            type: 'activity',
-          });
-        });
-
-        // Step 2: Sort all events chronologically
-        timelineEvents.sort((a, b) => a.timestamp - b.timestamp);
-
-        console.log('Timeline events (balance + activities):', timelineEvents.length);
-
-        // Step 3: Walk through events, update P&L when we hit balance points
-        let currentPnl = 0.0;
-        const mergedData: LineData[] = [];
-        const seenTimestamps = new Set<number>();
-
-        timelineEvents.forEach((event) => {
-          // Update P&L if this is a balance event
-          if (event.type === 'balance' && event.value !== undefined) {
-            currentPnl = event.value;
-            console.log(`P&L update at ${new Date(event.timestamp * 1000).toISOString()}: $${currentPnl}`);
-          }
-
-          // Add point to chart (dedupe by timestamp)
-          if (!seenTimestamps.has(event.timestamp)) {
-            mergedData.push({
-              time: event.timestamp as Time,
-              value: currentPnl,
-            });
-            seenTimestamps.add(event.timestamp);
-          }
-        });
-
-        // Data is already sorted and deduped
-        const chartData = mergedData;
+        console.log('Chart data points (snapshots + activities):', chartData.length);
 
         console.log('Final chart data:', chartData.length, 'points');
         console.log('First 3 points:', chartData.slice(0, 3));
