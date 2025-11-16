@@ -6,6 +6,24 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-16 - OpenRouter Migration + Symphony Fix
+
+**OpenRouter Migration Complete** - Full migration from 'default' provider to OpenRouter unified API
+- Frontend: Removed 'Default Model' button, all 7 models via OpenRouter (grok, claude, gemini, deepseek, gpt, kimi, qwen)
+- Backend: Removed 'default' → XAI mapping in engine_v2.py, factory.py uses OpenRouter + Grok as default
+- Database: Migrated 344 existing configs (provider='default' → 'openrouter', model='grok', thinking_mode=false)
+- Thinking mode toggle always available for premium users (no longer gated by model != 'default')
+- All new bot creation defaults to OpenRouter + Grok with thinking_mode flag
+
+**Symphony SL/TP Fix** - Fixed AttributeError in default SL/TP calculation
+- Issue: symphony_service.py accessed `config.trading.risk_management` as object property, but config.trading is dict
+- Fix: Changed to dict access pattern `config.trading.get("risk_management", {})`
+- Impact: Symphony bots can now apply default SL/TP without errors
+
+Files: StrategyEditor.tsx, page.tsx, engine_v2.py, factory.py, symphony_service.py
+
+---
+
 ## 2025-11-16 - Critical Production Fixes
 
 **Issue 1: Insufficient Candle Data** - WebSocket cache 3 candles, bots need 100 → RSI failed → no trading

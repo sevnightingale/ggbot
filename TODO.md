@@ -263,11 +263,13 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
   - [x] Add model logos in colored circles (7 brand colors)
   - [x] Update default config data to schema v2.2
 
-- [x] **Migration**
-  - [x] Keep old providers as fallback (not deleted)
-  - [ ] Update bot configs to use `provider: 'openrouter'` (deferred - can be done gradually)
-  - [ ] Test with real bot execution (decision engine) - deferred to Phase 1 testing
-  - [ ] Update `agent/run_agent.py` if needed (deferred - agents use Claude SDK directly)
+- [x] **Migration** (2025-11-16 - COMPLETE)
+  - [x] Keep old providers as fallback (not deleted - still available for direct API access)
+  - [x] Remove 'default' provider entirely (replaced with openrouter + grok)
+  - [x] Update all 344 bot configs to use `provider: 'openrouter', model: 'grok'`
+  - [x] Remove 'default' mapping in engine_v2.py and factory.py
+  - [x] Update frontend to remove 'Default Model' button
+  - [x] Test with real bot execution (decision engine works with OpenRouter)
 
 - [x] **Testing**
   - [x] Create test scripts (`test_14_models.py`, `test_model_parameters.py`)

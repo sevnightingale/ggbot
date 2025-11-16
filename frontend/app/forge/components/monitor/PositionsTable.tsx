@@ -38,7 +38,10 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
   const [closingPositions, setClosingPositions] = useState<Record<string, boolean>>({})
 
   // Helper functions
-  const formatPrice = (price: number) => {
+  const formatPrice = (price: number | null | undefined) => {
+    // Handle null/undefined for Symphony positions during settlement
+    if (price == null || isNaN(price)) return '$—'
+
     // Smart crypto price formatting based on price range
     if (price >= 10000) {
       return `$${price.toLocaleString(undefined, { maximumFractionDigits: 2 })}`
@@ -57,12 +60,18 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     }
   }
 
-  const formatPnL = (pnl: number) => {
+  const formatPnL = (pnl: number | null | undefined) => {
+    // Handle null/undefined for Symphony positions during settlement
+    if (pnl == null || isNaN(pnl)) return '$—'
+
     const sign = pnl >= 0 ? '+' : ''
     return `${sign}$${pnl.toFixed(2)}`
   }
 
-  const formatPercentage = (entry: number, current: number) => {
+  const formatPercentage = (entry: number | null | undefined, current: number | null | undefined) => {
+    // Handle null/undefined for Symphony positions during settlement
+    if (entry == null || current == null || isNaN(entry) || isNaN(current) || entry === 0) return '—%'
+
     const change = ((current - entry) / entry) * 100
     const sign = change >= 0 ? '+' : ''
     return `${sign}${change.toFixed(2)}%`
