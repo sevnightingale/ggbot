@@ -17,8 +17,8 @@ export function ConfigTabs({
   className = ''
 }: ConfigTabsProps) {
   const tabs: Array<{ id: ConfigTabType; label: string; Icon: LucideIcon }> = [
-    { id: 'market-data' as ConfigTabType, label: 'Market Data', Icon: BarChart3 },
     { id: 'strategy' as ConfigTabType, label: 'Strategy', Icon: Brain },
+    { id: 'market-data' as ConfigTabType, label: 'Market Data', Icon: BarChart3 },
     { id: 'trade-settings' as ConfigTabType, label: 'Trade Settings', Icon: Settings },
     { id: 'signals' as ConfigTabType, label: 'Signals', Icon: Radio },
   ]

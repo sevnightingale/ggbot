@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { Crown } from 'lucide-react'
+import { Crown, MessageSquare } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
 import { ConfigData, apiClient } from '@/lib/api'
 import { UpgradeModal } from '@/components/UpgradeModal'
@@ -46,6 +46,7 @@ interface StrategyEditorProps {
   configData?: ConfigData
   configType?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
+  onOpenAIAssistant?: () => void
   className?: string
 }
 
@@ -53,6 +54,7 @@ export function StrategyEditor({
   configData,
   configType,
   onUpdate,
+  onOpenAIAssistant,
   className = ''
 }: StrategyEditorProps) {
   const { canAccess } = usePermissions()
@@ -236,6 +238,29 @@ export function StrategyEditor({
 
       {/* Trading Strategy - Main Section */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+        {/* AI Assistant Banner */}
+        {onOpenAIAssistant && (
+          <div className="mb-6 p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--accent)]/30">
+            <div className="flex items-center justify-between gap-4">
+              <div className="flex-1">
+                <p className="text-sm text-[var(--text-primary)] font-medium mb-1">
+                  Need help building your strategy?
+                </p>
+                <p className="text-xs text-[var(--text-muted)]">
+                  Launch AI Assistant to get guidance on creating effective trading strategies
+                </p>
+              </div>
+              <button
+                onClick={onOpenAIAssistant}
+                className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] rounded-lg transition-colors font-medium"
+              >
+                <MessageSquare className="w-4 h-4" />
+                <span>Launch Assistant</span>
+              </button>
+            </div>
+          </div>
+        )}
+
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Your Trading Strategy
         </h3>

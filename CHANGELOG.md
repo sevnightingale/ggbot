@@ -25,6 +25,21 @@ Complete history of features, fixes, and improvements. For current status see AC
 - Config auto-reload after AI updates via apiClient.getConfig() → setAllBots merge
 - Build: 15 pages generated, 330 kB /forge bundle, zero TS/ESLint errors
 
+**AI Assistant UX Redesign** - Ceremonial brutalist styling, proper layout, contextual placement
+- Bottom sheet: 80vh → 50vh height, fixed flex layout ensures input always visible
+- Colors: Full VIBE.md compliance (--bg-secondary, --accent, --border, --text-primary)
+- User messages: brass accent bg, assistant messages: --bg-tertiary w/ border
+- Button relocated: Header → Strategy section banner (contextual, not global)
+- Banner: "Need help building your strategy? Launch AI Assistant" w/ brass CTA button
+- Files: UniversalAIAssistant.tsx, StrategyEditor.tsx, ConfigureLayout.tsx, forge/page.tsx
+
+**Configure Tab Reorganization** - Strategy-first layout, logical component order
+- Tab order: Strategy (1st), Market Data (2nd), Trade Settings (3rd), Signals (4th)
+- Strategy section order: Analysis Frequency → Strategy Prompt → Full Prompt → LLM Selection
+- AI Assistant banner at top of Strategy Prompt section (most contextually relevant)
+- Configure page defaults to Strategy tab for scheduled/signal_validation bots
+- Files: ConfigTabs.tsx, StrategyEditor.tsx
+
 **ActivationBar UX Overhaul** - Replaced pipeline ticker + backend messages w/ activity-based status + KPIs
 - SSE now reads account_snapshots (UniversalAccountMonitor) instead of paper_accounts, removed live API enrichment
 - ActivationBar Option A layout: Row 1 (bot name + activity status + controls), Row 2 (5 KPI cards)

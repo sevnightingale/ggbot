@@ -22,6 +22,7 @@ interface ConfigureLayoutProps {
   onCancelConfig?: () => void
   onResetConfig?: () => void
   onUpdateConfig?: (updates: Partial<ConfigData>) => void
+  onOpenAIAssistant?: () => void
   className?: string
 }
 
@@ -35,6 +36,7 @@ export function ConfigureLayout({
   onCancelConfig,
   onResetConfig,
   onUpdateConfig,
+  onOpenAIAssistant,
   className = ''
 }: ConfigureLayoutProps) {
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabType>('strategy')
@@ -104,6 +106,7 @@ export function ConfigureLayout({
             configData={configData}
             configType={editingTableFields?.config_type || selectedBot?.config_type}
             onUpdate={onUpdateConfig}
+            onOpenAIAssistant={onOpenAIAssistant}
           />
         )}
 

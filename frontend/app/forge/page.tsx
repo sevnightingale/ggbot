@@ -17,7 +17,7 @@ import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { AgentConfigurator } from './components/configure/AgentConfigurator'
 import { BotCreationModal } from './components/modals/BotCreationModal'
 import { UniversalAIAssistant } from '@/components/UniversalAIAssistant'
-import { Wrench, Sparkles } from 'lucide-react'
+import { Wrench } from 'lucide-react'
 
 interface Position {
   trade_id: string
@@ -1453,15 +1453,6 @@ function ForgeApp() {
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
               />
-              {activeTab === 'configure' && selectedBot && (
-                <button
-                  onClick={() => setAiAssistantOpen(true)}
-                  className="px-4 py-2 bg-brass hover:bg-brass/90 text-obsidian rounded-lg flex items-center gap-2 transition-colors"
-                >
-                  <Sparkles className="w-4 h-4" />
-                  AI Assistant
-                </button>
-              )}
             </div>
 
             <div className="flex-1 mt-4 pb-32">
@@ -1512,6 +1503,7 @@ function ForgeApp() {
                     onUpdateConfig={(updates) => {
                       updateEditingConfig({ configData: updates })
                     }}
+                    onOpenAIAssistant={() => setAiAssistantOpen(true)}
                   />
                 )
               ) : (

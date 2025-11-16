@@ -349,10 +349,12 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         // Simplified: Backend already merges snapshots + activities
         // Just convert timestamps and use balance values directly
         const chartData: LineData[] = balancePoints
+          .filter(point => point.timestamp && point.balance != null)  // Filter null/invalid points
           .map(point => ({
             time: Math.floor(new Date(point.timestamp).getTime() / 1000) as Time,
             value: point.balance
           }))
+          .filter(point => !isNaN(point.time as number) && point.value != null)  // Extra safety check
           .sort((a, b) => {
             const timeA = typeof a.time === 'number' ? a.time : parseFloat(a.time as string);
             const timeB = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
@@ -409,7 +411,14 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           // Create one marker per timestamp based on priority
           const markers: SeriesMarker<Time>[] = [];
 
+          // Create a Set of valid timestamps from chartData for marker validation
+          const validTimestamps = new Set(chartData.map(point => point.time as number));
+
           groupedByTimestamp.forEach((activitiesAtTime, timestamp) => {
+            // Skip markers for timestamps not in the chart data (prevents TradingView errors)
+            if (!validTimestamps.has(timestamp)) {
+              return;
+            }
             // Determine marker type based on priority (NEW: unified activity types)
             const hasTradeLong = activitiesAtTime.some(a =>
               a.type === 'trade_entry' && a.data?.details?.side === 'long'
