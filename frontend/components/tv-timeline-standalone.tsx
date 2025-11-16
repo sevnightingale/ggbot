@@ -634,7 +634,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
                 { k: 'P/L', v: `${info.currentBalance - info.startingBalance >= 0 ? '+' : ''}${Math.round(info.currentBalance - info.startingBalance).toLocaleString()}` },
                 { k: 'Trades', v: String(info.totalTrades) },
                 { k: 'Win Rate', v: `${Math.round(info.winRate)}%` },
-                { k: 'Perf', v: `${typeof info.performance === 'number' ? info.performance.toFixed(2) : info.performance}%` },
+                { k: 'Perf', v: typeof info.performance === 'number' && info.performance != null ? `${info.performance.toFixed(2)}%` : 'N/A' },
               ].map((d, i) => (
                 <div key={i} className="border rounded-lg px-3 py-2" style={{ borderColor: VIBE.hair }}>
                   <div className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'rgba(237,235,231,0.6)' }}>
@@ -943,7 +943,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
                             {indicator.context && typeof indicator.context === 'object' && (indicator.context as Record<string, unknown>).trend ? (
                               <div className="text-sm mb-1">
                                 Trend: <span className="font-mono">{String(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).direction)}</span>
-                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength ? <span className="ml-2">({(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength) * 100).toFixed(1)}%)</span> : null}
+                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength != null ? <span className="ml-2">({(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength) * 100).toFixed(1)}%)</span> : null}
                               </div>
                             ) : null}
 
@@ -1005,7 +1005,7 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
                       Balance at Time
                     </div>
                     <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
-                      ${detailActivity.data.details.balance.toFixed(2)}
+                      {detailActivity.data.details.balance != null ? `$${detailActivity.data.details.balance.toFixed(2)}` : '$—'}
                     </div>
                   </div>
                  ) : null}

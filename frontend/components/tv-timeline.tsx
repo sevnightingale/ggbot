@@ -692,7 +692,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 { k: 'P/L', v: `${info.currentBalance - info.startingBalance >= 0 ? '+' : ''}${Math.round(info.currentBalance - info.startingBalance).toLocaleString()}` },
                 { k: 'Trades', v: String(info.totalTrades) },
                 { k: 'Win Rate', v: `${Math.round(info.winRate)}%` },
-                { k: 'Perf', v: `${typeof info.performance === 'number' ? info.performance.toFixed(2) : info.performance}%` },
+                { k: 'Perf', v: typeof info.performance === 'number' && info.performance != null ? `${info.performance.toFixed(2)}%` : 'N/A' },
               ].map((d, i) => (
                 <div key={i} className="border rounded-lg px-3 py-2" style={{ borderColor: VIBE.hair }}>
                   <div className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'rgba(237,235,231,0.6)' }}>
