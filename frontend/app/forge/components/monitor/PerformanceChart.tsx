@@ -435,6 +435,7 @@ function TradeDetailPopover({ trade, onClose }: TradeDetailPopoverProps) {
   }
 
   const getSideColor = (side: string) => {
+    if (!side) return 'text-[var(--text-muted)]'
     return side.toLowerCase() === 'long' ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
   }
 
@@ -452,7 +453,7 @@ function TradeDetailPopover({ trade, onClose }: TradeDetailPopoverProps) {
           <div className="flex items-center gap-2">
             <span className="font-semibold text-[var(--text-primary)]">{trade.symbol}</span>
             <span className={`text-sm font-medium ${getSideColor(trade.side)}`}>
-              {trade.side.toUpperCase()}
+              {trade.side ? trade.side.toUpperCase() : 'N/A'}
             </span>
           </div>
           <button

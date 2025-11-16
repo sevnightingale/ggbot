@@ -184,10 +184,12 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
 
 
   const getSideColor = (side: string) => {
+    if (!side) return 'text-[var(--text-muted)]'
     return side.toLowerCase() === 'long' ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
   }
 
   const getSideIcon = (side: string) => {
+    if (!side) return null
     return side.toLowerCase() === 'long' ? (
       <TrendingUp className="h-4 w-4" />
     ) : (
@@ -261,7 +263,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                   <td className="py-3 px-2">
                     <div className={`flex items-center gap-1 text-sm font-medium ${getSideColor(position.side)}`}>
                       {getSideIcon(position.side)}
-                      {position.side.toUpperCase()}
+                      {position.side ? position.side.toUpperCase() : 'N/A'}
                     </div>
                   </td>
                   {/* Position: Size + Leverage stacked */}
@@ -357,7 +359,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
                 <span className="text-[var(--text-secondary)]">•</span>
                 <div className={`flex items-center gap-1 text-sm font-medium ${getSideColor(position.side)}`}>
                   {getSideIcon(position.side)}
-                  {position.side.toUpperCase()}
+                  {position.side ? position.side.toUpperCase() : 'N/A'}
                 </div>
               </div>
               <div className={`text-sm font-semibold ${getPnLColor(position.unrealized_pnl)}`}>

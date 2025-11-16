@@ -93,6 +93,7 @@ export function TradeHistoryModal({ configId, isOpen, onClose, totalTrades, winR
   }
 
   const getSideIcon = (side: string) => {
+    if (!side) return null
     return side.toLowerCase() === 'long' ? (
       <TrendingUp className="h-4 w-4" />
     ) : (
@@ -101,6 +102,7 @@ export function TradeHistoryModal({ configId, isOpen, onClose, totalTrades, winR
   }
 
   const getSideColor = (side: string) => {
+    if (!side) return 'text-[var(--text-muted)]'
     return side.toLowerCase() === 'long' ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
   }
 
@@ -233,7 +235,7 @@ export function TradeHistoryModal({ configId, isOpen, onClose, totalTrades, winR
                             <td className="py-3 px-4">
                               <div className={`flex items-center gap-1 text-xs font-medium ${getSideColor(trade.side)}`}>
                                 {getSideIcon(trade.side)}
-                                {trade.side.toUpperCase()}
+                                {trade.side ? trade.side.toUpperCase() : 'N/A'}
                               </div>
                             </td>
                             <td className="py-3 px-4 text-right text-sm text-[var(--text-secondary)]">

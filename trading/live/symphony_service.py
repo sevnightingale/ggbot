@@ -195,17 +195,32 @@ class SymphonyLiveTradingService:
                 entry_price = market_price.mid
 
                 # Apply default SL/TP if not provided in decision
-                if not stop_loss and config.trading.risk_management.default_stop_loss_percent:
-                    default_sl = config.get_default_stop_loss_price(entry_price, action)
-                    if default_sl:
-                        stop_loss = default_sl
-                        self._log.info(f"Applied default stop loss: ${stop_loss:.2f}")
+                # Access dict structure properly: config.trading is a dict
+                risk_mgmt = config.trading.get("risk_management", {})
 
-                if not take_profit and config.trading.risk_management.default_take_profit_percent:
-                    default_tp = config.get_default_take_profit_price(entry_price, action)
-                    if default_tp:
-                        take_profit = default_tp
-                        self._log.info(f"Applied default take profit: ${take_profit:.2f}")
+                if not stop_loss:
+                    stop_loss_pct = risk_mgmt.get("default_stop_loss_percent")
+                    if stop_loss_pct:
+                        # Calculate SL price based on side
+                        if action == "long":
+                            stop_loss = entry_price * (1 - stop_loss_pct / 100.0)
+                        elif action == "short":
+                            stop_loss = entry_price * (1 + stop_loss_pct / 100.0)
+
+                        if stop_loss:
+                            self._log.info(f"Applied default stop loss: ${stop_loss:.2f} ({stop_loss_pct}%)")
+
+                if not take_profit:
+                    take_profit_pct = risk_mgmt.get("default_take_profit_percent")
+                    if take_profit_pct:
+                        # Calculate TP price based on side
+                        if action == "long":
+                            take_profit = entry_price * (1 + take_profit_pct / 100.0)
+                        elif action == "short":
+                            take_profit = entry_price * (1 - take_profit_pct / 100.0)
+
+                        if take_profit:
+                            self._log.info(f"Applied default take profit: ${take_profit:.2f} ({take_profit_pct}%)")
 
             except Exception as e:
                 self._log.warning(f"Failed to apply default SL/TP: {e}")

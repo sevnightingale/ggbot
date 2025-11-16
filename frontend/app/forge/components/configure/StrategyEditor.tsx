@@ -58,7 +58,7 @@ export function StrategyEditor({
   const { canAccess } = usePermissions()
   const currentStrategy = configData?.decision?.user_prompt || ''
   const analysisFrequency = configData?.decision?.analysis_frequency || '1h'
-  const llmModel = configData?.llm_config?.model || 'default'
+  const llmModel = configData?.llm_config?.model || 'grok'
   const thinkingMode = configData?.llm_config?.thinking_mode || false
   const currentConfigType = configType || configData?.config_type || 'scheduled_trading'
 
@@ -151,10 +151,10 @@ export function StrategyEditor({
     handleStrategyChange(textarea.value)
   }
 
-  // Handle model selection (OpenRouter)
+  // Handle model selection (OpenRouter only)
   const handleModelChange = (modelId: string) => {
-    // Check if user has access to premium LLMs (non-default models)
-    if (modelId !== 'default' && !hasPremiumAccess) {
+    // Check if user has access to premium LLMs
+    if (!hasPremiumAccess) {
       setUpgradeModalOpen(true)
       return
     }
@@ -162,7 +162,7 @@ export function StrategyEditor({
     onUpdate?.({
       llm_config: {
         ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, thinking_mode: false }),
-        provider: modelId === 'default' ? 'default' : 'openrouter',
+        provider: 'openrouter',
         model: modelId,
         thinking_mode: configData?.llm_config?.thinking_mode || false,
         use_platform_keys: true,
@@ -175,7 +175,7 @@ export function StrategyEditor({
   const handleThinkingModeChange = (enabled: boolean) => {
     onUpdate?.({
       llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'default', model: 'default' }),
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok' }),
         thinking_mode: enabled
       }
     })
@@ -373,27 +373,7 @@ export function StrategyEditor({
             <div className="p-4 text-center text-[var(--text-muted)]">Loading models...</div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {/* Default Model - Always first */}
-              <button
-                onClick={() => handleModelChange('default')}
-                className={`p-4 rounded-xl border text-left transition-all ${
-                  llmModel === 'default'
-                    ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                    : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                }`}
-              >
-                <div className="flex items-center justify-between mb-2">
-                  <div className="font-medium">Default Model</div>
-                  <span className="text-xs px-2 py-1 rounded-full bg-[var(--profit-color)]/20 text-[var(--profit-color)]">
-                    Free
-                  </span>
-                </div>
-                <div className="text-xs text-[var(--text-muted)]">
-                  Basic intelligence for standard trading strategies
-                </div>
-              </button>
-
-              {/* Premium Models - Conditional */}
+              {/* All OpenRouter Models */}
               {!hasPremiumAccess ? (
                 <button
                   onClick={() => setUpgradeModalOpen(true)}
@@ -401,7 +381,7 @@ export function StrategyEditor({
                 >
                   <div className="flex items-center justify-between mb-2">
                     <div className="font-medium flex items-center gap-2">
-                      7 Premium Models
+                      7 AI Models
                       <Crown className="h-3 w-3" />
                     </div>
                   </div>
@@ -464,7 +444,7 @@ export function StrategyEditor({
           )}
 
           {/* Thinking Mode Toggle - Below model selection */}
-          {llmModel !== 'default' && hasPremiumAccess && (
+          {hasPremiumAccess && (
             <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
               <div className="flex items-center justify-between">
                 <div className="flex-1">
@@ -495,8 +475,8 @@ export function StrategyEditor({
           <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
             <div className="text-sm text-[var(--text-muted)]">
               Current: <span className="text-[var(--text-primary)] font-medium">
-                {llmModel === 'default' ? 'Default Model' : llmModels.find(m => m.model_id === llmModel)?.display_name || llmModel}
-                {thinkingMode && llmModel !== 'default' && <span className="text-[var(--text-muted)]"> (Thinking Mode)</span>}
+                {llmModels.find(m => m.model_id === llmModel)?.display_name || llmModel}
+                {thinkingMode && <span className="text-[var(--text-muted)]"> (Thinking Mode)</span>}
               </span>
             </div>
           </div>

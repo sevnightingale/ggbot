@@ -98,16 +98,16 @@ class DecisionEngineV2:
             llm_config = self.config.llm_config if hasattr(self.config, 'llm_config') else {}
 
             if isinstance(llm_config, dict) and llm_config:
-                provider_name = llm_config.get('provider', 'default')
-                model_name = llm_config.get('model', None)
+                provider_name = llm_config.get('provider', 'openrouter')
+                model_name = llm_config.get('model', 'grok')
+                # Get thinking mode flag
+                thinking_mode = llm_config.get('thinking_mode', False)
 
-                # Handle default provider mapping to XAI/Grok (basic intelligence)
-                if provider_name == 'default':
-                    provider_name = 'xai'
-                    model_name = model_name or 'grok-4-fast-non-reasoning'  # Basic non-reasoning model
-                elif not model_name:
-                    # Set best reasoning models for pro providers
-                    if provider_name == 'xai':
+                # Set model defaults if not specified
+                if not model_name or model_name == 'default':
+                    if provider_name == 'openrouter':
+                        model_name = 'grok'  # Default OpenRouter model
+                    elif provider_name == 'xai':
                         model_name = 'grok-4-fast-reasoning'  # Frontier reasoning model
                     elif provider_name == 'deepseek':
                         model_name = 'deepseek-reasoner'  # Frontier reasoning
@@ -116,39 +116,28 @@ class DecisionEngineV2:
                     elif provider_name == 'anthropic':
                         model_name = 'claude-opus-4-1-20250805'  # Frontier reasoning
             else:
-                # Fallback to legacy decision config
-                decision_config = self.config.decision if hasattr(self.config, 'decision') else {}
-                if isinstance(decision_config, dict):
-                    provider_name = decision_config.get('llm_provider', 'default')
-                    model_name = decision_config.get('llm_model', None)
-
-                    # Handle default provider mapping
-                    if provider_name == 'default':
-                        provider_name = 'xai'
-                        model_name = model_name or 'grok-4-fast-non-reasoning'
-                    elif not model_name:
-                        model_name = 'grok-4-fast-non-reasoning' if provider_name == 'xai' else 'deepseek-reasoner'
-                else:
-                    # Handle legacy format where decision might be a string or other type
-                    provider_name = 'xai'  # New default is XAI/Grok
-                    model_name = 'grok-4-fast-non-reasoning'
+                # Fallback to OpenRouter + Grok
+                provider_name = 'openrouter'
+                model_name = 'grok'
+                thinking_mode = False
 
             # Get API key with user/platform priority
             api_key = await LLMKeyService.get_api_key(self.user_id, provider_name)
 
-            # Create provider instance - resolve "default" model to None for proper default handling
-            resolved_model = None if model_name == "default" else model_name
+            # Create provider instance
             self.llm_provider = get_llm_provider(
                 provider_name=provider_name,
                 api_key=api_key,
-                model=resolved_model  # Uses provider default if None
+                model=model_name,
+                thinking=thinking_mode  # Pass thinking mode to provider
             )
 
             logger.bind(
                 config_id=self.config_id,
                 user_id=self.user_id,
                 provider=provider_name,
-                model=model_name or "default"
+                model=model_name,
+                thinking=thinking_mode
             ).info("LLM provider initialized successfully")
 
         except Exception as e:

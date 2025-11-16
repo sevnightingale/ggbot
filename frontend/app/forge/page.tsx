@@ -202,8 +202,9 @@ function ForgeApp() {
           analysis_frequency: 'agent_driven'
         },
         llm_config: {
-          provider: 'default',
-          model: 'default',
+          provider: 'openrouter',
+          model: 'grok',
+          thinking_mode: false,
           use_platform_keys: true,
           use_own_key: false
         }
@@ -232,8 +233,9 @@ function ForgeApp() {
           : 'if RSI 1hr below 50 enter long, if above enter short'
       },
       llm_config: {
-        provider: 'default',
-        model: 'default',
+        provider: 'openrouter',
+        model: 'grok',
+        thinking_mode: false,
         use_platform_keys: true,
         use_own_key: false
       },

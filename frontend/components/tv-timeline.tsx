@@ -390,10 +390,15 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           const markers: SeriesMarker<Time>[] = [];
 
           groupedByTimestamp.forEach((activitiesAtTime, timestamp) => {
-            // Determine marker type based on priority
-            const hasTradeLong = activitiesAtTime.some(a => a.type === 'trade_entry_long');
-            const hasTradeShort = activitiesAtTime.some(a => a.type === 'trade_entry_short');
-            const hasAnalysis = activitiesAtTime.some(a => a.type === 'analysis');
+            // Determine marker type based on priority (NEW: unified activity types)
+            const hasTradeLong = activitiesAtTime.some(a =>
+              a.type === 'trade_entry' && a.data?.details?.side === 'long'
+            );
+            const hasTradeShort = activitiesAtTime.some(a =>
+              a.type === 'trade_entry' && a.data?.details?.side === 'short'
+            );
+            const hasTradeExit = activitiesAtTime.some(a => a.type === 'trade_exit');
+            const hasLLMThought = activitiesAtTime.some(a => a.type === 'llm_thought');
             const hasMarketQuery = activitiesAtTime.some(a => a.type === 'market_query');
             const hasAgentWait = activitiesAtTime.some(a => a.type === 'agent_wait');
 
@@ -413,7 +418,15 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 shape: 'arrowDown',
                 size: 2, // Make arrows bigger
               });
-            } else if (hasAnalysis) {
+            } else if (hasTradeExit) {
+              markers.push({
+                time: timestamp as Time,
+                position: 'inBar',
+                color: 'rgba(156, 163, 175, 0.6)', // gray with transparency
+                shape: 'circle',
+                size: 1, // Medium circles for exits
+              });
+            } else if (hasLLMThought) {
               markers.push({
                 time: timestamp as Time,
                 position: 'aboveBar',
@@ -542,18 +555,37 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       let icon = '●';
       let label = 'ACTIVE';
 
-      if (latestActivity.type === 'trade_entry_long') {
+      // NEW: unified activity type detection
+      const isLongEntry = latestActivity.type === 'trade_entry' && latestActivity.data?.details?.side === 'long';
+      const isShortEntry = latestActivity.type === 'trade_entry' && latestActivity.data?.details?.side === 'short';
+
+      if (isLongEntry) {
         icon = '↑';
         label = 'LONG ENTERED';
-      } else if (latestActivity.type === 'trade_entry_short') {
+      } else if (isShortEntry) {
         icon = '↓';
         label = 'SHORT ENTERED';
+      } else if (latestActivity.type === 'trade_exit') {
+        icon = '⨯';
+        label = 'POSITION CLOSED';
       } else if (latestActivity.type === 'market_query') {
         icon = '📊';
         label = 'QUERIED MARKET';
-      } else if (latestActivity.type === 'analysis') {
+      } else if (latestActivity.type === 'llm_thought') {
         icon = '💭';
         label = 'ANALYZING';
+      } else if (latestActivity.type === 'price_check') {
+        icon = '💱';
+        label = 'PRICE CHECK';
+      } else if (latestActivity.type === 'observation_recorded') {
+        icon = '📝';
+        label = 'RECORDED';
+      } else if (latestActivity.type === 'strategy_updated') {
+        icon = '⚙️';
+        label = 'CONFIG UPDATED';
+      } else if (latestActivity.type === 'signal_received') {
+        icon = '📡';
+        label = 'SIGNAL';
       }
 
       const timeAgo = diffMins > 0 ? `${diffMins}m ago` : `${diffSecs}s ago`;
@@ -567,14 +599,23 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
   const info = metadata;
 
-  // Get status color based on activity type
+  // Get status color based on activity type (NEW: unified types)
   const getStatusColor = () => {
     if (!latestActivity) return VIBE.brass;
-    if (latestActivity.type === 'trade_entry_long') return '#16a34a';
-    if (latestActivity.type === 'trade_entry_short') return '#dc2626';
+
+    const isLongEntry = latestActivity.type === 'trade_entry' && latestActivity.data?.details?.side === 'long';
+    const isShortEntry = latestActivity.type === 'trade_entry' && latestActivity.data?.details?.side === 'short';
+
+    if (isLongEntry) return '#16a34a';
+    if (isShortEntry) return '#dc2626';
+    if (latestActivity.type === 'trade_exit') return '#9ca3af'; // gray-400
     if (latestActivity.type === 'market_query') return VIBE.signal;
-    if (latestActivity.type === 'analysis') return VIBE.brass;
+    if (latestActivity.type === 'llm_thought') return VIBE.brass;
     if (latestActivity.type === 'agent_wait') return VIBE.ivory;
+    if (latestActivity.type === 'price_check') return VIBE.signal;
+    if (latestActivity.type === 'observation_recorded') return VIBE.brass;
+    if (latestActivity.type === 'strategy_updated') return VIBE.signal;
+    if (latestActivity.type === 'signal_received') return VIBE.signal;
     return VIBE.brass;
   };
 
@@ -665,11 +706,16 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 }}
               >
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
-                  {selectedActivity.type === 'trade_entry_long' && '↑ LONG ENTRY'}
-                  {selectedActivity.type === 'trade_entry_short' && '↓ SHORT ENTRY'}
+                  {selectedActivity.type === 'trade_entry' && selectedActivity.data?.details?.side === 'long' && '↑ LONG ENTRY'}
+                  {selectedActivity.type === 'trade_entry' && selectedActivity.data?.details?.side === 'short' && '↓ SHORT ENTRY'}
+                  {selectedActivity.type === 'trade_exit' && '⨯ POSITION CLOSED'}
                   {selectedActivity.type === 'market_query' && '📊 MARKET QUERY'}
-                  {selectedActivity.type === 'analysis' && '💭 AGENT THOUGHT'}
+                  {selectedActivity.type === 'llm_thought' && '💭 AGENT THOUGHT'}
+                  {selectedActivity.type === 'price_check' && '💱 PRICE CHECK'}
                   {selectedActivity.type === 'agent_wait' && '⏸ WAITING'}
+                  {selectedActivity.type === 'observation_recorded' && '📝 OBSERVATION'}
+                  {selectedActivity.type === 'strategy_updated' && '⚙️ STRATEGY UPDATE'}
+                  {selectedActivity.type === 'signal_received' && '📡 SIGNAL RECEIVED'}
                 </div>
                 {selectedActivity.data.summary && (
                   <div className="text-sm mb-1 prose prose-invert prose-sm max-w-none" style={{ color: VIBE.ivory }}>
@@ -703,20 +749,26 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 >
                   <div
                     style={{
-                      fontSize: selectedActivity.type.includes('trade_entry') ? '40px' : '20px',
-                      color: selectedActivity.type === 'trade_entry_long' ? '#16a34a' :
-                             selectedActivity.type === 'trade_entry_short' ? '#dc2626' :
+                      fontSize: selectedActivity.type === 'trade_entry' ? '40px' : '20px',
+                      color: selectedActivity.type === 'trade_entry' && selectedActivity.data?.details?.side === 'long' ? '#16a34a' :
+                             selectedActivity.type === 'trade_entry' && selectedActivity.data?.details?.side === 'short' ? '#dc2626' :
+                             selectedActivity.type === 'trade_exit' ? '#9ca3af' :
                              selectedActivity.type === 'market_query' ? VIBE.signal :
-                             selectedActivity.type === 'analysis' ? VIBE.brass : VIBE.ivory,
+                             selectedActivity.type === 'llm_thought' ? VIBE.brass : VIBE.ivory,
                       lineHeight: 1,
                       animation: 'markerPulse 1.5s ease-in-out infinite'
                     }}
                   >
-                    {selectedActivity.type === 'trade_entry_long' && '▲'}
-                    {selectedActivity.type === 'trade_entry_short' && '▼'}
+                    {selectedActivity.type === 'trade_entry' && selectedActivity.data?.details?.side === 'long' && '▲'}
+                    {selectedActivity.type === 'trade_entry' && selectedActivity.data?.details?.side === 'short' && '▼'}
+                    {selectedActivity.type === 'trade_exit' && '⨯'}
                     {(selectedActivity.type === 'market_query' ||
-                      selectedActivity.type === 'analysis' ||
-                      selectedActivity.type === 'agent_wait') && '●'}
+                      selectedActivity.type === 'llm_thought' ||
+                      selectedActivity.type === 'price_check' ||
+                      selectedActivity.type === 'agent_wait' ||
+                      selectedActivity.type === 'observation_recorded' ||
+                      selectedActivity.type === 'strategy_updated' ||
+                      selectedActivity.type === 'signal_received') && '●'}
                   </div>
                 </div>
               )}
@@ -757,11 +809,16 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         onClose={() => setDetailActivities([])}
         title={
           detailActivities.length === 1
-            ? detailActivities[0].type === 'trade_entry_long' ? 'Long Entry' :
-              detailActivities[0].type === 'trade_entry_short' ? 'Short Entry' :
+            ? detailActivities[0].type === 'trade_entry' && detailActivities[0].data?.details?.side === 'long' ? 'Long Entry' :
+              detailActivities[0].type === 'trade_entry' && detailActivities[0].data?.details?.side === 'short' ? 'Short Entry' :
+              detailActivities[0].type === 'trade_exit' ? 'Position Closed' :
               detailActivities[0].type === 'market_query' ? 'Market Query' :
-              detailActivities[0].type === 'analysis' ? 'Agent Thought' :
+              detailActivities[0].type === 'llm_thought' ? 'Agent Thought' :
+              detailActivities[0].type === 'price_check' ? 'Price Check' :
               detailActivities[0].type === 'agent_wait' ? 'Agent Waiting' :
+              detailActivities[0].type === 'observation_recorded' ? 'Observation' :
+              detailActivities[0].type === 'strategy_updated' ? 'Strategy Update' :
+              detailActivities[0].type === 'signal_received' ? 'Signal Received' :
               'Activity'
             : `${detailActivities.length} Activities`
         }
@@ -787,25 +844,31 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 {/* Activity Type Badge */}
                 <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold mb-4" style={{
                   backgroundColor:
-                    detailActivity.type === 'trade_entry_long' ? '#16a34a' :
-                    detailActivity.type === 'trade_entry_short' ? '#dc2626' :
+                    detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'long' ? '#16a34a' :
+                    detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'short' ? '#dc2626' :
+                    detailActivity.type === 'trade_exit' ? '#9ca3af' :
                     detailActivity.type === 'market_query' ? VIBE.signal :
-                    detailActivity.type === 'analysis' ? VIBE.brass :
+                    detailActivity.type === 'llm_thought' ? VIBE.brass :
                     detailActivity.type === 'agent_wait' ? VIBE.ivory : VIBE.brass,
                   color: detailActivity.type === 'agent_wait' ? VIBE.obsidian : VIBE.ivory
                 }}>
-                  {detailActivity.type === 'trade_entry_long' && '↑ Long Entry'}
-                  {detailActivity.type === 'trade_entry_short' && '↓ Short Entry'}
+                  {detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'long' && '↑ Long Entry'}
+                  {detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'short' && '↓ Short Entry'}
+                  {detailActivity.type === 'trade_exit' && '⨯ Position Closed'}
                   {detailActivity.type === 'market_query' && '📊 Market Query'}
-                  {detailActivity.type === 'analysis' && '💭 Agent Thought'}
+                  {detailActivity.type === 'llm_thought' && '💭 Agent Thought'}
+                  {detailActivity.type === 'price_check' && '💱 Price Check'}
                   {detailActivity.type === 'agent_wait' && '⏸ Waiting'}
+                  {detailActivity.type === 'observation_recorded' && '📝 Observation'}
+                  {detailActivity.type === 'strategy_updated' && '⚙️ Strategy Update'}
+                  {detailActivity.type === 'signal_received' && '📡 Signal Received'}
                 </div>
 
                 {/* Type-specific content */}
                 <div className="space-y-4">
 
-            {/* TRADE ENTRY SPECIFIC FIELDS */}
-            {(detailActivity.type === 'trade_entry_long' || detailActivity.type === 'trade_entry_short') ? (
+            {/* TRADE ENTRY/EXIT SPECIFIC FIELDS */}
+            {(detailActivity.type === 'trade_entry' || detailActivity.type === 'trade_exit') ? (
               <>
                 {detailActivity.data.confidence !== undefined ? (
                   <div>
@@ -983,8 +1046,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               </>
             ) : null}
 
-            {/* ANALYSIS SPECIFIC FIELDS */}
-            {detailActivity.type === 'analysis' && detailActivity.data.details?.thought ? (
+            {/* LLM THOUGHT SPECIFIC FIELDS */}
+            {detailActivity.type === 'llm_thought' && detailActivity.data.details?.thought ? (
               <div>
                 <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
                   Agent Thought

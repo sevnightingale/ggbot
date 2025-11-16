@@ -38,15 +38,7 @@ def get_llm_provider(
     """
     provider_name = provider_name.lower()
 
-    # Handle default provider mapping to XAI/Grok
-    if provider_name == 'default':
-        return XAIProvider(
-            api_key=api_key,
-            model=model or 'grok-4-fast-non-reasoning',
-            **kwargs
-        )
-
-    elif provider_name == 'deepseek':
+    if provider_name == 'deepseek':
         return DeepSeekProvider(
             api_key=api_key,
             model=model or 'deepseek-reasoner',
@@ -77,14 +69,14 @@ def get_llm_provider(
     elif provider_name == 'openrouter':
         return OpenRouterProvider(
             api_key=api_key,
-            model=model or 'gpt-5',
+            model=model or 'grok',  # Default to Grok for OpenRouter
             **kwargs
         )
 
     else:
         raise ValueError(
             f"Unsupported LLM provider: {provider_name}. "
-            f"Supported providers: default, deepseek, openai, anthropic, xai, openrouter"
+            f"Supported providers: openrouter, deepseek, openai, anthropic, xai"
         )
 
 
@@ -95,4 +87,4 @@ def get_available_providers() -> list[str]:
     Returns:
         list[str]: List of provider names that can be used with get_llm_provider
     """
-    return ['default', 'deepseek', 'openai', 'anthropic', 'xai', 'openrouter']
+    return ['openrouter', 'deepseek', 'openai', 'anthropic', 'xai']
