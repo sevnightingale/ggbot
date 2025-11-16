@@ -35,6 +35,28 @@ const getThemeColors = (isDark: boolean) => ({
   }
 })[isDark ? 'dark' : 'light'];
 
+// Formatting helpers for activity data (handles null/undefined gracefully)
+const formatActivityPrice = (price: number | null | undefined): string => {
+  if (price == null) return '—';
+  return `$${price.toFixed(2)}`;
+};
+
+const formatActivityPercent = (value: number | null | undefined): string => {
+  if (value == null) return 'N/A';
+  return `${(value * 100).toFixed(1)}%`;
+};
+
+const formatActivityNumber = (value: number | null | undefined, decimals = 2): string => {
+  if (value == null) return '—';
+  return value.toFixed(decimals);
+};
+
+const formatActivityUSD = (value: number | null | undefined): string => {
+  if (value == null) return '—';
+  const sign = value >= 0 ? '+' : '';
+  return `${sign}$${value.toFixed(2)}`;
+};
+
 interface BalancePoint {
   timestamp: string;
   balance: number;
@@ -870,7 +892,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             {/* TRADE ENTRY/EXIT SPECIFIC FIELDS */}
             {(detailActivity.type === 'trade_entry' || detailActivity.type === 'trade_exit') ? (
               <>
-                {detailActivity.data.confidence !== undefined ? (
+                {/* Confidence */}
+                {detailActivity.data.details?.confidence != null ? (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Confidence
@@ -880,53 +903,88 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                         <div
                           className="h-full rounded-full"
                           style={{
-                            width: `${(detailActivity.data.confidence || 0) * 100}%`,
+                            width: `${(Number(detailActivity.data.details.confidence) || 0) * 100}%`,
                             backgroundColor: VIBE.signal
                           }}
                         />
                       </div>
-                      <span className="text-sm font-semibold">{Math.round((detailActivity.data.confidence || 0) * 100)}%</span>
+                      <span className="text-sm font-semibold">{formatActivityPercent(Number(detailActivity.data.details.confidence))}</span>
                     </div>
                   </div>
                  ) : null}
 
-                {detailActivity.data.leverage ? (
+                {/* Leverage */}
+                {detailActivity.data.details?.leverage != null ? (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Leverage
                     </div>
-                    <div className="text-lg font-semibold">{detailActivity.data.leverage}x</div>
+                    <div className="text-lg font-semibold">{detailActivity.data.details.leverage}x</div>
                   </div>
                  ) : null}
 
-                {detailActivity.data.entry_price ? (
+                {/* Entry Price */}
+                {detailActivity.data.details?.entry_price != null ? (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Entry Price
                     </div>
-                    <div className="text-lg font-mono">${Number(detailActivity.data.entry_price || 0).toLocaleString()}</div>
+                    <div className="text-lg font-mono">{formatActivityPrice(Number(detailActivity.data.details.entry_price))}</div>
                   </div>
                  ) : null}
 
+                {/* Exit Price (for trade_exit) */}
+                {detailActivity.data.details?.exit_price != null ? (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Exit Price
+                    </div>
+                    <div className="text-lg font-mono">{formatActivityPrice(Number(detailActivity.data.details.exit_price))}</div>
+                  </div>
+                 ) : null}
+
+                {/* P&L (for trade_exit) */}
+                {detailActivity.data.details?.pnl != null ? (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      P&L
+                    </div>
+                    <div className="text-lg font-semibold" style={{ color: Number(detailActivity.data.details.pnl) >= 0 ? VIBE.signal : VIBE.ember }}>
+                      {formatActivityUSD(Number(detailActivity.data.details.pnl))}
+                    </div>
+                  </div>
+                 ) : null}
+
+                {/* Size USD */}
+                {detailActivity.data.details?.size_usd != null ? (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Position Size
+                    </div>
+                    <div className="text-lg font-mono">{formatActivityPrice(Number(detailActivity.data.details.size_usd))}</div>
+                  </div>
+                 ) : null}
+
+                {/* Stop Loss / Take Profit Grid */}
                 <div className="grid grid-cols-2 gap-4">
-                  {detailActivity.data.stop_loss_price ? (
+                  {detailActivity.data.details?.stop_loss != null ? (
                     <div>
                       <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                         Stop Loss
                       </div>
                       <div className="text-sm font-mono" style={{ color: VIBE.ember }}>
-                        ${Number(detailActivity.data.stop_loss_price || 0).toLocaleString()}
+                        {formatActivityPrice(Number(detailActivity.data.details.stop_loss))}
                       </div>
                     </div>
                   ) : null}
 
-                  {detailActivity.data.take_profit_price ? (
+                  {detailActivity.data.details?.take_profit != null ? (
                     <div>
                       <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                         Take Profit
                       </div>
                       <div className="text-sm font-mono" style={{ color: VIBE.signal }}>
-                        ${Number(detailActivity.data.take_profit_price || 0).toLocaleString()}
+                        {formatActivityPrice(Number(detailActivity.data.details.take_profit))}
                       </div>
                     </div>
                   ) : null}
@@ -1003,7 +1061,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                             {indicator.context && typeof indicator.context === 'object' && (indicator.context as Record<string, unknown>).trend ? (
                               <div className="text-sm mb-1">
                                 Trend: <span className="font-mono">{String(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).direction)}</span>
-                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength ? <span className="ml-2">({(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength) * 100).toFixed(1)}%)</span> : null}
+                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength ? <span className="ml-2">({formatActivityPercent(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength))})</span> : null}
                               </div>
                             ) : null}
 
@@ -1059,13 +1117,13 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   <ReactMarkdown>{String(detailActivity.data.details.thought)}</ReactMarkdown>
                 </div>
 
-                {detailActivity.data.details.balance && typeof detailActivity.data.details.balance === 'number' ? (
+                {detailActivity.data.details.balance != null && typeof detailActivity.data.details.balance === 'number' ? (
                   <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: 'rgba(0, 217, 255, 0.1)' }}>
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Balance at Time
                     </div>
                     <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
-                      ${detailActivity.data.details.balance.toFixed(2)}
+                      {formatActivityPrice(detailActivity.data.details.balance)}
                     </div>
                   </div>
                  ) : null}
