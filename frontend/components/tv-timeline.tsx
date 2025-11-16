@@ -46,11 +46,6 @@ const formatActivityPercent = (value: number | null | undefined): string => {
   return `${(value * 100).toFixed(1)}%`;
 };
 
-const formatActivityNumber = (value: number | null | undefined, decimals = 2): string => {
-  if (value == null) return '—';
-  return value.toFixed(decimals);
-};
-
 const formatActivityUSD = (value: number | null | undefined): string => {
   if (value == null) return '—';
   const sign = value >= 0 ? '+' : '';
@@ -919,7 +914,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Leverage
                     </div>
-                    <div className="text-lg font-semibold">{detailActivity.data.details.leverage}x</div>
+                    <div className="text-lg font-semibold">{String(detailActivity.data.details.leverage)}x</div>
                   </div>
                  ) : null}
 
