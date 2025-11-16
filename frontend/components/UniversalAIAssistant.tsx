@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, ChevronDown } from "lucide-react";
+import { Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 interface Message {
@@ -106,72 +106,49 @@ export function UniversalAIAssistant({
   return (
     <AnimatePresence>
       {isOpen && (
-        <>
-          {/* Backdrop */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={onClose}
-            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40"
-          />
-
-          {/* Bottom Sheet */}
-          <motion.div
-            initial={{ y: "100%" }}
-            animate={{ y: 0 }}
-            exit={{ y: "100%" }}
-            transition={{ type: "spring", damping: 30, stiffness: 300 }}
-            className="fixed inset-x-0 bottom-0 z-50 flex flex-col bg-[var(--bg-secondary)] border-t border-[var(--border)] shadow-2xl"
-            style={{ height: "60vh", maxHeight: "600px" }}
-          >
-            {/* Header with drag handle */}
-            <div className="flex-shrink-0">
-              {/* Drag handle */}
-              <div className="w-full flex justify-center py-3 cursor-grab active:cursor-grabbing">
-                <div className="w-16 h-1 bg-[var(--border)] rounded-full" />
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -20 }}
+          transition={{ duration: 0.2 }}
+          className="fixed top-4 left-1/2 -translate-x-1/2 z-50 w-full max-w-2xl mx-4"
+        >
+          <div className="flex flex-col bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl" style={{ height: "500px" }}>
+            {/* Header */}
+            <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)] flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                <Sparkles className="w-5 h-5 text-[var(--accent)]" />
+                <h3 className="font-semibold text-[var(--text-primary)]">
+                  Strategy Advisor
+                </h3>
+                <span className="text-xs text-[var(--text-muted)]">
+                  {botType === "agent"
+                    ? "Strategy Builder"
+                    : botType === "scheduled"
+                    ? "Config Helper"
+                    : "Signal Validator"}
+                </span>
               </div>
-
-              {/* Header bar */}
-              <div className="px-4 pb-3 border-b border-[var(--border)] flex justify-between items-center">
-                <div className="flex items-center gap-2">
-                  <Sparkles className="w-5 h-5 text-[var(--accent)]" />
-                  <h3 className="font-semibold text-[var(--text-primary)]">
-                    Strategy Advisor
-                  </h3>
-                  <span className="text-xs text-[var(--text-muted)]">
-                    {botType === "agent"
-                      ? "Strategy Builder"
-                      : botType === "scheduled"
-                      ? "Config Helper"
-                      : "Signal Validator"}
-                  </span>
-                </div>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={onClose}
-                  className="hover:bg-[var(--bg-tertiary)]"
-                >
-                  <ChevronDown className="w-4 h-4" />
-                </Button>
-              </div>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={onClose}
+                className="hover:bg-[var(--bg-tertiary)]"
+              >
+                <X className="w-4 h-4" />
+              </Button>
             </div>
 
-            {/* Messages area - flex-1 to fill available space */}
+            {/* Messages area */}
             <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
               {messages.length === 0 && (
                 <div className="text-center text-[var(--text-muted)] mt-8">
                   <Sparkles className="w-12 h-12 mx-auto mb-4 text-[var(--accent)] opacity-50" />
                   <p className="text-sm">
-                    Hi! I can help you configure your bot.
+                    Hi! I can help you build your trading strategy.
                   </p>
                   <p className="text-xs mt-2">
-                    Ask me anything about setting up{" "}
-                    {botType === "agent"
-                      ? "your trading strategy"
-                      : "your bot configuration"}
-                    .
+                    I&apos;ll update your strategy in real-time as we chat - watch it appear below!
                   </p>
                 </div>
               )}
@@ -213,15 +190,15 @@ export function UniversalAIAssistant({
               <div ref={messagesEndRef} />
             </div>
 
-            {/* Input area - flex-shrink-0 to prevent collapse */}
-            <div className="flex-shrink-0 p-4 border-t border-[var(--border)] bg-[var(--bg-secondary)]">
+            {/* Input area */}
+            <div className="flex-shrink-0 p-4 border-t border-[var(--border)]">
               <div className="flex gap-2">
                 <input
                   type="text"
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
                   onKeyPress={handleKeyPress}
-                  placeholder="Ask me anything about your bot configuration..."
+                  placeholder="Describe your trading strategy..."
                   className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
                   disabled={loading}
                   autoFocus
@@ -235,8 +212,8 @@ export function UniversalAIAssistant({
                 </Button>
               </div>
             </div>
-          </motion.div>
-        </>
+          </div>
+        </motion.div>
       )}
     </AnimatePresence>
   );
