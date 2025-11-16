@@ -71,8 +71,7 @@ export function StrategyEditor({
   const [llmModels, setLLMModels] = useState<LLMModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
 
-  // State for collapsible sections
-  const [showSystemSections, setShowSystemSections] = useState(false)
+  // State for upgrade modal
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
 
   // Ref for textarea auto-resize
@@ -185,57 +184,6 @@ export function StrategyEditor({
 
   return (
     <div className={`space-y-6 ${className}`}>
-      {/* Analysis Frequency - Hide for signal_validation configs */}
-      {currentConfigType !== 'signal_validation' && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
-            Analysis Frequency
-          </h3>
-          <p className="text-sm text-[var(--text-muted)] mb-4">
-            How often your bot analyzes the market and makes decisions
-          </p>
-
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-            {['5m', '15m', '1h', '4h'].map((freq) => {
-              const isPremium = freq === '5m' || freq === '15m'
-              const hasAccess = !isPremium || hasPremiumAccess
-              const isLocked = isPremium && !hasAccess
-
-              return (
-                <button
-                  key={freq}
-                  onClick={() => handleFrequencyChange(freq)}
-                  className={`px-4 py-3 text-sm rounded-xl border transition-all relative ${
-                    analysisFrequency === freq
-                      ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] border-[var(--accent)] hover:bg-[var(--accent-hover)]'
-                      : isLocked
-                        ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 hover:opacity-80'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span>Every {freq}</span>
-                    {isLocked && <Crown className="h-3 w-3" />}
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-
-          <div className="mt-4 p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-            <div className="text-sm text-[var(--text-muted)] flex items-center gap-2">
-              Current: <span className="text-[var(--text-primary)] font-medium">Every {analysisFrequency}</span>
-              {(analysisFrequency === '5m' || analysisFrequency === '15m') && (
-                <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                  <Crown className="h-3 w-3" />
-                  <span>Pro</span>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Trading Strategy - Main Section */}
       <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
         {/* AI Assistant Banner */}
@@ -305,83 +253,6 @@ export function StrategyEditor({
             </div>
           </div>
         </div>
-      </div>
-
-      {/* System Template Context - Collapsible */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-[var(--text-primary)]">
-            Complete Prompt Template
-          </h3>
-          <button
-            onClick={() => setShowSystemSections(!showSystemSections)}
-            className="text-sm text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            {showSystemSections ? 'Hide Details' : 'View Full Context'}
-          </button>
-        </div>
-
-        <p className="text-sm text-[var(--text-muted)] mb-4">
-          See the complete prompt structure that gets sent to the AI (your strategy + system context)
-        </p>
-
-        {showSystemSections && (
-          <div className="space-y-4">
-            {/* Market Data Section */}
-            <div>
-              <div className="text-sm font-medium text-[var(--text-muted)] mb-2">1. MARKET DATA ANALYSIS</div>
-              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] opacity-70">
-                <div className="text-sm text-[var(--text-secondary)]">
-                  All technical indicators from your Market Data configuration across 7 timeframes (5m, 15m, 30m, 1h, 4h, 1d, 1w)
-                </div>
-              </div>
-            </div>
-
-            {/* Volume Analysis Section */}
-            <div>
-              <div className="text-sm font-medium text-[var(--text-muted)] mb-2">2. VOLUME CONFIRMATION ANALYSIS</div>
-              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] opacity-70">
-                <div className="text-sm text-[var(--text-secondary)]">
-                  Current volume vs average volume analysis for trade confirmation
-                </div>
-              </div>
-            </div>
-
-            {/* User Strategy Section */}
-            <div>
-              <div className="text-sm font-medium text-[var(--agent-decision)] mb-2">3. YOUR TRADING STRATEGY ← YOU CONTROL THIS</div>
-              <div className="p-4 rounded-xl bg-[var(--agent-decision)]/10 border border-[var(--agent-decision)]/30">
-                <div className="text-sm text-[var(--text-primary)] font-mono">
-                  {currentStrategy || 'Your strategy will appear here...'}
-                </div>
-              </div>
-            </div>
-
-            {/* Task Instructions */}
-            <div>
-              <div className="text-sm font-medium text-[var(--text-muted)] mb-2">4. TASK INSTRUCTIONS</div>
-              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] opacity-70">
-                <div className="text-sm text-[var(--text-secondary)]">
-                  Instructions to strictly follow your strategy, not invent additional rules, and use only provided data.
-                </div>
-              </div>
-            </div>
-
-            {/* Output Format */}
-            <div>
-              <div className="text-sm font-medium text-[var(--text-muted)] mb-2">5. OUTPUT FORMAT</div>
-              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] opacity-70">
-                <div className="text-sm text-[var(--text-secondary)] font-mono">
-                  ACTION: [long/short/hold/wait]<br/>
-                  CONFIDENCE: [0.000-1.000]<br/>
-                  REASONING: [explanation]<br/>
-                  STOP_LOSS: [price or null]<br/>
-                  TAKE_PROFIT: [price or null]
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
 
       {/* LLM Model Selection */}
@@ -507,6 +378,45 @@ export function StrategyEditor({
           </div>
         </div>
       </div>
+
+      {/* Analysis Frequency - Hide for signal_validation configs */}
+      {currentConfigType !== 'signal_validation' && (
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+          <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
+            Analysis Frequency
+          </h3>
+          <p className="text-sm text-[var(--text-muted)] mb-4">
+            How often your bot analyzes the market and makes decisions
+          </p>
+
+          <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
+            {['5m', '15m', '30m', '1h', '4h', '1d', '1w'].map((freq) => {
+              const isPremium = freq === '5m' || freq === '15m'
+              const hasAccess = !isPremium || hasPremiumAccess
+              const isLocked = isPremium && !hasAccess
+
+              return (
+                <button
+                  key={freq}
+                  onClick={() => handleFrequencyChange(freq)}
+                  className={`px-3 py-2 text-sm rounded-lg border transition-all relative ${
+                    analysisFrequency === freq
+                      ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] border-[var(--accent)] hover:bg-[var(--accent-hover)]'
+                      : isLocked
+                        ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 hover:opacity-80'
+                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-1">
+                    <span>{freq}</span>
+                    {isLocked && <Crown className="h-3 w-3" />}
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Upgrade Modal */}
       <UpgradeModal

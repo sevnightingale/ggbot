@@ -33,12 +33,15 @@ Complete history of features, fixes, and improvements. For current status see AC
 - Banner: "Need help building your strategy? Launch AI Assistant" w/ brass CTA button
 - Files: UniversalAIAssistant.tsx, StrategyEditor.tsx, ConfigureLayout.tsx, forge/page.tsx
 
-**Configure Tab Reorganization** - Strategy-first layout, logical component order
+**Configure Tab Reorganization** - Strategy-first layout, streamlined components
 - Tab order: Strategy (1st), Market Data (2nd), Trade Settings (3rd), Signals (4th)
-- Strategy section order: Analysis Frequency → Strategy Prompt → Full Prompt → LLM Selection
-- AI Assistant banner at top of Strategy Prompt section (most contextually relevant)
+- Strategy section order: Strategy Prompt (w/ AI Assistant banner) → LLM Selection → Analysis Frequency
+- Removed "Complete Prompt Template" collapsible section (simplified UX, -70 lines)
+- Analysis Frequency: 4 options → 7 options (5m, 15m, 30m, 1h, 4h, 1d, 1w), compact 7-column grid
+- Frequency buttons: Removed "Every" prefix, smaller padding (px-3 py-2), tighter spacing (gap-2)
 - Configure page defaults to Strategy tab for scheduled/signal_validation bots
 - Files: ConfigTabs.tsx, StrategyEditor.tsx
+- Bundle size: 330 kB → 329 kB (-1 kB from removed sections)
 
 **ActivationBar UX Overhaul** - Replaced pipeline ticker + backend messages w/ activity-based status + KPIs
 - SSE now reads account_snapshots (UniversalAccountMonitor) instead of paper_accounts, removed live API enrichment
