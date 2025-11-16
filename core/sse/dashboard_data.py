@@ -278,7 +278,9 @@ async def _enhance_accounts_with_portfolio_data(accounts: List[Dict[str, Any]]) 
             enhanced_accounts.append(enhanced_account)
 
         except Exception as e:
-            logger.error(f"Failed to enhance account {account.get('config_id', 'unknown')} with portfolio data: {e}")
+            # Transient DB errors (SSL, connection timeouts) are expected with Supabase
+            # Gracefully degrade - return account without portfolio enhancement
+            logger.warning(f"Failed to enhance account {account.get('config_id', 'unknown')} with portfolio data: {e}")
             # Return original account data on error
             enhanced_accounts.append(account)
 

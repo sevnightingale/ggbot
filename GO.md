@@ -85,14 +85,15 @@ As you work on tasks, **keep TODO.md updated in real-time**:
 
 When a significant feature/fix is done:
 
-1. **Update CHANGELOG.md** (COMPRESSED FORMAT):
+1. **Update CHANGELOG.md** (TELEGRAPHIC STYLE - CRITICAL):
    - Add entry under date: `## YYYY-MM-DD - Brief Title`
-   - Use **ultra-concise bullet points** - sacrifice grammar for brevity
-   - Format: `- **Category**: What changed, key metric, files`
-   - Example: `- **Tool**: get_current_price - Sub-ms WebSocket lookup with REST fallback`
+   - **TELEGRAPHIC STYLE**: Omit articles (a, an, the), conjunctions where possible
+   - Maintain specificity: file references, error details, technical accuracy
+   - Example: "WebSocket cache 3 candles, bots need 100 → RSI failed" NOT "The WebSocket cache had 3 candles but bots requested 100"
    - NO paragraphs, NO explanations, NO narrative - ONLY essential facts
    - Include: files changed, performance numbers, bug root cause (1 line max)
-   - Target: 3-8 bullets per entry, NOT 20+ line paragraphs
+   - Target: 3-8 lines per entry for recent work, 1-3 lines for older entries
+   - See CHANGELOG.md header for full style guide
 
 2. **Update TODO.md**:
    - Move completed checkbox items from TODO → CHANGELOG

@@ -59,6 +59,15 @@ pm2 restart ggbot       # Restart after code changes
 - **Type hints**: Follow PEP 484 where possible
 - **Error handling**: Use specific exceptions, log with `core.common.logger`
 
+### Documentation Style
+
+**CHANGELOG.md - Telegraphic Style (CRITICAL)**:
+- Omit articles (a, an, the) and conjunctions where possible
+- Maintain specificity: include file references, error details, technical accuracy
+- Target 3-8 lines per entry for recent work, 1-3 lines for older entries
+- Example: "WebSocket cache 3 candles, bots need 100 → RSI failed" NOT "The WebSocket cache had 3 candles but the bots requested 100 which caused RSI to fail"
+- See CHANGELOG.md header and GO.md "When Work is Completed" section for complete guidelines
+
 ### Logging Pattern
 ```python
 from core.common.logger import logger

@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-15 17:58:10 UTC (Auto-updated by status_check.py)
-**System Health**: 🟡 LOW ACTIVITY
+**Last Updated**: 2025-11-16 00:33:34 UTC (Auto-updated by status_check.py)
+**System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
@@ -13,28 +13,28 @@
 
 ### Bot Statistics
 - **Total Bots**: 378
-- **Active Bots**: 2 (0.5%)
-  - Paper Trading: 1
+- **Active Bots**: 3 (0.8%)
+  - Paper Trading: 2
   - Live Trading: 0
-- **Inactive Bots**: 376
+- **Inactive Bots**: 375
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,457
+- **Total Trades (All Time)**: 5,459
   - Wins: 1,638
-  - Losses: 3,819
-  - Platform Win Rate: 30.02%
-  - Total P&L: $-15,996.58
+  - Losses: 3,821
+  - Platform Win Rate: 30.01%
+  - Total P&L: $-15,998.84
 - **Recent Activity**:
-  - Last 24 hours: 0 trades
-  - Last 7 days: 6 trades
-  - Last 30 days: 3655 trades
+  - Last 24 hours: 2 trades
+  - Last 7 days: 8 trades
+  - Last 30 days: 3611 trades
 
 ### Open Positions
 - **Open Positions**: 1
 - **Unique Symbols**: 1
 - **Total Exposure**: $100.00
-- **Unrealized P&L**: $-1.23
+- **Unrealized P&L**: $-0.45
 
 ### Account Balances (Paper Trading)
 - **Average Balance**: $9,900.19
@@ -43,15 +43,17 @@
 
 ### Top Trading Symbols (Active Bots)
 
+- **BTC/USDT**: 2 bots
 - **ADA/USDT**: 1 bots
-- **BTC/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
+- **wait**: 4 decisions (avg confidence: 0.0%)
+- **enter**: 1 decisions (avg confidence: 65.0%)
 
 ### System Health
-- **Decisions (last hour)**: 0
-- **Status**: 🟡 LOW ACTIVITY
+- **Decisions (last hour)**: 3
+- **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
 
@@ -59,22 +61,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0.1% | 60MB | 41m | 52 |
-| x-bot | 🟢 online | 0% | 38MB | 41m | 52 |
-| error-alerts | 🟢 online | 0% | 32MB | 41m | 59 |
-| market-data-ws | 🟢 online | 1.8% | 172MB | 41m | 54 |
-| ggbot | 🟢 online | 1.6% | 248MB | 41m | 155 |
-| account-monitor | 🟢 online | 0.5% | 102MB | 41m | 5 |
+| signal-listener | 🟢 online | 0% | 63MB | 32m | 54 |
+| x-bot | 🟢 online | 0% | 41MB | 32m | 54 |
+| error-alerts | 🟢 online | 0% | 33MB | 32m | 61 |
+| market-data-ws | 🟢 online | 1.8% | 174MB | 32m | 56 |
+| ggbot | 🟢 online | 1.5% | 250MB | 25m | 161 |
+| account-monitor | 🟢 online | 0.9% | 107MB | 32m | 8 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (47%)
-- **Memory**: 2.0Gi / 3.8Gi
-- **CPU Load**: 0.23 / 0.15 / 0.21 (1m/5m/15m)
+- **Memory**: 1.9Gi / 3.8Gi
+- **CPU Load**: 0.89 / 0.52 / 0.53 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 16.37M)
+- **Redis**: 🟢 connected (Memory: 16.48M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -353,7 +355,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-15 17:58:11 UTC
+**Last Updated**: 2025-11-16 00:33:35 UTC
 
 ---
 
@@ -402,7 +404,7 @@ df -h
 | `is_heartbeat` | boolean | ✓ | false |
 | `created_at` | timestamp with time zone |  | now() |
 
-### `activities` (23 columns)
+### `activities` (25 columns)
 
 **Primary Key**: `activity_id`
 
@@ -411,6 +413,7 @@ df -h
 
 **Indexes**:
 - `idx_activities_billing` on (user_id, created_at, stripe_reported)
+- `idx_activities_chart_data` on (config_id, created_at, account_balance)
 - `idx_activities_config_billing` on (config_id, created_at)
 - `idx_activities_config_time` on (config_id, created_at)
 - `idx_activities_decision` on (decision_id)
@@ -444,6 +447,8 @@ df -h
 | `platform_cost_usd` | numeric | ✓ |  |
 | `stripe_reported` | boolean | ✓ | false |
 | `stripe_reported_at` | timestamp with time zone | ✓ |  |
+| `account_balance` | numeric | ✓ |  |
+| `account_pnl` | numeric | ✓ |  |
 
 ### `agent_sessions` (5 columns)
 
@@ -1194,7 +1199,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-15 17:58:11 UTC
+**Last Updated**: 2025-11-16 00:33:35 UTC
 
 ---
 

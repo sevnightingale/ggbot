@@ -63,16 +63,22 @@ class TechnicalIndicators:
     def calculate_rsi(self, df: pd.DataFrame, length: int = 14) -> Dict[str, Any]:
         """
         Calculate RSI with simple analytical context.
-        
+
         Args:
             df: DataFrame with OHLCV data
             length: RSI period (default: 14)
-            
+
         Returns:
             Dictionary with RSI values and analysis
         """
         if len(df) < length + 1:
-            raise ValueError(f"Need at least {length + 1} periods for RSI calculation, got {len(df)}")
+            self._log.debug(f"Insufficient data for RSI: need {length + 1} periods, got {len(df)}")
+            return {
+                "error": "insufficient_data",
+                "required_periods": length + 1,
+                "available_periods": len(df),
+                "message": f"Need at least {length + 1} candles for RSI, currently have {len(df)}"
+            }
         
         # Calculate RSI using pandas-ta
         rsi_series = ta.rsi(df['close'], length=length)
@@ -114,7 +120,12 @@ class TechnicalIndicators:
         """
         min_periods = slow + signal
         if len(df) < min_periods:
-            raise ValueError(f"Need at least {min_periods} periods for MACD calculation, got {len(df)}")
+            self._log.debug(f"Insufficient data for MACD: need {min_periods} periods, got {len(df)}")
+            return {
+                "error": "insufficient_data",
+                "required_periods": min_periods,
+                "available_periods": len(df)
+            }
         
         # Calculate MACD using pandas-ta
         macd_result = ta.macd(df['close'], fast=fast, slow=slow, signal=signal)

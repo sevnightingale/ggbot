@@ -219,7 +219,8 @@ class SymphonyAccountAdapter(AccountAdapter):
             self._position_cache[config_id] = current_open
 
         except Exception as e:
-            self._log.error(f"Failed to detect Symphony closes for {config_id}: {e}")
+            # Transient errors (API timeouts, SSL issues) are expected and will retry in 5s
+            self._log.warning(f"Failed to detect Symphony closes for {config_id}: {e}")
 
     async def supports_balance(self) -> bool:
         """

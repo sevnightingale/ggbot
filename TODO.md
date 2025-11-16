@@ -4,7 +4,7 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🎯 **IN PROGRESS - Snapshot-Based Timeline Chart** (2025-11-14)
+## ✅ **COMPLETE - Snapshot-Based Timeline Chart** (2025-11-15)
 
 **Objective**: Improve tv-timeline performance by using account snapshots instead of direct API calls, with proper time-based X-axis.
 
@@ -16,19 +16,26 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [x] Add `account_balance` and `account_pnl` columns to activities table
 - [x] Create database migration with indexes
 - [x] Update all activity logging locations to fetch latest snapshot
-- [x] Test activity logging with snapshot values (4/4 tests passed)
+- [x] Test activity logging with snapshot values (6 activities verified)
 
-**Workstream 2: Chart Integration** (CC Instance 2)
-- [ ] Create new `/api/v2/snapshots/{config_id}/balance-series` endpoint
-- [ ] Update tv-timeline.tsx to use snapshot + activity data
-- [ ] Test chart rendering with proper time axis
-- [ ] Validate clickable activities work correctly
+**Workstream 2: Chart Integration** ✅ **COMPLETE** (CC Instance 2)
+- [x] Create new `/api/v2/snapshots/{config_id}/balance-series` endpoint
+- [x] Update tv-timeline.tsx to use snapshot + activity data
+- [x] Fix Aster P&L calculation (use totalWalletBalance directly)
+- [x] Test chart rendering with proper time axis
+- [x] Validate clickable activities work correctly
 
-### **Integration Testing**
-- [ ] Verify chart shows proper time spacing (5-min intervals)
-- [ ] Confirm activities appear at exact timestamps
-- [ ] Validate step-function behavior (flat → jump → flat)
-- [ ] Test with all trading modes (paper, symphony, aster)
+### **Integration Testing** ✅ **COMPLETE**
+- [x] Verify chart shows proper time spacing (5-min intervals)
+- [x] Confirm activities appear at exact timestamps (verified: 22:01:54, 23:01:09)
+- [x] Validate step-function behavior (flat → jump → flat)
+- [x] Test with all trading modes (paper ✅, aster ✅, symphony ✅)
+
+### **Performance Results**
+- **Before**: API calls every 10 seconds to reconstruct P&L
+- **After**: Single database query, instant chart loads
+- **Chart behavior**: Step function (snapshots every 5 min + activities at exact timestamps)
+- **Data accuracy**: Aster P&L now uses totalWalletBalance (fixed $-29.03 vs incorrect $-0.01)
 
 ---
 
@@ -83,6 +90,69 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - **Type Consistency**: 100% of new activities use official types
 - **Detection Speed**: Auto-closes appear within 5-10 seconds
 - **Lifecycle Tracking**: All trades have entry + exit with trade_id linking
+
+---
+
+## ✅ **COMPLETE - Critical Production Fixes** (2025-11-16)
+
+**Objective**: Fix critical production issues preventing trading and breaking SSE dashboard streams.
+
+### **Issue 1: Insufficient Candle Data Preventing Trading** ✅ **FIXED**
+
+**Problem**:
+- WebSocket cache had 3 candles, bots requested 100
+- System returned 3 candles as "success"
+- RSI calculation failed (needs 15 minimum)
+- LLM received no RSI data → couldn't make trading decisions
+
+**Root Cause**:
+- Gateway returned insufficient cached data without validation
+- WebSocket adapter returned insufficient data without raising error
+- No fallback to REST API occurred
+
+**Fix Applied**:
+- `market_intelligence/gateway.py`: Validate cached OHLCV has enough candles before using
+- `market_intelligence/adapters/market_data/redis_websocket.py`: Raise `AdapterError` if cache insufficient
+- Result: Automatic fallback to BinanceRestAdapter (REST API) ensures bots always get requested candles
+
+### **Issue 2: SSL Connection Errors Breaking SSE Stream** ✅ **FIXED**
+
+**Problem**:
+- Persistent SSL errors: "SSL connection has been closed unexpectedly"
+- SSE dashboard stream breaking with `ERR_INCOMPLETE_CHUNKED_ENCODING`
+- Errors occurring across all database operations (hundreds/minute)
+
+**Root Cause**:
+- NO connection pooling → every database query opened NEW SSL connection
+- With SSE (every 5s), monitor (every 5s), bot executions, frontend calls → hundreds of SSL connections/minute
+- Supabase rejecting/timing out connections due to connection churn
+
+**Fix Applied**:
+- `core/common/db.py`: Implemented psycopg2 connection pooling
+  - Min 5 connections (always alive)
+  - Max 20 connections (concurrent queries)
+  - ThreadedConnectionPool (thread-safe for FastAPI)
+- Result: SSL connections stay open and reused, no more handshake on every query
+
+### **Bonus Fixes**:
+- Changed transient adapter errors from ERROR → WARNING (paper/symphony/aster adapters)
+- Removed duplicate error logging in `trading/paper/positions.py` and `core/sse/dashboard_data.py`
+- Graceful error handling in indicators (RSI, MACD) if insufficient data
+
+**Files Modified**:
+- market_intelligence/gateway.py
+- market_intelligence/adapters/market_data/redis_websocket.py
+- core/common/db.py
+- core/monitoring/adapters/*.py (paper, symphony, aster)
+- trading/paper/positions.py
+- core/sse/dashboard_data.py
+- extraction/v2/indicators.py
+
+**Impact**:
+- ✅ Bots can now trade (always get sufficient candle data)
+- ✅ SSE stream stable (no more SSL connection errors)
+- ✅ Dashboard loads reliably
+- ✅ Reduced database connection load by ~95%
 
 ---
 

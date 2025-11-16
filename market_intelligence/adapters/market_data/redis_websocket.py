@@ -92,7 +92,14 @@ class RedisWebSocketAdapter(DataAdapter):
             # Sort by timestamp (oldest first)
             df = df.sort_values('timestamp').reset_index(drop=True)
 
-            # Limit to requested number of candles
+            # Validate we have enough candles
+            if len(df) < limit:
+                raise AdapterError(
+                    f"Insufficient candles in Redis cache: have {len(df)}, need {limit}. "
+                    f"WebSocket cache may still be warming up. Falling back to REST API."
+                )
+
+            # Limit to requested number of candles (if we have more than needed)
             if len(df) > limit:
                 df = df.tail(limit).reset_index(drop=True)
 

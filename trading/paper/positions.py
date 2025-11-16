@@ -258,7 +258,8 @@ class PositionManager:
                     )
                     
         except Exception as e:
-            logger.error(f"Failed to get portfolio summary for {config_id}: {e}")
+            # Transient DB errors (SSL, connection timeouts) are common with Supabase
+            # Let caller decide how to log/handle - don't log here to avoid duplicates
             raise
     
     async def get_position_risk_metrics(self, config_id: str) -> Dict[str, Any]:

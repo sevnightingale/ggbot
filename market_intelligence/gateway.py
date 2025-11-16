@@ -111,10 +111,33 @@ class MarketIntelligence:
 
         # Check cache
         cached_data = await self.cache_manager.get(cache_key, cache_config)
+        use_cache = False  # Track if we should use cached data
+
         if cached_data:
             latency_ms = (time.time() - start_time) * 1000
-            self._log.info(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
 
+            # For OHLCV data, validate we have enough candles
+            if data_type == 'ohlcv' and isinstance(cached_data, list):
+                df = pd.DataFrame(cached_data)
+                limit = validated_params.get('limit', 200)
+
+                if len(df) < limit:
+                    # Cache doesn't have enough data - treat as miss
+                    self._log.warning(
+                        f"Cache insufficient for {data_type}: {cache_key} "
+                        f"(has {len(df)} candles, need {limit}). Falling back to REST API."
+                    )
+                    cached_data = None
+                else:
+                    # Cache has enough data - use it
+                    use_cache = True
+                    self._log.info(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
+            else:
+                # Non-OHLCV data or already wrapped - use cache
+                use_cache = True
+                self._log.info(f"Cache hit for {data_type}: {cache_key} ({latency_ms:.0f}ms)")
+
+        if use_cache and cached_data:
             # Wrap cached data in AdapterResponse if it's not already
             if isinstance(cached_data, AdapterResponse):
                 adapter_response = cached_data

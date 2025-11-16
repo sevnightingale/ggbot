@@ -218,7 +218,8 @@ class AsterAccountAdapter(AccountAdapter):
             self._last_income_check[config_id] = datetime.now(timezone.utc)
 
         except Exception as e:
-            self._log.error(f"Failed to detect Aster closes for {config_id}: {e}")
+            # Transient errors (API timeouts, connection issues) are expected and will retry in 5s
+            self._log.warning(f"Failed to detect Aster closes for {config_id}: {e}")
 
     async def supports_balance(self) -> bool:
         """AsterDEX provides balance data."""

@@ -1,6 +1,7 @@
 # common/db.py
 import json
 import psycopg2
+from psycopg2 import pool
 from decimal import Decimal
 from contextlib import contextmanager
 import os
@@ -9,6 +10,9 @@ from dotenv import load_dotenv
 
 # Load environment variables
 load_dotenv()
+
+# Global connection pool (initialized on first use)
+_connection_pool = None
 
 
 class DecimalEncoder(json.JSONEncoder):
@@ -22,19 +26,19 @@ def get_database_url():
     """Get database connection URL, preferring Supabase over legacy config."""
     supabase_url = os.getenv("SUPABASE_URL")
     supabase_key = os.getenv("SUPABASE_SERVICE_KEY")
-    
+
     if supabase_url and supabase_key:
         # Parse Supabase URL to get database connection details
         # Supabase URL format: https://project-ref.supabase.co
         # Database URL format: postgresql://postgres:[password]@db.project-ref.supabase.co:5432/postgres
         parsed = urlparse(supabase_url)
         project_ref = parsed.netloc.split('.')[0]
-        
+
         # Get database password from service key (you'll need to set this in .env)
         db_password = os.getenv("SUPABASE_DB_PASSWORD")
         if not db_password:
             raise ValueError("SUPABASE_DB_PASSWORD environment variable required for database connection")
-            
+
         # Use transaction pooler for IPv4 compatibility (direct db only has IPv6)
         return f"postgresql://postgres.{project_ref}:{db_password}@aws-1-ap-southeast-1.pooler.supabase.com:6543/postgres"
     else:
@@ -42,24 +46,42 @@ def get_database_url():
         from core.common.config import DB_HOST, DB_PORT, DB_NAME, DB_USER, DB_PASS
         return f"postgresql://{DB_USER}:{DB_PASS}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
+def _get_connection_pool():
+    """Get or create the global connection pool."""
+    global _connection_pool
+
+    if _connection_pool is None:
+        database_url = get_database_url()
+        # Create a connection pool with min 5, max 20 connections
+        # This reduces SSL connection churn dramatically
+        _connection_pool = pool.ThreadedConnectionPool(
+            minconn=5,   # Keep 5 connections alive at all times
+            maxconn=20,  # Allow up to 20 concurrent connections
+            dsn=database_url
+        )
+
+    return _connection_pool
+
 @contextmanager
 def get_db_connection():
     """
-    Context manager to safely handle database connections.
+    Context manager to safely handle database connections using connection pooling.
     Automatically uses Supabase if configured, otherwise falls back to legacy config.
-    
+
+    Connection pool reduces SSL connection churn from hundreds/minute to ~5-20 persistent connections.
+
     Usage:
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("SELECT * FROM some_table")
             results = cur.fetchall()
     """
-    database_url = get_database_url()
-    conn = psycopg2.connect(database_url)
+    pool = _get_connection_pool()
+    conn = pool.getconn()  # Get connection from pool (reuses existing SSL connection)
     try:
         yield conn
     finally:
-        conn.close()
+        pool.putconn(conn)  # Return connection to pool (keeps SSL connection alive)
 
 def upsert_market_data(user_id, symbol, config_id, data_dict, data_type=None, source=None, timeframe='mixed'):
     """
