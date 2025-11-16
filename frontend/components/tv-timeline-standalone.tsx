@@ -159,7 +159,10 @@ export default function TVTimelineStandalone({ configId, title, variant = 'stand
           },
         },
         localization: {
-          priceFormatter: (price: number) => `$${price.toFixed(2)}`,
+          priceFormatter: (price: number) => {
+            if (price == null || isNaN(price)) return '$—';
+            return `$${price.toFixed(2)}`;
+          },
         },
       });
 
