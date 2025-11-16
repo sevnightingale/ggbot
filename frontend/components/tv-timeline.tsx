@@ -663,48 +663,50 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           }
         }
       `}</style>
-      {/* HEADER */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-5 pt-5 pb-4">
-        <div className="rounded-xl border p-4 sm:p-6" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair }}>
-          <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 sm:gap-6">
-            <div className="flex-1 min-w-0">
-              <h1 className="text-xl sm:text-2xl md:text-3xl leading-tight tracking-tight">
-                {title ?? info?.botName ?? 'Activity Timeline'}
-              </h1>
-              <div className="flex items-center gap-2 font-mono text-xs sm:text-sm" style={{ color: 'rgba(237,235,231,0.7)' }}>
-                <div
-                  className="w-2 h-2 rounded-full"
-                  style={{
-                    backgroundColor: getStatusColor(),
-                    animation: 'statusPulse 2s ease-in-out infinite'
-                  }}
-                />
-                <span>{statusText || 'ARENA STATUS'}</span>
+      {/* HEADER - Only shown in standalone mode, hidden in embedded mode (KPIs shown in ActivationBar) */}
+      {variant === 'standalone' && (
+        <section className="max-w-7xl mx-auto px-4 sm:px-5 pt-5 pb-4">
+          <div className="rounded-xl border p-4 sm:p-6" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair }}>
+            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 sm:gap-6">
+              <div className="flex-1 min-w-0">
+                <h1 className="text-xl sm:text-2xl md:text-3xl leading-tight tracking-tight">
+                  {title ?? info?.botName ?? 'Activity Timeline'}
+                </h1>
+                <div className="flex items-center gap-2 font-mono text-xs sm:text-sm" style={{ color: 'rgba(237,235,231,0.7)' }}>
+                  <div
+                    className="w-2 h-2 rounded-full"
+                    style={{
+                      backgroundColor: getStatusColor(),
+                      animation: 'statusPulse 2s ease-in-out infinite'
+                    }}
+                  />
+                  <span>{statusText || 'ARENA STATUS'}</span>
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* KPI Row */}
-          {info && (
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 mt-4">
-              {[
-                { k: 'Balance', v: `$${Math.round(info.currentBalance).toLocaleString()}` },
-                { k: 'P/L', v: `${info.currentBalance - info.startingBalance >= 0 ? '+' : ''}${Math.round(info.currentBalance - info.startingBalance).toLocaleString()}` },
-                { k: 'Trades', v: String(info.totalTrades) },
-                { k: 'Win Rate', v: `${Math.round(info.winRate)}%` },
-                { k: 'Perf', v: typeof info.performance === 'number' && info.performance != null ? `${info.performance.toFixed(2)}%` : 'N/A' },
-              ].map((d, i) => (
-                <div key={i} className="border rounded-lg px-3 py-2" style={{ borderColor: VIBE.hair }}>
-                  <div className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                    {d.k}
+            {/* KPI Row */}
+            {info && (
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 sm:gap-3 mt-4">
+                {[
+                  { k: 'Balance', v: `$${Math.round(info.currentBalance).toLocaleString()}` },
+                  { k: 'P/L', v: `${info.currentBalance - info.startingBalance >= 0 ? '+' : ''}${Math.round(info.currentBalance - info.startingBalance).toLocaleString()}` },
+                  { k: 'Trades', v: String(info.totalTrades) },
+                  { k: 'Win Rate', v: `${Math.round(info.winRate)}%` },
+                  { k: 'Perf', v: typeof info.performance === 'number' && info.performance != null ? `${info.performance.toFixed(2)}%` : 'N/A' },
+                ].map((d, i) => (
+                  <div key={i} className="border rounded-lg px-3 py-2" style={{ borderColor: VIBE.hair }}>
+                    <div className="text-[10px] uppercase tracking-[0.18em]" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      {d.k}
+                    </div>
+                    <div className="text-lg sm:text-xl leading-snug">{d.v}</div>
                   </div>
-                  <div className="text-lg sm:text-xl leading-snug">{d.v}</div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </section>
+                ))}
+              </div>
+            )}
+          </div>
+        </section>
+      )}
 
       {/* CHART */}
       <section className="max-w-7xl mx-auto px-4 sm:px-5 pb-5">

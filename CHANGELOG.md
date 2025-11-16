@@ -6,6 +6,50 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-16 - Universal AI Assistant Implementation
+
+**Universal AI Assistant Deployed** - Claude Haiku function calling for bot configuration assistance
+- Single endpoint `/api/v2/assistant/chat` w/ 3 tools (query_available_data, load_full_config, update_full_config)
+- Works for ALL bot types: agent (strategy building), scheduled (config sections), signal_validation
+- Bottom sheet modal (framer-motion) overlays configure pages, draggable/collapsible
+- Bot-type aware system prompts, deep merge for partial config updates
+- Cost: ~$0.016/session (~$16/mo @ 1000 users), conversation history in React state
+- Auto-refreshes parent config when AI makes changes
+- Files: api/assistant.py, frontend/components/UniversalAIAssistant.tsx, frontend/app/forge/page.tsx
+- Planning: DOCS/todo/strategy_builder_api.md (new simplified approach), archived complex PM2/SDK version
+
+**TypeScript Build Fixes** - Frontend build compilation passing, all type errors resolved
+- Added Activity, ConversationMessage, AccountData interfaces for proper typing
+- Removed unused executionStatus/statusMessage state (linter cleaned old status tracking)
+- Type assertions for Record<string, unknown> fields in ActivationBar activity details
+- Config auto-reload after AI updates via apiClient.getConfig() → setAllBots merge
+- Build: 15 pages generated, 330 kB /forge bundle, zero TS/ESLint errors
+
+**ActivationBar UX Overhaul** - Replaced pipeline ticker + backend messages w/ activity-based status + KPIs
+- SSE now reads account_snapshots (UniversalAccountMonitor) instead of paper_accounts, removed live API enrichment
+- ActivationBar Option A layout: Row 1 (bot name + activity status + controls), Row 2 (5 KPI cards)
+- Removed PipelineTicker (Extraction→Decision→Trading circles), removed backend orchestration messages
+- Activity-based status w/ 9 types (trade_entry, trade_exit, market_query, llm_thought, agent_wait, price_check, observation_recorded, strategy_updated, signal_received)
+- Braille spinner always active, 3 rotating message variants/4s, live time updates/1s
+- Status pulls real data from activity details: symbol, price, P/L, confidence, leverage, countdown for agent_wait
+- TVTimeline KPI header hidden in embedded mode (shown in ActivationBar), visible standalone only
+- Latest activity fetched every 30s from /api/v2/activities/{config_id}?limit=1
+- Files: core/sse/dashboard_data.py, ActivationBar.tsx, page.tsx (ForgeApp), tv-timeline.tsx
+
+---
+
+## 2025-11-16 - Metered Billing Production Deployment
+
+**Metered Billing System Verified LIVE** - Stripe Billing Meters operational w/ weekly invoicing
+- Verified meter events sent successfully ($0.107734 aggregated current period)
+- APScheduler midnight UTC runs confirmed (17 activities reported to date)
+- Meter aggregation perfectly aligned w/ subscription billing period (Nov 13-20)
+- Invoice preview shows $0 until period end (expected Stripe behavior for metered usage)
+- First production invoice: Nov 20, 2025 @ 19:04:46 UTC
+- Files: billing/stripe_meter_reporter.py, DOCS/completed/METERED_BILLING_IMPLEMENTATION.md
+
+---
+
 ## 2025-11-16 - OpenRouter Migration + Symphony Fix
 
 **OpenRouter Migration Complete** - Full migration from 'default' provider to OpenRouter unified API

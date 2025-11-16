@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-16 00:33:34 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-16 06:42:57 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -28,13 +28,13 @@
 - **Recent Activity**:
   - Last 24 hours: 2 trades
   - Last 7 days: 8 trades
-  - Last 30 days: 3611 trades
+  - Last 30 days: 3549 trades
 
 ### Open Positions
 - **Open Positions**: 1
 - **Unique Symbols**: 1
 - **Total Exposure**: $100.00
-- **Unrealized P&L**: $-0.45
+- **Unrealized P&L**: $0.34
 
 ### Account Balances (Paper Trading)
 - **Average Balance**: $9,900.19
@@ -48,11 +48,11 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 4 decisions (avg confidence: 0.0%)
-- **enter**: 1 decisions (avg confidence: 65.0%)
+- **wait**: 10 decisions (avg confidence: 37.7%)
+- **enter**: 2 decisions (avg confidence: 70.0%)
 
 ### System Health
-- **Decisions (last hour)**: 3
+- **Decisions (last hour)**: 1
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -61,22 +61,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 63MB | 32m | 54 |
-| x-bot | 🟢 online | 0% | 41MB | 32m | 54 |
-| error-alerts | 🟢 online | 0% | 33MB | 32m | 61 |
-| market-data-ws | 🟢 online | 1.8% | 174MB | 32m | 56 |
-| ggbot | 🟢 online | 1.5% | 250MB | 25m | 161 |
-| account-monitor | 🟢 online | 0.9% | 107MB | 32m | 8 |
+| signal-listener | 🟢 online | 0% | 63MB | 6h 5m | 55 |
+| x-bot | 🟢 online | 0% | 40MB | 6h 5m | 55 |
+| error-alerts | 🟢 online | 0% | 32MB | 6h 5m | 62 |
+| market-data-ws | 🟢 online | 0% | 173MB | 6h 5m | 57 |
+| ggbot | 🟢 online | 1.8% | 261MB | 3h 50m | 164 |
+| account-monitor | 🟢 online | 5.5% | 117MB | 3h 50m | 10 |
 
 ### VM Resources
 
 - **Disk**: 36G / 78G (47%)
-- **Memory**: 1.9Gi / 3.8Gi
-- **CPU Load**: 0.89 / 0.52 / 0.53 (1m/5m/15m)
+- **Memory**: 2.1Gi / 3.8Gi
+- **CPU Load**: 0.51 / 0.35 / 0.28 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 16.48M)
+- **Redis**: 🟢 connected (Memory: 11.65M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -231,6 +231,16 @@
 - **Error Monitoring**: Catches and reports system errors
 - **Telegram Alerts**: Real-time notifications to admin channels
 
+### **Metered Billing System** (Production Live - 2025-11-16)
+- **Stripe Billing Meters**: Tracks LLM usage costs with 70% markup
+- **Daily Reporting**: APScheduler job runs midnight UTC, aggregates unreported activities
+- **Activity Logging**: All LLM calls tracked with provider/platform costs, tokens (input/output/reasoning)
+- **Meter Aggregation**: Real-time event reporting, Stripe aggregates for billing period
+- **Weekly Invoicing**: Usage-based subscriptions billed weekly (configurable)
+- **Production Metrics**: $0.107734 aggregated current period, 17 activities reported to date
+- **Next Invoice**: Nov 20, 2025 @ 19:04:46 UTC (first production invoice)
+- **Documentation**: Complete guide in DOCS/completed/METERED_BILLING_IMPLEMENTATION.md
+
 ### **Market Intelligence**
 **32 data points across 7 categories (8 Grok-powered sources LIVE):**
 - **Technical Analysis** (21 indicators): RSI, MACD, Bollinger Bands, volume, momentum, trend
@@ -310,25 +320,38 @@ df -h
 
 ## 💳 Stripe Subscription System
 
-### Pro Plan Features ($29/month)
-| Feature | Free Plan | Pro Plan |
-|---------|-----------|----------|
-| **Active Bots** | 1 bot | 10 bots |
-| **Analysis Frequency** | 1 hour minimum | 5 minutes minimum |
-| **AI Models** | Default Model | Frontier Reasoning Models (GPT-5, Claude Opus 4, Grok 4, DeepSeek R1) |
-| **Live Trading** | ❌ | ✅ (Symphony.io integration) |
-| **Telegram Publishing** | ❌ | ✅ |
-| **Priority Support** | ❌ | ✅ |
+### Subscription Tiers
+| Feature | Free | Usage-Based | Pro |
+|---------|------|-------------|-----|
+| **Base Price** | $0/month | $0/month | $29/month |
+| **Bot Activation** | ❌ Browse only | ✅ Unlimited | ✅ Unlimited |
+| **LLM Usage** | N/A | Pay-per-use (1.70× markup) | Pay-per-use (1.70× markup) |
+| **Analysis Frequency** | N/A | 5 minutes minimum | 5 minutes minimum |
+| **AI Models** | N/A | 7 Frontier Models | 7 Frontier Models |
+| **Live Trading** | ❌ | ✅ (Symphony.io) | ✅ (Symphony.io) |
+| **Telegram Publishing** | ❌ | ✅ | ✅ |
+| **Agents** | ❌ | ❌ | ✅ Only PRO |
+| **Billing** | N/A | Weekly invoicing | Monthly + usage |
 
 ### Stripe Integration
 **Backend API Endpoints** (`/api/v2/`):
-- `POST /create-checkout-session` - Create Stripe Checkout with 14-day free trial
+- `POST /create-checkout-session` - Create Stripe Checkout (usage-based or PRO plans)
 - `POST /stripe-webhook` - Handle subscription events (HMAC verified)
 - `POST /create-portal-session` - Stripe billing portal for self-service management
 - `GET /me` - User profile with subscription status
+- `GET /billing/usage` - Current unreported usage with model breakdown
+- `GET /billing/usage/breakdown` - Per-bot and daily usage breakdown
+
+**Metered Billing System** (Production Live):
+- Daily meter reporting via APScheduler (midnight UTC)
+- Meter ID: `mtr_61TcMoxbXUvKBLQG741J9gH6H6LiHGyW`
+- Event Name: `llm_tokens_usd`
+- All LLM calls tracked with tokens and costs in `activities` table
+- 70% markup applied: `platform_cost_usd = provider_cost_usd × 1.70`
+- Weekly/monthly invoicing with real-time Stripe Billing Meters aggregation
 
 **Frontend Components**:
-- `<UpgradeModal>` - Pricing modal with monthly/annual toggle
+- `<UpgradeModal>` - Pricing modal with usage-based and PRO plans
 - `<PermissionGate>` - Premium feature gates
 - `<UserProfile>` - Subscription badge with upgrade/billing buttons
 
@@ -355,7 +378,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-16 00:33:35 UTC
+**Last Updated**: 2025-11-16 06:42:58 UTC
 
 ---
 
@@ -1199,7 +1222,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-16 00:33:35 UTC
+**Last Updated**: 2025-11-16 06:42:58 UTC
 
 ---
 

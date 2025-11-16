@@ -43,24 +43,8 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
             for bot in db_data['bots']:
                 _enhance_bot_with_runtime_data(bot)
 
-        # Enrich live positions and accounts from Symphony
-        if db_data.get('bots'):
-            positions, accounts = await _enrich_live_positions_and_accounts(
-                db_data['bots'],
-                db_data.get('positions', []),
-                db_data.get('accounts', [])
-            )
-            db_data['positions'] = positions
-            db_data['accounts'] = accounts
-
-        # Enhance paper accounts with portfolio analytics
-        # (Live accounts already enriched with Symphony data)
-        if db_data.get('accounts'):
-            paper_accounts = [a for a in db_data['accounts'] if a.get('source') == 'paper']
-            live_accounts = [a for a in db_data['accounts'] if a.get('source') == 'live']
-
-            enhanced_paper = await _enhance_accounts_with_portfolio_data(paper_accounts)
-            db_data['accounts'] = enhanced_paper + live_accounts
+        # NOTE: Account data now comes from account_snapshots table (written by UniversalAccountMonitor)
+        # No need to enrich live positions/accounts - already handled by background monitor
 
         return db_data
 
@@ -133,13 +117,22 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         WHERE rn <= 5  -- 5 most recent decisions per bot (no time filter)
     ),
     account_summaries AS (
-        SELECT pa.config_id, pa.account_id, pa.current_balance, pa.total_pnl,
-               pa.total_trades, pa.win_trades, pa.loss_trades, pa.open_positions,
-               pa.updated_at, 'paper' AS source
-        FROM paper_accounts pa
-        INNER JOIN bot_configs bc ON pa.config_id = bc.config_id
-        WHERE bc.trading_mode IS NULL OR bc.trading_mode = 'paper'
-        -- Note: Live accounts will be fetched via Symphony API
+        -- Get latest snapshot per config from universal account monitor
+        SELECT DISTINCT ON (asn.config_id)
+               asn.config_id,
+               asn.snapshot_id as account_id,
+               asn.current_balance,
+               asn.total_pnl,
+               asn.total_trades,
+               asn.win_trades,
+               asn.loss_trades,
+               asn.open_positions,
+               asn.win_rate,
+               asn.timestamp as updated_at,
+               asn.trading_mode as source
+        FROM account_snapshots asn
+        INNER JOIN bot_configs bc ON asn.config_id = bc.config_id
+        ORDER BY asn.config_id, asn.timestamp DESC
     )
     SELECT json_build_object(
         'bots', COALESCE((SELECT json_agg(

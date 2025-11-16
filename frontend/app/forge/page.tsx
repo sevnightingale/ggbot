@@ -16,7 +16,8 @@ import TVTimeline from '@/components/tv-timeline'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { AgentConfigurator } from './components/configure/AgentConfigurator'
 import { BotCreationModal } from './components/modals/BotCreationModal'
-import { Wrench } from 'lucide-react'
+import { UniversalAIAssistant } from '@/components/UniversalAIAssistant'
+import { Wrench, Sparkles } from 'lucide-react'
 
 interface Position {
   trade_id: string
@@ -29,6 +30,34 @@ interface Position {
   status: string
   opened_at: string
   leverage: number
+}
+
+interface Activity {
+  id: string
+  timestamp: string
+  type: string
+  priority: number
+  data: {
+    summary?: string
+    details?: Record<string, unknown>
+    symbol?: string
+    importance?: number
+    trade_id?: string
+    trade_type?: string
+    confidence?: number
+    leverage?: number
+    entry_price?: number
+    stop_loss_price?: number
+  }
+}
+
+interface AccountData {
+  config_id: string
+  current_balance: number
+  total_pnl: number
+  total_trades: number
+  win_rate?: number
+  win_trades?: number
 }
 
 function ForgeApp() {
@@ -44,6 +73,8 @@ function ForgeApp() {
   const [allBots, setAllBots] = useState<BotConfiguration[]>([])
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
+  const [accounts, setAccounts] = useState<AccountData[]>([])  // Account data from SSE
+  const [latestActivity, setLatestActivity] = useState<Activity | null>(null)  // Latest activity for status display
   const [dataSources, setDataSources] = useState<DataSource[]>([])
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
@@ -63,8 +94,6 @@ function ForgeApp() {
 
 
   // Real-time status tracking
-  const [executionStatus, setExecutionStatus] = useState<'idle' | 'extraction' | 'decision' | 'trading'>('idle')
-  const [statusMessage, setStatusMessage] = useState<string>('')
   const [nextRun, setNextRun] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<string>('')
 
@@ -93,6 +122,9 @@ function ForgeApp() {
 
   // Debounce timer for auto-save
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
+
+  // AI Assistant state
+  const [aiAssistantOpen, setAiAssistantOpen] = useState(false)
 
   // Start editing mode when configure tab is activated
   useEffect(() => {
@@ -126,8 +158,6 @@ function ForgeApp() {
     if (selectedConfigId && selectedBot) {
       // Clear operational data that should be bot-specific
       setPositions([])
-      setExecutionStatus('idle')
-      setStatusMessage('')
       setCountdown('')
       setNextRun(null)
 
@@ -381,15 +411,7 @@ function ForgeApp() {
             // Update bot execution status (extraction/decision/trading phases)
             if (data.bots) {
               const myBot = data.bots.find((b: { config_id: string }) => b.config_id === currentSelectedId)
-              if (myBot?.execution_status) {
-                const phase = myBot.execution_status.phase
-                if (phase === 'extracting') setExecutionStatus('extraction')
-                else if (phase === 'deciding') setExecutionStatus('decision')
-                else if (phase === 'trading') setExecutionStatus('trading')
-                else setExecutionStatus('idle')
-
-                setStatusMessage(myBot.execution_status.message || '')
-              }
+              // Execution status tracking removed - now shown via latestActivity in ActivationBar
 
               // Update next run time
               if (myBot?.next_run) {
@@ -422,6 +444,11 @@ function ForgeApp() {
             if (data.positions) {
               const myPositions = data.positions.filter((p: { config_id: string }) => p.config_id === currentSelectedId)
               setPositions(myPositions)
+            }
+
+            // Update accounts data (for KPIs in ActivationBar)
+            if (data.accounts) {
+              setAccounts(data.accounts)
             }
 
           } catch (error) {
@@ -511,6 +538,42 @@ function ForgeApp() {
     const interval = setInterval(updateCountdown, 1000)
     return () => clearInterval(interval)
   }, [nextRun, selectedBot])
+
+  // Fetch latest activity for selected bot (for status display when idle)
+  useEffect(() => {
+    if (!selectedConfigId || !user) {
+      setLatestActivity(null)
+      return
+    }
+
+    const fetchLatestActivity = async () => {
+      try {
+        const token = await getAuthToken()
+        if (!token) return
+
+        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+        const response = await fetch(`${apiUrl}/api/v2/activities/${selectedConfigId}?limit=1`, {
+          headers: { Authorization: `Bearer ${token}` }
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          if (data.activities && data.activities.length > 0) {
+            setLatestActivity(data.activities[0])
+          } else {
+            setLatestActivity(null)
+          }
+        }
+      } catch (error) {
+        console.error('Failed to fetch latest activity:', error)
+      }
+    }
+
+    fetchLatestActivity()
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchLatestActivity, 30000)
+    return () => clearInterval(interval)
+  }, [selectedConfigId, user])
 
   // Page visibility retry - retry failed loads when user returns to page
   useEffect(() => {
@@ -645,8 +708,6 @@ function ForgeApp() {
           ? { ...bot, state: 'inactive' as const }
           : bot
       ))
-      setExecutionStatus('idle')
-      setStatusMessage('')
       setNextRun(null)
       setCountdown('')
 
@@ -667,9 +728,7 @@ function ForgeApp() {
       const result = await apiClient.triggerBotManually(selectedBot.config_id)
       console.log('✅ Manual trigger result:', result)
 
-      // Set execution status to show it's running
-      setExecutionStatus('extraction')
-      setStatusMessage('Manual execution started...')
+      // Manual execution started - status will be tracked via SSE updates
 
     } catch (error) {
       console.error('❌ Failed to trigger bot manually:', error)
@@ -1361,25 +1420,49 @@ function ForgeApp() {
           {/* Main Content */}
           <main className="col-span-12 md:col-span-9 flex flex-col pb-16 md:pb-0">
             {/* ActivationBar - persistent across all tabs */}
-            {selectedBot && (
-              <ActivationBar
-                selectedBot={selectedBot}
-                executionStatus={executionStatus}
-                statusMessage={statusMessage}
-                countdown={countdown}
-                isStarting={isStarting}
-                isStopping={isStopping}
-                isManualTriggering={isManualTriggering}
-                onStart={handleStart}
-                onStop={handleStop}
-                onManualTrigger={handleManualTrigger}
-              />
-            )}
+            {selectedBot && (() => {
+              // Calculate metrics from accounts data for selected bot
+              const account = accounts.find(a => a.config_id === selectedConfigId)
+              const metrics = account ? {
+                balance: Number(account.current_balance || 0),
+                pnl: Number(account.total_pnl || 0),
+                trades: Number(account.total_trades || 0),
+                winRate: account.win_rate ? Number(account.win_rate) :
+                         (account.total_trades > 0 ? (Number(account.win_trades || 0) / Number(account.total_trades)) * 100 : 0),
+                performance: Number(account.total_pnl || 0)  // Performance in absolute USD for now
+              } : null
 
-            <TabNavigation
-              activeTab={activeTab}
-              onTabChange={setActiveTab}
-            />
+              return (
+                <ActivationBar
+                  selectedBot={selectedBot}
+                  countdown={countdown}
+                  isStarting={isStarting}
+                  isStopping={isStopping}
+                  isManualTriggering={isManualTriggering}
+                  onStart={handleStart}
+                  onStop={handleStop}
+                  onManualTrigger={handleManualTrigger}
+                  metrics={metrics}
+                  latestActivity={latestActivity}
+                />
+              )
+            })()}
+
+            <div className="flex items-center justify-between">
+              <TabNavigation
+                activeTab={activeTab}
+                onTabChange={setActiveTab}
+              />
+              {activeTab === 'configure' && selectedBot && (
+                <button
+                  onClick={() => setAiAssistantOpen(true)}
+                  className="px-4 py-2 bg-brass hover:bg-brass/90 text-obsidian rounded-lg flex items-center gap-2 transition-colors"
+                >
+                  <Sparkles className="w-4 h-4" />
+                  AI Assistant
+                </button>
+              )}
+            </div>
 
             <div className="flex-1 mt-4 pb-32">
               {selectedBot ? (
@@ -1462,6 +1545,29 @@ function ForgeApp() {
         onConfirm={handleCreateNewBot}
         existingBotCount={allBots.length}
       />
+
+      {/* Universal AI Assistant */}
+      {selectedBot && activeTab === 'configure' && (
+        <UniversalAIAssistant
+          configId={selectedBot.config_id}
+          botType={selectedBot.config_type as "agent" | "scheduled" | "signal_validation"}
+          isOpen={aiAssistantOpen}
+          onClose={() => setAiAssistantOpen(false)}
+          onConfigUpdate={async () => {
+            // Reload the selected bot's config when AI updates it
+            if (selectedConfigId) {
+              try {
+                const updatedBot = await apiClient.getConfig(selectedConfigId)
+                setAllBots(prev => prev.map(bot =>
+                  bot.config_id === selectedConfigId ? updatedBot : bot
+                ))
+              } catch (error) {
+                console.error('Failed to reload bot config after AI update:', error)
+              }
+            }
+          }}
+        />
+      )}
     </div>
   )
 }
