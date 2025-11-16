@@ -195,7 +195,7 @@ export function StrategyEditor({
                   Need help building your strategy?
                 </p>
                 <p className="text-xs text-[var(--text-muted)]">
-                  Launch AI Assistant to get guidance on creating effective trading strategies
+                  Get guidance on creating effective trading strategies with AI
                 </p>
               </div>
               <button
@@ -203,7 +203,7 @@ export function StrategyEditor({
                 className="flex-shrink-0 flex items-center gap-2 px-4 py-2 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] rounded-lg transition-colors font-medium"
               >
                 <MessageSquare className="w-4 h-4" />
-                <span>Launch Assistant</span>
+                <span>Launch Strategy Advisor</span>
               </button>
             </div>
           </div>
