@@ -361,7 +361,7 @@ async def load_full_config(config_id: str, user_id: str) -> Dict[str, Any]:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT config_type, config_data, config_name, selected_pair
+                    SELECT config_type, config_data, config_name
                     FROM configurations
                     WHERE config_id = %s AND user_id = %s
                 """, (config_id, user_id))
@@ -370,7 +370,10 @@ async def load_full_config(config_id: str, user_id: str) -> Dict[str, Any]:
                 if not result:
                     raise ValueError("Configuration not found")
 
-                config_type, config_data, config_name, selected_pair = result
+                config_type, config_data, config_name = result
+
+                # Extract selected_pair from config_data JSONB if it exists
+                selected_pair = config_data.get("selected_pair") if config_data else None
 
                 return {
                     "config_type": config_type,
