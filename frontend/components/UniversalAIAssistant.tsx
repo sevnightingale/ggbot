@@ -112,10 +112,10 @@ export function UniversalAIAssistant({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -20 }}
           transition={{ duration: 0.2 }}
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none"
+          className="fixed inset-0 z-50 flex items-start justify-center p-4 pt-2 pointer-events-none"
         >
           {/* Modal */}
-          <div className="pointer-events-auto flex flex-col bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-2xl h-[500px] max-h-[90vh]">
+          <div className="pointer-events-auto flex flex-col bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl shadow-2xl w-full max-w-2xl h-[500px] max-h-[50vh] md:max-h-[90vh]">
             {/* Header */}
             <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)] flex justify-between items-center">
               <div className="flex items-center gap-2">
