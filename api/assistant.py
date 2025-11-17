@@ -490,7 +490,7 @@ async def universal_assistant_chat(
 
         # Call Claude with tools
         response = client.messages.create(
-            model="claude-haiku-4-5-20250929",
+            model="claude-haiku-4-5-20251001",
             max_tokens=4096,
             system=system_prompt,
             messages=messages,
@@ -575,7 +575,7 @@ async def universal_assistant_chat(
 
             # Get next response
             response = client.messages.create(
-                model="claude-haiku-4-5-20250929",
+                model="claude-haiku-4-5-20251001",
                 max_tokens=4096,
                 system=system_prompt,
                 messages=messages,
