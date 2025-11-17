@@ -1557,6 +1557,8 @@ function ForgeApp() {
                 setAllBots(prev => prev.map(bot =>
                   bot.config_id === selectedConfigId ? updatedBot : bot
                 ))
+                // Also update editingConfigData immediately to refresh form fields
+                setEditingConfigData(updatedBot.config_data)
               } catch (error) {
                 console.error('Failed to reload bot config after AI update:', error)
               }
