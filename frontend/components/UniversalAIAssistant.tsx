@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { apiClient } from "@/lib/api";
 
 interface Message {
   role: "user" | "assistant";
@@ -52,9 +53,9 @@ export function UniversalAIAssistant({
     setMessages((prev) => [...prev, { role: "user", content: userMessage }]);
 
     try {
-      const response = await fetch("/api/v2/assistant/chat", {
+      const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business';
+      const response = await apiClient.authenticatedFetch(`${baseUrl}/api/v2/assistant/chat`, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           config_id: configId,
           bot_type: botType,

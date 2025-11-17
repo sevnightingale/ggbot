@@ -20,7 +20,7 @@ from core.common.logger import logger
 from core.auth.supabase_auth import get_current_user_v2, AuthenticatedUser
 
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v2", tags=["assistant"])
 
 
 # ============================================================================
