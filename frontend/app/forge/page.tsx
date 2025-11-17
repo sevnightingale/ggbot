@@ -1542,7 +1542,11 @@ function ForgeApp() {
       {selectedBot && activeTab === 'configure' && (
         <UniversalAIAssistant
           configId={selectedBot.config_id}
-          botType={selectedBot.config_type as "agent" | "scheduled" | "signal_validation"}
+          botType={
+            selectedBot.config_type === 'scheduled_trading'
+              ? 'scheduled'
+              : selectedBot.config_type as "agent" | "scheduled" | "signal_validation"
+          }
           isOpen={aiAssistantOpen}
           onClose={() => setAiAssistantOpen(false)}
           onConfigUpdate={async () => {
