@@ -52,10 +52,10 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
                 trading_mode = mode_result[0]
 
                 # Try recent snapshot first (preferred - includes all trading modes)
-                # For paper mode: Use Total Equity (current_balance + unrealized_pnl)
+                # For paper mode: Use Total Equity (current_balance + margin_used + unrealized_pnl)
                 # For live modes: Use total_pnl (already includes unrealized)
                 if trading_mode == 'paper':
-                    balance_field = "COALESCE(current_balance + unrealized_pnl, current_balance)"
+                    balance_field = "COALESCE(current_balance + margin_used + unrealized_pnl, current_balance)"
                 else:
                     balance_field = "current_balance"
 
@@ -80,14 +80,16 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
 
                 # Query appropriate account table based on trading mode
                 if trading_mode == 'paper':
-                    # For paper: Need to add unrealized P&L from open positions
+                    # For paper: Need to add margin + unrealized P&L from open positions
                     cur.execute("""
                         SELECT
-                            pa.current_balance + COALESCE(pt.unrealized_pnl, 0) as total_equity,
+                            pa.current_balance + COALESCE(pt.margin_used, 0) + COALESCE(pt.unrealized_pnl, 0) as total_equity,
                             pa.total_pnl
                         FROM paper_accounts pa
                         LEFT JOIN (
-                            SELECT config_id, SUM(unrealized_pnl) as unrealized_pnl
+                            SELECT config_id,
+                                   SUM(margin_used) as margin_used,
+                                   SUM(unrealized_pnl) as unrealized_pnl
                             FROM paper_trades
                             WHERE status = 'open'
                             GROUP BY config_id
