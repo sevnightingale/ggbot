@@ -522,7 +522,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 position: isProfit ? 'aboveBar' : 'belowBar', // Profit up, loss down
                 color: isProfit ? '#16a34a' : '#dc2626', // green for profit, red for loss
                 shape: 'circle',
-                size: 1.5, // Slightly smaller than trade entries
+                size: 0.75, // Small circles with text labels
                 text: `${isProfit ? '+' : ''}$${pnl.toFixed(2)}`, // Show P&L amount
               });
             }
@@ -842,7 +842,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             <>
               {/* Tooltip card */}
               <div
-                className="absolute top-4 right-4 rounded-lg border px-4 py-3 pointer-events-none"
+                className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border px-4 py-3 pointer-events-none"
                 style={{
                   backgroundColor: VIBE.carbon,
                   borderColor: VIBE.brass,

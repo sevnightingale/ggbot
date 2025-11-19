@@ -93,7 +93,9 @@ export function useAutoSave<T>({
     // Debounced save
     saveTimerRef.current = setTimeout(async () => {
       try {
+        console.log(`🔄 [${saveId}] Starting auto-save...`)
         await onSave(value)
+        console.log(`✅ [${saveId}] Auto-save completed successfully`)
 
         if (mountedRef.current) {
           setStatus('saved')
@@ -108,6 +110,7 @@ export function useAutoSave<T>({
         }
       } catch (err) {
         const error = err instanceof Error ? err : new Error('Save failed')
+        console.error(`❌ [${saveId}] Auto-save failed:`, error)
 
         if (mountedRef.current) {
           setStatus('error')

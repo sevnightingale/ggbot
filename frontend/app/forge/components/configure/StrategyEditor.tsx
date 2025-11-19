@@ -109,13 +109,17 @@ export function StrategyEditor({
   useAutoSave({
     value: currentStrategy,
     onSave: async (value) => {
-      await apiClient.updateConfig(configId, {
+      console.log('💾 Auto-saving strategy prompt...', { configId, value: value.substring(0, 50) })
+      const updatePayload = {
         decision: {
           user_prompt: value,
           analysis_frequency: analysisFrequency || '1h',
           system_prompt: configData?.decision?.system_prompt || ''
         }
-      })
+      }
+      console.log('💾 Update payload:', updatePayload)
+      await apiClient.updateConfig(configId, updatePayload)
+      console.log('✅ Strategy prompt saved successfully')
       onUpdate?.({
         decision: {
           ...(configData?.decision || {}),
