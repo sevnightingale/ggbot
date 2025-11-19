@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useRef, useEffect } from 'react'
+import { useState } from 'react'
 import { Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { apiClient } from '@/lib/api'
+import ReactMarkdown from 'react-markdown'
 
 interface Message {
   role: 'user' | 'assistant'
@@ -39,12 +40,6 @@ export function StrategyAdvisorPanel({
   const [conversationHistory, setConversationHistory] = useState<ConversationMessage[]>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
-  const messagesEndRef = useRef<HTMLDivElement>(null)
-
-  // Auto-scroll to bottom when messages change
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [messages])
 
   const sendMessage = async () => {
     if (!input.trim() || loading) return
@@ -153,9 +148,30 @@ export function StrategyAdvisorPanel({
                   : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border)]'
               }`}
             >
-              <div className="text-sm whitespace-pre-wrap">
-                {msg.content}
-              </div>
+              {msg.role === 'assistant' ? (
+                <div className="text-sm markdown-content">
+                  <ReactMarkdown
+                    components={{
+                      p: ({children}) => <p className="mb-2 last:mb-0">{children}</p>,
+                      ul: ({children}) => <ul className="list-disc list-inside mb-2 space-y-1">{children}</ul>,
+                      ol: ({children}) => <ol className="list-decimal list-inside mb-2 space-y-1">{children}</ol>,
+                      li: ({children}) => <li className="text-sm">{children}</li>,
+                      strong: ({children}) => <strong className="font-semibold">{children}</strong>,
+                      em: ({children}) => <em className="italic">{children}</em>,
+                      code: ({children}) => <code className="bg-[var(--bg-primary)] px-1 py-0.5 rounded text-xs">{children}</code>,
+                      h1: ({children}) => <h1 className="text-base font-bold mb-2 mt-3 first:mt-0">{children}</h1>,
+                      h2: ({children}) => <h2 className="text-sm font-bold mb-2 mt-3 first:mt-0">{children}</h2>,
+                      h3: ({children}) => <h3 className="text-sm font-semibold mb-1 mt-2 first:mt-0">{children}</h3>,
+                    }}
+                  >
+                    {msg.content}
+                  </ReactMarkdown>
+                </div>
+              ) : (
+                <div className="text-sm whitespace-pre-wrap">
+                  {msg.content}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -171,9 +187,6 @@ export function StrategyAdvisorPanel({
             </div>
           </div>
         )}
-
-        {/* Scroll anchor */}
-        <div ref={messagesEndRef} />
       </div>
 
       {/* Input area */}

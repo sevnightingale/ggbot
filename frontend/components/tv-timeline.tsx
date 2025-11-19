@@ -480,65 +480,75 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             if (!validTimestamps.has(timestamp)) {
               return;
             }
-            // Determine marker type based on priority (NEW: unified activity types)
+            // Determine marker type based on priority (NEW: AI consciousness markers)
+            // Trade events = arrows above/below line (vertical movement)
+            // Observation events = circles on the line (neutral position)
+
             const hasTradeLong = activitiesAtTime.some(a =>
               a.type === 'trade_entry' && a.data?.details?.side === 'long'
             );
             const hasTradeShort = activitiesAtTime.some(a =>
               a.type === 'trade_entry' && a.data?.details?.side === 'short'
             );
-            const hasTradeExit = activitiesAtTime.some(a => a.type === 'trade_exit');
+            const tradeExitActivity = activitiesAtTime.find(a => a.type === 'trade_exit');
             const hasLLMThought = activitiesAtTime.some(a => a.type === 'llm_thought');
             const hasMarketQuery = activitiesAtTime.some(a => a.type === 'market_query');
             const hasAgentWait = activitiesAtTime.some(a => a.type === 'agent_wait');
 
+            // TRADE EVENTS (arrows, above/below line)
             if (hasTradeLong) {
               markers.push({
                 time: timestamp as Time,
                 position: 'belowBar',
-                color: '#16a34a', // green-600
+                color: '#16a34a', // solid green
                 shape: 'arrowUp',
-                size: 2, // Make arrows bigger
+                size: 2,
               });
             } else if (hasTradeShort) {
               markers.push({
                 time: timestamp as Time,
                 position: 'aboveBar',
-                color: '#dc2626', // red-600
+                color: '#dc2626', // solid red
                 shape: 'arrowDown',
-                size: 2, // Make arrows bigger
+                size: 2,
               });
-            } else if (hasTradeExit) {
+            } else if (tradeExitActivity) {
+              // Determine profit/loss from P&L
+              const pnl = tradeExitActivity.data?.details?.pnl || 0;
+              const isProfit = pnl > 0;
+
+              markers.push({
+                time: timestamp as Time,
+                position: isProfit ? 'aboveBar' : 'belowBar', // Profit up, loss down
+                color: '#C1A87D', // solid brass (matching line)
+                shape: isProfit ? 'arrowUp' : 'arrowDown',
+                size: 2,
+              });
+            }
+            // OBSERVATION EVENTS (circles, on the line)
+            else if (hasLLMThought) {
               markers.push({
                 time: timestamp as Time,
                 position: 'inBar',
-                color: 'rgba(156, 163, 175, 0.6)', // gray with transparency
+                color: '#C1A87D', // solid brass (matching line)
                 shape: 'circle',
-                size: 1, // Medium circles for exits
-              });
-            } else if (hasLLMThought) {
-              markers.push({
-                time: timestamp as Time,
-                position: 'aboveBar',
-                color: 'rgba(193, 168, 125, 0.6)', // brass with transparency
-                shape: 'circle',
-                size: 0.5, // Smaller circles
+                size: 1, // standard circle size
               });
             } else if (hasMarketQuery) {
               markers.push({
                 time: timestamp as Time,
-                position: 'belowBar',
-                color: 'rgba(60, 166, 224, 0.5)', // signal blue with transparency
+                position: 'inBar',
+                color: '#3CA6E0', // solid signal blue
                 shape: 'circle',
-                size: 0.5, // Smaller circles
+                size: 1, // standard circle size
               });
             } else if (hasAgentWait) {
               markers.push({
                 time: timestamp as Time,
-                position: 'belowBar',
-                color: 'rgba(237, 235, 231, 0.4)', // ivory with transparency
+                position: 'inBar',
+                color: '#9ca3af', // solid gray
                 shape: 'circle',
-                size: 0.5, // Smaller circles
+                size: 1, // standard circle size
               });
             }
           });
