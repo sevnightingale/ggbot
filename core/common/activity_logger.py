@@ -37,9 +37,30 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # Try recent snapshot first (preferred - includes all trading modes)
+                # First, determine trading mode to use correct balance formula
                 cur.execute("""
-                    SELECT current_balance, total_pnl
+                    SELECT trading_mode
+                    FROM configurations
+                    WHERE config_id = %s
+                    LIMIT 1
+                """, (config_id,))
+                mode_result = cur.fetchone()
+
+                if not mode_result:
+                    return None
+
+                trading_mode = mode_result[0]
+
+                # Try recent snapshot first (preferred - includes all trading modes)
+                # For paper mode: Use Total Equity (current_balance + unrealized_pnl)
+                # For live modes: Use total_pnl (already includes unrealized)
+                if trading_mode == 'paper':
+                    balance_field = "COALESCE(current_balance + unrealized_pnl, current_balance)"
+                else:
+                    balance_field = "current_balance"
+
+                cur.execute(f"""
+                    SELECT {balance_field}, total_pnl
                     FROM account_snapshots
                     WHERE config_id = %s
                       AND timestamp > NOW() - INTERVAL '10 minutes'
@@ -57,26 +78,21 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
                 # FALLBACK: No recent snapshot - query account table directly
                 # This handles race condition where trade closes before monitor creates snapshot
 
-                # First, determine trading mode
-                cur.execute("""
-                    SELECT trading_mode
-                    FROM configurations
-                    WHERE config_id = %s
-                    LIMIT 1
-                """, (config_id,))
-                mode_result = cur.fetchone()
-
-                if not mode_result:
-                    return None
-
-                trading_mode = mode_result[0]
-
                 # Query appropriate account table based on trading mode
                 if trading_mode == 'paper':
+                    # For paper: Need to add unrealized P&L from open positions
                     cur.execute("""
-                        SELECT current_balance, total_pnl
-                        FROM paper_accounts
-                        WHERE config_id = %s
+                        SELECT
+                            pa.current_balance + COALESCE(pt.unrealized_pnl, 0) as total_equity,
+                            pa.total_pnl
+                        FROM paper_accounts pa
+                        LEFT JOIN (
+                            SELECT config_id, SUM(unrealized_pnl) as unrealized_pnl
+                            FROM paper_trades
+                            WHERE status = 'open'
+                            GROUP BY config_id
+                        ) pt ON pa.config_id = pt.config_id
+                        WHERE pa.config_id = %s
                         LIMIT 1
                     """, (config_id,))
                     fallback = cur.fetchone()

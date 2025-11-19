@@ -55,10 +55,10 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
                 config_created = config[1]
 
                 # Determine which field to use based on trading mode
-                # Paper: current_balance (actual balance progression)
-                # Live (Aster/Symphony): total_pnl (P&L from $0)
+                # Paper: current_balance + unrealized_pnl (Total Equity = cash + margin + live P&L)
+                # Live (Aster/Symphony): total_pnl (P&L from $0, already includes unrealized)
                 if trading_mode == "paper":
-                    value_field_snapshots = "COALESCE(current_balance, total_pnl)"
+                    value_field_snapshots = "COALESCE(current_balance + unrealized_pnl, total_pnl)"
                     value_field_activities = "COALESCE(account_balance, account_pnl)"
                 else:  # aster, symphony, or other live modes
                     value_field_snapshots = "COALESCE(total_pnl, current_balance)"
