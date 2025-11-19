@@ -8,6 +8,8 @@ Monitors positions, tracks balances, and stores account snapshots.
 import asyncio
 import random
 import uuid
+import redis
+import json
 from datetime import datetime, timezone, timedelta
 from decimal import Decimal
 from typing import Dict, Optional, List
@@ -18,6 +20,9 @@ from core.monitoring.adapters import PaperAccountAdapter, SymphonyAccountAdapter
 
 # Create monitoring logger
 logger = base_logger.bind(service="universal_account_monitor")
+
+# Redis connection for equity caching
+redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
 
 class UniversalAccountMonitor:
@@ -130,6 +135,10 @@ class UniversalAccountMonitor:
         if not snapshot:
             return
 
+        # Cache total equity in Redis for activity logging
+        # This represents what the AI "sees" at this moment
+        await self._cache_total_equity(config_id, snapshot)
+
         # Check if we should save this snapshot
         should_save, is_heartbeat = self._should_save_snapshot(config_id, snapshot)
 
@@ -141,6 +150,40 @@ class UniversalAccountMonitor:
             self.last_snapshots[config_id] = snapshot
             if is_heartbeat:
                 self.last_heartbeat[config_id] = snapshot.timestamp
+
+    async def _cache_total_equity(self, config_id: str, snapshot: AccountSnapshot):
+        """
+        Cache total equity in Redis for immediate access by activity logger.
+
+        This represents the AI's current perception of account value.
+        Updated every 5 seconds, consumed by all activity logging.
+
+        Redis key: equity:{config_id}
+        Value: JSON with total_equity, timestamp, trading_mode
+        TTL: 30 seconds (refresh every 5s, expires if monitor stops)
+        """
+        try:
+            total_equity = snapshot.total_equity
+            if total_equity is None:
+                logger.warning(f"No total equity for {config_id}, skipping cache")
+                return
+
+            cache_data = {
+                'total_equity': float(total_equity),
+                'timestamp': snapshot.timestamp.isoformat(),
+                'trading_mode': snapshot.trading_mode,
+                'config_id': config_id
+            }
+
+            redis_key = f"equity:{config_id}"
+            redis_client.setex(
+                redis_key,
+                30,  # TTL: 30 seconds
+                json.dumps(cache_data)
+            )
+
+        except Exception as e:
+            logger.warning(f"Failed to cache equity for {config_id}: {e}")
 
     def _should_save_snapshot(self, config_id: str, snapshot: AccountSnapshot) -> tuple[bool, bool]:
         """

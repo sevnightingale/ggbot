@@ -8,33 +8,50 @@ Used by scheduled bots, agents, and signal validation.
 
 from core.common.db import get_db_connection
 import json
+import redis
 from typing import Optional, Dict, Any
 from datetime import datetime
+
+# Redis client for equity cache
+redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
 
 
 def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
     """
-    Get most recent account snapshot for a config (within last 10 minutes).
+    Get total equity for activity logging - represents AI's current perception.
 
-    Falls back to querying account tables directly if no recent snapshot exists.
-    This prevents race conditions during trade closes where activity logging happens
-    before the account monitor creates a new snapshot.
+    Data sources (in priority order):
+    1. Redis cache (updated every 5s by account monitor) - FASTEST, MOST RECENT
+    2. Recent database snapshot (within last 10 minutes)
+    3. Direct account table query (race condition fallback)
 
-    Used for populating account_balance and account_pnl fields in activities
-    to enable efficient timeline chart rendering without API calls.
+    The Redis cache represents the AI's "consciousness" - what it sees every 5 seconds.
+    This is what gets logged with each activity, creating the AI's timeline.
 
     Args:
         config_id: Bot configuration ID
 
     Returns:
-        Dict with 'current_balance' and 'total_pnl' keys, or None if no account data found
+        Dict with 'current_balance' (total equity) and 'total_pnl' keys
 
     Example:
         >>> snapshot = get_latest_snapshot("uuid")
         >>> if snapshot:
-        ...     print(f"Balance: {snapshot['current_balance']}, P&L: {snapshot['total_pnl']}")
+        ...     print(f"Total Equity: {snapshot['current_balance']}, P&L: {snapshot['total_pnl']}")
     """
     try:
+        # TIER 1: Try Redis cache first (updated every 5s, most recent)
+        redis_key = f"equity:{config_id}"
+        cached_data = redis_client.get(redis_key)
+
+        if cached_data:
+            cache = json.loads(cached_data)
+            return {
+                'current_balance': cache.get('total_equity'),  # This is total equity!
+                'total_pnl': None  # Not needed for chart, but keep for compatibility
+            }
+
+        # TIER 2 & 3: Fallback to database queries (below)
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 # First, determine trading mode to use correct balance formula

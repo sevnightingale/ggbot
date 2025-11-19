@@ -71,6 +71,38 @@ class AccountSnapshot:
         return self.open_positions > 0
 
     @property
+    def total_equity(self) -> Optional[Decimal]:
+        """
+        Calculate Total Equity - the true net worth of the account.
+
+        This represents what the AI "sees" at this moment in time.
+
+        For paper mode:
+            Total Equity = current_balance + margin_used + unrealized_pnl
+            (cash + locked margin + live P&L)
+
+        For live modes (Symphony/Aster):
+            Total Equity = total_pnl
+            (already includes realized + unrealized P&L)
+
+        Returns:
+            Decimal representing total account equity, or None if insufficient data
+        """
+        if self.trading_mode == 'paper':
+            # Paper trading: Add all components
+            if self.current_balance is None:
+                return None
+
+            margin = self.margin_used if self.margin_used else Decimal('0')
+            unrealized = self.unrealized_pnl if self.unrealized_pnl else Decimal('0')
+
+            return self.current_balance + margin + unrealized
+
+        else:
+            # Live modes (symphony/aster): total_pnl already includes everything
+            return self.total_pnl
+
+    @property
     def return_pct(self) -> Optional[Decimal]:
         """
         Calculate return percentage if balance is available.

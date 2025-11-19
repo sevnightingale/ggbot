@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react'
 import { BotConfiguration, ConfigData, DataSource } from '@/lib/api'
-import { SaveConfigBar } from './SaveConfigBar'
+import { SaveStatusIndicator } from '@/components/SaveStatusIndicator'
+import { StrategyAdvisorPanel } from '@/components/StrategyAdvisorPanel'
 import { ConfigTabs, ConfigTabType } from './ConfigTabs'
 import { MarketDataSelector } from './MarketDataSelector'
 import { SignalsConfiguration } from './SignalsConfiguration'
@@ -10,19 +11,18 @@ import { StrategyEditor } from './StrategyEditor'
 import { TradeSettings } from './TradeSettings'
 import { EmptyState } from '../shared/EmptyState'
 import { Settings } from 'lucide-react'
+import { SaveStatus } from '@/lib/hooks/useAutoSave'
 
 // DataSource will be passed from parent page.tsx
 interface ConfigureLayoutProps {
   selectedBot?: BotConfiguration | null
   editingConfigData?: ConfigData | null
   editingTableFields?: { config_name?: string; config_type?: string } | null
-  hasUnsavedChanges?: boolean
   dataSources?: DataSource[]
-  onSaveConfig?: () => void
-  onCancelConfig?: () => void
-  onResetConfig?: () => void
   onUpdateConfig?: (updates: Partial<ConfigData>) => void
-  onOpenAIAssistant?: () => void
+  onConfigUpdate?: () => void
+  saveStatus?: SaveStatus
+  saveError?: Error | null
   className?: string
 }
 
@@ -30,13 +30,11 @@ export function ConfigureLayout({
   selectedBot,
   editingConfigData,
   editingTableFields,
-  hasUnsavedChanges = false,
   dataSources = [],
-  onSaveConfig,
-  onCancelConfig,
-  onResetConfig,
   onUpdateConfig,
-  onOpenAIAssistant,
+  onConfigUpdate,
+  saveStatus = 'idle',
+  saveError = null,
   className = ''
 }: ConfigureLayoutProps) {
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabType>('strategy')
@@ -60,17 +58,26 @@ export function ConfigureLayout({
   // Use editing config data if available, otherwise use selected bot's config
   const configData = editingConfigData || selectedBot.config_data
 
+  // Determine bot type for Strategy Advisor
+  const botType = (editingTableFields?.config_type || selectedBot.config_type) as 'agent' | 'scheduled' | 'signal_validation'
+  const mappedBotType = botType === 'scheduled_trading' ? 'scheduled' : botType
+
   return (
     <div className={className}>
-      {/* Save Config Bar - Always visible */}
-      <SaveConfigBar
-        selectedBot={selectedBot}
-        editingTableFields={editingTableFields}
-        hasUnsavedChanges={hasUnsavedChanges}
-        isEditingConfig={true}
-        onSave={onSaveConfig}
-        onCancel={onCancelConfig}
-        onReset={onResetConfig}
+      {/* Save Status Indicator - Global */}
+      <div className="flex justify-center mb-4">
+        <SaveStatusIndicator
+          status={saveStatus}
+          error={saveError}
+        />
+      </div>
+
+      {/* Strategy Advisor Panel - Always visible */}
+      <StrategyAdvisorPanel
+        configId={selectedBot.config_id}
+        botType={mappedBotType}
+        onConfigUpdate={onConfigUpdate || (() => {})}
+        className="mb-6"
       />
 
       {/* Configuration Tabs */}
@@ -106,7 +113,6 @@ export function ConfigureLayout({
             configData={configData}
             configType={editingTableFields?.config_type || selectedBot?.config_type}
             onUpdate={onUpdateConfig}
-            onOpenAIAssistant={onOpenAIAssistant}
           />
         )}
 
