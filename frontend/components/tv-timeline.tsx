@@ -426,6 +426,22 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
         if (lineSeriesRef.current && chartData.length > 0) {
           console.log('Setting data on chart...');
+
+          // Defensive validation before passing to TradingView
+          const invalidPoints = chartData.filter(p =>
+            p.time == null ||
+            p.value == null ||
+            typeof p.time !== 'number' ||
+            typeof p.value !== 'number' ||
+            isNaN(p.time) ||
+            isNaN(p.value)
+          );
+
+          if (invalidPoints.length > 0) {
+            console.error('❌ INVALID CHART DATA POINTS:', invalidPoints);
+            throw new Error(`Found ${invalidPoints.length} invalid chart data points`);
+          }
+
           lineSeriesRef.current.setData(chartData);
 
           // Build activities lookup map - group by timestamp
@@ -533,6 +549,23 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               const timeB = typeof b.time === 'number' ? b.time : parseFloat(b.time as string);
               return timeA - timeB;
             });
+
+            // Defensive validation before passing to TradingView
+            const invalidMarkers = sortedMarkers.filter(m =>
+              m.time == null ||
+              m.position == null ||
+              m.color == null ||
+              m.shape == null ||
+              m.size == null ||
+              typeof m.time !== 'number' ||
+              isNaN(m.time)
+            );
+
+            if (invalidMarkers.length > 0) {
+              console.error('❌ INVALID MARKERS:', invalidMarkers);
+              throw new Error(`Found ${invalidMarkers.length} invalid markers`);
+            }
+
             lineSeriesRef.current.setMarkers(sortedMarkers);
             console.log('Markers added:', sortedMarkers.length, {
               trade_entries: sortedMarkers.filter(m => m.shape === 'arrowUp' || m.shape === 'arrowDown').length,
