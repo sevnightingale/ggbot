@@ -115,6 +115,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   // Refs to avoid stale closures and enable cross-effect communication
   const sessionRef = useRef<Session | null>(null);
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
+  const fetchAbortControllerRef = useRef<AbortController | null>(null);
 
   // Get theme colors
   const VIBE = getThemeColors(theme === 'dark');
@@ -307,9 +308,6 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
     window.addEventListener('resize', handleResize);
 
-    // Create AbortController for this chart instance
-    const abortController = new AbortController();
-
     const fetchData = async () => {
       try {
         // Guard: Don't fetch if component is unmounted or chart destroyed
@@ -317,6 +315,16 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           console.log('fetchData skipped - chart or line series destroyed');
           return;
         }
+
+        // CRITICAL: Abort any previous in-flight fetchData call
+        if (fetchAbortControllerRef.current) {
+          console.log('Aborting previous fetchData call');
+          fetchAbortControllerRef.current.abort();
+        }
+
+        // Create new AbortController for THIS fetch
+        const abortController = new AbortController();
+        fetchAbortControllerRef.current = abortController;
 
         console.log('fetchData starting...', { configId, hasAuth: !!sessionRef.current });
         setLoading(true);
@@ -571,7 +579,11 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
     return () => {
       console.log('Cleanup: Aborting fetches and removing chart');
-      abortController.abort(); // Cancel any in-flight API requests
+      // Abort any in-flight fetchData call
+      if (fetchAbortControllerRef.current) {
+        fetchAbortControllerRef.current.abort();
+        fetchAbortControllerRef.current = null;
+      }
       clearInterval(intervalId);
       if (chartRef.current) {
         window.removeEventListener('resize', () => {});
@@ -579,7 +591,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         chartRef.current = null;
         lineSeriesRef.current = null;
       }
-      fetchDataRef.current = null; // Clear ref
+      fetchDataRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configId, chartContainer]); // NOTE: session and theme NOT in dependencies
