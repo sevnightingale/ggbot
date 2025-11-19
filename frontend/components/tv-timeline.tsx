@@ -578,9 +578,11 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
           // Only fit content on first load, preserve user zoom/pan on subsequent updates
           if (isFirstLoadRef.current) {
-            chartRef.current?.timeScale().fitContent();
+            // TEMPORARY: Skip fitContent to test if it's causing the error
+            console.log('⚠️ SKIPPING fitContent (testing)');
+            // chartRef.current?.timeScale().fitContent();
             isFirstLoadRef.current = false;
-            console.log('Data set successfully (initial load, fitted content)');
+            console.log('Data set successfully (initial load, NO fit)');
           } else {
             console.log('Data set successfully (update, preserved zoom/pan)');
           }
