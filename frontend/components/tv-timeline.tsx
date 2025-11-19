@@ -444,6 +444,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
           lineSeriesRef.current.setData(chartData);
 
+          console.log('Chart data set, waiting for initial render before adding markers...');
+
           // Build activities lookup map - group by timestamp
           activitiesMapRef.current.clear();
           const groupedByTimestamp = new Map<number, Activity[]>();
@@ -566,11 +568,12 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               throw new Error(`Found ${invalidMarkers.length} invalid markers`);
             }
 
-            lineSeriesRef.current.setMarkers(sortedMarkers);
-            console.log('Markers added:', sortedMarkers.length, {
+            // TEMPORARY: Skip setting markers to test if they're causing the error
+            console.log('⚠️ SKIPPING markers (testing):', sortedMarkers.length, {
               trade_entries: sortedMarkers.filter(m => m.shape === 'arrowUp' || m.shape === 'arrowDown').length,
               circles: sortedMarkers.filter(m => m.shape === 'circle').length,
             });
+            // lineSeriesRef.current.setMarkers(sortedMarkers);
           }
 
           // Only fit content on first load, preserve user zoom/pan on subsequent updates
