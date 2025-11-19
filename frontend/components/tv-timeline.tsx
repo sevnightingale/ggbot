@@ -514,7 +514,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               });
             } else if (tradeExitActivity) {
               // Determine profit/loss from P&L
-              const pnl = tradeExitActivity.data?.details?.pnl || 0;
+              const pnl = Number(tradeExitActivity.data?.details?.pnl || 0);
               const isProfit = pnl > 0;
 
               markers.push({
