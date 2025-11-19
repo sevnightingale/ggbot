@@ -251,51 +251,50 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
     lineSeriesRef.current = lineSeries;
     console.log('Line series created:', !!lineSeries);
 
-      // Crosshair move handler - highlight activity when crosshair snaps to it
-      chart.subscribeCrosshairMove((param) => {
-        if (!param.time || !param.point) {
-          setSelectedActivity(null);
-          setCrosshairPosition(null);
-          return;
-        }
+    // Crosshair move handler - highlight activity when crosshair snaps to it
+    chart.subscribeCrosshairMove((param) => {
+      if (!param.time || !param.point) {
+        setSelectedActivity(null);
+        setCrosshairPosition(null);
+        return;
+      }
 
-        const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
-        const activities = activitiesMapRef.current.get(timestamp);
+      const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
+      const activities = activitiesMapRef.current.get(timestamp);
 
-        if (activities && activities.length > 0) {
-          // For tooltip, show the first/primary activity
-          setSelectedActivity(activities[0]);
-          setCrosshairPosition({ x: param.point.x, y: param.point.y });
-        } else {
-          setSelectedActivity(null);
-          setCrosshairPosition(null);
-        }
-      });
+      if (activities && activities.length > 0) {
+        // For tooltip, show the first/primary activity
+        setSelectedActivity(activities[0]);
+        setCrosshairPosition({ x: param.point.x, y: param.point.y });
+      } else {
+        setSelectedActivity(null);
+        setCrosshairPosition(null);
+      }
+    });
 
-      // Click handler - open activity detail when clicking on a point
-      chart.subscribeClick((param) => {
-        if (!param.time) return;
+    // Click handler - open activity detail when clicking on a point
+    chart.subscribeClick((param) => {
+      if (!param.time) return;
 
-        const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
-        const activities = activitiesMapRef.current.get(timestamp);
+      const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
+      const activities = activitiesMapRef.current.get(timestamp);
 
-        if (activities && activities.length > 0) {
-          console.log('Clicked activities:', activities);
-          setDetailActivities(activities);
-        }
-      });
+      if (activities && activities.length > 0) {
+        console.log('Clicked activities:', activities);
+        setDetailActivities(activities);
+      }
+    });
 
-      const handleResize = () => {
-        if (chartContainer && chartRef.current) {
-          chartRef.current.applyOptions({
-            width: chartContainer.clientWidth,
-            height: chartContainer.clientHeight,
-          });
-        }
-      };
+    const handleResize = () => {
+      if (chartContainer && chartRef.current) {
+        chartRef.current.applyOptions({
+          width: chartContainer.clientWidth,
+          height: chartContainer.clientHeight,
+        });
+      }
+    };
 
-      window.addEventListener('resize', handleResize);
-    }
+    window.addEventListener('resize', handleResize);
 
     const fetchData = async () => {
       try {
