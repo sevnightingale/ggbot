@@ -842,7 +842,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             <>
               {/* Tooltip card */}
               <div
-                className="absolute top-4 left-1/2 -translate-x-1/2 rounded-lg border px-4 py-3 pointer-events-none"
+                className="absolute bottom-4 left-4 rounded-lg border px-4 py-3 pointer-events-none"
                 style={{
                   backgroundColor: VIBE.carbon,
                   borderColor: VIBE.brass,

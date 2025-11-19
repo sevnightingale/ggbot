@@ -80,9 +80,26 @@ export function StrategyEditor({
   // Ref for textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Debug: Log component mount and props
+  useEffect(() => {
+    console.log('🎬 StrategyEditor mounted with:', {
+      configId,
+      hasConfigData: !!configData,
+      currentStrategy: currentStrategy.substring(0, 50),
+      configDataPrompt: configData?.decision?.user_prompt?.substring(0, 50)
+    })
+  }, [])
+
+  // Debug: Log whenever currentStrategy state changes
+  useEffect(() => {
+    console.log('📝 currentStrategy state changed to:', currentStrategy.substring(0, 50))
+  }, [currentStrategy])
+
   // Sync local state when configData changes (from AI updates or external sources)
   useEffect(() => {
+    console.log('🔄 configData.decision.user_prompt changed:', configData?.decision?.user_prompt?.substring(0, 50))
     if (configData?.decision?.user_prompt !== undefined) {
+      console.log('🔄 Syncing local state with configData')
       setCurrentStrategy(configData.decision.user_prompt)
     }
   }, [configData?.decision?.user_prompt])
@@ -242,17 +259,20 @@ export function StrategyEditor({
 
   // Handle strategy text change
   const handleStrategyChange = (value: string) => {
+    console.log('🔤 handleStrategyChange called with:', value.substring(0, 50))
     // Limit to 10,000 characters
     if (value.length > 10000) {
       value = value.substring(0, 10000)
     }
 
     // Update local state (auto-save will trigger)
+    console.log('🔤 Setting currentStrategy state...')
     setCurrentStrategy(value)
   }
 
   // Auto-resize textarea
   const handleTextareaResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    console.log('⌨️ Textarea onChange fired!')
     const textarea = e.target
     textarea.style.height = 'auto'
     textarea.style.height = `${textarea.scrollHeight}px`
