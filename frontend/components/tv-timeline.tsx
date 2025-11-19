@@ -112,6 +112,10 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
   const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
 
+  // Refs to avoid stale closures and enable cross-effect communication
+  const sessionRef = useRef<Session | null>(null);
+  const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
+
   // Get theme colors
   const VIBE = getThemeColors(theme === 'dark');
 
@@ -121,9 +125,15 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
     const getSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
       setSession(session);
+      sessionRef.current = session; // Keep ref in sync
     };
     getSession();
   }, []);
+
+  // Keep session ref up to date when session changes
+  useEffect(() => {
+    sessionRef.current = session;
+  }, [session]);
 
   // Update chart colors when theme changes
   useEffect(() => {
@@ -165,18 +175,19 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
     }
   }, [theme]);
 
-  // Fetch data and initialize chart
+  // Chart creation and data polling - only recreates when switching bots or container changes
+  // NOTE: session is NOT a dependency - fetchData reads current session via ref
   useEffect(() => {
-    console.log('useEffect running', { configId, hasContainer: !!chartContainer, hasSession: !!session });
+    console.log('Chart creation effect:', { configId, hasContainer: !!chartContainer });
 
     if (!configId || !chartContainer) {
       console.log('Early return - missing configId or container');
       return;
     }
 
-    // CRITICAL: Clean up existing chart before creating new one to prevent double-render
+    // Clean up existing chart when switching bots
     if (chartRef.current) {
-      console.log('Cleaning up existing chart before creating new one');
+      console.log('Cleaning up existing chart (switching bots)');
       chartRef.current.remove();
       chartRef.current = null;
       lineSeriesRef.current = null;
@@ -296,6 +307,9 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
     window.addEventListener('resize', handleResize);
 
+    // Create AbortController for this chart instance
+    const abortController = new AbortController();
+
     const fetchData = async () => {
       try {
         // Guard: Don't fetch if component is unmounted or chart destroyed
@@ -304,19 +318,29 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           return;
         }
 
-        console.log('fetchData starting...', { configId, hasSession: !!session });
+        console.log('fetchData starting...', { configId, hasAuth: !!sessionRef.current });
         setLoading(true);
         setError(null);
 
-        const headers: HeadersInit = session?.access_token
-          ? { Authorization: `Bearer ${session.access_token}` }
+        // Read current session from ref (not stale closure)
+        const headers: HeadersInit = sessionRef.current?.access_token
+          ? { Authorization: `Bearer ${sessionRef.current.access_token}` }
           : {};
 
         console.log('Fetching from API...');
         const [balanceSeriesRes, activitiesRes, metadataRes] = await Promise.all([
-          fetch(`/api/v2/snapshots/${configId}/balance-series`, { headers }),  // Using snapshot-based endpoint
-          fetch(`/api/v2/activities/${configId}`, { headers }),
-          fetch(`/api/v2/activities/${configId}/metadata`, { headers }),
+          fetch(`/api/v2/snapshots/${configId}/balance-series`, {
+            headers,
+            signal: abortController.signal
+          }),
+          fetch(`/api/v2/activities/${configId}`, {
+            headers,
+            signal: abortController.signal
+          }),
+          fetch(`/api/v2/activities/${configId}/metadata`, {
+            headers,
+            signal: abortController.signal
+          }),
         ]);
 
         console.log('API responses:', {
@@ -525,11 +549,19 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
         setLoading(false);
       } catch (err) {
+        // Ignore AbortError - it's expected when component unmounts or chart changes
+        if (err instanceof Error && err.name === 'AbortError') {
+          console.log('fetchData aborted (chart cleanup)');
+          return;
+        }
         console.error('Error fetching timeline data:', err);
         setError(err instanceof Error ? err.message : 'Failed to load data');
         setLoading(false);
       }
     };
+
+    // Store fetchData in ref so session effect can call it
+    fetchDataRef.current = fetchData;
 
     console.log('About to call fetchData...');
     fetchData();
@@ -538,6 +570,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
     const intervalId = setInterval(fetchData, 10000);
 
     return () => {
+      console.log('Cleanup: Aborting fetches and removing chart');
+      abortController.abort(); // Cancel any in-flight API requests
       clearInterval(intervalId);
       if (chartRef.current) {
         window.removeEventListener('resize', () => {});
@@ -545,9 +579,20 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         chartRef.current = null;
         lineSeriesRef.current = null;
       }
+      fetchDataRef.current = null; // Clear ref
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configId, session, chartContainer]);
+  }, [configId, chartContainer]); // NOTE: session and theme NOT in dependencies
+  // - session: prevents double render, fetchData reads current value via ref
+  // - theme: separate effect handles color updates dynamically
+
+  // Refetch data when session loads (for RLS auth) - without recreating chart
+  useEffect(() => {
+    if (session && chartRef.current && lineSeriesRef.current && fetchDataRef.current) {
+      console.log('Session loaded, refetching data with auth');
+      fetchDataRef.current();
+    }
+  }, [session]);
 
   // Track latest activity and update status text
   useEffect(() => {
