@@ -109,7 +109,7 @@ export function StrategyAdvisorPanel({
   }
 
   return (
-    <div className={`flex flex-col rounded-2xl border border-[var(--accent)]/30 bg-[var(--bg-secondary)] ${className}`} style={{ height: '350px' }}>
+    <div className={`flex flex-col rounded-2xl border border-[var(--accent)]/30 bg-[var(--bg-secondary)] ${className}`} style={{ height: '500px' }}>
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)] flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-[var(--accent)]" />
@@ -187,7 +187,6 @@ export function StrategyAdvisorPanel({
             placeholder="Ask me to configure your bot..."
             className="flex-1 px-4 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)]"
             disabled={loading}
-            autoFocus
           />
           <Button
             onClick={sendMessage}

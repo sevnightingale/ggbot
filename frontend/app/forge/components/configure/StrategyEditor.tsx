@@ -80,6 +80,31 @@ export function StrategyEditor({
   // Ref for textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
+  // Sync local state when configData changes (from AI updates or external sources)
+  useEffect(() => {
+    if (configData?.decision?.user_prompt !== undefined) {
+      setCurrentStrategy(configData.decision.user_prompt)
+    }
+  }, [configData?.decision?.user_prompt])
+
+  useEffect(() => {
+    if (configData?.decision?.analysis_frequency !== undefined && configData.decision.analysis_frequency !== null) {
+      setAnalysisFrequency(configData.decision.analysis_frequency)
+    }
+  }, [configData?.decision?.analysis_frequency])
+
+  useEffect(() => {
+    if (configData?.llm_config?.model !== undefined) {
+      setLlmModel(configData.llm_config.model)
+    }
+  }, [configData?.llm_config?.model])
+
+  useEffect(() => {
+    if (configData?.llm_config?.thinking_mode !== undefined) {
+      setThinkingMode(configData.llm_config.thinking_mode)
+    }
+  }, [configData?.llm_config?.thinking_mode])
+
   // Auto-save hooks for each field
   useAutoSave({
     value: currentStrategy,
