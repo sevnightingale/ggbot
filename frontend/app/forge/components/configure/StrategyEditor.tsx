@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import Image from 'next/image'
 import { Crown } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
@@ -122,93 +122,102 @@ export function StrategyEditor({
     }
   }, [configData?.llm_config?.thinking_mode])
 
+  // Memoized save callbacks to prevent useEffect cleanup canceling timers
+  const saveStrategy = useCallback(async (value: string) => {
+    console.log('💾 Auto-saving strategy prompt...', { configId, value: value.substring(0, 50) })
+    const updatePayload = {
+      decision: {
+        user_prompt: value,
+        analysis_frequency: analysisFrequency || '1h',
+        system_prompt: configData?.decision?.system_prompt || ''
+      }
+    }
+    console.log('💾 Update payload:', updatePayload)
+    await apiClient.updateConfig(configId, updatePayload)
+    console.log('✅ Strategy prompt saved successfully')
+    onUpdate?.({
+      decision: {
+        ...(configData?.decision || {}),
+        user_prompt: value,
+        analysis_frequency: analysisFrequency || '1h',
+        system_prompt: configData?.decision?.system_prompt || ''
+      }
+    })
+  }, [configId, analysisFrequency, configData?.decision, onUpdate])
+
   // Auto-save hooks for each field
   useAutoSave({
     value: currentStrategy,
-    onSave: async (value) => {
-      console.log('💾 Auto-saving strategy prompt...', { configId, value: value.substring(0, 50) })
-      const updatePayload = {
-        decision: {
-          user_prompt: value,
-          analysis_frequency: analysisFrequency || '1h',
-          system_prompt: configData?.decision?.system_prompt || ''
-        }
-      }
-      console.log('💾 Update payload:', updatePayload)
-      await apiClient.updateConfig(configId, updatePayload)
-      console.log('✅ Strategy prompt saved successfully')
-      onUpdate?.({
-        decision: {
-          ...(configData?.decision || {}),
-          user_prompt: value,
-          analysis_frequency: analysisFrequency || '1h',
-          system_prompt: configData?.decision?.system_prompt || ''
-        }
-      })
-    },
+    onSave: saveStrategy,
     delay: 1000,
     saveId: 'strategy-prompt'
   })
 
+  const saveFrequency = useCallback(async (value: string) => {
+    await apiClient.updateConfig(configId, {
+      decision: {
+        analysis_frequency: value || '1h',
+        user_prompt: currentStrategy,
+        system_prompt: configData?.decision?.system_prompt || ''
+      }
+    })
+    onUpdate?.({
+      decision: {
+        ...(configData?.decision || {}),
+        analysis_frequency: value || '1h',
+        user_prompt: currentStrategy,
+        system_prompt: configData?.decision?.system_prompt || ''
+      }
+    })
+  }, [configId, currentStrategy, configData?.decision, onUpdate])
+
+  const saveModel = useCallback(async (value: string) => {
+    await apiClient.updateConfig(configId, {
+      llm_config: {
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
+        model: value
+      }
+    })
+    onUpdate?.({
+      llm_config: {
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
+        model: value
+      }
+    })
+  }, [configId, configData?.llm_config, onUpdate])
+
+  const saveThinkingMode = useCallback(async (value: boolean) => {
+    await apiClient.updateConfig(configId, {
+      llm_config: {
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
+        thinking_mode: value
+      }
+    })
+    onUpdate?.({
+      llm_config: {
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
+        thinking_mode: value
+      }
+    })
+  }, [configId, configData?.llm_config, onUpdate])
+
   useAutoSave({
     value: analysisFrequency,
-    onSave: async (value) => {
-      await apiClient.updateConfig(configId, {
-        decision: {
-          analysis_frequency: value || '1h',
-          user_prompt: currentStrategy,
-          system_prompt: configData?.decision?.system_prompt || ''
-        }
-      })
-      onUpdate?.({
-        decision: {
-          ...(configData?.decision || {}),
-          analysis_frequency: value || '1h',
-          user_prompt: currentStrategy,
-          system_prompt: configData?.decision?.system_prompt || ''
-        }
-      })
-    },
+    onSave: saveFrequency,
     delay: 500,
     saveId: 'analysis-frequency'
   })
 
   useAutoSave({
     value: llmModel,
-    onSave: async (value) => {
-      await apiClient.updateConfig(configId, {
-        llm_config: {
-          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
-          model: value
-        }
-      })
-      onUpdate?.({
-        llm_config: {
-          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
-          model: value
-        }
-      })
-    },
+    onSave: saveModel,
     delay: 500,
     saveId: 'llm-model'
   })
 
   useAutoSave({
     value: thinkingMode,
-    onSave: async (value) => {
-      await apiClient.updateConfig(configId, {
-        llm_config: {
-          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
-          thinking_mode: value
-        }
-      })
-      onUpdate?.({
-        llm_config: {
-          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
-          thinking_mode: value
-        }
-      })
-    },
+    onSave: saveThinkingMode,
     delay: 500,
     saveId: 'thinking-mode'
   })
