@@ -104,7 +104,7 @@ export function StrategyAdvisorPanel({
   }
 
   return (
-    <div className={`flex flex-col rounded-2xl border border-[var(--accent)]/30 bg-[var(--bg-secondary)] ${className}`} style={{ height: '500px' }}>
+    <div className={`flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] ${className}`} style={{ height: '500px' }}>
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)] flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-[var(--accent)]" />

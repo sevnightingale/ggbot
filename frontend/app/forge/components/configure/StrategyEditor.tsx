@@ -296,7 +296,7 @@ export function StrategyEditor({
               onChange={handleTextareaResize}
               rows={6}
               maxLength={10000}
-              className="w-full p-4 rounded-xl bg-[var(--bg-primary)] border-2 border-[var(--agent-decision)]/30 text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-[var(--agent-decision)] resize-none overflow-hidden"
+              className="w-full p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none overflow-hidden"
               placeholder="Example: if RSI 1h below 30 and volume > 1.5x average enter long, if RSI 1h above 70 exit position"
               style={{minHeight: '6rem'}}
             />
@@ -307,17 +307,6 @@ export function StrategyEditor({
               <div className="text-xs text-[var(--text-muted)]">
                 {currentStrategy.length}/10,000
               </div>
-            </div>
-          </div>
-
-          {/* Default Strategy Example */}
-          <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-            <div className="text-xs font-medium text-[var(--text-muted)] mb-2">DEFAULT STRATEGY:</div>
-            <div className="text-sm text-[var(--text-secondary)] font-mono">
-              if RSI 1h below 50 enter long, if above 50 enter short
-            </div>
-            <div className="text-xs text-[var(--text-muted)] mt-2">
-              This simple strategy will always enter a trade, giving you immediate results to see your bot in action.
             </div>
           </div>
         </div>
