@@ -174,70 +174,82 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       return;
     }
 
-    // Create chart if it doesn't exist
-    if (!chartRef.current) {
-      const containerWidth = chartContainer.clientWidth;
-      const containerHeight = chartContainer.clientHeight;
+    // CRITICAL: Clean up existing chart before creating new one to prevent double-render
+    if (chartRef.current) {
+      console.log('Cleaning up existing chart before creating new one');
+      chartRef.current.remove();
+      chartRef.current = null;
+      lineSeriesRef.current = null;
+    }
 
-      console.log('Creating chart with dimensions:', { width: containerWidth, height: containerHeight });
+    const containerWidth = chartContainer.clientWidth;
+    const containerHeight = chartContainer.clientHeight;
 
-      // Reset first load flag when creating new chart
-      isFirstLoadRef.current = true;
+    console.log('Creating chart with dimensions:', { width: containerWidth, height: containerHeight });
 
-      const chart = createChart(chartContainer, {
-        width: containerWidth,
-        height: containerHeight,
-        layout: {
-          background: { type: ColorType.Solid, color: VIBE.carbon },
-          textColor: VIBE.hair,
-        },
-        grid: {
-          vertLines: { color: VIBE.hair, style: LineStyle.Dotted },
-          horzLines: { color: VIBE.hair, style: LineStyle.Dotted },
-        },
-        rightPriceScale: {
-          borderColor: VIBE.hair,
-        },
-        timeScale: {
-          borderColor: VIBE.hair,
-          timeVisible: true,
-          secondsVisible: false,
-        },
-        crosshair: {
-          mode: 1,
-          vertLine: {
-            color: VIBE.brass,
-            width: 1,
-            style: LineStyle.Dashed,
-          },
-          horzLine: {
-            color: VIBE.brass,
-            width: 1,
-            style: LineStyle.Dashed,
-          },
-        },
-        localization: {
-          priceFormatter: (price: number) => {
-            if (price == null || isNaN(price)) return '$—';
-            return `$${price.toFixed(2)}`;
-          },
-        },
-      });
+    // Reset first load flag when creating new chart
+    isFirstLoadRef.current = true;
 
-      chartRef.current = chart;
-      console.log('Chart created:', !!chart);
+    // Ensure all color values are valid (not null/undefined)
+    const colors = getThemeColors(theme === 'dark');
+    const carbonColor = colors.carbon || '#141416';
+    const hairColor = colors.hair || 'rgba(237,235,231,0.16)';
+    const brassColor = colors.brass || '#C1A87D';
 
-      const lineSeries = chart.addLineSeries({
-        color: VIBE.brass,  // Changed from signal (blue) to brass
-        lineWidth: 2,
-        crosshairMarkerVisible: true,
-        crosshairMarkerRadius: 4,
-        lastValueVisible: true,
-        priceLineVisible: false,  // Remove the dashed price line
-      });
+    const chart = createChart(chartContainer, {
+      width: containerWidth,
+      height: containerHeight,
+      layout: {
+        background: { type: ColorType.Solid, color: carbonColor },
+        textColor: hairColor,
+      },
+      grid: {
+        vertLines: { color: hairColor, style: LineStyle.Dotted },
+        horzLines: { color: hairColor, style: LineStyle.Dotted },
+      },
+      rightPriceScale: {
+        borderColor: hairColor,
+      },
+      timeScale: {
+        borderColor: hairColor,
+        timeVisible: true,
+        secondsVisible: false,
+      },
+      crosshair: {
+        mode: 1,
+        vertLine: {
+          color: brassColor,
+          width: 1,
+          style: LineStyle.Dashed,
+        },
+        horzLine: {
+          color: brassColor,
+          width: 1,
+          style: LineStyle.Dashed,
+        },
+      },
+      localization: {
+        priceFormatter: (price: number) => {
+          if (price == null || isNaN(price)) return '$—';
+          return `$${price.toFixed(2)}`;
+        },
+      },
+    });
 
-      lineSeriesRef.current = lineSeries;
-      console.log('Line series created:', !!lineSeries);
+    chartRef.current = chart;
+    console.log('Chart created:', !!chart);
+
+    const lineSeries = chart.addLineSeries({
+      color: brassColor,
+      lineWidth: 2,
+      crosshairMarkerVisible: true,
+      crosshairMarkerRadius: 4,
+      lastValueVisible: true,
+      priceLineVisible: false,
+    });
+
+    lineSeriesRef.current = lineSeries;
+    console.log('Line series created:', !!lineSeries);
 
       // Crosshair move handler - highlight activity when crosshair snaps to it
       chart.subscribeCrosshairMove((param) => {
