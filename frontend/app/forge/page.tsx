@@ -16,7 +16,6 @@ import TVTimeline from '@/components/tv-timeline'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { AgentConfigurator } from './components/configure/AgentConfigurator'
 import { BotCreationModal } from './components/modals/BotCreationModal'
-import { UniversalAIAssistant } from '@/components/UniversalAIAssistant'
 import { Wrench } from 'lucide-react'
 
 interface Position {
@@ -100,15 +99,12 @@ function ForgeApp() {
   // Tab navigation state
   const [activeTab, setActiveTab] = useState<'monitor' | 'configure'>('monitor')
 
-  // Configuration editing state - sandboxed from operational display
-  const [isEditingConfig, setIsEditingConfig] = useState(false)
+  // Configuration editing state - simplified for auto-save
   const [editingConfigData, setEditingConfigData] = useState<ConfigData | null>(null)
   const [editingTableFields, setEditingTableFields] = useState<{
     config_name?: string
     config_type?: string
   } | null>(null)
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
-  const [originalConfig, setOriginalConfig] = useState<BotConfiguration | null>(null)
 
   // Agent conversation state (for agentic config type)
   const [agentMessages, setAgentMessages] = useState<Array<{
@@ -123,16 +119,12 @@ function ForgeApp() {
   // Debounce timer for auto-save
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
-  // AI Assistant state
-  const [aiAssistantOpen, setAiAssistantOpen] = useState(false)
-
-  // Start editing mode when configure tab is activated
+  // Load bot config into editing state when configure tab is activated
   useEffect(() => {
-    if (activeTab === 'configure' && selectedBot && !isEditingConfig) {
-      console.log('🔧 Starting edit mode for bot:', selectedBot.config_id)
-      console.log('🔧 Bot data being loaded into editing state:', JSON.stringify(selectedBot, null, 2))
+    if (activeTab === 'configure' && selectedBot) {
+      console.log('🔧 Loading config for editing:', selectedBot.config_id)
 
-      // Enter editing mode - load selected bot config into editing state
+      // Load bot config into editing state
       // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
       const configDataWithTradingMode = selectedBot.config_data
         ? {
@@ -142,16 +134,13 @@ function ForgeApp() {
           }
         : null
 
-      setIsEditingConfig(true)
       setEditingConfigData(configDataWithTradingMode)
       setEditingTableFields({
         config_name: selectedBot.config_name,
         config_type: selectedBot.config_type
       })
-      setOriginalConfig(selectedBot)
-      setHasUnsavedChanges(false)
     }
-  }, [activeTab, selectedBot, isEditingConfig])
+  }, [activeTab, selectedBot])
 
   // Clear component data immediately when switching bots for instant UI update
   useEffect(() => {
@@ -608,34 +597,27 @@ function ForgeApp() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [loadError, user, allBots.length, selectedConfigId])
 
-  // Handle selectedConfigId changes while in editing mode (programmatic bot switches)
+  // Handle selectedConfigId changes to update editing state
   useEffect(() => {
-    if (isEditingConfig && selectedBot && editingConfigData) {
-      // If the selected bot changed while editing, we need to update the editing state
-      const isEditingDifferentBot = originalConfig?.config_id !== selectedBot.config_id
+    if (selectedBot && editingConfigData && selectedBot.config_id !== editingConfigData.selected_pair) {
+      console.log('🔄 Bot changed - updating editing state')
 
-      if (isEditingDifferentBot) {
-        console.log('🔄 Bot changed while editing - switching editing state to new bot')
-
-        // Load the new bot's config into editing state
-        // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
-        const configDataWithTradingMode = {
-          ...JSON.parse(JSON.stringify(selectedBot.config_data)),
-          trading_mode: selectedBot.trading_mode,
-          symphony_agent_id: selectedBot.symphony_agent_id
-        }
-
-        setEditingConfigData(configDataWithTradingMode)
-        setEditingTableFields({
-          config_name: selectedBot.config_name,
-          config_type: selectedBot.config_type
-        })
-        setOriginalConfig(selectedBot)
-        setHasUnsavedChanges(false)
+      // Load the new bot's config into editing state
+      // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
+      const configDataWithTradingMode = {
+        ...JSON.parse(JSON.stringify(selectedBot.config_data)),
+        trading_mode: selectedBot.trading_mode,
+        symphony_agent_id: selectedBot.symphony_agent_id
       }
+
+      setEditingConfigData(configDataWithTradingMode)
+      setEditingTableFields({
+        config_name: selectedBot.config_name,
+        config_type: selectedBot.config_type
+      })
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedConfigId, selectedBot, isEditingConfig, originalConfig])
+  }, [selectedConfigId, selectedBot])
 
   // Start bot function using proper API client
   const startBot = async () => {
@@ -757,8 +739,6 @@ function ForgeApp() {
     configData?: Partial<ConfigData>
     tableFields?: { config_name?: string; config_type?: string }
   }) => {
-    if (!isEditingConfig) return
-
     // Update JSONB config_data if provided
     if (updates.configData) {
       setEditingConfigData(prev => {
@@ -817,100 +797,36 @@ function ForgeApp() {
         ...updates.tableFields
       }))
     }
-
-    // Mark as having changes
-    setHasUnsavedChanges(true)
   }
 
   // Handle bot switching with clean state reset
   const handleBotSelection = (configId: string) => {
-    // If currently editing and has unsaved changes, show warning
-    if (isEditingConfig && hasUnsavedChanges) {
-      console.warn('⚠️ Switching bots - discarding unsaved changes')
-    }
-
     // Always reset to monitor tab when switching bots
     setActiveTab('monitor')
 
-    // Clear any editing state
-    setIsEditingConfig(false)
+    // Clear editing state
     setEditingConfigData(null)
     setEditingTableFields(null)
-    setHasUnsavedChanges(false)
-    setOriginalConfig(null)
 
     // Switch to the new bot
     setSelectedConfigId(configId)
   }
 
-  // Save configuration changes
-  const saveConfigurationChanges = async () => {
-    if (!selectedBot || !editingConfigData || !editingTableFields || !hasUnsavedChanges) return
-
-    console.log('💾 Attempting to save config for bot:', selectedBot.config_id)
-    console.log('💾 Selected bot structure:', JSON.stringify(selectedBot, null, 2))
-    console.log('💾 Editing config data:', JSON.stringify(editingConfigData, null, 2))
-    console.log('💾 Table fields:', editingTableFields)
-
-    try {
-      // Call API with both JSONB config_data and table fields
-      const updatedBot = await apiClient.updateConfig(
-        selectedBot.config_id,
-        editingConfigData,                     // JSONB config_data
-        editingTableFields.config_name,        // Table field
-        editingTableFields.config_type         // Table field
-      )
-
-      // Update the selected bot in allBots array
-      setAllBots(prev => prev.map(bot =>
-        bot.config_id === selectedBot.config_id ? updatedBot : bot
-      ))
-
-      // Clear editing state
-      setIsEditingConfig(false)
-      setEditingConfigData(null)
-      setEditingTableFields(null)
-      setHasUnsavedChanges(false)
-      setOriginalConfig(null)
-
-      // Show save confirmation
-      alert('✅ Configuration saved successfully!')
-
-    } catch (error) {
-      console.error('❌ Failed to save configuration:', error)
-
-      // If 404 error, the bot was likely deleted - refresh bot list
-      if (error instanceof Error && error.message.includes('404')) {
-        console.warn('⚠️ Bot not found (404) - refreshing bot list from server')
-        await refreshBotList()
+  // Config update callback for AI Assistant and child components
+  const handleConfigUpdate = async () => {
+    // Reload the selected bot's config after AI or auto-save updates
+    if (selectedConfigId) {
+      try {
+        const updatedBot = await apiClient.getConfig(selectedConfigId)
+        setAllBots(prev => prev.map(bot =>
+          bot.config_id === selectedConfigId ? updatedBot : bot
+        ))
+        // Also update editingConfigData to refresh form fields
+        setEditingConfigData(updatedBot.config_data)
+      } catch (error) {
+        console.error('Failed to reload bot config after update:', error)
       }
-
-      // Show error alert
-      alert('❌ Failed to save configuration. Please try again.')
     }
-  }
-
-  // Cancel configuration editing
-  const cancelConfigurationEditing = () => {
-    // Discard all editing state
-    setIsEditingConfig(false)
-    setEditingConfigData(null)
-    setEditingTableFields(null)
-    setHasUnsavedChanges(false)
-    setOriginalConfig(null)
-  }
-
-  // Reset configuration to original values
-  const resetConfigurationChanges = () => {
-    if (!originalConfig) return
-
-    // Reload original config into editing state
-    setEditingConfigData(JSON.parse(JSON.stringify(originalConfig.config_data)))
-    setEditingTableFields({
-      config_name: originalConfig.config_name,
-      config_type: originalConfig.config_type
-    })
-    setHasUnsavedChanges(false)
   }
 
   // Handler function for creating new bot
@@ -982,12 +898,6 @@ function ForgeApp() {
 
   // Handler function for renaming bot
   const handleRenameBot = async (configId: string, newName: string) => {
-    // Prevent renaming if there are unsaved configuration changes
-    if (hasUnsavedChanges) {
-      console.warn('Cannot rename bot while configuration changes are unsaved')
-      return
-    }
-
     setIsBotAction(true)
 
     try {
@@ -1035,11 +945,8 @@ function ForgeApp() {
         if (selectedConfigId === configId) {
           setSelectedConfigId(updatedBots.length > 0 ? updatedBots[0].config_id : null)
           // Clear editing state if deleting currently editing bot
-          setIsEditingConfig(false)
           setEditingConfigData(null)
           setEditingTableFields(null)
-          setHasUnsavedChanges(false)
-          setOriginalConfig(null)
         }
 
         return updatedBots
@@ -1312,32 +1219,6 @@ function ForgeApp() {
     }
   }, [selectedConfigId, editingTableFields?.config_type, user?.id])
 
-  // Helper function to refresh bot list from server (for error recovery)
-  const refreshBotList = async () => {
-    try {
-      const refreshedBots = await apiClient.listConfigs()
-      setAllBots(refreshedBots)
-
-      // Check if currently selected bot still exists
-      if (selectedConfigId) {
-        const stillExists = refreshedBots.find(bot => bot.config_id === selectedConfigId)
-        if (!stillExists) {
-          setSelectedConfigId(refreshedBots.length > 0 ? refreshedBots[0].config_id : null)
-          // Clear editing state since selected bot no longer exists
-          setIsEditingConfig(false)
-          setEditingConfigData(null)
-          setEditingTableFields(null)
-          setHasUnsavedChanges(false)
-          setOriginalConfig(null)
-        }
-      }
-
-      return refreshedBots
-    } catch (error) {
-      console.error('❌ Failed to refresh bot list:', error)
-      throw error
-    }
-  }
 
   if (loading) {
     return (
@@ -1490,20 +1371,16 @@ function ForgeApp() {
                     agentStarted={agentStarted}
                   />
                 ) : (
-                  // Normal mode: Show regular config tabs
+                  // Normal mode: Show regular config tabs with Strategy Advisor
                   <ConfigureLayout
                     selectedBot={selectedBot}
                     editingConfigData={editingConfigData}
                     editingTableFields={editingTableFields}
-                    hasUnsavedChanges={hasUnsavedChanges}
                     dataSources={dataSources}
-                    onSaveConfig={saveConfigurationChanges}
-                    onCancelConfig={cancelConfigurationEditing}
-                    onResetConfig={resetConfigurationChanges}
                     onUpdateConfig={(updates) => {
                       updateEditingConfig({ configData: updates })
                     }}
-                    onOpenAIAssistant={() => setAiAssistantOpen(true)}
+                    onConfigUpdate={handleConfigUpdate}
                   />
                 )
               ) : (
@@ -1537,35 +1414,6 @@ function ForgeApp() {
         onConfirm={handleCreateNewBot}
         existingBotCount={allBots.length}
       />
-
-      {/* Universal AI Assistant */}
-      {selectedBot && activeTab === 'configure' && (
-        <UniversalAIAssistant
-          configId={selectedBot.config_id}
-          botType={
-            selectedBot.config_type === 'scheduled_trading'
-              ? 'scheduled'
-              : selectedBot.config_type as "agent" | "scheduled" | "signal_validation"
-          }
-          isOpen={aiAssistantOpen}
-          onClose={() => setAiAssistantOpen(false)}
-          onConfigUpdate={async () => {
-            // Reload the selected bot's config when AI updates it
-            if (selectedConfigId) {
-              try {
-                const updatedBot = await apiClient.getConfig(selectedConfigId)
-                setAllBots(prev => prev.map(bot =>
-                  bot.config_id === selectedConfigId ? updatedBot : bot
-                ))
-                // Also update editingConfigData immediately to refresh form fields
-                setEditingConfigData(updatedBot.config_data)
-              } catch (error) {
-                console.error('Failed to reload bot config after AI update:', error)
-              }
-            }
-          }}
-        />
-      )}
     </div>
   )
 }

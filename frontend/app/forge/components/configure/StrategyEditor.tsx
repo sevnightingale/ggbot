@@ -6,6 +6,7 @@ import { Crown } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
 import { ConfigData, apiClient } from '@/lib/api'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { useAutoSave } from '@/lib/hooks/useAutoSave'
 
 interface LLMModel {
   model_id: string
@@ -43,6 +44,7 @@ const MODEL_COLORS: Record<string, string> = {
 }
 
 interface StrategyEditorProps {
+  configId: string
   configData?: ConfigData
   configType?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
@@ -50,20 +52,23 @@ interface StrategyEditorProps {
 }
 
 export function StrategyEditor({
+  configId,
   configData,
   configType,
   onUpdate,
   className = ''
 }: StrategyEditorProps) {
   const { canAccess } = usePermissions()
-  const currentStrategy = configData?.decision?.user_prompt || ''
-  const analysisFrequency = configData?.decision?.analysis_frequency || '1h'
-  const llmModel = configData?.llm_config?.model || 'grok'
-  const thinkingMode = configData?.llm_config?.thinking_mode || false
   const currentConfigType = configType || configData?.config_type || 'scheduled_trading'
 
   // Check premium access once to avoid repeated permission checks
   const hasPremiumAccess = canAccess('premium_llms')
+
+  // Local state for form fields (for optimistic updates)
+  const [currentStrategy, setCurrentStrategy] = useState(configData?.decision?.user_prompt || '')
+  const [analysisFrequency, setAnalysisFrequency] = useState(configData?.decision?.analysis_frequency || '1h')
+  const [llmModel, setLlmModel] = useState(configData?.llm_config?.model || 'grok')
+  const [thinkingMode, setThinkingMode] = useState(configData?.llm_config?.thinking_mode || false)
 
   // State for LLM models
   const [llmModels, setLLMModels] = useState<LLMModel[]>([])
@@ -74,6 +79,93 @@ export function StrategyEditor({
 
   // Ref for textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Auto-save hooks for each field
+  useAutoSave({
+    value: currentStrategy,
+    onSave: async (value) => {
+      await apiClient.updateConfig(configId, {
+        decision: {
+          user_prompt: value,
+          analysis_frequency: analysisFrequency || '1h',
+          system_prompt: configData?.decision?.system_prompt || ''
+        }
+      })
+      onUpdate?.({
+        decision: {
+          ...(configData?.decision || {}),
+          user_prompt: value,
+          analysis_frequency: analysisFrequency || '1h',
+          system_prompt: configData?.decision?.system_prompt || ''
+        }
+      })
+    },
+    delay: 1000,
+    saveId: 'strategy-prompt'
+  })
+
+  useAutoSave({
+    value: analysisFrequency,
+    onSave: async (value) => {
+      await apiClient.updateConfig(configId, {
+        decision: {
+          analysis_frequency: value || '1h',
+          user_prompt: currentStrategy,
+          system_prompt: configData?.decision?.system_prompt || ''
+        }
+      })
+      onUpdate?.({
+        decision: {
+          ...(configData?.decision || {}),
+          analysis_frequency: value || '1h',
+          user_prompt: currentStrategy,
+          system_prompt: configData?.decision?.system_prompt || ''
+        }
+      })
+    },
+    delay: 500,
+    saveId: 'analysis-frequency'
+  })
+
+  useAutoSave({
+    value: llmModel,
+    onSave: async (value) => {
+      await apiClient.updateConfig(configId, {
+        llm_config: {
+          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
+          model: value
+        }
+      })
+      onUpdate?.({
+        llm_config: {
+          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
+          model: value
+        }
+      })
+    },
+    delay: 500,
+    saveId: 'llm-model'
+  })
+
+  useAutoSave({
+    value: thinkingMode,
+    onSave: async (value) => {
+      await apiClient.updateConfig(configId, {
+        llm_config: {
+          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
+          thinking_mode: value
+        }
+      })
+      onUpdate?.({
+        llm_config: {
+          ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
+          thinking_mode: value
+        }
+      })
+    },
+    delay: 500,
+    saveId: 'thinking-mode'
+  })
 
   // Fetch available LLM models on mount
   useEffect(() => {
@@ -115,14 +207,8 @@ export function StrategyEditor({
       return
     }
 
-    onUpdate?.({
-      decision: {
-        ...(configData?.decision || {}),  // Guard: fallback to empty object
-        analysis_frequency: freq,
-        system_prompt: configData?.decision?.system_prompt,
-        user_prompt: configData?.decision?.user_prompt
-      }
-    })
+    // Update local state (auto-save will trigger)
+    setAnalysisFrequency(freq)
   }
 
   // Handle strategy text change
@@ -132,14 +218,8 @@ export function StrategyEditor({
       value = value.substring(0, 10000)
     }
 
-    onUpdate?.({
-      decision: {
-        ...(configData?.decision || {}),  // Guard: fallback to empty object
-        analysis_frequency: configData?.decision?.analysis_frequency ?? null,
-        system_prompt: configData?.decision?.system_prompt,
-        user_prompt: value
-      }
-    })
+    // Update local state (auto-save will trigger)
+    setCurrentStrategy(value)
   }
 
   // Auto-resize textarea
@@ -158,26 +238,14 @@ export function StrategyEditor({
       return
     }
 
-    onUpdate?.({
-      llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, thinking_mode: false }),
-        provider: 'openrouter',
-        model: modelId,
-        thinking_mode: configData?.llm_config?.thinking_mode || false,
-        use_platform_keys: true,
-        use_own_key: false
-      }
-    })
+    // Update local state (auto-save will trigger)
+    setLlmModel(modelId)
   }
 
   // Handle thinking mode toggle
   const handleThinkingModeChange = (enabled: boolean) => {
-    onUpdate?.({
-      llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok' }),
-        thinking_mode: enabled
-      }
-    })
+    // Update local state (auto-save will trigger)
+    setThinkingMode(enabled)
   }
 
   return (

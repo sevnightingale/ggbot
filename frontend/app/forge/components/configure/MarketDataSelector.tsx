@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { Crown } from 'lucide-react'
-import { ConfigData } from '@/lib/api'
+import { ConfigData, apiClient } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 
@@ -28,6 +28,7 @@ interface DataSource {
 }
 
 interface MarketDataSelectorProps {
+  configId: string
   configData?: ConfigData
   dataSources?: DataSource[]
   activeTab?: string
@@ -39,6 +40,7 @@ interface MarketDataSelectorProps {
 }
 
 export function MarketDataSelector({
+  configId,
   configData,
   dataSources = [],
   activeTab = 'technical_analysis',
@@ -71,8 +73,8 @@ export function MarketDataSelector({
     point.description.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
 
-  // Handle data point toggle
-  const handleToggleDataPoint = (dataPointId: string) => {
+  // Handle data point toggle with auto-save
+  const handleToggleDataPoint = async (dataPointId: string) => {
     if (!onUpdate || !activeDataSource) return
 
     const dataPoint = activeDataSource.data_points.find(p => p.data_point_id === dataPointId)
@@ -124,7 +126,15 @@ export function MarketDataSelector({
       delete update.extraction!.selected_data_sources[category]
     }
 
-    onUpdate(update)
+    // Auto-save to backend
+    try {
+      await apiClient.updateConfig(configId, update)
+      // Update local state for immediate UI feedback
+      onUpdate(update)
+    } catch (error) {
+      console.error('Failed to save market data selection:', error)
+      // TODO: Show error toast to user
+    }
   }
 
   return (

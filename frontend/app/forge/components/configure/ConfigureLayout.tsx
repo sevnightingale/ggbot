@@ -4,6 +4,7 @@ import React, { useState } from 'react'
 import { BotConfiguration, ConfigData, DataSource } from '@/lib/api'
 import { SaveStatusIndicator } from '@/components/SaveStatusIndicator'
 import { StrategyAdvisorPanel } from '@/components/StrategyAdvisorPanel'
+import { SaveStatusProvider, useSaveStatus } from '@/lib/contexts/SaveStatusContext'
 import { ConfigTabs, ConfigTabType } from './ConfigTabs'
 import { MarketDataSelector } from './MarketDataSelector'
 import { SignalsConfiguration } from './SignalsConfiguration'
@@ -11,7 +12,6 @@ import { StrategyEditor } from './StrategyEditor'
 import { TradeSettings } from './TradeSettings'
 import { EmptyState } from '../shared/EmptyState'
 import { Settings } from 'lucide-react'
-import { SaveStatus } from '@/lib/hooks/useAutoSave'
 
 // DataSource will be passed from parent page.tsx
 interface ConfigureLayoutProps {
@@ -21,23 +21,20 @@ interface ConfigureLayoutProps {
   dataSources?: DataSource[]
   onUpdateConfig?: (updates: Partial<ConfigData>) => void
   onConfigUpdate?: () => void
-  saveStatus?: SaveStatus
-  saveError?: Error | null
   className?: string
 }
 
-export function ConfigureLayout({
+function ConfigureLayoutContent({
   selectedBot,
   editingConfigData,
   editingTableFields,
   dataSources = [],
   onUpdateConfig,
   onConfigUpdate,
-  saveStatus = 'idle',
-  saveError = null,
   className = ''
 }: ConfigureLayoutProps) {
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabType>('strategy')
+  const { globalStatus, globalError } = useSaveStatus()
 
   // Local state for MarketDataSelector
   const [marketDataActiveTab, setMarketDataActiveTab] = useState('technical_analysis')
@@ -59,16 +56,19 @@ export function ConfigureLayout({
   const configData = editingConfigData || selectedBot.config_data
 
   // Determine bot type for Strategy Advisor
-  const botType = (editingTableFields?.config_type || selectedBot.config_type) as 'agent' | 'scheduled' | 'signal_validation'
-  const mappedBotType = botType === 'scheduled_trading' ? 'scheduled' : botType
+  const botType = editingTableFields?.config_type || selectedBot.config_type
+  const mappedBotType: 'agent' | 'scheduled' | 'signal_validation' =
+    botType === 'scheduled_trading' ? 'scheduled' :
+    botType === 'agent' ? 'agent' :
+    'signal_validation'
 
   return (
     <div className={className}>
       {/* Save Status Indicator - Global */}
       <div className="flex justify-center mb-4">
         <SaveStatusIndicator
-          status={saveStatus}
-          error={saveError}
+          status={globalStatus}
+          error={globalError}
         />
       </div>
 
@@ -91,6 +91,7 @@ export function ConfigureLayout({
       <div className="min-h-[400px]">
         {activeConfigTab === 'market-data' && (
           <MarketDataSelector
+            configId={selectedBot.config_id}
             configData={configData}
             onUpdate={onUpdateConfig}
             dataSources={dataSources}
@@ -103,6 +104,7 @@ export function ConfigureLayout({
 
         {activeConfigTab === 'signals' && (
           <SignalsConfiguration
+            configId={selectedBot.config_id}
             configData={configData}
             onUpdate={onUpdateConfig}
           />
@@ -110,6 +112,7 @@ export function ConfigureLayout({
 
         {activeConfigTab === 'strategy' && (
           <StrategyEditor
+            configId={selectedBot.config_id}
             configData={configData}
             configType={editingTableFields?.config_type || selectedBot?.config_type}
             onUpdate={onUpdateConfig}
@@ -126,5 +129,14 @@ export function ConfigureLayout({
         )}
       </div>
     </div>
+  )
+}
+
+// Wrapper component that provides SaveStatusContext
+export function ConfigureLayout(props: ConfigureLayoutProps) {
+  return (
+    <SaveStatusProvider>
+      <ConfigureLayoutContent {...props} />
+    </SaveStatusProvider>
   )
 }

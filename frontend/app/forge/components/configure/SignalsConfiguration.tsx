@@ -3,15 +3,17 @@
 import React, { useState } from 'react'
 import { usePermissions } from '@/lib/permissions'
 import { ExternalLink, Lock, CheckCircle, AlertCircle } from 'lucide-react'
-import { ConfigData } from '@/lib/api'
+import { ConfigData, apiClient } from '@/lib/api'
 
 interface SignalsConfigurationProps {
+  configId: string
   configData?: ConfigData
   onUpdate?: (updates: Partial<ConfigData>) => void
   className?: string
 }
 
 export function SignalsConfiguration({
+  configId,
   configData,
   onUpdate,
   className = ''
@@ -44,8 +46,8 @@ export function SignalsConfiguration({
     }
   }
 
-  // Toggle ggShot enabled/disabled
-  const toggleGgShot = (enabled: boolean) => {
+  // Toggle ggShot enabled/disabled with auto-save
+  const toggleGgShot = async (enabled: boolean) => {
     // Check permission before enabling
     if (enabled && !isGgShotSubscribed) {
       alert('ggShot signals require a paid subscription. Upgrade to access external signal sources!')
@@ -86,7 +88,15 @@ export function SignalsConfiguration({
       delete update.extraction!.selected_data_sources!.signals_group_chats
     }
 
-    updateConfig(update)
+    // Auto-save to backend
+    try {
+      await apiClient.updateConfig(configId, update)
+      // Update local state for immediate UI feedback
+      updateConfig(update)
+    } catch (error) {
+      console.error('Failed to save signal configuration:', error)
+      // TODO: Show error toast to user
+    }
   }
 
   return (

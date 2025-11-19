@@ -1,4 +1,5 @@
-import { useEffect, useRef, useState, useCallback } from 'react'
+import { useEffect, useRef, useState, useCallback, useContext } from 'react'
+import { SaveStatusContext } from '@/lib/contexts/SaveStatusContext'
 
 export type SaveStatus = 'idle' | 'saving' | 'saved' | 'error'
 
@@ -7,6 +8,7 @@ interface UseAutoSaveOptions<T> {
   onSave: (value: T) => Promise<void>
   delay?: number
   enabled?: boolean
+  saveId?: string  // Optional unique ID for tracking this save operation
 }
 
 interface UseAutoSaveReturn {
@@ -23,6 +25,7 @@ interface UseAutoSaveReturn {
  * - Optimistic UI updates
  * - Automatic rollback on error
  * - Cleanup on unmount
+ * - Reports to global SaveStatusContext if available
  *
  * @example
  * const { status, error } = useAutoSave({
@@ -30,18 +33,21 @@ interface UseAutoSaveReturn {
  *   onSave: async (text) => {
  *     await apiClient.updateConfig(configId, { decision: { user_prompt: text } })
  *   },
- *   delay: 1000
+ *   delay: 1000,
+ *   saveId: 'strategy-prompt'
  * })
  */
 export function useAutoSave<T>({
   value,
   onSave,
   delay = 1000,
-  enabled = true
+  enabled = true,
+  saveId = `save-${Math.random()}`
 }: UseAutoSaveOptions<T>): UseAutoSaveReturn {
   const [status, setStatus] = useState<SaveStatus>('idle')
   const [error, setError] = useState<Error | null>(null)
 
+  const saveStatusContext = useContext(SaveStatusContext)
   const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
   const previousValueRef = useRef<T>(value)
   const mountedRef = useRef(true)
@@ -81,6 +87,9 @@ export function useAutoSave<T>({
     setStatus('saving')
     setError(null)
 
+    // Report to global context if available
+    saveStatusContext?.registerSave(saveId)
+
     // Debounced save
     saveTimerRef.current = setTimeout(async () => {
       try {
@@ -88,6 +97,7 @@ export function useAutoSave<T>({
 
         if (mountedRef.current) {
           setStatus('saved')
+          saveStatusContext?.completeSave(saveId)
 
           // Auto-reset to idle after 2 seconds
           setTimeout(() => {
@@ -102,6 +112,7 @@ export function useAutoSave<T>({
         if (mountedRef.current) {
           setStatus('error')
           setError(error)
+          saveStatusContext?.failSave(saveId, error)
 
           // Rollback to previous value (parent component should handle this)
           console.error('Auto-save failed, should rollback to:', previousValue)
@@ -122,6 +133,7 @@ export function useAutoSave<T>({
         clearTimeout(saveTimerRef.current)
       }
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [value, onSave, delay, enabled])
 
   return { status, error, reset }

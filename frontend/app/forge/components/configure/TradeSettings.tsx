@@ -2,17 +2,17 @@
 
 import React from 'react'
 import { Lock } from 'lucide-react'
-import { ConfigData, createDefaultConfigData } from '@/lib/api'
+import { ConfigData, createDefaultConfigData, apiClient } from '@/lib/api'
 import { SymbolSelector } from '@/components/SymbolSelector'
 import { usePermissions } from '@/lib/permissions'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useFieldValidation, ValidationRules } from '@/lib/useTradeValidation'
 import { ValidationMessage } from '@/components/ValidationMessage'
 
 interface TradeSettingsProps {
   configData?: ConfigData
-  configId?: string
+  configId: string
   tradingMode?: 'paper' | 'symphony' | 'aster'
   onUpdate?: (updates: Partial<ConfigData>) => void
   onValidationChange?: (hasErrors: boolean) => void
@@ -30,6 +30,7 @@ export function TradeSettings({
   const isSymphonyBot = tradingMode === 'symphony'
   const { canAccess } = usePermissions()
   const [session, setSession] = useState<{ access_token?: string } | null>(null)
+  const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const supabase = createClientComponentClient()
@@ -38,6 +39,15 @@ export function TradeSettings({
       setSession(session)
     }
     getSession()
+  }, [])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+      }
+    }
   }, [])
 
   const defaultConfig = createDefaultConfigData()
@@ -79,9 +89,24 @@ export function TradeSettings({
   ])
 
   const updateConfig = (updates: Partial<ConfigData>) => {
+    // Update local state immediately for optimistic UI
     if (onUpdate) {
       onUpdate(updates)
     }
+
+    // Debounced auto-save
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current)
+    }
+
+    saveTimerRef.current = setTimeout(async () => {
+      try {
+        await apiClient.updateConfig(configId, updates)
+        console.log('✅ Trade settings auto-saved')
+      } catch (error) {
+        console.error('❌ Failed to auto-save trade settings:', error)
+      }
+    }, 1000)
   }
 
   // Helper to update trading config with proper type handling
