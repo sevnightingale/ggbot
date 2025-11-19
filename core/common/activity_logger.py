@@ -16,6 +16,10 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
     """
     Get most recent account snapshot for a config (within last 10 minutes).
 
+    Falls back to querying account tables directly if no recent snapshot exists.
+    This prevents race conditions during trade closes where activity logging happens
+    before the account monitor creates a new snapshot.
+
     Used for populating account_balance and account_pnl fields in activities
     to enable efficient timeline chart rendering without API calls.
 
@@ -23,7 +27,7 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
         config_id: Bot configuration ID
 
     Returns:
-        Dict with 'current_balance' and 'total_pnl' keys, or None if no recent snapshot
+        Dict with 'current_balance' and 'total_pnl' keys, or None if no account data found
 
     Example:
         >>> snapshot = get_latest_snapshot("uuid")
@@ -33,6 +37,7 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # Try recent snapshot first (preferred - includes all trading modes)
                 cur.execute("""
                     SELECT current_balance, total_pnl
                     FROM account_snapshots
@@ -48,6 +53,58 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
                         'current_balance': float(result[0]) if result[0] is not None else None,
                         'total_pnl': float(result[1]) if result[1] is not None else None
                     }
+
+                # FALLBACK: No recent snapshot - query account table directly
+                # This handles race condition where trade closes before monitor creates snapshot
+
+                # First, determine trading mode
+                cur.execute("""
+                    SELECT trading_mode
+                    FROM configurations
+                    WHERE config_id = %s
+                    LIMIT 1
+                """, (config_id,))
+                mode_result = cur.fetchone()
+
+                if not mode_result:
+                    return None
+
+                trading_mode = mode_result[0]
+
+                # Query appropriate account table based on trading mode
+                if trading_mode == 'paper':
+                    cur.execute("""
+                        SELECT current_balance, total_pnl
+                        FROM paper_accounts
+                        WHERE config_id = %s
+                        LIMIT 1
+                    """, (config_id,))
+                    fallback = cur.fetchone()
+
+                    if fallback:
+                        return {
+                            'current_balance': float(fallback[0]) if fallback[0] is not None else None,
+                            'total_pnl': float(fallback[1]) if fallback[1] is not None else None
+                        }
+
+                # For symphony/aster, fallback to most recent snapshot (even if older than 10 min)
+                # This is better than returning None, though may be slightly stale
+                elif trading_mode in ['symphony', 'aster']:
+                    cur.execute("""
+                        SELECT current_balance, total_pnl
+                        FROM account_snapshots
+                        WHERE config_id = %s
+                        ORDER BY timestamp DESC
+                        LIMIT 1
+                    """, (config_id,))
+                    fallback = cur.fetchone()
+
+                    if fallback:
+                        return {
+                            'current_balance': float(fallback[0]) if fallback[0] is not None else None,
+                            'total_pnl': float(fallback[1]) if fallback[1] is not None else None
+                        }
+
                 return None
     except Exception as e:
         # Non-critical - snapshot is optional for activity logging

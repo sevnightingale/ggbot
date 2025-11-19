@@ -434,11 +434,13 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             typeof p.time !== 'number' ||
             typeof p.value !== 'number' ||
             isNaN(p.time) ||
-            isNaN(p.value)
+            isNaN(p.value) ||
+            !isFinite(p.time) ||  // Catch Infinity/-Infinity
+            !isFinite(p.value)     // Catch Infinity/-Infinity
           );
 
           if (invalidPoints.length > 0) {
-            console.error('❌ INVALID CHART DATA POINTS:', invalidPoints);
+            console.error('❌ INVALID CHART DATA POINTS (found Infinity, NaN, or null):', invalidPoints);
             throw new Error(`Found ${invalidPoints.length} invalid chart data points`);
           }
 
@@ -558,11 +560,12 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               m.shape == null ||
               m.size == null ||
               typeof m.time !== 'number' ||
-              isNaN(m.time)
+              isNaN(m.time) ||
+              !isFinite(m.time)  // Catch Infinity/-Infinity
             );
 
             if (invalidMarkers.length > 0) {
-              console.error('❌ INVALID MARKERS:', invalidMarkers);
+              console.error('❌ INVALID MARKERS (found Infinity, NaN, or null):', invalidMarkers);
               throw new Error(`Found ${invalidMarkers.length} invalid markers`);
             }
 
