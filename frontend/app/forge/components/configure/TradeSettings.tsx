@@ -128,7 +128,7 @@ export function TradeSettings({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Trading Pair Selection */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Trading Pair
         </h3>
@@ -151,7 +151,7 @@ export function TradeSettings({
       </div>
 
       {/* Position Sizing */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Position Sizing
         </h3>
@@ -261,7 +261,7 @@ export function TradeSettings({
       </div>
 
       {/* Risk Management */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Risk Management
         </h3>
@@ -385,7 +385,7 @@ export function TradeSettings({
       </div>
 
       {/* Telegram Integration */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">
             Telegram Publishing

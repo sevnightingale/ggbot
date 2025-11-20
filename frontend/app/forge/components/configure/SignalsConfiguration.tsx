@@ -107,7 +107,7 @@ export function SignalsConfiguration({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* ggShot Signals Section */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <div className="flex items-center gap-3 mb-4">
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">
             ggShot Premium Signals
@@ -308,7 +308,7 @@ export function SignalsConfiguration({
       </div>
 
       {/* Future Signals Sources */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 opacity-60">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 opacity-60">
         <div className="flex items-center gap-3 mb-4">
           <Lock className="h-5 w-5 text-[var(--text-muted)]" />
           <h3 className="text-lg font-semibold text-[var(--text-primary)]">

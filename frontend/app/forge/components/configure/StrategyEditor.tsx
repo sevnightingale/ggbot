@@ -315,7 +315,7 @@ export function StrategyEditor({
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Trading Strategy - Main Section */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Your Trading Strategy
         </h3>
@@ -352,7 +352,7 @@ export function StrategyEditor({
       </div>
 
       {/* LLM Model Selection */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           AI Decision Engine
         </h3>
@@ -477,7 +477,7 @@ export function StrategyEditor({
 
       {/* Analysis Frequency - Hide for signal_validation configs */}
       {currentConfigType !== 'signal_validation' && (
-        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+        <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
           <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-2">
             Analysis Frequency
           </h3>

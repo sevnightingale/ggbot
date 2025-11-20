@@ -164,7 +164,7 @@ export function MarketDataSelector({
       )}
 
       {/* Data Sources Section */}
-      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6">
+      <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Data Sources
         </h3>

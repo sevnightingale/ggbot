@@ -1336,7 +1336,7 @@ function ForgeApp() {
               />
             </div>
 
-            <div className="flex-1 mt-4 pb-32">
+            <div className="flex-1 mt-4 pb-8">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
                   <div className="space-y-2">
