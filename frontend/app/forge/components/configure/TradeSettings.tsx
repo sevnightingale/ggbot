@@ -13,6 +13,8 @@ import { ValidationMessage } from '@/components/ValidationMessage'
 interface TradeSettingsProps {
   configData?: ConfigData
   configId: string
+  configName?: string
+  configType?: string
   tradingMode?: 'paper' | 'symphony' | 'aster'
   onUpdate?: (updates: Partial<ConfigData>) => void
   onValidationChange?: (hasErrors: boolean) => void
@@ -22,6 +24,8 @@ interface TradeSettingsProps {
 export function TradeSettings({
   configData,
   configId,
+  configName,
+  configType,
   tradingMode = 'paper',
   onUpdate,
   onValidationChange,
@@ -101,7 +105,8 @@ export function TradeSettings({
 
     saveTimerRef.current = setTimeout(async () => {
       try {
-        await apiClient.updateConfig(configId, updates)
+        // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
+        await apiClient.updateConfig(configId, updates, configName, configType)
         console.log('✅ Trade settings auto-saved')
       } catch (error) {
         console.error('❌ Failed to auto-save trade settings:', error)

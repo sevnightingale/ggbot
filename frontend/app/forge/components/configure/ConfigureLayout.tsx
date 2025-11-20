@@ -92,6 +92,8 @@ function ConfigureLayoutContent({
         {activeConfigTab === 'market-data' && (
           <MarketDataSelector
             configId={selectedBot.config_id}
+            configName={editingTableFields?.config_name || selectedBot?.config_name}
+            configType={editingTableFields?.config_type || selectedBot?.config_type}
             configData={configData}
             onUpdate={onUpdateConfig}
             dataSources={dataSources}
@@ -105,6 +107,8 @@ function ConfigureLayoutContent({
         {activeConfigTab === 'signals' && (
           <SignalsConfiguration
             configId={selectedBot.config_id}
+            configName={editingTableFields?.config_name || selectedBot?.config_name}
+            configType={editingTableFields?.config_type || selectedBot?.config_type}
             configData={configData}
             onUpdate={onUpdateConfig}
           />
@@ -114,6 +118,7 @@ function ConfigureLayoutContent({
           <StrategyEditor
             configId={selectedBot.config_id}
             configData={configData}
+            configName={editingTableFields?.config_name || selectedBot?.config_name}
             configType={editingTableFields?.config_type || selectedBot?.config_type}
             onUpdate={onUpdateConfig}
           />
@@ -123,6 +128,8 @@ function ConfigureLayoutContent({
           <TradeSettings
             configData={configData}
             configId={selectedBot?.config_id}
+            configName={editingTableFields?.config_name || selectedBot?.config_name}
+            configType={editingTableFields?.config_type || selectedBot?.config_type}
             tradingMode={selectedBot?.trading_mode}
             onUpdate={onUpdateConfig}
           />

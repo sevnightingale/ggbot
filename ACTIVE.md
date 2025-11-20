@@ -87,7 +87,7 @@
 |---------|-----|--------|---------|
 | **V2 Orchestrator** | `https://ggbots-api.nightingale.business` | ✅ | Main backend API |
 | **Frontend** | `https://ggbot-app.vercel.app` | ✅ | Next.js application |
-| **Timeline Viewer** | `aster.ggbots.ai` | ✅ | Real-time activity timeline with TradingView charts |
+| **Timeline Viewer** | `aster.ggbots.ai` | ✅ | AI consciousness timeline - chart shows bot's subjective awareness moments |
 
 ### Core API Endpoints
 
@@ -140,8 +140,14 @@
 
 **Activity Timeline & Monitoring**
 - `GET /api/v2/activities/{config_id}` - Get all activities (trades, queries, thoughts, waits)
-- `GET /api/v2/activities/{config_id}/balance-series` - Get P&L snapshots for chart
+- `GET /api/v2/snapshots/{config_id}/balance-series` - Get AI consciousness timeline (activities-only, Redis-cached equity)
 - `GET /api/v2/activities/{config_id}/metadata` - Get bot metadata (name, symbols, status)
+
+**AI Assistant** (Production)
+- `POST /api/v2/assistant/chat` - Universal AI assistant for bot configuration (Claude Haiku function calling)
+- 3 tools: query_available_data, load_full_config, update_full_config
+- Bot-type aware (agent, scheduled, signal_validation), conversation history, deep merge config updates
+- Inline chat panel in Configure tab (500px fixed height, markdown rendering, auto-save integration)
 
 **User Management**
 - `GET /api/v2/user/profile` - User profile with subscription details
@@ -201,6 +207,7 @@
 ### **account-monitor Service**
 - **Universal Account Monitoring**: Unified monitoring for paper, Symphony, and Aster trading accounts
 - **5-Second Check Intervals**: Continuous monitoring with on-change detection
+- **Redis Equity Cache**: Total equity cached every 5s for instant activity logging (30s TTL)
 - **Historical Snapshots**: 5-minute heartbeat storage in account_snapshots table
 - **Adapter Pattern**: Clean architecture for multiple trading mode data sources
 - **Documentation**: Complete implementation guide in DOCS/UNIFIED_ACCOUNT_MONITORING.md
@@ -269,7 +276,7 @@
 | Port | Service | Access | Purpose |
 |------|---------|--------|---------|
 | **Remote** | Supabase PostgreSQL | HTTPS/SSL | Main application database (managed) |
-| **6379** | Redis | Localhost | WebSocket cache, live prices, scheduler idempotency |
+| **6379** | Redis | Localhost | WebSocket cache, live prices, equity cache, scheduler idempotency |
 
 ### System Ports
 | Port | Service | Access | Purpose |
@@ -282,7 +289,7 @@
 
 ## 🔄 Background Tasks
 
-- **Universal Account Monitoring**: ✅ ACTIVE (5-second checks, 5-minute snapshots for all trading modes)
+- **Universal Account Monitoring**: ✅ ACTIVE (5s checks, Redis equity cache, 5min snapshots for all trading modes)
 - **Position Monitoring**: ✅ ACTIVE (3-second cycles monitoring 120+ configs with open positions)
 - **Autonomous Trading**: ✅ ACTIVE (scheduled bot execution across multiple timeframes with APScheduler)
 - **Signal Processing**: ✅ ACTIVE (ggShot signal validation and telegram publishing)

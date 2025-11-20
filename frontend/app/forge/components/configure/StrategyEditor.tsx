@@ -46,6 +46,7 @@ const MODEL_COLORS: Record<string, string> = {
 interface StrategyEditorProps {
   configId: string
   configData?: ConfigData
+  configName?: string
   configType?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
   className?: string
@@ -54,6 +55,7 @@ interface StrategyEditorProps {
 export function StrategyEditor({
   configId,
   configData,
+  configName,
   configType,
   onUpdate,
   className = ''
@@ -133,7 +135,8 @@ export function StrategyEditor({
       }
     }
     console.log('💾 Update payload:', updatePayload)
-    await apiClient.updateConfig(configId, updatePayload)
+    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
+    await apiClient.updateConfig(configId, updatePayload, configName, configType)
     console.log('✅ Strategy prompt saved successfully')
     onUpdate?.({
       decision: {
@@ -143,7 +146,7 @@ export function StrategyEditor({
         system_prompt: configData?.decision?.system_prompt || ''
       }
     })
-  }, [configId, analysisFrequency, configData?.decision, onUpdate])
+  }, [configId, analysisFrequency, configData?.decision, configName, configType, onUpdate])
 
   // Auto-save hooks for each field
   useAutoSave({
@@ -154,13 +157,14 @@ export function StrategyEditor({
   })
 
   const saveFrequency = useCallback(async (value: string) => {
+    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
     await apiClient.updateConfig(configId, {
       decision: {
         analysis_frequency: value || '1h',
         user_prompt: currentStrategy,
         system_prompt: configData?.decision?.system_prompt || ''
       }
-    })
+    }, configName, configType)
     onUpdate?.({
       decision: {
         ...(configData?.decision || {}),
@@ -169,37 +173,39 @@ export function StrategyEditor({
         system_prompt: configData?.decision?.system_prompt || ''
       }
     })
-  }, [configId, currentStrategy, configData?.decision, onUpdate])
+  }, [configId, currentStrategy, configData?.decision, configName, configType, onUpdate])
 
   const saveModel = useCallback(async (value: string) => {
+    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
     await apiClient.updateConfig(configId, {
       llm_config: {
         ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
         model: value
       }
-    })
+    }, configName, configType)
     onUpdate?.({
       llm_config: {
         ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
         model: value
       }
     })
-  }, [configId, configData?.llm_config, onUpdate])
+  }, [configId, configData?.llm_config, configName, configType, onUpdate])
 
   const saveThinkingMode = useCallback(async (value: boolean) => {
+    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
     await apiClient.updateConfig(configId, {
       llm_config: {
         ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
         thinking_mode: value
       }
-    })
+    }, configName, configType)
     onUpdate?.({
       llm_config: {
         ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
         thinking_mode: value
       }
     })
-  }, [configId, configData?.llm_config, onUpdate])
+  }, [configId, configData?.llm_config, configName, configType, onUpdate])
 
   useAutoSave({
     value: analysisFrequency,

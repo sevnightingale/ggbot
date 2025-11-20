@@ -1,10 +1,12 @@
 # Market Maker Module
 
-**Standalone Avellaneda-Stoikov market making engine for spot trading.**
+**Standalone Avellaneda-Stoikov market making engine for orderbook-based spot trading.**
 
 ## Overview
 
-This module implements a professional market making strategy using the Avellaneda-Stoikov model. It's designed to provide liquidity on spot markets (DEXs like Kuru, Symphony spot, etc.) by continuously quoting bid/ask prices while managing inventory risk.
+This module implements a professional market making strategy using the Avellaneda-Stoikov model. It's designed to provide liquidity on **orderbook-based** DEXs (like Kuru on Monad) by continuously quoting bid/ask limit orders while managing inventory risk.
+
+**⚠️ IMPORTANT**: This is for **orderbook DEXs only** (Kuru, dYdX, Hyperliquid, etc.). It will **NOT** work on AMM-based DEXs (Uniswap, nad.fun, etc.) which use liquidity pools instead of limit orders.
 
 ### Key Features
 
@@ -148,27 +150,43 @@ config = StablePairConfig(
 - `Trades`: Total fills
 - `FILLS`: Real-time fill notifications
 
-## Next Steps
+## Production Usage (Kuru Exchange)
 
-### 1. Add Exchange Adapters
+Once Kuru launches on Monad with API access:
 
-Once Symphony or Kuru APIs are available:
+### 1. Get API Credentials
+Register on Kuru and get API key + secret
 
-```python
-# market_maker/exchanges/kuru.py
-class KuruExchangeAdapter:
-    def get_orderbook(self, symbol: str) -> Orderbook:
-        # Fetch real orderbook from Kuru API
-        pass
-
-    def place_limit_order(self, side: str, price: Decimal, size: Decimal):
-        # Place real order on Kuru
-        pass
-
-    def cancel_all_orders(self):
-        # Cancel all open orders
-        pass
+### 2. Set Environment Variables
+```bash
+export KURU_API_KEY="your_api_key"
+export KURU_API_SECRET="your_api_secret"
+export KURU_API_URL="https://api.kuru.finance"  # or actual URL
 ```
+
+### 3. Run Market Maker
+```bash
+cd /home/sev/ggbot
+source .venv/bin/activate
+python -m market_maker.run_kuru
+```
+
+### 4. Monitor Performance
+Watch for:
+- Fill rate (are you getting trades?)
+- Inventory skew (staying balanced?)
+- P&L (making money after fees?)
+- Spread competitiveness (too wide = no fills, too tight = adverse selection)
+
+### Exchange Adapter
+
+The Kuru adapter (`market_maker/exchanges/kuru.py`) is a **template** that needs to be updated based on Kuru's actual API documentation:
+
+- Authentication method (HMAC-SHA256 assumed)
+- Endpoint paths (`/v1/orderbook/{symbol}` etc.)
+- Request/response formats
+- Symbol format ("CHOG-USDC" vs "CHOG/USDC" vs "CHOG_USDC")
+- WebSocket endpoints for real-time fills
 
 ### 2. Add Rebalancing Logic
 
@@ -223,8 +241,14 @@ A: Yes, but it's designed as a standalone module. You can use ggbots database/lo
 **Q: How does this compare to ggbots scheduled bots?**
 A: Completely different. ggbots bots are directional (long/short) with 5min+ intervals. MM is market-neutral with 1-4 second updates.
 
-**Q: Will this work for $CHOG on Monday?**
-A: Yes, once we have Kuru/Symphony spot API. Just swap the mock orderbook generator for real exchange adapter.
+**Q: Will this work for $CHOG on nad.fun?**
+A: **No.** nad.fun is an AMM (like Uniswap), not an orderbook DEX. For AMM you provide liquidity to a pool, not place limit orders. This module is specifically for orderbook-based exchanges.
+
+**Q: Will this work for $CHOG on Kuru?**
+A: **Yes.** Kuru is an orderbook DEX on Monad. Once Kuru launches and provides API access, you can use this module by updating the `KuruAdapter` with their actual API endpoints.
+
+**Q: What about Symphony spot trading?**
+A: Depends. If Symphony launches orderbook-based spot trading (limit orders), yes. If it's AMM-based or pool-based, no.
 
 ## References
 

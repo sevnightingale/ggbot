@@ -6,6 +6,61 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-20 - Market Maker Module (Experimental)
+
+**Orderbook Market Making** - Avellaneda-Stoikov engine for Kuru DEX (not nad.fun AMM)
+- Spread calculation, inventory skew, volatility adaptation (~900 lines)
+- Simulation tested: +0.20% P&L, 3 fills, successful inventory management
+- Exchange adapter pattern w/ Kuru template (needs API docs)
+- Files: market_maker/engine.py, simulator.py, exchanges/kuru.py, DOCS/MM.md
+
+---
+
+## 2025-11-20 - AI Consciousness Timeline Architecture
+
+**Activities-Only Chart** - Timeline shows bot's subjective awareness, Redis-cached equity, no snapshots
+- Chart displays AI's discrete observation moments, not continuous time
+- Redis equity cache: account monitor caches total equity every 5s (TTL 30s)
+- Activity logger reads from Redis (tier 1), DB snapshots (tier 2), account table (tier 3)
+- Total equity = current_balance + margin_used + unrealized_pnl (paper trading fix)
+- Chart API queries activities table only (/api/v2/snapshots/{config_id}/balance-series)
+- Files: core/domain/account_snapshot.py (total_equity @property), core/monitoring/universal_account_monitor.py (_cache_total_equity), core/common/activity_logger.py (Redis tier), api/snapshots.py (activities-only query)
+
+**Marker Redesign** - Green/red circles w/ P&L text for exits, solid colors, vertical positioning
+- Trade exits: green/red circles (size 1.5) w/ dynamic P&L text (+$5.23 / -$2.10), position by profit/loss
+- Trade entries: green/red arrows (size 2), below/above line
+- Observations: brass/blue/gray circles (size 1), on line (inBar)
+- All solid colors, no transparency
+- Files: frontend/components/tv-timeline.tsx (marker logic), frontend/components/bottom-sheet.tsx (centered on desktop)
+
+---
+
+## 2025-11-19 - Strategy Advisor Auto-Save Redesign
+
+**Strategy Advisor Inline Chat Panel** - Replaced floating modal + SaveConfigBar w/ always-visible chat interface
+- Removed SaveConfigBar (explicit save/cancel/reset buttons), removed floating modal overlay
+- Strategy Advisor now 500px fixed-height panel at top of Configure tab, always visible
+- Markdown rendering for AI responses (ReactMarkdown w/ custom styling for lists, headers, code)
+- All borders unified to `border-[var(--border)]` (removed bright accent borders on chat + textarea)
+- Removed "Default Strategy Example" box from StrategyEditor, cleaner single-purpose section
+- Files: StrategyAdvisorPanel.tsx (new), SaveConfigBar.tsx (deleted), ConfigureLayout.tsx, StrategyEditor.tsx
+
+**Auto-Save Implementation** - All config forms auto-save w/ 1s debounce, optimistic updates, rollback on error
+- Removed hasUnsavedChanges, originalConfig, isEditingConfig state flags from page.tsx (-300 lines state logic)
+- useAutoSave hook: debounced saves, optimistic UI, automatic rollback on failure, reports to SaveStatusContext
+- SaveStatusContext: global status coordination (idle → saving → saved → error), auto-hide after 2s
+- SaveStatusIndicator: animated global indicator (Loader2 spinner → Check → AlertCircle)
+- Forms auto-save: StrategyEditor (prompt, frequency, LLM, thinking mode), MarketDataSelector (data sources), TradeSettings (all settings), SignalsConfiguration (ggShot toggle)
+- Critical bug fix: Wrapped onSave callbacks in useCallback to prevent timer cancellation on re-render
+- Files: useAutoSave.ts (new), SaveStatusContext.tsx (new), SaveStatusIndicator.tsx (new), StrategyEditor.tsx, MarketDataSelector.tsx, TradeSettings.tsx, SignalsConfiguration.tsx, page.tsx
+
+**AI Config Updates Sync to Forms** - Strategy Advisor changes automatically reflected in form fields
+- Added useEffect syncs for currentStrategy, analysisFrequency, llmModel, thinkingMode states
+- When AI updates config via `/api/v2/assistant/chat` → handleConfigUpdate reloads → forms update
+- Prevents stale form data when AI makes changes, user sees real-time updates
+
+---
+
 ## 2025-11-16 - Universal AI Assistant Implementation
 
 **Universal AI Assistant Deployed** - Claude Haiku function calling for bot configuration assistance

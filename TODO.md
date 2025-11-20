@@ -207,6 +207,47 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 
 ---
 
+## 📊 **Market Maker - Kuru Integration**
+
+**Status**: ⏸️ WAITING - Module complete, needs Kuru API launch (Monday Nov 24?)
+
+**What's Ready**:
+- [x] Core Avellaneda-Stoikov engine (~900 lines)
+- [x] Simulation tested (+0.20% P&L, inventory management working)
+- [x] Exchange adapter interface
+- [x] Kuru adapter template (needs real API docs)
+
+**Next Steps (When Kuru Launches)**:
+- [ ] **Get API Access** (~30 min)
+  - [ ] Register on Kuru platform
+  - [ ] Obtain API key + secret
+  - [ ] Read official API documentation
+
+- [ ] **Update KuruAdapter** (~1-2 hours)
+  - [ ] Update authentication method (currently assumes HMAC-SHA256)
+  - [ ] Fix endpoint URLs in `market_maker/exchanges/kuru.py`
+  - [ ] Update request/response parsing based on actual API format
+  - [ ] Confirm symbol format (CHOG-USDC vs CHOG/USDC vs CHOG_USDC)
+  - [ ] Add WebSocket integration for real-time fills
+
+- [ ] **Testing** (~2-3 hours)
+  - [ ] Test with $100-200 order size, $2k capital
+  - [ ] Validate orderbook fetching works
+  - [ ] Confirm limit orders placed successfully
+  - [ ] Monitor fill rate and spread competitiveness
+  - [ ] Test inventory rebalancing logic
+  - [ ] Verify P&L tracking accuracy (account for fees)
+
+- [ ] **Production Deployment** (if successful)
+  - [ ] Scale gradually ($500 orders, $5k capital after 24h)
+  - [ ] Monitor for adverse selection (consecutive fills one side)
+  - [ ] Add missing features: rebalancing, error handling, market impact detection
+  - [ ] Consider integration with ggbots monitoring/logging
+
+**Files**: `market_maker/`, `DOCS/MM.md`
+
+---
+
 ## 🧠 **Market Intelligence - Future Phases**
 
 **Phase 1 Complete**: 8 Grok sources live ($195/month platform cost)

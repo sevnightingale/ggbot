@@ -727,11 +727,11 @@ The AI Consciousness Timeline visualizes a bot's subjective awareness using Trad
 
 #### **1. TradingView Chart Integration**
 - **Library**: TradingView Lightweight Charts v4.2.0 (NOT v5 - API breaking changes)
-- **Chart Type**: Line series with brass color (#C9A962), 2px stroke width
-- **Data**: P&L snapshots from trade closes + unrealized P&L carry-forward between activities
+- **Chart Type**: Line series with brass color (#C1A87D), 2px stroke width
+- **Data**: Activities-only (no snapshots), total equity from Redis cache (current_balance + margin_used + unrealized_pnl)
 - **Y-Axis**: Formatted with `$` symbol, automatic scaling
-- **X-Axis**: Time-based with automatic date formatting
-- **Interaction**: Crosshair mode with dashed brass lines (#C9A962)
+- **X-Axis**: Activity timestamps (time spacing = sequence of AI observations, not clock time)
+- **Interaction**: Crosshair mode with dashed brass lines
 
 **Chart Configuration**:
 ```typescript
@@ -759,21 +759,25 @@ const lineSeries = chart.addLineSeries({
 })
 ```
 
-#### **2. Activity Markers**
+#### **2. Activity Markers** (2025-11-20 Update)
 
-**Marker Types** (sorted chronologically, grouped by timestamp):
-- **Trade Entries**:
-  - Long: Green arrow up (▲, #16a34a, belowBar, size: 2)
-  - Short: Red arrow down (▼, #dc2626, aboveBar, size: 2)
-- **Agent Thoughts**: Brass circles (●, rgba(193,168,125,0.6), aboveBar, size: 0.5)
-- **Market Queries**: Blue circles (●, rgba(60,166,224,0.5), belowBar, size: 0.5)
-- **Agent Waits**: Ivory circles (●, rgba(237,235,231,0.4), belowBar, size: 0.5)
+**Trade Events** (arrows, above/below line - vertical movement):
+- **Long Entry**: Green arrow up (▲, #16a34a, belowBar, size: 2)
+- **Short Entry**: Red arrow down (▼, #dc2626, aboveBar, size: 2)
+- **Exit (Profit)**: Green circle with P&L text (●, #16a34a, aboveBar, size: 1.5, text: "+$5.23")
+- **Exit (Loss)**: Red circle with P&L text (●, #dc2626, belowBar, size: 1.5, text: "-$2.10")
+
+**Observation Events** (circles, on the line - neutral position):
+- **LLM Thought**: Brass circle (●, #C1A87D, inBar, size: 1)
+- **Market Query**: Signal blue circle (●, #3CA6E0, inBar, size: 1)
+- **Agent Wait**: Gray circle (●, #9ca3af, inBar, size: 1)
 
 **Priority System**: When multiple activities occur at same timestamp, show single marker by priority:
 1. Trade entries (long/short)
-2. Agent thoughts
-3. Market queries
-4. Agent waits
+2. Trade exits
+3. LLM thoughts
+4. Market queries
+5. Agent waits
 
 **Critical Implementation Detail**: Markers must be sorted by time in ascending order or they disappear on zoom:
 ```typescript
@@ -923,25 +927,42 @@ Market queries now display the actual preprocessed data that agents receive:
 
 This shows the **200-500 analytical fields** (trend strength, divergence patterns, momentum velocity, etc.) that influence agent decisions.
 
-#### **6. Data Fetching & Management**
+#### **6. Data Fetching & Management** (2025-11-20 Update)
 
-**API Endpoints** (Multi-Mode Support):
+**API Endpoints** (AI Consciousness Architecture):
 ```typescript
-// Balance series (P&L snapshots at trade closes)
-// - Paper: Queries paper_trades table
-// - Symphony: Queries Symphony API get_trade_history()
-// - Aster: Queries Aster API get_user_trades() + paper_trades
-GET /api/v2/activities/{config_id}/balance-series?mode=pnl
+// AI consciousness timeline (activities-only, Redis-cached equity)
+// Returns activities with total_equity from Redis cache (updated every 5s by account monitor)
+// No snapshots queried - pure activity stream representing AI's awareness moments
+GET /api/v2/snapshots/{config_id}/balance-series
 
 // All activities (trades, queries, thoughts, waits)
-// - Universal: Works for all trading modes (activities table)
+// Universal: Works for all trading modes (activities table)
 GET /api/v2/activities/{config_id}
 
 // Bot metadata (name, balance, win rate, performance)
-// - Paper: Calculated from paper_trades (per-bot)
-// - Symphony: Queries Symphony API get_account_metrics() (account-wide)
-// - Aster: Queries Aster API balance + trades (account-wide)
+// Paper: Calculated from paper_trades (per-bot)
+// Symphony: Queries Symphony API get_account_metrics() (account-wide)
+// Aster: Queries Aster API balance + trades (account-wide)
 GET /api/v2/activities/{config_id}/metadata
+```
+
+**Redis Equity Caching Architecture** (2025-11-20):
+```
+Account Monitor (every 5s):
+  → Calculate total_equity (current_balance + margin_used + unrealized_pnl)
+  → Cache in Redis: equity:{config_id} (TTL: 30s)
+
+Activity Logger (on every activity):
+  → Read from Redis cache (tier 1)
+  → Fallback to database snapshots (tier 2)
+  → Fallback to account table query (tier 3)
+  → Store total_equity in activities.account_balance
+
+Chart API:
+  → Query activities table only
+  → Each activity has total_equity from moment it was logged
+  → Chart displays AI's discrete observations (not continuous snapshots)
 ```
 
 **Multi-Mode Architecture** (2025-11-13):

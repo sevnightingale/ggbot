@@ -7,6 +7,8 @@ import { ConfigData, apiClient } from '@/lib/api'
 
 interface SignalsConfigurationProps {
   configId: string
+  configName?: string
+  configType?: string
   configData?: ConfigData
   onUpdate?: (updates: Partial<ConfigData>) => void
   className?: string
@@ -14,6 +16,8 @@ interface SignalsConfigurationProps {
 
 export function SignalsConfiguration({
   configId,
+  configName,
+  configType,
   configData,
   onUpdate,
   className = ''
@@ -90,7 +94,8 @@ export function SignalsConfiguration({
 
     // Auto-save to backend
     try {
-      await apiClient.updateConfig(configId, update)
+      // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
+      await apiClient.updateConfig(configId, update, configName, configType)
       // Update local state for immediate UI feedback
       updateConfig(update)
     } catch (error) {

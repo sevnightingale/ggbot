@@ -86,6 +86,7 @@ The ggbot repository is organized into the following top-level directories:
 | **tests/** | Integration and unit testing suite | ✅ Active | test_trading_flow_simple.py |
 | **scripts/** | Utility scripts (status checks, maintenance, testing) | ✅ Active | status_check.py, maintenance_*.py |
 | **x_bot/** | Twitter bot for platform status updates | ✅ Active | Platform tweets at @ggbots_ai |
+| **market_maker/** | Avellaneda-Stoikov market making for orderbook DEXs (Kuru) | 🧪 Experimental | engine.py, simulator.py, exchanges/kuru.py |
 | **archive/** | Legacy code preserved for reference | 🔒 Archived | 15 archived directories (includes ggshot/) |
 
 **Note**: All bots and agents are stored as `configurations` records. The `agent/` directory contains autonomous Claude SDK agent runners (config_type='agent') with 12 MCP tools for 24/7 trading. See [agent/README.md](agent/README.md) for details.

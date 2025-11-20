@@ -29,6 +29,8 @@ interface DataSource {
 
 interface MarketDataSelectorProps {
   configId: string
+  configName?: string
+  configType?: string
   configData?: ConfigData
   dataSources?: DataSource[]
   activeTab?: string
@@ -41,6 +43,8 @@ interface MarketDataSelectorProps {
 
 export function MarketDataSelector({
   configId,
+  configName,
+  configType,
   configData,
   dataSources = [],
   activeTab = 'technical_analysis',
@@ -128,7 +132,8 @@ export function MarketDataSelector({
 
     // Auto-save to backend
     try {
-      await apiClient.updateConfig(configId, update)
+      // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
+      await apiClient.updateConfig(configId, update, configName, configType)
       // Update local state for immediate UI feedback
       onUpdate(update)
     } catch (error) {
