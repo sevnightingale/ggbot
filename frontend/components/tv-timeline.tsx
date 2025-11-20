@@ -764,7 +764,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   };
 
   return (
-    <div className="relative w-full min-h-screen font-sans" style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
+    <div className={`relative w-full font-sans ${variant === 'standalone' ? 'min-h-screen' : ''}`} style={{ backgroundColor: VIBE.obsidian, color: VIBE.ivory }}>
       <style>{`
         @keyframes markerPulse {
           0%, 100% {

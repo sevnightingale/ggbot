@@ -1329,14 +1329,14 @@ function ForgeApp() {
               )
             })()}
 
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between my-4">
               <TabNavigation
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
               />
             </div>
 
-            <div className="flex-1 mt-4 pb-8">
+            <div className="flex-1 pb-8">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
                   <div className="space-y-2">
