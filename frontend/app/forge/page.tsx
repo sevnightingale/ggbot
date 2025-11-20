@@ -1329,7 +1329,7 @@ function ForgeApp() {
               )
             })()}
 
-            <div className="flex items-center justify-between my-4">
+            <div className="flex items-center justify-between my-3">
               <TabNavigation
                 activeTab={activeTab}
                 onTabChange={setActiveTab}
@@ -1339,7 +1339,7 @@ function ForgeApp() {
             <div className="flex-1 pb-8">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
-                  <div className="space-y-2">
+                  <div className="space-y-3">
                     {/* Activity Timeline - Full Width */}
                     <TVTimeline
                       configId={selectedConfigId || ''}
