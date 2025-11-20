@@ -81,7 +81,7 @@ export function ActivationBar({
 
   return (
     <>
-      <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-4">
+      <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         {/* Row 1: Bot Name + Status + Controls */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
           {/* Left: Bot Name + Status */}

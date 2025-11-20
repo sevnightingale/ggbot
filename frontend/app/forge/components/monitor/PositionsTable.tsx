@@ -179,7 +179,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
   }, [positions])
   if (positions.length === 0) {
     return (
-      <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
+      <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 ${className}`}>
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Active Trades</h3>
         <div className="text-center py-8">
           <div className="text-[var(--text-muted)] mb-2">No active trades</div>
@@ -241,7 +241,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
   )
 
   return (
-    <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 ${className}`}>
+    <div className={`rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 ${className}`}>
       <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Active Trades</h3>
 
       {/* Desktop Table */}

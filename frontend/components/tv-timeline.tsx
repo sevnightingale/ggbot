@@ -833,8 +833,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       )}
 
       {/* CHART */}
-      <section className="max-w-7xl mx-auto px-4 sm:px-5 pb-5">
-        <div className="rounded-xl border overflow-hidden relative" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: variant === 'embedded' ? '600px' : 'calc(100vh - 280px)', minHeight: '400px' }}>
+      <section className="max-w-7xl mx-auto">
+        <div className="rounded-xl border p-4 relative" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: variant === 'embedded' ? '600px' : 'calc(100vh - 280px)', minHeight: '400px' }}>
           <div ref={setChartContainer} style={{ width: '100%', height: '100%' }} />
 
           {/* Activity hover tooltip */}

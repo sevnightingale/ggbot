@@ -1339,7 +1339,7 @@ function ForgeApp() {
             <div className="flex-1 mt-4 pb-32">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
-                  <div className="space-y-4">
+                  <div className="space-y-2">
                     {/* Activity Timeline - Full Width */}
                     <TVTimeline
                       configId={selectedConfigId || ''}
