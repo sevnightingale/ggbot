@@ -53,13 +53,13 @@ Legacy/Archive (Moved to /archive/):
 │   ├── ActivationBar.tsx   # Bot status/control with agent pipeline visualization
 │   └── PositionsTable.tsx  # Live trading positions with real-time P&L
 │
-├── configure/               # Bot configuration system
-│   ├── SaveConfigBar.tsx   # Bot type toggle + save/cancel with change tracking
-│   ├── ConfigTabs.tsx      # Sub-navigation (Market Data | Signals | Strategy | Trade Settings)
-│   ├── MarketDataSelector.tsx # Technical indicator selection with premium gates
-│   ├── SignalsConfiguration.tsx # External signal sources (ggShot, Discord, etc.)
-│   ├── StrategyEditor.tsx  # AI prompt editing with LLM provider selection
-│   └── TradeSettings.tsx   # Position sizing, risk management, Telegram integration
+├── configure/               # Bot configuration system (auto-save)
+│   ├── ConfigureLayout.tsx # Main layout with Strategy Advisor panel + SaveStatusContext
+│   ├── ConfigTabs.tsx      # Sub-navigation (Strategy | Market Data | Trade Settings | Signals)
+│   ├── StrategyEditor.tsx  # AI prompt editing with LLM provider selection (auto-saves)
+│   ├── MarketDataSelector.tsx # Technical indicator selection with premium gates (auto-saves)
+│   ├── TradeSettings.tsx   # Position sizing, risk management, Telegram integration (auto-saves)
+│   └── SignalsConfiguration.tsx # External signal sources (ggShot) (auto-saves)
 │
 └── shared/                  # Reusable components
     ├── ThemeToggle.tsx     # Dark/light mode switching
@@ -67,8 +67,10 @@ Legacy/Archive (Moved to /archive/):
     └── LoadingSkeleton.tsx # Loading placeholders
 
 /components/                 # Global components
-├── tv-timeline.tsx         # TradingView activity timeline with P&L chart, markers, live status
-├── bottom-sheet.tsx        # Framer Motion slide-up drawer for activity details
+├── tv-timeline.tsx         # AI consciousness timeline - bot's subjective awareness moments with equity chart
+├── bottom-sheet.tsx        # Framer Motion slide-up drawer (centered on desktop) for activity details
+├── StrategyAdvisorPanel.tsx # Inline AI chat for bot configuration (500px fixed, markdown rendering)
+├── SaveStatusIndicator.tsx # Global auto-save status (Saving → Saved → Error)
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
 ├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
 ├── UpgradeModal.tsx        # Stripe checkout modal with monthly/annual pricing toggle
@@ -85,6 +87,10 @@ Legacy/Archive (Moved to /archive/):
 ├── permissions.tsx         # Permission context with subscription checks
 ├── permission-gate.tsx     # Component for gating premium features
 ├── useTradeValidation.ts   # Trading settings validation hook
+├── hooks/
+│   └── useAutoSave.ts      # Debounced auto-save with optimistic updates + rollback
+├── contexts/
+│   └── SaveStatusContext.tsx # Global save status coordination
 ├── api.ts                  # API client with Stripe methods
 ├── theme.tsx               # Dark/light theme provider
 └── supabase.ts             # Supabase client setup
@@ -98,7 +104,8 @@ Legacy/Archive (Moved to /archive/):
 - **No Global Store**: Direct API types, no transformation layers
 - **Multi-Bot Native**: `selectedConfigId` pattern with seamless switching
 - **SSE Real-time**: Server-Sent Events replace complex WebSocket patterns
-- **Sandboxed Editing**: Configuration changes isolated from operational display
+- **Auto-Save Architecture**: Debounced form updates with optimistic UI, no explicit save buttons (2025-11-19)
+- **AI-First Configuration**: Strategy Advisor inline chat panel for collaborative bot setup
 
 ### **Real-time Data Flow**
 ```typescript
@@ -119,13 +126,12 @@ eventSource.onmessage = (event) => {
 
 ### **Configuration Architecture**
 ```typescript
-// Sandboxed editing pattern
+// Auto-save pattern (2025-11-19)
 const [allBots, setAllBots] = useState<BotConfiguration[]>([])
 const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
 const [editingConfig, setEditingConfig] = useState<ConfigData | null>(null)
-const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
 
-// Centralized config updates with deep merging
+// Centralized config updates with deep merging + auto-save
 const updateEditingConfig = (updates: Partial<ConfigData>) => {
   setEditingConfig(prev => ({
     ...prev,
@@ -135,8 +141,22 @@ const updateEditingConfig = (updates: Partial<ConfigData>) => {
     decision: { ...prev?.decision, ...updates.decision },
     trading: { ...prev?.trading, ...updates.trading }
   }))
-  setHasUnsavedChanges(true)
+  // No explicit save - forms auto-save via useAutoSave hook
 }
+
+// Auto-save hook example
+const saveStrategy = useCallback(async (value: string) => {
+  await apiClient.updateConfig(configId, {
+    decision: { user_prompt: value }
+  })
+}, [configId])
+
+useAutoSave({
+  value: currentStrategy,
+  onSave: saveStrategy,
+  delay: 1000,  // 1s debounce
+  saveId: 'strategy-prompt'
+})
 ```
 
 ---
@@ -501,17 +521,20 @@ import { Bot, Settings, BarChart3 } from 'lucide-react'
 - **Account Isolation**: $10k paper trading accounts per bot configuration
 
 ### **Configuration System**
-- **Market Data**: 21+ technical indicators with premium feature gating
-- **Signal Sources**: ggShot integration with subscription gatekeeping
-- **Strategy Editor**: AI prompt templates with LLM provider selection
-- **Trading Settings**: Symbol selection (141 pairs), position sizing, risk management, Telegram integration
+- **Strategy Advisor**: Inline AI chat panel (500px fixed) with Claude Haiku, markdown rendering, real-time config updates
+- **Auto-Save**: All forms auto-save with 1s debounce, optimistic updates, global status indicator (Saving → Saved → Error)
+- **Market Data**: 21+ technical indicators with premium feature gating (auto-saves)
+- **Signal Sources**: ggShot integration with subscription gatekeeping (auto-saves)
+- **Strategy Editor**: AI prompt editing with LLM provider selection, thinking mode toggle (auto-saves)
+- **Trading Settings**: Symbol selection (141 pairs), position sizing, risk management, Telegram integration (auto-saves)
 
 ### **Real-time Monitoring**
-- **Activity Timeline**: TradingView Lightweight Charts integration with P&L evolution, interactive activity markers, and live status indicators
-- **Timeline Features**: Trade entries (↑↓ arrows), market queries (○), agent thoughts (○), wait periods (○) with click-to-expand details
+- **AI Consciousness Timeline**: Chart shows bot's subjective awareness - each point = moment AI observed account state (not objective reality)
+- **Equity-Only Chart**: Activities-only (no snapshots), Redis-cached total equity, time spacing irrelevant (sequence of observations)
+- **Trade Markers**: Green/red arrows (entries), green/red circles with P&L text (exits), brass/blue/gray circles (observations)
 - **Live Status**: Pulsing colored dot showing current agent state with countdown timers ("⏸ WAITING • Next check in 2m 15s")
 - **KPI Header**: Real-time Balance, P&L, Trades, Win Rate metrics integrated into timeline view
-- **Bottom Sheet**: Framer Motion drawer with comprehensive activity details, preprocessed market data, and markdown-rendered analysis
+- **Bottom Sheet**: Framer Motion drawer (centered on desktop) with comprehensive activity details, preprocessed market data
 - **Live Positions**: Real-time P&L updates with color-coded performance in positions table
 - **Execution Pipeline**: Visual extraction → decision → trading status tracking in activation bar
 
@@ -674,13 +697,15 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 
 ### **Overview**
 
-The Activity Timeline provides professional-grade trading analytics using TradingView Lightweight Charts v4.2.0. It displays P&L evolution over time with interactive markers for all agent activities, live status indicators, and comprehensive market data insights.
+The AI Consciousness Timeline visualizes a bot's subjective awareness using TradingView Lightweight Charts v4.2.0. Each point represents a moment when the AI observed its account state - between points, the AI is "asleep" (not conscious of market changes). Time spacing is irrelevant; this is a sequence of observations, not a clock.
+
+**Key Paradigm** (2025-11-20): Activities-only chart with Redis-cached total equity. Account monitor caches equity every 5s, activity logger reads from cache, chart displays AI's discrete moments of awareness. No snapshots queried.
 
 **Dual-Mode Component**:
 - **Standalone**: `aster.ggbots.ai` → `/view/{config_id}` (full viewport, 100vh - 280px)
 - **Embedded**: `/forge` Monitor tab (fixed 600px height, full width)
 
-**Integration** (2025-11-08): Timeline replaced DecisionFeed + PerformanceChart in Forge Monitor tab, consolidating KPIs, P&L chart, and activity history into single comprehensive view.
+**Integration** (2025-11-08): Timeline replaced DecisionFeed + PerformanceChart in Forge Monitor tab, consolidating KPIs, equity chart, and activity history into single comprehensive view.
 
 ### **Architecture**
 

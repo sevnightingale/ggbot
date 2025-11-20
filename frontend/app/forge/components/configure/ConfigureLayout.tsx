@@ -63,9 +63,9 @@ function ConfigureLayoutContent({
     'signal_validation'
 
   return (
-    <div className={className}>
-      {/* Save Status Indicator - Global */}
-      <div className="flex justify-center mb-4">
+    <div className={`${className} relative`}>
+      {/* Save Status Indicator - Floating in corner */}
+      <div className="fixed top-4 right-4 z-50">
         <SaveStatusIndicator
           status={globalStatus}
           error={globalError}
