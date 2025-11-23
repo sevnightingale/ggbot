@@ -842,38 +842,49 @@ class GGBotOrchestrator:
             if successful_extractions == 0:
                 overall_result["error"] = "All timeframe extractions failed"
 
-            # Query ggShot signals for additional market context (with permission check)
+            # Query ggShot signals for additional market context (requires both config + permission)
             try:
                 from core.services.user_service import UserService
 
-                # Check if user has permission to access ggshot signals
-                user_service = UserService()
-                profile = await user_service.get_profile(user_id)
+                # Check if ggshot is enabled in bot config
+                extraction_config = config.extraction or {}
+                selected_sources = extraction_config.get('selected_data_sources', {})
+                trading_signals_config = selected_sources.get('trading_signals', {})
+                ggshot_enabled = 'ggshot' in trading_signals_config.get('data_points', [])
 
-                if profile and profile.paid_data_points and 'ggshot' in profile.paid_data_points:
-                    # User has paid access to ggshot signals
-                    from market_intelligence.adapters.signals.ggshot_adapter import GGShotAdapter
-                    from market_intelligence.types import QueryParams
+                if ggshot_enabled:
+                    # Check if user has permission to access ggshot signals
+                    user_service = UserService()
+                    profile = await user_service.get_profile(user_id)
 
-                    ggshot_adapter = GGShotAdapter()
-                    params = QueryParams(params={'symbol': symbol, 'include_raw': False})
-                    ggshot_response = await ggshot_adapter.fetch(params)
+                    if profile and profile.paid_data_points and 'ggshot' in profile.paid_data_points:
+                        # User has paid access and ggshot is enabled in config
+                        from market_intelligence.adapters.signals.ggshot_adapter import GGShotAdapter
+                        from market_intelligence.types import QueryParams
 
-                    if ggshot_response.data and ggshot_response.data.get('signals'):
-                        overall_result["ggshot_signals"] = ggshot_response.data['signals']
-                        overall_result["ggshot_metadata"] = ggshot_response.data.get('metadata', {})
-                        overall_result["ggshot_confidence"] = ggshot_response.confidence
+                        ggshot_adapter = GGShotAdapter()
+                        params = QueryParams(params={'symbol': symbol, 'include_raw': False})
+                        ggshot_response = await ggshot_adapter.fetch(params)
 
-                        timeframes_found = list(ggshot_response.data['signals'].keys())
-                        self._log.info(f"✅ Fetched ggShot signals for {symbol}: {len(timeframes_found)} timeframes ({', '.join(timeframes_found)})")
+                        if ggshot_response.data and ggshot_response.data.get('signals'):
+                            overall_result["ggshot_signals"] = ggshot_response.data['signals']
+                            overall_result["ggshot_metadata"] = ggshot_response.data.get('metadata', {})
+                            overall_result["ggshot_confidence"] = ggshot_response.confidence
+
+                            timeframes_found = list(ggshot_response.data['signals'].keys())
+                            self._log.info(f"✅ Fetched ggShot signals for {symbol}: {len(timeframes_found)} timeframes ({', '.join(timeframes_found)})")
+                        else:
+                            self._log.info(f"No ggShot signals found for {symbol}")
+                            overall_result["ggshot_signals"] = {}
+
+                        await ggshot_adapter.close()
                     else:
-                        self._log.info(f"No ggShot signals found for {symbol}")
+                        # User does not have permission to ggshot signals
+                        self._log.debug(f"User {user_id} does not have access to ggshot signals (paid_data_points: {profile.paid_data_points if profile else 'no profile'})")
                         overall_result["ggshot_signals"] = {}
-
-                    await ggshot_adapter.close()
                 else:
-                    # User does not have access to ggshot signals
-                    self._log.debug(f"User {user_id} does not have access to ggshot signals (paid_data_points: {profile.paid_data_points if profile else 'no profile'})")
+                    # ggShot not enabled in config
+                    self._log.debug(f"ggShot signals not enabled in config for {config.config_id}")
                     overall_result["ggshot_signals"] = {}
 
             except Exception as e:
