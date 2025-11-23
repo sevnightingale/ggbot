@@ -16,7 +16,7 @@ from core.services.config_service import config_service
 from core.common.db import get_db_connection, DecimalEncoder
 from core.services.llm_key_service import LLMKeyService
 from core.services.llm_pricing_service import llm_pricing_service
-from core.common.activity_logger import log_llm_activity_safe
+from core.common.activity_logger import log_llm_activity_safe, log_activity
 from decision.llm_providers import get_llm_provider
 from decision.prompts.opportunity_analysis import build_opportunity_analysis_prompt
 from decision.prompts.signal_validation import build_signal_validation_prompt
@@ -219,12 +219,27 @@ class DecisionEngineV2:
         
         # Get volume confirmation analysis
         volume_analysis = await self._get_volume_confirmation(symbol, signal_data.get('timeframe', '1h'))
-        
+
         # Build signal validation prompt
-        prompt = await self._build_signal_validation_prompt(
+        prompt, formatted_sections = await self._build_signal_validation_prompt(
             symbol, signal_data, market_data, current_price, volume_analysis
         )
-        
+
+        # Log market_query activity with formatted data
+        self._log_market_query_activity(
+            symbol=symbol,
+            query_mode="signal_validation",
+            current_price=current_price,
+            data_age_seconds=market_data.get('data_age_seconds', 0),
+            formatted_sections=formatted_sections,
+            metadata={
+                "timeframes_analyzed": market_data.get('timeframes_available', []),
+                "indicators_count": 21,  # All preprocessors
+                "signal_direction": signal_data.get('direction', 'UNKNOWN'),
+                "signal_source": signal_data.get('source', 'unknown')
+            }
+        )
+
         # Call LLM for validation
         llm_response, metadata = await self._call_llm(prompt)
 
@@ -293,10 +308,25 @@ class DecisionEngineV2:
         
         # Step 2.5: Get volume confirmation analysis
         volume_analysis = await self._get_volume_confirmation(symbol, '1h')  # Default timeframe for autonomous
-        
+
         # Step 3: Build prompt from template
-        prompt = await self._build_opportunity_analysis_prompt(symbol, market_data, current_price, volume_analysis)
-        
+        prompt, formatted_sections = await self._build_opportunity_analysis_prompt(symbol, market_data, current_price, volume_analysis)
+
+        # Step 3.5: Log market_query activity with formatted data
+        self._log_market_query_activity(
+            symbol=symbol,
+            query_mode="opportunity_analysis",
+            current_price=current_price,
+            data_age_seconds=market_data.get('data_age_seconds', 0),
+            formatted_sections=formatted_sections,
+            metadata={
+                "timeframes_analyzed": market_data.get('timeframes_available', []),
+                "indicators_count": 21,  # All preprocessors
+                "ggshot_available": bool(formatted_sections.get('ggshot_signals')),
+                "market_intelligence_categories": list(self.market_intelligence.keys()) if self.market_intelligence else []
+            }
+        )
+
         # Step 4: Call LLM
         llm_response, metadata = await self._call_llm(prompt)
 
@@ -419,15 +449,21 @@ class DecisionEngineV2:
             raise MarketDataError(f"Unable to get current price for {symbol}: {e}")
     
     async def _build_signal_validation_prompt(
-        self, 
+        self,
         symbol: str,
         signal_data: Dict,
         market_data: Dict[str, Any],
         current_price: Decimal,
         volume_analysis: str
-    ) -> str:
-        """Build signal validation prompt using template."""
-        
+    ) -> tuple[str, Dict[str, str]]:
+        """
+        Build signal validation prompt using template.
+
+        Returns:
+            Tuple of (prompt, formatted_sections) where formatted_sections contains
+            the individual formatted strings sent to LLM
+        """
+
         signal_context = self._format_signal_for_llm(signal_data)
         market_context = self._format_market_data_for_llm(market_data)
         # NO FALLBACK - fail explicitly if config is missing required data
@@ -435,11 +471,12 @@ class DecisionEngineV2:
         if not user_prompt:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
         user_strategy = user_prompt
-        
+
         # Extract signal direction for prompt
         signal_direction = signal_data.get('direction', 'UNKNOWN')
 
-        return build_signal_validation_prompt(
+        # Build prompt
+        prompt = build_signal_validation_prompt(
             symbol=symbol,
             current_price=f"${current_price:,.2f}",
             market_data=market_context,
@@ -448,12 +485,27 @@ class DecisionEngineV2:
             user_strategy=user_strategy,
             signal_direction=signal_direction
         )
+
+        # Also return the formatted sections for activity logging
+        formatted_sections = {
+            "technical_analysis": market_context,
+            "volume_confirmation": volume_analysis,
+            "signal_context": signal_context
+        }
+
+        return prompt, formatted_sections
     
     async def _build_opportunity_analysis_prompt(self, symbol: str,
                                                 market_data: Dict[str, Any],
                                                 current_price: Decimal,
-                                                volume_analysis: str) -> str:
-        """Build opportunity analysis prompt from template."""
+                                                volume_analysis: str) -> tuple[str, Dict[str, str]]:
+        """
+        Build opportunity analysis prompt from template.
+
+        Returns:
+            Tuple of (prompt, formatted_sections) where formatted_sections contains
+            the individual formatted strings sent to LLM
+        """
 
         market_context = self._format_market_data_for_llm(market_data)
         # NO FALLBACK - fail explicitly if config is missing required data
@@ -468,7 +520,8 @@ class DecisionEngineV2:
         # Format market intelligence if available
         market_intel_context = self._format_market_intelligence_for_llm() if hasattr(self, 'market_intelligence') and self.market_intelligence else None
 
-        return build_opportunity_analysis_prompt(
+        # Build prompt
+        prompt = build_opportunity_analysis_prompt(
             symbol=symbol,
             current_price=f"${current_price:,.2f}",
             market_data=market_context,
@@ -477,6 +530,16 @@ class DecisionEngineV2:
             ggshot_signals=ggshot_context,
             market_intelligence=market_intel_context
         )
+
+        # Also return the formatted sections for activity logging
+        formatted_sections = {
+            "technical_analysis": market_context,
+            "volume_confirmation": volume_analysis,
+            "ggshot_signals": ggshot_context,
+            "market_intelligence": market_intel_context
+        }
+
+        return prompt, formatted_sections
     
     async def _handle_position_management(self, symbol: str, position_data: Dict) -> Dict[str, Any]:
         """
@@ -501,12 +564,28 @@ class DecisionEngineV2:
         
         # Step 2.5: Get volume confirmation analysis
         volume_analysis = await self._get_volume_confirmation(symbol, '1h')  # Default timeframe for position management
-        
+
         # Step 3: Build position management prompt with context
-        prompt = await self._build_position_management_prompt(
+        prompt, formatted_sections = await self._build_position_management_prompt(
             symbol, position_data, market_data, current_price, volume_analysis
         )
-        
+
+        # Step 3.5: Log market_query activity with formatted data
+        self._log_market_query_activity(
+            symbol=symbol,
+            query_mode="position_management",
+            current_price=current_price,
+            data_age_seconds=market_data.get('data_age_seconds', 0),
+            formatted_sections=formatted_sections,
+            metadata={
+                "timeframes_analyzed": market_data.get('timeframes_available', []),
+                "indicators_count": 21,  # All preprocessors
+                "position_side": position_data.get('side', 'unknown'),
+                "position_pnl": float(position_data.get('unrealized_pnl', 0)),
+                "position_duration_hours": position_data.get('duration_hours', 0)
+            }
+        )
+
         # Step 4: Call LLM
         llm_response, metadata = await self._call_llm(prompt)
 
@@ -525,15 +604,21 @@ class DecisionEngineV2:
         )
 
     async def _build_position_management_prompt(
-        self, 
+        self,
         symbol: str,
         position_data: Dict,
         market_data: Dict[str, Any],
         current_price: Decimal,
         volume_analysis: str
-    ) -> str:
-        """Build position management prompt from template."""
-        
+    ) -> tuple[str, Dict[str, str]]:
+        """
+        Build position management prompt from template.
+
+        Returns:
+            Tuple of (prompt, formatted_sections) where formatted_sections contains
+            the individual formatted strings sent to LLM
+        """
+
         # Format position context for LLM
         position_context = self._format_position_data_for_llm(position_data, current_price)
         market_context = self._format_market_data_for_llm(market_data)
@@ -542,8 +627,9 @@ class DecisionEngineV2:
         if not user_prompt:
             raise ValueError(f"Missing required user_prompt in decision config for {self.config_id}. Fix the config data.")
         user_strategy = user_prompt
-        
-        return build_position_management_prompt(
+
+        # Build prompt
+        prompt = build_position_management_prompt(
             symbol=symbol,
             current_price=f"${current_price:,.2f}",
             market_data=market_context,
@@ -551,6 +637,15 @@ class DecisionEngineV2:
             position_data=position_context,
             user_strategy=user_strategy
         )
+
+        # Also return the formatted sections for activity logging
+        formatted_sections = {
+            "technical_analysis": market_context,
+            "volume_confirmation": volume_analysis,
+            "position_context": position_context
+        }
+
+        return prompt, formatted_sections
     
     def _format_position_data_for_llm(self, position_data: Dict, current_price: Decimal) -> str:
         """Format position data for LLM consumption with performance context."""
@@ -734,7 +829,7 @@ Take Profit: {take_profit_text}
                 activity_source='scheduled_bot',
                 summary=summary,
                 details={
-                    'reasoning': decision_data.get('reasoning', ''),
+                    'thought': decision_data.get('reasoning', ''),  # Changed from 'reasoning' to 'thought' for frontend compatibility
                     'confidence': confidence,
                     'action': action,
                     'symbol': symbol,
@@ -1824,6 +1919,95 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
         except Exception as e:
             logger.bind(config_id=self.config_id, symbol=symbol).error(f"Failed to save position decision: {e}")
             raise DecisionError(f"Failed to save position decision to database: {e}")
+
+    def _log_market_query_activity(
+        self,
+        symbol: str,
+        query_mode: str,
+        current_price: Decimal,
+        data_age_seconds: int,
+        formatted_sections: Dict[str, str],
+        metadata: Dict[str, Any]
+    ) -> None:
+        """
+        Log market_query activity with the EXACT formatted data sent to LLM.
+
+        This captures what the LLM sees when making decisions, enabling full traceability
+        of the data used for each trading decision.
+
+        Args:
+            symbol: Trading pair
+            query_mode: 'opportunity_analysis', 'signal_validation', or 'position_management'
+            current_price: Current market price
+            data_age_seconds: How old the market data is
+            formatted_sections: Dict containing the formatted strings sent to LLM:
+                - 'technical_analysis': Multi-timeframe indicator summary
+                - 'volume_confirmation': Volume analysis text
+                - 'ggshot_signals': ggShot signal text (if present)
+                - 'market_intelligence': Market intel text (if present)
+                - 'position_context': Position data (for position management)
+                - 'signal_context': External signal (for signal validation)
+            metadata: Additional metadata:
+                - timeframes_analyzed: List of timeframes
+                - indicators_count: Number of indicators
+                - ggshot_available: Boolean
+                - market_intelligence_categories: List of MI categories
+                - cost_breakdown: Dict of query costs
+        """
+        try:
+            # Build summary
+            sections_present = [k for k in formatted_sections.keys() if formatted_sections[k]]
+            summary = f"Queried market data for {symbol} ({query_mode}): {', '.join(sections_present)}"
+
+            # Estimate token counts for each section (rough approximation: 4 chars per token)
+            token_breakdown = {}
+            total_tokens = 0
+            for section_name, section_text in formatted_sections.items():
+                if section_text:
+                    tokens = len(section_text) // 4
+                    token_breakdown[f"{section_name}_tokens"] = tokens
+                    total_tokens += tokens
+
+            # Build details with EXACT formatted data sent to LLM
+            details = {
+                "query_mode": query_mode,
+                "current_price": float(current_price),
+                "data_age_seconds": data_age_seconds,
+
+                # EXACTLY what LLM receives - the formatted strings
+                "formatted_data": {
+                    k: v for k, v in formatted_sections.items() if v
+                },
+
+                # Metadata about the data
+                "metadata": {
+                    **metadata,
+                    "total_prompt_tokens": total_tokens,
+                    "breakdown": token_breakdown
+                }
+            }
+
+            # Log activity
+            log_activity(
+                config_id=self.config_id,
+                user_id=self.user_id,
+                activity_type="market_query",
+                activity_source="decision_engine",
+                summary=summary,
+                details=details,
+                related_symbol=symbol,
+                importance=6  # Important for debugging but not critical
+            )
+
+            logger.bind(config_id=self.config_id, symbol=symbol).debug(
+                f"Logged market_query activity: {query_mode}, {total_tokens} tokens"
+            )
+
+        except Exception as e:
+            # Non-critical - don't fail decision if logging fails
+            logger.bind(config_id=self.config_id, symbol=symbol).warning(
+                f"Failed to log market_query activity: {e}"
+            )
 
     def _create_position_management_intent(
         self, 
