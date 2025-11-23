@@ -1645,7 +1645,17 @@ async def get_config(
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT config_id, user_id, config_name, config_type, created_at, config_data
+                    SELECT
+                        config_id,
+                        user_id,
+                        config_name,
+                        config_type,
+                        state,
+                        trading_mode,
+                        symphony_agent_id,
+                        created_at,
+                        updated_at,
+                        config_data
                     FROM configurations
                     WHERE config_id = %s
                 """, (config_id,))
@@ -1660,8 +1670,12 @@ async def get_config(
                     "user_id": str(row[1]),
                     "config_name": row[2],
                     "config_type": row[3],
-                    "created_at": row[4].isoformat() if row[4] else None,
-                    "config_data": row[5]
+                    "state": row[4],
+                    "trading_mode": row[5],
+                    "symphony_agent_id": row[6],
+                    "created_at": row[7].isoformat() if row[7] else None,
+                    "updated_at": row[8].isoformat() if row[8] else None,
+                    "config_data": row[9]
                 }
 
         return {
