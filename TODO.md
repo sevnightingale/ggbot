@@ -127,42 +127,9 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🏆 **AsterDEX - Frontend Integration & Competition**
+## 🏆 **AsterDEX - Production Hardening**
 
-**Status**: Core trading operational, needs UI and testing for competition
-
-### **Vault & Credentials**
-- [ ] Add `get_aster_credential(user_id)` to vault_utils.py
-- [ ] Add `store_aster_credential(user_id, api_key, api_secret)`
-- [ ] Add `delete_aster_credential(user_id)`
-- [ ] Test credential encryption/decryption
-
-### **Frontend Integration**
-- [ ] **Settings Modal**
-  - [ ] Add "AsterDEX" tab to Settings modal
-  - [ ] Add API Key + Secret input fields
-  - [ ] Add "Test Connection" button
-  - [ ] Show connection status indicator
-
-- [ ] **Trading Mode Selection**
-  - [ ] Add "AsterDEX Live" option to bot creation modal
-  - [ ] Show AsterDEX badge in bot rail (orange/purple)
-  - [ ] Disable if credentials not configured
-  - [ ] Add tooltip explaining AsterDEX mode
-
-- [ ] **Dashboard Display**
-  - [ ] Add SSE enrichment for `trading_mode === 'aster'` (SSE already supports this, verify frontend)
-  - [x] Route close button to Aster service
-  - [ ] Show "Track on AsterDEX" for balance
-  - [x] Add AsterDEX icon/badge to active positions
-
-### **API Endpoints**
-- [ ] `POST /api/v2/aster/setup` (store credentials)
-- [ ] `GET /api/v2/aster/status` (check connection)
-- [ ] `POST /api/v2/aster/disconnect` (remove credentials)
-- [ ] `GET /api/v2/positions/aster/{config_id}` (query positions)
-- [ ] `POST /api/v2/positions/aster/{order_id}/close` (close position)
-- [ ] `GET /api/v2/account/aster/{config_id}` (account metrics)
+**Status**: ✅ Core implementation complete, needs production hardening and testing
 
 ### **SL/TP Improvements**
 - [ ] Add SL/TP conditional order creation (STOP_MARKET, TAKE_PROFIT_MARKET)
@@ -275,11 +242,12 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 ### **Bot Creation UX**
 - [x] Add name field to bot creation modal (completed 2025-11-13)
 
-### **Legal & Compliance**
-- [ ] Add Terms of Service page/modal to frontend
-- [ ] Add Privacy Policy page/modal to frontend
-- [ ] Add financial risk disclaimers (prominent placement on bot creation, settings, and trading pages)
-- [ ] Add "I acknowledge the risks" checkbox for live trading activation
+### **Legal & Compliance** ✅ COMPLETE
+- [x] Terms of Service page (/terms)
+- [x] Privacy Policy page (/privacy)
+- [x] Footer component with legal links
+- [x] Signup page disclaimer
+- [x] Live trading risk acknowledgment modal
 
 ### **Public Performance Features**
 **Dependencies**: ✅ RLS migration ready in `SQL.md` - see System Improvements → Security
@@ -291,11 +259,6 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 - Public arena shows: Bot Name | Mode | P&L | Win Rate | Trades
 
 Implementation tracked under **System Improvements → Security → Backend API Updates** and **Frontend Implementation** sections.
-
-### **Trading Modes Refactor** (In Progress - Other CC Instance)
-- [ ] Remove `execution_mode` duplication from JSONB
-- [ ] Add `trading_mode` selection to bot creation modal
-- [ ] Update frontend to use table field only
 
 ### **Mobile Responsive Design**
 - [ ] Transform desktop 3-column to mobile single column

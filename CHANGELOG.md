@@ -6,6 +6,48 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-23 - UI Spacing & Auto-Save Data Loss Fix
+
+**Critical Auto-Save Bug** - Missing config_name/config_type params overwrote bot names with defaults
+- Root cause: apiClient.updateConfig() calls lacked config_name, config_type → backend applied defaults
+- Fixed all config forms: StrategyEditor.tsx:98,136, MarketDataSelector.tsx:136, SignalsConfiguration.tsx:98, TradeSettings.tsx:109
+- Pattern: `await apiClient.updateConfig(configId, updates, configName, configType)` now mandatory
+
+**Spacing Standardization** - Uniform 16px padding, 12px vertical gaps
+- All components p-4 (16px): ActivationBar, TVTimeline, PositionsTable, Configure sections (previously mixed p-4/p-6)
+- Vertical: TabNavigation my-3, Monitor space-y-3 = consistent 12px
+- TVTimeline: min-h-screen only standalone (embedded no longer forces full-screen height)
+- Main content: pb-32 → pb-8 (excessive 128px → 32px)
+
+---
+
+## 2025-11-20 - Legal Documentation Implementation
+
+**Terms & Privacy Complete** - Full legal framework, signup integration, live trading risk modal
+- Terms of Service: 21 sections adapted from Symphony (AI disclaimer, arbitration, Panama jurisdiction, US restriction)
+- Privacy Policy: 13 sections (GDPR rights, data retention, third-party disclosure)
+- Legal pages: /terms + /privacy w/ layout, navigation (frontend/app/(legal)/)
+- Signup disclaimer: "By creating an account, you agree..." below auth form (signup/page.tsx)
+- Footer component: Terms, Privacy, Telegram, Contact links (components/Footer.tsx)
+- Risk modal: Pre-activation acknowledgment for live/aster bots, 5 risk categories, checkbox required (RiskAcknowledgmentModal.tsx, ActivationBar.tsx)
+
+---
+
+## 2025-11-20 - Trading Mode Refactor + AsterDEX Integration
+
+**Trading Mode Refactor** - execution_mode removed, single source: `configurations.trading_mode` column
+- Vault credentials for Symphony/Aster w/ encryption (vault_utils.py)
+- Frontend: Settings modal, bot creation selector, mode badges (SettingsModal.tsx, BotCreationModal.tsx, BotRail.tsx)
+- API endpoints: setup/status/disconnect for both modes (ggbot.py 2719-2858)
+- Deleted DuplicateAsLiveModal.tsx (308 lines)
+
+**AsterDEX Integration** - Core implementation complete, pending production hardening
+- 3-field credential form w/ validation, bot creation mode selector, purple/red badges
+- Trading service: 1,394-line aster_service_v3.py (Web3 signatures, market orders, SL/TP conditionals)
+- Audit trail via live_trades table (provider='aster')
+
+---
+
 ## 2025-11-20 - Market Maker Module (Experimental)
 
 **Orderbook Market Making** - Avellaneda-Stoikov engine for Kuru DEX (not nad.fun AMM)

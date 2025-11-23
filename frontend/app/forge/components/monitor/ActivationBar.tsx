@@ -5,6 +5,7 @@ import { Clock, Play, PauseCircle, Zap, Crown } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
 
 interface AccountMetrics {
   balance: number
@@ -62,12 +63,28 @@ export function ActivationBar({
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
   const { canAccess } = usePermissions()
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [riskModalOpen, setRiskModalOpen] = useState(false)
+
+  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'live'
 
   const handleActivate = () => {
     if (!canAccess('bot_activation')) {
       setUpgradeModalOpen(true)
       return
     }
+
+    // Show risk modal for live/aster bots
+    if (isLiveTrading) {
+      setRiskModalOpen(true)
+      return
+    }
+
+    // For paper trading, activate immediately
+    onStart()
+  }
+
+  const handleRiskAccepted = () => {
+    setRiskModalOpen(false)
     onStart()
   }
 
@@ -175,6 +192,15 @@ export function ActivationBar({
       <UpgradeModal
         open={upgradeModalOpen}
         onOpenChange={setUpgradeModalOpen}
+      />
+
+      {/* Risk Acknowledgment Modal */}
+      <RiskAcknowledgmentModal
+        isOpen={riskModalOpen}
+        onClose={() => setRiskModalOpen(false)}
+        onAccept={handleRiskAccepted}
+        tradingMode={selectedBot.trading_mode}
+        botName={selectedBot.config_name}
       />
     </>
   )

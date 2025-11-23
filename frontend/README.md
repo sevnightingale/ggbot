@@ -144,12 +144,13 @@ const updateEditingConfig = (updates: Partial<ConfigData>) => {
   // No explicit save - forms auto-save via useAutoSave hook
 }
 
-// Auto-save hook example
+// Auto-save hook example (CRITICAL: must pass configName/configType)
 const saveStrategy = useCallback(async (value: string) => {
+  // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
   await apiClient.updateConfig(configId, {
     decision: { user_prompt: value }
-  })
-}, [configId])
+  }, configName, configType)
+}, [configId, configName, configType])
 
 useAutoSave({
   value: currentStrategy,
@@ -177,18 +178,18 @@ useAutoSave({
 
     {/* Main Content - RIGHT COLUMN (75% width on desktop) */}
     <main className="col-span-12 md:col-span-9 flex flex-col pb-16 md:pb-0">
-      <ActivationBar />        // Height: ~80-120px (dynamic based on status)
-      <TabNavigation />        // Height: ~48px
+      <ActivationBar />        // Height: ~80-120px (dynamic), padding: p-4 (16px)
+      <TabNavigation />        // Height: ~48px, spacing: my-3 (12px)
 
       {/* Tab Content Area */}
-      <div className="flex-1 mt-4 pb-32">
+      <div className="flex-1 pb-8">
         {activeTab === 'monitor' ? (
-          <div className="space-y-4">
-            <TVTimeline variant="embedded" />  // Height: 600px fixed
-            <PositionsTable />                 // Height: Variable (auto)
+          <div className="space-y-3">  // 12px vertical gaps
+            <TVTimeline variant="embedded" />  // Height: 600px fixed, padding: p-4
+            <PositionsTable />                 // Height: Variable, padding: p-4
           </div>
         ) : (
-          <ConfigureLayout />  // Height: Variable (scrollable)
+          <ConfigureLayout />  // Height: Variable (scrollable), all sections: p-4
         )}
       </div>
     </main>
@@ -196,6 +197,15 @@ useAutoSave({
 
   <MobileNav className="md:hidden" />  // Fixed at bottom on mobile
 </div>
+```
+
+### **Spacing & Padding Standards** (2025-11-23)
+- **Component padding**: All components use `p-4` (16px) uniformly
+- **Vertical gaps**: 12px (`space-y-3`, `my-3`) between major sections
+- **Configure sections**: 24px gaps (`space-y-6`) between config blocks
+- **Auto-save pattern**: MUST pass `configName` and `configType` to preserve bot identity
+```typescript
+await apiClient.updateConfig(configId, updates, configName, configType)
 ```
 
 ### **Width & Spacing Constraints**

@@ -129,6 +129,17 @@ function SignupForm() {
             showLinks={true}
             redirectTo={`${process.env.NEXT_PUBLIC_SITE_URL || 'https://app.ggbots.ai'}/auth/callback`}
           />
+
+          <div className="mt-4 p-3 bg-charcoal-900/50 border border-gray-700 rounded text-xs text-gray-400 text-center">
+            By creating an account, you agree to our{' '}
+            <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 underline">
+              Terms of Service
+            </a>{' '}
+            and{' '}
+            <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 underline">
+              Privacy Policy
+            </a>
+          </div>
         </div>
 
         <div className="text-center mt-6">
