@@ -7,7 +7,7 @@ interface RiskAcknowledgmentModalProps {
   isOpen: boolean
   onClose: () => void
   onAccept: () => void
-  tradingMode: 'paper' | 'symphony' | 'aster' | 'live'
+  tradingMode: 'paper' | 'symphony' | 'aster'
   botName: string
 }
 
@@ -22,8 +22,8 @@ export function RiskAcknowledgmentModal({
 
   if (!isOpen) return null
 
-  const isLiveTrading = tradingMode === 'symphony' || tradingMode === 'aster' || tradingMode === 'live'
-  const platformName = tradingMode === 'symphony' ? 'Symphony.io' : tradingMode === 'aster' ? 'AsterDEX' : 'live trading'
+  const isLiveTrading = tradingMode === 'symphony' || tradingMode === 'aster'
+  const platformName = tradingMode === 'symphony' ? 'Symphony.io' : 'AsterDEX'
 
   const handleAccept = () => {
     if (acknowledged) {

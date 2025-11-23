@@ -65,7 +65,7 @@ export function ActivationBar({
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [riskModalOpen, setRiskModalOpen] = useState(false)
 
-  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'live'
+  const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
 
   const handleActivate = () => {
     if (!canAccess('bot_activation')) {
@@ -199,7 +199,7 @@ export function ActivationBar({
         isOpen={riskModalOpen}
         onClose={() => setRiskModalOpen(false)}
         onAccept={handleRiskAccepted}
-        tradingMode={selectedBot.trading_mode}
+        tradingMode={selectedBot.trading_mode || 'paper'}
         botName={selectedBot.config_name}
       />
     </>
