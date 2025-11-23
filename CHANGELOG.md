@@ -6,6 +6,26 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-23 - Balance Tracking System Overhaul
+
+**account_pnl Population** - NULL in 100% activities, Redis cache missing total_pnl
+- Added total_pnl to Redis (universal_account_monitor.py:173), activity logger now reads (activity_logger.py:51)
+- Backfilled 1,114 historical activities with calculated cumulative P&L
+
+**Race Condition Fix** - Activity logging before account update → stale balances
+- Moved log_activity() after account update in close_position() (supabase_service.py:595-624)
+- Future closes log correct post-update balance, no more $0.39 discrepancies
+
+**Duplicate Logging Removed** - Position monitor logged ALL closes, paper service already logged
+- Removed logging from paper_adapter._detect_and_log_closes() (paper_adapter.py:156-208)
+- Single trade_exit per close, timeline charts clean (was 37 duplicates in test config)
+
+**Frontend TypeScript Fix** - Obsolete 'live' mode causing build errors
+- Removed 'live' checks from ActivationBar.tsx:68, RiskAcknowledgmentModal.tsx:10,25
+- 'live' migrated to 'symphony' on 2025-11-15, stale references broke Vercel deploy
+
+---
+
 ## 2025-11-23 - UI Spacing & Auto-Save Data Loss Fix
 
 **Critical Auto-Save Bug** - Missing config_name/config_type params overwrote bot names with defaults
