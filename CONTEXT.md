@@ -1,14 +1,18 @@
-93:6  Warning: React Hook useEffect has missing dependencies: 'configData', 'configId', and 'currentStrategy'. Either include them or remove the dependency array.  react-hooks/exhaustive-deps
-info  - Need to disable some ESLint rules? Learn more here: https://nextjs.org/docs/app/api-reference/config/eslint#disabling-rules
-Failed to compile.
-./app/forge/components/monitor/ActivationBar.tsx:68:108
-Type error: This comparison appears to be unintentional because the types '"paper" | undefined' and '"live"' have no overlap.
-  66 |   const [riskModalOpen, setRiskModalOpen] = useState(false)
-  67 |
-> 68 |   const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster' || selectedBot.trading_mode === 'live'
-     |                                                                                                            ^
-  69 |
-  70 |   const handleActivate = () => {
-  71 |     if (!canAccess('bot_activation')) {
-Next.js build worker exited with code: 1 and signal: null
-Error: Command "npm run build" exited with 1
+Failed to close position: Failed to close position: {"status":"error","error":"Failed to close position: Trade not found or already closed","status_code":400}
+
+
+
+error
+
+🟠 ERROR
+
+Time: 2025-11-23 17:25:07
+Location: trading.paper.supabase_service:update_position_prices:924
+
+Message:
+Failed to update position prices: <ConnectionTerminated error_code:0, last_stream_id:19999, additional_data:None>
+
+Failed to load resource: the server responded with a status of 400 (Bad Request)Understand this error
+684-96a35eafa40ce8c6.js:1 Error closing position: Error: Failed to close position: {"status":"error","error":"Failed to close position: Trade not found or already closed","status_code":400}
+    at i.closePosition (page-495c61d6c6c5619d.js:1:4621)
+    at async b (page-495c61d6c6c5619d.js:1:61938)

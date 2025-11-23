@@ -48,7 +48,7 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
             cache = json.loads(cached_data)
             return {
                 'current_balance': cache.get('total_equity'),  # This is total equity!
-                'total_pnl': None  # Not needed for chart, but keep for compatibility
+                'total_pnl': cache.get('total_pnl')  # Now included in cache
             }
 
         # TIER 2 & 3: Fallback to database queries (below)

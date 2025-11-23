@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-23 16:15:51 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-23 17:34:20 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -26,9 +26,9 @@
   - Platform Win Rate: 30.01%
   - Total P&L: $-15,994.06
 - **Recent Activity**:
-  - Last 24 hours: 12 trades
+  - Last 24 hours: 11 trades
   - Last 7 days: 58 trades
-  - Last 30 days: 1785 trades
+  - Last 30 days: 1778 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -49,12 +49,12 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 316 decisions (avg confidence: 22.1%)
+- **wait**: 318 decisions (avg confidence: 20.9%)
 - **enter**: 12 decisions (avg confidence: 60.4%)
-- **exit**: 7 decisions (avg confidence: 85.0%)
+- **exit**: 6 decisions (avg confidence: 85.0%)
 
 ### System Health
-- **Decisions (last hour)**: 14
+- **Decisions (last hour)**: 15
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -63,22 +63,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 21MB | 4d 0h | 58 |
-| x-bot | 🟢 online | 0% | 27MB | 4d 0h | 58 |
-| error-alerts | 🟢 online | 0% | 22MB | 4d 0h | 65 |
-| market-data-ws | 🟢 online | 1.3% | 89MB | 4d 0h | 60 |
-| ggbot | 🟢 online | 0.5% | 242MB | 4d 0h | 195 |
-| account-monitor | 🟢 online | 0.4% | 167MB | 20h 37m | 16 |
+| signal-listener | 🟢 online | 0% | 21MB | 4d 1h | 58 |
+| x-bot | 🟢 online | 0% | 27MB | 4d 1h | 58 |
+| error-alerts | 🟢 online | 0% | 22MB | 4d 1h | 65 |
+| market-data-ws | 🟢 online | 1.4% | 43MB | 4d 1h | 60 |
+| ggbot | 🟢 online | 0.5% | 235MB | 4d 1h | 195 |
+| account-monitor | 🟢 online | 0.4% | 168MB | 21h 56m | 16 |
 
 ### VM Resources
 
 - **Disk**: 38G / 78G (49%)
-- **Memory**: 1.9Gi / 3.8Gi
-- **CPU Load**: 0.23 / 0.16 / 0.11 (1m/5m/15m)
+- **Memory**: 2.2Gi / 3.8Gi
+- **CPU Load**: 0.44 / 0.27 / 0.16 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 13.24M)
+- **Redis**: 🟢 connected (Memory: 13.20M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -387,7 +387,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-23 16:15:52 UTC
+**Last Updated**: 2025-11-23 17:34:21 UTC
 
 ---
 
@@ -1231,7 +1231,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-23 16:15:52 UTC
+**Last Updated**: 2025-11-23 17:34:21 UTC
 
 ---
 

@@ -170,6 +170,7 @@ class UniversalAccountMonitor:
 
             cache_data = {
                 'total_equity': float(total_equity),
+                'total_pnl': float(snapshot.total_pnl) if snapshot.total_pnl else 0.0,
                 'timestamp': snapshot.timestamp.isoformat(),
                 'trading_mode': snapshot.trading_mode,
                 'config_id': config_id

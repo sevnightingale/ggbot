@@ -495,16 +495,25 @@ class SupabasePaperTradingService:
             Closure result with P&L information
         """
         try:
-            # Get trade details
-            response = self.supabase.table('paper_trades').select("*").eq('trade_id', trade_id).eq('status', 'open').execute()
-            
+            # Idempotency check: Get trade details and verify it's open
+            response = self.supabase.table('paper_trades').select("*").eq('trade_id', trade_id).execute()
+
             if not response.data:
+                logger.warning(f"Trade {trade_id} not found, cannot close")
                 return {
                     "status": "failed",
-                    "reason": "Trade not found or already closed"
+                    "reason": "Trade not found"
                 }
-            
+
             trade = response.data[0]
+
+            # Check if already closed (prevents duplicate close activities)
+            if trade['status'] != 'open':
+                logger.info(f"Trade {trade_id} already closed (status: {trade['status']}), skipping duplicate close")
+                return {
+                    "status": "already_closed",
+                    "reason": f"Trade already has status: {trade['status']}"
+                }
             
             # Get current price if not provided
             if close_price is None:
@@ -567,7 +576,32 @@ class SupabasePaperTradingService:
             if not response.data:
                 logger.warning(f"Failed to create close order record for trade {trade_id}")
 
-            # Log trade exit activity
+            # Update account using domain model FIRST (before logging activity)
+            account = await self.account_repo.get_by_config_id(
+                config_id=str(trade["config_id"]), 
+                user_id=str(trade["user_id"])
+            )
+            
+            if account:
+                # Return margin that was reserved (not full position size)
+                margin_reserved = float(trade.get("margin_used", trade["size_usd"]))  # Fallback to size_usd for old trades
+                account.release_balance(Money(amount=Decimal(str(margin_reserved)), currency="USD"))
+                
+                # Realize P&L and update statistics
+                # Money class now properly handles negative amounts
+                pnl_money = Money(amount=Decimal(str(net_pnl)), currency="USD")
+                is_win = net_pnl > 0
+                account.realize_pnl(pnl_money, is_win)
+                
+                # Update position count
+                account.update_position_count(-1)
+                
+                # Save updated account
+                await self.account_repo.save(account)
+            else:
+                logger.error(f"Account not found for trade {trade_id}")
+
+            # Log trade exit activity AFTER account update (ensures fresh balance in activity log)
             from core.common.activity_logger import log_activity_safe
 
             pnl_pct = (net_pnl / size_usd * 100) if size_usd > 0 else 0
@@ -598,31 +632,6 @@ class SupabasePaperTradingService:
                 importance=9
             )
 
-            # Update account using domain model
-            account = await self.account_repo.get_by_config_id(
-                config_id=str(trade["config_id"]), 
-                user_id=str(trade["user_id"])
-            )
-            
-            if account:
-                # Return margin that was reserved (not full position size)
-                margin_reserved = float(trade.get("margin_used", trade["size_usd"]))  # Fallback to size_usd for old trades
-                account.release_balance(Money(amount=Decimal(str(margin_reserved)), currency="USD"))
-                
-                # Realize P&L and update statistics
-                # Money class now properly handles negative amounts
-                pnl_money = Money(amount=Decimal(str(net_pnl)), currency="USD")
-                is_win = net_pnl > 0
-                account.realize_pnl(pnl_money, is_win)
-                
-                # Update position count
-                account.update_position_count(-1)
-                
-                # Save updated account
-                await self.account_repo.save(account)
-            else:
-                logger.error(f"Account not found for trade {trade_id}")
-            
             logger.info(f"Paper position closed: {trade_id} - {reason} @ ${close_price:.2f} (P&L: ${net_pnl:.2f})")
             
             return {
