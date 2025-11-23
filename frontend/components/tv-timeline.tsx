@@ -1119,117 +1119,103 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             {/* MARKET QUERY SPECIFIC FIELDS */}
             {detailActivity.type === 'market_query' && detailActivity.data.details ? (
               <>
-                {detailActivity.data.details.timeframe && (
+                {/* Query Mode Badge */}
+                {(detailActivity.data.details as Record<string, unknown>).query_mode && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Timeframe
+                      Query Mode
                     </div>
-                    <div className="text-sm">{String(detailActivity.data.details.timeframe)}</div>
+                    <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
+                      backgroundColor: 'rgba(60, 166, 224, 0.2)',
+                      color: VIBE.signal
+                    }}>
+                      {String((detailActivity.data.details as Record<string, unknown>).query_mode).replace(/_/g, ' ')}
+                    </div>
                   </div>
-                 )}
+                )}
 
-                {detailActivity.data.details.categories && typeof detailActivity.data.details.categories === 'object' && (
+                {/* Current Price & Data Age */}
+                <div className="grid grid-cols-2 gap-4">
+                  {(detailActivity.data.details as Record<string, unknown>).current_price && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                        Price at Query
+                      </div>
+                      <div className="text-lg font-mono">${Number((detailActivity.data.details as Record<string, unknown>).current_price).toFixed(2)}</div>
+                    </div>
+                  )}
+                  {(detailActivity.data.details as Record<string, unknown>).data_age_seconds != null && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                        Data Age
+                      </div>
+                      <div className="text-sm">{Math.floor(Number((detailActivity.data.details as Record<string, unknown>).data_age_seconds) / 60)}m {Number((detailActivity.data.details as Record<string, unknown>).data_age_seconds) % 60}s</div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Metadata Summary */}
+                {(detailActivity.data.details as Record<string, unknown>).metadata && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Data Requested
+                      Query Summary
                     </div>
-                    {Object.entries(detailActivity.data.details.categories).map(([category, indicators]) => (
-                      <div key={category} className="mb-2">
-                        <div className="text-xs font-semibold mb-1" style={{ color: VIBE.signal }}>
-                          {category}:
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).timeframes_analyzed && (
+                        <div>
+                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Timeframes:</span> {(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).timeframes_analyzed as string[]).length}
                         </div>
-                        <div className="flex flex-wrap gap-1">
-                          {Array.isArray(indicators) && indicators.map((ind: unknown, i: number) => (
-                            <span
-                              key={i}
-                              className="px-2 py-1 rounded text-xs"
-                              style={{ backgroundColor: 'rgba(0, 217, 255, 0.2)', color: VIBE.signal }}
-                            >
-                              {String(ind)}
-                            </span>
-                          ))}
+                      )}
+                      {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count && (
+                        <div>
+                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Indicators:</span> {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count}
                         </div>
-                      </div>
-                    ))}
+                      )}
+                      {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).total_prompt_tokens && (
+                        <div>
+                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Tokens:</span> {Number(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).total_prompt_tokens).toLocaleString()}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                 )}
+                )}
 
-                {/* Display actual market data received */}
-                {detailActivity.data.details && (detailActivity.data.details as Record<string, unknown>).market_data && (
-                  <div className="mt-4">
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Market Data Received
+                {/* Formatted Data Sections (Collapsible) */}
+                {(detailActivity.data.details as Record<string, unknown>).formatted_data && (
+                  <div className="space-y-3">
+                    <div className="text-xs uppercase tracking-wider" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Data Sent to LLM
                     </div>
-
-                    {/* Technical Indicators */}
-                    {((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>)?.technicals &&
-                     (((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>).technicals as Record<string, unknown>)?.indicators ? (
-                      <div className="mb-4">
-                        <div className="text-xs font-semibold mb-2" style={{ color: VIBE.brass }}>
-                          Technical Indicators:
-                        </div>
-                        {Object.entries((((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>).technicals as Record<string, unknown>).indicators as Record<string, unknown>).map(([indName, indData]: [string, unknown]) => {
-                          const indicator = indData as Record<string, unknown>;
-                          return (
-                          <div key={indName} className="mb-3 p-3 rounded-lg" style={{ backgroundColor: 'rgba(193, 168, 125, 0.1)' }}>
-                            <div className="font-semibold mb-1" style={{ color: VIBE.brass }}>{indName}</div>
-
-                            {/* Current Value */}
-                            {indicator.current ? (
-                              <div className="text-sm mb-1">
-                                Value: <span className="font-mono">{typeof indicator.current === 'object' ? JSON.stringify((indicator.current as Record<string, unknown>).value || indicator.current) : String(indicator.current)}</span>
-                              </div>
-                            ) : null}
-
-                            {/* Trend */}
-                            {indicator.context && typeof indicator.context === 'object' && (indicator.context as Record<string, unknown>).trend ? (
-                              <div className="text-sm mb-1">
-                                Trend: <span className="font-mono">{String(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).direction)}</span>
-                                {((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength ? <span className="ml-2">({formatActivityPercent(Number(((indicator.context as Record<string, unknown>).trend as Record<string, unknown>).strength))})</span> : null}
-                              </div>
-                            ) : null}
-
-                            {/* Patterns */}
-                            {indicator.patterns && typeof indicator.patterns === 'object' && Object.keys(indicator.patterns as Record<string, unknown>).length > 0 ? (
-                              <div className="text-sm">
-                                Patterns: {Object.keys(indicator.patterns as Record<string, unknown>).map(p => (
-                                  <span key={p} className="inline-block px-2 py-0.5 mr-1 rounded text-xs" style={{ backgroundColor: 'rgba(193, 168, 125, 0.3)' }}>
-                                    {p}
-                                  </span>
-                                ))}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                        })}
-                      </div>
-                    ) : null}
-
-                    {/* Market Intelligence */}
-                    {(((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>)?.market_intelligence) ? (
-                      <div>
-                        <div className="text-xs font-semibold mb-2" style={{ color: VIBE.signal }}>
-                          Market Intelligence:
-                        </div>
-                        {Object.entries(((detailActivity.data.details as Record<string, unknown>).market_data as Record<string, unknown>).market_intelligence as Record<string, unknown>).map(([source, data]: [string, unknown]) => (
-                          <div key={source} className="mb-2 p-3 rounded-lg" style={{ backgroundColor: 'rgba(60, 166, 224, 0.1)' }}>
-                            <div className="font-semibold mb-1 text-sm" style={{ color: VIBE.signal }}>
-                              {source.replace(/_/g, ' ').toUpperCase()}
-                            </div>
-                            <pre className="text-xs font-mono overflow-x-auto" style={{ color: VIBE.ivory }}>
-                              {JSON.stringify(data, null, 2)}
+                    {Object.entries((detailActivity.data.details as Record<string, unknown>).formatted_data as Record<string, unknown>).map(([sectionName, sectionText]) => {
+                      if (!sectionText) return null;
+                      const metadata = (detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>;
+                      const breakdown = metadata?.breakdown as Record<string, unknown>;
+                      const tokens = breakdown?.[`${sectionName}_tokens`] || 0;
+                      return (
+                        <details key={sectionName} className="rounded-lg border" style={{ borderColor: VIBE.hair, backgroundColor: 'rgba(193, 168, 125, 0.05)' }}>
+                          <summary className="cursor-pointer px-4 py-3 font-semibold text-sm flex items-center justify-between" style={{ color: VIBE.brass }}>
+                            <span>{sectionName.replace(/_/g, ' ').toUpperCase()}</span>
+                            {Number(tokens) > 0 && (
+                              <span className="text-xs font-mono px-2 py-1 rounded" style={{ backgroundColor: 'rgba(193, 168, 125, 0.2)' }}>
+                                {Number(tokens).toLocaleString()} tokens
+                              </span>
+                            )}
+                          </summary>
+                          <div className="px-4 pb-4 max-h-96 overflow-y-auto">
+                            <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: VIBE.ivory }}>
+                              {String(sectionText)}
                             </pre>
                           </div>
-                        ))}
-                      </div>
-                    ) : null}
+                        </details>
+                      );
+                    })}
                   </div>
                 )}
               </>
             ) : null}
 
             {/* LLM THOUGHT SPECIFIC FIELDS */}
-            {detailActivity.type === 'llm_thought' && detailActivity.data.details?.thought ? (
+            {detailActivity.type === 'llm_thought' && detailActivity.data.details && ((detailActivity.data.details as Record<string, unknown>).thought || (detailActivity.data.details as Record<string, unknown>).reasoning) ? (
               <div>
                 <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
                   Agent Thought
@@ -1238,7 +1224,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   className="prose prose-invert prose-sm max-w-none"
                   style={{ color: VIBE.ivory }}
                 >
-                  <ReactMarkdown>{String(detailActivity.data.details.thought)}</ReactMarkdown>
+                  <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).thought || (detailActivity.data.details as Record<string, unknown>).reasoning)}</ReactMarkdown>
                 </div>
 
                 {detailActivity.data.details.balance != null && typeof detailActivity.data.details.balance === 'number' ? (
