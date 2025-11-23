@@ -507,7 +507,7 @@ class SupabasePaperTradingService:
 
             trade = response.data[0]
 
-            # Check if already closed (prevents duplicate close activities)
+            # Check if already closed (prevents multiple systems from closing same trade)
             if trade['status'] != 'open':
                 logger.info(f"Trade {trade_id} already closed (status: {trade['status']}), skipping duplicate close")
                 return {
