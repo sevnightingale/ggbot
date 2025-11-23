@@ -83,6 +83,7 @@ export function StrategyEditor({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Debug: Log component mount and props
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     console.log('🎬 StrategyEditor mounted with:', {
       configId,
@@ -90,7 +91,7 @@ export function StrategyEditor({
       currentStrategy: currentStrategy.substring(0, 50),
       configDataPrompt: configData?.decision?.user_prompt?.substring(0, 50)
     })
-  }, [])
+  }, []) // Only run on mount
 
   // Debug: Log whenever currentStrategy state changes
   useEffect(() => {

@@ -1120,7 +1120,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             {detailActivity.type === 'market_query' && detailActivity.data.details ? (
               <>
                 {/* Query Mode Badge */}
-                {(detailActivity.data.details as Record<string, unknown>).query_mode && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).query_mode) && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Query Mode
@@ -1136,7 +1136,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
                 {/* Current Price & Data Age */}
                 <div className="grid grid-cols-2 gap-4">
-                  {(detailActivity.data.details as Record<string, unknown>).current_price && (
+                  {Boolean((detailActivity.data.details as Record<string, unknown>).current_price) && (
                     <div>
                       <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                         Price at Query
@@ -1155,23 +1155,23 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 </div>
 
                 {/* Metadata Summary */}
-                {(detailActivity.data.details as Record<string, unknown>).metadata && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).metadata) && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Query Summary
                     </div>
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).timeframes_analyzed && (
+                      {Boolean(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).timeframes_analyzed) && (
                         <div>
                           <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Timeframes:</span> {(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).timeframes_analyzed as string[]).length}
                         </div>
                       )}
-                      {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count && (
+                      {Boolean(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count) && (
                         <div>
-                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Indicators:</span> {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count}
+                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Indicators:</span> {String(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count)}
                         </div>
                       )}
-                      {((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).total_prompt_tokens && (
+                      {Boolean(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).total_prompt_tokens) && (
                         <div>
                           <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Tokens:</span> {Number(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).total_prompt_tokens).toLocaleString()}
                         </div>
@@ -1181,7 +1181,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 )}
 
                 {/* Formatted Data Sections (Collapsible) */}
-                {(detailActivity.data.details as Record<string, unknown>).formatted_data && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).formatted_data) && (
                   <div className="space-y-3">
                     <div className="text-xs uppercase tracking-wider" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Data Sent to LLM
