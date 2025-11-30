@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-23 17:34:20 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-23 23:14:29 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -12,23 +12,23 @@
 - **Users with Bots**: 252 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 380
-- **Active Bots**: 4 (1.1%)
+- **Total Bots**: 378
+- **Active Bots**: 3 (0.8%)
   - Paper Trading: 3
   - Live Trading: 0
-- **Inactive Bots**: 376
+- **Inactive Bots**: 375
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,514
-  - Wins: 1,655
-  - Losses: 3,859
-  - Platform Win Rate: 30.01%
-  - Total P&L: $-15,994.06
+- **Total Trades (All Time)**: 5,457
+  - Wins: 1,636
+  - Losses: 3,821
+  - Platform Win Rate: 29.98%
+  - Total P&L: $-16,008.28
 - **Recent Activity**:
-  - Last 24 hours: 11 trades
-  - Last 7 days: 58 trades
-  - Last 30 days: 1778 trades
+  - Last 24 hours: 2 trades
+  - Last 7 days: 2 trades
+  - Last 30 days: 1688 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -37,24 +37,22 @@
 - **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,900.99
-- **Lowest Balance**: $176.38
+- **Average Balance**: $9,926.51
+- **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
 - **BTC/USDT**: 2 bots
 - **ADA/USDT**: 1 bots
-- **ETH/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 318 decisions (avg confidence: 20.9%)
-- **enter**: 12 decisions (avg confidence: 60.4%)
-- **exit**: 6 decisions (avg confidence: 85.0%)
+- **wait**: 50 decisions (avg confidence: 34.9%)
+- **enter**: 2 decisions (avg confidence: 75.0%)
 
 ### System Health
-- **Decisions (last hour)**: 15
+- **Decisions (last hour)**: 7
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -63,22 +61,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 21MB | 4d 1h | 58 |
-| x-bot | 🟢 online | 0% | 27MB | 4d 1h | 58 |
-| error-alerts | 🟢 online | 0% | 22MB | 4d 1h | 65 |
-| market-data-ws | 🟢 online | 1.4% | 43MB | 4d 1h | 60 |
-| ggbot | 🟢 online | 0.5% | 235MB | 4d 1h | 195 |
-| account-monitor | 🟢 online | 0.4% | 168MB | 21h 56m | 16 |
+| signal-listener | 🟢 online | 0% | 54MB | 49m | 59 |
+| x-bot | 🟢 online | 0% | 34MB | 49m | 59 |
+| error-alerts | 🟢 online | 0% | 31MB | 49m | 66 |
+| market-data-ws | 🟢 online | 1.3% | 164MB | 49m | 61 |
+| ggbot | 🟢 online | 0.4% | 249MB | 49m | 199 |
+| account-monitor | 🟢 online | 0% | 99MB | 49m | 19 |
 
 ### VM Resources
 
 - **Disk**: 38G / 78G (49%)
 - **Memory**: 2.2Gi / 3.8Gi
-- **CPU Load**: 0.44 / 0.27 / 0.16 (1m/5m/15m)
+- **CPU Load**: 0.67 / 0.47 / 0.37 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 13.20M)
+- **Redis**: 🟢 connected (Memory: 16.32M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -387,7 +385,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-23 17:34:21 UTC
+**Last Updated**: 2025-11-23 23:14:31 UTC
 
 ---
 
@@ -1231,7 +1229,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-23 17:34:21 UTC
+**Last Updated**: 2025-11-23 23:14:31 UTC
 
 ---
 

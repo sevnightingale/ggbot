@@ -226,6 +226,24 @@ case 'live_trading':
 - **CHANGELOG.md** - Complete history of features, fixes, and improvements
 - **CLAUDE.md** - This file - development workflow and code patterns
 
+## Documentation Quick Reference by Topic
+
+**Before investigating issues, consult the relevant module README:**
+
+| Issue Type | Primary Documentation |
+|------------|----------------------|
+| Trading mode behavior (paper/symphony/aster) | `trading/README.md` |
+| Position sizing, P&L calculations | `trading/README.md` |
+| Data extraction, indicators, preprocessors | `extraction/v2/README.md` |
+| Market intelligence, Grok sources | `market_intelligence/README.md` |
+| Decision engine, LLM prompts | `decision/README.md` |
+| Agent behavior, MCP tools, strategy | `agent/README.md` |
+| Frontend components, SSE, bot rail | `frontend/README.md` |
+| Database schema questions | `ACTIVE.md` (Database Schema section) |
+| API endpoint behavior | `ACTIVE.md` (Core API Endpoints section) |
+
+**Rule of Thumb**: If you're about to make an assumption about how a module works, read its README first.
+
 ---
 
 **Remember**: The platform is called **ggbots** (lowercase gg, always). The repo is called **ggbot** (without the s). Platform is at **ggbots.ai**.

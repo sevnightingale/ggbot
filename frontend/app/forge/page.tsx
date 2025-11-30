@@ -1405,6 +1405,8 @@ function ForgeApp() {
         onDuplicate={handleDuplicateBot}
         onDelete={handleDeleteBot}
         isBotAction={isBotAction}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       {/* Bot Creation Modal */}

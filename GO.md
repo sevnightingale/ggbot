@@ -166,7 +166,10 @@ For significant TODO items (multi-day work, complex features), maintain planning
 - ✅ DO follow existing `data_sources` + `data_points` metadata pattern
 
 **Architecture Patterns**:
+- ❌ DON'T assume paper_accounts exists for all trading modes (only paper mode uses it)
 - ❌ DON'T reinvent existing patterns - ask user first if unsure
+- ✅ DO read trading/README.md before diagnosing trading execution issues
+- ✅ DO check module READMEs before making assumptions about how code works
 - ✅ DO check ACTIVE.md for existing system architecture before proposing solutions
 
 ---

@@ -1,9 +1,30 @@
 'use client'
 
 import React from 'react'
+import Image from 'next/image'
 import { BarChart2, Loader2, Circle } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { BotManagementMenu } from './BotManagementMenu'
+
+// Logo mapping for LLM models (shared with StrategyEditor)
+const MODEL_LOGOS: Record<string, string> = {
+  'grok': '/Grok_logo.png',
+  'claude': '/Claude_logo.png',
+  'gemini': '/Gemini_logo.png',
+  'deepseek': '/deepseek_logo.png',
+  'gpt': '/GPT_logo.png',
+  'kimi': '/kimi-color.png',
+  'qwen': '/qwen_logo.png',
+}
+
+// Background colors for model logos
+const MODEL_COLORS: Record<string, string> = {
+  'qwen': '#8760ec',
+  'deepseek': '#617aef',
+  'claude': '#ff6938',
+  'grok': '#030303',
+  'kimi': '#00c2cb',
+}
 
 interface BotRailProps {
   bots: BotConfiguration[]
@@ -51,7 +72,7 @@ export function BotRail({
           <div className="flex items-center gap-2 font-medium text-[var(--text-primary)]">
             <BarChart2 className="h-4 w-4" />
             <div className="flex items-center gap-2">
-              <span>Bots</span>
+              <span>Your ggbots</span>
               <span className="text-xs text-[var(--text-muted)] font-normal">
                 {currentBotCount}/{botLimit}
               </span>
@@ -118,15 +139,29 @@ function BotRow({
   isBotAction
 }: BotRowProps) {
   // Get bot metadata
-  const isSignalDriven = bot.config_data.decision?.analysis_frequency === 'signal_driven'
+  const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
   const configType =
     bot.config_type === 'signal_validation' ? 'Signal validation' :
     bot.config_type === 'agent' ? 'Agent strategy' :
     'Autonomous trading'
-  const analysisFreq = bot.config_data.decision?.analysis_frequency || '1h'
-  const frequency = isSignalDriven ? 'Signal driven' : `Every ${analysisFreq}`
+
+  // Format frequency text based on mode
+  let frequency = ''
+  if (analysisFreq === 'signal_driven') {
+    frequency = 'Signal driven'
+  } else if (analysisFreq === 'agent_driven') {
+    frequency = 'Agent driven'
+  } else {
+    frequency = `Frequency: ${analysisFreq}`
+  }
+
   const isSymphony = bot.trading_mode === 'symphony'
   const isAster = bot.trading_mode === 'aster'
+
+  // Get LLM model info
+  const llmModel = bot.config_data.llm_config?.model || 'grok'
+  const logoPath = MODEL_LOGOS[llmModel]
+  const logoColor = MODEL_COLORS[llmModel]
 
   return (
     <div
@@ -135,7 +170,11 @@ function BotRow({
       }`}
     >
       <div
-        onClick={onClick}
+        onClick={(e) => {
+          // Don't select bot if clicking menu button
+          if ((e.target as HTMLElement).closest('[data-menu-trigger]')) return
+          onClick()
+        }}
         className="cursor-pointer mb-2"
       >
         <div className="flex items-center justify-between mb-2">
@@ -162,6 +201,30 @@ function BotRow({
           <span className="rounded-full border border-[var(--border)] px-2 py-0.5 text-xs text-[var(--text-secondary)]">
             {configType === 'Signal validation' ? 'Signal' : configType === 'Agent strategy' ? 'Agent' : 'Auto'}
           </span>
+
+          {/* LLM Model Logo */}
+          {logoPath && (
+            <span className="rounded-full border border-[var(--border)] px-1.5 py-0.5 flex items-center gap-1">
+              <div
+                className="flex items-center justify-center rounded-full"
+                style={{
+                  width: '16px',
+                  height: '16px',
+                  backgroundColor: logoColor || 'transparent',
+                  padding: logoColor ? '2px' : '0'
+                }}
+              >
+                <Image
+                  src={logoPath}
+                  alt={`${llmModel} logo`}
+                  width={16}
+                  height={16}
+                  className="object-contain"
+                />
+              </div>
+            </span>
+          )}
+
           {isSymphony && (
             <span
               className="rounded-full px-2 py-0.5 text-xs font-semibold"

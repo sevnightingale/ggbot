@@ -207,7 +207,11 @@ export function BotManagementMenu({
   return (
     <div ref={menuRef} className="relative">
       <button
-        onClick={() => setIsOpen(!isOpen)}
+        data-menu-trigger
+        onClick={(e) => {
+          e.stopPropagation()
+          setIsOpen(!isOpen)
+        }}
         className="text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
         aria-label="Bot actions"
       >

@@ -26,6 +26,27 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-23 - API Endpoint & Frontend Build Fixes
+
+**GET /api/v2/config/{config_id} Missing Fields** - Frontend couldn't display Symphony/Aster bot details
+- Query missing: state, trading_mode, symphony_agent_id, updated_at columns (ggbot.py:1647-1665)
+- Frontend received incomplete data → configType undefined, trading mode badges missing
+- Added 4 missing columns to SELECT, expanded response object with proper indices
+- Impact: Symphony/Aster bots now display correctly in UI (was: no mode badge, broken settings)
+
+**Frontend TypeScript Build Errors** - Type 'unknown' not assignable to ReactNode
+- tv-timeline.tsx: Wrapped 7 unknown conditions in Boolean() (lines 1123,1139,1158,1164,1169,1174,1184)
+- Direct rendering unknown values → build failure, wrapped indicators_count in String()
+- StrategyEditor.tsx: Added eslint-disable for intentional mount-only useEffect (line 86)
+- Build: ✅ 17 pages generated, no TS errors
+
+**Documentation Updates** - Prevent future architectural misunderstandings
+- CLAUDE.md: Added "Documentation Quick Reference by Topic" table (trading/README for mode issues)
+- GO.md: Added explicit warning "DON'T assume paper_accounts exists for all trading modes"
+- Lesson: Symphony/Aster use live_trades table only, paper mode uses paper_accounts (already in trading/README.md)
+
+---
+
 ## 2025-11-23 - UI Spacing & Auto-Save Data Loss Fix
 
 **Critical Auto-Save Bug** - Missing config_name/config_type params overwrote bot names with defaults
