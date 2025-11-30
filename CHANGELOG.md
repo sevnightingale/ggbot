@@ -6,6 +6,33 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-11-30 - Activity Timeline Data Visibility + ggShot Config Fix
+
+**Market Query Activity Logging** - Exact LLM prompt data now stored for full traceability
+- Added formatted_data to market_query activities (decision/engine_v2.py:1923-2010)
+- Logs technical_analysis, volume_confirmation, ggshot_signals, market_intelligence strings sent to LLM
+- Token count tracking per section with metadata.breakdown
+- 3 logging calls in opportunity_analysis, signal_validation, position_management handlers
+
+**Frontend Bottom Sheet Rendering** - Collapsible sections display formatted LLM prompts
+- Complete rewrite of market_query bottom sheet (tv-timeline.tsx:1119-1215)
+- Shows query mode, price at query, data age, timeframes/indicators/token counts
+- Formatted data sections collapsible with <details>, monospace <pre> for readability
+- Replaced OLD structure (categories, market_data.technicals) with NEW formatted_data structure
+
+**llm_thought Field Name Fix** - Frontend expected 'thought' but backend logged 'reasoning'
+- Changed details.reasoning → details.thought in decision/engine_v2.py:832
+- Added backward compatibility in frontend (accepts both 'thought' and 'reasoning')
+- Fixed broken llm_thought activity display in timeline bottom sheet
+
+**ggShot Signal Config Enforcement** - Only fetch if enabled in bot config AND user has permission
+- Added config check: extraction.selected_data_sources.trading_signals.data_points must contain 'ggshot'
+- Previously only checked user permissions → ALL bots fetched ggShot if user had paid access
+- Fixed in ggbot.py:845-888, now respects bot-level configuration
+- Default scheduled bots no longer show ggShot unless explicitly configured
+
+---
+
 ## 2025-11-23 - Balance Tracking System Overhaul
 
 **account_pnl Population** - NULL in 100% activities, Redis cache missing total_pnl
