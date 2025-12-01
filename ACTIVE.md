@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-11-23 23:14:29 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-11-30 11:13:36 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -13,46 +13,47 @@
 
 ### Bot Statistics
 - **Total Bots**: 378
-- **Active Bots**: 3 (0.8%)
-  - Paper Trading: 3
+- **Active Bots**: 2 (0.5%)
+  - Paper Trading: 2
   - Live Trading: 0
-- **Inactive Bots**: 375
+- **Inactive Bots**: 376
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,457
-  - Wins: 1,636
-  - Losses: 3,821
-  - Platform Win Rate: 29.98%
-  - Total P&L: $-16,008.28
+- **Total Trades (All Time)**: 5,483
+  - Wins: 1,655
+  - Losses: 3,828
+  - Platform Win Rate: 30.18%
+  - Total P&L: $-16,003.34
 - **Recent Activity**:
-  - Last 24 hours: 2 trades
-  - Last 7 days: 2 trades
-  - Last 30 days: 1688 trades
+  - Last 24 hours: 8 trades
+  - Last 7 days: 29 trades
+  - Last 30 days: 220 trades
 
 ### Open Positions
-- **Open Positions**: 0
-- **Unique Symbols**: 0
-- **Total Exposure**: $0.00
-- **Unrealized P&L**: $0.00
+- **Open Positions**: 1
+- **Unique Symbols**: 1
+- **Total Exposure**: $100.00
+- **Unrealized P&L**: $-0.45
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,926.51
+- **Average Balance**: $9,926.26
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 2 bots
 - **ADA/USDT**: 1 bots
+- **BTC/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 50 decisions (avg confidence: 34.9%)
-- **enter**: 2 decisions (avg confidence: 75.0%)
+- **wait**: 272 decisions (avg confidence: 66.5%)
+- **enter**: 8 decisions (avg confidence: 76.9%)
+- **exit**: 8 decisions (avg confidence: 80.0%)
 
 ### System Health
-- **Decisions (last hour)**: 7
+- **Decisions (last hour)**: 12
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -61,22 +62,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 54MB | 49m | 59 |
-| x-bot | 🟢 online | 0% | 34MB | 49m | 59 |
-| error-alerts | 🟢 online | 0% | 31MB | 49m | 66 |
-| market-data-ws | 🟢 online | 1.3% | 164MB | 49m | 61 |
-| ggbot | 🟢 online | 0.4% | 249MB | 49m | 199 |
-| account-monitor | 🟢 online | 0% | 99MB | 49m | 19 |
+| signal-listener | 🟢 online | 0% | 16MB | 6d 12h | 59 |
+| x-bot | 🟢 online | 0% | 23MB | 6d 12h | 59 |
+| error-alerts | 🟢 online | 0% | 21MB | 6d 12h | 66 |
+| market-data-ws | 🟢 online | 1% | 43MB | 6d 12h | 61 |
+| ggbot | 🟢 online | 0.7% | 238MB | 6d 11h | 200 |
+| account-monitor | 🟢 online | 0.1% | 23MB | 6d 12h | 19 |
+| agent-b0148622-a3ae-452a-b95b-2fc4d5a6bf99 | 🟢 online | 0% | 55MB | 4d 2h | 0 |
 
 ### VM Resources
 
 - **Disk**: 38G / 78G (49%)
-- **Memory**: 2.2Gi / 3.8Gi
-- **CPU Load**: 0.67 / 0.47 / 0.37 (1m/5m/15m)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 1.93 / 1.53 / 0.72 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 16.32M)
+- **Redis**: 🟢 connected (Memory: 12.76M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -385,7 +387,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-11-23 23:14:31 UTC
+**Last Updated**: 2025-11-30 11:13:38 UTC
 
 ---
 
@@ -1229,7 +1231,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-11-23 23:14:31 UTC
+**Last Updated**: 2025-11-30 11:13:38 UTC
 
 ---
 

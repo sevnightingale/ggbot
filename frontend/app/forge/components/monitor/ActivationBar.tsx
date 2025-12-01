@@ -8,7 +8,8 @@ import { UpgradeModal } from '@/components/UpgradeModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
 
 interface AccountMetrics {
-  balance: number
+  totalEquity: number
+  availableBalance: number
   pnl: number
   trades: number
   winRate: number
@@ -168,23 +169,31 @@ export function ActivationBar({
           </div>
         </div>
 
-        {/* Row 2: KPI Metrics */}
-        {metrics && (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3">
-            <KPICard label="Balance" value={`$${Math.round(metrics.balance).toLocaleString()}`} />
-            <KPICard
-              label="P/L"
-              value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
-              positive={metrics.pnl >= 0}
-            />
-            <KPICard label="Trades" value={String(metrics.trades)} />
-            <KPICard label="Win Rate" value={`${Math.round(metrics.winRate)}%`} />
-            <KPICard
-              label="Perf"
-              value={`${metrics.performance.toFixed(2)}%`}
-              positive={metrics.performance >= 0}
-            />
-          </div>
+        {/* Row 2: KPI Metrics - Only show for Paper Trading */}
+        {metrics && selectedBot.trading_mode === 'paper' && (
+          <>
+            {/* Row 1: Financial Health */}
+            <div className="grid grid-cols-3 gap-3 mb-2">
+              <KPICard label="Total Equity" value={`$${Math.round(metrics.totalEquity).toLocaleString()}`} />
+              <KPICard label="Available" value={`$${Math.round(metrics.availableBalance).toLocaleString()}`} />
+              <KPICard
+                label="P/L"
+                value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
+                positive={metrics.pnl >= 0}
+              />
+            </div>
+
+            {/* Row 2: Trading Performance */}
+            <div className="grid grid-cols-3 gap-3">
+              <KPICard label="Trades" value={String(metrics.trades)} />
+              <KPICard label="Win Rate" value={`${Math.round(metrics.winRate)}%`} />
+              <KPICard
+                label="Perf"
+                value={`${metrics.performance.toFixed(2)}%`}
+                positive={metrics.performance >= 0}
+              />
+            </div>
+          </>
         )}
       </div>
 

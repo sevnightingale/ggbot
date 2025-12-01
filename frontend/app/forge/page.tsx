@@ -53,10 +53,14 @@ interface Activity {
 interface AccountData {
   config_id: string
   current_balance: number
+  available_balance?: number
+  margin_used?: number
   total_pnl: number
+  unrealized_pnl?: number
   total_trades: number
   win_rate?: number
   win_trades?: number
+  open_positions?: number
 }
 
 function ForgeApp() {
@@ -1305,11 +1309,14 @@ function ForgeApp() {
               // Calculate metrics from accounts data for selected bot
               const account = accounts.find(a => a.config_id === selectedConfigId)
               const metrics = account ? {
-                balance: Number(account.current_balance || 0),
+                // Total Equity = current_balance + margin_used + unrealized_pnl
+                totalEquity: Number(account.current_balance || 0) +
+                             Number(account.margin_used || 0) +
+                             Number(account.unrealized_pnl || 0),
+                availableBalance: Number(account.available_balance || 0),
                 pnl: Number(account.total_pnl || 0),
                 trades: Number(account.total_trades || 0),
-                winRate: account.win_rate ? Number(account.win_rate) :
-                         (account.total_trades > 0 ? (Number(account.win_trades || 0) / Number(account.total_trades)) * 100 : 0),
+                winRate: account.win_rate ? Number(account.win_rate) * 100 : 0,  // Convert to percentage
                 performance: Number(account.total_pnl || 0)  // Performance in absolute USD for now
               } : null
 
