@@ -6,6 +6,24 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-04 - Unified Config Saving + Symphony Win Rate Fix
+
+**Unified Batched Config Save System** - Reduced 40+ API calls to 1
+- Created useBatchedConfigSave hook (frontend/lib/hooks/useBatchedConfigSave.ts)
+- 5s debounce accumulates all changes, single API call after idle
+- Dirty field tracking prevents SSE from overwriting user edits mid-type
+- Converted all config components to controlled: StrategyEditor (removed 4 useAutoSave hooks), TradeSettings (removed debounce timer), MarketDataSelector, SignalsConfiguration
+- SSE handler updated: skips dirty fields, updates non-dirty fields only
+- Documentation: DOCS/completed/UNIFIED_CONFIG_SAVING.md
+
+**Symphony Win Rate Numeric Overflow Fix**
+- Database column account_snapshots.win_rate is NUMERIC(5,4), max 9.9999
+- Symphony service returned 0-100 percentage (50.0 for 50%), caused overflow
+- Fixed in symphony_adapter.py:55-58: divide raw_win_rate by 100
+- Now matches paper_adapter which already returns 0-1 format
+
+---
+
 ## 2025-11-30 - Activity Timeline Data Visibility + ggShot Config Fix
 
 **Market Query Activity Logging** - Exact LLM prompt data now stored for full traceability
