@@ -1620,6 +1620,34 @@ async def create_config(
             logger.error(f"Failed to create paper account for config {config.config_id}: {e}")
             # Don't fail the config creation - account can be created later
 
+    # Create initial account_snapshot for timeline and metrics
+    # Paper starts at $10,000, live modes start at $0 (will sync from exchange)
+    initial_balance = 10000.0 if trading_mode == "paper" else 0.0
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    INSERT INTO account_snapshots (
+                        config_id, user_id, trading_mode,
+                        current_balance, available_balance, margin_used,
+                        total_pnl, realized_pnl, unrealized_pnl,
+                        total_trades, win_trades, loss_trades, open_positions
+                    ) VALUES (
+                        %s, %s, %s,
+                        %s, %s, 0,
+                        0, 0, 0,
+                        0, 0, 0, 0
+                    )
+                """, (
+                    config.config_id, current_user.user_id, trading_mode,
+                    initial_balance, initial_balance
+                ))
+                conn.commit()
+        logger.info(f"Created initial account_snapshot for config {config.config_id} (balance=${initial_balance})")
+    except Exception as e:
+        logger.error(f"Failed to create initial account_snapshot for config {config.config_id}: {e}")
+        # Non-critical - account monitor will create snapshot on next cycle
+
     logger.bind(user_id=current_user.user_id).info(
         f"Created {trading_mode} bot '{request.config_name}' (config_id={config.config_id})"
     )

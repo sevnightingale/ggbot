@@ -109,9 +109,9 @@ export function ActivationBar({
                 {selectedBot.config_name}
               </h2>
             </div>
-            {/* Status Message - Always show latest activity with braille spinner */}
+            {/* Status Message - Dynamic when active, static "last activity" when inactive */}
             {latestActivity && (
-              <StatusMessage latestActivity={latestActivity} />
+              <StatusMessage latestActivity={latestActivity} isActive={isActive} />
             )}
           </div>
 
@@ -243,9 +243,28 @@ function KPICard({ label, value, positive }: KPICardProps) {
 
 interface StatusMessageProps {
   latestActivity: Activity
+  isActive: boolean
 }
 
-function StatusMessage({ latestActivity }: StatusMessageProps) {
+// Format time ago with appropriate units (seconds, minutes, hours, days)
+function formatTimeAgo(diffMs: number): string {
+  const diffSecs = Math.floor(diffMs / 1000)
+  const diffMins = Math.floor(diffMs / 60000)
+  const diffHours = Math.floor(diffMs / 3600000)
+  const diffDays = Math.floor(diffMs / 86400000)
+
+  if (diffDays > 0) {
+    return `${diffDays}d ago`
+  } else if (diffHours > 0) {
+    return `${diffHours}h ago`
+  } else if (diffMins > 0) {
+    return `${diffMins}m ago`
+  } else {
+    return `${diffSecs}s ago`
+  }
+}
+
+function StatusMessage({ latestActivity, isActive }: StatusMessageProps) {
   const spinnerChars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏']
   const [spinnerIndex, setSpinnerIndex] = React.useState(0)
   const [variantIndex, setVariantIndex] = React.useState(0)
@@ -260,9 +279,13 @@ function StatusMessage({ latestActivity }: StatusMessageProps) {
       const activityTime = new Date(activity.timestamp)
       const now = new Date()
       const diffMs = now.getTime() - activityTime.getTime()
-      const diffMins = Math.floor(diffMs / 60000)
-      const diffSecs = Math.floor((diffMs % 60000) / 1000)
-      const timeAgo = diffMins > 0 ? `${diffMins}m ago` : `${diffSecs}s ago`
+      const timeAgo = formatTimeAgo(diffMs)
+
+      // If bot is inactive, show static "last activity" message
+      if (!isActive) {
+        setDisplayMessage(`Last activity ${timeAgo}`)
+        return
+      }
 
       let variants: string[] = []
 
@@ -382,6 +405,17 @@ function StatusMessage({ latestActivity }: StatusMessageProps) {
           ]
           break
 
+        case 'bot_created':
+          const botName = (details.config_name as string | undefined) || 'Bot'
+          const tradingMode = (details.trading_mode as string | undefined)?.toUpperCase() || 'PAPER'
+          const pair = (details.selected_pair as string | undefined) || ''
+          variants = [
+            `🤖 BOT CREATED • ${tradingMode} mode • ${timeAgo}`,
+            `🤖 ${botName} initialized • ${timeAgo}`,
+            `🤖 Ready to trade${pair ? ` ${pair}` : ''} • ${timeAgo}`
+          ]
+          break
+
         default:
           variants = [activity.data?.summary || `Activity • ${timeAgo}`]
       }
@@ -393,7 +427,7 @@ function StatusMessage({ latestActivity }: StatusMessageProps) {
     // Update time every second
     const interval = setInterval(generateMessage, 1000)
     return () => clearInterval(interval)
-  }, [latestActivity, variantIndex])
+  }, [latestActivity, variantIndex, isActive])
 
   // Cycle through variants every 4 seconds
   React.useEffect(() => {
@@ -413,9 +447,13 @@ function StatusMessage({ latestActivity }: StatusMessageProps) {
 
   return (
     <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
-      <span className="font-mono text-[var(--agent-extraction)]">
-        {spinnerChars[spinnerIndex]}
-      </span>
+      {isActive ? (
+        <span className="font-mono text-[var(--agent-extraction)]">
+          {spinnerChars[spinnerIndex]}
+        </span>
+      ) : (
+        <span className="text-[var(--text-muted)]">○</span>
+      )}
       <span>{displayMessage}</span>
     </div>
   )
