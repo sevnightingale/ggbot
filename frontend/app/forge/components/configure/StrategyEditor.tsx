@@ -1,12 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
+import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { Crown } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
 import { ConfigData, apiClient } from '@/lib/api'
 import { UpgradeModal } from '@/components/UpgradeModal'
-import { useAutoSave } from '@/lib/hooks/useAutoSave'
 
 interface LLMModel {
   model_id: string
@@ -44,29 +43,34 @@ const MODEL_COLORS: Record<string, string> = {
 }
 
 interface StrategyEditorProps {
-  configId: string
+  // configId, configName, configType - unused, batched save handled by parent
   configData?: ConfigData
-  configName?: string
-  configType?: string
   onUpdate?: (updates: Partial<ConfigData>) => void
   className?: string
 }
 
+/**
+ * StrategyEditor - Controlled component for strategy configuration
+ *
+ * This component is now fully controlled - all changes are passed to parent
+ * via onUpdate(), and parent handles batched saving.
+ *
+ * Local state is only used for:
+ * 1. UI responsiveness (optimistic updates)
+ * 2. Syncing from configData prop when external updates arrive
+ */
 export function StrategyEditor({
-  configId,
   configData,
-  configName,
-  configType,
   onUpdate,
   className = ''
 }: StrategyEditorProps) {
   const { canAccess } = usePermissions()
-  const currentConfigType = configType || configData?.config_type || 'scheduled_trading'
+  const currentConfigType = configData?.config_type || 'scheduled_trading'
 
   // Check premium access once to avoid repeated permission checks
   const hasPremiumAccess = canAccess('premium_llms')
 
-  // Local state for form fields (for optimistic updates)
+  // Local state for form fields - syncs with configData prop
   const [currentStrategy, setCurrentStrategy] = useState(configData?.decision?.user_prompt || '')
   const [analysisFrequency, setAnalysisFrequency] = useState(configData?.decision?.analysis_frequency || '1h')
   const [llmModel, setLlmModel] = useState(configData?.llm_config?.model || 'grok')
@@ -82,27 +86,9 @@ export function StrategyEditor({
   // Ref for textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
-  // Debug: Log component mount and props
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+  // Sync local state when configData changes (from SSE/AI updates)
   useEffect(() => {
-    console.log('🎬 StrategyEditor mounted with:', {
-      configId,
-      hasConfigData: !!configData,
-      currentStrategy: currentStrategy.substring(0, 50),
-      configDataPrompt: configData?.decision?.user_prompt?.substring(0, 50)
-    })
-  }, []) // Only run on mount
-
-  // Debug: Log whenever currentStrategy state changes
-  useEffect(() => {
-    console.log('📝 currentStrategy state changed to:', currentStrategy.substring(0, 50))
-  }, [currentStrategy])
-
-  // Sync local state when configData changes (from AI updates or external sources)
-  useEffect(() => {
-    console.log('🔄 configData.decision.user_prompt changed:', configData?.decision?.user_prompt?.substring(0, 50))
     if (configData?.decision?.user_prompt !== undefined) {
-      console.log('🔄 Syncing local state with configData')
       setCurrentStrategy(configData.decision.user_prompt)
     }
   }, [configData?.decision?.user_prompt])
@@ -125,110 +111,6 @@ export function StrategyEditor({
     }
   }, [configData?.llm_config?.thinking_mode])
 
-  // Memoized save callbacks to prevent useEffect cleanup canceling timers
-  const saveStrategy = useCallback(async (value: string) => {
-    console.log('💾 Auto-saving strategy prompt...', { configId, value: value.substring(0, 50) })
-    const updatePayload = {
-      decision: {
-        user_prompt: value,
-        analysis_frequency: analysisFrequency || '1h',
-        system_prompt: configData?.decision?.system_prompt || ''
-      }
-    }
-    console.log('💾 Update payload:', updatePayload)
-    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-    await apiClient.updateConfig(configId, updatePayload, configName, configType)
-    console.log('✅ Strategy prompt saved successfully')
-    onUpdate?.({
-      decision: {
-        ...(configData?.decision || {}),
-        user_prompt: value,
-        analysis_frequency: analysisFrequency || '1h',
-        system_prompt: configData?.decision?.system_prompt || ''
-      }
-    })
-  }, [configId, analysisFrequency, configData?.decision, configName, configType, onUpdate])
-
-  // Auto-save hooks for each field
-  useAutoSave({
-    value: currentStrategy,
-    onSave: saveStrategy,
-    delay: 1000,
-    saveId: 'strategy-prompt'
-  })
-
-  const saveFrequency = useCallback(async (value: string) => {
-    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-    await apiClient.updateConfig(configId, {
-      decision: {
-        analysis_frequency: value || '1h',
-        user_prompt: currentStrategy,
-        system_prompt: configData?.decision?.system_prompt || ''
-      }
-    }, configName, configType)
-    onUpdate?.({
-      decision: {
-        ...(configData?.decision || {}),
-        analysis_frequency: value || '1h',
-        user_prompt: currentStrategy,
-        system_prompt: configData?.decision?.system_prompt || ''
-      }
-    })
-  }, [configId, currentStrategy, configData?.decision, configName, configType, onUpdate])
-
-  const saveModel = useCallback(async (value: string) => {
-    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-    await apiClient.updateConfig(configId, {
-      llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
-        model: value
-      }
-    }, configName, configType)
-    onUpdate?.({
-      llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
-        model: value
-      }
-    })
-  }, [configId, configData?.llm_config, configName, configType, onUpdate])
-
-  const saveThinkingMode = useCallback(async (value: boolean) => {
-    // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-    await apiClient.updateConfig(configId, {
-      llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
-        thinking_mode: value
-      }
-    }, configName, configType)
-    onUpdate?.({
-      llm_config: {
-        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: 'grok', thinking_mode: false }),
-        thinking_mode: value
-      }
-    })
-  }, [configId, configData?.llm_config, configName, configType, onUpdate])
-
-  useAutoSave({
-    value: analysisFrequency,
-    onSave: saveFrequency,
-    delay: 500,
-    saveId: 'analysis-frequency'
-  })
-
-  useAutoSave({
-    value: llmModel,
-    onSave: saveModel,
-    delay: 500,
-    saveId: 'llm-model'
-  })
-
-  useAutoSave({
-    value: thinkingMode,
-    onSave: saveThinkingMode,
-    delay: 500,
-    saveId: 'thinking-mode'
-  })
-
   // Fetch available LLM models on mount
   useEffect(() => {
     const fetchModels = async () => {
@@ -238,28 +120,38 @@ export function StrategyEditor({
         setLLMModels(models.filter(m => m.enabled))
       } catch (error) {
         console.error('Failed to fetch LLM models:', error)
-        // Fallback to empty array on error
         setLLMModels([])
       } finally {
         setModelsLoading(false)
       }
     }
-
     fetchModels()
   }, [])
 
-  // Auto-resize textarea when content changes or component mounts
+  // Auto-resize textarea when content changes
   useEffect(() => {
-    const resizeTextarea = () => {
-      if (textareaRef.current) {
-        textareaRef.current.style.height = 'auto'
-        textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
-      }
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto'
+      textareaRef.current.style.height = `${textareaRef.current.scrollHeight}px`
     }
-
-    // Resize immediately when content changes
-    resizeTextarea()
   }, [currentStrategy])
+
+  // Handle strategy text change - update local state + notify parent
+  const handleStrategyChange = (value: string) => {
+    // Limit to 10,000 characters
+    const truncated = value.length > 10000 ? value.substring(0, 10000) : value
+    setCurrentStrategy(truncated)
+
+    // Notify parent (batched save happens at page.tsx level)
+    onUpdate?.({
+      decision: {
+        ...(configData?.decision || {}),
+        user_prompt: truncated,
+        analysis_frequency: analysisFrequency || '1h',
+        system_prompt: configData?.decision?.system_prompt || ''
+      }
+    })
+  }
 
   // Handle frequency selection
   const handleFrequencyChange = (freq: string) => {
@@ -269,48 +161,50 @@ export function StrategyEditor({
       return
     }
 
-    // Update local state (auto-save will trigger)
     setAnalysisFrequency(freq)
+    onUpdate?.({
+      decision: {
+        ...(configData?.decision || {}),
+        analysis_frequency: freq,
+        user_prompt: currentStrategy,
+        system_prompt: configData?.decision?.system_prompt || ''
+      }
+    })
   }
 
-  // Handle strategy text change
-  const handleStrategyChange = (value: string) => {
-    console.log('🔤 handleStrategyChange called with:', value.substring(0, 50))
-    // Limit to 10,000 characters
-    if (value.length > 10000) {
-      value = value.substring(0, 10000)
-    }
-
-    // Update local state (auto-save will trigger)
-    console.log('🔤 Setting currentStrategy state...')
-    setCurrentStrategy(value)
-  }
-
-  // Auto-resize textarea
-  const handleTextareaResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    console.log('⌨️ Textarea onChange fired!')
-    const textarea = e.target
-    textarea.style.height = 'auto'
-    textarea.style.height = `${textarea.scrollHeight}px`
-    handleStrategyChange(textarea.value)
-  }
-
-  // Handle model selection (OpenRouter only)
+  // Handle model selection
   const handleModelChange = (modelId: string) => {
-    // Check if user has access to premium LLMs
     if (!hasPremiumAccess) {
       setUpgradeModalOpen(true)
       return
     }
 
-    // Update local state (auto-save will trigger)
     setLlmModel(modelId)
+    onUpdate?.({
+      llm_config: {
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', thinking_mode: false }),
+        model: modelId
+      }
+    })
   }
 
   // Handle thinking mode toggle
   const handleThinkingModeChange = (enabled: boolean) => {
-    // Update local state (auto-save will trigger)
     setThinkingMode(enabled)
+    onUpdate?.({
+      llm_config: {
+        ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: llmModel }),
+        thinking_mode: enabled
+      }
+    })
+  }
+
+  // Auto-resize textarea on input
+  const handleTextareaResize = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    const textarea = e.target
+    textarea.style.height = 'auto'
+    textarea.style.height = `${textarea.scrollHeight}px`
+    handleStrategyChange(textarea.value)
   }
 
   return (

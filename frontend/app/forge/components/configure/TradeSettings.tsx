@@ -1,31 +1,32 @@
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import { Lock } from 'lucide-react'
-import { ConfigData, createDefaultConfigData, apiClient } from '@/lib/api'
+import { ConfigData, createDefaultConfigData } from '@/lib/api'
 import { SymbolSelector } from '@/components/SymbolSelector'
 import { usePermissions } from '@/lib/permissions'
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs'
-import { useEffect, useState, useRef } from 'react'
 import { useFieldValidation, ValidationRules } from '@/lib/useTradeValidation'
 import { ValidationMessage } from '@/components/ValidationMessage'
 
 interface TradeSettingsProps {
   configData?: ConfigData
-  configId: string
-  configName?: string
-  configType?: string
+  configId?: string  // Needed for test signal publishing feature
   tradingMode?: 'paper' | 'symphony' | 'aster'
   onUpdate?: (updates: Partial<ConfigData>) => void
   onValidationChange?: (hasErrors: boolean) => void
   className?: string
 }
 
+/**
+ * TradeSettings - Controlled component for trading configuration
+ *
+ * This component is fully controlled - all changes are passed to parent
+ * via onUpdate(), and parent handles batched saving.
+ */
 export function TradeSettings({
   configData,
   configId,
-  configName,
-  configType,
   tradingMode = 'paper',
   onUpdate,
   onValidationChange,
@@ -34,7 +35,6 @@ export function TradeSettings({
   const isSymphonyBot = tradingMode === 'symphony'
   const { canAccess } = usePermissions()
   const [session, setSession] = useState<{ access_token?: string } | null>(null)
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
     const supabase = createClientComponentClient()
@@ -43,15 +43,6 @@ export function TradeSettings({
       setSession(session)
     }
     getSession()
-  }, [])
-
-  // Cleanup timer on unmount
-  useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) {
-        clearTimeout(saveTimerRef.current)
-      }
-    }
   }, [])
 
   const defaultConfig = createDefaultConfigData()
@@ -92,26 +83,9 @@ export function TradeSettings({
     onValidationChange
   ])
 
+  // Update config - just notify parent (batched save happens at page.tsx level)
   const updateConfig = (updates: Partial<ConfigData>) => {
-    // Update local state immediately for optimistic UI
-    if (onUpdate) {
-      onUpdate(updates)
-    }
-
-    // Debounced auto-save
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current)
-    }
-
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-        await apiClient.updateConfig(configId, updates, configName, configType)
-        console.log('✅ Trade settings auto-saved')
-      } catch (error) {
-        console.error('❌ Failed to auto-save trade settings:', error)
-      }
-    }, 1000)
+    onUpdate?.(updates)
   }
 
   // Helper to update trading config with proper type handling

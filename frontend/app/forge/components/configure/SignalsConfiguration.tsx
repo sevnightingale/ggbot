@@ -3,7 +3,7 @@
 import React, { useState } from 'react'
 import { usePermissions } from '@/lib/permissions'
 import { ExternalLink, Lock, CheckCircle, AlertCircle } from 'lucide-react'
-import { ConfigData, apiClient } from '@/lib/api'
+import { ConfigData } from '@/lib/api'
 
 interface SignalsConfigurationProps {
   configId: string
@@ -15,9 +15,7 @@ interface SignalsConfigurationProps {
 }
 
 export function SignalsConfiguration({
-  configId,
-  configName,
-  configType,
+  // configId, configName, configType - unused, batched save handled by parent
   configData,
   onUpdate,
   className = ''
@@ -50,8 +48,8 @@ export function SignalsConfiguration({
     }
   }
 
-  // Toggle ggShot enabled/disabled with auto-save
-  const toggleGgShot = async (enabled: boolean) => {
+  // Toggle ggShot enabled/disabled - batched save handled by parent
+  const toggleGgShot = (enabled: boolean) => {
     // Check permission before enabling
     if (enabled && !isGgShotSubscribed) {
       alert('ggShot signals require a paid subscription. Upgrade to access external signal sources!')
@@ -92,16 +90,9 @@ export function SignalsConfiguration({
       delete update.extraction!.selected_data_sources!.signals_group_chats
     }
 
-    // Auto-save to backend
-    try {
-      // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-      await apiClient.updateConfig(configId, update, configName, configType)
-      // Update local state for immediate UI feedback
-      updateConfig(update)
-    } catch (error) {
-      console.error('Failed to save signal configuration:', error)
-      // TODO: Show error toast to user
-    }
+    // Update via parent's batched save handler
+    // (no direct API call - parent handles debounced save)
+    updateConfig(update)
   }
 
   return (

@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { BotConfiguration, ConfigData, DataSource } from '@/lib/api'
 import { SaveStatusIndicator } from '@/components/SaveStatusIndicator'
 import { StrategyAdvisorPanel } from '@/components/StrategyAdvisorPanel'
-import { SaveStatusProvider, useSaveStatus } from '@/lib/contexts/SaveStatusContext'
+import { useSaveStatus } from '@/lib/contexts/SaveStatusContext'
 import { ConfigTabs, ConfigTabType } from './ConfigTabs'
 import { MarketDataSelector } from './MarketDataSelector'
 import { SignalsConfiguration } from './SignalsConfiguration'
@@ -24,7 +24,19 @@ interface ConfigureLayoutProps {
   className?: string
 }
 
-function ConfigureLayoutContent({
+/**
+ * ConfigureLayout - Layout wrapper for bot configuration tabs
+ *
+ * This component is a pure pass-through for config changes.
+ * All save logic is handled by page.tsx via useBatchedConfigSave.
+ *
+ * Data flow:
+ * 1. Child component calls onUpdateConfig(updates)
+ * 2. page.tsx handleConfigChange updates local state + queues batched save
+ * 3. After 5s idle, batched save fires to API
+ * 4. SSE may push updates for non-dirty fields
+ */
+export function ConfigureLayout({
   selectedBot,
   editingConfigData,
   editingTableFields,
@@ -87,7 +99,7 @@ function ConfigureLayoutContent({
         className="mb-6"
       />
 
-      {/* Tab Content */}
+      {/* Tab Content - All components receive onUpdateConfig directly */}
       <div className="min-h-[400px]">
         {activeConfigTab === 'market-data' && (
           <MarketDataSelector
@@ -116,10 +128,7 @@ function ConfigureLayoutContent({
 
         {activeConfigTab === 'strategy' && (
           <StrategyEditor
-            configId={selectedBot.config_id}
             configData={configData}
-            configName={editingTableFields?.config_name || selectedBot?.config_name}
-            configType={editingTableFields?.config_type || selectedBot?.config_type}
             onUpdate={onUpdateConfig}
           />
         )}
@@ -128,22 +137,11 @@ function ConfigureLayoutContent({
           <TradeSettings
             configData={configData}
             configId={selectedBot?.config_id}
-            configName={editingTableFields?.config_name || selectedBot?.config_name}
-            configType={editingTableFields?.config_type || selectedBot?.config_type}
             tradingMode={selectedBot?.trading_mode}
             onUpdate={onUpdateConfig}
           />
         )}
       </div>
     </div>
-  )
-}
-
-// Wrapper component that provides SaveStatusContext
-export function ConfigureLayout(props: ConfigureLayoutProps) {
-  return (
-    <SaveStatusProvider>
-      <ConfigureLayoutContent {...props} />
-    </SaveStatusProvider>
   )
 }

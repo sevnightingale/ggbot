@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react'
 import { Crown } from 'lucide-react'
-import { ConfigData, apiClient } from '@/lib/api'
+import { ConfigData } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 
@@ -42,9 +42,7 @@ interface MarketDataSelectorProps {
 }
 
 export function MarketDataSelector({
-  configId,
-  configName,
-  configType,
+  // configId, configName, configType - unused, batched save handled by parent
   configData,
   dataSources = [],
   activeTab = 'technical_analysis',
@@ -77,8 +75,8 @@ export function MarketDataSelector({
     point.description.toLowerCase().includes(searchTerm.toLowerCase())
   ) || []
 
-  // Handle data point toggle with auto-save
-  const handleToggleDataPoint = async (dataPointId: string) => {
+  // Handle data point toggle - batched save handled by parent
+  const handleToggleDataPoint = (dataPointId: string) => {
     if (!onUpdate || !activeDataSource) return
 
     const dataPoint = activeDataSource.data_points.find(p => p.data_point_id === dataPointId)
@@ -130,16 +128,9 @@ export function MarketDataSelector({
       delete update.extraction!.selected_data_sources[category]
     }
 
-    // Auto-save to backend
-    try {
-      // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-      await apiClient.updateConfig(configId, update, configName, configType)
-      // Update local state for immediate UI feedback
-      onUpdate(update)
-    } catch (error) {
-      console.error('Failed to save market data selection:', error)
-      // TODO: Show error toast to user
-    }
+    // Update via parent's batched save handler
+    // (no direct API call - parent handles debounced save)
+    onUpdate(update)
   }
 
   return (

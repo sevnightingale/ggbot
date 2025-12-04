@@ -1,10 +1,12 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { apiClient, BotConfiguration, ConfigData, DataSource } from '@/lib/api'
 import { ThemeProvider } from '@/lib/theme'
 import { PermissionProvider, usePermissions } from '@/lib/permissions'
+import { SaveStatusProvider } from '@/lib/contexts/SaveStatusContext'
+import { useBatchedConfigSave } from '@/lib/hooks/useBatchedConfigSave'
 import { Header } from './components/layout/Header'
 import { BotRail } from './components/layout/BotRail'
 import { TabNavigation } from './components/layout/TabNavigation'
@@ -120,8 +122,53 @@ function ForgeApp() {
   const [isWaitingForAgent, setIsWaitingForAgent] = useState(false)
   const [agentStarted, setAgentStarted] = useState(false)
 
-  // Debounce timer for auto-save
-  const saveTimerRef = useRef<NodeJS.Timeout | null>(null)
+  // Unified batched config save with dirty field tracking
+  const {
+    queueChange: queueConfigChange,
+    isFieldDirty,
+  } = useBatchedConfigSave({
+    configId: selectedConfigId,
+    configName: editingTableFields?.config_name,
+    configType: editingTableFields?.config_type,
+    delay: 5000,  // 5 second debounce for batched saves
+    enabled: activeTab === 'configure',  // Only save when on configure tab
+  })
+
+  // Unified config change handler - used by ALL config components
+  const handleConfigChange = useCallback((updates: Partial<ConfigData>) => {
+    // 1. Update local state immediately for optimistic UI
+    setEditingConfigData(prev => {
+      if (!prev) return null
+
+      // Deep merge the updates into existing config
+      return {
+        ...prev,
+        ...updates,
+        // Handle nested objects specifically
+        ...(updates.extraction && {
+          extraction: { ...(prev.extraction || {}), ...updates.extraction }
+        }),
+        ...(updates.decision && {
+          decision: { ...(prev.decision || {}), ...updates.decision }
+        }),
+        ...(updates.trading && {
+          trading: { ...prev.trading, ...updates.trading }
+        }),
+        ...(updates.llm_config && {
+          llm_config: { ...(prev.llm_config || {}), ...updates.llm_config }
+        }),
+        ...(updates.telegram_integration && {
+          telegram_integration: { ...prev.telegram_integration, ...updates.telegram_integration }
+        }),
+        ...(updates.agent_strategy && {
+          agent_strategy: { ...(prev.agent_strategy || {}), ...updates.agent_strategy }
+        })
+      } as ConfigData
+    })
+
+    // 2. Queue for batched save (will be saved after 5s of inactivity)
+    queueConfigChange(updates)
+  }, [queueConfigChange])
 
   // Load bot config into editing state when configure tab is activated
   useEffect(() => {
@@ -415,21 +462,49 @@ function ForgeApp() {
                 setCountdown('Waiting for next run...')
               }
 
-              // Update agent strategy if changed (for real-time collaborative editing)
-              if (myBot?.config_data?.agent_strategy && editingConfigData) {
-                const newStrategyContent = myBot.config_data.agent_strategy.content
-                const currentStrategyContent = editingConfigData.agent_strategy?.content
+              // Update config fields from SSE (for AI Assistant changes, external updates)
+              // Only apply updates to fields that user is NOT currently editing (dirty fields)
+              if (myBot?.config_data && editingConfigData) {
+                const serverConfig = myBot.config_data
 
-                if (newStrategyContent !== currentStrategyContent) {
-                  console.log('📝 Agent strategy updated via SSE')
-                  setEditingConfigData(prev => {
-                    if (!prev) return null
-                    return {
-                      ...prev,
-                      agent_strategy: myBot.config_data.agent_strategy
+                setEditingConfigData(prev => {
+                  if (!prev) return null
+
+                  const merged = { ...prev }
+                  let hasChanges = false
+
+                  // List of top-level config fields to check for SSE updates
+                  const fieldsToCheck = [
+                    'decision',
+                    'extraction',
+                    'trading',
+                    'llm_config',
+                    'agent_strategy',
+                    'telegram_integration',
+                    'selected_pair'
+                  ] as const
+
+                  for (const field of fieldsToCheck) {
+                    // Skip if user is editing this field
+                    if (isFieldDirty(field)) {
+                      console.log(`🔒 SSE: Skipping ${field} (dirty - user is editing)`)
+                      continue
                     }
-                  })
-                }
+
+                    // Check if server has a different value
+                    const serverValue = serverConfig[field]
+                    const currentValue = prev[field]
+
+                    if (serverValue !== undefined &&
+                        JSON.stringify(serverValue) !== JSON.stringify(currentValue)) {
+                      console.log(`📝 SSE: Updating ${field} from server`)
+                      ;(merged as Record<string, unknown>)[field] = serverValue
+                      hasChanges = true
+                    }
+                  }
+
+                  return hasChanges ? merged : prev
+                })
               }
             }
 
@@ -736,72 +811,8 @@ function ForgeApp() {
     triggerBotManually()
   }
 
-  // Configuration editing handlers - removed startEditingConfig as we now always start in editing mode
-
-  // Unified config update function with deep merging
-  const updateEditingConfig = (updates: {
-    configData?: Partial<ConfigData>
-    tableFields?: { config_name?: string; config_type?: string }
-  }) => {
-    // Update JSONB config_data if provided
-    if (updates.configData) {
-      setEditingConfigData(prev => {
-        if (!prev) return null
-
-        // Deep merge the updates into existing config
-        const configUpdates = updates.configData!
-        return {
-          ...prev,
-          ...configUpdates,
-          // Handle nested objects specifically with guards for optional fields
-          ...(configUpdates.extraction && {
-            extraction: {
-              ...(prev.extraction || {}),  // Guard: fallback to empty object
-              ...configUpdates.extraction
-            }
-          }),
-          ...(configUpdates.decision && {
-            decision: {
-              ...(prev.decision || {}),  // Guard: fallback to empty object
-              ...configUpdates.decision
-            }
-          }),
-          ...(configUpdates.trading && {
-            trading: {
-              ...prev.trading,
-              ...configUpdates.trading
-            }
-          }),
-          ...(configUpdates.llm_config && {
-            llm_config: {
-              ...(prev.llm_config || {}),  // Guard: fallback to empty object
-              ...configUpdates.llm_config
-            }
-          }),
-          ...(configUpdates.telegram_integration && {
-            telegram_integration: {
-              ...prev.telegram_integration,
-              ...configUpdates.telegram_integration
-            }
-          }),
-          ...(configUpdates.agent_strategy && {
-            agent_strategy: {
-              ...(prev.agent_strategy || {}),  // Guard: handle agent configs
-              ...configUpdates.agent_strategy
-            }
-          })
-        } as ConfigData
-      })
-    }
-
-    // Update table fields if provided
-    if (updates.tableFields) {
-      setEditingTableFields(prev => ({
-        ...prev,
-        ...updates.tableFields
-      }))
-    }
-  }
+  // Configuration editing handlers
+  // Note: Config data changes now go through handleConfigChange (defined above with batched save)
 
   // Handle bot switching with clean state reset
   const handleBotSelection = (configId: string) => {
@@ -1023,52 +1034,22 @@ function ForgeApp() {
     }
   }
 
-  // Handler for strategy content changes (with debounced auto-save)
-  const handleStrategyChange = async (newContent: string) => {
+  // Handler for agent strategy content changes - uses unified batched save
+  const handleAgentStrategyChange = useCallback((newContent: string) => {
     if (!selectedConfigId) return
 
-    // Update local editing state immediately for responsive UI
-    setEditingConfigData(prev => {
-      if (!prev) return null
-      return {
-        ...prev,
-        agent_strategy: {
-          content: newContent,
-          autonomously_editable: prev.agent_strategy?.autonomously_editable ?? false,
-          version: prev.agent_strategy?.version ?? 1,
-          last_updated_at: prev.agent_strategy?.last_updated_at ?? new Date().toISOString(),
-          last_updated_by: prev.agent_strategy?.last_updated_by ?? 'user',
-          performance_log: prev.agent_strategy?.performance_log ?? []
-        }
+    // Use unified config change handler - preserves other agent_strategy fields
+    handleConfigChange({
+      agent_strategy: {
+        content: newContent,
+        autonomously_editable: editingConfigData?.agent_strategy?.autonomously_editable ?? false,
+        version: editingConfigData?.agent_strategy?.version ?? 1,
+        last_updated_at: new Date().toISOString(),
+        last_updated_by: 'user',
+        performance_log: editingConfigData?.agent_strategy?.performance_log ?? []
       }
     })
-
-    // Clear existing timer
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current)
-    }
-
-    // Set new timer for auto-save (1 second debounce)
-    saveTimerRef.current = setTimeout(async () => {
-      try {
-        console.log('💾 Auto-saving strategy...')
-        // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-        await apiClient.updateConfig(
-          selectedConfigId,
-          {
-            agent_strategy: {
-              content: newContent
-            }
-          },
-          editingTableFields?.config_name,  // Preserve bot name
-          editingTableFields?.config_type    // Preserve config type
-        )
-        console.log('✅ Strategy auto-saved')
-      } catch (error) {
-        console.error('❌ Failed to auto-save strategy:', error)
-      }
-    }, 1000)
-  }
+  }, [selectedConfigId, handleConfigChange, editingConfigData?.agent_strategy])
 
   // Handler for starting strategy builder agent
   const handleStartStrategyBuilder = async () => {
@@ -1373,7 +1354,7 @@ function ForgeApp() {
                     strategyContent={editingConfigData?.agent_strategy?.content || ''}
                     onSendMessage={handleSendAgentMessage}
                     onInputChange={setAgentInputValue}
-                    onStrategyChange={handleStrategyChange}
+                    onStrategyChange={handleAgentStrategyChange}
                     onStartAgent={handleStartStrategyBuilder}
                     agentStarted={agentStarted}
                   />
@@ -1384,9 +1365,7 @@ function ForgeApp() {
                     editingConfigData={editingConfigData}
                     editingTableFields={editingTableFields}
                     dataSources={dataSources}
-                    onUpdateConfig={(updates) => {
-                      updateEditingConfig({ configData: updates })
-                    }}
+                    onUpdateConfig={handleConfigChange}
                     onConfigUpdate={handleConfigUpdate}
                   />
                 )
@@ -1431,7 +1410,9 @@ export default function ForgePage() {
   return (
     <ThemeProvider>
       <PermissionProvider>
-        <ForgeApp />
+        <SaveStatusProvider>
+          <ForgeApp />
+        </SaveStatusProvider>
       </PermissionProvider>
     </ThemeProvider>
   )
