@@ -88,7 +88,8 @@ Legacy/Archive (Moved to /archive/):
 ├── permission-gate.tsx     # Component for gating premium features
 ├── useTradeValidation.ts   # Trading settings validation hook
 ├── hooks/
-│   └── useAutoSave.ts      # Debounced auto-save with optimistic updates + rollback
+│   ├── useBatchedConfigSave.ts  # Unified batched config save with dirty tracking (2025-12-04)
+│   └── useAutoSave.ts      # Legacy: Debounced auto-save (deprecated, use useBatchedConfigSave)
 ├── contexts/
 │   └── SaveStatusContext.tsx # Global save status coordination
 ├── api.ts                  # API client with Stripe methods
@@ -104,7 +105,7 @@ Legacy/Archive (Moved to /archive/):
 - **No Global Store**: Direct API types, no transformation layers
 - **Multi-Bot Native**: `selectedConfigId` pattern with seamless switching
 - **SSE Real-time**: Server-Sent Events replace complex WebSocket patterns
-- **Auto-Save Architecture**: Debounced form updates with optimistic UI, no explicit save buttons (2025-11-19)
+- **Unified Batched Save**: Single hook manages all config saves with 5s debounce + dirty field tracking (2025-12-04)
 - **AI-First Configuration**: Strategy Advisor inline chat panel for collaborative bot setup
 
 ### **Real-time Data Flow**
@@ -124,41 +125,64 @@ eventSource.onmessage = (event) => {
 }
 ```
 
-### **Configuration Architecture**
-```typescript
-// Auto-save pattern (2025-11-19)
-const [allBots, setAllBots] = useState<BotConfiguration[]>([])
-const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
-const [editingConfig, setEditingConfig] = useState<ConfigData | null>(null)
+### **Configuration Architecture** (Unified Batched Save - 2025-12-04)
 
-// Centralized config updates with deep merging + auto-save
-const updateEditingConfig = (updates: Partial<ConfigData>) => {
-  setEditingConfig(prev => ({
-    ...prev,
-    ...updates,
-    // Deep merge for nested JSONB fields
-    extraction: { ...prev?.extraction, ...updates.extraction },
-    decision: { ...prev?.decision, ...updates.decision },
-    trading: { ...prev?.trading, ...updates.trading }
-  }))
-  // No explicit save - forms auto-save via useAutoSave hook
-}
+All configuration components are now **controlled components** that call `onUpdate()` - no direct API calls.
+The parent `page.tsx` owns all state and save logic via `useBatchedConfigSave` hook.
 
-// Auto-save hook example (CRITICAL: must pass configName/configType)
-const saveStrategy = useCallback(async (value: string) => {
-  // ⚠️ CRITICAL: Always pass config_name and config_type to prevent overwriting with defaults
-  await apiClient.updateConfig(configId, {
-    decision: { user_prompt: value }
-  }, configName, configType)
-}, [configId, configName, configType])
-
-useAutoSave({
-  value: currentStrategy,
-  onSave: saveStrategy,
-  delay: 1000,  // 1s debounce
-  saveId: 'strategy-prompt'
-})
 ```
+┌─────────────────────────────────────────────────────────────────┐
+│                         page.tsx                                 │
+│                                                                  │
+│   useBatchedConfigSave({ delay: 5000 })                         │
+│         │                                                        │
+│         ├── Accumulates all changes into queue                   │
+│         ├── Tracks dirty fields                                  │
+│         ├── 5 second debounce                                    │
+│         └── Single batched API call                              │
+│                                                                  │
+│   SSE Handler                                                    │
+│         └── Updates only non-dirty fields                        │
+│                                                                  │
+└──────────────────────────────────────────────────────────────────┘
+                            │
+         ┌──────────────────┼──────────────────┐
+         ▼                  ▼                  ▼
+   StrategyEditor     TradeSettings    MarketDataSelector
+   (controlled)       (controlled)     (controlled)
+
+   All components just call onUpdate() - no direct API calls
+```
+
+```typescript
+// Unified batched config save with dirty field tracking (page.tsx)
+const { queueChange, isFieldDirty } = useBatchedConfigSave({
+  configId: selectedConfigId,
+  configName: editingTableFields?.config_name,
+  configType: editingTableFields?.config_type,
+  delay: 5000,  // 5s batch window
+  enabled: activeTab === 'configure',
+})
+
+// Unified config change handler - used by ALL config components
+const handleConfigChange = useCallback((updates: Partial<ConfigData>) => {
+  // 1. Update local state immediately (optimistic UI)
+  setEditingConfigData(prev => deepMerge(prev, updates))
+  // 2. Queue for batched save
+  queueConfigChange(updates)
+}, [queueConfigChange])
+
+// SSE handler with dirty field protection
+// User wins for fields they're editing, SSE updates non-dirty fields
+if (!isFieldDirty('decision')) {
+  merged.decision = serverConfig.decision  // Safe to update
+}
+```
+
+**Conflict Resolution**: When AI edits (via SSE) and user edits simultaneously:
+- **Dirty fields** (user editing): User wins, preserved
+- **Non-dirty fields**: Updated from SSE
+- **After save completes**: Dirty tracking clears
 
 ---
 
@@ -203,9 +227,10 @@ useAutoSave({
 - **Component padding**: All components use `p-4` (16px) uniformly
 - **Vertical gaps**: 12px (`space-y-3`, `my-3`) between major sections
 - **Configure sections**: 24px gaps (`space-y-6`) between config blocks
-- **Auto-save pattern**: MUST pass `configName` and `configType` to preserve bot identity
+- **Batched save pattern**: All config saves go through `useBatchedConfigSave` hook in page.tsx
 ```typescript
-await apiClient.updateConfig(configId, updates, configName, configType)
+// Config components just call onUpdate - no direct API calls
+onUpdate?.({ decision: { user_prompt: newValue } })
 ```
 
 ### **Width & Spacing Constraints**
@@ -530,13 +555,15 @@ import { Bot, Settings, BarChart3 } from 'lucide-react'
 - **Real-time Status**: Live execution status with agent pipeline visualization
 - **Account Isolation**: $10k paper trading accounts per bot configuration
 
-### **Configuration System**
+### **Configuration System** (Unified Batched Save - 2025-12-04)
 - **Strategy Advisor**: Inline AI chat panel (500px fixed) with Claude Haiku, markdown rendering, real-time config updates
-- **Auto-Save**: All forms auto-save with 1s debounce, optimistic updates, global status indicator (Saving → Saved → Error)
-- **Market Data**: 21+ technical indicators with premium feature gating (auto-saves)
-- **Signal Sources**: ggShot integration with subscription gatekeeping (auto-saves)
-- **Strategy Editor**: AI prompt editing with LLM provider selection, thinking mode toggle (auto-saves)
-- **Trading Settings**: Symbol selection (141 pairs), position sizing, risk management, Telegram integration (auto-saves)
+- **Unified Batched Save**: All config changes batched over 5s, single API call, dirty field tracking prevents SSE overwrites
+- **Controlled Components**: StrategyEditor, TradeSettings, MarketDataSelector, SignalsConfiguration - all just call `onUpdate()`
+- **SSE Conflict Resolution**: User wins for dirty fields, SSE updates non-dirty fields, clears after save
+- **Market Data**: 21+ technical indicators with premium feature gating
+- **Signal Sources**: ggShot integration with subscription gatekeeping
+- **Strategy Editor**: AI prompt editing with LLM provider selection, thinking mode toggle
+- **Trading Settings**: Symbol selection (141 pairs), position sizing, risk management, Telegram integration
 
 ### **Real-time Monitoring**
 - **AI Consciousness Timeline**: Chart shows bot's subjective awareness - each point = moment AI observed account state (not objective reality)
@@ -623,6 +650,7 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 **Overall Rating**: 🟢 Production-ready with clean Forge architecture
 
 **Recent Fixes Applied:**
+- ✅ **Unified Config Saving** (2025-12-04): Batched saves with 5s debounce, dirty field tracking, SSE conflict resolution - reduced 40+ API calls to 1
 - ✅ **Activity Timeline Integration** (2025-11-08): Replaced DecisionFeed + PerformanceChart with full-width TVTimeline in Monitor tab
 - ✅ **Critical routing fix**: Updated middleware to redirect `app.ggbots.ai` to `/forge` instead of non-existent `/dashboard`
 - ✅ **Legacy API cleanup**: Removed duplicate API client, single authenticated client architecture
