@@ -1022,7 +1022,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         }
       >
         {detailActivities.length > 0 && (
-          <div className="px-6 py-4 space-y-6 max-h-[calc(80vh-120px)] overflow-y-auto">
+          <div className="px-6 py-4 space-y-6">
             {/* Show timestamp once at top if all activities share same timestamp */}
             <div>
               <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
