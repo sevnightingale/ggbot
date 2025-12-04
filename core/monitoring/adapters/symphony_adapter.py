@@ -52,7 +52,10 @@ class SymphonyAccountAdapter(AccountAdapter):
             total_trades = int(metrics.get('total_trades', 0))
             win_trades = int(metrics.get('win_trades', 0))
             loss_trades = int(metrics.get('loss_trades', 0))
-            win_rate = Decimal(str(metrics.get('win_rate', 0)))
+            # Symphony returns win_rate as 0-100 percentage, convert to 0-1 for database
+            # Database column is NUMERIC(5,4) which can only hold 0-9.9999
+            raw_win_rate = metrics.get('win_rate', 0)
+            win_rate = Decimal(str(raw_win_rate)) / Decimal('100')
 
             # Get open positions
             open_positions_list = await self.symphony_service.get_open_positions(config_id)
