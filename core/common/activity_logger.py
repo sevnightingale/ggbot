@@ -169,6 +169,9 @@ ACTIVITY_TYPES = {
 
     # Signal Processing
     'signal_received',   # External signal ingested (ggShot, TradingView)
+
+    # Bot Lifecycle
+    'bot_created',       # Bot configuration created
 }
 
 

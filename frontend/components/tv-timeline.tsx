@@ -117,6 +117,10 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   const fetchDataRef = useRef<(() => Promise<void>) | null>(null);
   const fetchAbortControllerRef = useRef<AbortController | null>(null);
 
+  // Fast-click detection: track mousedown time to distinguish quick clicks from drag/pan
+  const mouseDownTimeRef = useRef<number>(0);
+  const FAST_CLICK_THRESHOLD_MS = 200;
+
   // Get theme colors
   const VIBE = getThemeColors(theme === 'dark');
 
@@ -284,15 +288,30 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       }
     });
 
-    // Click handler - open activity detail when clicking on a point
+    // Track mousedown time for fast-click detection
+    const handleMouseDown = () => {
+      mouseDownTimeRef.current = Date.now();
+    };
+    chartContainer.addEventListener('mousedown', handleMouseDown);
+    chartContainer.addEventListener('touchstart', handleMouseDown);
+
+    // Click handler - open activity detail only on fast clicks (< 200ms)
+    // This prevents accidental opens when panning/dragging the chart
     chart.subscribeClick((param) => {
       if (!param.time) return;
+
+      // Check if this was a fast click (not a drag/pan)
+      const clickDuration = Date.now() - mouseDownTimeRef.current;
+      if (clickDuration > FAST_CLICK_THRESHOLD_MS) {
+        console.log('Slow click ignored (drag/pan):', clickDuration, 'ms');
+        return;
+      }
 
       const timestamp = typeof param.time === 'number' ? param.time : parseFloat(param.time as string);
       const activities = activitiesMapRef.current.get(timestamp);
 
       if (activities && activities.length > 0) {
-        console.log('Clicked activities:', activities);
+        console.log('Fast click on activities:', activities, 'duration:', clickDuration, 'ms');
         setDetailActivities(activities);
       }
     });
@@ -494,6 +513,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             const hasLLMThought = activitiesAtTime.some(a => a.type === 'llm_thought');
             const hasMarketQuery = activitiesAtTime.some(a => a.type === 'market_query');
             const hasAgentWait = activitiesAtTime.some(a => a.type === 'agent_wait');
+            const hasBotCreated = activitiesAtTime.some(a => a.type === 'bot_created');
 
             // TRADE EVENTS (arrows, above/below line)
             if (hasTradeLong) {
@@ -550,6 +570,14 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 color: '#9ca3af', // solid gray
                 shape: 'circle',
                 size: 1, // standard circle size
+              });
+            } else if (hasBotCreated) {
+              markers.push({
+                time: timestamp as Time,
+                position: 'inBar',
+                color: '#16a34a', // green for new creation
+                shape: 'circle',
+                size: 1.5, // slightly larger for lifecycle event
               });
             }
           });
@@ -632,8 +660,11 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         fetchAbortControllerRef.current = null;
       }
       clearInterval(intervalId);
+      // Clean up mousedown listeners
+      chartContainer.removeEventListener('mousedown', handleMouseDown);
+      chartContainer.removeEventListener('touchstart', handleMouseDown);
+      window.removeEventListener('resize', handleResize);
       if (chartRef.current) {
-        window.removeEventListener('resize', () => {});
         chartRef.current.remove();
         chartRef.current = null;
         lineSeriesRef.current = null;
@@ -730,6 +761,9 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       } else if (latestActivity.type === 'signal_received') {
         icon = '📡';
         label = 'SIGNAL';
+      } else if (latestActivity.type === 'bot_created') {
+        icon = '🤖';
+        label = 'BOT CREATED';
       }
 
       const timeAgo = diffMins > 0 ? `${diffMins}m ago` : `${diffSecs}s ago`;
@@ -760,6 +794,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
     if (latestActivity.type === 'observation_recorded') return VIBE.brass;
     if (latestActivity.type === 'strategy_updated') return VIBE.signal;
     if (latestActivity.type === 'signal_received') return VIBE.signal;
+    if (latestActivity.type === 'bot_created') return '#16a34a'; // green for creation
     return VIBE.brass;
   };
 
@@ -840,15 +875,25 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           {/* Activity hover tooltip */}
           {selectedActivity && (
             <>
-              {/* Tooltip card */}
+              {/* Tooltip card - clickable to open details */}
               <div
-                className="absolute bottom-4 left-4 rounded-lg border px-4 py-3 pointer-events-none"
+                className="absolute bottom-4 left-4 rounded-lg border px-4 py-3 cursor-pointer transition-all hover:scale-[1.02]"
                 style={{
                   backgroundColor: VIBE.carbon,
                   borderColor: VIBE.brass,
                   borderWidth: '2px',
                   maxWidth: '300px',
                   zIndex: 10
+                }}
+                onClick={() => {
+                  // Get all activities at this timestamp and open bottom sheet
+                  const timestamp = Math.floor(new Date(selectedActivity.timestamp).getTime() / 1000);
+                  const activities = activitiesMapRef.current.get(timestamp);
+                  if (activities && activities.length > 0) {
+                    setDetailActivities(activities);
+                  } else {
+                    setDetailActivities([selectedActivity]);
+                  }
                 }}
               >
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
@@ -862,6 +907,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   {selectedActivity.type === 'observation_recorded' && '📝 OBSERVATION'}
                   {selectedActivity.type === 'strategy_updated' && '⚙️ STRATEGY UPDATE'}
                   {selectedActivity.type === 'signal_received' && '📡 SIGNAL RECEIVED'}
+                  {selectedActivity.type === 'bot_created' && '🤖 BOT CREATED'}
                 </div>
                 {selectedActivity.data.summary && (
                   <div className="text-sm mb-1 prose prose-invert prose-sm max-w-none" style={{ color: VIBE.ivory }}>
@@ -876,10 +922,15 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   {new Date(selectedActivity.timestamp).toLocaleString()}
                 </div>
                 {selectedActivity.data.symbol && (
-                  <div className="text-xs mt-2" style={{ color: VIBE.signal }}>
+                  <div className="text-xs mt-1" style={{ color: VIBE.signal }}>
                     {selectedActivity.data.symbol}
                   </div>
                 )}
+                {/* View Details hint */}
+                <div className="text-xs mt-2 pt-2 border-t flex items-center gap-1" style={{ borderColor: VIBE.hair, color: VIBE.brass }}>
+                  <span>Click to view details</span>
+                  <span>→</span>
+                </div>
               </div>
 
               {/* Highlighted marker overlay - shows larger version at crosshair position */}
@@ -965,6 +1016,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               detailActivities[0].type === 'observation_recorded' ? 'Observation' :
               detailActivities[0].type === 'strategy_updated' ? 'Strategy Update' :
               detailActivities[0].type === 'signal_received' ? 'Signal Received' :
+              detailActivities[0].type === 'bot_created' ? 'Bot Created' :
               'Activity'
             : `${detailActivities.length} Activities`
         }
@@ -995,7 +1047,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                     detailActivity.type === 'trade_exit' ? '#9ca3af' :
                     detailActivity.type === 'market_query' ? VIBE.signal :
                     detailActivity.type === 'llm_thought' ? VIBE.brass :
-                    detailActivity.type === 'agent_wait' ? VIBE.ivory : VIBE.brass,
+                    detailActivity.type === 'agent_wait' ? VIBE.ivory :
+                    detailActivity.type === 'bot_created' ? '#16a34a' : VIBE.brass,
                   color: detailActivity.type === 'agent_wait' ? VIBE.obsidian : VIBE.ivory
                 }}>
                   {detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'long' && '↑ Long Entry'}
@@ -1008,6 +1061,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   {detailActivity.type === 'observation_recorded' && '📝 Observation'}
                   {detailActivity.type === 'strategy_updated' && '⚙️ Strategy Update'}
                   {detailActivity.type === 'signal_received' && '📡 Signal Received'}
+                  {detailActivity.type === 'bot_created' && '🤖 Bot Created'}
                 </div>
 
                 {/* Type-specific content */}
@@ -1280,6 +1334,47 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   </div>
                  )}
               </>
+            ) : null}
+
+            {/* BOT CREATED SPECIFIC FIELDS */}
+            {detailActivity.type === 'bot_created' && detailActivity.data.details ? (
+              <div className="grid grid-cols-2 gap-4">
+                {/* Trading Mode */}
+                {Boolean((detailActivity.data.details as Record<string, unknown>).trading_mode) && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Trading Mode
+                    </div>
+                    <div className="text-lg font-semibold" style={{ color: '#16a34a' }}>
+                      {String((detailActivity.data.details as Record<string, unknown>).trading_mode).toUpperCase()}
+                    </div>
+                  </div>
+                )}
+
+                {/* Config Type */}
+                {Boolean((detailActivity.data.details as Record<string, unknown>).config_type) && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Bot Type
+                    </div>
+                    <div className="text-sm">
+                      {String((detailActivity.data.details as Record<string, unknown>).config_type).replace(/_/g, ' ')}
+                    </div>
+                  </div>
+                )}
+
+                {/* Selected Pair */}
+                {Boolean((detailActivity.data.details as Record<string, unknown>).selected_pair) && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Trading Pair
+                    </div>
+                    <div className="text-sm font-mono" style={{ color: VIBE.signal }}>
+                      {String((detailActivity.data.details as Record<string, unknown>).selected_pair)}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : null}
 
             {/* Summary (for all types that have it) */}

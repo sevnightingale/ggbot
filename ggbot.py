@@ -1624,6 +1624,24 @@ async def create_config(
         f"Created {trading_mode} bot '{request.config_name}' (config_id={config.config_id})"
     )
 
+    # Log bot_created activity for timeline
+    from core.common.activity_logger import log_activity_safe
+    log_activity_safe(
+        config_id=config.config_id,
+        user_id=current_user.user_id,
+        activity_type='bot_created',
+        activity_source='user_action',
+        summary=f"Created {trading_mode} bot: {request.config_name}",
+        details={
+            'config_name': request.config_name,
+            'config_type': config_type,
+            'trading_mode': trading_mode,
+            'selected_pair': request_data.get('selected_pair'),
+        },
+        related_symbol=request_data.get('selected_pair'),
+        importance=8  # High importance for lifecycle event
+    )
+
     return {
         "status": "success",
         "config": config.to_dict()
