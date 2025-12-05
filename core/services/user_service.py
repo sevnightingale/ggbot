@@ -6,6 +6,7 @@ Handles user profile management and subscription-related operations.
 
 from typing import Optional
 from datetime import datetime
+import time
 from core.common.db import get_db_connection
 from core.common.logger import logger
 from core.domain import UserProfile, SubscriptionTier, SubscriptionStatus
@@ -64,6 +65,10 @@ class UserService:
 
                 # Sync user to Resend audience
                 resend_service.sync_user_to_resend(user_id, email)
+
+                # Delay to respect Resend rate limit (2 requests/second)
+                # sync_user_to_resend makes 1-2 API calls, so wait 600ms before next call
+                time.sleep(0.6)
 
                 # Send welcome email
                 resend_service.send_welcome_email(email)

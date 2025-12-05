@@ -6,6 +6,42 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-05 - Admin Dashboard + Resend Rate Limit Fix
+
+**Admin Dashboard** - Internal platform management at /admin, restricted to admin user ID
+- Backend: api/admin.py with 13 endpoints (stats, services, billing, users, bot control)
+- Platform stats: users, bots, trades, P&L, health checks
+- PM2/VM/Redis monitoring: services table with CPU/memory, disk usage, Redis status
+- Billing overview: token usage, provider vs platform costs (70% markup), unreported amounts
+- User management: search by email, view/edit subscription tiers, bot counts, trading activity
+- User detail page: editable subscription_tier/status, bot list with start/stop controls, per-bot token costs, paper account summaries
+- Bot control: start/stop any bot, reset paper accounts to $10k
+- Config editing: JSONB preview (form-based editor planned but JSON sufficient for now)
+- Security: JWT auth → admin user ID check → service role (layered defense)
+- Frontend: 3 pages (/admin, /admin/users, /admin/users/[user_id]) with manual refresh
+- Env vars: ADMIN_USER_ID (backend), NEXT_PUBLIC_ADMIN_USER_ID (frontend)
+- Files: api/admin.py (~930 lines), frontend/app/admin/* (3 pages + layout)
+
+**Resend Email Rate Limit Fix** - Welcome emails no longer fail on new signups
+- Added 600ms delay between sync_user_to_resend() and send_welcome_email()
+- Issue: 3 API calls in 1s (get_contact, add_contact, send_email) exceeded Resend's 2/second limit
+- Fix spreads calls across >1s: sync (1-2 calls) → wait 600ms → send (1 call)
+- File: core/services/user_service.py get_or_create_profile()
+
+## 2025-12-05 - Strategy Advisor Character Creation Prompt + Reasoning Tier System
+
+**Strategy Advisor Prompt Overhaul** - Character creation UX for onboarding, adaptive 4-scenario framework
+- Opening protocol: Always asks 2 questions (experience level + strategy clarity)
+- Scenario A (Inexperienced + No strategy): Character creation mode w/ personality questions (patient vs aggressive, trust crowd vs fade, react to news vs ignore noise), archetypes, bot naming encouraged
+- Scenario B (Inexperienced + Vague idea): Educational translator, fleshes out rough concepts ("I heard RSI is good")
+- Scenario C (Experienced + No strategy): Thesis exploration mode (what moves prices? technicals vs smart money vs sentiment?)
+- Scenario D (Experienced + Has strategy): Get out of their way, minimal questions, fast translation
+- Tone shift: "Bring your trading bot to life" vs "configure trading bots" (form-filling vibe removed)
+- Technical accuracy: reasoning_tier economy/standard/premium (not thinking_mode), 7 model families (grok/deepseek/gemini/claude/gpt/kimi/qwen), decision.user_prompt for ALL bot types
+- DO/DON'T guidelines: Adapt to user, conversational not form, support both philosophical + rules bots
+- Success criteria: User feels understood, bot has executable strategy, bonus if named/personality resonates
+- File: api/assistant.py get_system_prompt() rewritten (~320 lines), planning doc DOCS/new_assistant_prompt.md
+
 ## 2025-12-05 - Reasoning Tier System + Strategy Advisor Unification
 
 **Reasoning Tier System** - Replaces boolean thinking_mode with 3-tier economy/standard/premium
@@ -27,11 +63,13 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 **Testing**: scripts/test_provider_tier_models.py verified all 21 models via OpenRouter API
 
-**Grok Agentic Adapter Timeout Fix** - Resolved DEADLINE_EXCEEDED errors
-- XAI SDK Client now initialized with timeout=180.0 (3 minutes)
-- Previous: no timeout → gRPC default caused DEADLINE_EXCEEDED on complex queries
-- NFP jobs queries failed when web searches took >default timeout
-- Added timeout detection in error handling with clear messages
+**Grok Agentic Adapter Query-Specific Timeouts** - Resolved DEADLINE_EXCEEDED errors
+- Implemented query-specific timeout system: NFP 300s, CPI/TVL/Whale 180s, VIX/DXY/Twitter/News 120s
+- Previous: no timeout → gRPC default caused DEADLINE_EXCEEDED on complex government data queries
+- NFP (Non-Farm Payroll) requires 5min for BLS.gov/Bloomberg/Reuters multi-source searches
+- Test results: 7/8 data points passing (VIX/DXY/CPI/TVL/Whale/Twitter/News) under 25s each
+- Enhanced error handling shows timeout duration for debugging
+- File: market_intelligence/adapters/agentic/grok_agentic.py query_timeouts map
 - Note: market_intelligence uses xai-sdk directly, separate from decision engine OpenRouter calls
 
 **Agent Configuration Now Uses Strategy Advisor** - Unified UX across all bot types

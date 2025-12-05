@@ -4,13 +4,16 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## ✅ **DEPLOYED - Universal AI Assistant** (2025-11-16)
+## ✅ **DEPLOYED - Strategy Advisor (Character Creation UX)** (2025-12-05)
 
-**Status**: 🟢 PRODUCTION READY - Backend live, frontend ready for testing
+**Status**: 🟢 PRODUCTION READY - Onboarding-focused prompt deployed
 
 ### **Implementation Complete**
 - [x] Backend API endpoint: `POST /api/v2/assistant/chat`
 - [x] Claude Haiku 4.5 function calling with 3 tools
+- [x] **NEW**: Adaptive prompt with 4 scenarios (character creation, educational translator, thesis exploration, efficiency mode)
+- [x] **NEW**: Experience-level detection (beginner/intermediate/advanced)
+- [x] **NEW**: Strategy clarity detection (no idea/vague/specific)
 - [x] Bot-type aware system prompts (agent, scheduled, signal_validation)
 - [x] Frontend bottom sheet component (UniversalAIAssistant.tsx)
 - [x] Framer-motion draggable/collapsible UI
@@ -18,18 +21,28 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [x] Auto-refreshes config on AI updates
 - [x] Build test passing (TypeScript, ESLint clean)
 
+### **Character Creation Approach**
+For beginners with no strategy:
+- "Let's create your bot's personality!"
+- Evocative questions: patient vs aggressive, trust crowd vs fade, react to news vs ignore noise
+- Personality archetypes: The Contrarian, Momentum Rider, Patient Sniper
+- Bot naming encouraged
+- Translates personality into executable strategy
+
 ### **Features**
 - Works for ALL 3 bot types (agent, scheduled, signal_validation)
-- See config while chatting (bottom sheet overlay)
+- Adapts conversation based on user experience + strategy clarity
 - Query 32 available data points across 7 categories
 - Load and update full bot configurations
 - Deep merge for partial updates (update just one field)
 - Cost: ~$0.016 per session (~$16/month for 1000 users)
+- Technical accuracy: reasoning_tier (economy/standard/premium), 7 model families
 
 ### **Next Steps**
-- [ ] Test on production (Vercel deployment)
+- [ ] Test on production (Vercel deployment) with new prompt
 - [ ] Monitor Claude API costs and usage
-- [ ] Gather user feedback for improvements
+- [ ] Gather user feedback on character creation UX
+- [ ] A/B test conversion rates (form-based vs character creation)
 - [ ] Consider adding conversation persistence (Redis cache)
 
 ### **Files Created/Modified**

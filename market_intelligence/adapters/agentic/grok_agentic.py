@@ -330,10 +330,22 @@ Return ONLY the JSON object, no markdown formatting.""",
         except ImportError:
             raise AdapterError("xai-sdk not installed. Run: pip install xai-sdk>=1.3.1")
 
-        # Initialize client with extended timeout for agentic queries
-        # Agentic queries with web/X search + code execution can take 30-120 seconds
-        # Set timeout to 180 seconds (3 minutes) to allow complex research
-        client = Client(api_key=self.api_key, timeout=180.0)
+        # Query-specific timeouts (in seconds)
+        # NFP queries require extended time due to complex government data source searches
+        query_timeouts = {
+            'nfp_jobs': 300.0,  # 5 minutes - complex BLS.gov/Bloomberg/Reuters searches
+            'cpi_inflation': 180.0,  # 3 minutes - government data
+            'dxy_index': 120.0,  # 2 minutes - financial indices
+            'vix_index': 120.0,  # 2 minutes - financial indices
+            'btc_tvl': 180.0,  # 3 minutes - DeFi protocol aggregation
+            'whale_activity': 180.0,  # 3 minutes - blockchain analysis
+            'twitter_sentiment': 120.0,  # 2 minutes - X search + analysis
+            'crypto_news': 120.0,  # 2 minutes - news aggregation
+        }
+        timeout = query_timeouts.get(query_type, 180.0)  # Default 3 minutes
+
+        self._log.debug(f"Using {timeout}s timeout for {query_type}")
+        client = Client(api_key=self.api_key, timeout=timeout)
 
         # Determine which tools to enable based on query type
         tools = []
@@ -422,11 +434,11 @@ Return ONLY the JSON object, no markdown formatting.""",
             # Check for timeout errors
             if "DEADLINE_EXCEEDED" in error_msg or "timeout" in error_msg.lower():
                 self._log.error(
-                    f"Grok query timed out after 180s for {query_type}. "
+                    f"Grok query timed out after {timeout}s for {query_type}. "
                     f"This query may be too complex or data source unavailable. "
                     f"Error: {error_msg}"
                 )
-                raise AdapterError(f"Grok query timeout (>180s) for {query_type}: Data source may be slow or unavailable")
+                raise AdapterError(f"Grok query timeout (>{timeout}s) for {query_type}: Data source may be slow or unavailable")
 
             self._log.error(f"Grok streaming failed for {query_type}: {e}")
             raise
