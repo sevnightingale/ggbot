@@ -6,7 +6,26 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
-## 2025-12-05 - Strategy Advisor Unification & Agent Cleanup
+## 2025-12-05 - Reasoning Tier System + Strategy Advisor Unification
+
+**Reasoning Tier System** - Replaces boolean thinking_mode with 3-tier economy/standard/premium
+- openrouter_provider.py: Added MODEL_TIER_MAP for 21 (model, tier) combinations
+- Grok: grok-3-mini / grok-4-fast / grok-4
+- DeepSeek: deepseek-chat / deepseek-v3.2 / deepseek-r1
+- Gemini: gemini-2.0-flash / gemini-2.5-pro / gemini-3-pro-preview
+- Claude: claude-haiku-4.5 / claude-sonnet-4.5 / claude-opus-4.5
+- GPT: gpt-4.1-mini / gpt-5 / gpt-5-pro
+- Kimi: kimi-k2 / kimi-k2-0905 / kimi-k2-thinking
+- Qwen: qwen-turbo / qwen-plus / qwen3-max
+- Tier-based max_tokens (2048/4096/8192) and reasoning effort (none/medium/high)
+- Backward compatible: thinking_mode true→premium, false→standard
+
+**Frontend Reasoning Selector** - 3-button UI replaces toggle
+- StrategyEditor.tsx: Economy/Standard/Premium buttons instead of thinking toggle
+- api.ts: Added reasoning_tier to ConfigData type
+- Config stores both reasoning_tier (new) and thinking_mode (legacy compatibility)
+
+**Testing**: scripts/test_provider_tier_models.py verified all 21 models via OpenRouter API
 
 **Agent Configuration Now Uses Strategy Advisor** - Unified UX across all bot types
 - Agent bots now use same ConfigureLayout + StrategyAdvisorPanel as scheduled/signal bots
