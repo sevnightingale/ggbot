@@ -303,42 +303,35 @@ export function StrategyEditor({
                           : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
                       }`}
                     >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="font-medium flex items-center gap-2">
-                          {logoPath && (
-                            <div
-                              className="flex items-center justify-center rounded-full"
-                              style={{
-                                backgroundColor: MODEL_COLORS[model.model_id] || '#333',
-                                width: '28px',
-                                height: '28px',
-                                padding: '4px'
-                              }}
-                            >
-                              <Image
-                                src={logoPath}
-                                alt={`${model.display_name} logo`}
-                                width={20}
-                                height={20}
-                                className="object-contain"
-                              />
-                            </div>
-                          )}
-                          {model.display_name}
-                          <Crown className="h-3 w-3 text-amber-500" />
+                      <div className="flex items-center gap-3">
+                        {logoPath && (
+                          <div
+                            className="flex items-center justify-center rounded-full flex-shrink-0"
+                            style={{
+                              backgroundColor: MODEL_COLORS[model.model_id] || '#333',
+                              width: '32px',
+                              height: '32px',
+                              padding: '5px'
+                            }}
+                          >
+                            <Image
+                              src={logoPath}
+                              alt={`${model.display_name} logo`}
+                              width={22}
+                              height={22}
+                              className="object-contain"
+                            />
+                          </div>
+                        )}
+                        <div className="flex-1 min-w-0">
+                          <div className="font-semibold text-base capitalize flex items-center gap-2">
+                            {model.model_id}
+                            <Crown className="h-3 w-3 text-amber-500 flex-shrink-0" />
+                          </div>
+                          <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                            {model.context_display || 'N/A'}
+                          </div>
                         </div>
-                        <span className="text-xs text-[var(--text-muted)]">
-                          {model.context_display || 'N/A'}
-                        </span>
-                      </div>
-                      <div className="text-xs text-[var(--text-muted)]">
-                        {(() => {
-                          // Map reasoning tier to pricing (premium uses thinking pricing)
-                          const cost = reasoningTier === 'premium'
-                            ? model.cost_per_decision?.thinking
-                            : model.cost_per_decision?.standard
-                          return cost != null ? `$${cost.toFixed(3)}/decision` : 'Pricing unavailable'
-                        })()}
                       </div>
                     </button>
                   )
@@ -350,26 +343,38 @@ export function StrategyEditor({
           {/* Reasoning Tier Selector - Below model selection */}
           {hasPremiumAccess && (
             <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-              <div className="text-sm font-medium text-[var(--text-primary)] mb-3">
-                Reasoning Level
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <div className="text-sm font-medium text-[var(--text-primary)]">
+                    Reasoning Level
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                    Controls quality, speed, and cost
+                  </div>
+                </div>
               </div>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-3">
                 {[
-                  { tier: 'economy' as const, label: 'Economy', desc: 'Fast & cheap' },
-                  { tier: 'standard' as const, label: 'Standard', desc: 'Balanced' },
-                  { tier: 'premium' as const, label: 'Premium', desc: 'Best quality' }
-                ].map(({ tier, label, desc }) => (
+                  { tier: 'economy' as const, label: 'Economy', desc: 'Fast & cheap', emoji: '⚡' },
+                  { tier: 'standard' as const, label: 'Standard', desc: 'Balanced', emoji: '⚖️' },
+                  { tier: 'premium' as const, label: 'Premium', desc: 'Best quality', emoji: '✨' }
+                ].map(({ tier, label, desc, emoji }) => (
                   <button
                     key={tier}
                     onClick={() => handleReasoningTierChange(tier)}
-                    className={`p-3 rounded-lg border text-center transition-all ${
+                    className={`p-4 rounded-xl border-2 text-center transition-all ${
                       reasoningTier === tier
-                        ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] border-[var(--accent)]'
-                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
+                        ? 'bg-[var(--accent)]/10 border-[var(--accent)] shadow-sm'
+                        : 'bg-[var(--bg-secondary)] border-[var(--border)] hover:border-[var(--accent)]/50 hover:bg-[var(--bg-tertiary)]'
                     }`}
                   >
-                    <div className="text-sm font-medium">{label}</div>
-                    <div className={`text-xs ${reasoningTier === tier ? 'opacity-80' : 'text-[var(--text-muted)]'}`}>
+                    <div className="text-2xl mb-2">{emoji}</div>
+                    <div className={`text-sm font-semibold mb-1 ${
+                      reasoningTier === tier ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'
+                    }`}>
+                      {label}
+                    </div>
+                    <div className="text-xs text-[var(--text-muted)]">
                       {desc}
                     </div>
                   </button>
