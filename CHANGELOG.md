@@ -27,6 +27,13 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 **Testing**: scripts/test_provider_tier_models.py verified all 21 models via OpenRouter API
 
+**Grok Agentic Adapter Timeout Fix** - Resolved DEADLINE_EXCEEDED errors
+- XAI SDK Client now initialized with timeout=180.0 (3 minutes)
+- Previous: no timeout → gRPC default caused DEADLINE_EXCEEDED on complex queries
+- NFP jobs queries failed when web searches took >default timeout
+- Added timeout detection in error handling with clear messages
+- Note: market_intelligence uses xai-sdk directly, separate from decision engine OpenRouter calls
+
 **Agent Configuration Now Uses Strategy Advisor** - Unified UX across all bot types
 - Agent bots now use same ConfigureLayout + StrategyAdvisorPanel as scheduled/signal bots
 - Added AgentStrategySection component (ConfigureLayout.tsx:35-125) - simplified UI for agents
