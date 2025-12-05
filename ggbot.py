@@ -297,11 +297,13 @@ from api.agent import router as agent_router
 from api.activities import router as activities_router
 from api.snapshots import router as snapshots_router
 from api.assistant import router as assistant_router
+from api.admin import router as admin_router
 app.include_router(paper_trading_router)
 app.include_router(agent_router)
 app.include_router(activities_router)
 app.include_router(snapshots_router)
 app.include_router(assistant_router)
+app.include_router(admin_router)
 
 
 class GGBotOrchestrator:
@@ -1624,6 +1626,7 @@ async def create_config(
     # Paper starts at $10,000, live modes start at $0 (will sync from exchange)
     initial_balance = 10000.0 if trading_mode == "paper" else 0.0
     try:
+        from core.common.db import get_db_connection
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
