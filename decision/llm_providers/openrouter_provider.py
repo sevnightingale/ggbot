@@ -21,56 +21,123 @@ class OpenRouterProvider(LLMProvider):
     DeepSeek, xAI) through a single standardized interface with consistent token tracking.
     """
 
-    # Model name mapping: user-friendly name → OpenRouter model ID
+    # Model + Reasoning Tier → OpenRouter model ID
+    # Tiers: economy (cheap/fast), standard (balanced), premium (best quality)
+    MODEL_TIER_MAP = {
+        # Grok (xAI)
+        ('grok', 'economy'): 'x-ai/grok-3-mini',
+        ('grok', 'standard'): 'x-ai/grok-4-fast',
+        ('grok', 'premium'): 'x-ai/grok-4',
+
+        # DeepSeek
+        ('deepseek', 'economy'): 'deepseek/deepseek-chat',
+        ('deepseek', 'standard'): 'deepseek/deepseek-v3.2',
+        ('deepseek', 'premium'): 'deepseek/deepseek-r1',
+
+        # Gemini (Google)
+        ('gemini', 'economy'): 'google/gemini-2.0-flash-001',
+        ('gemini', 'standard'): 'google/gemini-2.5-pro',
+        ('gemini', 'premium'): 'google/gemini-3-pro-preview',
+
+        # Claude (Anthropic)
+        ('claude', 'economy'): 'anthropic/claude-haiku-4.5',
+        ('claude', 'standard'): 'anthropic/claude-sonnet-4.5',
+        ('claude', 'premium'): 'anthropic/claude-opus-4.5',
+
+        # GPT (OpenAI)
+        ('gpt', 'economy'): 'openai/gpt-4.1-mini',
+        ('gpt', 'standard'): 'openai/gpt-5',
+        ('gpt', 'premium'): 'openai/gpt-5-pro',
+
+        # Kimi (MoonshotAI)
+        ('kimi', 'economy'): 'moonshotai/kimi-k2',
+        ('kimi', 'standard'): 'moonshotai/kimi-k2-0905',
+        ('kimi', 'premium'): 'moonshotai/kimi-k2-thinking',
+
+        # Qwen
+        ('qwen', 'economy'): 'qwen/qwen-turbo',
+        ('qwen', 'standard'): 'qwen/qwen-plus',
+        ('qwen', 'premium'): 'qwen/qwen3-max',
+    }
+
+    # Legacy MODEL_MAP for backward compatibility (maps to standard tier)
     MODEL_MAP = {
         'grok': 'x-ai/grok-4-fast',
         'claude': 'anthropic/claude-sonnet-4.5',
         'gemini': 'google/gemini-2.5-pro',
-        'deepseek': 'deepseek/deepseek-chat-v3.1',
+        'deepseek': 'deepseek/deepseek-v3.2',
         'gpt': 'openai/gpt-5',
-        'kimi': 'moonshotai/kimi-k2-thinking',
-        'qwen': 'qwen/qwen3-max',
-
-        # Legacy names for backward compatibility
-        'grok-4-fast': 'x-ai/grok-4-fast',
-        'claude-sonnet-4.5': 'anthropic/claude-sonnet-4.5',
-        'gpt-5': 'openai/gpt-5',
-        'deepseek-chat': 'deepseek/deepseek-chat-v3.1',
-
-        # Default
+        'kimi': 'moonshotai/kimi-k2-0905',
+        'qwen': 'qwen/qwen-plus',
         'default': 'x-ai/grok-4-fast'
     }
 
-    # Models that support reasoning parameter
+    # All OpenRouter model IDs that support reasoning parameter
     REASONING_SUPPORTED = {
+        # Grok
+        'x-ai/grok-3-mini',
         'x-ai/grok-4-fast',
-        'anthropic/claude-sonnet-4.5',
+        'x-ai/grok-4',
+        # DeepSeek
+        'deepseek/deepseek-chat',
+        'deepseek/deepseek-v3.2',
+        'deepseek/deepseek-r1',
+        # Gemini
+        'google/gemini-2.0-flash-001',
         'google/gemini-2.5-pro',
-        'deepseek/deepseek-chat-v3.1',
+        'google/gemini-3-pro-preview',
+        # Claude
+        'anthropic/claude-haiku-4.5',
+        'anthropic/claude-sonnet-4.5',
+        'anthropic/claude-opus-4.5',
+        # GPT
+        'openai/gpt-4.1-mini',
         'openai/gpt-5',
-        'moonshotai/kimi-k2-thinking'
-        # Note: qwen/qwen3-max does NOT support reasoning
+        'openai/gpt-5-pro',
+        # Kimi
+        'moonshotai/kimi-k2',
+        'moonshotai/kimi-k2-0905',
+        'moonshotai/kimi-k2-thinking',
+        # Qwen - does NOT support reasoning
     }
 
     # Models that support temperature parameter
     TEMPERATURE_SUPPORTED = {
+        # Grok
+        'x-ai/grok-3-mini',
         'x-ai/grok-4-fast',
-        'anthropic/claude-sonnet-4.5',
+        'x-ai/grok-4',
+        # DeepSeek
+        'deepseek/deepseek-chat',
+        'deepseek/deepseek-v3.2',
+        'deepseek/deepseek-r1',
+        # Gemini
+        'google/gemini-2.0-flash-001',
         'google/gemini-2.5-pro',
-        'deepseek/deepseek-chat-v3.1',
+        'google/gemini-3-pro-preview',
+        # Claude
+        'anthropic/claude-haiku-4.5',
+        'anthropic/claude-sonnet-4.5',
+        'anthropic/claude-opus-4.5',
+        # Kimi
+        'moonshotai/kimi-k2',
+        'moonshotai/kimi-k2-0905',
         'moonshotai/kimi-k2-thinking',
-        'qwen/qwen3-max'
-        # Note: openai/gpt-5 does NOT support temperature
+        # Qwen
+        'qwen/qwen-turbo',
+        'qwen/qwen-plus',
+        'qwen/qwen3-max',
+        # GPT - does NOT support temperature
     }
 
-    def __init__(self, api_key: str, model: str = "gpt-5", **kwargs):
+    def __init__(self, api_key: str, model: str = "grok", **kwargs):
         """
         Initialize the OpenRouter provider.
 
         Args:
             api_key (str): OpenRouter API key
-            model (str): Internal model name (will be mapped to preset)
-            **kwargs: Additional settings like timeout, max_retries, etc.
+            model (str): Internal model name (grok, claude, gemini, deepseek, gpt, kimi, qwen)
+            **kwargs: Additional settings like timeout, max_retries, reasoning_tier, etc.
         """
         super().__init__(api_key, model, **kwargs)
 
@@ -83,14 +150,27 @@ class OpenRouterProvider(LLMProvider):
         self.timeout = kwargs.get('timeout', 200)
         self.max_retries = kwargs.get('max_retries', 3)
 
-        # Get OpenRouter model ID for internal model name
-        self.openrouter_model = self.MODEL_MAP.get(self.model, self.MODEL_MAP['default'])
+        # Get reasoning tier (economy, standard, premium)
+        # Support both new reasoning_tier and legacy thinking_mode
+        self.reasoning_tier = kwargs.get('reasoning_tier', None)
+        if self.reasoning_tier is None:
+            # Backward compatibility: thinking_mode maps to tiers
+            thinking_mode = kwargs.get('thinking', False)
+            self.reasoning_tier = 'premium' if thinking_mode else 'standard'
 
-        # Get thinking mode flag (enables reasoning + higher token limits)
-        self.thinking_mode = kwargs.get('thinking', False)
+        # Get OpenRouter model ID using tier-based lookup
+        tier_key = (self.model, self.reasoning_tier)
+        if tier_key in self.MODEL_TIER_MAP:
+            self.openrouter_model = self.MODEL_TIER_MAP[tier_key]
+        else:
+            # Fallback to legacy MODEL_MAP
+            self.openrouter_model = self.MODEL_MAP.get(self.model, self.MODEL_MAP['default'])
+
+        # For backward compatibility, set thinking_mode based on tier
+        self.thinking_mode = self.reasoning_tier == 'premium'
 
         logger.bind(module="decision.openrouter").info(
-            f"Initialized OpenRouter provider - model: {self.model} → {self.openrouter_model}, thinking: {self.thinking_mode}"
+            f"Initialized OpenRouter provider - model: {self.model}, tier: {self.reasoning_tier} → {self.openrouter_model}"
         )
 
     async def generate_response(self,
@@ -129,16 +209,13 @@ class OpenRouterProvider(LLMProvider):
 
         for attempt in range(self.max_retries):
             try:
-                # Determine max_tokens based on thinking mode
-                if self.thinking_mode:
-                    # Thinking mode: higher token limits for extended reasoning
-                    if self.openrouter_model == 'qwen/qwen3-max':
-                        max_tokens = 4096  # Qwen thinking mode
-                    else:
-                        max_tokens = 8192  # Standard thinking mode
+                # Determine max_tokens based on reasoning tier
+                if self.reasoning_tier == 'premium':
+                    max_tokens = 8192  # Premium: extended reasoning
+                elif self.reasoning_tier == 'standard':
+                    max_tokens = 4096  # Standard: balanced
                 else:
-                    # Standard mode: balanced performance
-                    max_tokens = 2048
+                    max_tokens = 2048  # Economy: fast/cheap
 
                 # Build request parameters
                 request_params = {
@@ -152,9 +229,13 @@ class OpenRouterProvider(LLMProvider):
                 if self.openrouter_model in self.TEMPERATURE_SUPPORTED:
                     request_params["temperature"] = temperature
 
-                # Add reasoning if thinking mode enabled and model supports it
-                if self.thinking_mode and self.openrouter_model in self.REASONING_SUPPORTED:
-                    request_params["extra_body"] = {"reasoning": {"effort": "high"}}
+                # Add reasoning based on tier (if model supports it)
+                if self.openrouter_model in self.REASONING_SUPPORTED:
+                    if self.reasoning_tier == 'premium':
+                        request_params["extra_body"] = {"reasoning": {"effort": "high"}}
+                    elif self.reasoning_tier == 'standard':
+                        request_params["extra_body"] = {"reasoning": {"effort": "medium"}}
+                    # economy: no reasoning parameter
 
                 # Call OpenRouter via OpenAI SDK
                 response = await self.client.chat.completions.create(**request_params)
@@ -192,7 +273,8 @@ class OpenRouterProvider(LLMProvider):
                 metadata = {
                     "model": self.model,  # Return internal model name
                     "openrouter_model": self.openrouter_model,  # Actual OpenRouter model ID
-                    "thinking_mode": self.thinking_mode,
+                    "reasoning_tier": self.reasoning_tier,
+                    "thinking_mode": self.thinking_mode,  # Backward compatibility
                     "max_tokens": max_tokens,
                     "usage": {
                         "prompt_tokens": usage.prompt_tokens,

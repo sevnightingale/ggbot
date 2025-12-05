@@ -100,8 +100,13 @@ class DecisionEngineV2:
             if isinstance(llm_config, dict) and llm_config:
                 provider_name = llm_config.get('provider', 'openrouter')
                 model_name = llm_config.get('model', 'grok')
-                # Get thinking mode flag
-                thinking_mode = llm_config.get('thinking_mode', False)
+
+                # Get reasoning tier (new) or fall back to thinking_mode (legacy)
+                reasoning_tier = llm_config.get('reasoning_tier', None)
+                if reasoning_tier is None:
+                    # Backward compatibility: thinking_mode maps to tiers
+                    thinking_mode = llm_config.get('thinking_mode', False)
+                    reasoning_tier = 'premium' if thinking_mode else 'standard'
 
                 # Set model defaults if not specified
                 if not model_name or model_name == 'default':
@@ -119,7 +124,7 @@ class DecisionEngineV2:
                 # Fallback to OpenRouter + Grok
                 provider_name = 'openrouter'
                 model_name = 'grok'
-                thinking_mode = False
+                reasoning_tier = 'standard'
 
             # Get API key with user/platform priority
             api_key = await LLMKeyService.get_api_key(self.user_id, provider_name)
@@ -129,7 +134,7 @@ class DecisionEngineV2:
                 provider_name=provider_name,
                 api_key=api_key,
                 model=model_name,
-                thinking=thinking_mode  # Pass thinking mode to provider
+                reasoning_tier=reasoning_tier  # Pass reasoning tier to provider
             )
 
             logger.bind(
@@ -137,7 +142,7 @@ class DecisionEngineV2:
                 user_id=self.user_id,
                 provider=provider_name,
                 model=model_name,
-                thinking=thinking_mode
+                reasoning_tier=reasoning_tier
             ).info("LLM provider initialized successfully")
 
         except Exception as e:

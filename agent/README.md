@@ -1,7 +1,7 @@
 # Autonomous Trading Agent
 
 **Status**: Phase 3 Complete - Production Ready with Session Persistence
-**Last Updated**: 2025-11-13
+**Last Updated**: 2025-12-04
 
 ---
 
@@ -9,7 +9,11 @@
 
 The ggbots autonomous trading agent enables 24/7 AI-powered trading with full control over strategy execution, position management, and self-directed timing. Built on Claude Agent SDK with 12 specialized MCP tools and **conversation persistence** across crashes and restarts.
 
-**Architecture**: Two-mode system (Strategy Definition → Autonomous Trading) with SDK-powered session resumption
+**Architecture**:
+- **Strategy Configuration**: Via Strategy Advisor API (`/api/v2/assistant/chat`)
+- **Trade Execution**: Via Autonomous Agent (this module)
+
+> **Note**: Strategy definition mode is DEPRECATED. Use the Strategy Advisor for bot configuration.
 
 **Current Support**:
 - ✅ **Paper Trading** - 142 symbols, full simulation with $10k accounts
@@ -36,38 +40,43 @@ agent/
 
 ## 🚀 Quick Start
 
-### 1. Start Agent in Strategy Definition Mode
+### 1. Configure Your Bot Strategy (via UI or API)
+
+Use the **Strategy Advisor** in the Forge UI to configure your bot's trading strategy:
+
+1. Go to `/forge` and select your agent bot
+2. Click the "Configure" tab
+3. Chat with the Strategy Advisor to build your strategy
+4. The strategy is saved to `decision.user_prompt`
+
+**API Alternative**:
+```bash
+curl -X POST "https://ggbots.ai/api/v2/assistant/chat" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "config_id": "<config_id>",
+    "bot_type": "agent",
+    "message": "Help me create a BTC momentum trading strategy",
+    "conversation_history": []
+  }'
+```
+
+### 2. Start Autonomous Trading
 
 ```bash
 # Activate environment
 cd /home/sev/ggbot && source .venv/bin/activate
 
-# Start agent
-python agent/run_agent.py --config-id=<config_id> --mode=strategy_definition
-```
-
-### 2. Chat with Agent (Separate Terminal)
-
-```bash
-# In another terminal
-python agent/chat.py --config-id=<config_id>
-```
-
-Agent will guide you through:
-1. Assessing your experience level
-2. Showing available data sources (7 categories, 32 data points)
-3. Building a complete trading strategy
-4. Saving strategy and exiting
-
-### 3. Start Autonomous Trading
-
-```bash
-# Agent automatically saved strategy to database
-# Now start autonomous mode
+# Start agent in autonomous mode
 python agent/run_agent.py --config-id=<config_id> --mode=autonomous
 ```
 
+Or via the UI: Click "Activate" button on your agent bot.
+
 Agent executes 24/7 with self-directed timing using `wait_for` tool.
+
+> **Note**: `strategy_definition` mode is DEPRECATED. Use the Strategy Advisor API instead.
 
 ---
 
@@ -310,25 +319,24 @@ Save strategy and exit strategy definition mode.
 
 ---
 
-## 🎭 Two Agent Modes
+## 🎭 Agent Architecture
 
-### **Strategy Definition Mode**
+### **Strategy Configuration (via Strategy Advisor API)**
 
-**Purpose**: Interactive conversation to build trading strategy
+> **DEPRECATED**: The old `strategy_definition` mode is no longer supported.
+> Use the Strategy Advisor API (`/api/v2/assistant/chat`) instead.
 
-**Flow**:
-1. Agent assesses user experience level
-2. Shows available data sources (if needed)
-3. Defines entry/exit conditions
-4. Sets position sizing and risk management
-5. Confirms monitoring frequency
-6. Saves strategy via `save_strategy_and_exit`
+**How it works now**:
+1. User chats with Strategy Advisor in the Forge UI
+2. Strategy Advisor (Claude Haiku) helps build trading strategy
+3. Strategy is saved to `decision.user_prompt` in config
+4. User activates bot → agent starts in autonomous mode
 
-**Key Features**:
-- Educational for beginners (explains indicators)
-- Validation for experts (checks feasibility)
-- Grounded in reality (only suggests available data)
-- No auto-activation (user must restart in autonomous mode)
+**Benefits of the new approach**:
+- Instant responses (no PM2 process startup)
+- Lower cost (Haiku vs Opus)
+- Same UI for all bot types (agent, scheduled, signal_validation)
+- Simpler architecture (API-based, no Redis queues)
 
 ### **Autonomous Mode**
 
@@ -336,11 +344,12 @@ Save strategy and exit strategy definition mode.
 
 **Flow**:
 1. Startup checks (balance, positions, mode)
-2. Query market data per strategy
-3. Execute trades when conditions met
-4. Use `wait_for` between actions
-5. Record observations after closing
-6. Repeat forever
+2. Load strategy from `decision.user_prompt`
+3. Query market data per strategy
+4. Execute trades when conditions met
+5. Use `wait_for` between actions
+6. Record observations after closing
+7. Repeat forever
 
 **Key Features**:
 - No user interaction needed
@@ -477,20 +486,22 @@ python agent/test_mcp_tools.py
 # Expected: All 12 tools respond with proper format
 ```
 
-### Test Strategy Definition
+### Test Strategy Configuration (via API)
 
 ```bash
-# Terminal 1: Start agent
-python agent/run_agent.py --config-id=<id> --mode=strategy_definition
+# Test Strategy Advisor API
+curl -X POST "http://localhost:8000/api/v2/assistant/chat" \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "config_id": "<config_id>",
+    "bot_type": "agent",
+    "message": "Show me what data sources are available",
+    "conversation_history": []
+  }'
 
-# Terminal 2: Chat
-python agent/chat.py --config-id=<id>
-
-# Test flow:
-# 1. Agent asks about experience
-# 2. Discuss strategy
-# 3. Agent saves and exits
-# 4. Check database for saved strategy
+# Check strategy saved to database
+psql -c "SELECT config_data->'decision'->>'user_prompt' FROM configurations WHERE config_id = '<id>'"
 ```
 
 ### Test Autonomous Trading

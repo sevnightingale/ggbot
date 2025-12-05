@@ -1046,20 +1046,31 @@ async def query_trade_observations(
 @router.post("/{config_id}/start")
 async def start_agent(
     config_id: str,
-    mode: str = Query(..., description="strategy_definition | autonomous"),
+    mode: str = Query(default="autonomous", description="Agent mode (only 'autonomous' supported)"),
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ):
     """
-    Start agent process via PM2.
+    Start autonomous trading agent via PM2.
+
+    The agent will execute trades based on the strategy defined in
+    decision.user_prompt. Strategy configuration is done via the
+    Strategy Advisor (api/assistant.py), not the agent itself.
 
     Args:
         config_id: Configuration ID
-        mode: Agent mode ('strategy_definition' or 'autonomous')
+        mode: Agent mode (only 'autonomous' supported, kept for backwards compat)
         current_user: Authenticated user from JWT token
 
     Returns:
         Status of agent startup
     """
+
+    # strategy_definition mode is deprecated - use Strategy Advisor API instead
+    if mode == "strategy_definition":
+        raise HTTPException(
+            status_code=400,
+            detail="strategy_definition mode is deprecated. Use the Strategy Advisor chat (/api/v2/assistant/chat) to configure your bot's strategy."
+        )
 
     try:
         # Check if already running
@@ -1082,7 +1093,7 @@ async def start_agent(
                 "agent_name": agent_name
             }
 
-        # Start via PM2
+        # Start via PM2 - always in autonomous mode
         cmd = [
             'pm2', 'start',
             'agent/run_agent.py',
@@ -1090,7 +1101,7 @@ async def start_agent(
             '--interpreter', '.venv-agent/bin/python',
             '--',
             '--config-id', config_id,
-            '--mode', mode
+            '--mode', 'autonomous'
         ]
 
         subprocess.run(cmd, cwd='/home/sev/ggbot', check=True)
@@ -1098,14 +1109,14 @@ async def start_agent(
         logger.info(
             f"Agent started successfully",
             config_id=config_id,
-            mode=mode,
+            mode="autonomous",
             agent_name=agent_name
         )
 
         return {
             "status": "started",
             "config_id": config_id,
-            "mode": mode,
+            "mode": "autonomous",
             "agent_name": agent_name,
             "timestamp": datetime.utcnow().isoformat()
         }

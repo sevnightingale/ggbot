@@ -108,15 +108,14 @@ Autonomous traders that execute a natural language strategy 24/7.
 **Configuration Structure:**
 ```json
 {
-  "agent_strategy": {
-    "content": "Markdown strategy text",
-    "autonomously_editable": false,
-    "version": 1
+  "decision": {
+    "user_prompt": "Your trading strategy in markdown format",
+    "analysis_frequency": "agent_driven"
   }
 }
 ```
 
-**Strategy Format** (markdown):
+**Strategy Format** (markdown in decision.user_prompt):
 The strategy should be clear, executable instructions including:
 - **Entry Conditions**: When to open positions (long/short)
 - **Exit Conditions**: Take profit and stop loss rules
@@ -145,6 +144,9 @@ The strategy should be clear, executable instructions including:
 - Check conditions every 1 hour
 - Maximum 1 trade per 4 hours
 ```
+
+**IMPORTANT**: For agent bots, update `decision.user_prompt` with the strategy text.
+Do NOT use `agent_strategy` - it is deprecated.
 """
 
     elif bot_type == "scheduled":
@@ -236,9 +238,9 @@ You have access to these tools via function calling:
 2. Ask clarifying questions to understand user goals
 3. Suggest data sources that align with bot type and strategy
 4. Validate that requested indicators are available (use query_available_data)
-5. For agent bots: Write clear, executable strategies in markdown
-6. For scheduled bots: Configure extraction, decision, trading, and llm_config sections
-7. Use `update_full_config()` to save changes (partial updates are fine - you can update just one field)
+5. For ALL bot types: Use `decision.user_prompt` for the trading strategy
+6. For scheduled bots: Also configure extraction, trading, and llm_config sections
+7. Use `update_full_config()` to save changes (partial updates are fine)
 8. Explain what you're changing and why
 9. Iterate based on user feedback
 
@@ -248,8 +250,8 @@ You have access to these tools via function calling:
 - Be specific about configuration values
 - Include risk management for all trading bots
 - Validate timeframes and data sources before suggesting them
-- For agent strategies: Be detailed and executable
-- For scheduled configs: Ensure all required fields are present
+- For ALL bots: Strategy goes in `decision.user_prompt` - be detailed and executable
+- Do NOT use `agent_strategy` - it is deprecated
 - When updating config, use deep merge (partial updates work)
 """
 
@@ -303,7 +305,7 @@ TOOL_UPDATE_FULL_CONFIG = {
             },
             "updates": {
                 "type": "object",
-                "description": "Configuration updates (partial or full). Will be deep merged with existing config. You can update just 'agent_strategy' for agents, or 'extraction', 'decision', 'trading', 'llm_config' for scheduled bots."
+                "description": "Configuration updates (partial or full). Will be deep merged with existing config. For ALL bot types, use 'decision.user_prompt' for the trading strategy. Other sections: 'extraction', 'trading', 'llm_config'. Do NOT use 'agent_strategy' - it is deprecated."
             }
         },
         "required": ["config_id", "updates"]
@@ -424,11 +426,6 @@ async def update_full_config(
 
                 # Deep merge updates
                 updated_config = deep_merge(config_data, updates)
-
-                # Increment agent_strategy version if it was updated
-                if "agent_strategy" in updates:
-                    current_version = config_data.get("agent_strategy", {}).get("version", 0)
-                    updated_config["agent_strategy"]["version"] = current_version + 1
 
                 # Save back to database
                 cur.execute("""

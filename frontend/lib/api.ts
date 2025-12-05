@@ -48,7 +48,8 @@ export interface ConfigData {
   llm_config?: {  // Optional for agent and signal_validation configs
     provider: string  // 'default' | 'openai' | 'deepseek' | 'anthropic' | 'xai' | 'openrouter'
     model?: string    // Model name for the provider
-    thinking_mode?: boolean  // Enable extended reasoning mode (higher cost, better quality)
+    reasoning_tier?: 'economy' | 'standard' | 'premium'  // Reasoning level (economy=fast/cheap, standard=balanced, premium=best)
+    thinking_mode?: boolean  // DEPRECATED: Use reasoning_tier instead. Kept for backward compatibility.
     use_platform_keys: boolean
     use_own_key: boolean
     // API keys are NOT stored here - they go to user_llm_credentials table via Vault

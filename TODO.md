@@ -41,6 +41,72 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
+## 🔧 **HIGH PRIORITY - Admin Dashboard** [ADMIN_DASHBOARD.md]
+
+**Status**: 🟡 PLANNING
+**Planning Doc**: [DOCS/todo/ADMIN_DASHBOARD.md](DOCS/todo/ADMIN_DASHBOARD.md)
+**Estimated Time**: 9-13 hours
+
+**Goal**: Internal admin dashboard at `/admin` for platform management, restricted to admin user ID.
+
+### **Core Features**
+- Platform overview (stats, PM2 services, billing health)
+- User management with email search
+- Direct editing of user profiles, subscription tiers, configurations
+- Bot control (start/stop any bot)
+- Token usage monitoring (provider vs platform costs)
+
+### **Phase 1: Backend API** (~3-4 hours)
+- [ ] Create `api/admin.py` with admin auth dependency
+- [ ] `GET /api/v2/admin/stats` - Platform stats (reuse status_check.py)
+- [ ] `GET /api/v2/admin/services` - PM2, VM resources, Redis
+- [ ] `GET /api/v2/admin/logs/summary` - Log counts by level (24h)
+- [ ] `GET /api/v2/admin/billing` - Token usage, costs, unreported amounts
+- [ ] `GET /api/v2/admin/users` - User list with email search
+- [ ] `GET /api/v2/admin/users/{user_id}` - Full user detail
+- [ ] `PATCH /api/v2/admin/users/{user_id}` - Update user_profile
+- [ ] `GET /api/v2/admin/users/{user_id}/configs` - User's bots
+- [ ] `PATCH /api/v2/admin/configs/{config_id}` - Update config
+- [ ] `POST /api/v2/admin/bots/{config_id}/start` - Start bot
+- [ ] `POST /api/v2/admin/bots/{config_id}/stop` - Stop bot
+
+### **Phase 2: Frontend Dashboard** (~2 hours)
+- [ ] Create `/admin/layout.tsx` with admin user ID check
+- [ ] Create `/admin/page.tsx` dashboard overview
+- [ ] Stats cards (users, bots, P&L, health)
+- [ ] PM2 services table
+- [ ] Billing health section
+- [ ] Log summary (counts by level)
+
+### **Phase 3: User Management** (~3-4 hours)
+- [ ] Create `/admin/users/page.tsx` - User search + list
+- [ ] Create `/admin/users/[user_id]/page.tsx` - User detail
+- [ ] Editable user_profile fields (tier, status, paid_data_points)
+- [ ] Bot list with start/stop controls
+- [ ] Config data JSON editor
+- [ ] Per-bot token usage display
+
+### **Phase 4: Testing & Polish** (~1-2 hours)
+- [ ] Test all endpoints with admin auth
+- [ ] Test user search edge cases
+- [ ] Verify config updates work correctly
+- [ ] Add confirmation modals for destructive actions
+
+### **Environment Variables Required**
+```bash
+ADMIN_USER_ID=00000000-0000-0000-0000-000000000000           # Backend
+NEXT_PUBLIC_ADMIN_USER_ID=00000000-0000-0000-0000-000000000000  # Frontend
+```
+
+### **Files to Create**
+- `api/admin.py` - All admin endpoints (~400-500 lines)
+- `frontend/app/admin/layout.tsx` - Admin auth check
+- `frontend/app/admin/page.tsx` - Dashboard overview
+- `frontend/app/admin/users/page.tsx` - User list
+- `frontend/app/admin/users/[user_id]/page.tsx` - User detail
+
+---
+
 ## 🤖 **Agent - Session Persistence Testing & Monitoring**
 
 **Status**: Session resumption implemented (2025-11-08), needs production validation
@@ -67,63 +133,51 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🏗️ **Agent Architecture - Builder/Executor Separation**
+## ✅ **COMPLETE - Strategy Advisor Unification & Agent Cleanup** [STRATEGY_UNIFICATION.md]
 
-**Status**: Planning (2025-11-08)
-**Planning Doc**: [DOCS/todo/strategy_builder_agent.md](DOCS/todo/strategy_builder_agent.md)
+**Status**: 🟢 COMPLETE (2025-12-04)
+**Planning Doc**: [DOCS/todo/STRATEGY_UNIFICATION.md](DOCS/todo/STRATEGY_UNIFICATION.md)
 
-**Goal**: Split agent into two distinct services:
-- **Strategy Builder** (shared, multi-user) - Configuration assistant always available
-- **Autonomous Traders** (dedicated, per-bot) - Execution-only agents
+**Goal**: Unify configuration experience across all bot types using the existing Strategy Advisor API. Remove old PM2-based strategy_definition mode and consolidate strategy fields.
 
-### **Phase 1: Create Builder Service** (No Breaking Changes)
-- [ ] **Database**
-  - [ ] Create `strategy_builder_sessions` table
-  - [ ] Rename `agent_sessions` → `trading_agent_sessions`
-  - [ ] Run migration (backward-compatible)
+### **Summary of Changes**
+- Agent bots now use the same `ConfigureLayout` + `StrategyAdvisorPanel` as scheduled bots
+- Strategy saved to `decision.user_prompt` for ALL bot types (agent_strategy deprecated)
+- `strategy_definition` mode deprecated in both API and agent runner
+- AgentConfigurator.tsx deleted (old PM2 + Redis polling approach)
+- Build passes ✓
 
-- [ ] **Builder Service Implementation**
-  - [ ] Create `agent/builder_service.py` (session pool manager)
-  - [ ] Create `agent/builder_mcp_server.py` (6 configuration tools)
-  - [ ] Create `api/builder.py` (WebSocket endpoints)
-  - [ ] Start as PM2 service: `pm2 start agent/builder_service.py --name strategy-builder`
+### **Phase 1: Frontend Unification** ✅
+- [x] **Update ConfigureLayout.tsx** - Added `AgentStrategySection` component, agent mode shows simplified UI
+- [x] **Update page.tsx** - Removed AgentConfigurator routing, cleaned up agent state variables
+- [x] **Delete AgentConfigurator.tsx** - Removed entirely
 
-- [ ] **Frontend Integration**
-  - [ ] Add WebSocket connection to builder service
-  - [ ] Update chat interface to always connect (no "Start" button)
-  - [ ] Add feature flag: `ENABLE_BUILDER_SERVICE`
+### **Phase 2: Strategy Field Consolidation** ✅
+- [x] **Update api/assistant.py** - Now only updates `decision.user_prompt`, agent_strategy deprecated
 
-- [ ] **Testing**
-  - [ ] Test 10+ concurrent users chatting with builder
-  - [ ] Verify session resumption across reconnects
-  - [ ] Validate zero cross-user session contamination
-  - [ ] Test update_bot_config saves correctly
+### **Phase 3: Backend Cleanup** ✅
+- [x] **Update api/agent.py** - Returns 400 error for strategy_definition mode, always uses autonomous
+- [x] **Update agent/run_agent.py** - Raises ValueError if strategy_definition mode requested
 
-### **Phase 2: Clean Up Trading Agents** (Breaking Change)
-- [ ] **Remove Mode Switching**
-  - [ ] Delete `strategy_definition` mode from `run_agent.py`
-  - [ ] Remove mode parameter from API endpoints
-  - [ ] Remove builder tools from trading agent MCP server
-  - [ ] Add startup validation (strategy must exist)
+### **Phase 4: Documentation & Testing** ✅
+- [x] **Update agent/README.md** - Documented new architecture, marked strategy_definition as deprecated
+- [x] **Build test** - Frontend build passes
 
-- [ ] **Update Frontend**
-  - [ ] Remove "Start Strategy Builder" button
-  - [ ] Update "Activate" button to validate strategy exists
-  - [ ] Update status display (builder always available)
+### **Files Modified**
+| File | Changes |
+|------|---------|
+| `frontend/app/forge/components/configure/ConfigureLayout.tsx` | Added AgentStrategySection, conditional rendering |
+| `frontend/app/forge/page.tsx` | Removed AgentConfigurator routing, cleaned agent state |
+| `frontend/app/forge/components/configure/AgentConfigurator.tsx` | DELETED |
+| `api/assistant.py` | Updated to use decision.user_prompt, deprecated agent_strategy |
+| `api/agent.py` | Returns 400 for strategy_definition mode |
+| `agent/run_agent.py` | Raises error for strategy_definition mode |
+| `agent/README.md` | Updated documentation |
 
-- [ ] **Communication**
-  - [ ] Notify users about simplified UX (no mode switching)
-  - [ ] Update `agent/README.md` documentation
-
-### **Phase 3: Expand Builder Scope** (Enhancement)
-- [ ] **Scheduled Bot Configuration**
-  - [ ] Add `update_bot_config` support for `extraction`, `decision`, `trading` sections
-  - [ ] Add validation for scheduled bot configs
-  - [ ] Update builder system prompt with scheduled guidance
-
-- [ ] **Frontend Integration**
-  - [ ] Enable builder chat for scheduled bot config pages
-  - [ ] Add context detection (agent vs scheduled)
+### **Remaining Work (Future)**
+- [ ] Remove `agent_strategy` column from configurations table (after verifying no usage)
+- [ ] Clean up Redis endpoints `/message`, `/poll-response` (kept for now)
+- [ ] Production testing of agent configuration flow
 
 ---
 

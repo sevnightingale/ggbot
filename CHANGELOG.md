@@ -6,6 +6,29 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-05 - Strategy Advisor Unification & Agent Cleanup
+
+**Agent Configuration Now Uses Strategy Advisor** - Unified UX across all bot types
+- Agent bots now use same ConfigureLayout + StrategyAdvisorPanel as scheduled/signal bots
+- Added AgentStrategySection component (ConfigureLayout.tsx:35-125) - simplified UI for agents
+- Conditional rendering: agent mode shows only strategy textarea, hides ConfigTabs
+- Deleted AgentConfigurator.tsx (old PM2 + Redis polling approach, ~300 lines removed)
+- Removed agent state from page.tsx: agentMessages, agentInputValue, isWaitingForAgent, handlers
+
+**Strategy Field Consolidation** - Single source of truth for all bot strategies
+- api/assistant.py updated: uses decision.user_prompt for ALL bot types
+- agent_strategy deprecated in system prompts and tool descriptions
+- Removed agent_strategy version increment logic
+
+**strategy_definition Mode Deprecated** - Agent only runs in autonomous mode
+- api/agent.py: returns 400 error if strategy_definition mode requested
+- agent/run_agent.py: raises ValueError with helpful message pointing to Strategy Advisor API
+- Argument parser updated: mode defaults to 'autonomous', warns on strategy_definition
+
+**Documentation**: agent/README.md updated with new architecture, DOCS/todo/STRATEGY_UNIFICATION.md
+
+---
+
 ## 2025-12-04 - Unified Config Saving + Symphony Win Rate Fix
 
 **Unified Batched Config Save System** - Reduced 40+ API calls to 1

@@ -74,7 +74,14 @@ export function StrategyEditor({
   const [currentStrategy, setCurrentStrategy] = useState(configData?.decision?.user_prompt || '')
   const [analysisFrequency, setAnalysisFrequency] = useState(configData?.decision?.analysis_frequency || '1h')
   const [llmModel, setLlmModel] = useState(configData?.llm_config?.model || 'grok')
-  const [thinkingMode, setThinkingMode] = useState(configData?.llm_config?.thinking_mode || false)
+  // Reasoning tier: 'economy' | 'standard' | 'premium'
+  // Backward compatible with thinking_mode: false -> 'standard', true -> 'premium'
+  const [reasoningTier, setReasoningTier] = useState<'economy' | 'standard' | 'premium'>(() => {
+    const tier = configData?.llm_config?.reasoning_tier
+    if (tier) return tier as 'economy' | 'standard' | 'premium'
+    // Legacy fallback
+    return configData?.llm_config?.thinking_mode ? 'premium' : 'standard'
+  })
 
   // State for LLM models
   const [llmModels, setLLMModels] = useState<LLMModel[]>([])
@@ -106,10 +113,15 @@ export function StrategyEditor({
   }, [configData?.llm_config?.model])
 
   useEffect(() => {
-    if (configData?.llm_config?.thinking_mode !== undefined) {
-      setThinkingMode(configData.llm_config.thinking_mode)
+    // Sync reasoning_tier from config, with backward compatibility for thinking_mode
+    const tier = configData?.llm_config?.reasoning_tier
+    if (tier) {
+      setReasoningTier(tier as 'economy' | 'standard' | 'premium')
+    } else if (configData?.llm_config?.thinking_mode !== undefined) {
+      // Legacy fallback
+      setReasoningTier(configData.llm_config.thinking_mode ? 'premium' : 'standard')
     }
-  }, [configData?.llm_config?.thinking_mode])
+  }, [configData?.llm_config?.reasoning_tier, configData?.llm_config?.thinking_mode])
 
   // Fetch available LLM models on mount
   useEffect(() => {
@@ -188,13 +200,15 @@ export function StrategyEditor({
     })
   }
 
-  // Handle thinking mode toggle
-  const handleThinkingModeChange = (enabled: boolean) => {
-    setThinkingMode(enabled)
+  // Handle reasoning tier change
+  const handleReasoningTierChange = (tier: 'economy' | 'standard' | 'premium') => {
+    setReasoningTier(tier)
     onUpdate?.({
       llm_config: {
         ...(configData?.llm_config || { use_platform_keys: true, use_own_key: false, provider: 'openrouter', model: llmModel }),
-        thinking_mode: enabled
+        reasoning_tier: tier,
+        // Keep thinking_mode for backward compatibility
+        thinking_mode: tier === 'premium'
       }
     })
   }
@@ -319,7 +333,10 @@ export function StrategyEditor({
                       </div>
                       <div className="text-xs text-[var(--text-muted)]">
                         {(() => {
-                          const cost = thinkingMode ? model.cost_per_decision?.thinking : model.cost_per_decision?.standard
+                          // Map reasoning tier to pricing (premium uses thinking pricing)
+                          const cost = reasoningTier === 'premium'
+                            ? model.cost_per_decision?.thinking
+                            : model.cost_per_decision?.standard
                           return cost != null ? `$${cost.toFixed(3)}/decision` : 'Pricing unavailable'
                         })()}
                       </div>
@@ -330,30 +347,33 @@ export function StrategyEditor({
             </div>
           )}
 
-          {/* Thinking Mode Toggle - Below model selection */}
+          {/* Reasoning Tier Selector - Below model selection */}
           {hasPremiumAccess && (
             <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-              <div className="flex items-center justify-between">
-                <div className="flex-1">
-                  <div className="text-sm font-medium text-[var(--text-primary)] mb-1">
-                    Extended Reasoning Mode
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    Enables deeper analysis with longer thinking time (higher cost, better quality)
-                  </div>
-                </div>
-                <button
-                  onClick={() => handleThinkingModeChange(!thinkingMode)}
-                  className={`ml-4 relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                    thinkingMode ? 'bg-[var(--accent)]' : 'bg-[var(--border)]'
-                  }`}
-                >
-                  <span
-                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
-                      thinkingMode ? 'translate-x-6' : 'translate-x-1'
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-3">
+                Reasoning Level
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                {[
+                  { tier: 'economy' as const, label: 'Economy', desc: 'Fast & cheap' },
+                  { tier: 'standard' as const, label: 'Standard', desc: 'Balanced' },
+                  { tier: 'premium' as const, label: 'Premium', desc: 'Best quality' }
+                ].map(({ tier, label, desc }) => (
+                  <button
+                    key={tier}
+                    onClick={() => handleReasoningTierChange(tier)}
+                    className={`p-3 rounded-lg border text-center transition-all ${
+                      reasoningTier === tier
+                        ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] border-[var(--accent)]'
+                        : 'bg-[var(--bg-secondary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
                     }`}
-                  />
-                </button>
+                  >
+                    <div className="text-sm font-medium">{label}</div>
+                    <div className={`text-xs ${reasoningTier === tier ? 'opacity-80' : 'text-[var(--text-muted)]'}`}>
+                      {desc}
+                    </div>
+                  </button>
+                ))}
               </div>
             </div>
           )}
@@ -363,7 +383,7 @@ export function StrategyEditor({
             <div className="text-sm text-[var(--text-muted)]">
               Current: <span className="text-[var(--text-primary)] font-medium">
                 {llmModels.find(m => m.model_id === llmModel)?.display_name || llmModel}
-                {thinkingMode && <span className="text-[var(--text-muted)]"> (Thinking Mode)</span>}
+                <span className="text-[var(--text-muted)]"> ({reasoningTier})</span>
               </span>
             </div>
           </div>

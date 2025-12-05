@@ -16,7 +16,6 @@ import { ActivationBar } from './components/monitor/ActivationBar'
 import { PositionsTable } from './components/monitor/PositionsTable'
 import TVTimeline from '@/components/tv-timeline'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
-import { AgentConfigurator } from './components/configure/AgentConfigurator'
 import { BotCreationModal } from './components/modals/BotCreationModal'
 import { Wrench } from 'lucide-react'
 
@@ -111,16 +110,6 @@ function ForgeApp() {
     config_name?: string
     config_type?: string
   } | null>(null)
-
-  // Agent conversation state (for agentic config type)
-  const [agentMessages, setAgentMessages] = useState<Array<{
-    role: 'user' | 'agent'
-    content: string
-    timestamp: string
-  }>>([])
-  const [agentInputValue, setAgentInputValue] = useState('')
-  const [isWaitingForAgent, setIsWaitingForAgent] = useState(false)
-  const [agentStarted, setAgentStarted] = useState(false)
 
   // Unified batched config save with dirty field tracking
   const {
@@ -993,218 +982,6 @@ function ForgeApp() {
     }
   }
 
-  // ============================================================================
-  // AGENT CONVERSATION HANDLERS
-  // ============================================================================
-
-  // Handler for sending message to agent
-  const handleSendAgentMessage = async () => {
-    if (!selectedConfigId || !agentInputValue.trim() || isWaitingForAgent) return
-
-    try {
-      // Add user message to UI immediately
-      const userMessage = {
-        role: 'user' as const,
-        content: agentInputValue.trim(),
-        timestamp: new Date().toISOString()
-      }
-      setAgentMessages(prev => [...prev, userMessage])
-      setAgentInputValue('')
-      setIsWaitingForAgent(true)
-
-      // Send to backend API
-      const token = await getAuthToken()
-      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ message: agentInputValue.trim() })
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to send message')
-      }
-
-      console.log('✅ Message sent to agent')
-    } catch (error) {
-      console.error('❌ Failed to send message:', error)
-      setIsWaitingForAgent(false)
-    }
-  }
-
-  // Handler for agent strategy content changes - uses unified batched save
-  const handleAgentStrategyChange = useCallback((newContent: string) => {
-    if (!selectedConfigId) return
-
-    // Use unified config change handler - preserves other agent_strategy fields
-    handleConfigChange({
-      agent_strategy: {
-        content: newContent,
-        autonomously_editable: editingConfigData?.agent_strategy?.autonomously_editable ?? false,
-        version: editingConfigData?.agent_strategy?.version ?? 1,
-        last_updated_at: new Date().toISOString(),
-        last_updated_by: 'user',
-        performance_log: editingConfigData?.agent_strategy?.performance_log ?? []
-      }
-    })
-  }, [selectedConfigId, handleConfigChange, editingConfigData?.agent_strategy])
-
-  // Handler for starting strategy builder agent
-  const handleStartStrategyBuilder = async () => {
-    if (!selectedConfigId) return
-
-    try {
-      const token = await getAuthToken()
-
-      // Start agent in strategy_definition mode
-      const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/start?mode=strategy_definition`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      })
-
-      if (!response.ok) {
-        throw new Error('Failed to start strategy builder')
-      }
-
-      setAgentStarted(true)
-      console.log('✅ Strategy builder started')
-
-      // Send initial greeting if no existing strategy
-      const currentStrategy = editingConfigData?.agent_strategy?.content
-      const greetingMessage = currentStrategy
-        ? `Here is my current strategy:\n\n${currentStrategy}\n\nI'd like to refine or update it. What improvements would you suggest?`
-        : "Hi! I'm ready to build a trading strategy. What do you recommend based on the available data sources?"
-
-      const messageResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/message`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ message: greetingMessage })
-      })
-
-      if (messageResponse.ok) {
-        setAgentMessages([{
-          role: 'user' as const,
-          content: greetingMessage,
-          timestamp: new Date().toISOString()
-        }])
-        setIsWaitingForAgent(true)
-      }
-    } catch (error) {
-      console.error('❌ Failed to start strategy builder:', error)
-    }
-  }
-
-  // Connect to already-running agent and fetch conversation history
-  useEffect(() => {
-    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) return
-    if (activeTab !== 'configure') return
-
-    const connectToRunningAgent = async () => {
-      try {
-        const token = await getAuthToken()
-
-        // Check if agent is running
-        const statusResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/status`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
-
-        if (!statusResponse.ok) return
-
-        const statusData = await statusResponse.json()
-        console.log('🔌 Agent status on mount:', statusData.status, 'mode:', statusData.mode)
-
-        // If running in strategy_definition mode, fetch conversation history
-        if (statusData.status === 'online' && statusData.mode === 'strategy_definition') {
-          console.log('🔌 Fetching conversation history...')
-
-          const historyResponse = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/conversation-history`, {
-            headers: { 'Authorization': `Bearer ${token}` }
-          })
-
-          if (historyResponse.ok) {
-            const historyData = await historyResponse.json()
-            console.log('🔌 Got history:', historyData.count, 'messages')
-
-            // Transform history to agentMessages format
-            const formattedMessages = historyData.messages.map((msg: { role: 'user' | 'agent'; content: string; timestamp: string }) => ({
-              role: msg.role,
-              content: msg.content,
-              timestamp: msg.timestamp
-            }))
-
-            setAgentMessages(formattedMessages)
-            console.log('🔌 Connected to running agent with', formattedMessages.length, 'messages')
-          }
-        }
-      } catch (error) {
-        console.error('Error connecting to running agent:', error)
-      }
-    }
-
-    connectToRunningAgent()
-  }, [selectedConfigId, editingTableFields?.config_type, activeTab, user?.id])
-
-  // Poll for agent responses (when agent mode is active)
-  useEffect(() => {
-    if (!selectedConfigId || editingTableFields?.config_type !== 'agent' || !user?.id) {
-      console.log('🔄 Poll skipped:', { selectedConfigId, configType: editingTableFields?.config_type, userId: user?.id })
-      return
-    }
-
-    console.log('🔄 Starting agent response polling...')
-
-    const pollInterval = setInterval(async () => {
-      try {
-        const token = await getAuthToken()
-        const response = await fetch(`${process.env.NEXT_PUBLIC_V2_API_URL}/api/v2/agent/${selectedConfigId}/poll-response`, {
-          headers: {
-            'Authorization': `Bearer ${token}`
-          }
-        })
-
-        console.log('🔄 Poll response status:', response.status)
-
-        if (!response.ok) return
-
-        const data = await response.json()
-        console.log('🔄 Poll data:', data)
-
-        if (data.status === 'success' && data.text) {
-          console.log('✅ Got agent message, adding to UI')
-          // Add agent message to UI
-          const agentMessage = {
-            role: 'agent' as const,
-            content: data.text,
-            timestamp: data.timestamp || new Date().toISOString()
-          }
-          setAgentMessages(prev => [...prev, agentMessage])
-          setIsWaitingForAgent(false)
-
-          // Check for confirmation button flag
-          // TODO: Re-enable when showConfirmButton state is added
-          // if (data.show_confirm_button) {
-          //   setShowConfirmButton(true)
-          // }
-        }
-      } catch (error) {
-        console.error('❌ Poll agent response failed:', error)
-      }
-    }, 2000) // Poll every 2 seconds
-
-    return () => {
-      console.log('🔄 Stopping agent response polling')
-      clearInterval(pollInterval)
-    }
-  }, [selectedConfigId, editingTableFields?.config_type, user?.id])
-
-
   if (loading) {
     return (
       <ThemeProvider>
@@ -1345,21 +1122,9 @@ function ForgeApp() {
                       }}
                     />
                   </div>
-                ) : editingTableFields?.config_type === 'agent' ? (
-                  // Agent mode: Always show 2-column collaborative editor
-                  <AgentConfigurator
-                    messages={agentMessages}
-                    inputValue={agentInputValue}
-                    isWaiting={isWaitingForAgent}
-                    strategyContent={editingConfigData?.agent_strategy?.content || ''}
-                    onSendMessage={handleSendAgentMessage}
-                    onInputChange={setAgentInputValue}
-                    onStrategyChange={handleAgentStrategyChange}
-                    onStartAgent={handleStartStrategyBuilder}
-                    agentStarted={agentStarted}
-                  />
                 ) : (
-                  // Normal mode: Show regular config tabs with Strategy Advisor
+                  // Configure mode: ConfigureLayout handles ALL bot types
+                  // (agent mode shows simplified UI via conditional rendering in ConfigureLayout)
                   <ConfigureLayout
                     selectedBot={selectedBot}
                     editingConfigData={editingConfigData}

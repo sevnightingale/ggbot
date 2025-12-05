@@ -11,8 +11,11 @@ Architecture:
 - Auto-compaction at 95% token usage
 
 Usage:
-    python agent/run_agent.py --config-id=abc123 --mode=strategy_definition
     python agent/run_agent.py --config-id=abc123 --mode=autonomous
+
+IMPORTANT: strategy_definition mode is DEPRECATED.
+Use the Strategy Advisor API (/api/v2/assistant/chat) for bot configuration.
+The agent now only runs in autonomous mode for trade execution.
 """
 
 import os
@@ -58,9 +61,13 @@ load_dotenv()
 
 class TradingAgent:
     """
-    Autonomous trading agent with two modes:
-    - strategy_definition: Interactive strategy building with user
-    - autonomous: 24/7 trading loop with self-directed timing
+    Autonomous trading agent for executing trades based on configured strategy.
+
+    The agent reads strategy from decision.user_prompt and executes trades
+    autonomously. Strategy configuration is done via the Strategy Advisor
+    API (/api/v2/assistant/chat), not the agent itself.
+
+    NOTE: strategy_definition mode is DEPRECATED. Use Strategy Advisor instead.
     """
 
     def __init__(self, config_id: str, user_id: str, mode: str):
@@ -366,7 +373,15 @@ Be disciplined and execute the strategy faithfully.
                 # (can't capture here - receive_messages() can only be iterated once)
 
                 if self.mode == "strategy_definition":
-                    await self._run_strategy_definition(client)
+                    # DEPRECATED: strategy_definition mode is no longer supported
+                    # Use the Strategy Advisor API (/api/v2/assistant/chat) instead
+                    logger.error("strategy_definition mode is DEPRECATED")
+                    raise ValueError(
+                        "strategy_definition mode is deprecated. "
+                        "Use the Strategy Advisor chat API (/api/v2/assistant/chat) "
+                        "to configure your bot's strategy, then start the agent "
+                        "in autonomous mode."
+                    )
                 else:  # autonomous
                     await self._run_autonomous(client)
 
@@ -846,11 +861,19 @@ async def main():
     parser.add_argument(
         "--mode",
         choices=["strategy_definition", "autonomous"],
-        required=True,
-        help="Agent mode: strategy_definition or autonomous"
+        default="autonomous",
+        help="Agent mode (strategy_definition is DEPRECATED - use autonomous only)"
     )
 
     args = parser.parse_args()
+
+    # Warn about deprecated mode
+    if args.mode == "strategy_definition":
+        logger.warning(
+            "strategy_definition mode is DEPRECATED. "
+            "Use the Strategy Advisor API (/api/v2/assistant/chat) to configure your bot. "
+            "The agent will fail to start in this mode."
+        )
 
     # Get user_id from config
     # For now, we'll load it from the config lookup
