@@ -63,12 +63,14 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 **Testing**: scripts/test_provider_tier_models.py verified all 21 models via OpenRouter API
 
-**Grok Agentic Adapter Query-Specific Timeouts** - Resolved DEADLINE_EXCEEDED errors
-- Implemented query-specific timeout system: NFP 300s, CPI/TVL/Whale 180s, VIX/DXY/Twitter/News 120s
-- Previous: no timeout → gRPC default caused DEADLINE_EXCEEDED on complex government data queries
+**Grok Agentic Adapter Query-Specific Timeouts** - Resolved DEADLINE_EXCEEDED errors, all 8 data points passing
+- Implemented query-specific timeout system: NFP 300s, CPI/TVL/Whale/Twitter 180s, VIX/DXY/News 120s
+- Previous: no timeout → gRPC default caused DEADLINE_EXCEEDED on complex queries (NFP, Twitter)
 - NFP (Non-Farm Payroll) requires 5min for BLS.gov/Bloomberg/Reuters multi-source searches
-- Test results: 7/8 data points passing (VIX/DXY/CPI/TVL/Whale/Twitter/News) under 25s each
-- Enhanced error handling shows timeout duration for debugging
+- Twitter sentiment needs 3min for X search + sentiment analysis + code execution
+- Test results: 8/8 passing, $0.08 per full suite, 38 tool calls total
+- Query times: VIX/DXY/CPI 15-17s, NFP 25s, BTC TVL 33s, Whale 23s, Twitter 18s, News 24s
+- Enhanced error handling shows query-specific timeout duration for debugging
 - File: market_intelligence/adapters/agentic/grok_agentic.py query_timeouts map
 - Note: market_intelligence uses xai-sdk directly, separate from decision engine OpenRouter calls
 

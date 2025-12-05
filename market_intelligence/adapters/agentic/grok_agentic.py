@@ -339,7 +339,7 @@ Return ONLY the JSON object, no markdown formatting.""",
             'vix_index': 120.0,  # 2 minutes - financial indices
             'btc_tvl': 180.0,  # 3 minutes - DeFi protocol aggregation
             'whale_activity': 180.0,  # 3 minutes - blockchain analysis
-            'twitter_sentiment': 120.0,  # 2 minutes - X search + analysis
+            'twitter_sentiment': 180.0,  # 3 minutes - X search + sentiment analysis + code execution
             'crypto_news': 120.0,  # 2 minutes - news aggregation
         }
         timeout = query_timeouts.get(query_type, 180.0)  # Default 3 minutes
