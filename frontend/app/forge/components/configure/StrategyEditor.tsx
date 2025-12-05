@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { Crown } from 'lucide-react'
+import { Crown, Zap, Activity, Sparkles } from 'lucide-react'
 import { usePermissions } from '@/lib/permissions'
 import { ConfigData, apiClient } from '@/lib/api'
 import { UpgradeModal } from '@/components/UpgradeModal'
@@ -355,10 +355,10 @@ export function StrategyEditor({
               </div>
               <div className="grid grid-cols-3 gap-3">
                 {[
-                  { tier: 'economy' as const, label: 'Economy', desc: 'Fast & cheap', emoji: '⚡' },
-                  { tier: 'standard' as const, label: 'Standard', desc: 'Balanced', emoji: '⚖️' },
-                  { tier: 'premium' as const, label: 'Premium', desc: 'Best quality', emoji: '✨' }
-                ].map(({ tier, label, desc, emoji }) => (
+                  { tier: 'economy' as const, label: 'Economy', desc: 'Fast & cheap', icon: Zap },
+                  { tier: 'standard' as const, label: 'Standard', desc: 'Balanced', icon: Activity },
+                  { tier: 'premium' as const, label: 'Premium', desc: 'Best quality', icon: Sparkles }
+                ].map(({ tier, label, desc, icon: Icon }) => (
                   <button
                     key={tier}
                     onClick={() => handleReasoningTierChange(tier)}
@@ -368,7 +368,11 @@ export function StrategyEditor({
                         : 'bg-[var(--bg-secondary)] border-[var(--border)] hover:border-[var(--accent)]/50 hover:bg-[var(--bg-tertiary)]'
                     }`}
                   >
-                    <div className="text-2xl mb-2">{emoji}</div>
+                    <div className="flex justify-center mb-2">
+                      <Icon className={`h-6 w-6 ${
+                        reasoningTier === tier ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
+                      }`} />
+                    </div>
                     <div className={`text-sm font-semibold mb-1 ${
                       reasoningTier === tier ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'
                     }`}>
