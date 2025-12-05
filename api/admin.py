@@ -661,7 +661,7 @@ async def update_user(
     params = []
 
     if update.subscription_tier is not None:
-        valid_tiers = ['free', 'usage_based', 'ggbase']
+        valid_tiers = ['free', 'usage_based', 'ggbase', 'pro']
         if update.subscription_tier not in valid_tiers:
             raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {valid_tiers}")
         updates.append("subscription_tier = %s")

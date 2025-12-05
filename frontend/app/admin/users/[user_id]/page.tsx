@@ -323,7 +323,7 @@ export default function UserDetailPage() {
             >
               <option value="free">Free</option>
               <option value="usage_based">Usage Based</option>
-              <option value="ggbase">Pro (ggbase)</option>
+              <option value="pro">Pro</option>
             </select>
           </div>
 

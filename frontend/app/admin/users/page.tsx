@@ -95,6 +95,7 @@ export default function UsersPage() {
   const getTierBadge = (tier: string) => {
     switch (tier) {
       case 'ggbase':
+      case 'pro':
         return <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">Pro</span>
       case 'usage_based':
         return <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">Usage</span>
