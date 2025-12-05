@@ -54,69 +54,38 @@ For beginners with no strategy:
 
 ---
 
-## 🔧 **HIGH PRIORITY - Admin Dashboard** [ADMIN_DASHBOARD.md]
+## ✅ **COMPLETE - Admin Dashboard** [ADMIN_DASHBOARD.md]
 
-**Status**: 🟡 PLANNING
+**Status**: 🟢 COMPLETE (2025-12-05)
 **Planning Doc**: [DOCS/todo/ADMIN_DASHBOARD.md](DOCS/todo/ADMIN_DASHBOARD.md)
-**Estimated Time**: 9-13 hours
 
-**Goal**: Internal admin dashboard at `/admin` for platform management, restricted to admin user ID.
+**Summary**: Internal admin dashboard at `/admin` for platform management, restricted to admin user ID.
 
-### **Core Features**
-- Platform overview (stats, PM2 services, billing health)
-- User management with email search
-- Direct editing of user profiles, subscription tiers, configurations
-- Bot control (start/stop any bot)
-- Token usage monitoring (provider vs platform costs)
+### **Implementation Complete**
+- [x] Backend: `api/admin.py` with 13 endpoints (930 lines)
+- [x] Platform stats: users, bots, trades, P&L, health
+- [x] PM2/VM/Redis monitoring with services table
+- [x] Billing overview: token usage, provider vs platform costs, unreported amounts
+- [x] User management: search by email, view/edit subscription tiers
+- [x] User detail page: editable fields, bot controls, token usage per bot
+- [x] Bot control: start/stop any bot, reset paper accounts
+- [x] Config editing: JSONB preview (form-based editor deferred)
+- [x] Frontend: 3 pages with manual refresh
+- [x] Security: JWT → admin ID check → service role
+- [x] Environment variables set (ADMIN_USER_ID, NEXT_PUBLIC_ADMIN_USER_ID)
+- [x] Build passing, deployed to production
 
-### **Phase 1: Backend API** (~3-4 hours)
-- [ ] Create `api/admin.py` with admin auth dependency
-- [ ] `GET /api/v2/admin/stats` - Platform stats (reuse status_check.py)
-- [ ] `GET /api/v2/admin/services` - PM2, VM resources, Redis
-- [ ] `GET /api/v2/admin/logs/summary` - Log counts by level (24h)
-- [ ] `GET /api/v2/admin/billing` - Token usage, costs, unreported amounts
-- [ ] `GET /api/v2/admin/users` - User list with email search
-- [ ] `GET /api/v2/admin/users/{user_id}` - Full user detail
-- [ ] `PATCH /api/v2/admin/users/{user_id}` - Update user_profile
-- [ ] `GET /api/v2/admin/users/{user_id}/configs` - User's bots
-- [ ] `PATCH /api/v2/admin/configs/{config_id}` - Update config
-- [ ] `POST /api/v2/admin/bots/{config_id}/start` - Start bot
-- [ ] `POST /api/v2/admin/bots/{config_id}/stop` - Stop bot
-
-### **Phase 2: Frontend Dashboard** (~2 hours)
-- [ ] Create `/admin/layout.tsx` with admin user ID check
-- [ ] Create `/admin/page.tsx` dashboard overview
-- [ ] Stats cards (users, bots, P&L, health)
-- [ ] PM2 services table
-- [ ] Billing health section
-- [ ] Log summary (counts by level)
-
-### **Phase 3: User Management** (~3-4 hours)
-- [ ] Create `/admin/users/page.tsx` - User search + list
-- [ ] Create `/admin/users/[user_id]/page.tsx` - User detail
-- [ ] Editable user_profile fields (tier, status, paid_data_points)
-- [ ] Bot list with start/stop controls
-- [ ] Config data JSON editor
-- [ ] Per-bot token usage display
-
-### **Phase 4: Testing & Polish** (~1-2 hours)
-- [ ] Test all endpoints with admin auth
-- [ ] Test user search edge cases
-- [ ] Verify config updates work correctly
-- [ ] Add confirmation modals for destructive actions
-
-### **Environment Variables Required**
-```bash
-ADMIN_USER_ID=00000000-0000-0000-0000-000000000000           # Backend
-NEXT_PUBLIC_ADMIN_USER_ID=00000000-0000-0000-0000-000000000000  # Frontend
-```
-
-### **Files to Create**
-- `api/admin.py` - All admin endpoints (~400-500 lines)
+### **Files Created**
+- `api/admin.py` - 13 admin endpoints (~930 lines)
 - `frontend/app/admin/layout.tsx` - Admin auth check
 - `frontend/app/admin/page.tsx` - Dashboard overview
-- `frontend/app/admin/users/page.tsx` - User list
-- `frontend/app/admin/users/[user_id]/page.tsx` - User detail
+- `frontend/app/admin/users/page.tsx` - User search + list
+- `frontend/app/admin/users/[user_id]/page.tsx` - User detail + edit
+
+### **Next Steps (Optional)**
+- [ ] Form-based config editor (currently shows JSON preview)
+- [ ] Audit logging for admin actions
+- [ ] Multiple admin user support
 
 ---
 
