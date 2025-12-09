@@ -1,15 +1,15 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-12-04 20:23:34 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-12-09 16:39:44 UTC (Auto-updated by status_check.py)
 **System Health**: 🟡 LOW ACTIVITY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 259
+- **Total Users**: 261
 - **Pro Users (ggbase)**: 0 (0 active subscriptions)
-- **Free Users**: 255
-- **Users with Bots**: 253 (97.7%)
+- **Free Users**: 256
+- **Users with Bots**: 255 (97.7%)
 
 ### Bot Statistics
 - **Total Bots**: 381
@@ -27,7 +27,7 @@
   - Total P&L: $-16,178.41
 - **Recent Activity**:
   - Last 24 hours: 0 trades
-  - Last 7 days: 6 trades
+  - Last 7 days: 0 trades
   - Last 30 days: 9 trades
 
 ### Open Positions
@@ -37,7 +37,7 @@
 - **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,926.71
+- **Average Balance**: $9,927.10
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
@@ -58,23 +58,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 63MB | 59m | 61 |
-| x-bot | 🟢 online | 0% | 40MB | 59m | 61 |
-| error-alerts | 🟢 online | 0% | 33MB | 59m | 68 |
-| market-data-ws | 🟢 online | 1.7% | 174MB | 59m | 63 |
-| ggbot | 🟢 online | 0.7% | 251MB | 23m | 203 |
-| account-monitor | 🟢 online | 0.1% | 105MB | 59m | 21 |
-| agent-b0148622-a3ae-452a-b95b-2fc4d5a6bf99 | 🔴 waiting restart | 0% | 0MB | 58m | 21 |
+| signal-listener | 🟢 online | 0.1% | 26MB | 3d 22h | 65 |
+| x-bot | 🟢 online | 0% | 26MB | 3d 22h | 64 |
+| error-alerts | 🟢 online | 0% | 21MB | 3d 22h | 71 |
+| market-data-ws | 🟢 online | 3% | 153MB | 3d 22h | 66 |
+| ggbot | 🟢 online | 0.3% | 272MB | 3d 22h | 210 |
+| account-monitor | 🟢 online | 0% | 210MB | 21h 10m | 26 |
 
 ### VM Resources
 
 - **Disk**: 39G / 78G (50%)
-- **Memory**: 2.8Gi / 3.8Gi
-- **CPU Load**: 0.37 / 0.58 / 0.46 (1m/5m/15m)
+- **Memory**: 2.7Gi / 3.8Gi
+- **CPU Load**: 0.64 / 0.38 / 0.24 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 16.39M)
+- **Redis**: 🟢 connected (Memory: 12.73M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -383,7 +382,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-12-04 20:23:35 UTC
+**Last Updated**: 2025-12-09 16:39:45 UTC
 
 ---
 
@@ -1227,7 +1226,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-12-04 20:23:35 UTC
+**Last Updated**: 2025-12-09 16:39:45 UTC
 
 ---
 

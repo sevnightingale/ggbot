@@ -437,14 +437,14 @@ class SignalListenerService:
         """Handle incoming signal from any source."""
         try:
             self.logger.info(f"📡 Received {signal_data.source} signal: {signal_data.symbol} {signal_data.direction}")
-            
-            # Find user configurations that want this signal type
-            target_configs = await self._get_signal_subscribers(signal_data.source)
-            
+
+            # Find user configurations that want this signal type (filtered by symbol compatibility)
+            target_configs = await self._get_signal_subscribers(signal_data.source, signal_data.symbol)
+
             if not target_configs:
-                self.logger.info(f"No subscribers found for {signal_data.source} signals")
+                self.logger.info(f"No subscribers found for {signal_data.source} signals with symbol {signal_data.symbol}")
                 return
-            
+
             self.logger.info(f"🎯 Routing signal to {len(target_configs)} user configurations")
             
             # Trigger signal validation for each interested configuration
@@ -466,31 +466,26 @@ class SignalListenerService:
             self.logger.error(f"Error handling signal: {e}")
             traceback.print_exc()
     
-    async def _get_signal_subscribers(self, signal_source: str) -> List[Tuple[str, str]]:
-        """Find user configurations that want signals from this source."""
+    async def _get_signal_subscribers(self, signal_source: str, signal_symbol: str) -> List[Tuple[str, str]]:
+        """
+        Find user configurations that want signals from this source.
+
+        Filters by symbol compatibility based on trading mode:
+        - Symphony bots: Only receive symphony-compatible symbols
+        - Paper bots: Receive all symbols
+        - AsterDEX bots: Only receive aster-compatible symbols
+        """
         try:
+            # Import standardizer for symbol compatibility checks
+            from core.symbols import UniversalSymbolStandardizer
+            standardizer = UniversalSymbolStandardizer()
+
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     # Query for users with signal_validation configs wanting this signal source
-                    # Check if ggshot is in trading_signals data_points
-                    # Debug: First check what configs exist at all
+                    # Now include trading_mode to filter by symbol compatibility
                     cur.execute("""
-                        SELECT c.config_id, c.config_type, c.state,
-                               up.subscription_tier, up.subscription_status, up.paid_data_points,
-                               c.config_data->'extraction'->'selected_data_sources'->'trading_signals'->'data_points' as signal_data_points
-                        FROM configurations c
-                        JOIN user_profiles up ON c.user_id = up.user_id
-                        WHERE c.config_type = 'signal_validation'
-                    """)
-                    
-                    debug_results = cur.fetchall()
-                    self.logger.info(f"🔍 Debug: Found {len(debug_results)} signal_validation configs:")
-                    for row in debug_results:
-                        self.logger.info(f"   Config {row[0]}: type={row[1]}, state={row[2]}, tier={row[3]}, status={row[4]}, paid_points={row[5]}, signal_points={row[6]}")
-                    
-                    # Now run the actual query - handle nested config_data structure
-                    cur.execute("""
-                        SELECT DISTINCT c.config_id, c.user_id, c.config_data
+                        SELECT DISTINCT c.config_id, c.user_id, c.config_data, c.trading_mode
                         FROM configurations c
                         JOIN user_profiles up ON c.user_id = up.user_id
                         WHERE c.config_type = 'signal_validation'
@@ -503,34 +498,60 @@ class SignalListenerService:
                           AND up.subscription_tier = 'ggbase'
                           AND up.subscription_status = 'active'
                     """, (signal_source,))
-                    
+
                     results = cur.fetchall()
-                    self.logger.info(f"🔍 Debug: SQL query returned {len(results)} results for signal_source '{signal_source}'")
-                    
-                    # Filter results to only include configs that actually have this signal in data_points
+                    self.logger.info(f"🔍 Found {len(results)} active signal_validation configs for signal_source '{signal_source}'")
+
+                    # Filter results by signal source subscription AND symbol compatibility
                     subscribers = []
                     for row in results:
-                        config_id, user_id, config_data = row[0], row[1], row[2]
-                        
+                        config_id, user_id, config_data, trading_mode = row[0], row[1], row[2], row[3]
+
                         # Handle nested config_data structure (same as publishing service)
                         if "config_data" in config_data:
-                            inner_config = config_data["config_data"] 
+                            inner_config = config_data["config_data"]
                             extraction_config = inner_config.get('extraction', {}).get('selected_data_sources', {})
                         else:
                             extraction_config = config_data.get('extraction', {}).get('selected_data_sources', {})
-                        
+
                         signals_config = extraction_config.get('trading_signals', {})
                         data_points = signals_config.get('data_points', [])
-                        
-                        self.logger.info(f"🔍 Debug: Config {config_id} has signals data_points: {data_points}")
-                        
+
                         # Check if this signal source is in the data points (e.g., "ggshot")
-                        if signal_source in data_points:
-                            subscribers.append((config_id, user_id))
-                            self.logger.info(f"✅ Config {config_id} subscribed to {signal_source} signals")
-                    
-                    self.logger.debug(f"Found {len(subscribers)} subscribers for {signal_source} signals")
-                    
+                        if signal_source not in data_points:
+                            self.logger.debug(f"Config {config_id} does not subscribe to {signal_source}")
+                            continue
+
+                        # Check symbol compatibility based on trading mode
+                        if trading_mode == 'symphony':
+                            # Symphony bots only get symphony-compatible symbols
+                            is_compatible = standardizer.is_symphony_compatible(signal_symbol, "ccxt")
+                            if not is_compatible:
+                                self.logger.info(
+                                    f"🚫 Skipping Symphony bot {config_id}: {signal_symbol} not Symphony-compatible"
+                                )
+                                continue
+                        elif trading_mode == 'aster':
+                            # AsterDEX bots only get aster-compatible symbols
+                            is_compatible = standardizer.is_aster_compatible(signal_symbol, "ccxt")
+                            if not is_compatible:
+                                self.logger.info(
+                                    f"🚫 Skipping AsterDEX bot {config_id}: {signal_symbol} not AsterDEX-compatible"
+                                )
+                                continue
+                        # Paper mode: accepts all symbols (no filtering)
+
+                        subscribers.append((config_id, user_id))
+                        self.logger.info(
+                            f"✅ Config {config_id} subscribed to {signal_source} signals "
+                            f"(mode: {trading_mode}, symbol: {signal_symbol})"
+                        )
+
+                    self.logger.info(
+                        f"📊 Filtered to {len(subscribers)} compatible subscribers for {signal_symbol} "
+                        f"(out of {len(results)} total configs)"
+                    )
+
                     return subscribers
                     
         except Exception as e:

@@ -6,6 +6,19 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-05 - Signal Listener Symbol Filtering
+
+**Signal Listener Symbol Compatibility Filtering** - Symphony bots now only receive tradeable signals
+- signals/listener_service.py: _get_signal_subscribers() filters by trading_mode + symbol compatibility
+- Symphony bots: Only route 100 symphony-compatible symbols (BTC, ETH, SOL, etc.)
+- Paper bots: Accept all 142 ggShot symbols (no filtering)
+- AsterDEX bots: Only route aster-compatible symbols
+- Prevents: $45/mo wasted LLM calls on incompatible symbols (KNC, MATIC, SUSHI, etc.)
+- Implementation: Query trading_mode from DB, use UniversalSymbolStandardizer.is_symphony_compatible()
+- 42 symbols filtered: ACH, ALPHA, AXS, BAKE, BAL, BAND, BEL, BIGTIME, BNT, CELR, CETUS, CHR, CHZ, COTI, CRV, CYBER, FLM, GTC, HIGH, HOOK, ICX, ID, IOST, KAVA, KNC, LEVER, LPT, LQTY, MATIC, MKR, NKN, OGN, ONE, ONT, RLC, RUNE, SFP, SKLUS, SUI, SUSHI, SXP, VANRY
+- Result: Symphony bots no longer reject incompatible symbols, cleaner logs, cost savings
+- Testing: test_signal_filtering.py validates filtering logic (6/6 tests passing)
+
 ## 2025-12-05 - Admin Dashboard + Resend Rate Limit Fix
 
 **Admin Dashboard** - Internal platform management at /admin, restricted to admin user ID
