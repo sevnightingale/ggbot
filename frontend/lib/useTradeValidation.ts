@@ -83,6 +83,12 @@ export const ValidationRules = {
     warningThreshold: 50,
     warningMessage: '⚠️ Warning: Position size above 50% is very aggressive'
   },
+  maxPositionPercent: {
+    min: 1,
+    max: 100,
+    warningThreshold: 50,
+    warningMessage: '⚠️ Warning: Max position above 50% can be very risky even at high confidence'
+  },
   maxPositions: {
     min: 1,
     max: 50,

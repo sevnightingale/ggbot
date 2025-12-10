@@ -63,7 +63,6 @@ Use your trading strategy above to analyze the provided market data and identify
 Based on your analysis:
 - Is there a trading opportunity (long/short) or should you wait?
 - How confident are you in this opportunity?
-- What stop loss and take profit levels align with your strategy?
 
 Your reasoning should cite specific indicator values from the market data that triggered your strategy's rules.
 
@@ -71,5 +70,5 @@ Your reasoning should cite specific indicator values from the market data that t
 ACTION: [long/short/wait]
 CONFIDENCE: [0.000-1.000]
 REASONING: [Explain how your strategy interprets the current market data and identifies this opportunity]
-STOP_LOSS: [price or null]
-TAKE_PROFIT: [price or null]"""
+
+Note: Stop loss and take profit levels are managed by your risk management configuration and will be applied automatically based on your settings."""

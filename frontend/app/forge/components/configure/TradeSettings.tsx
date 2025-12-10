@@ -59,6 +59,7 @@ export function TradeSettings({
   const takeProfitValidation = useFieldValidation(riskManagement.default_take_profit_percent, ValidationRules.takeProfit)
   const positionPercentValidation = useFieldValidation(positionSizing.account_percent, ValidationRules.positionSizePercent)
   const fixedAmountValidation = useFieldValidation(positionSizing.fixed_amount_usd, ValidationRules.fixedAmountUsd(accountBalance))
+  const maxPositionPercentValidation = useFieldValidation(positionSizing.max_position_percent, ValidationRules.maxPositionPercent)
   const maxPositionsValidation = useFieldValidation(riskManagement.max_positions, ValidationRules.maxPositions)
 
   // Notify parent of validation state
@@ -68,6 +69,7 @@ export function TradeSettings({
                      !takeProfitValidation.isValid ||
                      !positionPercentValidation.isValid ||
                      !fixedAmountValidation.isValid ||
+                     !maxPositionPercentValidation.isValid ||
                      !maxPositionsValidation.isValid
 
     if (onValidationChange) {
@@ -79,6 +81,7 @@ export function TradeSettings({
     takeProfitValidation.isValid,
     positionPercentValidation.isValid,
     fixedAmountValidation.isValid,
+    maxPositionPercentValidation.isValid,
     maxPositionsValidation.isValid,
     onValidationChange
   ])
@@ -225,10 +228,19 @@ export function TradeSettings({
                 min="1"
                 max="100"
                 step="0.5"
-                className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-trading)] focus:border-transparent"
+                className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
+                  maxPositionPercentValidation.error
+                    ? 'border-red-500 focus:ring-red-500'
+                    : maxPositionPercentValidation.warning
+                    ? 'border-yellow-500 focus:ring-yellow-500'
+                    : 'border-[var(--border)] focus:ring-[var(--agent-trading)]'
+                }`}
                 placeholder="10"
               />
-              <div className="text-xs text-[var(--text-muted)] mt-1">For confidence-based sizing only</div>
+              <ValidationMessage error={maxPositionPercentValidation.error} warning={maxPositionPercentValidation.warning} />
+              {!maxPositionPercentValidation.error && !maxPositionPercentValidation.warning && (
+                <div className="text-xs text-[var(--text-muted)] mt-1">For confidence-based sizing only</div>
+              )}
             </div>
           </div>
         </div>

@@ -6,6 +6,59 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-10 - Frontend/Backend Validation Mismatch Fix (Leverage Not Applied)
+
+**Critical Bug** - User sets leverage 20x in frontend → trades execute with 1x (defaults)
+- Root cause: Frontend allows max_position_percent up to 100, backend Pydantic validation limits to ≤25
+- Flow: User saves max_position_percent=100 → backend validation fails → falls back to DEFAULT config (leverage=1, SL=3%, TP=6%)
+- Impact: User's leverage, SL, TP settings silently ignored, trades execute with wrong parameters
+
+**Validation Mismatch Details**
+- core/config/models.py:102 - Backend: `max_position_percent: Field(10.0, ge=1.0, le=25.0)`
+- frontend/app/forge/components/configure/TradeSettings.tsx:229 - Frontend: `<input max="100">`
+- frontend/lib/useTradeValidation.ts - No validation rule for max_position_percent (missing)
+- core/config/repository.py:73 - Fallback on validation error: `return self.get_default_config_for_type(config_type)`
+
+**Fix Applied**
+- core/config/models.py:102 - Increased backend limit from le=25.0 to le=100.0 (match frontend)
+- frontend/lib/useTradeValidation.ts:86-91 - Added maxPositionPercent validation rule (max 100, warning >50%)
+- frontend/app/forge/components/configure/TradeSettings.tsx - Applied validation styling, added ValidationMessage component
+- Result: Config loads successfully, user's leverage/SL/TP settings actually apply
+
+**Testing** - Config 1ddd2381-f806-4f05-bbef-a53ddfdfa8ed
+- Before fix: leverage=1 (default), max_position=10% (default), SL=3%, TP=6% (defaults)
+- After fix: leverage=20x (user setting), max_position=100% (user setting), SL=5%, TP=10% (user settings)
+
+---
+
+## 2025-12-10 - Stop Loss Inversion Bug Fix + Config-Driven Risk Management
+
+**Critical Bug Fix** - Inverted stop loss causing instant trade closures and chart crashes
+- Root cause: LLM prompt requested STOP_LOSS/TAKE_PROFIT outputs, parser somehow extracted Bollinger Band values (experimental code removed)
+- Bug behavior: LONG BTC/USDT entry $92,192.56 → SL $92,403.13 (ABOVE entry, inverted!) → closed 0.39s later
+- Chart crash: Rapid trade closure created activity data pattern causing "Value is null" error in TradingView library
+- Pattern: Only 1 of 7 decisions had SL/TP values (SL=$92,403.13 = BB lower band, TP=$92,713.27 = BB middle band)
+
+**Fix 1: Directional Validation** - Parser now validates SL/TP against entry price
+- decision/engine_v2.py _parse_llm_response(): Added validation logic after line 1450
+- LONG: SL must be below entry, TP above entry (otherwise rejected → config defaults apply)
+- SHORT: SL must be above entry, TP below entry
+- Logs warnings when invalid values detected for debugging
+- Prevents Bollinger Band bug and similar issues
+
+**Fix 2: Config-Driven Risk Management** - Removed LLM SL/TP fields from all prompts
+- decision/prompts/opportunity_analysis.py: Removed STOP_LOSS/TAKE_PROFIT from output format
+- decision/prompts/signal_validation.py: Same removal
+- decision/prompts/position_management.py: Same removal
+- LLM now outputs: ACTION + CONFIDENCE + REASONING only
+- Config defaults (default_stop_loss_percent, default_take_profit_percent) always apply via trading/paper/supabase_service.py
+- User settings (20x leverage, 1% SL, 2% TP) now actually used instead of silently bypassed
+- Simpler, more predictable, no LLM can mess up risk levels
+
+**Impact**: Chart renders correctly, trades execute with proper SL/TP, user config settings respected
+
+---
+
 ## 2025-12-05 - Signal Listener Symbol Filtering
 
 **Signal Listener Symbol Compatibility Filtering** - Symphony bots now only receive tradeable signals

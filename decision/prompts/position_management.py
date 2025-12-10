@@ -44,7 +44,6 @@ Consider:
 - How has the market evolved since your entry?
 - Does your current position still align with your trading strategy?
 - Should you close the position or wait based on current conditions?
-- Are there any adjustments needed to stop loss or take profit levels?
 
 Your reasoning should cite specific indicator values from the market data and how they relate to your position management rules according to your trading strategy.
 
@@ -52,5 +51,5 @@ Your reasoning should cite specific indicator values from the market data and ho
 ACTION: [close/wait]
 CONFIDENCE: [0.000-1.000]
 REASONING: [Explain how your strategy interprets current market data in relation to your existing position and performance]
-STOP_LOSS: [price or null]
-TAKE_PROFIT: [price or null]"""
+
+Note: Stop loss and take profit levels are managed by your risk management configuration. Focus on deciding whether to close or hold the position."""

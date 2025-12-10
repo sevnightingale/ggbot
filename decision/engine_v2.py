@@ -248,8 +248,8 @@ class DecisionEngineV2:
         # Call LLM for validation
         llm_response, metadata = await self._call_llm(prompt)
 
-        # Parse response
-        decision_data = self._parse_llm_response(llm_response)
+        # Parse response with validation
+        decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
 
         # Save signal validation decision to database
         decision_id = await self._save_signal_decision_to_db(
@@ -335,8 +335,8 @@ class DecisionEngineV2:
         # Step 4: Call LLM
         llm_response, metadata = await self._call_llm(prompt)
 
-        # Step 5: Parse response
-        decision_data = self._parse_llm_response(llm_response)
+        # Step 5: Parse response with validation
+        decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
 
         # Step 6: Save decision to database
         decision_id = await self._save_decision_to_db(symbol, decision_data, market_data, current_price, prompt, llm_response, metadata)
@@ -594,8 +594,8 @@ class DecisionEngineV2:
         # Step 4: Call LLM
         llm_response, metadata = await self._call_llm(prompt)
 
-        # Step 5: Parse response
-        decision_data = self._parse_llm_response(llm_response)
+        # Step 5: Parse response with validation
+        decision_data = self._parse_llm_response(llm_response, entry_price=float(current_price))
 
         # Step 6: Save decision to database (with parent decision link)
         decision_id = await self._save_position_decision_to_db(
@@ -1338,8 +1338,17 @@ Take Profit: {take_profit_text}
             logger.bind(config_id=self.config_id, user_id=self.user_id).error(f"LLM API call failed: {e}")
             raise LLMError(f"LLM API call failed: {e}")
     
-    def _parse_llm_response(self, response: str) -> Dict[str, Any]:
-        """Parse LLM response into structured decision data with standardized format."""
+    def _parse_llm_response(self, response: str, entry_price: Optional[float] = None) -> Dict[str, Any]:
+        """
+        Parse LLM response into structured decision data with standardized format.
+
+        Args:
+            response: Raw LLM text response
+            entry_price: Current market price for validating SL/TP directionality
+
+        Returns:
+            Parsed decision data with validated SL/TP values
+        """
         # Initialize with defaults
         parsed = {
             'action': 'wait',  # Default to wait instead of no_action
@@ -1438,7 +1447,44 @@ Take Profit: {take_profit_text}
         else:
             # Fallback to full response if no reasoning section found
             parsed['reasoning'] = response.strip()
-        
+
+        # CRITICAL: Validate SL/TP directionality if entry_price provided
+        # This prevents bugs like using Bollinger Bands as stop loss levels
+        if entry_price and parsed.get('action') in ['long', 'short']:
+            action = parsed['action']
+            sl_price = parsed.get('stop_loss_price')
+            tp_price = parsed.get('take_profit_price')
+
+            # Validate stop loss directionality
+            if sl_price is not None:
+                if action == 'long' and sl_price >= entry_price:
+                    logger.warning(
+                        f"Invalid SL for LONG: ${sl_price:.2f} >= entry ${entry_price:.2f}. "
+                        f"SL must be BELOW entry for longs. Ignoring LLM value, will use config default."
+                    )
+                    parsed['stop_loss_price'] = None
+                elif action == 'short' and sl_price <= entry_price:
+                    logger.warning(
+                        f"Invalid SL for SHORT: ${sl_price:.2f} <= entry ${entry_price:.2f}. "
+                        f"SL must be ABOVE entry for shorts. Ignoring LLM value, will use config default."
+                    )
+                    parsed['stop_loss_price'] = None
+
+            # Validate take profit directionality
+            if tp_price is not None:
+                if action == 'long' and tp_price <= entry_price:
+                    logger.warning(
+                        f"Invalid TP for LONG: ${tp_price:.2f} <= entry ${entry_price:.2f}. "
+                        f"TP must be ABOVE entry for longs. Ignoring LLM value, will use config default."
+                    )
+                    parsed['take_profit_price'] = None
+                elif action == 'short' and tp_price >= entry_price:
+                    logger.warning(
+                        f"Invalid TP for SHORT: ${tp_price:.2f} >= entry ${entry_price:.2f}. "
+                        f"TP must be BELOW entry for shorts. Ignoring LLM value, will use config default."
+                    )
+                    parsed['take_profit_price'] = None
+
         return parsed
     
     async def _save_signal_decision_to_db(

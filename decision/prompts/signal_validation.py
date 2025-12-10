@@ -47,5 +47,5 @@ Use your trading strategy above to analyze the provided market data and external
 ACTION: [{signal_direction.lower()}]
 CONFIDENCE: [0.000-1.000]
 REASONING: [Explain how your strategy interprets the market data in relation to the external signal]
-STOP_LOSS: [price or null]
-TAKE_PROFIT: [price or null]"""
+
+Note: Stop loss and take profit levels are managed by your risk management configuration and will be applied automatically based on your settings."""

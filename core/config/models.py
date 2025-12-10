@@ -99,7 +99,7 @@ class PositionSizingConfig(BaseModel):
     method: PositionSizingMethod = Field(default=PositionSizingMethod.CONFIDENCE_BASED, description="Position sizing strategy")
     fixed_amount_usd: Optional[float] = Field(100.0, ge=10, le=10000, description="Fixed USD amount per trade")
     account_percent: Optional[float] = Field(5.0, ge=0.1, le=50.0, description="Percentage of account balance per trade")
-    max_position_percent: Optional[float] = Field(10.0, ge=1.0, le=25.0, description="Max percentage when confidence=1.0")
+    max_position_percent: Optional[float] = Field(10.0, ge=1.0, le=100.0, description="Max percentage when confidence=1.0")
 
     @field_validator('fixed_amount_usd', 'account_percent', 'max_position_percent')
     @classmethod

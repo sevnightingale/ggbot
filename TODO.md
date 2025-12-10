@@ -210,6 +210,106 @@ See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complet
 
 ---
 
+## 🪙 **Symphony Spot Trading - Monad (MON) Integration**
+
+**Status**: ⏸️ BLOCKED - Waiting for Symphony API deployment
+
+**Planning Doc**: [DOCS/symphony_spot_integration.md](DOCS/symphony_spot_integration.md)
+**Test Report**: [DOCS/symphony_spot_test_report.md](DOCS/symphony_spot_test_report.md)
+
+### **Overview**
+Symphony has launched spot trading support on Monad testnet for token swaps (not perpetuals). Integration is ready but waiting for API endpoints to go live.
+
+**MON Details**:
+- Chain: Monad (new Layer 1)
+- SID: 10056
+- Trading: Spot swaps only (no perps)
+- Status: Testnet active, eligible for trading rewards
+
+### **Current Blocker**
+Both spot trading endpoints return 404 (not deployed yet):
+- `GET /token/price` - Token price lookup (public)
+- `POST /agent/swap` - Execute spot swaps (auth required)
+
+**Symphony perp endpoints work perfectly** - credentials validated, 6 open positions found.
+
+### **Prepared Assets** ✅
+All test scripts and documentation complete, ready to run once APIs available:
+
+**Test Scripts** (4 files created):
+- [x] `trading/live/symphony_price_test.py` - Token price testing
+- [x] `trading/live/symphony_swap_test.py` - Spot swap execution
+- [x] `trading/live/symphony_endpoint_discovery.py` - Auto-discovery
+- [x] `trading/live/symphony_connectivity_test.py` - Credential validation ✅
+
+**Documentation**:
+- [x] Complete 5-phase integration plan
+- [x] Architecture decisions (separate service, reuse live_trades table)
+- [x] Symbol registry design (symphony_spot_compatible flag)
+- [x] Agent MCP tool specifications
+
+### **Integration Phases** (Once APIs Available)
+
+**Phase 1: Testing** (~30 min)
+- [ ] Run `symphony_price_test.py` to validate token price endpoint
+- [ ] Verify MON SID = 10056
+- [ ] Run `symphony_swap_test.py` to test swap execution
+- [ ] Test MON → USDC and USDC → MON swaps
+- [ ] Verify batchId tracking works
+
+**Phase 2: Symbol Registry** (~15 min)
+- [ ] Add MON to `core/symbols/registry.py`
+- [ ] Add `symphony_spot_compatible` flag
+- [ ] Add `sid` field (10056)
+- [ ] Add `chain` field ("monad")
+- [ ] Update standardizer with `is_symphony_spot_compatible()` method
+- [ ] Update standardizer with `get_symphony_sid()` method
+
+**Phase 3: Spot Trading Service** (~2-3 hours)
+- [ ] Create `trading/live/symphony_spot_service.py`
+- [ ] Implement `get_token_price()` method (public API)
+- [ ] Implement `execute_swap()` method (auth required)
+- [ ] Implement `calculate_swap_pnl()` for P&L tracking
+- [ ] Add swap history queries (if API supports)
+- [ ] Extend `live_trades` table with `provider='symphony_spot'`
+- [ ] Test end-to-end swap execution
+
+**Phase 4: Bot Configuration** (~2-3 hours)
+- [ ] Extend `trading_mode` to include `'symphony_spot'`
+- [ ] Update decision engine to handle spot signals (Buy → USDC→MON, Sell → MON→USDC)
+- [ ] Implement inventory tracking (track MON vs USDC holdings)
+- [ ] Add frontend trading mode selector option
+- [ ] Update symbol selector to show only spot-compatible symbols
+- [ ] Remove leverage/SL/TP fields for spot mode in settings
+
+**Phase 5: Agent Integration** (~1-2 hours)
+- [ ] Create `execute_spot_swap` MCP tool
+- [ ] Update agent system prompt with spot trading capabilities
+- [ ] Add inventory management to agent strategy
+- [ ] Test autonomous spot trading
+- [ ] Verify activity logging for swaps
+
+### **Next Actions**
+- [ ] Contact Symphony team to ask:
+  - When will `/token/price` and `/agent/swap` be deployed?
+  - Is there a testnet/staging URL for early testing?
+  - Do spot endpoints require different auth (Privy vs API key)?
+  - What's the ETA for Monad spot trading going live?
+- [ ] Monitor Symphony Discord/docs for deployment announcements
+- [ ] Test endpoints periodically for availability
+
+**Estimated Time**: 6-9 hours once APIs are deployed (all groundwork complete)
+
+**Files Created**:
+- `trading/live/symphony_price_test.py`
+- `trading/live/symphony_swap_test.py`
+- `trading/live/symphony_endpoint_discovery.py`
+- `trading/live/symphony_connectivity_test.py`
+- `DOCS/symphony_spot_integration.md`
+- `DOCS/symphony_spot_test_report.md`
+
+---
+
 ## 📊 **Market Maker - Kuru Integration**
 
 **Status**: ⏸️ WAITING - Module complete, needs Kuru API launch (Monday Nov 24?)
