@@ -19,7 +19,7 @@ from psycopg2.extras import execute_values
 from core.common.logger import logger
 from core.common.db import get_db_connection
 from core.symbols.standardizer import UniversalSymbolStandardizer
-from core.config import config_repo, BotConfig, PositionSizingMethod
+from core.config import config_repo, BotConfig
 from core.domain.models.account import Account
 from core.domain.models.value_objects import Money, Symbol
 from core.domain.repositories.supabase_account_repository import supabase_account_repo
@@ -123,38 +123,25 @@ class SupabasePaperTradingService:
         # Minimum position size of $10
         position_size = max(position_size, 10.0)
 
-        sizing_method = config.trading.position_sizing.method.value
-        logger.debug(f"Position sizing ({sizing_method}): confidence={confidence:.3f}, balance=${balance:,}, margin=${margin_required:.2f}, size=${position_size:.2f}, leverage={leverage}x")
+        logger.debug(f"Position sizing (confidence-based): confidence={confidence:.3f}, balance=${balance:,}, margin=${margin_required:.2f}, size=${position_size:.2f}, leverage={leverage}x")
         return position_size
     
     async def _check_position_limits(self, config: BotConfig, config_id: str, user_id: str) -> tuple[bool, Optional[str]]:
         """
         Check if new position would exceed configured limits.
-        
+
+        Note: max_positions limit removed - positions limited naturally by account balance.
+
         Args:
             config: Bot configuration with risk management settings
             config_id: Configuration ID
             user_id: User ID
-            
+
         Returns:
             (can_open_position, reason_if_not)
         """
-        max_positions = config.trading.risk_management.max_positions
-        
-        try:
-            # Count current open positions
-            response = self.supabase.table('paper_trades').select("count", count="exact").eq('config_id', config_id).eq('user_id', user_id).eq('status', 'open').execute()
-            
-            open_positions = response.count or 0
-            
-            if open_positions >= max_positions:
-                return False, f"Maximum positions limit reached ({open_positions}/{max_positions})"
-            
-            return True, None
-            
-        except Exception as e:
-            logger.error(f"Failed to check position limits: {str(e)}")
-            return False, f"Failed to check position limits: {str(e)}"
+        # No hard limit - positions naturally limited by available balance
+        return True, None
     
     def _apply_default_risk_levels(self, config: BotConfig, intent: Dict[str, Any], entry_price: float) -> Dict[str, Any]:
         """

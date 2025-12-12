@@ -227,18 +227,13 @@ function ForgeApp() {
       trading_mode: tradingMode,
       symphony_agent_id: symphonyAgentId,
       trading: {
-        leverage: 1,
+        leverage: 5,
         position_sizing: {
-          method: 'fixed_usd',
-          fixed_amount_usd: 100,
-          account_percent: 5.0,
-          max_position_percent: 10.0
+          max_margin_percent: 20.0
         },
         risk_management: {
-          max_positions: 1,
           default_stop_loss_percent: 5.0,
-          default_take_profit_percent: 10.0,
-          max_daily_loss_usd: 500
+          default_take_profit_percent: 10.0
         }
       }
     }
@@ -253,8 +248,7 @@ function ForgeApp() {
           ...baseConfig.trading,
           leverage: 10,  // Higher default for agents
           position_sizing: {
-            method: 'confidence_based',  // Always use confidence-based for agents
-            max_position_percent: 25.0   // Allow up to 25% risk per trade
+            max_margin_percent: 25.0   // Allow up to 25% risk per trade
           }
         },
         decision: {
@@ -299,18 +293,13 @@ function ForgeApp() {
         use_own_key: false
       },
       trading: {
-        leverage: 1,
+        leverage: 5,
         position_sizing: {
-          method: 'fixed_usd',
-          fixed_amount_usd: 100,
-          account_percent: 5.0,
-          max_position_percent: 10.0
+          max_margin_percent: 20.0
         },
         risk_management: {
-          max_positions: 1,
           default_stop_loss_percent: 5.0,
-          default_take_profit_percent: 10.0,
-          max_daily_loss_usd: 500
+          default_take_profit_percent: 10.0
         }
       },
       telegram_integration: {

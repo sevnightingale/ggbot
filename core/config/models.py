@@ -10,13 +10,6 @@ from pydantic import BaseModel, Field, field_validator
 from enum import Enum
 
 
-class PositionSizingMethod(str, Enum):
-    """Position sizing method enumeration."""
-    FIXED_USD = "fixed_usd"
-    ACCOUNT_PERCENTAGE = "account_percentage"
-    CONFIDENCE_BASED = "confidence_based"
-
-
 class ExecutionMode(str, Enum):
     """Trading execution mode enumeration."""
     PAPER = "paper"
@@ -95,27 +88,14 @@ class LLMConfig(BaseModel):
 
 
 class PositionSizingConfig(BaseModel):
-    """Position sizing configuration."""
-    method: PositionSizingMethod = Field(default=PositionSizingMethod.CONFIDENCE_BASED, description="Position sizing strategy")
-    fixed_amount_usd: Optional[float] = Field(100.0, ge=10, le=10000, description="Fixed USD amount per trade")
-    account_percent: Optional[float] = Field(5.0, ge=0.1, le=50.0, description="Percentage of account balance per trade")
-    max_position_percent: Optional[float] = Field(10.0, ge=1.0, le=100.0, description="Max percentage when confidence=1.0")
-
-    @field_validator('fixed_amount_usd', 'account_percent', 'max_position_percent')
-    @classmethod
-    def validate_positive_numbers(cls, v):
-        """Ensure all percentage and amount fields are positive."""
-        if v is not None and v <= 0:
-            raise ValueError("Value must be positive")
-        return v
+    """Position sizing configuration - confidence-based only."""
+    max_margin_percent: float = Field(20.0, ge=1.0, le=100.0, description="Max margin % when confidence=1.0")
 
 
 class RiskManagementConfig(BaseModel):
     """Risk management configuration."""
-    max_positions: int = Field(default=5, ge=1, le=20, description="Maximum concurrent positions")
-    default_stop_loss_percent: Optional[float] = Field(3.0, ge=0.5, le=20.0, description="Default stop loss percentage")
-    default_take_profit_percent: Optional[float] = Field(6.0, ge=0.5, le=50.0, description="Default take profit percentage")
-    max_daily_loss_usd: Optional[float] = Field(None, ge=50, le=5000, description="Maximum daily loss limit")
+    default_stop_loss_percent: Optional[float] = Field(5.0, ge=0.5, le=50.0, description="Default stop loss percentage")
+    default_take_profit_percent: Optional[float] = Field(10.0, ge=0.5, le=500.0, description="Default take profit percentage")
 
     @field_validator('default_stop_loss_percent', 'default_take_profit_percent')
     @classmethod
@@ -129,7 +109,7 @@ class RiskManagementConfig(BaseModel):
 class TradingConfig(BaseModel):
     """Trading module configuration."""
     execution_mode: ExecutionMode = Field(default=ExecutionMode.PAPER, description="Trading execution mode")
-    leverage: int = Field(default=1, ge=1, le=100, description="Trading leverage (1x for spot, up to 100x for perpetuals)")
+    leverage: int = Field(default=5, ge=1, le=100, description="Trading leverage (1x for spot, up to 100x for perpetuals)")
     position_sizing: PositionSizingConfig = Field(default_factory=PositionSizingConfig, description="Position sizing configuration")
     risk_management: RiskManagementConfig = Field(default_factory=RiskManagementConfig, description="Risk management configuration")
 
@@ -225,10 +205,19 @@ class BotConfig(BaseModel):
 
     def get_position_size(self, confidence: float, balance: float) -> float:
         """
-        Calculate position size based on configuration and current parameters.
+        Calculate position size: margin = confidence × max_margin_percent × balance, then × leverage.
 
-        Position sizing settings represent MARGIN (risk), which is then multiplied
-        by leverage to get the actual position size.
+        Position sizing semantics:
+        - Margin = collateral you risk (% of account based on confidence)
+        - Position = margin × leverage (actual market exposure)
+
+        Example:
+        - Balance: $10,000
+        - Max margin: 20%
+        - Confidence: 0.8
+        - Leverage: 5x
+        → Margin: 0.8 × 20% × $10,000 = $1,600 (collateral risked)
+        → Position: $1,600 × 5 = $8,000 (actual market exposure)
 
         Args:
             confidence: AI confidence score (0.0 to 1.0)
@@ -240,17 +229,9 @@ class BotConfig(BaseModel):
         sizing = self.trading.position_sizing
         leverage = self.trading.leverage
 
-        # Calculate margin based on sizing method
-        if sizing.method == PositionSizingMethod.FIXED_USD:
-            margin = sizing.fixed_amount_usd or 100.0
-        elif sizing.method == PositionSizingMethod.ACCOUNT_PERCENTAGE:
-            margin = balance * ((sizing.account_percent or 5.0) / 100.0)
-        elif sizing.method == PositionSizingMethod.CONFIDENCE_BASED:
-            max_pct = (sizing.max_position_percent or 10.0) / 100.0
-            margin = confidence * max_pct * balance
-        else:
-            # Fallback to current behavior
-            margin = confidence * 0.10 * balance
+        # Calculate margin based on confidence
+        max_pct = (sizing.max_margin_percent or 20.0) / 100.0
+        margin = confidence * max_pct * balance
 
         # Position size = margin × leverage
         return margin * leverage

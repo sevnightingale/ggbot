@@ -66,7 +66,6 @@ export const ValidationRules = {
     min: 1,
     max: 100,
     warningThreshold: 20,
-    errorMessage: undefined, // Will use default
     warningMessage: '⚠️ High risk: Leverage above 20x amplifies losses'
   },
   stopLoss: {
@@ -77,27 +76,10 @@ export const ValidationRules = {
     min: 1,
     max: 500
   },
-  positionSizePercent: {
-    min: 0.1,
-    max: 100,
-    warningThreshold: 50,
-    warningMessage: '⚠️ Warning: Position size above 50% is very aggressive'
-  },
-  maxPositionPercent: {
+  maxMarginPercent: {
     min: 1,
     max: 100,
     warningThreshold: 50,
-    warningMessage: '⚠️ Warning: Max position above 50% can be very risky even at high confidence'
-  },
-  maxPositions: {
-    min: 1,
-    max: 50,
-    warningThreshold: 10,
-    warningMessage: '⚠️ Warning: Managing 10+ positions simultaneously is complex'
-  },
-  fixedAmountUsd: (accountBalance: number) => ({
-    min: 10,
-    max: accountBalance,
-    errorMessage: accountBalance ? `Cannot exceed account balance ($${accountBalance.toLocaleString()})` : 'Invalid account balance'
-  })
+    warningMessage: '⚠️ Warning: Max margin above 50% can be very risky even at high confidence'
+  }
 }

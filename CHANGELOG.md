@@ -6,6 +6,54 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-10 - Position Sizing Simplification (BREAKING CHANGE)
+
+**📄 Full Documentation:** `DOCS/completed/2025-12-10_position_sizing_simplification.md`
+
+**Major Refactor** - Removed position sizing methods, simplified to confidence-based only
+- Deleted PositionSizingMethod enum (FIXED_USD, ACCOUNT_PERCENTAGE, CONFIDENCE_BASED)
+- Deleted position_sizing.method, .fixed_amount_usd, .account_percent fields
+- Deleted risk_management.max_positions, .max_daily_loss_usd fields
+- Renamed max_position_percent → max_margin_percent (semantic clarity: margin = collateral risked, not position size)
+
+**New Simplified Structure**
+```python
+position_sizing: { max_margin_percent: 20.0 }  # Only 1 field
+risk_management: { default_stop_loss_percent: 5.0, default_take_profit_percent: 10.0 }  # Only 2 fields
+leverage: 5  # Moved to trading root level
+```
+
+**Calculation Semantics** - Clear margin vs position distinction
+- Margin = confidence × max_margin_percent × balance (collateral risked)
+- Position = margin × leverage (market exposure)
+- Example: $10k account, 80% confidence, 20% max, 5x leverage → $1,600 margin → $8,000 position
+
+**Backend Changes**
+- core/config/models.py: Deleted enum, simplified PositionSizingConfig to 1 field, updated get_position_size()
+- core/config/schemas.py: Same simplification
+- trading/paper/supabase_service.py: Removed max_positions check (now natural limit via balance)
+- trading/live/symphony_service.py: _calculate_weight() simplified (3 methods → 1)
+- trading/live/aster_service_v3.py: Same simplification
+- core/services/config_service.py + templates: Updated defaults
+
+**Frontend Changes** - Massive UI simplification
+- lib/api.ts: Updated TypeScript types, simplified createDefaultConfigData()
+- TradeSettings.tsx: **MAJOR UX OVERHAUL** - Removed method selector, removed 3 inputs → 1 clean input for max_margin_percent
+- useTradeValidation.ts: Removed unused rules (fixedAmountUsd, positionSizePercent, maxPositions)
+- forge/page.tsx, test/page.tsx: Updated default configs
+
+**New Defaults** (More realistic for crypto)
+- leverage: 1x → 5x (moderate leverage, not scary)
+- max_margin_percent: 20% (was max_position_percent: 10%)
+- default_stop_loss_percent: 3% → 5% (breathing room)
+- default_take_profit_percent: 6% → 10% (clean 2:1 R/R)
+
+**Migration** - Old configs auto-upgrade via load_config_from_dict() fallback to defaults
+
+**Impact** - Cleaner UI, clearer semantics, better defaults, no method confusion
+
+---
+
 ## 2025-12-10 - Frontend/Backend Validation Mismatch Fix (Leverage Not Applied)
 
 **Critical Bug** - User sets leverage 20x in frontend → trades execute with 1x (defaults)

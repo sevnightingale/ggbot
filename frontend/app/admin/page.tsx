@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import { RefreshCw, Users, Bot, DollarSign, Activity, Server, Database, AlertCircle, ChevronRight } from 'lucide-react'
+import { RefreshCw, Users, Bot, DollarSign, Activity, Server, Database, AlertCircle, ChevronRight, TrendingUp } from 'lucide-react'
 import Link from 'next/link'
 
 interface PlatformStats {
@@ -393,8 +393,8 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* User Management Link */}
-      <div className="mt-6">
+      {/* Navigation Links */}
+      <div className="mt-6 space-y-3">
         <Link
           href="/admin/users"
           className="flex items-center justify-between p-4 bg-charcoal-900 rounded-lg border border-charcoal-700 hover:border-charcoal-600 transition-colors group"
@@ -403,6 +403,18 @@ export default function AdminDashboard() {
             <Users className="h-5 w-5 text-blue-400" />
             <span className="text-white font-medium">Manage Users</span>
             <span className="text-gray-500 text-sm">Search, view, and edit user accounts</span>
+          </div>
+          <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-white transition-colors" />
+        </Link>
+
+        <Link
+          href="/admin/bots-comparison"
+          className="flex items-center justify-between p-4 bg-charcoal-900 rounded-lg border border-charcoal-700 hover:border-charcoal-600 transition-colors group"
+        >
+          <div className="flex items-center gap-3">
+            <TrendingUp className="h-5 w-5 text-green-400" />
+            <span className="text-white font-medium">Bot Performance Comparison</span>
+            <span className="text-gray-500 text-sm">Compare equity curves across paper trading bots</span>
           </div>
           <ChevronRight className="h-5 w-5 text-gray-500 group-hover:text-white transition-colors" />
         </Link>

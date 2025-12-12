@@ -986,3 +986,99 @@ async def admin_reset_account(
         "previous_balance": float(old_balance or 0),
         "previous_pnl": float(old_pnl or 0)
     }
+
+
+# =============================================================================
+# Bot Performance Comparison Endpoint
+# =============================================================================
+
+@router.get("/bots/equity-comparison")
+async def get_equity_comparison(
+    admin: AuthenticatedUser = Depends(require_admin),
+    user_id: Optional[str] = Query(default=None),
+    hours: int = Query(default=72, ge=1, le=720)  # Default 3 days, max 30 days
+) -> Dict[str, Any]:
+    """
+    Get equity performance comparison for paper trading bots.
+
+    Returns time-series equity data (current_balance + margin_used + unrealized_pnl)
+    for all active paper trading bots.
+    """
+    # If no user_id specified, use admin's user_id
+    target_user_id = user_id or admin.user_id
+
+    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Get equity snapshots for all active paper bots
+            cur.execute("""
+                SELECT
+                    c.config_id,
+                    c.config_name,
+                    s.timestamp,
+                    COALESCE(s.current_balance, 0) +
+                    COALESCE(s.margin_used, 0) +
+                    COALESCE(s.unrealized_pnl, 0) as total_equity,
+                    s.total_pnl,
+                    s.total_trades,
+                    s.win_rate,
+                    s.open_positions
+                FROM account_snapshots s
+                JOIN configurations c ON s.config_id = c.config_id
+                WHERE c.user_id = %s
+                AND c.trading_mode = 'paper'
+                AND c.state = 'active'
+                AND s.timestamp >= %s
+                ORDER BY c.config_name, s.timestamp ASC
+            """, (target_user_id, cutoff_time))
+
+            rows = cur.fetchall()
+
+            # Group by bot
+            bots_data = {}
+            for row in rows:
+                config_id = row[0]
+                config_name = row[1]
+                timestamp = row[2]
+                total_equity = float(row[3])
+                total_pnl = float(row[4] or 0)
+                total_trades = row[5] or 0
+                win_rate = float(row[6] or 0)
+                open_positions = row[7] or 0
+
+                if config_id not in bots_data:
+                    bots_data[config_id] = {
+                        "config_id": config_id,
+                        "config_name": config_name,
+                        "data_points": [],
+                        "current_equity": total_equity,
+                        "current_pnl": total_pnl,
+                        "total_trades": total_trades,
+                        "win_rate": win_rate,
+                        "open_positions": open_positions
+                    }
+
+                # Add data point
+                bots_data[config_id]["data_points"].append({
+                    "timestamp": timestamp.isoformat(),
+                    "equity": total_equity
+                })
+
+                # Update current values (last snapshot)
+                bots_data[config_id]["current_equity"] = total_equity
+                bots_data[config_id]["current_pnl"] = total_pnl
+                bots_data[config_id]["total_trades"] = total_trades
+                bots_data[config_id]["win_rate"] = win_rate
+                bots_data[config_id]["open_positions"] = open_positions
+
+            # Convert to list and sort by current equity descending
+            bots_list = list(bots_data.values())
+            bots_list.sort(key=lambda x: x["current_equity"], reverse=True)
+
+    return {
+        "success": True,
+        "user_id": target_user_id,
+        "hours": hours,
+        "bots": bots_list
+    }

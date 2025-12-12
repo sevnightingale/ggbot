@@ -42,7 +42,6 @@ from web3 import Web3
 from core.common.logger import logger
 from core.common.db import get_db_connection
 from core.common.activity_logger import log_activity_safe
-from core.config.models import PositionSizingMethod
 from core.symbols.standardizer import UniversalSymbolStandardizer
 
 
@@ -229,24 +228,14 @@ class AsterDEXV3LiveTradingService:
             trading_config = config.trading or {}
             sizing_config = trading_config.get('position_sizing', {})
             leverage = trading_config.get('leverage', 1)
-            sizing_method = sizing_config.get('method', 'fixed_usd')
-
-            # Calculate margin based on sizing method
-            if sizing_method == 'fixed_usd':
-                margin = sizing_config.get('fixed_amount_usd', 100.0)
-            elif sizing_method == 'account_percentage':
-                margin = total_equity * (sizing_config.get('account_percent', 5.0) / 100.0)
-            elif sizing_method == 'confidence_based':
-                max_pct = sizing_config.get('max_position_percent', 10.0) / 100.0
-                margin = confidence * max_pct * total_equity
-            else:
-                # Fallback
-                margin = confidence * 0.10 * total_equity
+            # Calculate margin: confidence × max_margin_percent × equity
+            max_pct = sizing_config.get('max_margin_percent', 20.0) / 100.0
+            margin = confidence * max_pct * total_equity
 
             # Position size = margin × leverage
             position_size_usd = margin * leverage
 
-            self._log.info(f"Target position size: ${position_size_usd:.2f} (confidence={confidence:.3f}, method={sizing_method}, margin=${margin:.2f}, leverage={leverage}x)")
+            self._log.info(f"Target position size: ${position_size_usd:.2f} (confidence={confidence:.3f}, max_margin={max_pct*100:.1f}%, margin=${margin:.2f}, leverage={leverage}x)")
 
             # Step 3: Get current market price for the symbol
             # LivePriceService now handles both BTC-USDT and BTC/USDT formats automatically

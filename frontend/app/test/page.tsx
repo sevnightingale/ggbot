@@ -56,18 +56,13 @@ export default function TestPage() {
     },
     trading: {
       execution_mode: "paper",
-      leverage: 1,
+      leverage: 5,
       position_sizing: {
-        method: "confidence_based",
-        fixed_amount_usd: 50,
-        account_percent: 5.0,
-        max_position_percent: 10.0
+        max_margin_percent: 20.0
       },
       risk_management: {
-        max_positions: 3,
-        default_stop_loss_percent: 2.0,
-        default_take_profit_percent: 4.0,
-        max_daily_loss_usd: 200
+        default_stop_loss_percent: 5.0,
+        default_take_profit_percent: 10.0
       },
       exchange_config: {
         exchange_type: "cex",

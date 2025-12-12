@@ -50,18 +50,13 @@
   
   "trading": {
     "execution_mode": "paper",
-    "leverage": 1,
+    "leverage": 5,
     "position_sizing": {
-      "method": "fixed_usd",
-      "fixed_amount_usd": 100,
-      "account_percent": 5.0,
-      "max_position_percent": 10.0
+      "max_margin_percent": 20.0
     },
     "risk_management": {
-      "max_positions": 1,
       "default_stop_loss_percent": 5.0,
-      "default_take_profit_percent": 10.0,
-      "max_daily_loss_usd": 500
+      "default_take_profit_percent": 10.0
     },
     "exchange_config": {
       "exchange_type": "cex",

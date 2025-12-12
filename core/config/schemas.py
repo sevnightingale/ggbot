@@ -38,40 +38,16 @@ class BotState(str, Enum):
     INACTIVE = "inactive"
     ARCHIVED = "archived"
 
-class PositionSizingMethod(str, Enum):
-    """Position sizing calculation methods."""
-    FIXED_USD = "fixed_usd"
-    ACCOUNT_PERCENT = "account_percent"
-    ACCOUNT_PERCENTAGE = "account_percentage"  # ← Legacy typo in production
-    CONFIDENCE_BASED = "confidence_based"
-
 # ============================================================================
 # Common Config Components (Nested Objects)
 # ============================================================================
 
 class PositionSizingConfig(BaseModel):
-    """Position sizing configuration."""
-    method: PositionSizingMethod
-    fixed_amount_usd: Optional[float] = None  # Used if method=fixed_usd
-    account_percent: Optional[float] = None   # Used if method=account_percent
-    max_position_percent: Optional[float] = None  # Used if method=confidence_based
-
-    @field_validator('fixed_amount_usd')
-    def validate_fixed_amount(cls, v, info):
-        if info.data.get('method') == PositionSizingMethod.FIXED_USD and not v:
-            raise ValueError("fixed_amount_usd required when method=fixed_usd")
-        return v
-
-    @field_validator('max_position_percent')
-    def validate_max_position(cls, v, info):
-        if info.data.get('method') == PositionSizingMethod.CONFIDENCE_BASED and not v:
-            raise ValueError("max_position_percent required when method=confidence_based")
-        return v
+    """Position sizing configuration - confidence-based only."""
+    max_margin_percent: float = Field(default=20.0, ge=1.0, le=100.0)
 
 class RiskManagementConfig(BaseModel):
     """Risk management settings."""
-    max_positions: int = Field(ge=1, le=50)  # ← Increased to support production data
-    max_daily_loss_usd: Optional[float] = Field(None, ge=0)
     default_stop_loss_percent: Optional[float] = Field(None, ge=0, le=100)
     default_take_profit_percent: Optional[float] = Field(None, ge=0, le=1000)
 

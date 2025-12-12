@@ -29,7 +29,6 @@ from core.common.db import get_db_connection
 from core.common.activity_logger import log_activity_safe
 from core.auth.vault_utils import VaultManager
 from core.symbols import UniversalSymbolStandardizer
-from core.config.models import PositionSizingMethod
 
 
 class SymphonyLiveTradingService:
@@ -747,30 +746,18 @@ class SymphonyLiveTradingService:
 
     def _calculate_weight(self, config, confidence: float) -> float:
         """
-        Calculate position weight (percentage 0-100) from config.
+        Calculate position weight: confidence × max_margin_percent (clamped 0.1-100%).
 
-        Uses existing position sizing logic:
-        - ACCOUNT_PERCENTAGE: Use account_percent directly
-        - CONFIDENCE_BASED: confidence * max_position_percent
-        - FIXED_USD: Not supported for live trading (returns default 10%)
+        Weight represents the percentage of account to use as margin/collateral.
         """
         sizing = config.trading.get("position_sizing", {})
-        method = sizing.get("method", "ACCOUNT_PERCENTAGE")
-
-        if method == PositionSizingMethod.ACCOUNT_PERCENTAGE or method == "ACCOUNT_PERCENTAGE":
-            weight = sizing.get("account_percent", 10.0)
-        elif method == PositionSizingMethod.CONFIDENCE_BASED or method == "CONFIDENCE_BASED":
-            max_pct = sizing.get("max_position_percent", 10.0)
-            weight = confidence * max_pct
-        else:
-            # FIXED_USD not supported for Symphony (needs percentage)
-            self._log.warning(f"FIXED_USD sizing not supported for live trading, using default 10%")
-            weight = 10.0
+        max_pct = sizing.get("max_margin_percent", 20.0)
+        weight = confidence * max_pct
 
         # Clamp to 0.1-100 range
         weight = max(0.1, min(weight, 100.0))
 
-        self._log.info(f"Calculated weight: {weight:.1f}% (method={method}, confidence={confidence:.3f})")
+        self._log.info(f"Calculated weight: {weight:.1f}% (confidence={confidence:.3f}, max_margin={max_pct}%)")
         return weight
 
     async def _save_live_trade_record(

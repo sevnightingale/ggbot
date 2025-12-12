@@ -66,16 +66,11 @@ export interface ConfigData {
   trading: {
     leverage: number
     position_sizing: {
-      method: string
-      fixed_amount_usd?: number
-      account_percent?: number
-      max_position_percent?: number
+      max_margin_percent: number
     }
     risk_management: {
-      max_positions: number
       default_stop_loss_percent?: number
       default_take_profit_percent?: number
-      max_daily_loss_usd?: number
     }
   }
   telegram_integration: {
@@ -772,18 +767,13 @@ export function createDefaultConfigData(): ConfigData {
       use_own_key: false
     },
     trading: {
-      leverage: 1,
+      leverage: 5,
       position_sizing: {
-        method: "fixed_usd", // Simple fixed amount for beginners
-        fixed_amount_usd: 100,
-        account_percent: 5.0,
-        max_position_percent: 10.0
+        max_margin_percent: 20.0
       },
       risk_management: {
-        max_positions: 1, // Conservative default
-        default_stop_loss_percent: 5.0, // Wider stops for demo
-        default_take_profit_percent: 10.0,
-        max_daily_loss_usd: 500
+        default_stop_loss_percent: 5.0,
+        default_take_profit_percent: 10.0
       }
     },
     telegram_integration: {

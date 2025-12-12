@@ -571,18 +571,13 @@ class ConfigService:
                 "user_prompt": "My trading strategy:\nEnter when RSI is oversold below 30 and MACD shows bullish crossover. Avoid during high volatility periods.\n\nCurrent market analysis:\n{MARKET_DATA}\n\nDecision: Based on the above data, should I ENTER, WAIT, or EXIT this position?"
             },
             "trading": {
-                "leverage": 1,
+                "leverage": 5,
                 "position_sizing": {
-                    "method": "confidence_based",
-                    "fixed_amount_usd": 100,
-                    "account_percent": 5.0,
-                    "max_position_percent": 10.0
+                    "max_margin_percent": 20.0
                 },
                 "risk_management": {
-                    "max_positions": 5,
-                    "default_stop_loss_percent": 3.0,
-                    "default_take_profit_percent": 6.0,
-                    "max_daily_loss_usd": 500
+                    "default_stop_loss_percent": 5.0,
+                    "default_take_profit_percent": 10.0
                 }
             },
             "telegram_integration": {
