@@ -110,6 +110,70 @@ For beginners with no strategy:
 
 ---
 
+## 🎲 **USX Staking Modal - Bot Competition Betting**
+
+**Status**: 🔵 PLANNING
+**Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md)
+**Complexity**: Medium (~6-8 hours)
+
+**Summary**: Gamification feature allowing users to stake USX (Scroll stablecoin) on which bot they think will win competitions. Standard Scroll staking (USX→sUSX) + simple DB record of bot choice. Competition logic deferred.
+
+### **Elegant Architecture**
+- Users stake normally via Scroll's USX/sUSX system (no custom contracts)
+- Modal records: `{ user_id, wallet_address, config_id, usx_amount, tx_hash }`
+- Single table: `usx_stakes`
+- All competition logic (winners, prizes, leaderboards) added later
+
+### **User Flow**
+1. Click "Stake on Bot" → Modal opens
+2. Connect wallet (RainbowKit)
+3. Select bot to back (dropdown)
+4. Enter USX amount
+5. Execute 2 txs: approve + deposit to sUSX vault
+6. Record stake in DB
+7. User earns base yield (worst case) + prize if bot wins (best case)
+
+### **Implementation Phases**
+
+**Phase 1: Research & Setup** (~1 hour)
+- [ ] Find USX/sUSX contract addresses on Scroll mainnet (docs.usx.capital, Scrollscan)
+- [ ] Get WalletConnect Project ID (cloud.walletconnect.com)
+- [ ] Install deps: `wagmi`, `viem`, `@rainbow-me/rainbowkit`, `@tanstack/react-query`
+- [ ] Set up wagmi config with Scroll chain
+
+**Phase 2: Database & Backend** (~1 hour)
+- [ ] Create `usx_stakes` table (user_id, wallet_address, config_id, usx_amount, tx_hash)
+- [ ] Add `POST /api/v2/usx/stake` endpoint (record stake after on-chain tx)
+- [ ] Add `GET /api/v2/usx/stakes` endpoint (list user stakes)
+
+**Phase 3: Frontend Web3 Integration** (~2-3 hours)
+- [ ] Wrap app in WagmiProvider + RainbowKitProvider + QueryClientProvider
+- [ ] Create contract constants (`lib/contracts.ts` with USX/sUSX addresses + ABIs)
+- [ ] Build StakingModal component with wallet connect, bot selector, amount input
+- [ ] Test wallet connection and balance reading
+
+**Phase 4: On-Chain Integration** (~2-3 hours)
+- [ ] Implement approve transaction (USX.approve → sUSX vault)
+- [ ] Implement deposit transaction (Vault.deposit → receive sUSX)
+- [ ] Add transaction waiting/success/error states
+- [ ] Test on Scroll mainnet with small amounts
+
+**Phase 5: UI Integration** (~1 hour)
+- [ ] Add "Stake on Bot" trigger (location TBD)
+- [ ] Integrate modal with existing UI
+- [ ] End-to-end testing
+- [ ] Deploy to Vercel
+
+### **Deferred (Future Work)**
+- Competition logic (winners, prize distribution)
+- Leaderboard UI
+- Competition admin interface
+- Public competition pages
+
+**Why defer**: Already have bot performance tracking via `account_snapshots`. Can determine winners retroactively. Staking mechanism is the hard part.
+
+---
+
 ## 🤖 **Agent - Session Persistence Testing & Monitoring**
 
 **Status**: Session resumption implemented (2025-11-08), needs production validation

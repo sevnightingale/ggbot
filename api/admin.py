@@ -1020,7 +1020,6 @@ async def get_equity_comparison(
                     c.config_name,
                     s.timestamp,
                     COALESCE(s.current_balance, 0) +
-                    COALESCE(s.margin_used, 0) +
                     COALESCE(s.unrealized_pnl, 0) as total_equity,
                     s.total_pnl,
                     s.total_trades,
