@@ -4,6 +4,25 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
+## 🚨 **CRITICAL - CVE-2025-66478 Secret Rotation**
+
+**Status**: 🔴 URGENT - Application was vulnerable for ~11 hours (Dec 4-5, 2025)
+**Planning Doc**: [DOCS/todo/CVE_2025_66478_SECRET_ROTATION.md](DOCS/todo/CVE_2025_66478_SECRET_ROTATION.md)
+
+**Vulnerability**: Next.js/React Server Components RCE (CVSS 10.0)
+- Application ran vulnerable Next.js 15.3.3 during exposure window
+- Upgraded to patched 15.5.7 on Dec 5, 2025
+- Per advisory: "rotate any secrets it uses, starting with your most critical ones"
+
+**Action Required**: Follow rotation checklist in priority order
+- [ ] **Day 1**: CRITICAL secrets (Supabase, Auth, Trading APIs)
+- [ ] **Day 1-2**: HIGH PRIORITY secrets (AI APIs, Market Data, Email)
+- [ ] **Week 1**: MEDIUM PRIORITY secrets (Admin, Redis, OAuth)
+
+See planning doc for complete provider-specific instructions and verification steps.
+
+---
+
 ## ✅ **DEPLOYED - Strategy Advisor (Character Creation UX)** (2025-12-05)
 
 **Status**: 🟢 PRODUCTION READY - Onboarding-focused prompt deployed
@@ -62,7 +81,7 @@ For beginners with no strategy:
 **Summary**: Internal admin dashboard at `/admin` for platform management, restricted to admin user ID.
 
 ### **Implementation Complete**
-- [x] Backend: `api/admin.py` with 13 endpoints (930 lines)
+- [x] Backend: `api/admin.py` with 14 endpoints (1084 lines)
 - [x] Platform stats: users, bots, trades, P&L, health
 - [x] PM2/VM/Redis monitoring with services table
 - [x] Billing overview: token usage, provider vs platform costs, unreported amounts
@@ -70,17 +89,19 @@ For beginners with no strategy:
 - [x] User detail page: editable fields, bot controls, token usage per bot
 - [x] Bot control: start/stop any bot, reset paper accounts
 - [x] Config editing: JSONB preview (form-based editor deferred)
-- [x] Frontend: 3 pages with manual refresh
+- [x] Bot performance comparison: equity curves chart (2025-12-14)
+- [x] Frontend: 4 pages with manual refresh
 - [x] Security: JWT → admin ID check → service role
 - [x] Environment variables set (ADMIN_USER_ID, NEXT_PUBLIC_ADMIN_USER_ID)
 - [x] Build passing, deployed to production
 
 ### **Files Created**
-- `api/admin.py` - 13 admin endpoints (~930 lines)
+- `api/admin.py` - 14 admin endpoints (~1084 lines)
 - `frontend/app/admin/layout.tsx` - Admin auth check
 - `frontend/app/admin/page.tsx` - Dashboard overview
 - `frontend/app/admin/users/page.tsx` - User search + list
 - `frontend/app/admin/users/[user_id]/page.tsx` - User detail + edit
+- `frontend/app/admin/bots-comparison/page.tsx` - Bot equity comparison chart
 
 ### **Next Steps (Optional)**
 - [ ] Form-based config editor (currently shows JSON preview)

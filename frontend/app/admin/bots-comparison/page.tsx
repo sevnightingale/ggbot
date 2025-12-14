@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { ArrowLeft, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DataPoint {
@@ -37,6 +38,12 @@ const BOT_COLORS = [
   '#8b5cf6', // purple
   '#ec4899', // pink
 ]
+
+// Helper to get bot profile image
+const getBotImage = (botName: string): string => {
+  const normalized = botName.toLowerCase().replace(/\s+/g, '-')
+  return `/the-${normalized}-1.png`
+}
 
 export default function BotsComparisonPage() {
   const [data, setData] = useState<ComparisonData | null>(null)
@@ -244,13 +251,21 @@ export default function BotsComparisonPage() {
                 key={bot.config_id}
                 className="bg-charcoal-900 rounded-lg border border-charcoal-700 p-4"
               >
-                {/* Bot name with color indicator */}
-                <div className="flex items-center gap-2 mb-3">
-                  <div
-                    className="w-3 h-3 rounded-full"
-                    style={{ backgroundColor: BOT_COLORS[index % BOT_COLORS.length] }}
-                  />
-                  <h3 className="text-white font-medium">{bot.config_name}</h3>
+                {/* Bot name with profile image and color indicator */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="relative">
+                    <Image
+                      src={getBotImage(bot.config_name)}
+                      alt={bot.config_name}
+                      width={48}
+                      height={48}
+                      className="rounded-full border-2"
+                      style={{ borderColor: BOT_COLORS[index % BOT_COLORS.length] }}
+                    />
+                  </div>
+                  <div className="flex-1">
+                    <h3 className="text-white font-medium">{bot.config_name}</h3>
+                  </div>
                 </div>
 
                 {/* Current equity */}

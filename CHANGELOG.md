@@ -6,6 +6,21 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-14 - Admin Dashboard: Bot Performance Comparison
+
+**Feature** - Equity curve comparison chart for paper trading bots
+- Backend: api/admin.py - Added GET /api/v2/admin/bots/equity-comparison endpoint
+- Query params: user_id (optional), hours (default 72, max 720)
+- Calculates total_equity = current_balance + margin_used + unrealized_pnl from account_snapshots table
+- Returns time-series data grouped by bot, sorted by current equity descending
+- Frontend: /admin/bots-comparison page with Recharts line chart (6 color-coded lines)
+- Time range selector (24h/3d/7d/30d), stats cards per bot (equity, P&L %, trades, win rate, open positions)
+- Filters active paper bots only (excludes symphony/aster modes with incomplete equity data)
+- Navigation link added to main admin dashboard page.tsx
+- Fixed unused variable warning in TradeSettings.tsx (removed tradingMode, isSymphonyBot)
+
+---
+
 ## 2025-12-10 - Position Sizing Simplification (BREAKING CHANGE)
 
 **📄 Full Documentation:** `DOCS/completed/2025-12-10_position_sizing_simplification.md`

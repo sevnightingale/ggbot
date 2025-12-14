@@ -180,6 +180,22 @@
 - `POST /api/v2/stripe-webhook` - Handle Stripe webhook events
 - `POST /api/v2/create-portal-session` - Create Stripe billing portal session
 
+**Admin Dashboard** (Production, restricted to ADMIN_USER_ID)
+- `GET /api/v2/admin/stats` - Platform stats (users, bots, trades, P&L, health)
+- `GET /api/v2/admin/services` - PM2 services, VM resources, Redis status
+- `GET /api/v2/admin/logs/summary` - Log level counts (hours parameter)
+- `GET /api/v2/admin/billing` - 30-day billing overview with token usage
+- `GET /api/v2/admin/users` - List users (search by email, pagination)
+- `GET /api/v2/admin/users/{user_id}` - User detail with configs + accounts
+- `PATCH /api/v2/admin/users/{user_id}` - Update subscription tier/status
+- `GET /api/v2/admin/users/{user_id}/configs` - Get user configurations
+- `PATCH /api/v2/admin/configs/{config_id}` - Update config fields
+- `POST /api/v2/admin/bots/{config_id}/start` - Start bot (admin override)
+- `POST /api/v2/admin/bots/{config_id}/stop` - Stop bot (admin override)
+- `POST /api/v2/admin/bots/{config_id}/reset-account` - Reset paper account to $10k
+- `GET /api/v2/admin/bots/equity-comparison` - Bot performance comparison (equity curves)
+- Frontend: 4 pages (/admin, /admin/users, /admin/users/[user_id], /admin/bots-comparison)
+
 ---
 
 ## 📊 System Architecture

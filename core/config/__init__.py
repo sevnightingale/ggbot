@@ -7,7 +7,6 @@ bot configurations across the platform.
 
 from .models import (
     BotConfig,
-    PositionSizingMethod,
     ExecutionMode,
     TradingConfig,
     PositionSizingConfig,
@@ -21,7 +20,6 @@ from .repository import ConfigRepository, config_repo
 __all__ = [
     # Models
     "BotConfig",
-    "PositionSizingMethod",
     "ExecutionMode",
     "TradingConfig",
     "PositionSizingConfig",
