@@ -1056,9 +1056,8 @@ function ForgeApp() {
               // Calculate metrics from accounts data for selected bot
               const account = accounts.find(a => a.config_id === selectedConfigId)
               const metrics = account ? {
-                // Total Equity = current_balance + margin_used + unrealized_pnl
+                // Total Equity = current_balance + unrealized_pnl
                 totalEquity: Number(account.current_balance || 0) +
-                             Number(account.margin_used || 0) +
                              Number(account.unrealized_pnl || 0),
                 availableBalance: Number(account.available_balance || 0),
                 pnl: Number(account.total_pnl || 0),
