@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
 import { ArrowLeft, RefreshCw, TrendingUp, TrendingDown } from 'lucide-react'
 import Link from 'next/link'
-import Image from 'next/image'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DataPoint {
@@ -254,12 +253,10 @@ export default function BotsComparisonPage() {
                 {/* Bot name with profile image and color indicator */}
                 <div className="flex items-center gap-3 mb-3">
                   <div className="relative">
-                    <Image
+                    <img
                       src={getBotImage(bot.config_name)}
                       alt={bot.config_name}
-                      width={48}
-                      height={48}
-                      className="rounded-full border-2"
+                      className="w-12 h-12 rounded-full border-2 object-cover"
                       style={{ borderColor: BOT_COLORS[index % BOT_COLORS.length] }}
                     />
                   </div>
