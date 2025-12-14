@@ -62,6 +62,7 @@ interface AccountData {
   win_rate?: number
   win_trades?: number
   open_positions?: number
+  performance_pct?: number  // Performance % calculated from first/latest activities
 }
 
 function ForgeApp() {
@@ -1060,10 +1061,10 @@ function ForgeApp() {
                 totalEquity: Number(account.current_balance || 0) +
                              Number(account.unrealized_pnl || 0),
                 availableBalance: Number(account.available_balance || 0),
-                pnl: Number(account.total_pnl || 0),
+                pnl: Number(account.unrealized_pnl || 0),  // Show unrealized P&L instead of total
                 trades: Number(account.total_trades || 0),
                 winRate: account.win_rate ? Number(account.win_rate) * 100 : 0,  // Convert to percentage
-                performance: Number(account.total_pnl || 0)  // Performance in absolute USD for now
+                performance: Number(account.performance_pct || 0)  // Performance % from activities
               } : null
 
               return (

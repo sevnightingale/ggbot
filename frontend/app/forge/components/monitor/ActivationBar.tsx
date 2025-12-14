@@ -177,7 +177,7 @@ export function ActivationBar({
               <KPICard label="Total Equity" value={`$${Math.round(metrics.totalEquity).toLocaleString()}`} />
               <KPICard label="Available" value={`$${Math.round(metrics.availableBalance).toLocaleString()}`} />
               <KPICard
-                label="P/L"
+                label="Unrealized"
                 value={`${metrics.pnl >= 0 ? '+' : ''}$${Math.round(metrics.pnl).toLocaleString()}`}
                 positive={metrics.pnl >= 0}
               />

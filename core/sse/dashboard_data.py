@@ -116,6 +116,24 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         ) ranked_decisions
         WHERE rn <= 5  -- 5 most recent decisions per bot (no time filter)
     ),
+    first_activities AS (
+        -- Get first activity for each bot (for performance calculation)
+        SELECT DISTINCT ON (config_id)
+               config_id,
+               account_balance as initial_equity
+        FROM activities
+        WHERE account_balance IS NOT NULL
+        ORDER BY config_id, created_at ASC
+    ),
+    latest_activities AS (
+        -- Get latest activity for each bot (for performance calculation)
+        SELECT DISTINCT ON (config_id)
+               config_id,
+               account_balance as current_equity
+        FROM activities
+        WHERE account_balance IS NOT NULL
+        ORDER BY config_id, created_at DESC
+    ),
     account_summaries AS (
         -- Get latest snapshot per config from universal account monitor
         SELECT DISTINCT ON (asn.config_id)
@@ -132,9 +150,17 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                asn.open_positions,
                asn.win_rate,
                asn.timestamp as updated_at,
-               asn.trading_mode as source
+               asn.trading_mode as source,
+               -- Calculate performance % from activities
+               CASE
+                   WHEN fa.initial_equity IS NOT NULL AND fa.initial_equity > 0 AND la.current_equity IS NOT NULL
+                   THEN ((la.current_equity - fa.initial_equity) / fa.initial_equity * 100)
+                   ELSE 0
+               END as performance_pct
         FROM account_snapshots asn
         INNER JOIN bot_configs bc ON asn.config_id = bc.config_id
+        LEFT JOIN first_activities fa ON asn.config_id = fa.config_id
+        LEFT JOIN latest_activities la ON asn.config_id = la.config_id
         ORDER BY asn.config_id, asn.timestamp DESC
     )
     SELECT json_build_object(
