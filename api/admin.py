@@ -1001,8 +1001,10 @@ async def get_equity_comparison(
     """
     Get equity performance comparison for paper trading bots.
 
-    Returns time-series equity data (current_balance + margin_used + unrealized_pnl)
+    Returns time-series equity data (current_balance + unrealized_pnl)
     for all active paper trading bots.
+
+    Note: current_balance already includes margin_used.
     """
     # If no user_id specified, use admin's user_id
     target_user_id = user_id or admin.user_id
