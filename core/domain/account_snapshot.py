@@ -78,8 +78,10 @@ class AccountSnapshot:
         This represents what the AI "sees" at this moment in time.
 
         For paper mode:
-            Total Equity = current_balance + margin_used + unrealized_pnl
-            (cash + locked margin + live P&L)
+            Total Equity = current_balance + unrealized_pnl
+
+            Note: current_balance already includes margin_used
+            (current_balance = available_balance + margin_used)
 
         For live modes (Symphony/Aster):
             Total Equity = total_pnl
@@ -89,14 +91,13 @@ class AccountSnapshot:
             Decimal representing total account equity, or None if insufficient data
         """
         if self.trading_mode == 'paper':
-            # Paper trading: Add all components
+            # Paper trading: current_balance + unrealized P&L
             if self.current_balance is None:
                 return None
 
-            margin = self.margin_used if self.margin_used else Decimal('0')
             unrealized = self.unrealized_pnl if self.unrealized_pnl else Decimal('0')
 
-            return self.current_balance + margin + unrealized
+            return self.current_balance + unrealized
 
         else:
             # Live modes (symphony/aster): total_pnl already includes everything
