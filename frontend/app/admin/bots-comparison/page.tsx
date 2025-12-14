@@ -40,7 +40,9 @@ const BOT_COLORS = [
 
 // Helper to get bot profile image
 const getBotImage = (botName: string): string => {
-  const normalized = botName.toLowerCase().replace(/\s+/g, '-')
+  // Remove "The " prefix if present, then normalize
+  const withoutThe = botName.replace(/^The\s+/i, '')
+  const normalized = withoutThe.toLowerCase().replace(/\s+/g, '-')
   return `/the-${normalized}-1.png`
 }
 

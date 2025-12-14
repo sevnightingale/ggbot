@@ -184,6 +184,39 @@ For beginners with no strategy:
 
 ---
 
+## 📚 **Documentation - Prompt System Architecture Review**
+
+**Status**: 🟡 NEEDS REVIEW
+**Planning Doc**: [DOCS/todo/PROMPT_SYSTEM_ARCHITECTURE.md](DOCS/todo/PROMPT_SYSTEM_ARCHITECTURE.md)
+
+**Summary**: Comprehensive analysis of prompt generation system, trade settings integration, and position management flows.
+
+### **Documentation Complete**
+- [x] Output format instructions (exact LLM requirements)
+- [x] Trade settings integration (leverage, position sizing, SL/TP defaults)
+- [x] Position management mode (routing, data fetching, formatting)
+- [x] Complete flow diagrams (opportunity analysis + position management)
+- [x] Key design insights (separation of concerns, context continuity)
+- [x] 8 potential improvements identified
+
+### **Review Tasks**
+- [ ] Read complete documentation (PROMPT_SYSTEM_ARCHITECTURE.md)
+- [ ] Evaluate proposed improvements for priority/feasibility
+- [ ] Decide if any improvements should move to active development
+- [ ] Update system documentation if architecture changes are planned
+
+### **Potential Improvements to Consider**
+1. Add risk context to prompts (leverage, defaults visible to LLM)
+2. Dynamic TP/SL defaults based on volatility/timeframe
+3. Implement SL/TP trailing updates (currently LLM can suggest but system doesn't apply)
+4. Multi-position portfolio management
+5. Performance classification granularity improvements
+6. Feedback loop for default applications
+7. Structured output format (JSON schema)
+8. Portfolio context in opportunity analysis
+
+---
+
 ## 🏆 **AsterDEX - Production Hardening**
 
 **Status**: ✅ Core implementation complete, needs production hardening and testing
