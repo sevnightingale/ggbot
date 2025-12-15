@@ -49,7 +49,8 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
         return db_data
 
     except Exception as e:
-        logger.error(f"Failed to get unified dashboard data for user {user_id}: {e}")
+        import traceback
+        logger.error(f"Failed to get unified dashboard data for user {user_id}: {e}\n{traceback.format_exc()}")
         # Return empty structure on error
         return {
             'bots': [],
@@ -151,7 +152,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                asn.win_rate,
                asn.timestamp as updated_at,
                asn.trading_mode as source,
-               -- Calculate performance % from activities
+               -- Calculate performance percentage from activities
                CASE
                    WHEN fa.initial_equity IS NOT NULL AND fa.initial_equity > 0 AND la.current_equity IS NOT NULL
                    THEN ((la.current_equity - fa.initial_equity) / fa.initial_equity * 100)
