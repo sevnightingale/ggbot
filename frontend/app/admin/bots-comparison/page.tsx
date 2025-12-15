@@ -17,6 +17,7 @@ interface BotData {
   data_points: DataPoint[]
   current_equity: number
   current_pnl: number
+  initial_balance: number
   total_trades: number
   win_rate: number
   open_positions: number
@@ -244,7 +245,7 @@ export default function BotsComparisonPage() {
       {!loading && data && data.bots.length > 0 && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {data.bots.map((bot, index) => {
-            const pnlPercent = ((bot.current_equity - 10000) / 10000) * 100
+            const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
             const isPositive = pnlPercent >= 0
 
             return (

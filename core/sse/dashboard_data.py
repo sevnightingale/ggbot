@@ -200,15 +200,16 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         with conn.cursor() as cur:
             cur.execute(query, (user_id,))
             result = cur.fetchone()
-            
-            if result and result[0]:
+
+            # Check if result exists and has at least one element before accessing
+            if result and len(result) > 0 and result[0]:
                 return result[0]  # Return the JSON object
             else:
                 # Return empty structure if no data
                 return {
                     'bots': [],
                     'positions': [],
-                    'decisions': [], 
+                    'decisions': [],
                     'accounts': [],
                     'timestamp': datetime.now(timezone.utc).isoformat()
                 }

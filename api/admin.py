@@ -1024,9 +1024,11 @@ async def get_equity_comparison(
                     s.total_pnl,
                     s.total_trades,
                     s.win_rate,
-                    s.open_positions
+                    s.open_positions,
+                    pa.initial_balance
                 FROM account_snapshots s
                 JOIN configurations c ON s.config_id = c.config_id
+                LEFT JOIN paper_accounts pa ON s.config_id = pa.config_id
                 WHERE c.user_id = %s
                 AND c.trading_mode = 'paper'
                 AND c.state = 'active'
@@ -1047,6 +1049,7 @@ async def get_equity_comparison(
                 total_trades = row[5] or 0
                 win_rate = float(row[6] or 0)
                 open_positions = row[7] or 0
+                initial_balance = float(row[8] or 10000)
 
                 if config_id not in bots_data:
                     bots_data[config_id] = {
@@ -1055,6 +1058,7 @@ async def get_equity_comparison(
                         "data_points": [],
                         "current_equity": total_equity,
                         "current_pnl": total_pnl,
+                        "initial_balance": initial_balance,
                         "total_trades": total_trades,
                         "win_rate": win_rate,
                         "open_positions": open_positions

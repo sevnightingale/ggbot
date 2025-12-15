@@ -429,18 +429,35 @@ Return ONLY the JSON object, no markdown formatting.""",
             return parsed_data, metadata
 
         except Exception as e:
+            # Extract detailed error information from gRPC exceptions
             error_msg = str(e)
+            error_details = error_msg
+
+            # Try to get gRPC details if available
+            if hasattr(e, 'code'):
+                error_details = f"gRPC code: {e.code()}, details: {e.details()}"
+            elif hasattr(e, '_state'):
+                error_details = f"gRPC state: {e._state}"
+
+            # Check for resource exhaustion (out of credits)
+            if "RESOURCE_EXHAUSTED" in error_msg or "credits" in error_msg.lower():
+                self._log.error(
+                    f"🚨 XAI/Grok API credits exhausted for {query_type}. "
+                    f"Add credits at https://console.x.ai/team/settings/billing or increase spending limit. "
+                    f"Error: {error_details}"
+                )
+                raise AdapterError(f"XAI API credits exhausted - add funds to continue using Grok market intelligence")
 
             # Check for timeout errors
             if "DEADLINE_EXCEEDED" in error_msg or "timeout" in error_msg.lower():
                 self._log.error(
                     f"Grok query timed out after {timeout}s for {query_type}. "
                     f"This query may be too complex or data source unavailable. "
-                    f"Error: {error_msg}"
+                    f"Error: {error_details}"
                 )
                 raise AdapterError(f"Grok query timeout (>{timeout}s) for {query_type}: Data source may be slow or unavailable")
 
-            self._log.error(f"Grok streaming failed for {query_type}: {e}")
+            self._log.error(f"Grok streaming failed for {query_type}: {error_details}")
             raise
 
     def _parse_grok_response(self, content: str, query_type: str) -> Dict[str, Any]:

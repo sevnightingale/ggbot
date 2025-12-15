@@ -23,9 +23,9 @@ query_params:
     description: Cryptocurrency symbol (e.g., BTC, ETH) - required for symbol-specific queries
 
 sources:
-  - adapter: GrokAgenticAdapter
+  - adapter: OpenRouterMarketAdapter
     priority: 1
-    cost: variable  # $0.05-0.15 per query
+    cost: variable  # ~$0.01-0.05 per query (Perplexity Sonar)
 
 cache:
   backend: redis

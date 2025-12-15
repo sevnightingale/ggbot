@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-12-14 13:04:54 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-12-15 00:59:28 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -20,26 +20,26 @@
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,454
-  - Wins: 1,637
+- **Total Trades (All Time)**: 5,455
+  - Wins: 1,638
   - Losses: 3,817
-  - Platform Win Rate: 30.01%
-  - Total P&L: $-16,177.29
+  - Platform Win Rate: 30.03%
+  - Total P&L: $-16,165.37
 - **Recent Activity**:
-  - Last 24 hours: 1 trades
-  - Last 7 days: 1 trades
-  - Last 30 days: 8 trades
+  - Last 24 hours: 3 trades
+  - Last 7 days: 3 trades
+  - Last 30 days: 10 trades
 
 ### Open Positions
-- **Open Positions**: 0
-- **Unique Symbols**: 0
-- **Total Exposure**: $0.00
-- **Unrealized P&L**: $0.00
+- **Open Positions**: 1
+- **Unique Symbols**: 1
+- **Total Exposure**: $6,007.83
+- **Unrealized P&L**: $6.47
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,931.60
+- **Average Balance**: $9,925.15
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $11,305.02
+- **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
@@ -48,12 +48,12 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 67 decisions (avg confidence: 16.0%)
-- **enter**: 13 decisions (avg confidence: 65.4%)
-- **exit**: 1 decisions (avg confidence: 58.0%)
+- **wait**: 194 decisions (avg confidence: 30.1%)
+- **enter**: 8 decisions (avg confidence: 64.4%)
+- **exit**: 2 decisions (avg confidence: 51.5%)
 
 ### System Health
-- **Decisions (last hour)**: 21
+- **Decisions (last hour)**: 10
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -62,22 +62,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 19MB | 1d 21h | 67 |
-| x-bot | 🟢 online | 0% | 26MB | 1d 21h | 66 |
-| error-alerts | 🟢 online | 0% | 25MB | 1d 21h | 73 |
-| market-data-ws | 🟢 online | 1.4% | 99MB | 1d 21h | 68 |
-| ggbot | 🟢 online | 0.5% | 299MB | 1h 1m | 236 |
-| account-monitor | 🟢 online | 1.9% | 181MB | 13h 24m | 30 |
+| signal-listener | 🟢 online | 0% | 17MB | 2d 9h | 67 |
+| x-bot | 🟢 online | 0% | 21MB | 2d 9h | 66 |
+| error-alerts | 🟢 online | 0% | 24MB | 2d 9h | 73 |
+| market-data-ws | 🟢 online | 0.8% | 90MB | 2d 9h | 68 |
+| ggbot | 🟢 online | 0.8% | 298MB | 44m | 242 |
+| account-monitor | 🟢 online | 1.7% | 260MB | 1d 1h | 30 |
 
 ### VM Resources
 
 - **Disk**: 39G / 78G (50%)
 - **Memory**: 2.0Gi / 3.8Gi
-- **CPU Load**: 0.29 / 0.18 / 0.21 (1m/5m/15m)
+- **CPU Load**: 0.28 / 0.17 / 0.18 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 12.53M)
+- **Redis**: 🟢 connected (Memory: 12.99M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -402,7 +402,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-12-14 13:04:56 UTC
+**Last Updated**: 2025-12-15 00:59:29 UTC
 
 ---
 
@@ -1246,7 +1246,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-12-14 13:04:56 UTC
+**Last Updated**: 2025-12-15 00:59:29 UTC
 
 ---
 
