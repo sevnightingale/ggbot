@@ -6,14 +6,15 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
-## 2025-12-17 - Bot Limit Removal + Market Intelligence Migration
+## 2025-12-17 - Bot Limit Removal + Market Intelligence Hybrid Setup
 
 **SSE Dashboard Fix** - core/sse/dashboard_data.py:205 - Added tuple length check, prevented "tuple index out of range" crash for 2 users
 
-**Market Intelligence Migration** - XAI/Grok credits exhausted (StatusCode.RESOURCE_EXHAUSTED) → switched to OpenRouter/Perplexity Sonar Pro
-- Created market_intelligence/adapters/agentic/openrouter_adapter.py - same prompts, native web search
-- Updated grok_agentic.yaml - adapter changed from GrokAgenticAdapter to OpenRouterMarketAdapter
-- Cost reduced $0.05-0.15/query → $0.01-0.05/query, all 8 sources working (VIX, DXY, CPI, NFP, BTC TVL, whale, Twitter, news)
+**Market Intelligence Hybrid** - Split sources between Grok (Twitter/on-chain) and Perplexity (macro) for optimal quality/cost
+- Created market_intelligence/adapters/agentic/openrouter_adapter.py - Perplexity Sonar Pro with native web search
+- Created perplexity_macro.yaml - VIX, DXY, CPI, NFP via Perplexity (~$0.01/query)
+- Updated grok_agentic.yaml - Twitter sentiment, crypto news, BTC TVL, whale activity via Grok XAI ($0.05-0.15/query)
+- Grok uses native X/Twitter access + code execution (superior quality), Perplexity handles macro (5-10× cheaper)
 
 **Bot Limit Removed** - Usage-based pricing model, no artificial caps
 - Dropped PostgreSQL trigger trigger_check_user_bot_limit + check_user_bot_limit() function (was blocking at 7 bots)

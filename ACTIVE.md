@@ -266,7 +266,7 @@
 - **Documentation**: Complete guide in DOCS/completed/METERED_BILLING_IMPLEMENTATION.md
 
 ### **Market Intelligence**
-**32 data points across 7 categories (8 Perplexity-powered sources LIVE via OpenRouter):**
+**32 data points across 7 categories (hybrid: 4 Perplexity macro + 4 Grok Twitter/on-chain sources LIVE):**
 - **Technical Analysis** (21 indicators): RSI, MACD, Bollinger Bands, volume, momentum, trend
 - **Trading Signals** (1 source): ggShot AI-filtered signals (1,829+ stored in database, 70 days history, live updates)
 - **On-Chain Analytics** (2 live): BTC TVL, whale activity
@@ -345,21 +345,28 @@ df -h
 ## 💳 Stripe Subscription System
 
 ### Subscription Tiers
-| Feature | Free | Usage-Based | Pro |
-|---------|------|-------------|-----|
-| **Base Price** | $0/month | $0/month | $29/month |
-| **Bot Activation** | ❌ Browse only | ✅ Unlimited | ✅ Unlimited |
-| **LLM Usage** | N/A | Pay-per-use (1.70× markup) | Pay-per-use (1.70× markup) |
-| **Analysis Frequency** | N/A | 5 minutes minimum | 5 minutes minimum |
-| **AI Models** | N/A | 7 Frontier Models | 7 Frontier Models |
-| **Live Trading** | ❌ | ✅ (Symphony.io) | ✅ (Symphony.io) |
-| **Telegram Publishing** | ❌ | ✅ | ✅ |
-| **Agents** | ❌ | ❌ | ✅ Only PRO |
-| **Billing** | N/A | Weekly invoicing | Monthly + usage |
+| Feature | Free | Usage-Based |
+|---------|------|-------------|
+| **Base Price** | $0/month | $0/month |
+| **Bot Activation** | ❌ Browse only | ✅ Unlimited |
+| **LLM Usage** | N/A | Pay-per-use (1.70× markup) |
+| **Analysis Frequency** | N/A | Any (5m to 1w) |
+| **AI Models** | N/A | All 7 Frontier Models |
+| **Reasoning Tiers** | N/A | Economy/Standard/Premium |
+| **Live Trading** | ❌ | ✅ (Symphony.io, AsterDEX) |
+| **Telegram Publishing** | ❌ | ✅ |
+| **Billing** | N/A | Weekly invoicing |
+
+**Typical Costs** (based on real usage data):
+- Budget: <$2/month (1-2 bots, hourly, economy reasoning)
+- Active Trader: $10-35/month (3-5 bots, 15-30min, standard reasoning)
+- Power User: $50-150/month (5-10 bots, 5-15min, premium reasoning)
+
+**Cost varies 30× between reasoning tiers**: Economy (~$0.003), Standard (~$0.01), Premium (~$0.04-0.09) per decision
 
 ### Stripe Integration
 **Backend API Endpoints** (`/api/v2/`):
-- `POST /create-checkout-session` - Create Stripe Checkout (usage-based or PRO plans)
+- `POST /create-checkout-session` - Create Stripe Checkout (usage-based plan)
 - `POST /stripe-webhook` - Handle subscription events (HMAC verified)
 - `POST /create-portal-session` - Stripe billing portal for self-service management
 - `GET /me` - User profile with subscription status
