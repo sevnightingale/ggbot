@@ -23,6 +23,11 @@ export function BotImageUpload({
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
+  // Sync preview with currentImageUrl when it changes (e.g., from SSE update)
+  React.useEffect(() => {
+    setPreview(currentImageUrl)
+  }, [currentImageUrl])
+
   // Resize image to 1024x1024
   const resizeImage = (file: File): Promise<Blob> => {
     return new Promise((resolve, reject) => {

@@ -69,7 +69,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     query = """
     WITH bot_configs AS (
         SELECT c.config_id, c.user_id, c.config_name, c.config_type, c.state, c.config_data,
-               c.trading_mode, c.symphony_agent_id,
+               c.trading_mode, c.symphony_agent_id, c.profile_image_url,
                c.created_at, c.updated_at
         FROM configurations c
         WHERE c.user_id = %s AND c.state != 'archived'
@@ -174,6 +174,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                 'state', bc.state,
                 'trading_mode', bc.trading_mode,
                 'symphony_agent_id', bc.symphony_agent_id,
+                'profile_image_url', bc.profile_image_url,
                 'config_data', json_build_object(
                     'schema_version', bc.config_data->>'schema_version',
                     'config_type', bc.config_data->>'config_type',
