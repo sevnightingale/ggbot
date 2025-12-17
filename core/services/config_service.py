@@ -107,7 +107,7 @@ class BotConfigV2:
         return cls(
             config_id=data["config_id"],
             user_id=data["user_id"],
-            config_name=data.get("config_name", "Untitled Bot"),
+            config_name=data.get("config_name"),  # Don't apply fallback - preserve NULL from DB
             selected_pair=data["selected_pair"],
             extraction=data.get("extraction"),
             decision=data.get("decision"),
@@ -283,7 +283,7 @@ class ConfigService:
                     if not result:
                         return None
 
-                    db_config_name = result[0] or "Untitled Bot"  # Config name from table column
+                    db_config_name = result[0]  # Config name from table column (can be NULL)
                     config_data = json.loads(result[1]) if isinstance(result[1], str) else result[1]
                     db_config_type = result[4] or "scheduled_trading"  # Use config_type from database
                     trading_mode = result[5] or "paper"
@@ -372,7 +372,7 @@ class ConfigService:
                             flattened_config = {
                                 "config_id": config_id,
                                 "user_id": user_id,
-                                "config_name": config_name or config_data.get("config_name", "Untitled Bot"),
+                                "config_name": config_name,  # Use actual DB value, don't apply fallback
                                 "selected_pair": inner_config.get("selected_pair", "BTC/USDT"),
                                 "extraction": inner_config.get("extraction", {}),
                                 "decision": inner_config.get("decision", {}),
