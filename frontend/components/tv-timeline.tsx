@@ -939,64 +939,6 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   <span>{statusText || 'ARENA STATUS'}</span>
                 </div>
               </div>
-
-              {/* Chart Mode and Timeframe Controls */}
-              <div className="flex flex-col sm:flex-row gap-2">
-                {/* Mode Toggle */}
-                <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: VIBE.obsidian }}>
-                  <button
-                    onClick={() => setChartMode('activity')}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                      chartMode === 'activity'
-                        ? 'shadow-sm'
-                        : 'hover:bg-opacity-50'
-                    }`}
-                    style={{
-                      backgroundColor: chartMode === 'activity' ? VIBE.brass : 'transparent',
-                      color: chartMode === 'activity' ? VIBE.obsidian : VIBE.ivory
-                    }}
-                  >
-                    Activity Timeline
-                  </button>
-                  <button
-                    onClick={() => setChartMode('performance')}
-                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                      chartMode === 'performance'
-                        ? 'shadow-sm'
-                        : 'hover:bg-opacity-50'
-                    }`}
-                    style={{
-                      backgroundColor: chartMode === 'performance' ? VIBE.brass : 'transparent',
-                      color: chartMode === 'performance' ? VIBE.obsidian : VIBE.ivory
-                    }}
-                  >
-                    Performance Chart
-                  </button>
-                </div>
-
-                {/* Timeframe Selector (Performance mode only) */}
-                {chartMode === 'performance' && (
-                  <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: VIBE.obsidian }}>
-                    {(['5m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
-                      <button
-                        key={tf}
-                        onClick={() => setTimeframe(tf)}
-                        className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
-                          timeframe === tf
-                            ? 'shadow-sm'
-                            : 'hover:bg-opacity-50'
-                        }`}
-                        style={{
-                          backgroundColor: timeframe === tf ? VIBE.signal : 'transparent',
-                          color: timeframe === tf ? VIBE.obsidian : VIBE.ivory
-                        }}
-                      >
-                        {tf.toUpperCase()}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
             </div>
 
             {/* KPI Row */}
@@ -1024,8 +966,68 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
       {/* CHART */}
       <section className="max-w-7xl mx-auto">
-        <div className="rounded-xl border p-4 relative" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: variant === 'embedded' ? '600px' : 'calc(100vh - 280px)', minHeight: '400px' }}>
-          <div ref={setChartContainer} style={{ width: '100%', height: '100%' }} />
+        <div className="rounded-xl border p-4 relative flex flex-col" style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.hair, height: variant === 'embedded' ? '600px' : 'calc(100vh - 280px)', minHeight: '400px' }}>
+
+          {/* Chart Mode and Timeframe Controls - Centered above chart */}
+          <div className="flex justify-center gap-2 mb-3 flex-shrink-0">
+            {/* Mode Toggle */}
+            <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: VIBE.obsidian }}>
+              <button
+                onClick={() => setChartMode('activity')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  chartMode === 'activity'
+                    ? 'shadow-sm'
+                    : 'hover:bg-opacity-50'
+                }`}
+                style={{
+                  backgroundColor: chartMode === 'activity' ? VIBE.brass : 'transparent',
+                  color: chartMode === 'activity' ? VIBE.obsidian : VIBE.ivory
+                }}
+              >
+                Activity Timeline
+              </button>
+              <button
+                onClick={() => setChartMode('performance')}
+                className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                  chartMode === 'performance'
+                    ? 'shadow-sm'
+                    : 'hover:bg-opacity-50'
+                }`}
+                style={{
+                  backgroundColor: chartMode === 'performance' ? VIBE.brass : 'transparent',
+                  color: chartMode === 'performance' ? VIBE.obsidian : VIBE.ivory
+                }}
+              >
+                Performance Chart
+              </button>
+            </div>
+
+            {/* Timeframe Selector (Performance mode only) */}
+            {chartMode === 'performance' && (
+              <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: VIBE.obsidian }}>
+                {(['5m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
+                  <button
+                    key={tf}
+                    onClick={() => setTimeframe(tf)}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                      timeframe === tf
+                        ? 'shadow-sm'
+                        : 'hover:bg-opacity-50'
+                    }`}
+                    style={{
+                      backgroundColor: timeframe === tf ? VIBE.signal : 'transparent',
+                      color: timeframe === tf ? VIBE.obsidian : VIBE.ivory
+                    }}
+                  >
+                    {tf.toUpperCase()}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Chart - takes remaining space */}
+          <div ref={setChartContainer} className="flex-1" />
 
           {/* Activity hover tooltip */}
           {selectedActivity && (
