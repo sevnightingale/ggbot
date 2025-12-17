@@ -54,7 +54,8 @@ const formatActivityUSD = (value: number | null | undefined): string => {
 
 interface BalancePoint {
   timestamp: string;
-  balance: number;
+  total_equity?: number;  // New API key
+  balance?: number;       // Legacy API key (deprecated)
 }
 
 interface Activity {
@@ -92,6 +93,70 @@ interface TimelineProps {
   variant?: 'standalone' | 'embedded';
 }
 
+type ChartMode = 'activity' | 'performance';
+type Timeframe = '5m' | '1h' | '4h' | '1d';
+
+// Aggregate 5-minute data points into higher timeframes
+function aggregateToTimeframe(dataPoints: BalancePoint[], timeframe: Timeframe): BalancePoint[] {
+  if (timeframe === '5m' || dataPoints.length === 0) {
+    return dataPoints; // No aggregation needed
+  }
+
+  // Calculate period size in minutes
+  const periodMinutes = {
+    '1h': 60,
+    '4h': 240,
+    '1d': 1440
+  }[timeframe];
+
+  const aggregated: BalancePoint[] = [];
+  let currentPeriodStart: Date | null = null;
+  let currentPeriodPoints: BalancePoint[] = [];
+
+  dataPoints.forEach((point) => {
+    const timestamp = new Date(point.timestamp);
+
+    if (!currentPeriodStart) {
+      // Start first period
+      currentPeriodStart = new Date(timestamp);
+      currentPeriodStart.setMinutes(0, 0, 0); // Round down to hour
+      currentPeriodPoints = [point];
+    } else {
+      // Check if we're still in the same period
+      const minutesSinceStart = (timestamp.getTime() - currentPeriodStart.getTime()) / (1000 * 60);
+
+      if (minutesSinceStart < periodMinutes) {
+        // Still in same period
+        currentPeriodPoints.push(point);
+      } else {
+        // Period ended, aggregate and start new period
+        if (currentPeriodPoints.length > 0) {
+          // Use the LAST value in the period (most accurate for equity)
+          const lastPoint = currentPeriodPoints[currentPeriodPoints.length - 1];
+          aggregated.push(lastPoint);
+        }
+
+        // Start new period
+        currentPeriodStart = new Date(timestamp);
+        currentPeriodStart.setMinutes(
+          Math.floor(timestamp.getMinutes() / periodMinutes) * periodMinutes,
+          0,
+          0
+        );
+        currentPeriodPoints = [point];
+      }
+    }
+  });
+
+  // Add final period
+  if (currentPeriodPoints.length > 0) {
+    const lastPoint = currentPeriodPoints[currentPeriodPoints.length - 1];
+    aggregated.push(lastPoint);
+  }
+
+  return aggregated;
+}
+
 export default function TVTimeline({ configId, title, variant = 'standalone' }: TimelineProps) {
   const { theme } = useTheme();
   const [chartContainer, setChartContainer] = useState<HTMLDivElement | null>(null);
@@ -108,6 +173,10 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   const [crosshairPosition, setCrosshairPosition] = useState<{ x: number; y: number } | null>(null);
   const [latestActivity, setLatestActivity] = useState<Activity | null>(null);
   const [statusText, setStatusText] = useState<string>('');
+
+  // Chart mode and timeframe state
+  const [chartMode, setChartMode] = useState<ChartMode>('activity');
+  const [timeframe, setTimeframe] = useState<Timeframe>('5m');
 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
   const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
@@ -354,47 +423,63 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
           ? { Authorization: `Bearer ${sessionRef.current.access_token}` }
           : {};
 
-        console.log('Fetching from API...');
-        const [balanceSeriesRes, activitiesRes, metadataRes] = await Promise.all([
-          fetch(`/api/v2/snapshots/${configId}/balance-series`, {
-            headers,
-            signal: abortController.signal
-          }),
-          fetch(`/api/v2/activities/${configId}`, {
-            headers,
-            signal: abortController.signal
-          }),
-          fetch(`/api/v2/activities/${configId}/metadata`, {
-            headers,
-            signal: abortController.signal
-          }),
-        ]);
+        console.log('Fetching from API...', { mode: chartMode, timeframe });
+
+        // Choose endpoint based on chart mode
+        const seriesEndpoint = chartMode === 'activity'
+          ? `/api/v2/snapshots/${configId}/balance-series`
+          : `/api/v2/snapshots/${configId}/performance-series`;
+
+        // Fetch data (activities only needed for activity mode)
+        const fetchPromises = [
+          fetch(seriesEndpoint, { headers, signal: abortController.signal }),
+          fetch(`/api/v2/activities/${configId}/metadata`, { headers, signal: abortController.signal }),
+        ];
+
+        // Only fetch activities for activity mode (needed for markers/details)
+        if (chartMode === 'activity') {
+          fetchPromises.push(
+            fetch(`/api/v2/activities/${configId}`, { headers, signal: abortController.signal })
+          );
+        }
+
+        const responses = await Promise.all(fetchPromises);
+        const [balanceSeriesRes, metadataRes, activitiesRes] = responses;
 
         console.log('API responses:', {
           balanceOk: balanceSeriesRes.ok,
           balanceStatus: balanceSeriesRes.status,
-          activitiesOk: activitiesRes.ok,
-          activitiesStatus: activitiesRes.status,
+          activitiesOk: activitiesRes?.ok,
+          activitiesStatus: activitiesRes?.status,
           metadataOk: metadataRes.ok,
           metadataStatus: metadataRes.status
         });
 
-        if (!balanceSeriesRes.ok || !activitiesRes.ok || !metadataRes.ok) {
+        // Check required responses
+        if (!balanceSeriesRes.ok || !metadataRes.ok || (chartMode === 'activity' && activitiesRes && !activitiesRes.ok)) {
           const balanceError = await balanceSeriesRes.text();
-          const activitiesError = await activitiesRes.text();
           const metadataError = await metadataRes.text();
+          const activitiesError = activitiesRes ? await activitiesRes.text() : 'N/A';
           console.error('API errors:', { balanceError, activitiesError, metadataError });
           throw new Error(`Failed to fetch timeline data`);
         }
 
-        const [balanceSeries, activitiesData, metadataData] = await Promise.all([
-          balanceSeriesRes.json(),
-          activitiesRes.json(),
-          metadataRes.json(),
-        ]);
+        // Parse responses
+        const balanceSeries = await balanceSeriesRes.json();
+        const metadataData = await metadataRes.json();
+        const activitiesData = activitiesRes ? await activitiesRes.json() : null;
 
-        const balancePoints: BalancePoint[] = balanceSeries.balance_series || [];
-        const activities: Activity[] = activitiesData.activities || [];
+        // Get balance points and apply aggregation for performance mode
+        let balancePoints: BalancePoint[] = balanceSeries.equity_series || balanceSeries.balance_series || [];
+
+        // Apply timeframe aggregation for performance mode
+        if (chartMode === 'performance' && timeframe !== '5m') {
+          console.log(`Aggregating ${balancePoints.length} points to ${timeframe} timeframe...`);
+          balancePoints = aggregateToTimeframe(balancePoints, timeframe);
+          console.log(`After aggregation: ${balancePoints.length} points`);
+        }
+
+        const activities: Activity[] = activitiesData?.activities || [];
 
         console.log('Raw balance points:', balancePoints.length);
         console.log('Raw activities:', activities.length);
@@ -409,12 +494,15 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         });
 
         // Simplified: Backend already merges snapshots + activities
-        // Just convert timestamps and use balance values directly
+        // Just convert timestamps and use equity values directly
         const chartData: LineData[] = balancePoints
-          .filter(point => point.timestamp && point.balance != null)  // Filter null/invalid points
+          .filter(point => {
+            const equity = point.total_equity ?? point.balance;  // Use new key with fallback to legacy
+            return point.timestamp && equity != null;
+          })
           .map(point => ({
             time: Math.floor(new Date(point.timestamp).getTime() / 1000) as Time,
-            value: point.balance
+            value: point.total_equity ?? point.balance ?? 0  // Use new key with fallback to legacy
           }))
           .filter(point => !isNaN(point.time as number) && point.value != null)  // Extra safety check
           .sort((a, b) => {
@@ -465,31 +553,32 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
           lineSeriesRef.current.setData(chartData);
 
-          // Build activities lookup map - group by timestamp
-          activitiesMapRef.current.clear();
-          const groupedByTimestamp = new Map<number, Activity[]>();
+          // Build activities lookup map and markers - ONLY for activity mode
+          if (chartMode === 'activity') {
+            activitiesMapRef.current.clear();
+            const groupedByTimestamp = new Map<number, Activity[]>();
 
-          activities.forEach((activity) => {
-            const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
-            if (!groupedByTimestamp.has(timestamp)) {
-              groupedByTimestamp.set(timestamp, []);
+            activities.forEach((activity) => {
+              const timestamp = Math.floor(new Date(activity.timestamp).getTime() / 1000);
+              if (!groupedByTimestamp.has(timestamp)) {
+                groupedByTimestamp.set(timestamp, []);
+              }
+              groupedByTimestamp.get(timestamp)!.push(activity);
+            });
+
+            // Set the grouped activities in the ref
+            activitiesMapRef.current = groupedByTimestamp;
+
+            // Update latest activity for status display
+            const sortedActivities = activities.sort((a, b) =>
+              new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+            );
+            if (sortedActivities.length > 0) {
+              setLatestActivity(sortedActivities[0]);
             }
-            groupedByTimestamp.get(timestamp)!.push(activity);
-          });
 
-          // Set the grouped activities in the ref
-          activitiesMapRef.current = groupedByTimestamp;
-
-          // Update latest activity for status display
-          const sortedActivities = activities.sort((a, b) =>
-            new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
-          );
-          if (sortedActivities.length > 0) {
-            setLatestActivity(sortedActivities[0]);
-          }
-
-          // Create one marker per timestamp based on priority
-          const markers: SeriesMarker<Time>[] = [];
+            // Create one marker per timestamp based on priority
+            const markers: SeriesMarker<Time>[] = [];
 
           // Create a Set of valid timestamps from chartData for marker validation
           const validTimestamps = new Set(chartData.map(point => point.time as number));
@@ -614,6 +703,13 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               circles: sortedMarkers.filter(m => m.shape === 'circle').length,
             });
           }
+          } else {
+            // Performance mode - clear markers and activities
+            activitiesMapRef.current.clear();
+            if (lineSeriesRef.current) {
+              lineSeriesRef.current.setMarkers([]);
+            }
+          }
 
           // Only fit content on first load, preserve user zoom/pan on subsequent updates
           if (isFirstLoadRef.current) {
@@ -672,9 +768,10 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
       fetchDataRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [configId, chartContainer]); // NOTE: session and theme NOT in dependencies
+  }, [configId, chartContainer, chartMode, timeframe]); // NOTE: session and theme NOT in dependencies
   // - session: prevents double render, fetchData reads current value via ref
   // - theme: separate effect handles color updates dynamically
+  // - chartMode and timeframe: trigger data refetch when changed
 
   // Refetch data when session loads (for RLS auth) - without recreating chart
   useEffect(() => {
@@ -841,6 +938,64 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   />
                   <span>{statusText || 'ARENA STATUS'}</span>
                 </div>
+              </div>
+
+              {/* Chart Mode and Timeframe Controls */}
+              <div className="flex flex-col sm:flex-row gap-2">
+                {/* Mode Toggle */}
+                <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: VIBE.obsidian }}>
+                  <button
+                    onClick={() => setChartMode('activity')}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                      chartMode === 'activity'
+                        ? 'shadow-sm'
+                        : 'hover:bg-opacity-50'
+                    }`}
+                    style={{
+                      backgroundColor: chartMode === 'activity' ? VIBE.brass : 'transparent',
+                      color: chartMode === 'activity' ? VIBE.obsidian : VIBE.ivory
+                    }}
+                  >
+                    Activity Timeline
+                  </button>
+                  <button
+                    onClick={() => setChartMode('performance')}
+                    className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                      chartMode === 'performance'
+                        ? 'shadow-sm'
+                        : 'hover:bg-opacity-50'
+                    }`}
+                    style={{
+                      backgroundColor: chartMode === 'performance' ? VIBE.brass : 'transparent',
+                      color: chartMode === 'performance' ? VIBE.obsidian : VIBE.ivory
+                    }}
+                  >
+                    Performance Chart
+                  </button>
+                </div>
+
+                {/* Timeframe Selector (Performance mode only) */}
+                {chartMode === 'performance' && (
+                  <div className="flex gap-1 p-1 rounded-lg" style={{ backgroundColor: VIBE.obsidian }}>
+                    {(['5m', '1h', '4h', '1d'] as Timeframe[]).map((tf) => (
+                      <button
+                        key={tf}
+                        onClick={() => setTimeframe(tf)}
+                        className={`px-3 py-1.5 rounded text-xs font-medium transition-all ${
+                          timeframe === tf
+                            ? 'shadow-sm'
+                            : 'hover:bg-opacity-50'
+                        }`}
+                        style={{
+                          backgroundColor: timeframe === tf ? VIBE.signal : 'transparent',
+                          color: timeframe === tf ? VIBE.obsidian : VIBE.ivory
+                        }}
+                      >
+                        {tf.toUpperCase()}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 

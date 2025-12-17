@@ -23,33 +23,33 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
   const features = [
     {
       icon: '🧠',
-      title: 'Frontier reasoning models',
-      description: 'Access to Claude, GPT-5, Grok, Gemini, and more'
+      title: 'All 7 frontier AI models',
+      description: 'Claude, GPT-5, Grok, Gemini, DeepSeek, Kimi, Qwen'
     },
     {
       icon: '⚡',
-      title: 'High frequency analysis',
-      description: 'Run your ggbots as often as you need'
+      title: 'Any analysis frequency',
+      description: '5-minute to weekly checks - you choose'
     },
     {
       icon: '📱',
       title: 'Telegram signal publishing',
-      description: 'Receive your ggbot\'s decisions as trading signals'
+      description: 'Receive your bot decisions as trading signals'
     },
     {
       icon: '🤖',
-      title: 'Multiple active bots',
-      description: 'Run up to 10 ggbots simultaneously'
+      title: 'Unlimited active bots',
+      description: 'Run as many bots as you need simultaneously'
     },
     {
-      icon: '🔍',
-      title: 'Signal validation mode',
-      description: 'Validate external signals before execution'
+      icon: '🎯',
+      title: 'Paper & live trading',
+      description: 'Test with virtual $10k or trade real money'
     },
     {
       icon: '📊',
-      title: 'Live trading (Symphony)',
-      description: 'Execute real trades on supported exchanges'
+      title: 'Real-time performance tracking',
+      description: 'Monitor all your bots with live P&L updates'
     }
   ]
 
@@ -91,16 +91,35 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         {/* Pricing Display */}
         <div className="text-center mb-3 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
           <div className="flex items-baseline justify-center gap-2 mb-2">
-            <span className="text-4xl font-bold text-[var(--text-primary)]">
-              Usage-Based
-            </span>
+            <span className="text-4xl font-bold text-[var(--text-primary)]">$0</span>
+            <span className="text-lg text-[var(--text-secondary)]">base fee</span>
           </div>
           <p className="text-lg text-[var(--text-secondary)] mb-3">
-            No monthly fee • Pay per LLM call
+            Pay only for what you use
           </p>
-          <div className="text-sm text-[var(--text-muted)] space-y-1">
-            <p>Typical costs: <span className="font-semibold text-[var(--text-primary)]">~$0.05 per decision</span></p>
-            <p className="text-xs">Exact cost depends on model choice and market data complexity</p>
+
+          {/* Cost Range Examples */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <div className="bg-[var(--bg-tertiary)] rounded p-2">
+              <div className="text-xs text-[var(--text-muted)] mb-1">Budget</div>
+              <div className="font-semibold text-[var(--profit-color)]">&lt;$2/mo</div>
+              <div className="text-xs text-[var(--text-tertiary)] mt-1">Hourly • Economy</div>
+            </div>
+            <div className="bg-[var(--bg-tertiary)] rounded p-2">
+              <div className="text-xs text-[var(--text-muted)] mb-1">Active</div>
+              <div className="font-semibold text-[var(--accent)]">$10-35/mo</div>
+              <div className="text-xs text-[var(--text-tertiary)] mt-1">15-30min • Standard</div>
+            </div>
+            <div className="bg-[var(--bg-tertiary)] rounded p-2">
+              <div className="text-xs text-[var(--text-muted)] mb-1">Power</div>
+              <div className="font-semibold text-[var(--text-primary)]">$50-150/mo</div>
+              <div className="text-xs text-[var(--text-tertiary)] mt-1">5-15min • Premium</div>
+            </div>
+          </div>
+
+          <div className="text-xs text-[var(--text-muted)] space-y-1">
+            <p>Your costs scale with your configuration:</p>
+            <p className="text-[var(--text-tertiary)]">Reasoning tier (Economy/Standard/Premium) • Frequency • Number of bots</p>
           </div>
         </div>
 
@@ -142,7 +161,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
             </>
           ) : (
             <>
-              Subscribe & Activate Bots
+              Activate Usage-Based Billing
             </>
           )}
         </button>
@@ -150,7 +169,7 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
         {/* Footer */}
         <div className="text-center mt-3">
           <p className="text-xs text-[var(--text-tertiary)]">
-            Secure payment by Stripe • Cancel anytime
+            No credit card required to start • Secure payment by Stripe
           </p>
         </div>
       </DialogContent>

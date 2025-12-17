@@ -35,11 +35,14 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
     Returns:
         {
             "status": "success",
-            "balance_series": [{"timestamp": "...", "balance": 123.45}, ...],
-            "current_balance": 123.45,
-            "initial_balance": 10000.0,
+            "equity_series": [{"timestamp": "...", "total_equity": 123.45}, ...],
+            "current_equity": 123.45,
+            "initial_equity": 10000.0,
             "mode": "equity"
         }
+
+    Note: Response keys updated from 'balance' to 'total_equity' for clarity.
+          Data comes from activities.total_equity column.
     """
     try:
         with get_db_connection() as conn:
@@ -59,14 +62,14 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
                 config_created = config[1]
 
                 # Get activities ONLY - these are the AI's conscious moments
-                # account_balance field now contains total equity (from Redis cache)
+                # total_equity field contains total equity (from Redis cache)
                 cur.execute("""
                     SELECT
                         created_at,
-                        account_balance as total_equity
+                        total_equity
                     FROM activities
                     WHERE config_id = %s
-                      AND account_balance IS NOT NULL
+                      AND total_equity IS NOT NULL
                     ORDER BY created_at ASC
                 """, (config_id,))
                 activities = cur.fetchall()
@@ -78,15 +81,15 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
         for act in activities:
             timeline.append({
                 "timestamp": act[0].isoformat(),
-                "balance": float(act[1]) if act[1] is not None else 0
+                "total_equity": float(act[1]) if act[1] is not None else 0
             })
 
         # Sort by timestamp (though order should already be correct)
         timeline.sort(key=lambda x: x['timestamp'])
 
         # Calculate current and initial equity
-        current_balance = timeline[-1]['balance'] if timeline else 10000.0
-        initial_balance = timeline[0]['balance'] if timeline else 10000.0
+        current_equity = timeline[-1]['total_equity'] if timeline else 10000.0
+        initial_equity = timeline[0]['total_equity'] if timeline else 10000.0
 
         # Mode is always "equity" - total account value
         mode = "equity"
@@ -97,14 +100,106 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
 
         return {
             "status": "success",
+            "equity_series": timeline,
+            "current_equity": current_equity,
+            "initial_equity": initial_equity,
+            "mode": mode,
+            # Legacy keys for backward compatibility (deprecated)
             "balance_series": timeline,
-            "current_balance": current_balance,
-            "initial_balance": initial_balance,
-            "mode": mode
+            "current_balance": current_equity,
+            "initial_balance": initial_equity
         }
 
     except HTTPException:
         raise
     except Exception as e:
         logger.bind(config_id=config_id).error(f"Snapshot balance series failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/{config_id}/performance-series")
+async def get_performance_series(config_id: str) -> Dict[str, Any]:
+    """
+    Get objective performance timeline - ACCOUNT_SNAPSHOTS ONLY.
+
+    This chart represents objective 5-minute performance tracking,
+    regardless of bot activity. Every 5 minutes the Universal Account
+    Monitor records a snapshot of the account state.
+
+    Time spacing is uniform - every 5 minutes exactly.
+
+    Args:
+        config_id: Bot configuration ID
+
+    Returns:
+        {
+            "status": "success",
+            "equity_series": [{"timestamp": "...", "total_equity": 123.45}, ...],
+            "current_equity": 123.45,
+            "initial_equity": 10000.0
+        }
+
+    Note: Data comes from account_snapshots table.
+          Formula: total_equity = current_balance + unrealized_pnl
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                # Verify config exists
+                cur.execute("""
+                    SELECT trading_mode, created_at
+                    FROM configurations
+                    WHERE config_id = %s
+                """, (config_id,))
+                config = cur.fetchone()
+
+                if not config:
+                    raise HTTPException(status_code=404, detail="Config not found")
+
+                trading_mode = config[0]
+                config_created = config[1]
+
+                # Get account snapshots - regular 5-minute intervals
+                # Formula: total_equity = current_balance + unrealized_pnl
+                cur.execute("""
+                    SELECT
+                        timestamp,
+                        current_balance + COALESCE(unrealized_pnl, 0) as total_equity
+                    FROM account_snapshots
+                    WHERE config_id = %s
+                    ORDER BY timestamp ASC
+                """, (config_id,))
+                snapshots = cur.fetchall()
+
+        # Build timeline from snapshots
+        timeline = []
+
+        for snap in snapshots:
+            timeline.append({
+                "timestamp": snap[0].isoformat(),
+                "total_equity": float(snap[1]) if snap[1] is not None else 0
+            })
+
+        # Sort by timestamp (though order should already be correct)
+        timeline.sort(key=lambda x: x['timestamp'])
+
+        # Calculate current and initial equity
+        current_equity = timeline[-1]['total_equity'] if timeline else 10000.0
+        initial_equity = timeline[0]['total_equity'] if timeline else 10000.0
+
+        logger.bind(config_id=config_id).info(
+            f"Performance timeline: {len(snapshots)} snapshots (5-min intervals)"
+        )
+
+        return {
+            "status": "success",
+            "equity_series": timeline,
+            "current_equity": current_equity,
+            "initial_equity": initial_equity
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.bind(config_id=config_id).error(f"Performance series failed: {e}")
         raise HTTPException(status_code=500, detail=str(e))

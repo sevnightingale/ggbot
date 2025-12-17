@@ -121,18 +121,18 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
         -- Get first activity for each bot (for performance calculation)
         SELECT DISTINCT ON (config_id)
                config_id,
-               account_balance as initial_equity
+               total_equity as initial_equity
         FROM activities
-        WHERE account_balance IS NOT NULL
+        WHERE total_equity IS NOT NULL
         ORDER BY config_id, created_at ASC
     ),
     latest_activities AS (
         -- Get latest activity for each bot (for performance calculation)
         SELECT DISTINCT ON (config_id)
                config_id,
-               account_balance as current_equity
+               total_equity as current_equity
         FROM activities
-        WHERE account_balance IS NOT NULL
+        WHERE total_equity IS NOT NULL
         ORDER BY config_id, created_at DESC
     ),
     account_summaries AS (

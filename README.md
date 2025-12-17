@@ -311,6 +311,76 @@ The ggbot repository includes 8 comprehensive module READMEs with detailed techn
 
 ---
 
+## 📈 Account Metrics Glossary
+
+The platform uses standardized formulas for calculating account performance metrics. All calculations are centralized in `core/domain/metrics_calculator.py` to ensure consistency across backend APIs, frontend displays, and monitoring systems.
+
+### Core Balance Metrics
+
+| Metric | Formula | Description |
+|--------|---------|-------------|
+| **Total Equity** | `current_balance + unrealized_pnl` | True net worth of account - what AI sees at any moment |
+| **Current Balance** | Stored in DB | Total account value including margin; only changes when P&L is realized |
+| **Available Balance** | `current_balance - margin_used` | Balance available for new trades |
+| **Margin Used** | Sum of open position margins | Balance reserved for existing positions |
+
+### P&L Metrics
+
+| Metric | Formula | Description |
+|--------|---------|-------------|
+| **Total P&L** | `realized_pnl + unrealized_pnl` | All profit/loss (closed + open positions) |
+| **Realized P&L** | `total_pnl - unrealized_pnl` | P&L from closed positions only |
+| **Unrealized P&L** | Sum from `paper_trades.unrealized_pnl` | Live P&L from open positions |
+
+### Performance Metrics
+
+| Metric | Formula | Description |
+|--------|---------|-------------|
+| **Performance %** | `((current_equity - initial_equity) / initial_equity) × 100` | Return percentage from account inception |
+| **Win Rate** | `(win_trades / total_trades) × 100` | Percentage of winning trades (0-100%) |
+| **Return on Investment** | `(total_pnl / initial_equity) × 100` | ROI percentage based on P&L |
+
+### Important Notes
+
+1. **Total Equity vs Current Balance**:
+   - **Total Equity** = Live account value including unrealized P&L (changes every tick)
+   - **Current Balance** = Account balance that only changes when positions close
+   - For paper trading: `total_equity = current_balance + unrealized_pnl`
+
+2. **Margin Accounting**:
+   - `current_balance` INCLUDES margin used for open positions
+   - `available_balance` EXCLUDES margin (subtracts it out)
+   - Margin is tracked separately in `paper_trades.margin_used`
+
+3. **Performance Calculation**:
+   - Uses `total_equity` (not just balance) to show true real-time performance
+   - Includes unrealized P&L so chart moves with market
+   - Initial equity calculated as: `current_equity - total_pnl`
+
+4. **Win Rate Representation**:
+   - **Domain models** return percentage (0-100)
+   - **Database** stores decimal (0-1)
+   - **Frontend** expects decimal and multiplies by 100 for display
+
+### Data Sources
+
+| Metric Location | Update Frequency | Source |
+|-----------------|------------------|--------|
+| `account_snapshots` table | Every 5 minutes | Universal Account Monitor |
+| `activities.total_equity` column | Every 5 seconds | Redis cache → Activity logger |
+| Account API responses | On demand | Real-time DB queries |
+
+### Code References
+
+- **Centralized Calculator**: `core/domain/metrics_calculator.py` - Single source of truth for all formulas
+- **Domain Models**: `core/domain/models/account.py`, `core/domain/account_snapshot.py`
+- **Paper Trading**: `trading/paper/supabase_service.py`
+- **Account Monitoring**: `core/monitoring/adapters/paper_adapter.py`
+- **Activity Logging**: `core/common/activity_logger.py`
+- **API Endpoints**: `ggbot.py` (lines 3362-3469), `api/admin.py` (lines 995-1089)
+
+---
+
 ## 🗄️ Repository Layer (Data Access)
 
 Repositories provide the data access layer, mapping domain models to database tables.

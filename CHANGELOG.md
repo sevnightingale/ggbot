@@ -6,6 +6,17 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-17 - TV Timeline Dual-Mode + Timeframe Aggregation
+
+**Frontend** - Dual-mode equity chart with timeframe aggregation in TV Timeline component
+- Activity Timeline mode: Irregular intervals, bot subjective awareness (activities.total_equity), shows markers/tooltips/details
+- Performance Chart mode: Regular 5-min intervals, objective tracking (account_snapshots), clean line only
+- Timeframe aggregation: 5M (base), 1H, 4H, 1D views (Performance mode only, uses LAST value per period)
+- Backend: Added GET /api/v2/snapshots/{config_id}/performance-series endpoint (api/snapshots.py)
+- Conditional fetching: Activity mode fetches activities for markers, Performance mode skips unnecessary calls
+- UI: Brass toggle buttons, signal-blue timeframe selector, updates trigger data refetch via useEffect dependencies
+- Users choose between contextual activity view or clean performance trending
+
 ## 2025-12-17 - Bot Limit Removal + Market Intelligence Hybrid Setup
 
 **SSE Dashboard Fix** - core/sse/dashboard_data.py:205 - Added tuple length check, prevented "tuple index out of range" crash for 2 users

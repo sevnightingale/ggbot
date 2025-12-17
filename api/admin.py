@@ -1001,8 +1001,10 @@ async def get_equity_comparison(
     """
     Get equity performance comparison for paper trading bots.
 
-    Returns time-series equity data (current_balance + unrealized_pnl)
-    for all active paper trading bots.
+    Returns time-series equity data for all active paper trading bots.
+
+    Formula: total_equity = current_balance + unrealized_pnl
+    (Source: AccountMetricsCalculator.calculate_total_equity)
 
     Note: current_balance already includes margin_used.
     """
@@ -1014,6 +1016,8 @@ async def get_equity_comparison(
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             # Get equity snapshots for all active paper bots
+            # Formula: total_equity = current_balance + unrealized_pnl
+            # (Matches AccountMetricsCalculator.calculate_total_equity)
             cur.execute("""
                 SELECT
                     c.config_id,

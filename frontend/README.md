@@ -388,22 +388,26 @@ import { UpgradeModal } from '@/components/UpgradeModal'
 ```
 
 ### **Feature Gatekeeping**
-- **Multiple Bots (10 vs 1)**: Requires Pro Plan subscription
-- **High Frequency (5min vs 1h)**: Requires Pro Plan subscription
-- **OpenAI GPT-4**: Requires `premium_llms` access (Pro Plan)
-- **ggShot Signals**: Requires `ggshot` subscription (Pro Plan)
-- **Telegram Publishing**: Requires `telegram_publishing` access (Pro Plan)
-- **Platform LLM Keys**: Requires `platform_llm_keys` access (Pro Plan)
+All features available with usage-based subscription:
+- **Unlimited Bots**: No bot count limits
+- **Any Frequency**: 5-minute to weekly analysis
+- **All 7 AI Models**: GPT, Claude, Grok, Gemini, DeepSeek, Kimi, Qwen
+- **All Reasoning Tiers**: Economy/Standard/Premium
+- **ggShot Signals**: Available with usage-based subscription
+- **Telegram Publishing**: Available with usage-based subscription
+- **Live Trading**: Symphony.io and AsterDEX integrations
 
 ### **Stripe Integration**
 ```typescript
 // API methods in /lib/api.ts
-apiClient.createCheckoutSession({ plan: 'monthly', coupon: 'EARLY50' })
+apiClient.createCheckoutSession({ plan: 'usage' })
 apiClient.createPortalSession() // For subscription management
 ```
 
-**Pro Plan**: $29/month or $279/year (14-day free trial)
-**Early Adopter**: 50% off for 6 months with code `EARLY50`
+**Usage-Based Pricing**: $0 base fee, pay per AI decision
+- Budget: <$2/month (hourly checks, economy reasoning)
+- Active: $10-35/month (15-30min frequency, standard reasoning)
+- Power: $50-150/month (5-15min frequency, premium reasoning)
 
 ---
 
@@ -630,11 +634,11 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 
 ### **Monetization & Subscriptions**
 - [x] Stripe integration (checkout, webhooks, billing portal)
-- [x] Pro Plan pricing and feature differentiation
-- [x] UpgradeModal with monthly/annual toggle
+- [x] Usage-based pricing with transparent cost estimates
+- [x] UpgradeModal with reasoning tier examples
 - [x] Subscription status display in UserProfile
 - [x] Permission gates triggering upgrade flow
-- [x] Early adopter coupon system
+- [x] Metered billing system (pay-per-decision)
 
 ### **Integration & Deployment**
 - [x] V2 backend API integration with real-time data
@@ -658,7 +662,7 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 - ✅ **Symbol validation system**: 141 supported trading pairs with dropdown + search functionality
 - ✅ **Help widget integration**: Floating community support with Telegram group access
 - ✅ **UX improvements**: Symbol selection moved from locked exchange section to accessible location
-- ✅ **Stripe subscription system**: Complete monetization with Pro Plan ($29/mo), checkout flow, webhooks, billing portal
+- ✅ **Stripe subscription system**: Usage-based metered billing, checkout flow, webhooks, billing portal
 - ✅ **Trading settings validation**: Real-time error/warning feedback for 6 critical trading parameters
 
 ### **🔴 Critical Issues (RESOLVED)**
@@ -735,11 +739,17 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 
 ### **Overview**
 
-The AI Consciousness Timeline visualizes a bot's subjective awareness using TradingView Lightweight Charts v4.2.0. Each point represents a moment when the AI observed its account state - between points, the AI is "asleep" (not conscious of market changes). Time spacing is irrelevant; this is a sequence of observations, not a clock.
+Dual-mode equity chart using TradingView Lightweight Charts v4.2.0. Users can toggle between Activity Timeline (AI consciousness) and Performance Chart (objective tracking) with timeframe aggregation.
 
-**Key Paradigm** (2025-11-20): Activities-only chart with Redis-cached total equity. Account monitor caches equity every 5s, activity logger reads from cache, chart displays AI's discrete moments of awareness. No snapshots queried.
+**Dual Chart Modes** (2025-12-17):
+- **Activity Timeline**: Bot's subjective awareness - irregular intervals when AI acts (activities.total_equity from Redis cache)
+- **Performance Chart**: Objective 5-minute tracking - regular snapshots regardless of activity (account_snapshots table)
+  - **Timeframe Aggregation**: 5M (base), 1H, 4H, 1D views for higher-level performance analysis
+  - **Smart Aggregation**: Uses LAST value in each period (most accurate for equity)
 
-**Dual-Mode Component**:
+**Mode Toggle UI**: Brass-colored toggle buttons in header with conditional timeframe selector (performance mode only)
+
+**Component Variants**:
 - **Standalone**: `aster.ggbots.ai` → `/view/{config_id}` (full viewport, 100vh - 280px)
 - **Embedded**: `/forge` Monitor tab (fixed 600px height, full width)
 
@@ -965,24 +975,52 @@ Market queries now display the actual preprocessed data that agents receive:
 
 This shows the **200-500 analytical fields** (trend strength, divergence patterns, momentum velocity, etc.) that influence agent decisions.
 
-#### **6. Data Fetching & Management** (2025-11-20 Update)
+#### **6. Data Fetching & Management** (2025-12-17 Update)
 
-**API Endpoints** (AI Consciousness Architecture):
+**API Endpoints** (Dual-Mode Architecture):
 ```typescript
-// AI consciousness timeline (activities-only, Redis-cached equity)
+// ACTIVITY MODE: AI consciousness timeline (activities-only, Redis-cached equity)
 // Returns activities with total_equity from Redis cache (updated every 5s by account monitor)
-// No snapshots queried - pure activity stream representing AI's awareness moments
+// Irregular intervals - pure activity stream representing AI's awareness moments
 GET /api/v2/snapshots/{config_id}/balance-series
 
-// All activities (trades, queries, thoughts, waits)
-// Universal: Works for all trading modes (activities table)
+// PERFORMANCE MODE: Objective performance tracking (account_snapshots, regular 5-min intervals)
+// Returns snapshots with total_equity calculated from current_balance + unrealized_pnl
+// Regular 5-minute intervals regardless of bot activity
+GET /api/v2/snapshots/{config_id}/performance-series
+
+// All activities (trades, queries, thoughts, waits) - ACTIVITY MODE ONLY
+// Used for markers, hover tooltips, and click details
 GET /api/v2/activities/{config_id}
 
-// Bot metadata (name, balance, win rate, performance)
+// Bot metadata (name, balance, win rate, performance) - BOTH MODES
 // Paper: Calculated from paper_trades (per-bot)
 // Symphony: Queries Symphony API get_account_metrics() (account-wide)
 // Aster: Queries Aster API balance + trades (account-wide)
 GET /api/v2/activities/{config_id}/metadata
+```
+
+**Conditional Fetching** (2025-12-17):
+```typescript
+// Choose endpoint based on chart mode
+const seriesEndpoint = chartMode === 'activity'
+  ? `/api/v2/snapshots/${configId}/balance-series`   // activities.total_equity
+  : `/api/v2/snapshots/${configId}/performance-series` // account_snapshots
+
+// Activity mode: Fetch activities for markers
+// Performance mode: Skip activities fetch (no markers needed)
+const fetchPromises = [
+  fetch(seriesEndpoint),
+  fetch(`/api/v2/activities/${configId}/metadata`),
+]
+if (chartMode === 'activity') {
+  fetchPromises.push(fetch(`/api/v2/activities/${configId}`))
+}
+
+// Apply timeframe aggregation for performance mode
+if (chartMode === 'performance' && timeframe !== '5m') {
+  balancePoints = aggregateToTimeframe(balancePoints, timeframe)
+}
 ```
 
 **Redis Equity Caching Architecture** (2025-11-20):

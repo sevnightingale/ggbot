@@ -223,7 +223,8 @@ class ConfigService:
             # Validate configuration
             errors = config.validate()
             if errors:
-                self._log.error(f"Configuration validation failed: {errors}")
+                self._log.error(f"❌ Configuration validation failed for user {user_id}: {errors}")
+                self._log.error(f"Config data: {json.dumps(config_data, indent=2)}")
                 return None
 
             # Store in database

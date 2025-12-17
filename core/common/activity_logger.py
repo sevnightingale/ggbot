@@ -4,6 +4,9 @@ Activity Logger - Universal activity logging for Activity Timeline
 This module provides a simple interface for logging all bot/agent activities
 to the unified activities table with optional token tracking for metered billing.
 Used by scheduled bots, agents, and signal validation.
+
+Note: Total equity calculations use formulas from AccountMetricsCalculator
+(core.domain.metrics_calculator) to ensure consistency across platform.
 """
 
 from core.common.db import get_db_connection
@@ -11,6 +14,9 @@ import json
 import redis
 from typing import Optional, Dict, Any
 from datetime import datetime
+
+# Import for formula reference (not used directly in SQL, but documents source of truth)
+from core.domain.metrics_calculator import AccountMetricsCalculator
 
 # Redis client for equity cache
 redis_client = redis.Redis(host='localhost', port=6379, db=0, decode_responses=True)
@@ -32,7 +38,8 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
         config_id: Bot configuration ID
 
     Returns:
-        Dict with 'current_balance' (total equity) and 'total_pnl' keys
+        Dict with 'current_balance' (contains total equity value) and 'total_pnl' keys
+        Note: Key is 'current_balance' for backward compatibility, value is total_equity
 
     Example:
         >>> snapshot = get_latest_snapshot("uuid")
@@ -69,8 +76,9 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
                 trading_mode = mode_result[0]
 
                 # Try recent snapshot first (preferred - includes all trading modes)
-                # For paper mode: Use Total Equity (current_balance + unrealized_pnl)
-                # Note: current_balance already includes margin_used
+                # For paper mode: Use Total Equity formula from AccountMetricsCalculator
+                #   Formula: total_equity = current_balance + unrealized_pnl
+                #   Note: current_balance already includes margin_used
                 # For live modes: Use total_pnl (already includes unrealized)
                 if trading_mode == 'paper':
                     balance_field = "COALESCE(current_balance + unrealized_pnl, current_balance)"
@@ -98,8 +106,9 @@ def get_latest_snapshot(config_id: str) -> Optional[Dict[str, Optional[float]]]:
 
                 # Query appropriate account table based on trading mode
                 if trading_mode == 'paper':
-                    # For paper: Need to add unrealized P&L from open positions
-                    # Note: current_balance already includes margin_used
+                    # For paper: Calculate total equity using AccountMetricsCalculator formula
+                    #   Formula: total_equity = current_balance + unrealized_pnl
+                    #   Note: current_balance already includes margin_used
                     cur.execute("""
                         SELECT
                             pa.current_balance + COALESCE(pt.unrealized_pnl, 0) as total_equity,
@@ -244,7 +253,7 @@ def log_activity(
                     INSERT INTO activities
                     (config_id, user_id, activity_type, activity_source, summary, details,
                      trade_id, trade_type, decision_id, related_symbol, importance,
-                     account_balance, account_pnl)
+                     total_equity, account_pnl)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING activity_id
                 """, (
@@ -351,7 +360,7 @@ def log_llm_activity(
                      decision_id, related_symbol, importance,
                      provider, model, thinking_mode, input_tokens, output_tokens,
                      reasoning_tokens, provider_cost_usd, platform_cost_usd, stripe_reported,
-                     account_balance, account_pnl)
+                     total_equity, account_pnl)
                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
                     RETURNING activity_id
                 """, (

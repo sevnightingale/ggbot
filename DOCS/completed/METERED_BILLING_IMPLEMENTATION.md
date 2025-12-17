@@ -192,19 +192,26 @@ def can_activate_bots(self) -> bool:
 | Tier | Base Price | Features | Usage Billing |
 |------|-----------|----------|---------------|
 | **FREE** | $0/month | Browse/configure only | N/A - Can't activate bots |
-| **USAGE_BASED** | $0/month | All features except agents | 1.70× provider cost |
-| **PRO** | $29/month | All features + agents | 1.70× provider cost |
+| **USAGE_BASED** | $0/month | All features, unlimited bots | 1.70× provider cost |
 
-### Usage Costs (Examples)
+**Note**: Previously offered PRO tier ($29/month) has been deprecated. All users now use usage-based pricing.
 
-**Typical decision (GPT-4o):**
-- Input: ~1,200 tokens × $0.0025/1K = $0.0030
-- Output: ~300 tokens × $0.0100/1K = $0.0030
-- Provider cost: $0.0060
-- **Platform charge: $0.0102** (1.70× markup)
+### Usage Costs (Real-World Examples)
 
-**Monthly usage (1 active bot, 4 decisions/day):**
-- ~120 decisions/month × $0.0102 = **~$1.22/month**
+**Per-decision costs by reasoning tier:**
+- Economy: ~$0.003/decision (Grok economy, DeepSeek)
+- Standard: ~$0.01/decision (Kimi, Grok standard)
+- Premium: ~$0.04-0.09/decision (GPT, Claude, Gemini with extended reasoning)
+
+**Typical monthly costs by configuration:**
+- **Budget Setup** (<$2/month): 1-2 bots, hourly checks, economy reasoning
+  - Example: ~60 decisions/month × $0.003 = $0.18/month per bot
+- **Active Trader** ($10-35/month): 3-5 bots, 15-30min frequency, standard reasoning
+  - Example: ~450 decisions/month × $0.01 = $4.50/month per bot × 3-5 bots
+- **Power User** ($50-150/month): 5-10 bots, 5-15min frequency, premium reasoning
+  - Example: ~1,800 decisions/month × $0.04 = $72/month per bot (5min + premium)
+
+**Cost varies 30× between economy and premium reasoning tiers**, giving users full control over their monthly spend.
 
 ---
 

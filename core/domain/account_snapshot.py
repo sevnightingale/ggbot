@@ -10,6 +10,8 @@ from decimal import Decimal
 from typing import Optional, Dict, Any
 from abc import ABC, abstractmethod
 
+from .metrics_calculator import AccountMetricsCalculator
+
 
 @dataclass
 class AccountSnapshot:
@@ -91,13 +93,14 @@ class AccountSnapshot:
             Decimal representing total account equity, or None if insufficient data
         """
         if self.trading_mode == 'paper':
-            # Paper trading: current_balance + unrealized P&L
+            # Paper trading: use centralized calculator
             if self.current_balance is None:
                 return None
 
-            unrealized = self.unrealized_pnl if self.unrealized_pnl else Decimal('0')
-
-            return self.current_balance + unrealized
+            return AccountMetricsCalculator.calculate_total_equity(
+                self.current_balance,
+                self.unrealized_pnl
+            )
 
         else:
             # Live modes (symphony/aster): total_pnl already includes everything
@@ -106,19 +109,31 @@ class AccountSnapshot:
     @property
     def return_pct(self) -> Optional[Decimal]:
         """
-        Calculate return percentage if balance is available.
+        Calculate return percentage from initial equity.
 
-        Returns total_pnl as percentage of initial balance.
-        Assumes initial balance = current_balance - total_pnl.
+        Formula: ((current_equity - initial_equity) / initial_equity) * 100
+
+        Where initial_equity is calculated as: total_equity - total_pnl
+
+        This gives the performance percentage since account inception.
         """
-        if self.current_balance is None:
+        equity = self.total_equity
+        if equity is None:
             return None
 
-        initial_balance = self.current_balance - self.total_pnl
-        if initial_balance <= 0:
+        # Calculate initial equity by subtracting all accumulated P&L
+        initial_equity = AccountMetricsCalculator.calculate_initial_equity_from_current(
+            equity,
+            self.total_pnl
+        )
+
+        if initial_equity <= 0:
             return None
 
-        return (self.total_pnl / initial_balance) * Decimal('100')
+        return AccountMetricsCalculator.calculate_performance_percent(
+            equity,
+            initial_equity
+        )
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert to dictionary for JSON serialization."""

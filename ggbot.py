@@ -3364,15 +3364,23 @@ async def get_bot_account(
     config_id: str,
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Get account summary for a bot configuration."""
+    """
+    Get account summary for a bot configuration.
+
+    Returns comprehensive account metrics including total equity,
+    performance percentage, and margin details.
+    """
     try:
         from trading.paper.supabase_service import SupabasePaperTradingService
-        
+        from core.common.db import get_db_connection
+        from core.domain.metrics_calculator import AccountMetricsCalculator
+        from decimal import Decimal
+
         service = SupabasePaperTradingService()
-        
+
         # Get account summary
         account_summary = await service.get_account_summary(config_id)
-        
+
         if "error" in account_summary:
             return {
                 "status": "success",
@@ -3380,40 +3388,82 @@ async def get_bot_account(
                 "account": {
                     "initial_balance": 10000.0,
                     "current_balance": 10000.0,
+                    "available_balance": 10000.0,
+                    "margin_used": 0.0,
                     "total_pnl": 0.0,
+                    "unrealized_pnl": 0.0,
+                    "realized_pnl": 0.0,
+                    "total_equity": 10000.0,
+                    "performance_percent": 0.0,
                     "open_positions": 0,
                     "total_trades": 0,
                     "win_trades": 0,
                     "loss_trades": 0,
-                    "win_rate": 0.0,
-                    "total_return_pct": 0.0
+                    "win_rate": 0.0
                 }
             }
-        
-        # Calculate additional metrics
-        initial_balance = account_summary.get("initial_balance", 10000.0)
-        current_balance = account_summary.get("current_balance", 10000.0)
-        total_pnl = account_summary.get("total_pnl", 0.0)
-        
-        # Total return percentage
-        total_return_pct = ((current_balance - initial_balance) / initial_balance * 100) if initial_balance > 0 else 0.0
-        
+
+        # Extract base metrics
+        initial_balance = Decimal(str(account_summary.get("initial_balance", 10000.0)))
+        current_balance = Decimal(str(account_summary.get("current_balance", 10000.0)))
+        total_pnl = Decimal(str(account_summary.get("total_pnl", 0.0)))
+
+        # Get unrealized P&L and margin from open positions
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        COALESCE(SUM(unrealized_pnl), 0) as unrealized_pnl,
+                        COALESCE(SUM(margin_used), 0) as margin_used
+                    FROM paper_trades
+                    WHERE config_id = %s AND status = 'open'
+                """, (config_id,))
+                position_data = cur.fetchone()
+                unrealized_pnl = Decimal(str(position_data[0])) if position_data else Decimal('0')
+                margin_used = Decimal(str(position_data[1])) if position_data else Decimal('0')
+
+        # Calculate metrics using centralized calculator
+        total_equity = AccountMetricsCalculator.calculate_total_equity(
+            current_balance,
+            unrealized_pnl
+        )
+
+        available_balance = AccountMetricsCalculator.calculate_available_balance(
+            current_balance,
+            margin_used
+        )
+
+        realized_pnl = AccountMetricsCalculator.calculate_realized_pnl(
+            total_pnl,
+            unrealized_pnl
+        )
+
+        performance_percent = AccountMetricsCalculator.calculate_performance_percent(
+            total_equity,
+            initial_balance
+        )
+
         return {
             "status": "success",
             "config_id": config_id,
             "account": {
-                "initial_balance": initial_balance,
-                "current_balance": current_balance,
-                "total_pnl": total_pnl,
+                "initial_balance": float(initial_balance),
+                "current_balance": float(current_balance),
+                "available_balance": float(available_balance),
+                "margin_used": float(margin_used),
+                "total_pnl": float(total_pnl),
+                "unrealized_pnl": float(unrealized_pnl),
+                "realized_pnl": float(realized_pnl),
+                "total_equity": float(total_equity),
+                "performance_percent": float(performance_percent) if performance_percent is not None else 0.0,
                 "open_positions": account_summary.get("open_positions", 0),
                 "total_trades": account_summary.get("total_trades", 0),
                 "win_trades": account_summary.get("win_trades", 0),
                 "loss_trades": account_summary.get("loss_trades", 0),
-                "win_rate": account_summary.get("win_rate", 0.0),
-                "total_return_pct": round(total_return_pct, 2)
+                "win_rate": account_summary.get("win_rate", 0.0)
             }
         }
-        
+
     except Exception as e:
         logger.error(f"Failed to get account for {config_id}: {e}")
         raise HTTPException(status_code=500, detail="Failed to get account")

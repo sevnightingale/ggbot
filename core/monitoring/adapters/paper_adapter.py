@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from decimal import Decimal
 from typing import Optional, Set, Dict
 from core.domain.account_snapshot import AccountAdapter, AccountSnapshot
+from core.domain.metrics_calculator import AccountMetricsCalculator
 from core.common.db import get_db_connection
 from core.common.logger import logger
 
@@ -54,8 +55,11 @@ class PaperAccountAdapter(AccountAdapter):
                     (account_id, user_id, current_balance, total_pnl,
                      open_positions, total_trades, win_trades, loss_trades, trading_mode) = account
 
-                    # Calculate win rate
-                    win_rate = Decimal(win_trades) / Decimal(total_trades) if total_trades > 0 else Decimal('0')
+                    # Calculate win rate using centralized calculator (returns decimal 0-1)
+                    win_rate = AccountMetricsCalculator.calculate_win_rate_decimal(
+                        win_trades,
+                        total_trades
+                    )
 
                     # Get unrealized P&L from open positions
                     cur.execute("""
@@ -70,11 +74,17 @@ class PaperAccountAdapter(AccountAdapter):
                     position_data = cur.fetchone()
                     unrealized_pnl, position_value, margin_used = position_data or (Decimal('0'), Decimal('0'), Decimal('0'))
 
-                    # Calculate realized P&L (total_pnl - unrealized_pnl)
-                    realized_pnl = Decimal(total_pnl) - unrealized_pnl
+                    # Calculate realized P&L using centralized calculator
+                    realized_pnl = AccountMetricsCalculator.calculate_realized_pnl(
+                        Decimal(total_pnl),
+                        unrealized_pnl
+                    )
 
-                    # Calculate available balance (current_balance - margin_used)
-                    available_balance = Decimal(current_balance) - margin_used
+                    # Calculate available balance using centralized calculator
+                    available_balance = AccountMetricsCalculator.calculate_available_balance(
+                        Decimal(current_balance),
+                        margin_used
+                    )
 
                     # Get win/loss stats from closed trades
                     cur.execute("""

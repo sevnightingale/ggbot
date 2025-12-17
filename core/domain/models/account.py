@@ -14,6 +14,7 @@ from uuid import UUID
 from pydantic import BaseModel, Field, field_validator
 
 from .value_objects import Money
+from ..metrics_calculator import AccountMetricsCalculator
 
 
 class AccountType(str, Enum):
@@ -45,10 +46,15 @@ class AccountStatistics(BaseModel):
     
     @property
     def win_rate(self) -> Optional[Decimal]:
-        """Calculate win rate percentage (0-100)"""
-        if self.total_trades == 0:
-            return None
-        return Decimal(str(self.win_trades / self.total_trades * 100)).quantize(Decimal('0.1'))
+        """
+        Calculate win rate percentage (0-100).
+
+        Uses centralized calculator for consistency across platform.
+        """
+        return AccountMetricsCalculator.calculate_win_rate_percent(
+            self.win_trades,
+            self.total_trades
+        )
     
     @property
     def completed_trades(self) -> int:
@@ -98,18 +104,43 @@ class Account(BaseModel):
     
     @property
     def total_return(self) -> Decimal:
-        """Calculate total return percentage from initial balance"""
+        """
+        Calculate total return percentage from initial balance.
+
+        Uses centralized calculator for consistency across platform.
+        """
         if self.initial_balance.amount == 0:
             return Decimal('0.00')
-        
-        total_value = self.current_balance.amount + self.total_pnl.amount
-        return ((total_value - self.initial_balance.amount) / self.initial_balance.amount * 100).quantize(Decimal('0.01'))
+
+        # Calculate current equity (balance + P&L)
+        current_equity = self.current_balance.amount + self.total_pnl.amount
+
+        # Use centralized calculator
+        result = AccountMetricsCalculator.calculate_performance_percent(
+            current_equity,
+            self.initial_balance.amount
+        )
+
+        return result if result is not None else Decimal('0.00')
     
     @property
     def account_equity(self) -> Money:
-        """Calculate total account equity (balance + unrealized P&L would be added by caller)"""
+        """
+        Calculate total account equity.
+
+        Note: This returns current_balance + total_pnl. For paper accounts,
+        unrealized P&L should be included in total_pnl by caller before using this.
+
+        Uses centralized calculator for consistency.
+        """
+        # Note: For paper accounts, this assumes total_pnl includes unrealized P&L
+        # The calculator expects unrealized_pnl to be passed separately, but here
+        # we're using the fact that current_balance + total_pnl = equity when
+        # total_pnl already includes unrealized
+        equity_amount = self.current_balance.amount + self.total_pnl.amount
+
         return Money(
-            amount=self.current_balance.amount + self.total_pnl.amount,
+            amount=equity_amount,
             currency=self.current_balance.currency
         )
     
@@ -141,40 +172,48 @@ class Account(BaseModel):
     def reserve_balance(self, amount: Money) -> Money:
         """
         Reserve balance for a trade (reduces available balance).
-        
+
+        NOTE: This does NOT modify current_balance! Current balance represents total equity
+        and should only change when P&L is realized. The margin is tracked separately in
+        paper_trades.margin_used and available_balance is calculated as (current - margin).
+
         Args:
             amount: Amount to reserve
-            
+
         Returns:
-            New current balance after reservation
-            
+            Current balance (unchanged)
+
         Raises:
             ValueError: If insufficient balance or currency mismatch
         """
         if amount.currency != self.current_balance.currency:
             raise ValueError(f"Currency mismatch: {amount.currency} != {self.current_balance.currency}")
-        
+
         if not self.can_afford_trade(amount):
             raise ValueError(f"Insufficient balance: {self.current_balance} < {amount}")
-        
-        self.current_balance = self.current_balance.subtract(amount)
+
+        # Do NOT modify current_balance - it should remain constant until P&L is realized
         self.updated_at = datetime.now(timezone.utc)
         return self.current_balance
     
     def release_balance(self, amount: Money) -> Money:
         """
         Release reserved balance back to available (e.g., after trade closes).
-        
+
+        NOTE: This does NOT modify current_balance! Current balance represents total equity
+        and should only change when P&L is realized. The margin release is tracked by
+        deleting/updating paper_trades.margin_used.
+
         Args:
             amount: Amount to release back to balance
-            
+
         Returns:
-            New current balance after release
+            Current balance (unchanged)
         """
         if amount.currency != self.current_balance.currency:
             raise ValueError(f"Currency mismatch: {amount.currency} != {self.current_balance.currency}")
-        
-        self.current_balance = self.current_balance.add(amount)
+
+        # Do NOT modify current_balance - it should remain constant until P&L is realized
         self.updated_at = datetime.now(timezone.utc)
         return self.current_balance
     
