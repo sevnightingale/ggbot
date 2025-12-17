@@ -45,8 +45,8 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 
 ### **Current Capabilities**
 - ✅ **32 data points** across 7 categories (all FREE tier except ggShot)
-- ✅ **4 adapter types** handling diverse data sources
-- ✅ **Parallel query execution** (~30s for all 8 Grok sources, 5.3x speedup)
+- ✅ **5 adapter types** handling diverse data sources (hybrid Grok + Perplexity)
+- ✅ **Parallel query execution** (~30s for all 8 sources, 5.3x speedup)
 - ✅ **Custom cache TTL** per data point (10min to 24hrs)
 - ✅ **Agent dynamic queries** (query without modifying config)
 - ✅ **$0.76/user/month** at 257 users, scales to $0.20/user at 1000 users
@@ -303,24 +303,38 @@ Adapters are specialized modules that fetch data from specific sources.
 ---
 
 #### **Type 2: GrokAgenticAdapter** (`adapters/agentic/grok_agentic.py`)
-**Purpose**: Universal intelligence via XAI's autonomous agentic API
+**Purpose**: Twitter/on-chain intelligence via XAI's autonomous agentic API
 
-**Revolutionary Approach**: ONE adapter handles 8+ data sources via Grok's autonomous AI:
-- Web search (CBOE, Bloomberg, Yahoo Finance, etc.)
-- X (Twitter) search and NLP analysis
-- Code execution for complex analysis
+**Revolutionary Approach**: Native X/Twitter access + code execution + web search:
+- X (Twitter) search and NLP analysis (xAI owns Twitter)
+- On-chain data aggregation with code execution
+- Breaking news via web search
 
-**8 Prompt Templates** (query_type parameter):
+**4 Prompt Templates** (query_type parameter):
+1. `twitter_sentiment` - X/Twitter sentiment analysis (symbol-specific)
+2. `crypto_news` - Breaking crypto headlines (symbol-specific)
+3. `btc_tvl` - Bitcoin Total Value Locked in DeFi
+4. `whale_activity` - Large wallet movements (symbol-specific)
+
+**Cost Per Query**: $0.0017 (BTC TVL) to $0.0637 (Twitter sentiment with NLP)
+
+---
+
+#### **Type 3: OpenRouterMarketAdapter** (`adapters/agentic/openrouter_adapter.py`)
+**Purpose**: Macro economic indicators via OpenRouter + Perplexity Sonar Pro
+
+**Approach**: Perplexity models with native web search for real-time macro data:
+- Web search (CBOE, Bloomberg, BLS, Fed, etc.)
+- JSON-structured responses
+- 5-10× cheaper than Grok for macro queries
+
+**4 Prompt Templates** (query_type parameter):
 1. `vix_index` - VIX volatility index
 2. `dxy_index` - US Dollar strength
 3. `cpi_inflation` - Latest CPI inflation data
 4. `nfp_jobs` - Nonfarm payrolls report
-5. `twitter_sentiment` - X/Twitter sentiment analysis (symbol-specific)
-6. `crypto_news` - Breaking crypto headlines (symbol-specific)
-7. `btc_tvl` - Bitcoin Total Value Locked in DeFi
-8. `whale_activity` - Large wallet movements (symbol-specific)
 
-**Cost Per Query**: $0.0015 (CPI) to $0.0637 (Twitter sentiment with NLP)
+**Cost Per Query**: ~$0.01 per query (251-346 tokens)
 
 **Features**:
 - Streaming support with tool call observability
@@ -341,7 +355,7 @@ Adapters are specialized modules that fetch data from specific sources.
 
 ---
 
-#### **Type 3: BinanceFundingAdapter** (`adapters/derivatives/binance_funding.py`)
+#### **Type 4: BinanceFundingAdapter** (`adapters/derivatives/binance_funding.py`)
 **Purpose**: Real-time perpetual funding rates from Binance
 
 **Capabilities**:
@@ -353,7 +367,7 @@ Adapters are specialized modules that fetch data from specific sources.
 
 ---
 
-#### **Type 4: GGShotAdapter** (`adapters/signals/ggshot_adapter.py`)
+#### **Type 5: GGShotAdapter** (`adapters/signals/ggshot_adapter.py`)
 **Purpose**: Premium trading signals from ggShot Telegram channels
 
 **Integration**:
@@ -408,10 +422,10 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | | BTC Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
 | | ETH Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
 | **Macro Economics** (4 indicators) |
-| | VIX Volatility Index | GrokAgentic | ~$0.0036 | 15 min | 🆓 |
-| | DXY Dollar Index | GrokAgentic | ~$0.0029 | 15 min | 🆓 |
-| | CPI Inflation | GrokAgentic | ~$0.0015 | 24 hours | 🆓 |
-| | NFP Jobs Report | GrokAgentic | ~$0.0086 | 24 hours | 🆓 |
+| | VIX Volatility Index | OpenRouter/Perplexity | ~$0.01 | 15 min | 🆓 |
+| | DXY Dollar Index | OpenRouter/Perplexity | ~$0.01 | 15 min | 🆓 |
+| | CPI Inflation | OpenRouter/Perplexity | ~$0.01 | 24 hours | 🆓 |
+| | NFP Jobs Report | OpenRouter/Perplexity | ~$0.01 | 24 hours | 🆓 |
 | **On-Chain Analytics** (2 sources) |
 | | BTC TVL in DeFi | GrokAgentic | ~$0.0017 | 1 hour | 🆓 |
 | | Whale Activity | GrokAgentic | ~$0.0134 | 30 min | 🆓 |
@@ -649,7 +663,7 @@ Do you need to fetch data from a NEW external API/source?
 
 ### **Option 1: Add Grok Query Type (Easiest)**
 
-**When to Use**: Macro data, sentiment, news, on-chain data that Grok can research via web/X search
+**When to Use**: Twitter/X sentiment, on-chain data, crypto news (requires native X access or code execution)
 
 **Steps** (30 minutes):
 1. Add prompt template to `grok_agentic.py:PROMPT_TEMPLATES`
@@ -657,12 +671,12 @@ Do you need to fetch data from a NEW external API/source?
 3. Seed database with new data_point
 4. Test with test script
 
-**Example**: Adding "Fear & Greed Index"
+**Example**: Adding "Fear & Greed Index" (to Perplexity for macro, or Grok for sentiment)
 
 ```python
-# 1. Add to grok_agentic.py
+# 1. Add to openrouter_adapter.py (macro data) OR grok_agentic.py (sentiment/on-chain)
 PROMPT_TEMPLATES = {
-    # ... existing 8 templates ...
+    # ... existing templates ...
     'fear_greed_index': """
     Get the current Crypto Fear & Greed Index from alternative.me or similar sources.
 
@@ -799,17 +813,15 @@ response_schema:
 
 ### **Cost Economics**
 
-**Per-Query Costs** (8 Grok sources):
-- CPI: $0.0015 (cheapest)
-- DXY: $0.0029
-- VIX: $0.0036
-- NFP: $0.0086
-- BTC TVL: $0.0017
-- Whale Activity: $0.0134
-- Crypto News: $0.0149
-- Twitter Sentiment: $0.0637 (most expensive, NLP analysis)
+**Per-Query Costs** (8 sources, hybrid setup):
+- **Perplexity (macro)**: ~$0.01 each (VIX, DXY, CPI, NFP)
+- **Grok (Twitter/on-chain)**:
+  - BTC TVL: $0.0017
+  - Whale Activity: $0.0134
+  - Crypto News: $0.0149
+  - Twitter Sentiment: $0.0637 (most expensive, native X access + NLP)
 
-**Total**: $0.1103 for all 8 queries (first run, no cache)
+**Total**: ~$0.08 for all 8 queries (first run, no cache) - 27% cost reduction vs pure Grok
 
 **Monthly Platform Cost** (257 users):
 ```
@@ -819,16 +831,15 @@ Without caching:
   257 users × 8 queries × 24 times/day = 49,344 queries/day
   49,344 × $0.0138 avg = $680/day = $20,400/month ❌
 
-With Smart Caching (Custom TTL per data type):
-  VIX/DXY (15min): 96 queries/day × $0.0033 = $0.32/day
-  CPI/NFP (24hr): 2 queries/day × $0.0051 = $0.01/day
-  Twitter (30min): 48 queries/day × $0.0637 = $3.06/day
-  News (10min): 144 queries/day × $0.0149 = $2.15/day
-  BTC TVL (1hr): 24 queries/day × $0.0017 = $0.04/day
-  Whale (30min): 48 queries/day × $0.0134 = $0.64/day
+With Smart Caching + Hybrid (Custom TTL per data type):
+  VIX/DXY/CPI/NFP (Perplexity): 98 queries/day × $0.01 = $0.98/day
+  Twitter (Grok, 30min): 48 queries/day × $0.0637 = $3.06/day
+  News (Grok, 10min): 144 queries/day × $0.0149 = $2.15/day
+  BTC TVL (Grok, 1hr): 24 queries/day × $0.0017 = $0.04/day
+  Whale (Grok, 30min): 48 queries/day × $0.0134 = $0.64/day
 
-  Total: ~$6.50/day = $195/month ✅
-  Cost per user: $0.76/month 🎉
+  Total: ~$6.87/day = $206/month ✅
+  Cost per user: $0.80/month 🎉
 ```
 
 **Scaling Economics**:
@@ -1044,7 +1055,8 @@ market_intelligence/
 │   ├── derivatives/
 │   │   └── binance_funding.py         # Binance funding rates
 │   ├── agentic/
-│   │   └── grok_agentic.py            # XAI Grok agentic API (8 sources)
+│   │   ├── grok_agentic.py            # XAI Grok (4 Twitter/on-chain sources)
+│   │   └── openrouter_adapter.py      # OpenRouter/Perplexity (4 macro sources)
 │   ├── signals/
 │   │   └── ggshot_adapter.py          # ggShot signal queries
 │   └── market_data/
