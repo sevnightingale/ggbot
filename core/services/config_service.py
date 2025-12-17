@@ -40,7 +40,7 @@ class BotConfigV2:
     ):
         self.config_id = config_id
         self.user_id = user_id
-        self.config_name = config_name
+        self.config_name = config_name or "Untitled Bot"  # Apply fallback when constructing object
         self.selected_pair = selected_pair
         self.extraction = extraction or {}
         self.decision = decision or {}
@@ -320,7 +320,8 @@ class ConfigService:
                             flattened_config["config_id"] = config_id
                         if "user_id" not in flattened_config:
                             flattened_config["user_id"] = user_id
-                        # Always use database config_type and Symphony fields
+                        # Always use database column values for these fields
+                        flattened_config["config_name"] = db_config_name  # ADD THIS - was missing!
                         flattened_config["config_type"] = db_config_type
                         flattened_config["trading_mode"] = trading_mode
                         flattened_config["symphony_agent_id"] = symphony_agent_id
@@ -448,7 +449,7 @@ class ConfigService:
             if not existing_config:
                 self._log.warning(f"Config {config_id} not found for user {user_id}")
                 return None
-            
+
             # Deep merge agent_strategy if partially updating
             merged_agent_strategy = existing_config.agent_strategy
             if "agent_strategy" in config_data and config_data["agent_strategy"]:

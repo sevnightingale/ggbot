@@ -115,7 +115,7 @@ export function ActivationBar({
                 }}
               />
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">
-                {selectedBot.config_name}
+                {selectedBot.config_name || 'Untitled Bot'}
               </h2>
             </div>
             {/* Status Message - Dynamic when active, static "last activity" when inactive */}
@@ -218,7 +218,7 @@ export function ActivationBar({
         onClose={() => setRiskModalOpen(false)}
         onAccept={handleRiskAccepted}
         tradingMode={selectedBot.trading_mode || 'paper'}
-        botName={selectedBot.config_name}
+        botName={selectedBot.config_name || 'Untitled Bot'}
       />
     </>
   )
