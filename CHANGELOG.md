@@ -6,6 +6,87 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-17 - Bot Limit Removal + Market Intelligence Migration
+
+**SSE Dashboard Fix** - core/sse/dashboard_data.py:205 - Added tuple length check, prevented "tuple index out of range" crash for 2 users
+
+**Market Intelligence Migration** - XAI/Grok credits exhausted (StatusCode.RESOURCE_EXHAUSTED) → switched to OpenRouter/Perplexity Sonar Pro
+- Created market_intelligence/adapters/agentic/openrouter_adapter.py - same prompts, native web search
+- Updated grok_agentic.yaml - adapter changed from GrokAgenticAdapter to OpenRouterMarketAdapter
+- Cost reduced $0.05-0.15/query → $0.01-0.05/query, all 8 sources working (VIX, DXY, CPI, NFP, BTC TVL, whale, Twitter, news)
+
+**Bot Limit Removed** - Usage-based pricing model, no artificial caps
+- Dropped PostgreSQL trigger trigger_check_user_bot_limit + check_user_bot_limit() function (was blocking at 7 bots)
+- frontend/app/forge/components/layout/BotRail.tsx - removed limit check, alert, counter display (was 10 bot limit)
+- frontend/app/success/page.tsx - "10 active bots" → "Unlimited active bots"
+
+## 2025-12-15 - Account Metrics Standardization (MAJOR REFACTOR)
+
+**Major Refactor** - Centralized all account performance metric calculations, eliminated formula duplication across 6 locations
+
+**New Centralized Calculator** - `core/domain/metrics_calculator.py`
+- Created AccountMetricsCalculator with static methods for all metrics (single source of truth)
+- Methods: calculate_total_equity(), calculate_available_balance(), calculate_performance_percent(), calculate_win_rate_percent(), calculate_realized_pnl()
+- All formulas now reference this calculator, eliminating 6 duplicate implementations
+- Future formula changes require single-file update (was 6 files)
+
+**Domain Model Updates** - Standardized to use calculator
+- `core/domain/account_snapshot.py` - Updated total_equity, return_pct properties to use calculator
+- Fixed AccountSnapshot.return_pct formula bug (was incorrectly calculating initial_balance)
+- `core/domain/models/account.py` - Updated Account.total_return, account_equity, AccountStatistics.win_rate
+- `core/monitoring/adapters/paper_adapter.py` - Replaced win_rate, realized_pnl, available_balance formulas
+- `core/common/activity_logger.py` - Added documentation comments referencing calculator as source of truth
+- `api/admin.py` - Added formula reference comments in equity comparison endpoint
+
+**API Enhancements** - Added missing calculated fields
+- `ggbot.py:3362-3469` - Enhanced /api/v2/bot/{config_id}/account endpoint
+- Added fields: total_equity, available_balance, margin_used, unrealized_pnl, realized_pnl, performance_percent
+- All metrics calculated using AccountMetricsCalculator for consistency
+- Fallback values for accounts without data (initial state)
+
+**API Response Updates** - Improved naming clarity with backward compatibility
+- `api/snapshots.py` - Updated /api/v2/snapshots/{config_id}/balance-series response
+- New keys: equity_series, current_equity, initial_equity (was balance_series, current_balance, initial_balance)
+- Legacy keys retained for backward compatibility (deprecated but functional)
+- Updated docstring to reflect total_equity semantic (not just balance)
+
+**Frontend Updates** - Support new API keys with fallback
+- `frontend/components/tv-timeline.tsx` - Updated BalancePoint interface with total_equity field
+- Chart data uses `point.total_equity ?? point.balance` (new key with legacy fallback)
+- Updated comments from "balance" to "equity" terminology throughout
+
+**Documentation** - Comprehensive metrics glossary added to README
+- Added "Account Metrics Glossary" section to README.md (lines 314-383)
+- Tables: Core Balance Metrics, P&L Metrics, Performance Metrics, Data Sources
+- Important notes section explaining equity vs balance, margin accounting, win_rate representation
+- Code references section with file locations for all metric calculations
+- Documented formula fragmentation issue resolved by this refactor (was 6 locations, now 1)
+
+**SQL Query Documentation** - Added formula reference comments
+- `core/sse/dashboard_data.py` - Added comments noting account_balance column contains total_equity
+- Noted future migration will rename column for clarity
+
+**Impact** - Single source of truth for metrics, consistent calculations platform-wide, easier maintenance
+- Formula changes: 6 files → 1 file (83% reduction in maintenance surface)
+- Reduced formula inconsistency risk across backend, frontend, monitoring
+- Enhanced API responses with comprehensive account metrics
+- Backward-compatible frontend updates (supports both old and new API keys)
+- Complete documentation of all metrics formulas and data sources
+
+**Database Schema Migration** - Added total_equity column to activities table
+- Added activities.total_equity column (NUMERIC(20, 8), nullable)
+- Migrated all existing data from account_balance to total_equity (6,910 rows)
+- Updated activity_logger.py INSERT statements to use total_equity column
+- Updated api/snapshots.py, core/sse/dashboard_data.py to read from total_equity
+- Legacy account_balance column retained temporarily (will be removed in future cleanup)
+
+**No Breaking Changes** - All updates backward-compatible
+- API response includes both legacy and new keys
+- Frontend supports both field names with graceful fallback
+- Database migration completed with data preservation
+
+---
+
 ## 2025-12-14 - Admin Dashboard: Equity Calculation Fix
 
 **Bug Fix** - Corrected total equity formula in bot comparison chart

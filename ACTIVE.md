@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-12-15 00:59:28 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-12-15 15:57:18 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -13,47 +13,47 @@
 
 ### Bot Statistics
 - **Total Bots**: 388
-- **Active Bots**: 8 (2.1%)
+- **Active Bots**: 7 (1.8%)
   - Paper Trading: 1
   - Live Trading: 0
-- **Inactive Bots**: 380
+- **Inactive Bots**: 381
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,455
-  - Wins: 1,638
+- **Total Trades (All Time)**: 5,453
+  - Wins: 1,636
   - Losses: 3,817
-  - Platform Win Rate: 30.03%
-  - Total P&L: $-16,165.37
+  - Platform Win Rate: 30.00%
+  - Total P&L: $-16,178.41
 - **Recent Activity**:
-  - Last 24 hours: 3 trades
-  - Last 7 days: 3 trades
-  - Last 30 days: 10 trades
+  - Last 24 hours: 10 trades
+  - Last 7 days: 12 trades
+  - Last 30 days: 19 trades
 
 ### Open Positions
-- **Open Positions**: 1
-- **Unique Symbols**: 1
-- **Total Exposure**: $6,007.83
-- **Unrealized P&L**: $6.47
+- **Open Positions**: 0
+- **Unique Symbols**: 0
+- **Total Exposure**: $0.00
+- **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,925.15
+- **Average Balance**: $9,928.23
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 7 bots
+- **BTC/USDT**: 6 bots
 - **ADA/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 194 decisions (avg confidence: 30.1%)
-- **enter**: 8 decisions (avg confidence: 64.4%)
-- **exit**: 2 decisions (avg confidence: 51.5%)
+- **wait**: 374 decisions (avg confidence: 32.9%)
+- **enter**: 15 decisions (avg confidence: 63.1%)
+- **exit**: 14 decisions (avg confidence: 49.7%)
 
 ### System Health
-- **Decisions (last hour)**: 10
+- **Decisions (last hour)**: 19
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -62,22 +62,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 17MB | 2d 9h | 67 |
-| x-bot | 🟢 online | 0% | 21MB | 2d 9h | 66 |
-| error-alerts | 🟢 online | 0% | 24MB | 2d 9h | 73 |
-| market-data-ws | 🟢 online | 0.8% | 90MB | 2d 9h | 68 |
-| ggbot | 🟢 online | 0.8% | 298MB | 44m | 242 |
-| account-monitor | 🟢 online | 1.7% | 260MB | 1d 1h | 30 |
+| signal-listener | 🟢 online | 0% | 149MB | 14h 15m | 68 |
+| x-bot | 🟢 online | 0% | 43MB | 14h 15m | 67 |
+| error-alerts | 🟢 online | 0% | 33MB | 14h 15m | 74 |
+| market-data-ws | 🟢 online | 3.4% | 170MB | 14h 15m | 69 |
+| ggbot | 🟢 online | 0.6% | 265MB | 2m | 247 |
+| account-monitor | 🟢 online | 1.3% | 219MB | 14h 15m | 31 |
 
 ### VM Resources
 
 - **Disk**: 39G / 78G (50%)
-- **Memory**: 2.0Gi / 3.8Gi
-- **CPU Load**: 0.28 / 0.17 / 0.18 (1m/5m/15m)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 1.04 / 0.53 / 0.26 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 12.99M)
+- **Redis**: 🟢 connected (Memory: 11.64M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -266,7 +266,7 @@
 - **Documentation**: Complete guide in DOCS/completed/METERED_BILLING_IMPLEMENTATION.md
 
 ### **Market Intelligence**
-**32 data points across 7 categories (8 Grok-powered sources LIVE):**
+**32 data points across 7 categories (8 Perplexity-powered sources LIVE via OpenRouter):**
 - **Technical Analysis** (21 indicators): RSI, MACD, Bollinger Bands, volume, momentum, trend
 - **Trading Signals** (1 source): ggShot AI-filtered signals (1,829+ stored in database, 70 days history, live updates)
 - **On-Chain Analytics** (2 live): BTC TVL, whale activity
@@ -402,7 +402,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-12-15 00:59:29 UTC
+**Last Updated**: 2025-12-15 15:57:19 UTC
 
 ---
 
@@ -1246,7 +1246,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-12-15 00:59:29 UTC
+**Last Updated**: 2025-12-15 15:57:19 UTC
 
 ---
 
