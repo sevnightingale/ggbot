@@ -53,15 +53,9 @@ export function BotRail({
   isBotAction = false,
   className = ''
 }: BotRailProps) {
-  const botLimit = 10  // Everyone gets 10 bots
   const currentBotCount = bots.length
-  const atLimit = currentBotCount >= botLimit
 
   const handleCreateNew = () => {
-    if (atLimit) {
-      alert('You have reached the maximum of 10 bots. Please delete a bot to create a new one.')
-      return
-    }
     onCreateNew?.()
   }
 
@@ -74,13 +68,13 @@ export function BotRail({
             <div className="flex items-center gap-2">
               <span>Your ggbots</span>
               <span className="text-xs text-[var(--text-muted)] font-normal">
-                {currentBotCount}/{botLimit}
+                {currentBotCount}
               </span>
             </div>
           </div>
           <button
             onClick={handleCreateNew}
-            disabled={isCreatingNew || atLimit}
+            disabled={isCreatingNew}
             className="rounded-xl border border-[var(--border)] px-2 py-1 text-xs transition-all text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed hover:bg-[var(--bg-tertiary)]"
           >
             {isCreatingNew ? (

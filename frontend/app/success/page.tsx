@@ -44,7 +44,7 @@ export default function SuccessPage() {
 
         {/* Features Unlocked */}
         <div className="bg-[var(--bg-secondary)] border border-[var(--border)] rounded-2xl p-6 mb-8 space-y-4">
-          <FeatureItem text="10 active bots" />
+          <FeatureItem text="Unlimited active bots" />
           <FeatureItem text="5-minute analysis intervals" />
           <FeatureItem text="Frontier AI models included" />
           <FeatureItem text="Telegram signal publishing" />
