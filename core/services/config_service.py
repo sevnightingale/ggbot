@@ -34,6 +34,7 @@ class BotConfigV2:
         state: str = "inactive",
         trading_mode: str = "paper",
         symphony_agent_id: Optional[str] = None,
+        profile_image_url: Optional[str] = None,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -52,6 +53,7 @@ class BotConfigV2:
         self.state = state
         self.trading_mode = trading_mode
         self.symphony_agent_id = symphony_agent_id
+        self.profile_image_url = profile_image_url
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -65,6 +67,7 @@ class BotConfigV2:
             "state": self.state,
             "trading_mode": self.trading_mode,
             "symphony_agent_id": self.symphony_agent_id,
+            "profile_image_url": self.profile_image_url,
             "config_data": {
                 "schema_version": self.schema_version,
                 "selected_pair": self.selected_pair,
@@ -271,7 +274,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id
+                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -285,6 +288,7 @@ class ConfigService:
                     db_config_type = result[4] or "scheduled_trading"  # Use config_type from database
                     trading_mode = result[5] or "paper"
                     symphony_agent_id = result[6]
+                    profile_image_url = result[7]
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -305,6 +309,7 @@ class ConfigService:
                             "agent_strategy": inner_config.get("agent_strategy"),  # Include agent strategy
                             "trading_mode": trading_mode,
                             "symphony_agent_id": symphony_agent_id,
+                            "profile_image_url": profile_image_url,
                             "created_at": result[2].isoformat() if result[2] else None,
                             "updated_at": result[3].isoformat() if result[3] else None
                         }
@@ -319,6 +324,7 @@ class ConfigService:
                         flattened_config["config_type"] = db_config_type
                         flattened_config["trading_mode"] = trading_mode
                         flattened_config["symphony_agent_id"] = symphony_agent_id
+                        flattened_config["profile_image_url"] = profile_image_url
                         if "created_at" not in flattened_config and result[2]:
                             flattened_config["created_at"] = result[2].isoformat()
                         if "updated_at" not in flattened_config and result[3]:
@@ -347,14 +353,14 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type,
-                               trading_mode, symphony_agent_id
+                               trading_mode, symphony_agent_id, profile_image_url
                         FROM configurations
                         WHERE user_id = %s
                         ORDER BY created_at DESC
                     """, (user_id,))
 
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id = row
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url = row
 
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -379,6 +385,7 @@ class ConfigService:
                                 "state": state or "inactive",
                                 "trading_mode": trading_mode or "paper",
                                 "symphony_agent_id": symphony_agent_id,
+                                "profile_image_url": profile_image_url,
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -393,6 +400,7 @@ class ConfigService:
                             flattened_config["config_type"] = db_config_type or "scheduled_trading"
                             flattened_config["trading_mode"] = trading_mode or "paper"
                             flattened_config["symphony_agent_id"] = symphony_agent_id
+                            flattened_config["profile_image_url"] = profile_image_url
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:
@@ -415,7 +423,8 @@ class ConfigService:
         config_name: Optional[str] = None,
         config_type: Optional[str] = None,
         trading_mode: Optional[str] = None,
-        symphony_agent_id: Optional[str] = None
+        symphony_agent_id: Optional[str] = None,
+        profile_image_url: Optional[str] = None
     ) -> Optional[BotConfigV2]:
         """
         Update bot configuration with user access validation.
@@ -428,6 +437,7 @@ class ConfigService:
             config_type: Optional updated config type
             trading_mode: Optional updated trading mode ('paper', 'symphony', 'aster')
             symphony_agent_id: Optional updated Symphony agent ID
+            profile_image_url: Optional updated bot avatar image URL
 
         Returns:
             Updated BotConfigV2 instance if successful, None otherwise
@@ -464,6 +474,7 @@ class ConfigService:
                 agent_strategy=merged_agent_strategy,  # Use deep-merged agent strategy
                 trading_mode=trading_mode if trading_mode is not None else existing_config.trading_mode,
                 symphony_agent_id=symphony_agent_id if symphony_agent_id is not None else existing_config.symphony_agent_id,
+                profile_image_url=profile_image_url if profile_image_url is not None else existing_config.profile_image_url,
                 created_at=existing_config.created_at,
                 updated_at=datetime.now()
             )
@@ -480,7 +491,7 @@ class ConfigService:
                     cur.execute("""
                         UPDATE configurations
                         SET config_name = %s, config_data = %s, config_type = %s,
-                            trading_mode = %s, symphony_agent_id = %s, updated_at = NOW()
+                            trading_mode = %s, symphony_agent_id = %s, profile_image_url = %s, updated_at = NOW()
                         WHERE config_id = %s AND user_id = %s
                     """, (
                         updated_config.config_name,
@@ -488,6 +499,7 @@ class ConfigService:
                         updated_config.config_type,
                         updated_config.trading_mode,
                         updated_config.symphony_agent_id,
+                        updated_config.profile_image_url,
                         config_id,
                         user_id
                     ))

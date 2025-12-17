@@ -6,6 +6,7 @@ import { BotConfiguration } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
+import { BotImageUpload } from '@/components/BotImageUpload'
 
 interface AccountMetrics {
   totalEquity: number
@@ -102,9 +103,17 @@ export function ActivationBar({
       <div className="sticky top-[64px] z-30 rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4">
         {/* Row 1: Bot Name + Status + Controls */}
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
-          {/* Left: Bot Name + Status */}
+          {/* Left: Profile Image + Bot Name + Status */}
           <div className="flex flex-col items-center lg:items-start gap-2">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-3">
+              <BotImageUpload
+                configId={selectedBot.config_id}
+                currentImageUrl={selectedBot.profile_image_url || null}
+                onUploadComplete={(url) => {
+                  // Update parent state if needed - currently handled by SSE refresh
+                  console.log('Image uploaded:', url)
+                }}
+              />
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">
                 {selectedBot.config_name}
               </h2>

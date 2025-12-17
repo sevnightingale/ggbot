@@ -126,6 +126,7 @@ class ConfigUpdateRequest(BaseModel):
     config_type: Optional[str] = None
     trading_mode: Optional[str] = None  # Allow updating trading mode
     symphony_agent_id: Optional[str] = None  # Allow updating Symphony agent ID
+    profile_image_url: Optional[str] = None  # Bot avatar image URL
     selected_pair: Optional[str] = None
     extraction: Optional[Dict[str, Any]] = None
     decision: Optional[Dict[str, Any]] = None
@@ -1717,7 +1718,8 @@ async def get_config(
                         symphony_agent_id,
                         created_at,
                         updated_at,
-                        config_data
+                        config_data,
+                        profile_image_url
                     FROM configurations
                     WHERE config_id = %s
                 """, (config_id,))
@@ -1737,7 +1739,8 @@ async def get_config(
                     "symphony_agent_id": row[6],
                     "created_at": row[7].isoformat() if row[7] else None,
                     "updated_at": row[8].isoformat() if row[8] else None,
-                    "config_data": row[9]
+                    "config_data": row[9],
+                    "profile_image_url": row[10]
                 }
 
         return {
@@ -1819,6 +1822,7 @@ async def update_config(
     config_type = update_data.pop("config_type", None)
     trading_mode = update_data.pop("trading_mode", None)
     symphony_agent_id = update_data.pop("symphony_agent_id", None)
+    profile_image_url = update_data.pop("profile_image_url", None)
 
     # Validate symbol has real-time price data if changing selected_pair
     selected_pair = update_data.get("selected_pair")
@@ -1851,7 +1855,8 @@ async def update_config(
         config_name=config_name,
         config_type=config_type,
         trading_mode=trading_mode,
-        symphony_agent_id=symphony_agent_id
+        symphony_agent_id=symphony_agent_id,
+        profile_image_url=profile_image_url
     )
     
     if not config:
