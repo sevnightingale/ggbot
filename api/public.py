@@ -62,6 +62,7 @@ async def get_arena_performance(
                 SELECT
                     c.config_id,
                     c.config_name,
+                    c.profile_image_url,
                     s.timestamp,
                     COALESCE(s.current_balance, 0) +
                     COALESCE(s.unrealized_pnl, 0) as total_equity,
@@ -69,7 +70,9 @@ async def get_arena_performance(
                     s.total_trades,
                     s.win_rate,
                     s.open_positions,
-                    pa.initial_balance
+                    pa.initial_balance,
+                    s.current_balance,
+                    s.unrealized_pnl
                 FROM account_snapshots s
                 JOIN configurations c ON s.config_id = c.config_id
                 LEFT JOIN paper_accounts pa ON s.config_id = pa.config_id
@@ -86,25 +89,31 @@ async def get_arena_performance(
             for row in rows:
                 config_id = row[0]
                 config_name = row[1]
-                timestamp = row[2]
-                total_equity = float(row[3])
-                total_pnl = float(row[4] or 0)
-                total_trades = row[5] or 0
-                win_rate = float(row[6] or 0)
-                open_positions = row[7] or 0
-                initial_balance = float(row[8] or 10000)
+                profile_image_url = row[2]
+                timestamp = row[3]
+                total_equity = float(row[4])
+                total_pnl = float(row[5] or 0)
+                total_trades = row[6] or 0
+                win_rate = float(row[7] or 0)
+                open_positions = row[8] or 0
+                initial_balance = float(row[9] or 10000)
+                current_balance = float(row[10] or 0)
+                unrealized_pnl = float(row[11] or 0)
 
                 if config_id not in bots_data:
                     bots_data[config_id] = {
                         "config_id": config_id,
                         "config_name": config_name,
+                        "profile_image_url": profile_image_url,
                         "data_points": [],
                         "current_equity": total_equity,
                         "current_pnl": total_pnl,
                         "initial_balance": initial_balance,
                         "total_trades": total_trades,
                         "win_rate": win_rate,
-                        "open_positions": open_positions
+                        "open_positions": open_positions,
+                        "current_balance": current_balance,
+                        "unrealized_pnl": unrealized_pnl
                     }
 
                 # Add data point
@@ -119,6 +128,8 @@ async def get_arena_performance(
                 bots_data[config_id]["total_trades"] = total_trades
                 bots_data[config_id]["win_rate"] = win_rate
                 bots_data[config_id]["open_positions"] = open_positions
+                bots_data[config_id]["current_balance"] = current_balance
+                bots_data[config_id]["unrealized_pnl"] = unrealized_pnl
 
             # Convert to list and sort by current equity descending
             bots_list = list(bots_data.values())

@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, TrendingUp, TrendingDown, Trophy } from 'lucide-react'
+import { RefreshCw, TrendingUp, TrendingDown, Trophy, Upload } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DataPoint {
@@ -12,6 +12,7 @@ interface DataPoint {
 interface BotData {
   config_id: string
   config_name: string
+  profile_image_url: string | null
   data_points: DataPoint[]
   current_equity: number
   current_pnl: number
@@ -19,6 +20,8 @@ interface BotData {
   total_trades: number
   win_rate: number
   open_positions: number
+  current_balance: number
+  unrealized_pnl: number
 }
 
 interface ArenaData {
@@ -27,29 +30,21 @@ interface ArenaData {
   competition_days: number
 }
 
-// Color palette for bots (brass, signal, jade, ruby, amethyst, amber)
+// Color palette for the 6 bots
 const BOT_COLORS = [
-  '#D4AF37', // brass
-  '#00F0FF', // signal
-  '#10b981', // jade
-  '#ef4444', // ruby
-  '#8b5cf6', // amethyst
+  '#10b981', // green
+  '#3b82f6', // blue
   '#f59e0b', // amber
+  '#ef4444', // red
+  '#8b5cf6', // purple
+  '#ec4899', // pink
 ]
-
-// Helper to get bot profile image
-const getBotImage = (botName: string): string => {
-  // Remove "The " prefix if present, then normalize
-  const withoutThe = botName.replace(/^The\s+/i, '')
-  const normalized = withoutThe.toLowerCase().replace(/\s+/g, '-')
-  return `/the-${normalized}-1.png`
-}
 
 export default function ArenaPage() {
   const [data, setData] = useState<ArenaData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [hours, setHours] = useState(504) // Default 21 days (competition period)
+  const [hours, setHours] = useState(504) // Default 21 days
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -120,18 +115,15 @@ export default function ArenaPage() {
 
   const chartData = getChartData()
 
-  // Calculate rankings (by current equity)
-  const rankedBots = data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
-
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div className="flex items-center gap-4">
-          <Trophy className="h-8 w-8" style={{ color: '#D4AF37' }} />
+          <Trophy className="h-8 w-8 text-brass" />
           <div>
             <h1 className="text-2xl font-bold text-white">Arena</h1>
-            <p className="text-sm" style={{ color: '#6B7280' }}>
+            <p className="text-sm text-gray-500">
               {data ? `${data.bots.length} bots competing • ${data.competition_days} days` : 'Loading competition...'}
             </p>
           </div>
@@ -142,11 +134,7 @@ export default function ArenaPage() {
           <select
             value={hours}
             onChange={(e) => setHours(Number(e.target.value))}
-            className="px-3 py-2 rounded-lg text-white text-sm focus:outline-none"
-            style={{
-              backgroundColor: '#0A0F1E',
-              border: '1px solid #1E293B',
-            }}
+            className="px-3 py-2 bg-charcoal-800 border border-charcoal-700 rounded-lg text-white text-sm focus:outline-none focus:border-charcoal-500"
           >
             <option value={168}>7 days</option>
             <option value={336}>14 days</option>
@@ -157,11 +145,7 @@ export default function ArenaPage() {
           <button
             onClick={fetchData}
             disabled={loading}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg text-white transition-colors disabled:opacity-50"
-            style={{
-              backgroundColor: '#0A0F1E',
-              border: '1px solid #1E293B',
-            }}
+            className="flex items-center gap-2 px-4 py-2 bg-charcoal-800 hover:bg-charcoal-700 rounded-lg text-white transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
@@ -171,7 +155,7 @@ export default function ArenaPage() {
 
       {/* Error */}
       {error && (
-        <div className="mb-6 p-4 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)', border: '1px solid #ef4444', color: '#ef4444' }}>
+        <div className="mb-6 p-4 bg-red-900/20 border border-red-500 rounded-lg text-red-400">
           {error}
         </div>
       )}
@@ -179,14 +163,14 @@ export default function ArenaPage() {
       {/* Loading */}
       {loading && !data && (
         <div className="flex items-center justify-center h-96">
-          <RefreshCw className="h-8 w-8 animate-spin" style={{ color: '#6B7280' }} />
+          <RefreshCw className="h-8 w-8 animate-spin text-gray-500" />
         </div>
       )}
 
       {/* Chart */}
       {!loading && data && chartData.length > 0 && (
-        <div className="rounded-lg border p-6 mb-6" style={{ backgroundColor: '#0A0F1E', borderColor: '#1E293B' }}>
-          <h2 className="text-lg font-semibold text-white mb-4">Performance Over Time</h2>
+        <div className="bg-charcoal-900 rounded-lg border border-charcoal-700 p-6 mb-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Total Equity Over Time</h2>
           <ResponsiveContainer width="100%" height={400}>
             <LineChart data={chartData}>
               <CartesianGrid strokeDasharray="3 3" stroke="#374151" />
@@ -232,87 +216,94 @@ export default function ArenaPage() {
         </div>
       )}
 
-      {/* Leaderboard */}
-      {!loading && data && rankedBots.length > 0 && (
-        <div>
-          <h2 className="text-lg font-semibold text-white mb-4">Leaderboard</h2>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {rankedBots.map((bot, index) => {
-              const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
-              const isPositive = pnlPercent >= 0
-              const rankColor = index === 0 ? '#D4AF37' : index === 1 ? '#C0C0C0' : index === 2 ? '#CD7F32' : '#6B7280'
+      {/* Stats Cards */}
+      {!loading && data && data.bots.length > 0 && (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          {data.bots.map((bot, index) => {
+            const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
+            const isPositive = pnlPercent >= 0
 
-              return (
-                <div
-                  key={bot.config_id}
-                  className="rounded-lg border p-4"
-                  style={{ backgroundColor: '#0A0F1E', borderColor: '#1E293B' }}
-                >
-                  {/* Bot name with profile image, rank, and color indicator */}
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="relative">
+            return (
+              <div
+                key={bot.config_id}
+                className="bg-charcoal-900 rounded-lg border border-charcoal-700 p-4"
+              >
+                {/* Bot name with profile image and color indicator */}
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="relative">
+                    {bot.profile_image_url ? (
                       <img
-                        src={getBotImage(bot.config_name)}
+                        src={bot.profile_image_url}
                         alt={bot.config_name}
                         className="w-12 h-12 rounded-full border-2 object-cover"
-                        style={{ borderColor: BOT_COLORS[data.bots.findIndex(b => b.config_id === bot.config_id) % BOT_COLORS.length] }}
+                        style={{ borderColor: BOT_COLORS[index % BOT_COLORS.length] }}
                       />
-                      {/* Rank badge */}
-                      <div
-                        className="absolute -top-1 -right-1 w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold"
-                        style={{ backgroundColor: rankColor, color: index < 3 ? '#000' : '#fff' }}
-                      >
-                        {index + 1}
-                      </div>
-                    </div>
-                    <div className="flex-1">
-                      <h3 className="text-white font-medium">{bot.config_name}</h3>
-                    </div>
-                  </div>
-
-                  {/* Current equity */}
-                  <div className="mb-2">
-                    <p className="text-sm" style={{ color: '#6B7280' }}>Current Equity</p>
-                    <p className="text-2xl font-bold text-white">
-                      {formatCurrency(bot.current_equity)}
-                    </p>
-                  </div>
-
-                  {/* P&L */}
-                  <div className="flex items-center gap-2 mb-3">
-                    {isPositive ? (
-                      <TrendingUp className="h-4 w-4" style={{ color: '#10b981' }} />
                     ) : (
-                      <TrendingDown className="h-4 w-4" style={{ color: '#ef4444' }} />
+                      <div
+                        className="w-12 h-12 rounded-full border-2 flex items-center justify-center bg-charcoal-800"
+                        style={{ borderColor: BOT_COLORS[index % BOT_COLORS.length] }}
+                      >
+                        <Upload className="h-5 w-5 text-gray-500" />
+                      </div>
                     )}
-                    <span style={{ color: isPositive ? '#10b981' : '#ef4444' }}>
-                      {formatCurrency(bot.current_pnl)} ({pnlPercent.toFixed(2)}%)
-                    </span>
                   </div>
-
-                  {/* Stats grid */}
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div>
-                      <p style={{ color: '#6B7280' }}>Trades</p>
-                      <p className="text-white">{bot.total_trades}</p>
-                    </div>
-                    <div>
-                      <p style={{ color: '#6B7280' }}>Win Rate</p>
-                      <p className="text-white">{(bot.win_rate * 100).toFixed(1)}%</p>
-                    </div>
-                    <div>
-                      <p style={{ color: '#6B7280' }}>Open</p>
-                      <p className="text-white">{bot.open_positions}</p>
-                    </div>
-                    <div>
-                      <p style={{ color: '#6B7280' }}>Points</p>
-                      <p className="text-white">{bot.data_points.length}</p>
-                    </div>
+                  <div className="flex-1">
+                    <h3 className="text-white font-medium">{bot.config_name}</h3>
                   </div>
                 </div>
-              )
-            })}
-          </div>
+
+                {/* Current equity */}
+                <div className="mb-2">
+                  <p className="text-gray-500 text-sm">Current Equity</p>
+                  <p className="text-2xl font-bold text-white">
+                    {formatCurrency(bot.current_equity)}
+                  </p>
+                </div>
+
+                {/* P&L */}
+                <div className="flex items-center gap-2 mb-3">
+                  {isPositive ? (
+                    <TrendingUp className="h-4 w-4 text-green-400" />
+                  ) : (
+                    <TrendingDown className="h-4 w-4 text-red-400" />
+                  )}
+                  <span className={isPositive ? 'text-green-400' : 'text-red-400'}>
+                    {formatCurrency(bot.current_pnl)} ({pnlPercent.toFixed(2)}%)
+                  </span>
+                </div>
+
+                {/* Stats grid - 6 metrics */}
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-gray-500">Trades</p>
+                    <p className="text-white">{bot.total_trades}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Win Rate</p>
+                    <p className="text-white">{(bot.win_rate * 100).toFixed(1)}%</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Open</p>
+                    <p className="text-white">{bot.open_positions}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Initial</p>
+                    <p className="text-white">{formatCurrency(bot.initial_balance)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Balance</p>
+                    <p className="text-white">{formatCurrency(bot.current_balance)}</p>
+                  </div>
+                  <div>
+                    <p className="text-gray-500">Unrealized</p>
+                    <p className={bot.unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}>
+                      {formatCurrency(bot.unrealized_pnl)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
         </div>
       )}
     </div>
