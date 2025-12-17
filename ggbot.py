@@ -298,12 +298,14 @@ from api.activities import router as activities_router
 from api.snapshots import router as snapshots_router
 from api.assistant import router as assistant_router
 from api.admin import router as admin_router
+from api.public import router as public_router
 app.include_router(paper_trading_router)
 app.include_router(agent_router)
 app.include_router(activities_router)
 app.include_router(snapshots_router)
 app.include_router(assistant_router)
 app.include_router(admin_router)
+app.include_router(public_router)
 
 
 class GGBotOrchestrator:

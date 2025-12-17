@@ -6,6 +6,17 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-17 - Arena Public Competition Page
+
+**Public Arena** - No-auth bot competition leaderboard at /arena (future arena.ggbots.ai subdomain)
+- Backend: GET /api/v2/public/arena/performance - No auth required, returns showcase bots only (api/public.py)
+- Database: Uses existing is_public_performance flag on configurations table (defaults false)
+- Query: account_snapshots WHERE is_public_performance = true, formula = current_balance + unrealized_pnl
+- Frontend: /app/arena/page.tsx - Recharts multi-line comparison, defaults 21-day competition period (504h)
+- UI: Gold trophy header, ranked leaderboard cards (gold/silver/bronze badges), time selectors (7d, 14d, 21d, 30d)
+- Colors: Brass, signal, jade, ruby, amethyst, amber for bot lines
+- Setup: Admins manually flag showcase bots via is_public_performance column, users see public performance without login
+
 ## 2025-12-17 - TV Timeline Dual-Mode + Timeframe Aggregation
 
 **Frontend** - Dual-mode equity chart with timeframe aggregation in TV Timeline component

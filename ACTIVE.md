@@ -1,34 +1,34 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-12-15 15:57:18 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-12-17 10:12:43 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 261
+- **Total Users**: 262
 - **Pro Users (ggbase)**: 0 (0 active subscriptions)
-- **Free Users**: 256
-- **Users with Bots**: 255 (97.7%)
+- **Free Users**: 257
+- **Users with Bots**: 256 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 388
-- **Active Bots**: 7 (1.8%)
+- **Total Bots**: 387
+- **Active Bots**: 8 (2.1%)
   - Paper Trading: 1
   - Live Trading: 0
-- **Inactive Bots**: 381
+- **Inactive Bots**: 379
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,453
-  - Wins: 1,636
-  - Losses: 3,817
-  - Platform Win Rate: 30.00%
-  - Total P&L: $-16,178.41
+- **Total Trades (All Time)**: 5,464
+  - Wins: 1,642
+  - Losses: 3,822
+  - Platform Win Rate: 30.05%
+  - Total P&L: $-16,209.55
 - **Recent Activity**:
-  - Last 24 hours: 10 trades
-  - Last 7 days: 12 trades
-  - Last 30 days: 19 trades
+  - Last 24 hours: 13 trades
+  - Last 7 days: 28 trades
+  - Last 30 days: 34 trades
 
 ### Open Positions
 - **Open Positions**: 0
@@ -37,23 +37,23 @@
 - **Unrealized P&L**: $0.00
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,928.23
+- **Average Balance**: $9,927.96
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 6 bots
+- **BTC/USDT**: 7 bots
 - **ADA/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 374 decisions (avg confidence: 32.9%)
-- **enter**: 15 decisions (avg confidence: 63.1%)
-- **exit**: 14 decisions (avg confidence: 49.7%)
+- **wait**: 459 decisions (avg confidence: 30.0%)
+- **enter**: 22 decisions (avg confidence: 66.1%)
+- **exit**: 22 decisions (avg confidence: 55.9%)
 
 ### System Health
-- **Decisions (last hour)**: 19
+- **Decisions (last hour)**: 21
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -62,22 +62,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 149MB | 14h 15m | 68 |
-| x-bot | 🟢 online | 0% | 43MB | 14h 15m | 67 |
-| error-alerts | 🟢 online | 0% | 33MB | 14h 15m | 74 |
-| market-data-ws | 🟢 online | 3.4% | 170MB | 14h 15m | 69 |
-| ggbot | 🟢 online | 0.6% | 265MB | 2m | 247 |
-| account-monitor | 🟢 online | 1.3% | 219MB | 14h 15m | 31 |
+| signal-listener | 🟢 online | 0% | 63MB | 1h 8m | 69 |
+| x-bot | 🟢 online | 0% | 41MB | 1h 9m | 68 |
+| error-alerts | 🟢 online | 0% | 33MB | 1h 8m | 75 |
+| market-data-ws | 🟢 online | 1.4% | 174MB | 1h 8m | 70 |
+| ggbot | 🟢 online | 2.2% | 307MB | 1h 8m | 253 |
+| account-monitor | 🟢 online | 1.5% | 118MB | 1h 8m | 34 |
+| agent-3823aa15-02eb-460e-a88b-7c594d0ed8d0 | 🟢 online | 0% | 66MB | 1h 8m | 1 |
 
 ### VM Resources
 
-- **Disk**: 39G / 78G (50%)
-- **Memory**: 2.5Gi / 3.8Gi
-- **CPU Load**: 1.04 / 0.53 / 0.26 (1m/5m/15m)
+- **Disk**: 39G / 78G (51%)
+- **Memory**: 2.3Gi / 3.8Gi
+- **CPU Load**: 0.73 / 0.44 / 0.24 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 11.64M)
+- **Redis**: 🟢 connected (Memory: 13.50M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -409,7 +410,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-12-15 15:57:19 UTC
+**Last Updated**: 2025-12-17 10:12:44 UTC
 
 ---
 
@@ -458,7 +459,7 @@ df -h
 | `is_heartbeat` | boolean | ✓ | false |
 | `created_at` | timestamp with time zone |  | now() |
 
-### `activities` (25 columns)
+### `activities` (26 columns)
 
 **Primary Key**: `activity_id`
 
@@ -503,6 +504,7 @@ df -h
 | `stripe_reported_at` | timestamp with time zone | ✓ |  |
 | `account_balance` | numeric | ✓ |  |
 | `account_pnl` | numeric | ✓ |  |
+| `total_equity` | numeric | ✓ |  |
 
 ### `agent_sessions` (5 columns)
 
@@ -1253,7 +1255,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-12-15 15:57:19 UTC
+**Last Updated**: 2025-12-17 10:12:44 UTC
 
 ---
 
