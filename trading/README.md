@@ -755,8 +755,14 @@ Position tracking with real-time P&L calculation (V2.0 with leverage fixes).
 - **Leverage Support**: Stores leverage multiplier and calculates correct P&L
 - **Margin Tracking**: `margin_used` field tracks actual reserved amount for accurate release
 - **Risk Management**: Stop loss and take profit levels with leveraged execution
-- **Decision Integration**: Links to Decision Module via decision_id
+- **Decision Integration**: Links to Decision Module via decision_id (ENTRY decision only)
 - **Confidence Tracking**: Preserves AI confidence scores
+
+**CRITICAL: Decision Linkage**
+- `decision_id` stores the **ENTRY decision** that created the trade
+- EXIT decisions UPDATE the trade row (closed_at, close_reason) but `decision_id` stays unchanged
+- To trace exit execution: query `activities` table by time, NOT by joining decisions on decision_id
+- `close_reason='position_management'` means "LLM exit decision executed" (not a separate monitoring system)
 
 ### paper_orders
 Complete audit trail of all paper orders.

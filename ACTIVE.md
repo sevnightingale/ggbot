@@ -461,6 +461,10 @@ df -h
 
 ### `activities` (26 columns)
 
+**Purpose**: Complete audit trail and timeline source of truth for all bot activities.
+
+**CRITICAL FOR DEBUGGING**: To trace trade execution (entry/exit), query `activities` by time, NOT by joining `decisions` on `decision_id`. The `decision_id` on `paper_trades` only links to ENTRY decisions.
+
 **Primary Key**: `activity_id`
 
 **Foreign Keys**:

@@ -172,6 +172,12 @@ For significant TODO items (multi-day work, complex features), maintain planning
 - ✅ DO check module READMEs before making assumptions about how code works
 - ✅ DO check ACTIVE.md for existing system architecture before proposing solutions
 
+**Debugging Trade Execution**:
+- ❌ DON'T query `decisions LEFT JOIN paper_trades ON decision_id` to find exits (only ENTRY decisions link)
+- ❌ DON'T assume `close_reason='position_management'` means separate monitoring system (it's LLM exit)
+- ✅ DO query `activities` table chronologically to see full timeline (market_query → llm_thought → trade_exit)
+- ✅ DO understand `paper_trades.decision_id` stores ENTRY decision only (exits UPDATE the row)
+
 ---
 
 ## 💡 Development Workflow Reminders
