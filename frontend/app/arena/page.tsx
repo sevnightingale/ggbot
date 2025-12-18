@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { ThemeProvider } from '@/lib/theme'
 
 interface DataPoint {
   timestamp: string
@@ -81,7 +82,7 @@ const BOT_DESCRIPTIONS: Record<string, { frequency: string; symbol: string; tagl
   }
 }
 
-export default function ArenaPage() {
+function ArenaContent() {
   const [data, setData] = useState<ArenaData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -596,5 +597,13 @@ export default function ArenaPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function ArenaPage() {
+  return (
+    <ThemeProvider>
+      <ArenaContent />
+    </ThemeProvider>
   )
 }

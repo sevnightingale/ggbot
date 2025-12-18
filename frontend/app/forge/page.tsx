@@ -92,6 +92,10 @@ function ForgeApp() {
   const selectedConfigIdRef = useRef(selectedConfigId)
   selectedConfigIdRef.current = selectedConfigId
 
+  // Track previous config ID to detect ACTUAL bot switches (not just SSE reference changes)
+  const prevConfigIdForEditingRef = useRef<string | null>(null)
+  const prevConfigIdForClearingRef = useRef<string | null>(null)
+
   // Get currently selected bot
   const selectedBot = selectedConfigId
     ? allBots.find(bot => bot.config_id === selectedConfigId) || null
@@ -160,39 +164,62 @@ function ForgeApp() {
     queueConfigChange(updates)
   }, [queueConfigChange])
 
-  // Load bot config into editing state when configure tab is activated
+  // Load bot config into editing state when configure tab is activated OR bot changes
+  // IMPORTANT: Use ref to prevent SSE updates from triggering this (SSE updates allBots
+  // which creates new selectedBot reference even when config_id is the same)
   useEffect(() => {
-    if (activeTab === 'configure' && selectedBot) {
-      console.log('🔧 Loading config for editing:', selectedBot.config_id)
+    if (activeTab !== 'configure' || !selectedBot) return
 
-      // Load bot config into editing state
-      // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
-      const configDataWithTradingMode = selectedBot.config_data
-        ? {
-            ...JSON.parse(JSON.stringify(selectedBot.config_data)),
-            trading_mode: selectedBot.trading_mode,
-            symphony_agent_id: selectedBot.symphony_agent_id
-          }
-        : null
-
-      setEditingConfigData(configDataWithTradingMode)
-      setEditingTableFields({
-        config_name: selectedBot.config_name,
-        config_type: selectedBot.config_type
-      })
+    // Only load config if:
+    // 1. This is the first time loading for this config_id, OR
+    // 2. The config_id actually changed (user switched bots)
+    const configIdChanged = prevConfigIdForEditingRef.current !== selectedBot.config_id
+    if (!configIdChanged && editingConfigData !== null) {
+      // Same config_id and we already have editing data - skip (SSE triggered this)
+      return
     }
+
+    console.log('🔧 Loading config for editing:', selectedBot.config_id)
+    prevConfigIdForEditingRef.current = selectedBot.config_id
+
+    // Load bot config into editing state
+    // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
+    const configDataWithTradingMode = selectedBot.config_data
+      ? {
+          ...JSON.parse(JSON.stringify(selectedBot.config_data)),
+          trading_mode: selectedBot.trading_mode,
+          symphony_agent_id: selectedBot.symphony_agent_id
+        }
+      : null
+
+    setEditingConfigData(configDataWithTradingMode)
+    setEditingTableFields({
+      config_name: selectedBot.config_name,
+      config_type: selectedBot.config_type
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab, selectedBot])
 
   // Clear component data immediately when switching bots for instant UI update
+  // IMPORTANT: Use ref to only run when config_id ACTUALLY changes (not on SSE updates)
   useEffect(() => {
-    if (selectedConfigId && selectedBot) {
-      // Clear operational data that should be bot-specific
-      setPositions([])
-      setCountdown('')
-      setNextRun(null)
+    if (!selectedConfigId) return
 
-      console.log('🔄 Switched to bot:', selectedBot.config_id, selectedBot.config_name)
+    // Only clear data if the config_id actually changed
+    if (prevConfigIdForClearingRef.current === selectedConfigId) {
+      // Same config_id - this is just an SSE update, don't clear anything
+      return
     }
+
+    // Config ID actually changed - user switched bots
+    prevConfigIdForClearingRef.current = selectedConfigId
+
+    // Clear operational data that should be bot-specific
+    setPositions([])
+    setCountdown('')
+    setNextRun(null)
+
+    console.log('🔄 Switched to bot:', selectedConfigId, selectedBot?.config_name)
   }, [selectedConfigId, selectedBot]) // Clear data when switching bots
 
   // Real auth check
