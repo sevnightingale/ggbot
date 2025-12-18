@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react'
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef, ReactNode } from 'react'
 import { SaveStatus } from '@/lib/hooks/useAutoSave'
 
 interface SaveStatusContextType {
@@ -17,11 +17,18 @@ export function SaveStatusProvider({ children }: { children: ReactNode }) {
   const [activeSaves, setActiveSaves] = useState<Set<string>>(new Set())
   const [lastError, setLastError] = useState<Error | null>(null)
   const [lastCompleteTime, setLastCompleteTime] = useState<number>(0)
+  const [, forceUpdate] = useState({})  // Dummy state to force re-render
+  const hideTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Register that a save operation started
   const registerSave = useCallback((id: string) => {
     setActiveSaves(prev => new Set(prev).add(id))
     setLastError(null)
+    // Clear any pending hide timer
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+      hideTimerRef.current = null
+    }
   }, [])
 
   // Mark a save operation as complete
@@ -32,6 +39,14 @@ export function SaveStatusProvider({ children }: { children: ReactNode }) {
       return next
     })
     setLastCompleteTime(Date.now())
+
+    // Schedule a re-render after 2s to hide the "Saved" indicator
+    if (hideTimerRef.current) {
+      clearTimeout(hideTimerRef.current)
+    }
+    hideTimerRef.current = setTimeout(() => {
+      forceUpdate({})  // Force re-render to transition from 'saved' to 'idle'
+    }, 2100)  // Slightly longer than 2s to ensure the check passes
   }, [])
 
   // Mark a save operation as failed
@@ -42,6 +57,15 @@ export function SaveStatusProvider({ children }: { children: ReactNode }) {
       return next
     })
     setLastError(error)
+  }, [])
+
+  // Cleanup timer on unmount
+  useEffect(() => {
+    return () => {
+      if (hideTimerRef.current) {
+        clearTimeout(hideTimerRef.current)
+      }
+    }
   }, [])
 
   // Determine global status

@@ -179,21 +179,17 @@ function ArenaContent() {
       {/* Header with brass CTA */}
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-primary)]/80 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
-          <a href="https://ggbots.ai" className="flex items-center gap-2 group">
+          <a href="https://ggbots.ai" className="flex items-center gap-2">
             <Image
               src="/ggbots_logo.svg"
               alt="ggbots logo"
               width={28}
               height={28}
-              className="h-7 w-auto transition-transform duration-200 group-hover:scale-110"
+              className="h-7 w-auto"
               style={{
                 filter: 'brightness(0) saturate(100%) invert(var(--logo-invert, 89%)) sepia(12%) saturate(584%) hue-rotate(200deg) brightness(95%) contrast(89%)'
               }}
             />
-            <span className="font-display text-lg">
-              <span className="text-[var(--accent)]">gg</span>
-              <span className="text-[var(--text-primary)]">bots</span>
-            </span>
           </a>
           {/* BRASS CTA BUTTON */}
           <a
