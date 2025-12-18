@@ -6,6 +6,15 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-17 - Bot Image Upload Fixes
+
+**Critical Fixes** - Bot name preservation + image display in ActivationBar
+- Bug: Image upload reset config_name to "Untitled Bot" → config_service.py flat structure path missing db_config_name assignment (line 324)
+- Bug: SSE dashboard query omitted profile_image_url → added to SELECT (dashboard_data.py:72) and json_build_object (line 177)
+- Bug: Frontend SSE listener didn't update allBots state → added setAllBots() merge in SSE handler (forge/page.tsx:432-443)
+- Bug: BotImageUpload preview didn't sync with prop changes → added useEffect to sync preview with currentImageUrl (BotImageUpload.tsx:27-29)
+- Result: Name preserved during image upload, image displays in ActivationBar after SSE update (2-3 sec), Arena page shows images correctly
+
 ## 2025-12-17 - Arena Public Competition Page
 
 **Public Arena** - No-auth bot competition leaderboard at /arena (future arena.ggbots.ai subdomain)

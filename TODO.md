@@ -23,6 +23,167 @@ See planning doc for complete provider-specific instructions and verification st
 
 ---
 
+## 🏆 **HIGH PRIORITY - ggArena Bot Preparation** (2025-12-18)
+
+**Status**: 🟡 IN PROGRESS - 7 bots configured but need optimization before 21-day public competition
+**Analysis Doc**: [ARENA_BOT_ANALYSIS.md](ARENA_BOT_ANALYSIS.md)
+
+**Current State**:
+- 7 arena bots identified (ggSignals, The Compass, The Arbiter, The Contrarian, The Herald, The Sentinel, The Nomad)
+- All bots currently INACTIVE (making decisions but not executing trades)
+- Only "The Technician (old)" active: 32 trades, 50% win rate, -$105.79 P&L
+- Key issue: Some bots too conservative (1-3% confidence = 100% waits), Symphony integration not working
+
+### **Task 1: Strategy Deep-Dive & Optimization** 🔍
+
+**Goal**: Analyze decision patterns and improve strategy prompts for better trade execution
+
+**The Technician Analysis** (Active bot, poor performance):
+- [ ] Query last 50 decisions with full reasoning
+- [ ] Identify pattern: Why 50% win rate despite 21 indicators?
+- [ ] Analyze entry/exit timing (5m frequency = over-trading?)
+- [ ] Check stop loss/take profit hit rates
+- [ ] Review confidence distribution (55% avg = too low threshold?)
+- [ ] Compare successful trades vs losing trades (indicators at entry)
+- [ ] Recommend: Strategy refinements, frequency change, or indicator subset
+
+**Low-Confidence Bots** (Herald 1%, Sentinel 3%, Arbiter 10%):
+- [ ] Query sample "wait" decisions with reasoning
+- [ ] Identify why confidence is so low (prompt wording? risk aversion? data quality?)
+- [ ] Review strategy prompts for overly conservative language
+- [ ] Test hypothesis: "when in doubt, wait" vs "when in doubt, trade" bias
+- [ ] Recommend specific prompt changes to increase action bias
+
+**ggSignals Analysis** (68% confidence but 0 trades):
+- [ ] Query enter/exit decisions (91 enters, 17 exits in 7 days)
+- [ ] Verify decision quality and reasoning patterns
+- [ ] Confirm strong conviction = likely to succeed
+- [ ] Check if Symphony integration is blocking execution (see Task 3)
+
+**Deliverables**:
+- Detailed decision pattern analysis for each bot
+- Specific strategy prompt recommendations
+- Confidence threshold recommendations
+- Indicator effectiveness analysis (which ones correlate with wins?)
+
+---
+
+### **Task 2: Tune Conservative Bots for Arena Activity** ⚙️
+
+**Goal**: Adjust prompts/configs so all bots will actually trade during 21-day competition
+
+**The Herald** (30m, 1% confidence, 0/128 trades):
+- [ ] Review current prompt for overly cautious language
+- [ ] Add explicit "bias toward action" guidance
+- [ ] Lower implicit confidence bar in reasoning
+- [ ] Test: Activate for 24h, monitor if trades trigger
+- [ ] Target: 20-30% confidence minimum, 20%+ action rate
+
+**The Sentinel** (15m, 3% confidence, 0/261 trades):
+- [ ] Current: "only trade when setup, trend, and confirmation align perfectly"
+- [ ] Revise: "trade when 2 of 3 align with reasonable confidence"
+- [ ] Remove "capital is sacred" language (creates fear)
+- [ ] Add "taking calculated risks is part of trading"
+- [ ] Test: Activate for 24h, verify trades execute
+- [ ] Target: 10-15% confidence minimum, 15%+ action rate
+
+**The Arbiter** (4h, 10% confidence, 0/16 trades):
+- [ ] Review "weigh all evidence" prompt (analysis paralysis?)
+- [ ] Add tiebreaker logic: "when evidence is mixed, trust momentum"
+- [ ] Reduce required confluence from "all indicators" to "majority"
+- [ ] Test: Activate for 24h
+- [ ] Target: 40-50% confidence, 10%+ action rate
+
+**The Contrarian** (1h, 13% confidence, 0/67 trades):
+- [ ] Strategy may be fundamentally sound (waiting for extremes)
+- [ ] Review: Are RSI/funding extremes actually occurring?
+- [ ] Consider: Lower threshold for "extreme" (RSI <30/>70 instead of <20/>80)
+- [ ] Add: "Minor extremes are still tradeable"
+- [ ] Test: Activate for 24h
+- [ ] Target: 30-40% confidence, 15%+ action rate
+
+**The Nomad** (Agent, no strategy):
+- [ ] Create initial agent strategy prompt
+- [ ] Define: Autonomous market scanner, opportunity-driven
+- [ ] Tools: query_market_data, execute_trade, record observations
+- [ ] Guidance: "Scan for 7 symbols daily, trade best 2-3 setups"
+- [ ] Test: Start agent for 24h
+- [ ] Target: 2-5 trades/day
+
+**General Tuning Principles**:
+- Remove fear-based language ("capital is sacred", "only when perfect")
+- Add action-bias language ("when in doubt, trust the setup")
+- Lower confidence thresholds implicitly via prompt tone
+- Add explicit tiebreaker rules for mixed signals
+- Test each bot 24h before competition starts
+
+---
+
+### **Task 3: Symphony Integration Debug** 🔌
+
+**Status**: BLOCKED - ggSignals making 91 enter decisions but 0 trades executing
+
+**Issue**: Symphony trades may be executing on Symphony side, but API calls failing to track/record them
+
+**Investigation Steps**:
+- [ ] Check Symphony credentials configured for user
+  - Query: `SELECT symphony_vault_id, symphony_smart_account FROM user_profiles WHERE user_id = '<admin_id>'`
+  - Verify vault decryption works
+- [ ] Check ggSignals paper account vs Symphony account
+  - Bot config shows `trading_mode='symphony'` but `paper_accounts` table has $10k
+  - Verify: Does Symphony mode use paper_accounts or live_trades table?
+- [ ] Review Symphony service execution logs
+  - Check: `pm2 logs ggbot | grep -i symphony`
+  - Look for: API call failures, auth errors, position creation failures
+- [ ] Test manual Symphony trade via API
+  - Call: `POST /api/v2/agent/execute-trade` with ggSignals config_id
+  - Verify: Trade executes on Symphony + records in live_trades table
+- [ ] Check decision → trade linking
+  - Query: ggSignals decisions with `decision_id` vs `live_trades.decision_id`
+  - Expected: 91 enter decisions should create 91 live_trades records (if conditions met)
+- [ ] Review Symphony service code
+  - File: `trading/live/symphony_service.py`
+  - Check: execute_trade() method, error handling, batch_id creation
+  - Verify: live_trades INSERT after Symphony API success
+- [ ] Check symbol compatibility
+  - BTC/USDT should be Symphony-compatible (verify in registry)
+  - Check: Symbol conversion BTC/USDT → Symphony format
+- [ ] API endpoint investigation
+  - File: `ggbot.py` orchestrator
+  - Check: Does scheduled_trading + symphony mode route to Symphony service?
+  - Expected flow: decision engine → trading router → symphony_service.execute_trade()
+
+**Potential Issues**:
+1. Symphony credentials not configured (vault_id NULL)
+2. Decision confidence < execution threshold (but 68% seems high enough)
+3. Position sizing calculation failing
+4. Symphony API authentication failing silently
+5. Orchestrator not routing Symphony bots correctly
+6. live_trades table constraint preventing INSERTs
+
+**Testing Plan**:
+- [ ] Activate ggSignals for 1 hour (test mode)
+- [ ] Monitor logs in real-time: `pm2 logs ggbot --lines 100`
+- [ ] Verify: Decision made → Trade execution attempted → Result logged
+- [ ] Check: Any error messages in logs?
+- [ ] Query live_trades table after 1 hour: Any new records?
+
+**Fix Actions** (TBD based on findings):
+- [ ] Configure Symphony credentials if missing
+- [ ] Fix position sizing if failing
+- [ ] Add error handling/logging if silent failures
+- [ ] Update orchestrator routing if misconfigured
+- [ ] Update documentation on Symphony mode behavior
+
+**Success Criteria**:
+- ggSignals makes decision with action='enter'
+- Symphony API receives trade request
+- Trade executes on Symphony (visible in Symphony dashboard)
+- live_trades table records new entry with provider='symphony'
+- Decision links to trade via decision_id
+
+---
+
 ## ✅ **DEPLOYED - Strategy Advisor (Character Creation UX)** (2025-12-05)
 
 **Status**: 🟢 PRODUCTION READY - Onboarding-focused prompt deployed

@@ -1,25 +1,27 @@
-🎬 StrategyEditor mounted with: {configId: '17e7d911-c732-44c2-b1b7-74a7a840e16e', hasConfigData: true, currentStrategy: 'if RSI 1hr below 50 enter long (if twitter sentime', configDataPrompt: 'if RSI 1hr below 50 enter long (if twitter sentime'}
-page-e452254c2821c3ca.js:1 📝 currentStrategy state changed to: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 🔄 configData.decision.user_prompt changed: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 🔄 Syncing local state with configData
-page-e452254c2821c3ca.js:1 🔍 API Call: getLLMModels to https://ggbots-api.nightingale.business/api/v2/llm-models
-page-e452254c2821c3ca.js:1 🔧 Loading config for editing: 17e7d911-c732-44c2-b1b7-74a7a840e16e
-page-e452254c2821c3ca.js:1 🔄 Poll skipped: {selectedConfigId: '17e7d911-c732-44c2-b1b7-74a7a840e16e', configType: 'scheduled_trading', userId: '00000000-0000-0000-0000-000000000000'}
-page-e452254c2821c3ca.js:1 📡 Response status: 200 OK
-page-e452254c2821c3ca.js:1 ✅ LLM models loaded: {status: 'success', models: Array(7), count: 7}
-page-e452254c2821c3ca.js:1 ⌨️ Textarea onChange fired!
-page-e452254c2821c3ca.js:1 🔤 handleStrategyChange called with: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 🔤 Setting currentStrategy state...
-page-e452254c2821c3ca.js:1 📝 currentStrategy state changed to: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 ⌨️ Textarea onChange fired!
-page-e452254c2821c3ca.js:1 🔤 handleStrategyChange called with: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 🔤 Setting currentStrategy state...
-page-e452254c2821c3ca.js:1 📝 currentStrategy state changed to: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 ⌨️ Textarea onChange fired!
-page-e452254c2821c3ca.js:1 🔤 handleStrategyChange called with: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 🔤 Setting currentStrategy state...
-page-e452254c2821c3ca.js:1 📝 currentStrategy state changed to: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 ⌨️ Textarea onChange fired!
-page-e452254c2821c3ca.js:1 🔤 handleStrategyChange called with: if RSI 1hr below 50 enter long (if twitter sentime
-page-e452254c2821c3ca.js:1 🔤 Setting currentStrategy state...
-page-e452254c2821c3ca.js:1 📝 currentStrategy state changed to: if RSI 1hr below 50 enter long (if twitter sentime
+The Technician
+5min · BTC
+Price is truth. A rapid-fire technical trader living in the charts. Trades actively, reacting to momentum shifts with precision. No hesitation, no second-guessing. The chart speaks, it acts. Flow is edge.
+
+The Sentinel
+15min · BTC
+Guards capital above all else. A conservative tactician with tight stops and careful entries. Doesn't chase, doesn't gamble. Preserves the foundation while others take risks. Defense wins wars.
+
+The Herald
+30min · BTC
+Markets move on narrative. Watches sentiment and news, catching stories before price catches up. Understands that in crypto, hype and fear are forces as real as any indicator on the chart.
+
+The Contrarian
+1hr · BTC
+The crowd is wrong at extremes. Waits for peak fear or peak greed, then bets against the herd. Knows that when everyone agrees, the reversal is near. Fades the crowd with conviction.
+
+The Arbiter
+4hr · BTC
+Waits for the verdict. Weighs all evidence — technicals, sentiment, positioning, smart money — and acts only when every domain agrees. Patience is edge. Confluence is truth. Strikes decisively.
+
+The Compass
+1d · BTC
+Macro sets the tide. Reads dollar strength, fear indices, and global risk appetite. Knows crypto doesn't exist in a vacuum. Positions for regimes, not moves. Never fights the current.
+
+The Nomad
+1w · Self-Evolving
+No fixed path. Wanders the markets, learns, adapts, rewrites its own rules. What worked yesterday may not work tomorrow. The only constant is change. Built to evolve.

@@ -85,9 +85,9 @@ export function MobileNav({
           />
 
           {/* Drawer */}
-          <div className="fixed left-0 top-0 bottom-0 z-50 w-80 max-w-[85vw] bg-[var(--bg-primary)] border-r border-[var(--border)] shadow-2xl">
+          <div className="fixed left-0 top-0 bottom-0 z-50 w-80 max-w-[85vw] bg-[var(--bg-primary)] border-r border-[var(--border)] shadow-2xl flex flex-col">
             {/* Drawer Header */}
-            <div className="flex items-center justify-between p-4 border-b border-[var(--border)]">
+            <div className="flex items-center justify-between p-4 border-b border-[var(--border)] flex-shrink-0">
               <h2 className="text-lg font-semibold text-[var(--text-primary)]">Your ggbots</h2>
               <button
                 onClick={() => setIsDrawerOpen(false)}
@@ -97,8 +97,8 @@ export function MobileNav({
               </button>
             </div>
 
-            {/* Bot Rail Content */}
-            <div className="flex-1 overflow-y-auto">
+            {/* Bot Rail Content - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-4">
               <BotRail
                 bots={bots}
                 selectedId={selectedId}

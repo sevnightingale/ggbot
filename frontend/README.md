@@ -71,6 +71,7 @@ Legacy/Archive (Moved to /archive/):
 ├── bottom-sheet.tsx        # Framer Motion slide-up drawer (centered on desktop) for activity details
 ├── StrategyAdvisorPanel.tsx # Inline AI chat for bot configuration (500px fixed, markdown rendering)
 ├── SaveStatusIndicator.tsx # Global auto-save status (Saving → Saved → Error)
+├── BotImageUpload.tsx      # Bot profile image uploader - drag-drop, auto-resize to 1024×1024, Supabase Storage
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
 ├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
 ├── UpgradeModal.tsx        # Stripe checkout modal with monthly/annual pricing toggle
@@ -558,6 +559,15 @@ import { Bot, Settings, BarChart3 } from 'lucide-react'
 - **Bot Switching**: Seamless switching with isolated operational data
 - **Real-time Status**: Live execution status with agent pipeline visualization
 - **Account Isolation**: $10k paper trading accounts per bot configuration
+
+### **Bot Profile Images** (2025-12-18)
+- **Custom Avatars**: Upload bot profile images via drag-drop or click interface
+- **Auto-Processing**: Images automatically resized to 1024×1024 with center-crop and aspect ratio preservation
+- **Storage**: Supabase Storage bucket (`bot-avatars/{user_id}/{config_id}.jpg`) with RLS policies
+- **Display**: 48px circular avatars with brass border in ActivationBar next to bot name
+- **Upload UX**: Progress spinner during upload, hover-to-remove button, graceful fallback to Upload icon placeholder
+- **Specs**: 5MB max file size, supports JPG/PNG/WebP, JPEG output at 90% quality
+- **Integration**: `BotImageUpload` component with `profile_image_url` field on configurations table
 
 ### **Configuration System** (Unified Batched Save - 2025-12-04)
 - **Strategy Advisor**: Inline AI chat panel (500px fixed) with Claude Haiku, markdown rendering, real-time config updates
