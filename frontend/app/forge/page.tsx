@@ -429,6 +429,19 @@ function ForgeApp() {
 
             // Update bot execution status (extraction/decision/trading phases)
             if (data.bots) {
+              // Update allBots with fresh data from SSE (includes profile_image_url updates)
+              setAllBots(prev => {
+                const updatedBots = [...prev]
+                data.bots.forEach((sseBot: BotConfiguration) => {
+                  const index = updatedBots.findIndex(b => b.config_id === sseBot.config_id)
+                  if (index !== -1) {
+                    // Merge SSE data with existing bot to preserve any local-only state
+                    updatedBots[index] = { ...updatedBots[index], ...sseBot }
+                  }
+                })
+                return updatedBots
+              })
+
               const myBot = data.bots.find((b: { config_id: string }) => b.config_id === currentSelectedId)
               // Execution status tracking removed - now shown via latestActivity in ActivationBar
 
