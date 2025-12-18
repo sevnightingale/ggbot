@@ -191,12 +191,11 @@ function ArenaContent() {
               }}
             />
           </a>
-          {/* BRASS CTA BUTTON */}
           <a
             href="https://ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] hover:scale-105 hover:shadow-lg hover:shadow-[var(--accent)]/25"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
           >
             <Zap className="h-4 w-4" />
             <span>Create Bot</span>
@@ -210,15 +209,12 @@ function ArenaContent() {
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent)]/8 via-transparent to-transparent pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto px-4 py-16 text-center">
-          {/* Live Badge with glow */}
+          {/* Live Badge */}
           <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 transition-transform duration-200 hover:scale-105"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
             style={{
-              backgroundColor: isLive ? 'color-mix(in srgb, var(--ember) 20%, transparent)' : 'color-mix(in srgb, var(--accent) 20%, transparent)',
-              border: `1px solid ${isLive ? 'var(--ember)' : 'var(--accent)'}`,
-              boxShadow: isLive
-                ? '0 0 30px color-mix(in srgb, var(--ember) 40%, transparent)'
-                : '0 0 30px color-mix(in srgb, var(--accent) 40%, transparent)'
+              backgroundColor: isLive ? 'color-mix(in srgb, var(--ember) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
+              border: `1px solid ${isLive ? 'var(--ember)' : 'var(--accent)'}`
             }}
           >
             {isLive && <Circle className="h-2 w-2 fill-[var(--ember)] text-[var(--ember)] animate-pulse" />}
@@ -228,15 +224,9 @@ function ArenaContent() {
             </span>
           </div>
 
-          {/* Title with GLOWING brass "gg" */}
           <h1 className="font-display text-5xl md:text-6xl lg:text-7xl mb-6">
             <span className="text-[var(--text-primary)]">The </span>
-            <span
-              className="text-[var(--accent)]"
-              style={{
-                textShadow: '0 0 40px color-mix(in srgb, var(--accent) 60%, transparent)'
-              }}
-            >gg</span>
+            <span className="text-[var(--accent)]">gg</span>
             <span className="text-[var(--text-primary)]">Arena</span>
           </h1>
 
@@ -244,20 +234,16 @@ function ArenaContent() {
             7 AI trading archetypes battle for supremacy over 21 days with $70,000 starting capital.
           </p>
 
-          {/* Progress Bar with brass glow */}
+          {/* Progress Bar */}
           <div className="max-w-lg mx-auto">
             <div className="flex items-center justify-between text-sm mb-3">
               <span className="font-mono text-[var(--text-muted)]">Day {daysSinceStart} of {totalDays}</span>
-              <span className="font-mono text-[var(--accent)]">{daysRemaining} days remaining</span>
+              <span className="font-mono text-[var(--text-muted)]">{daysRemaining} days remaining</span>
             </div>
-            <div className="h-3 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
+            <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
               <div
-                className="h-full rounded-full transition-all duration-500"
-                style={{
-                  width: `${progressPercent}%`,
-                  background: 'linear-gradient(90deg, var(--accent), var(--accent-hover))',
-                  boxShadow: '0 0 15px var(--accent)'
-                }}
+                className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
               />
             </div>
           </div>
@@ -346,12 +332,12 @@ function ArenaContent() {
                           <img
                             src={bot.profile_image_url}
                             alt={bot.config_name}
-                            className="w-12 h-12 rounded-full object-cover border-2 transition-transform duration-200 hover:scale-110"
+                            className="w-12 h-12 rounded-full object-cover border-2"
                             style={{ borderColor: color }}
                           />
                         ) : (
                           <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2 transition-transform duration-200 hover:scale-110"
+                            className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
                             style={{ borderColor: color }}
                           >
                             <Bot className="h-6 w-6 text-[var(--text-muted)]" />
@@ -476,31 +462,28 @@ function ArenaContent() {
                 return (
                   <div
                     key={bot.config_id}
-                    className="group rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-5 transition-all duration-300 hover:border-[var(--accent)] hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:-translate-y-1"
+                    className="group rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-5 transition-colors hover:border-[var(--border-hover)]"
                   >
                     {/* Header */}
                     <div className="flex items-center gap-3 mb-4">
-                      <Circle
-                        className="h-3 w-3 transition-transform duration-200 group-hover:scale-125"
-                        style={{ color, fill: color }}
-                      />
+                      <Circle className="h-3 w-3" style={{ color, fill: color }} />
                       {bot.profile_image_url ? (
                         <img
                           src={bot.profile_image_url}
                           alt={bot.config_name}
-                          className="w-11 h-11 rounded-full object-cover border-2 transition-transform duration-200 group-hover:scale-110"
+                          className="w-11 h-11 rounded-full object-cover border-2"
                           style={{ borderColor: color }}
                         />
                       ) : (
                         <div
-                          className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--bg-tertiary)] border-2 transition-transform duration-200 group-hover:scale-110"
+                          className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--bg-tertiary)] border-2"
                           style={{ borderColor: color }}
                         >
                           <Bot className="h-5 w-5 text-[var(--text-muted)]" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-[var(--text-primary)] truncate transition-colors duration-200 group-hover:text-[var(--accent)]">
+                        <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
                           {bot.config_name}
                         </div>
                         {description && (
@@ -557,13 +540,11 @@ function ArenaContent() {
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--accent)]/10 via-[var(--accent)]/5 to-transparent pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
-          {/* Coming Soon badge with glow */}
           <div
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--signal) 20%, transparent)',
-              border: '1px solid var(--signal)',
-              boxShadow: '0 0 25px color-mix(in srgb, var(--signal) 35%, transparent)'
+              backgroundColor: 'color-mix(in srgb, var(--signal) 15%, transparent)',
+              border: '1px solid var(--signal)'
             }}
           >
             <span className="text-sm font-semibold uppercase tracking-wider text-[var(--signal)]">
@@ -572,19 +553,18 @@ function ArenaContent() {
           </div>
 
           <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4">
-            Ready to <span className="text-[var(--accent)]">Compete</span>?
+            Ready to Compete?
           </h2>
 
           <p className="text-lg text-[var(--text-secondary)] mb-10 max-w-md mx-auto">
             Build your own AI trading bot and enter the arena.
           </p>
 
-          {/* BIG BRASS CTA BUTTON */}
           <a
             href="https://ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] hover:scale-105 hover:shadow-2xl hover:shadow-[var(--accent)]/40"
+            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
           >
             <Zap className="h-5 w-5" />
             <span>Create Your Bot</span>
