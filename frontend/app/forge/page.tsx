@@ -668,27 +668,12 @@ function ForgeApp() {
     return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
   }, [loadError, user, allBots.length, selectedConfigId])
 
-  // Handle selectedConfigId changes to update editing state
-  useEffect(() => {
-    if (selectedBot && editingConfigData && selectedBot.config_id !== editingConfigData.selected_pair) {
-      console.log('🔄 Bot changed - updating editing state')
-
-      // Load the new bot's config into editing state
-      // IMPORTANT: Merge trading_mode and symphony_agent_id from top level into config_data
-      const configDataWithTradingMode = {
-        ...JSON.parse(JSON.stringify(selectedBot.config_data)),
-        trading_mode: selectedBot.trading_mode,
-        symphony_agent_id: selectedBot.symphony_agent_id
-      }
-
-      setEditingConfigData(configDataWithTradingMode)
-      setEditingTableFields({
-        config_name: selectedBot.config_name,
-        config_type: selectedBot.config_type
-      })
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [selectedConfigId, selectedBot])
+  // NOTE: Config loading for editing is handled by the useEffect at line 164-184
+  // which fires when activeTab === 'configure' && selectedBot changes.
+  //
+  // REMOVED: Broken useEffect that compared config_id to selected_pair (always mismatched)
+  // and fired on every SSE update, overwriting user's pending edits.
+  // Bug introduced: config_id (UUID) !== selected_pair ("BTC/USDT") was always true.
 
   // Start bot function using proper API client
   const startBot = async () => {
