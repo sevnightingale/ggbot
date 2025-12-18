@@ -1,7 +1,7 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-12-18 06:52:42 UTC (Auto-updated by status_check.py)
-**System Health**: 🟢 HEALTHY
+**Last Updated**: 2025-12-18 22:16:18 UTC (Auto-updated by status_check.py)
+**System Health**: 🟡 LOW ACTIVITY
 
 ## 📊 Live Platform Metrics
 
@@ -12,49 +12,48 @@
 - **Users with Bots**: 258 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 389
-- **Active Bots**: 2 (0.5%)
-  - Paper Trading: 2
+- **Total Bots**: 390
+- **Active Bots**: 1 (0.3%)
+  - Paper Trading: 1
   - Live Trading: 0
-- **Inactive Bots**: 387
+- **Inactive Bots**: 389
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,480
-  - Wins: 1,651
-  - Losses: 3,829
-  - Platform Win Rate: 30.13%
-  - Total P&L: $-16,283.61
+- **Total Trades (All Time)**: 5,488
+  - Wins: 1,657
+  - Losses: 3,831
+  - Platform Win Rate: 30.19%
+  - Total P&L: $-16,277.13
 - **Recent Activity**:
   - Last 24 hours: 16 trades
-  - Last 7 days: 44 trades
-  - Last 30 days: 50 trades
+  - Last 7 days: 53 trades
+  - Last 30 days: 59 trades
 
 ### Open Positions
-- **Open Positions**: 0
-- **Unique Symbols**: 0
-- **Total Exposure**: $0.00
-- **Unrealized P&L**: $0.00
+- **Open Positions**: 1
+- **Unique Symbols**: 1
+- **Total Exposure**: $6,732.47
+- **Unrealized P&L**: $-56.77
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,928.14
+- **Average Balance**: $9,928.34
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
 - **ADA/USDT**: 1 bots
-- **BTC/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 272 decisions (avg confidence: 44.0%)
-- **enter**: 17 decisions (avg confidence: 64.0%)
-- **exit**: 17 decisions (avg confidence: 50.1%)
+- **wait**: 230 decisions (avg confidence: 53.1%)
+- **enter**: 16 decisions (avg confidence: 62.7%)
+- **exit**: 15 decisions (avg confidence: 47.5%)
 
 ### System Health
-- **Decisions (last hour)**: 12
-- **Status**: 🟢 HEALTHY
+- **Decisions (last hour)**: 0
+- **Status**: 🟡 LOW ACTIVITY
 
 ## 🖥️ System Resources
 
@@ -62,23 +61,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 53MB | 21h 48m | 69 |
-| x-bot | 🟢 online | 0% | 28MB | 21h 49m | 68 |
-| error-alerts | 🟢 online | 0% | 29MB | 21h 48m | 75 |
-| market-data-ws | 🟢 online | 1.3% | 159MB | 21h 48m | 70 |
-| ggbot | 🟢 online | 2.3% | 276MB | 18h 13m | 261 |
-| account-monitor | 🟢 online | 0% | 109MB | 21h 48m | 34 |
-| agent-3823aa15-02eb-460e-a88b-7c594d0ed8d0 | 🟢 online | 0% | 54MB | 21h 48m | 1 |
+| signal-listener | 🟢 online | 0% | 19MB | 1d 13h | 69 |
+| x-bot | 🟢 online | 0% | 27MB | 1d 13h | 68 |
+| error-alerts | 🟢 online | 0% | 20MB | 1d 13h | 75 |
+| market-data-ws | 🟢 online | 1.3% | 36MB | 1d 13h | 70 |
+| ggbot | 🟢 online | 0.6% | 256MB | 1d 9h | 261 |
+| account-monitor | 🟢 online | 0.1% | 37MB | 1d 13h | 34 |
+| agent-3823aa15-02eb-460e-a88b-7c594d0ed8d0 | 🟢 online | 0% | 11MB | 1d 13h | 1 |
 
 ### VM Resources
 
-- **Disk**: 39G / 78G (51%)
-- **Memory**: 2.4Gi / 3.8Gi
-- **CPU Load**: 0.86 / 0.58 / 0.38 (1m/5m/15m)
+- **Disk**: 40G / 78G (51%)
+- **Memory**: 2.2Gi / 3.8Gi
+- **CPU Load**: 0.57 / 0.60 / 0.38 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 13.32M)
+- **Redis**: 🟢 connected (Memory: 13.61M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -410,7 +409,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-12-18 06:52:43 UTC
+**Last Updated**: 2025-12-18 22:16:20 UTC
 
 ---
 
@@ -460,10 +459,6 @@ df -h
 | `created_at` | timestamp with time zone |  | now() |
 
 ### `activities` (26 columns)
-
-**Purpose**: Complete audit trail and timeline source of truth for all bot activities.
-
-**CRITICAL FOR DEBUGGING**: To trace trade execution (entry/exit), query `activities` by time, NOT by joining `decisions` on `decision_id`. The `decision_id` on `paper_trades` only links to ENTRY decisions.
 
 **Primary Key**: `activity_id`
 
@@ -1260,7 +1255,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-12-18 06:52:43 UTC
+**Last Updated**: 2025-12-18 22:16:20 UTC
 
 ---
 

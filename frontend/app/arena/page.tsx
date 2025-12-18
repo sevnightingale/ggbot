@@ -1,7 +1,8 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink } from 'lucide-react'
+import Image from 'next/image'
+import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink, Circle } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DataPoint {
@@ -30,10 +31,10 @@ interface ArenaData {
   competition_days: number
 }
 
-// Distinct colors for chart lines - must be visually differentiable
+// Vibrant distinct colors for chart lines
 const BOT_COLORS = [
-  '#c1a87d', // brass
-  '#3b82f6', // blue
+  '#c1a87d', // brass (lead)
+  '#3ca6e0', // signal blue
   '#10b981', // emerald
   '#f59e0b', // amber
   '#8b5cf6', // purple
@@ -41,7 +42,7 @@ const BOT_COLORS = [
   '#06b6d4', // cyan
 ]
 
-// Bot descriptions from NOTE.md - hardcoded by name
+// Bot descriptions from NOTE.md
 const BOT_DESCRIPTIONS: Record<string, { frequency: string; symbol: string; tagline: string }> = {
   'The Technician': {
     frequency: '5min',
@@ -152,7 +153,7 @@ export default function ArenaPage() {
 
   const chartData = getChartData()
 
-  // Competition timeline - Updated for 2025
+  // Competition timeline
   const competitionStart = new Date('2025-12-18')
   const competitionEnd = new Date('2026-01-08')
   const today = new Date()
@@ -160,12 +161,12 @@ export default function ArenaPage() {
   const totalDays = 21
   const daysRemaining = Math.max(0, totalDays - daysSinceStart)
   const progressPercent = Math.min(100, Math.max(0, (daysSinceStart / totalDays) * 100))
-  const isActive = today >= competitionStart && today <= competitionEnd
+  const isLive = today >= competitionStart && today <= competitionEnd
 
   // Sort bots by equity for rankings
   const rankedBots = data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
 
-  // Get color for a bot by index (consistent across rankings and chart)
+  // Get color for a bot by its original index (consistent across rankings and chart)
   const getBotColor = (botName: string) => {
     if (!data) return BOT_COLORS[0]
     const index = data.bots.findIndex(b => b.config_name === botName)
@@ -174,18 +175,26 @@ export default function ArenaPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Header */}
-      <header className="border-b border-[var(--border)] bg-[var(--bg-secondary)]">
-        <div className="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
-          <a href="https://ggbots.ai" className="flex items-center gap-2 text-[var(--text-primary)] hover:text-[var(--accent)] transition-colors">
-            <Bot className="h-5 w-5" />
-            <span className="font-display text-lg">ggbots</span>
+      {/* Header - matches Forge */}
+      <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-primary)]/80 backdrop-blur">
+        <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
+          <a href="https://ggbots.ai" className="flex items-center gap-2">
+            <Image
+              src="/ggbots_logo.svg"
+              alt="ggbots logo"
+              width={28}
+              height={28}
+              className="h-7 w-auto"
+              style={{
+                filter: 'brightness(0) saturate(100%) invert(var(--logo-invert, 89%)) sepia(12%) saturate(584%) hue-rotate(200deg) brightness(95%) contrast(89%)'
+              }}
+            />
           </a>
           <a
             href="https://ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="flex items-center gap-1.5 text-sm text-[var(--text-muted)] hover:text-[var(--accent)] transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors"
           >
             <span>Create Your Bot</span>
             <ExternalLink className="h-3.5 w-3.5" />
@@ -193,12 +202,21 @@ export default function ArenaPage() {
         </div>
       </header>
 
-      {/* Hero */}
-      <div className="border-b border-[var(--border)] bg-[var(--bg-primary)]">
-        <div className="max-w-4xl mx-auto px-6 py-16 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent)]/10 text-[var(--accent)] text-xs font-mono uppercase tracking-wider mb-6">
-            <Trophy className="h-3.5 w-3.5" />
-            <span>{isActive ? 'Live Competition' : 'Prototype Season'}</span>
+      {/* Hero Section */}
+      <div className="border-b border-[var(--border)]">
+        <div className="max-w-4xl mx-auto px-4 py-12 text-center">
+          {/* Live Badge */}
+          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6"
+            style={{
+              backgroundColor: isLive ? 'color-mix(in srgb, var(--ember) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
+              border: `1px solid ${isLive ? 'color-mix(in srgb, var(--ember) 40%, transparent)' : 'color-mix(in srgb, var(--accent) 40%, transparent)'}`
+            }}
+          >
+            {isLive && <Circle className="h-2 w-2 fill-[var(--ember)] text-[var(--ember)] animate-pulse" />}
+            <Trophy className="h-3.5 w-3.5" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }} />
+            <span className="text-xs font-medium uppercase tracking-wider" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }}>
+              {isLive ? 'Live Competition' : 'Prototype Season'}
+            </span>
           </div>
 
           <h1 className="font-display text-4xl md:text-5xl text-[var(--text-primary)] mb-4">
@@ -207,16 +225,15 @@ export default function ArenaPage() {
 
           <p className="text-[var(--text-secondary)] mb-8 max-w-lg mx-auto">
             7 AI trading archetypes compete over 21 days with $70,000 starting capital.
-            Watch them battle, then build your own.
           </p>
 
-          {/* Progress */}
+          {/* Progress Bar */}
           <div className="max-w-md mx-auto">
             <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-2">
               <span className="font-mono">Day {daysSinceStart} of {totalDays}</span>
               <span className="font-mono">{daysRemaining} days remaining</span>
             </div>
-            <div className="h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden">
+            <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
               <div
                 className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
                 style={{ width: `${progressPercent}%` }}
@@ -227,16 +244,15 @@ export default function ArenaPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-6 py-8">
-        {/* Controls */}
+      <div className="max-w-7xl mx-auto px-4 py-6">
+        {/* Controls Row */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="font-display text-xl text-[var(--text-primary)]">Live Rankings</h2>
-          <div className="flex items-center gap-3">
+          <h2 className="font-display text-xl text-[var(--text-primary)]">Rankings</h2>
+          <div className="flex items-center gap-2">
             <select
               value={hours}
               onChange={(e) => setHours(Number(e.target.value))}
-              aria-label="Time range"
-              className="px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-[var(--text-primary)] text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
             >
               <option value={168}>7 days</option>
               <option value={336}>14 days</option>
@@ -245,8 +261,7 @@ export default function ArenaPage() {
             <button
               onClick={fetchData}
               disabled={loading}
-              aria-label="Refresh data"
-              className="p-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:border-[var(--border-hover)] transition-all disabled:opacity-50"
+              className="p-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -255,8 +270,13 @@ export default function ArenaPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl">
-            <p className="text-red-400 text-sm">{error}</p>
+          <div className="mb-6 p-4 rounded-2xl border"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--ember) 10%, transparent)',
+              borderColor: 'color-mix(in srgb, var(--ember) 30%, transparent)'
+            }}
+          >
+            <p className="text-[var(--ember)] text-sm">{error}</p>
           </div>
         )}
 
@@ -267,98 +287,103 @@ export default function ArenaPage() {
           </div>
         )}
 
-        {/* Rankings Table */}
+        {/* Rankings Card - matches BotRail styling */}
         {!loading && data && rankedBots.length > 0 && (
-          <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] overflow-hidden mb-8">
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="border-b border-[var(--border)] text-left">
-                    <th className="px-4 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider w-12">#</th>
-                    <th className="px-4 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider">Bot</th>
-                    <th className="px-4 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">Equity</th>
-                    <th className="px-4 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right">P&L</th>
-                    <th className="px-4 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right hidden sm:table-cell">Trades</th>
-                    <th className="px-4 py-3 text-xs font-medium text-[var(--text-muted)] uppercase tracking-wider text-right hidden sm:table-cell">Win Rate</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-[var(--border)]">
-                  {rankedBots.map((bot, index) => {
-                    const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
-                    const isPositive = pnlPercent >= 0
-                    const color = getBotColor(bot.config_name)
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-6">
+            <div className="space-y-2">
+              {rankedBots.map((bot, index) => {
+                const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
+                const isPositive = pnlPercent >= 0
+                const color = getBotColor(bot.config_name)
+                const description = BOT_DESCRIPTIONS[bot.config_name]
 
-                    return (
-                      <tr key={bot.config_id} className="hover:bg-[var(--bg-tertiary)] transition-colors">
-                        <td className="px-4 py-3">
-                          <span className={`font-mono text-sm ${index < 3 ? 'text-[var(--accent)] font-semibold' : 'text-[var(--text-muted)]'}`}>
-                            {index + 1}
-                          </span>
-                        </td>
-                        <td className="px-4 py-3">
-                          <div className="flex items-center gap-3">
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: color }}
-                            />
-                            {bot.profile_image_url ? (
-                              <img
-                                src={bot.profile_image_url}
-                                alt={bot.config_name}
-                                className="w-8 h-8 rounded-full object-cover flex-shrink-0 border-2"
-                                style={{ borderColor: color }}
-                              />
-                            ) : (
-                              <div
-                                className="w-8 h-8 rounded-full flex items-center justify-center bg-[var(--bg-primary)] flex-shrink-0 border-2"
-                                style={{ borderColor: color }}
-                              >
-                                <Bot className="h-4 w-4 text-[var(--text-muted)]" />
-                              </div>
-                            )}
-                            <div className="min-w-0">
-                              <p className="text-sm text-[var(--text-primary)] font-medium truncate">{bot.config_name}</p>
-                              <p className="text-xs text-[var(--text-muted)] font-mono">
-                                {BOT_DESCRIPTIONS[bot.config_name]?.frequency || '—'} · {BOT_DESCRIPTIONS[bot.config_name]?.symbol || '—'}
-                              </p>
-                            </div>
+                return (
+                  <div
+                    key={bot.config_id}
+                    className={`rounded-xl px-4 py-3 transition-colors ${
+                      index === 0 ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-primary)]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-4">
+                      {/* Rank */}
+                      <div className="w-8 text-center">
+                        <span className={`font-mono text-sm font-semibold ${
+                          index === 0 ? 'text-[var(--accent)]' :
+                          index < 3 ? 'text-[var(--text-secondary)]' :
+                          'text-[var(--text-muted)]'
+                        }`}>
+                          {index + 1}
+                        </span>
+                      </div>
+
+                      {/* Status + Avatar */}
+                      <div className="flex items-center gap-2">
+                        <Circle
+                          className="h-2.5 w-2.5"
+                          style={{ color, fill: color }}
+                        />
+                        {bot.profile_image_url ? (
+                          <img
+                            src={bot.profile_image_url}
+                            alt={bot.config_name}
+                            className="w-10 h-10 rounded-full object-cover border-2"
+                            style={{ borderColor: color }}
+                          />
+                        ) : (
+                          <div
+                            className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
+                            style={{ borderColor: color }}
+                          >
+                            <Bot className="h-5 w-5 text-[var(--text-muted)]" />
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <span className="font-mono text-sm text-[var(--text-primary)]">{formatCurrency(bot.current_equity)}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right">
-                          <div className="flex items-center justify-end gap-1">
-                            {isPositive ? (
-                              <TrendingUp className="h-3.5 w-3.5 text-emerald-500" />
-                            ) : (
-                              <TrendingDown className="h-3.5 w-3.5 text-red-500" />
-                            )}
-                            <span className={`font-mono text-sm ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
-                              {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
-                            </span>
+                        )}
+                      </div>
+
+                      {/* Name + Meta */}
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
+                        {description && (
+                          <div className="text-xs text-[var(--text-muted)] font-mono">
+                            {description.frequency} · {description.symbol}
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-right hidden sm:table-cell">
-                          <span className="font-mono text-sm text-[var(--text-secondary)]">{bot.total_trades}</span>
-                        </td>
-                        <td className="px-4 py-3 text-right hidden sm:table-cell">
-                          <span className="font-mono text-sm text-[var(--text-secondary)]">{(bot.win_rate * 100).toFixed(0)}%</span>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
+                        )}
+                      </div>
+
+                      {/* Stats - hidden on mobile */}
+                      <div className="hidden sm:flex items-center gap-6">
+                        <div className="text-right">
+                          <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Trades</div>
+                          <div className="text-sm font-mono text-[var(--text-primary)]">{bot.total_trades}</div>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Win Rate</div>
+                          <div className="text-sm font-mono text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
+                        </div>
+                      </div>
+
+                      {/* Equity + P&L */}
+                      <div className="text-right">
+                        <div className="text-sm font-mono text-[var(--text-primary)]">{formatCurrency(bot.current_equity)}</div>
+                        <div className={`text-xs font-mono flex items-center justify-end gap-1 ${
+                          isPositive ? 'text-green-500' : 'text-red-500'
+                        }`}>
+                          {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
         )}
 
-        {/* Chart */}
+        {/* Chart Card */}
         {!loading && data && chartData.length > 0 && (
-          <div className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] p-6 mb-8">
-            <h3 className="font-display text-lg text-[var(--text-primary)] mb-6">Performance Over Time</h3>
-            <ResponsiveContainer width="100%" height={400}>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-6">
+            <h3 className="font-display text-lg text-[var(--text-primary)] mb-4">Performance</h3>
+            <ResponsiveContainer width="100%" height={350}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2d" />
                 <XAxis
@@ -379,7 +404,7 @@ export default function ArenaPage() {
                   contentStyle={{
                     backgroundColor: '#141416',
                     border: '1px solid #2a2a2d',
-                    borderRadius: '8px',
+                    borderRadius: '12px',
                     color: '#edebe7',
                     fontSize: '12px'
                   }}
@@ -388,7 +413,7 @@ export default function ArenaPage() {
                 />
                 <Legend
                   wrapperStyle={{ fontSize: '12px', color: '#d6d3ce' }}
-                  iconType="line"
+                  iconType="circle"
                 />
                 {data.bots.map((bot, index) => (
                   <Line
@@ -406,11 +431,11 @@ export default function ArenaPage() {
           </div>
         )}
 
-        {/* Bot Cards */}
+        {/* Bot Cards Grid */}
         {!loading && data && data.bots.length > 0 && (
-          <div className="mb-8">
+          <>
             <h3 className="font-display text-lg text-[var(--text-primary)] mb-4">The Archetypes</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
               {data.bots.map((bot, index) => {
                 const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
                 const isPositive = pnlPercent >= 0
@@ -420,10 +445,11 @@ export default function ArenaPage() {
                 return (
                   <div
                     key={bot.config_id}
-                    className="bg-[var(--bg-secondary)] rounded-xl border border-[var(--border)] p-4 hover:border-[var(--border-hover)] transition-colors"
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 hover:border-[var(--border-hover)] transition-colors"
                   >
                     {/* Header */}
                     <div className="flex items-center gap-3 mb-3">
+                      <Circle className="h-2.5 w-2.5" style={{ color, fill: color }} />
                       {bot.profile_image_url ? (
                         <img
                           src={bot.profile_image_url}
@@ -440,11 +466,11 @@ export default function ArenaPage() {
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <h4 className="text-sm text-[var(--text-primary)] font-medium truncate">{bot.config_name}</h4>
+                        <div className="text-sm font-medium text-[var(--text-primary)] truncate">{bot.config_name}</div>
                         {description && (
-                          <p className="text-xs text-[var(--text-muted)] font-mono">
+                          <div className="text-xs text-[var(--text-muted)] font-mono">
                             {description.frequency} · {description.symbol}
-                          </p>
+                          </div>
                         )}
                       </div>
                     </div>
@@ -458,10 +484,10 @@ export default function ArenaPage() {
 
                     {/* Equity */}
                     <div className="flex items-baseline justify-between mb-3">
-                      <span className="font-mono text-lg text-[var(--text-primary)]">
+                      <span className="text-lg font-mono text-[var(--text-primary)]">
                         {formatCurrency(bot.current_equity)}
                       </span>
-                      <span className={`font-mono text-sm ${isPositive ? 'text-emerald-500' : 'text-red-500'}`}>
+                      <span className={`text-sm font-mono ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                         {isPositive ? '+' : ''}{pnlPercent.toFixed(1)}%
                       </span>
                     </div>
@@ -469,41 +495,53 @@ export default function ArenaPage() {
                     {/* Stats */}
                     <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[var(--border)]">
                       <div>
-                        <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Trades</p>
-                        <p className="font-mono text-xs text-[var(--text-primary)]">{bot.total_trades}</p>
+                        <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Trades</div>
+                        <div className="text-sm font-mono text-[var(--text-primary)]">{bot.total_trades}</div>
                       </div>
                       <div>
-                        <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Win</p>
-                        <p className="font-mono text-xs text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</p>
+                        <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Win</div>
+                        <div className="text-sm font-mono text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
                       </div>
                       <div>
-                        <p className="text-[10px] text-[var(--text-muted)] uppercase tracking-wide">Open</p>
-                        <p className="font-mono text-xs text-[var(--text-primary)]">{bot.open_positions}</p>
+                        <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Open</div>
+                        <div className="text-sm font-mono text-[var(--text-primary)]">{bot.open_positions}</div>
                       </div>
                     </div>
                   </div>
                 )
               })}
             </div>
-          </div>
+          </>
         )}
       </div>
 
-      {/* CTA - Always visible */}
+      {/* CTA Footer - Always visible */}
       <div className="border-t border-[var(--border)] bg-[var(--bg-secondary)]">
-        <div className="max-w-3xl mx-auto px-6 py-16 text-center">
-          <p className="text-xs font-mono uppercase tracking-widest text-[var(--accent)] mb-3">Coming January 2026</p>
+        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4"
+            style={{
+              backgroundColor: 'color-mix(in srgb, var(--signal) 15%, transparent)',
+              border: '1px solid color-mix(in srgb, var(--signal) 40%, transparent)'
+            }}
+          >
+            <span className="text-xs font-medium uppercase tracking-wider text-[var(--signal)]">
+              Coming January 2026
+            </span>
+          </div>
+
           <h2 className="font-display text-2xl md:text-3xl text-[var(--text-primary)] mb-4">
             Season 1 Opens Soon
           </h2>
+
           <p className="text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
-            Create your own AI trading bot and compete for prizes. Design your strategy and enter the arena.
+            Create your own AI trading bot and compete for prizes.
           </p>
+
           <a
             href="https://ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#0b0b0c] font-medium rounded-lg transition-colors"
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium shadow-sm ring-1 ring-inset transition bg-[var(--accent)] hover:bg-[var(--accent-hover)] ring-[var(--accent)] text-[#edebe7] dark:text-[#1a1816]"
           >
             <span>Create Your Bot</span>
             <ExternalLink className="h-4 w-4" />
