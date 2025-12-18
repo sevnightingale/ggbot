@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink, Circle } from 'lucide-react'
+import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 
 interface DataPoint {
@@ -166,7 +166,7 @@ export default function ArenaPage() {
   // Sort bots by equity for rankings
   const rankedBots = data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
 
-  // Get color for a bot by its original index (consistent across rankings and chart)
+  // Get color for a bot by its original index
   const getBotColor = (botName: string) => {
     if (!data) return BOT_COLORS[0]
     const index = data.bots.findIndex(b => b.config_name === botName)
@@ -175,68 +175,92 @@ export default function ArenaPage() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Header - matches Forge */}
+      {/* Header with brass CTA */}
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-primary)]/80 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
-          <a href="https://ggbots.ai" className="flex items-center gap-2">
+          <a href="https://ggbots.ai" className="flex items-center gap-2 group">
             <Image
               src="/ggbots_logo.svg"
               alt="ggbots logo"
               width={28}
               height={28}
-              className="h-7 w-auto"
+              className="h-7 w-auto transition-transform duration-200 group-hover:scale-110"
               style={{
                 filter: 'brightness(0) saturate(100%) invert(var(--logo-invert, 89%)) sepia(12%) saturate(584%) hue-rotate(200deg) brightness(95%) contrast(89%)'
               }}
             />
+            <span className="font-display text-lg">
+              <span className="text-[var(--accent)]">gg</span>
+              <span className="text-[var(--text-primary)]">bots</span>
+            </span>
           </a>
+          {/* BRASS CTA BUTTON */}
           <a
             href="https://ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] hover:scale-105 hover:shadow-lg hover:shadow-[var(--accent)]/25"
           >
-            <span>Create Your Bot</span>
-            <ExternalLink className="h-3.5 w-3.5" />
+            <Zap className="h-4 w-4" />
+            <span>Create Bot</span>
           </a>
         </div>
       </header>
 
-      {/* Hero Section */}
-      <div className="border-b border-[var(--border)]">
-        <div className="max-w-4xl mx-auto px-4 py-12 text-center">
-          {/* Live Badge */}
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full mb-6"
+      {/* Hero Section with brass gradient */}
+      <div className="relative border-b border-[var(--border)] overflow-hidden">
+        {/* Brass gradient overlay */}
+        <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent)]/8 via-transparent to-transparent pointer-events-none" />
+
+        <div className="relative max-w-4xl mx-auto px-4 py-16 text-center">
+          {/* Live Badge with glow */}
+          <div
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8 transition-transform duration-200 hover:scale-105"
             style={{
-              backgroundColor: isLive ? 'color-mix(in srgb, var(--ember) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
-              border: `1px solid ${isLive ? 'color-mix(in srgb, var(--ember) 40%, transparent)' : 'color-mix(in srgb, var(--accent) 40%, transparent)'}`
+              backgroundColor: isLive ? 'color-mix(in srgb, var(--ember) 20%, transparent)' : 'color-mix(in srgb, var(--accent) 20%, transparent)',
+              border: `1px solid ${isLive ? 'var(--ember)' : 'var(--accent)'}`,
+              boxShadow: isLive
+                ? '0 0 30px color-mix(in srgb, var(--ember) 40%, transparent)'
+                : '0 0 30px color-mix(in srgb, var(--accent) 40%, transparent)'
             }}
           >
             {isLive && <Circle className="h-2 w-2 fill-[var(--ember)] text-[var(--ember)] animate-pulse" />}
-            <Trophy className="h-3.5 w-3.5" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }} />
-            <span className="text-xs font-medium uppercase tracking-wider" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }}>
+            <Trophy className="h-4 w-4" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }} />
+            <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }}>
               {isLive ? 'Live Competition' : 'Prototype Season'}
             </span>
           </div>
 
-          <h1 className="font-display text-4xl md:text-5xl text-[var(--text-primary)] mb-4">
-            The <span className="text-[var(--accent)]">gg</span>Arena
+          {/* Title with GLOWING brass "gg" */}
+          <h1 className="font-display text-5xl md:text-6xl lg:text-7xl mb-6">
+            <span className="text-[var(--text-primary)]">The </span>
+            <span
+              className="text-[var(--accent)]"
+              style={{
+                textShadow: '0 0 40px color-mix(in srgb, var(--accent) 60%, transparent)'
+              }}
+            >gg</span>
+            <span className="text-[var(--text-primary)]">Arena</span>
           </h1>
 
-          <p className="text-[var(--text-secondary)] mb-8 max-w-lg mx-auto">
-            7 AI trading archetypes compete over 21 days with $70,000 starting capital.
+          <p className="text-lg text-[var(--text-secondary)] mb-10 max-w-xl mx-auto">
+            7 AI trading archetypes battle for supremacy over 21 days with $70,000 starting capital.
           </p>
 
-          {/* Progress Bar */}
-          <div className="max-w-md mx-auto">
-            <div className="flex items-center justify-between text-xs text-[var(--text-muted)] mb-2">
-              <span className="font-mono">Day {daysSinceStart} of {totalDays}</span>
-              <span className="font-mono">{daysRemaining} days remaining</span>
+          {/* Progress Bar with brass glow */}
+          <div className="max-w-lg mx-auto">
+            <div className="flex items-center justify-between text-sm mb-3">
+              <span className="font-mono text-[var(--text-muted)]">Day {daysSinceStart} of {totalDays}</span>
+              <span className="font-mono text-[var(--accent)]">{daysRemaining} days remaining</span>
             </div>
-            <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
+            <div className="h-3 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
               <div
-                className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
+                className="h-full rounded-full transition-all duration-500"
+                style={{
+                  width: `${progressPercent}%`,
+                  background: 'linear-gradient(90deg, var(--accent), var(--accent-hover))',
+                  boxShadow: '0 0 15px var(--accent)'
+                }}
               />
             </div>
           </div>
@@ -244,15 +268,18 @@ export default function ArenaPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        {/* Controls Row */}
+      <div className="max-w-7xl mx-auto px-4 py-8">
+        {/* Section Header with brass accent */}
         <div className="flex items-center justify-between mb-6">
-          <h2 className="font-display text-xl text-[var(--text-primary)]">Rankings</h2>
+          <div className="flex items-center gap-3">
+            <div className="w-1 h-8 rounded-full bg-[var(--accent)]" />
+            <h2 className="font-display text-2xl text-[var(--text-primary)]">Live Rankings</h2>
+          </div>
           <div className="flex items-center gap-2">
             <select
               value={hours}
               onChange={(e) => setHours(Number(e.target.value))}
-              className="px-3 py-1.5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-sm font-mono focus:outline-none focus:ring-1 focus:ring-[var(--accent)]"
+              className="px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-sm font-mono transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] hover:border-[var(--accent)]"
             >
               <option value={168}>7 days</option>
               <option value={336}>14 days</option>
@@ -261,7 +288,7 @@ export default function ArenaPage() {
             <button
               onClick={fetchData}
               disabled={loading}
-              className="p-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] hover:text-[var(--text-primary)] hover:bg-[var(--bg-tertiary)] transition-all disabled:opacity-50"
+              className="p-2.5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] transition-all duration-200 hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
             >
               <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
             </button>
@@ -270,78 +297,76 @@ export default function ArenaPage() {
 
         {/* Error */}
         {error && (
-          <div className="mb-6 p-4 rounded-2xl border"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--ember) 10%, transparent)',
-              borderColor: 'color-mix(in srgb, var(--ember) 30%, transparent)'
-            }}
-          >
+          <div className="mb-6 p-4 rounded-2xl border border-[var(--ember)] bg-[var(--ember)]/10">
             <p className="text-[var(--ember)] text-sm">{error}</p>
           </div>
         )}
 
         {/* Loading */}
         {loading && !data && (
-          <div className="flex items-center justify-center py-32">
-            <RefreshCw className="h-6 w-6 animate-spin text-[var(--accent)]" />
+          <div className="flex flex-col items-center justify-center py-32 gap-4">
+            <RefreshCw className="h-8 w-8 animate-spin text-[var(--accent)]" />
+            <span className="text-[var(--text-muted)]">Loading arena data...</span>
           </div>
         )}
 
-        {/* Rankings Card - matches BotRail styling */}
+        {/* Rankings Card */}
         {!loading && data && rankedBots.length > 0 && (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-6">
-            <div className="space-y-2">
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden mb-8">
+            <div className="divide-y divide-[var(--border)]">
               {rankedBots.map((bot, index) => {
                 const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
                 const isPositive = pnlPercent >= 0
                 const color = getBotColor(bot.config_name)
                 const description = BOT_DESCRIPTIONS[bot.config_name]
+                const isLeader = index === 0
 
                 return (
                   <div
                     key={bot.config_id}
-                    className={`rounded-xl px-4 py-3 transition-colors ${
-                      index === 0 ? 'bg-[var(--bg-tertiary)]' : 'hover:bg-[var(--bg-primary)]'
+                    className={`px-4 py-4 transition-all duration-200 hover:bg-[var(--bg-tertiary)] cursor-default ${
+                      isLeader ? 'bg-[var(--accent)]/10 border-l-4 border-l-[var(--accent)]' : ''
                     }`}
                   >
                     <div className="flex items-center gap-4">
-                      {/* Rank */}
-                      <div className="w-8 text-center">
-                        <span className={`font-mono text-sm font-semibold ${
-                          index === 0 ? 'text-[var(--accent)]' :
-                          index < 3 ? 'text-[var(--text-secondary)]' :
-                          'text-[var(--text-muted)]'
-                        }`}>
-                          {index + 1}
-                        </span>
+                      {/* Rank with medal for top 3 */}
+                      <div className="w-10 text-center flex-shrink-0">
+                        {index === 0 ? (
+                          <span className="text-2xl">🥇</span>
+                        ) : index === 1 ? (
+                          <span className="text-2xl">🥈</span>
+                        ) : index === 2 ? (
+                          <span className="text-2xl">🥉</span>
+                        ) : (
+                          <span className="font-mono text-lg text-[var(--text-muted)]">{index + 1}</span>
+                        )}
                       </div>
 
-                      {/* Status + Avatar */}
-                      <div className="flex items-center gap-2">
-                        <Circle
-                          className="h-2.5 w-2.5"
-                          style={{ color, fill: color }}
-                        />
+                      {/* Avatar with color border */}
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <Circle className="h-3 w-3" style={{ color, fill: color }} />
                         {bot.profile_image_url ? (
                           <img
                             src={bot.profile_image_url}
                             alt={bot.config_name}
-                            className="w-10 h-10 rounded-full object-cover border-2"
+                            className="w-12 h-12 rounded-full object-cover border-2 transition-transform duration-200 hover:scale-110"
                             style={{ borderColor: color }}
                           />
                         ) : (
                           <div
-                            className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
+                            className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2 transition-transform duration-200 hover:scale-110"
                             style={{ borderColor: color }}
                           >
-                            <Bot className="h-5 w-5 text-[var(--text-muted)]" />
+                            <Bot className="h-6 w-6 text-[var(--text-muted)]" />
                           </div>
                         )}
                       </div>
 
                       {/* Name + Meta */}
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-[var(--text-primary)]">{bot.config_name}</div>
+                        <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                          {bot.config_name}
+                        </div>
                         {description && (
                           <div className="text-xs text-[var(--text-muted)] font-mono">
                             {description.frequency} · {description.symbol}
@@ -350,24 +375,26 @@ export default function ArenaPage() {
                       </div>
 
                       {/* Stats - hidden on mobile */}
-                      <div className="hidden sm:flex items-center gap-6">
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Trades</div>
-                          <div className="text-sm font-mono text-[var(--text-primary)]">{bot.total_trades}</div>
+                      <div className="hidden md:flex items-center gap-8 flex-shrink-0">
+                        <div className="text-center">
+                          <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Trades</div>
+                          <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
                         </div>
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Win Rate</div>
-                          <div className="text-sm font-mono text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
+                        <div className="text-center">
+                          <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Win Rate</div>
+                          <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
                         </div>
                       </div>
 
                       {/* Equity + P&L */}
-                      <div className="text-right">
-                        <div className="text-sm font-mono text-[var(--text-primary)]">{formatCurrency(bot.current_equity)}</div>
-                        <div className={`text-xs font-mono flex items-center justify-end gap-1 ${
+                      <div className="text-right flex-shrink-0">
+                        <div className={`text-lg font-mono font-bold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                          {formatCurrency(bot.current_equity)}
+                        </div>
+                        <div className={`text-sm font-mono flex items-center justify-end gap-1 ${
                           isPositive ? 'text-green-500' : 'text-red-500'
                         }`}>
-                          {isPositive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
+                          {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                           {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
                         </div>
                       </div>
@@ -381,9 +408,12 @@ export default function ArenaPage() {
 
         {/* Chart Card */}
         {!loading && data && chartData.length > 0 && (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 mb-6">
-            <h3 className="font-display text-lg text-[var(--text-primary)] mb-4">Performance</h3>
-            <ResponsiveContainer width="100%" height={350}>
+          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 mb-8">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
+              <h3 className="font-display text-xl text-[var(--text-primary)]">Performance Over Time</h3>
+            </div>
+            <ResponsiveContainer width="100%" height={400}>
               <LineChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2d" />
                 <XAxis
@@ -403,10 +433,11 @@ export default function ArenaPage() {
                 <Tooltip
                   contentStyle={{
                     backgroundColor: '#141416',
-                    border: '1px solid #2a2a2d',
+                    border: '1px solid #c1a87d',
                     borderRadius: '12px',
                     color: '#edebe7',
-                    fontSize: '12px'
+                    fontSize: '12px',
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
                   }}
                   labelFormatter={formatTimestamp}
                   formatter={(value: number) => [formatCurrency(value), '']}
@@ -434,7 +465,10 @@ export default function ArenaPage() {
         {/* Bot Cards Grid */}
         {!loading && data && data.bots.length > 0 && (
           <>
-            <h3 className="font-display text-lg text-[var(--text-primary)] mb-4">The Archetypes</h3>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
+              <h3 className="font-display text-xl text-[var(--text-primary)]">The Archetypes</h3>
+            </div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
               {data.bots.map((bot, index) => {
                 const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
@@ -445,28 +479,33 @@ export default function ArenaPage() {
                 return (
                   <div
                     key={bot.config_id}
-                    className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-4 hover:border-[var(--border-hover)] transition-colors"
+                    className="group rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-5 transition-all duration-300 hover:border-[var(--accent)] hover:shadow-xl hover:shadow-[var(--accent)]/10 hover:-translate-y-1"
                   >
                     {/* Header */}
-                    <div className="flex items-center gap-3 mb-3">
-                      <Circle className="h-2.5 w-2.5" style={{ color, fill: color }} />
+                    <div className="flex items-center gap-3 mb-4">
+                      <Circle
+                        className="h-3 w-3 transition-transform duration-200 group-hover:scale-125"
+                        style={{ color, fill: color }}
+                      />
                       {bot.profile_image_url ? (
                         <img
                           src={bot.profile_image_url}
                           alt={bot.config_name}
-                          className="w-10 h-10 rounded-full object-cover border-2"
+                          className="w-11 h-11 rounded-full object-cover border-2 transition-transform duration-200 group-hover:scale-110"
                           style={{ borderColor: color }}
                         />
                       ) : (
                         <div
-                          className="w-10 h-10 rounded-full flex items-center justify-center bg-[var(--bg-tertiary)] border-2"
+                          className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--bg-tertiary)] border-2 transition-transform duration-200 group-hover:scale-110"
                           style={{ borderColor: color }}
                         >
                           <Bot className="h-5 w-5 text-[var(--text-muted)]" />
                         </div>
                       )}
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-[var(--text-primary)] truncate">{bot.config_name}</div>
+                        <div className="text-sm font-semibold text-[var(--text-primary)] truncate transition-colors duration-200 group-hover:text-[var(--accent)]">
+                          {bot.config_name}
+                        </div>
                         {description && (
                           <div className="text-xs text-[var(--text-muted)] font-mono">
                             {description.frequency} · {description.symbol}
@@ -477,34 +516,34 @@ export default function ArenaPage() {
 
                     {/* Tagline */}
                     {description && (
-                      <p className="text-xs text-[var(--text-secondary)] mb-3 leading-relaxed line-clamp-2">
+                      <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed line-clamp-2">
                         {description.tagline}
                       </p>
                     )}
 
                     {/* Equity */}
-                    <div className="flex items-baseline justify-between mb-3">
-                      <span className="text-lg font-mono text-[var(--text-primary)]">
+                    <div className="flex items-baseline justify-between mb-4">
+                      <span className="text-xl font-mono font-bold text-[var(--text-primary)]">
                         {formatCurrency(bot.current_equity)}
                       </span>
-                      <span className={`text-sm font-mono ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                      <span className={`text-sm font-mono font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
                         {isPositive ? '+' : ''}{pnlPercent.toFixed(1)}%
                       </span>
                     </div>
 
                     {/* Stats */}
-                    <div className="grid grid-cols-3 gap-2 pt-3 border-t border-[var(--border)]">
+                    <div className="grid grid-cols-3 gap-3 pt-4 border-t border-[var(--border)]">
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Trades</div>
-                        <div className="text-sm font-mono text-[var(--text-primary)]">{bot.total_trades}</div>
+                        <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Trades</div>
+                        <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
                       </div>
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Win</div>
-                        <div className="text-sm font-mono text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
+                        <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Win</div>
+                        <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
                       </div>
                       <div>
-                        <div className="text-[10px] uppercase tracking-wider text-[var(--text-muted)]">Open</div>
-                        <div className="text-sm font-mono text-[var(--text-primary)]">{bot.open_positions}</div>
+                        <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Open</div>
+                        <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.open_positions}</div>
                       </div>
                     </div>
                   </div>
@@ -515,36 +554,44 @@ export default function ArenaPage() {
         )}
       </div>
 
-      {/* CTA Footer - Always visible */}
-      <div className="border-t border-[var(--border)] bg-[var(--bg-secondary)]">
-        <div className="max-w-3xl mx-auto px-4 py-12 text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full mb-4"
+      {/* CTA Footer with brass gradient */}
+      <div className="relative border-t border-[var(--border)] overflow-hidden">
+        {/* Brass gradient background */}
+        <div className="absolute inset-0 bg-gradient-to-t from-[var(--accent)]/10 via-[var(--accent)]/5 to-transparent pointer-events-none" />
+
+        <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
+          {/* Coming Soon badge with glow */}
+          <div
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
             style={{
-              backgroundColor: 'color-mix(in srgb, var(--signal) 15%, transparent)',
-              border: '1px solid color-mix(in srgb, var(--signal) 40%, transparent)'
+              backgroundColor: 'color-mix(in srgb, var(--signal) 20%, transparent)',
+              border: '1px solid var(--signal)',
+              boxShadow: '0 0 25px color-mix(in srgb, var(--signal) 35%, transparent)'
             }}
           >
-            <span className="text-xs font-medium uppercase tracking-wider text-[var(--signal)]">
-              Coming January 2026
+            <span className="text-sm font-semibold uppercase tracking-wider text-[var(--signal)]">
+              Season 1 · January 2026
             </span>
           </div>
 
-          <h2 className="font-display text-2xl md:text-3xl text-[var(--text-primary)] mb-4">
-            Season 1 Opens Soon
+          <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4">
+            Ready to <span className="text-[var(--accent)]">Compete</span>?
           </h2>
 
-          <p className="text-[var(--text-secondary)] mb-8 max-w-md mx-auto">
-            Create your own AI trading bot and compete for prizes.
+          <p className="text-lg text-[var(--text-secondary)] mb-10 max-w-md mx-auto">
+            Build your own AI trading bot and enter the arena.
           </p>
 
+          {/* BIG BRASS CTA BUTTON */}
           <a
             href="https://ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-medium shadow-sm ring-1 ring-inset transition bg-[var(--accent)] hover:bg-[var(--accent-hover)] ring-[var(--accent)] text-[#edebe7] dark:text-[#1a1816]"
+            className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-all duration-300 bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] hover:scale-105 hover:shadow-2xl hover:shadow-[var(--accent)]/40"
           >
+            <Zap className="h-5 w-5" />
             <span>Create Your Bot</span>
-            <ExternalLink className="h-4 w-4" />
+            <ExternalLink className="h-5 w-5" />
           </a>
         </div>
       </div>
