@@ -6,6 +6,10 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2024-12-18 - Bot Profile Images + Arena Enhancements + Mobile Fix
+
+**Complete Documentation**: See [DOCS/completed/2024-12-18_bot_avatars_arena_enhancements.md](DOCS/completed/2024-12-18_bot_avatars_arena_enhancements.md)
+
 ## 2025-12-17 - Bot Image Upload Fixes
 
 **Critical Fixes** - Bot name preservation + image display in ActivationBar
