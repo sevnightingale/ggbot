@@ -429,20 +429,14 @@ function ArenaContent() {
                             )}
                           </div>
 
-                          {/* Name + Description */}
+                          {/* Name + Meta */}
                           <div className="flex-1 min-w-0">
                             <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
                               {bot.config_name}
                             </div>
-                            {bot.description ? (
-                              <p className="text-xs text-[var(--text-muted)] line-clamp-1">
-                                {bot.description}
-                              </p>
-                            ) : (
-                              <div className="text-xs text-[var(--text-muted)] font-mono">
-                                {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
-                              </div>
-                            )}
+                            <div className="text-xs text-[var(--text-muted)] font-mono">
+                              {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
+                            </div>
                           </div>
 
                           {/* Stats - hidden on mobile */}
