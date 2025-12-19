@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import Image from 'next/image'
 import { RefreshCw, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
@@ -224,15 +223,12 @@ function ArenaContent() {
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-primary)]/80 backdrop-blur">
         <div className="relative flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
           <a href="https://ggbots.ai" className="flex items-center gap-2 z-10">
-            <Image
+            <img
               src="/ggbots_logo.svg"
               alt="ggbots logo"
               width={28}
               height={28}
               className="h-7 w-auto"
-              style={{
-                filter: 'brightness(0) saturate(100%) invert(var(--logo-invert, 89%)) sepia(12%) saturate(584%) hue-rotate(200deg) brightness(95%) contrast(89%)'
-              }}
             />
           </a>
 
