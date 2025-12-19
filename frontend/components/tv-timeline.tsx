@@ -1377,7 +1377,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               <>
                 {/* Symbol & Timeframe */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
-                  {(detailActivity.data.details as Record<string, unknown>).symbol && (
+                  {Boolean((detailActivity.data.details as Record<string, unknown>).symbol) && (
                     <div>
                       <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                         Symbol
@@ -1387,7 +1387,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                       </div>
                     </div>
                   )}
-                  {(detailActivity.data.details as Record<string, unknown>).timeframe && (
+                  {Boolean((detailActivity.data.details as Record<string, unknown>).timeframe) && (
                     <div>
                       <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                         Timeframe
@@ -1400,7 +1400,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 </div>
 
                 {/* Categories Queried */}
-                {(detailActivity.data.details as Record<string, unknown>).categories && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).categories) && (
                   <div className="mb-4">
                     <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       Categories Queried
@@ -1582,7 +1582,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             {detailActivity.type === 'observation_recorded' && detailActivity.data.details ? (
               <div className="space-y-4">
                 {/* Observation Type Badge */}
-                {(detailActivity.data.details as Record<string, unknown>).observation_type && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).observation_type) && (
                   <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
                     backgroundColor: String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? 'rgba(22, 163, 74, 0.2)' : 'rgba(220, 38, 38, 0.2)',
                     color: String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? '#16a34a' : '#dc2626'
@@ -1592,7 +1592,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 )}
 
                 {/* What Went Well */}
-                {(detailActivity.data.details as Record<string, unknown>).what_went_well && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).what_went_well) && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-2" style={{ color: '#16a34a' }}>
                       What Went Well
@@ -1604,7 +1604,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 )}
 
                 {/* What Went Wrong */}
-                {(detailActivity.data.details as Record<string, unknown>).what_went_wrong && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).what_went_wrong) && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-2" style={{ color: '#dc2626' }}>
                       What Went Wrong
@@ -1616,7 +1616,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 )}
 
                 {/* Decision Review */}
-                {(detailActivity.data.details as Record<string, unknown>).decision_review && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).decision_review) && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.brass }}>
                       Decision Review
@@ -1628,7 +1628,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                 )}
 
                 {/* Predictive Data Points */}
-                {(detailActivity.data.details as Record<string, unknown>).predictive_data_points && (
+                {Boolean((detailActivity.data.details as Record<string, unknown>).predictive_data_points) && (
                   <div>
                     <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.signal }}>
                       Key Data Points
