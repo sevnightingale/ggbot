@@ -139,8 +139,8 @@ function ArenaContent() {
     setError(null)
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-      const response = await fetch(`${baseUrl}/api/v2/public/arena/performance?hours=${hours}`)
+      // Use relative URL to go through Next.js rewrites (avoids CORS issues)
+      const response = await fetch(`/api/v2/public/arena/performance?hours=${hours}`)
 
       if (!response.ok) {
         const errData = await response.json()

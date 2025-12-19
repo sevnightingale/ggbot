@@ -1645,6 +1645,58 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
               </div>
             ) : null}
 
+            {/* STRATEGY UPDATED SPECIFIC FIELDS (Agent Evolution) */}
+            {detailActivity.type === 'strategy_updated' && detailActivity.data.details ? (
+              <div className="space-y-4">
+                {/* Version Change */}
+                <div className="flex items-center gap-3">
+                  <div className="px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(237,235,231,0.1)' }}>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      From
+                    </div>
+                    <div className="text-lg font-semibold">
+                      v{String((detailActivity.data.details as Record<string, unknown>).old_version || '?')}
+                    </div>
+                  </div>
+                  <div style={{ color: VIBE.brass, fontSize: '24px' }}>→</div>
+                  <div className="px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(193, 168, 125, 0.2)' }}>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
+                      To
+                    </div>
+                    <div className="text-lg font-semibold" style={{ color: VIBE.brass }}>
+                      v{String((detailActivity.data.details as Record<string, unknown>).new_version || '?')}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Reason for Update */}
+                {Boolean((detailActivity.data.details as Record<string, unknown>).reason) && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.brass }}>
+                      Reason for Evolution
+                    </div>
+                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(193, 168, 125, 0.1)' }}>
+                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).reason)}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {/* New Strategy Content (Collapsible) */}
+                {Boolean((detailActivity.data.details as Record<string, unknown>).new_strategy_content) && (
+                  <details className="rounded-lg border" style={{ borderColor: VIBE.hair, backgroundColor: 'rgba(193, 168, 125, 0.05)' }}>
+                    <summary className="cursor-pointer px-4 py-3 font-semibold text-sm" style={{ color: VIBE.brass }}>
+                      View New Strategy Content
+                    </summary>
+                    <div className="px-4 pb-4 max-h-96 overflow-y-auto">
+                      <div className="prose prose-invert prose-sm max-w-none">
+                        <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).new_strategy_content)}</ReactMarkdown>
+                      </div>
+                    </div>
+                  </details>
+                )}
+              </div>
+            ) : null}
+
             {/* BOT CREATED SPECIFIC FIELDS */}
             {detailActivity.type === 'bot_created' && detailActivity.data.details ? (
               <div className="grid grid-cols-2 gap-4">
