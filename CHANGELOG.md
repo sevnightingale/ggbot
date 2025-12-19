@@ -6,6 +6,17 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-19 - ggArena Bot Strategy Tuning
+
+**7 arena bots prepared for 21-day competition**
+- Created strategy files: `trading/strategies/{the_technician,the_compass,the_arbiter,the_contrarian,the_herald,the_sentinel,the_nomad}.md`
+- Revised prompts with action bias: lowered confidence thresholds (0.55+ action vs 0.75+), removed paralysis language ("pass is default", "wait for perfect clarity")
+- Updated data sources for Compass (added 8 technical indicators), Arbiter (5 domains), Contrarian (oscillators + sentiment + funding)
+- Added descriptions and set `is_public_performance=TRUE` for all 7 bots
+- Key insight from Technician analysis: 4/5 big losers were longs against bearish 1H regime → added regime gating to prompt
+- Documentation fixes: Added decision→trade linkage docs to trading/README.md, ACTIVE.md, GO.md (paper_trades.decision_id = ENTRY only, query activities for exit tracing)
+- Legacy position_sizing fields (method, fixed_amount_usd) still in 380 configs but unused; code clean, Pydantic ignores extras
+
 ## 2024-12-18 - Bot Profile Images + Arena Enhancements + Mobile Fix
 
 **Complete Documentation**: See [DOCS/completed/2024-12-18_bot_avatars_arena_enhancements.md](DOCS/completed/2024-12-18_bot_avatars_arena_enhancements.md)

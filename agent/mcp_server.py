@@ -507,30 +507,8 @@ async def execute_trade(args: Dict[str, Any]) -> Dict[str, Any]:
                     "isError": True
                 }
 
-            # Trade succeeded - log activity to timeline
-            trade_type = agent_context.trading_mode or 'paper'  # 'paper', 'aster', or 'symphony'
-
-            log_activity_safe(
-                config_id=agent_context.config_id,
-                user_id=agent_context.user_id,
-                activity_type='trade_entry',
-                activity_source='agent_tool',
-                summary=f"Opened {side} {symbol} at ${trade.get('entry_price', 'N/A')}",
-                details={
-                    'symbol': symbol,
-                    'side': side,
-                    'entry_price': trade.get('entry_price'),
-                    'size_usd': trade.get('size_usd'),
-                    'leverage': trade.get('leverage'),  # Get from trade result, not agent input
-                    'stop_loss_price': stop_loss_price,
-                    'take_profit_price': take_profit_price,
-                    'confidence': confidence
-                },
-                trade_id=trade.get('trade_id'),
-                trade_type=trade_type,
-                related_symbol=symbol,
-                importance=9
-            )
+            # Trade succeeded - paper_service already logs trade_entry activity
+            # No duplicate logging needed here
 
             return {
                 "content": [{
@@ -771,31 +749,9 @@ async def close_position(args: Dict[str, Any]) -> Dict[str, Any]:
             trade = result.get("trade", {})
             pnl = trade.get("realized_pnl", 0)
             pnl_pct = trade.get("realized_pnl_percent", 0)
-            symbol = trade.get('symbol', 'N/A')
 
-            # Auto-log activity to timeline
-            trade_type = agent_context.trading_mode or 'paper'  # 'paper', 'aster', or 'symphony'
-
-            log_activity_safe(
-                config_id=agent_context.config_id,
-                user_id=agent_context.user_id,
-                activity_type='trade_exit',
-                activity_source='agent_tool',
-                summary=f"Closed {symbol}: {'+' if pnl > 0 else ''}{pnl:.2f} ({pnl_pct:.1f}%)",
-                details={
-                    'symbol': symbol,
-                    'side': trade.get('side'),
-                    'exit_price': trade.get('exit_price'),
-                    'pnl': pnl,
-                    'pnl_pct': pnl_pct,
-                    'duration_minutes': trade.get('duration_minutes'),
-                    'close_reason': reasoning
-                },
-                trade_id=trade_id,
-                trade_type=trade_type,
-                related_symbol=symbol,
-                importance=9
-            )
+            # Trade exit - paper_service already logs trade_exit activity
+            # No duplicate logging needed here
 
             return {
                 "content": [{

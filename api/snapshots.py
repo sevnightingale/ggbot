@@ -87,6 +87,18 @@ async def get_snapshot_balance_series(config_id: str) -> Dict[str, Any]:
         # Sort by timestamp (though order should already be correct)
         timeline.sort(key=lambda x: x['timestamp'])
 
+        # Deduplicate by Unix second (lightweight-charts requires unique timestamps)
+        # Multiple activities in same second (parallel queries) have same equity - keep last
+        if timeline:
+            from datetime import datetime
+            seen_seconds = {}
+            for point in timeline:
+                ts = datetime.fromisoformat(point['timestamp'].replace('Z', '+00:00'))
+                unix_second = int(ts.timestamp())
+                seen_seconds[unix_second] = point  # Last value wins
+            timeline = list(seen_seconds.values())
+            timeline.sort(key=lambda x: x['timestamp'])
+
         # Calculate current and initial equity
         current_equity = timeline[-1]['total_equity'] if timeline else 10000.0
         initial_equity = timeline[0]['total_equity'] if timeline else 10000.0

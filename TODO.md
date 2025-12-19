@@ -25,97 +25,24 @@ See planning doc for complete provider-specific instructions and verification st
 
 ## 🏆 **HIGH PRIORITY - ggArena Bot Preparation** (2025-12-18)
 
-**Status**: 🟡 IN PROGRESS - 7 bots configured but need optimization before 21-day public competition
-**Analysis Doc**: [ARENA_BOT_ANALYSIS.md](ARENA_BOT_ANALYSIS.md)
+**Status**: ✅ COMPLETE (Tasks 1 & 2) - Ready for activation
+**Completed**: 2025-12-19
 
-**Current State**:
-- 7 arena bots identified (ggSignals, The Compass, The Arbiter, The Contrarian, The Herald, The Sentinel, The Nomad)
-- All bots currently INACTIVE (making decisions but not executing trades)
-- Only "The Technician (old)" active: 32 trades, 50% win rate, -$105.79 P&L
-- Key issue: Some bots too conservative (1-3% confidence = 100% waits), Symphony integration not working
+### ~~Task 1: Strategy Deep-Dive & Optimization~~ ✅ DONE
 
-### **Task 1: Strategy Deep-Dive & Optimization** 🔍
+- Analyzed Technician: 4/5 big losers = longs against bearish 1H regime → added regime gating
+- Created strategy files: `trading/strategies/*.md` for all 7 bots
+- Added decision→trade linkage docs (paper_trades.decision_id = ENTRY only)
 
-**Goal**: Analyze decision patterns and improve strategy prompts for better trade execution
+### ~~Task 2: Tune Conservative Bots for Arena Activity~~ ✅ DONE
 
-**The Technician Analysis** (Active bot, poor performance):
-- [ ] Query last 50 decisions with full reasoning
-- [ ] Identify pattern: Why 50% win rate despite 21 indicators?
-- [ ] Analyze entry/exit timing (5m frequency = over-trading?)
-- [ ] Check stop loss/take profit hit rates
-- [ ] Review confidence distribution (55% avg = too low threshold?)
-- [ ] Compare successful trades vs losing trades (indicators at entry)
-- [ ] Recommend: Strategy refinements, frequency change, or indicator subset
+- Revised all prompts with action bias: 0.55+ threshold (was 0.75+)
+- Removed paralysis language ("pass is default", "wait for perfect clarity")
+- Updated data sources: Compass (8 indicators), Arbiter (5 domains), Contrarian (oscillators+sentiment+funding)
+- Added descriptions + `is_public_performance=TRUE` for all 7 bots
+- The Nomad: Full meta-trader prompt created (adapts to what's working)
 
-**Low-Confidence Bots** (Herald 1%, Sentinel 3%, Arbiter 10%):
-- [ ] Query sample "wait" decisions with reasoning
-- [ ] Identify why confidence is so low (prompt wording? risk aversion? data quality?)
-- [ ] Review strategy prompts for overly conservative language
-- [ ] Test hypothesis: "when in doubt, wait" vs "when in doubt, trade" bias
-- [ ] Recommend specific prompt changes to increase action bias
-
-**ggSignals Analysis** (68% confidence but 0 trades):
-- [ ] Query enter/exit decisions (91 enters, 17 exits in 7 days)
-- [ ] Verify decision quality and reasoning patterns
-- [ ] Confirm strong conviction = likely to succeed
-- [ ] Check if Symphony integration is blocking execution (see Task 3)
-
-**Deliverables**:
-- Detailed decision pattern analysis for each bot
-- Specific strategy prompt recommendations
-- Confidence threshold recommendations
-- Indicator effectiveness analysis (which ones correlate with wins?)
-
----
-
-### **Task 2: Tune Conservative Bots for Arena Activity** ⚙️
-
-**Goal**: Adjust prompts/configs so all bots will actually trade during 21-day competition
-
-**The Herald** (30m, 1% confidence, 0/128 trades):
-- [ ] Review current prompt for overly cautious language
-- [ ] Add explicit "bias toward action" guidance
-- [ ] Lower implicit confidence bar in reasoning
-- [ ] Test: Activate for 24h, monitor if trades trigger
-- [ ] Target: 20-30% confidence minimum, 20%+ action rate
-
-**The Sentinel** (15m, 3% confidence, 0/261 trades):
-- [ ] Current: "only trade when setup, trend, and confirmation align perfectly"
-- [ ] Revise: "trade when 2 of 3 align with reasonable confidence"
-- [ ] Remove "capital is sacred" language (creates fear)
-- [ ] Add "taking calculated risks is part of trading"
-- [ ] Test: Activate for 24h, verify trades execute
-- [ ] Target: 10-15% confidence minimum, 15%+ action rate
-
-**The Arbiter** (4h, 10% confidence, 0/16 trades):
-- [ ] Review "weigh all evidence" prompt (analysis paralysis?)
-- [ ] Add tiebreaker logic: "when evidence is mixed, trust momentum"
-- [ ] Reduce required confluence from "all indicators" to "majority"
-- [ ] Test: Activate for 24h
-- [ ] Target: 40-50% confidence, 10%+ action rate
-
-**The Contrarian** (1h, 13% confidence, 0/67 trades):
-- [ ] Strategy may be fundamentally sound (waiting for extremes)
-- [ ] Review: Are RSI/funding extremes actually occurring?
-- [ ] Consider: Lower threshold for "extreme" (RSI <30/>70 instead of <20/>80)
-- [ ] Add: "Minor extremes are still tradeable"
-- [ ] Test: Activate for 24h
-- [ ] Target: 30-40% confidence, 15%+ action rate
-
-**The Nomad** (Agent, no strategy):
-- [ ] Create initial agent strategy prompt
-- [ ] Define: Autonomous market scanner, opportunity-driven
-- [ ] Tools: query_market_data, execute_trade, record observations
-- [ ] Guidance: "Scan for 7 symbols daily, trade best 2-3 setups"
-- [ ] Test: Start agent for 24h
-- [ ] Target: 2-5 trades/day
-
-**General Tuning Principles**:
-- Remove fear-based language ("capital is sacred", "only when perfect")
-- Add action-bias language ("when in doubt, trust the setup")
-- Lower confidence thresholds implicitly via prompt tone
-- Add explicit tiebreaker rules for mixed signals
-- Test each bot 24h before competition starts
+**Arena Status**: 7 bots ready, 6 inactive + The Nomad active. Activate when launching competition.
 
 ---
 

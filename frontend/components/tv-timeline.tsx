@@ -1284,11 +1284,56 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                     <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
                       P&L
                     </div>
-                    <div className="text-lg font-semibold" style={{ color: Number(detailActivity.data.details.pnl) >= 0 ? VIBE.signal : VIBE.ember }}>
-                      {formatActivityUSD(Number(detailActivity.data.details.pnl))}
+                    <div className="flex items-baseline gap-2">
+                      <div className="text-lg font-semibold" style={{ color: Number(detailActivity.data.details.pnl) >= 0 ? VIBE.signal : VIBE.ember }}>
+                        {formatActivityUSD(Number(detailActivity.data.details.pnl))}
+                      </div>
+                      {detailActivity.data.details?.pnl_pct != null && (
+                        <div className="text-sm" style={{ color: Number(detailActivity.data.details.pnl) >= 0 ? VIBE.signal : VIBE.ember }}>
+                          ({Number(detailActivity.data.details.pnl_pct).toFixed(2)}%)
+                        </div>
+                      )}
                     </div>
                   </div>
                  ) : null}
+
+                {/* Trade Duration & Fees (for trade_exit) */}
+                {detailActivity.type === 'trade_exit' && (
+                  <div className="grid grid-cols-2 gap-4">
+                    {detailActivity.data.details?.duration_seconds != null && (
+                      <div>
+                        <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                          Duration
+                        </div>
+                        <div className="text-sm">
+                          {Math.floor(Number(detailActivity.data.details.duration_seconds) / 3600)}h {Math.floor((Number(detailActivity.data.details.duration_seconds) % 3600) / 60)}m
+                        </div>
+                      </div>
+                    )}
+                    {detailActivity.data.details?.total_fees != null && (
+                      <div>
+                        <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                          Fees
+                        </div>
+                        <div className="text-sm font-mono" style={{ color: VIBE.ember }}>
+                          -${Number(detailActivity.data.details.total_fees).toFixed(2)}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Close Reason (for trade_exit - important for agents) */}
+                {detailActivity.type === 'trade_exit' && detailActivity.data.details?.close_reason && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Close Reason
+                    </div>
+                    <div className="text-sm px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(237,235,231,0.05)' }}>
+                      {String(detailActivity.data.details.close_reason)}
+                    </div>
+                  </div>
+                )}
 
                 {/* Size USD */}
                 {detailActivity.data.details?.size_usd != null ? (
@@ -1330,6 +1375,46 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             {/* MARKET QUERY SPECIFIC FIELDS */}
             {detailActivity.type === 'market_query' && detailActivity.data.details ? (
               <>
+                {/* Symbol & Timeframe */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  {(detailActivity.data.details as Record<string, unknown>).symbol && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                        Symbol
+                      </div>
+                      <div className="text-lg font-mono" style={{ color: VIBE.signal }}>
+                        {String((detailActivity.data.details as Record<string, unknown>).symbol)}
+                      </div>
+                    </div>
+                  )}
+                  {(detailActivity.data.details as Record<string, unknown>).timeframe && (
+                    <div>
+                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                        Timeframe
+                      </div>
+                      <div className="text-lg font-semibold">
+                        {String((detailActivity.data.details as Record<string, unknown>).timeframe)}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Categories Queried */}
+                {(detailActivity.data.details as Record<string, unknown>).categories && (
+                  <div className="mb-4">
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+                      Categories Queried
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {Object.keys((detailActivity.data.details as Record<string, unknown>).categories as Record<string, unknown>).map((category) => (
+                        <div key={category} className="px-2 py-1 rounded-lg text-xs" style={{ backgroundColor: 'rgba(60, 166, 224, 0.15)', color: VIBE.signal }}>
+                          {category.replace(/_/g, ' ')}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
                 {/* Query Mode Badge */}
                 {Boolean((detailActivity.data.details as Record<string, unknown>).query_mode) && (
                   <div>
@@ -1491,6 +1576,73 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   </div>
                  )}
               </>
+            ) : null}
+
+            {/* OBSERVATION RECORDED SPECIFIC FIELDS (Agent Learnings) */}
+            {detailActivity.type === 'observation_recorded' && detailActivity.data.details ? (
+              <div className="space-y-4">
+                {/* Observation Type Badge */}
+                {(detailActivity.data.details as Record<string, unknown>).observation_type && (
+                  <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
+                    backgroundColor: String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? 'rgba(22, 163, 74, 0.2)' : 'rgba(220, 38, 38, 0.2)',
+                    color: String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? '#16a34a' : '#dc2626'
+                  }}>
+                    {String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? '✓ Win Analysis' : '✗ Loss Analysis'}
+                  </div>
+                )}
+
+                {/* What Went Well */}
+                {(detailActivity.data.details as Record<string, unknown>).what_went_well && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: '#16a34a' }}>
+                      What Went Well
+                    </div>
+                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(22, 163, 74, 0.1)' }}>
+                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).what_went_well)}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {/* What Went Wrong */}
+                {(detailActivity.data.details as Record<string, unknown>).what_went_wrong && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: '#dc2626' }}>
+                      What Went Wrong
+                    </div>
+                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)' }}>
+                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).what_went_wrong)}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {/* Decision Review */}
+                {(detailActivity.data.details as Record<string, unknown>).decision_review && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.brass }}>
+                      Decision Review
+                    </div>
+                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(193, 168, 125, 0.1)' }}>
+                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).decision_review)}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {/* Predictive Data Points */}
+                {(detailActivity.data.details as Record<string, unknown>).predictive_data_points && (
+                  <div>
+                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.signal }}>
+                      Key Data Points
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 text-sm">
+                      {Object.entries((detailActivity.data.details as Record<string, unknown>).predictive_data_points as Record<string, unknown>).map(([key, value]) => (
+                        <div key={key} className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(60, 166, 224, 0.1)' }}>
+                          <span style={{ color: 'rgba(237,235,231,0.6)' }}>{key}:</span> {String(value)}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
             ) : null}
 
             {/* BOT CREATED SPECIFIC FIELDS */}
