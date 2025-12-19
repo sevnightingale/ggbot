@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
+import { RefreshCw, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
 
@@ -202,13 +202,11 @@ function ArenaContent() {
 
   // Competition timeline
   const competitionStart = new Date('2025-12-18')
-  const competitionEnd = new Date('2026-01-08')
   const today = new Date()
   const daysSinceStart = Math.max(0, Math.floor((today.getTime() - competitionStart.getTime()) / (1000 * 60 * 60 * 24)))
   const totalDays = 21
   const daysRemaining = Math.max(0, totalDays - daysSinceStart)
   const progressPercent = Math.min(100, Math.max(0, (daysSinceStart / totalDays) * 100))
-  const isLive = today >= competitionStart && today <= competitionEnd
 
   // Sort bots by equity for rankings
   const rankedBots = data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
@@ -268,21 +266,6 @@ function ArenaContent() {
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent)]/8 via-transparent to-transparent pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto px-4 py-10 text-center">
-          {/* Badge */}
-          <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--accent) 15%, transparent)',
-              border: '1px solid var(--accent)'
-            }}
-          >
-            {isLive && <Circle className="h-2 w-2 fill-[var(--accent)] text-[var(--accent)] animate-pulse" />}
-            <Trophy className="h-4 w-4 text-[var(--accent)]" />
-            <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
-              {isLive ? 'Live Competition' : 'Prototype Season'}
-            </span>
-          </div>
-
           <h1 className="font-display text-5xl md:text-6xl text-[var(--accent)] mb-4">
             The ggArena
           </h1>
