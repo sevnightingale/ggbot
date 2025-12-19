@@ -44,7 +44,7 @@ export default function Pricing() {
             Pay only for what you use
           </h2>
           <p className="text-lg text-ivory/70 max-w-2xl mx-auto">
-            No monthly fees, no credit card to start. Your costs scale with your configuration choices.
+            No monthly fees. Free to build and test. Card required to activate.
           </p>
         </div>
 
@@ -160,7 +160,7 @@ export default function Pricing() {
         {/* Bottom guarantees */}
         <div className="text-center p-6 bg-obsidian border border-ivory/20 rounded-sm">
           <div className="flex flex-wrap justify-center gap-6 text-sm text-ivory/60">
-            <span>• No credit card required</span>
+            <span>• Free to build and test</span>
             <span>• Cancel anytime</span>
             <span>• Usage caps available</span>
             <span>• Full cost transparency</span>

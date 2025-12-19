@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Check, Sparkles, Loader2 } from 'lucide-react'
+import { Sparkles, Loader2 } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -22,34 +22,19 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   const features = [
     {
-      icon: '🧠',
-      title: 'All 7 frontier AI models',
-      description: 'Claude, GPT-5, Grok, Gemini, DeepSeek, Kimi, Qwen'
-    },
-    {
-      icon: '⚡',
-      title: 'Any analysis frequency',
-      description: '5-minute to weekly checks - you choose'
-    },
-    {
-      icon: '📱',
-      title: 'Telegram signal publishing',
-      description: 'Receive your bot decisions as trading signals'
-    },
-    {
       icon: '🤖',
       title: 'Unlimited active bots',
-      description: 'Run as many bots as you need simultaneously'
+      description: 'Run as many bots as you need'
+    },
+    {
+      icon: '🧠',
+      title: 'All 7 AI models',
+      description: 'Claude, Grok, Gemini & more'
     },
     {
       icon: '🎯',
       title: 'Paper & live trading',
-      description: 'Test with virtual $10k or trade real money'
-    },
-    {
-      icon: '📊',
-      title: 'Real-time performance tracking',
-      description: 'Monitor all your bots with live P&L updates'
+      description: 'Test or trade real money'
     }
   ]
 
@@ -75,101 +60,84 @@ export function UpgradeModal({ open, onOpenChange }: UpgradeModalProps) {
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
-          <div className="flex items-center gap-2 mb-1">
-            <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
-              <Sparkles className="h-5 w-5 text-[var(--text-primary)]" />
-            </div>
-            <DialogTitle className="text-2xl">Activate Your ggbots</DialogTitle>
-          </div>
-          <DialogDescription>
-            Pay only for what you use - simple, transparent pricing
-          </DialogDescription>
-        </DialogHeader>
-
-        {/* Pricing Display */}
-        <div className="text-center mb-3 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
-          <div className="flex items-baseline justify-center gap-2 mb-2">
-            <span className="text-4xl font-bold text-[var(--text-primary)]">$0</span>
-            <span className="text-lg text-[var(--text-secondary)]">base fee</span>
-          </div>
-          <p className="text-lg text-[var(--text-secondary)] mb-3">
-            Pay only for what you use
-          </p>
-
-          {/* Cost Range Examples */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <div className="bg-[var(--bg-tertiary)] rounded p-2">
-              <div className="text-xs text-[var(--text-muted)] mb-1">Budget</div>
-              <div className="font-semibold text-[var(--profit-color)]">&lt;$2/mo</div>
-              <div className="text-xs text-[var(--text-tertiary)] mt-1">Hourly • Economy</div>
-            </div>
-            <div className="bg-[var(--bg-tertiary)] rounded p-2">
-              <div className="text-xs text-[var(--text-muted)] mb-1">Active</div>
-              <div className="font-semibold text-[var(--accent)]">$10-35/mo</div>
-              <div className="text-xs text-[var(--text-tertiary)] mt-1">15-30min • Standard</div>
-            </div>
-            <div className="bg-[var(--bg-tertiary)] rounded p-2">
-              <div className="text-xs text-[var(--text-muted)] mb-1">Power</div>
-              <div className="font-semibold text-[var(--text-primary)]">$50-150/mo</div>
-              <div className="text-xs text-[var(--text-tertiary)] mt-1">5-15min • Premium</div>
-            </div>
-          </div>
-
-          <div className="text-xs text-[var(--text-muted)] space-y-1">
-            <p>Your costs scale with your configuration:</p>
-            <p className="text-[var(--text-tertiary)]">Reasoning tier (Economy/Standard/Premium) • Frequency • Number of bots</p>
-          </div>
-        </div>
-
-        {/* Features List - 2 column grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-3">
-          {features.map((feature, index) => (
-            <div key={index} className="flex gap-2 items-start">
-              <div className="text-xl mt-0.5">{feature.icon}</div>
-              <div className="flex-1">
-                <h4 className="font-medium text-[var(--text-primary)] text-sm mb-0.5">
-                  {feature.title}
-                </h4>
-                <p className="text-xs text-[var(--text-secondary)]">
-                  {feature.description}
-                </p>
+      <DialogContent className="max-w-lg flex flex-col max-h-[85vh]">
+        {/* Scrollable content */}
+        <div className="flex-1 overflow-y-auto">
+          <DialogHeader>
+            <div className="flex items-center gap-2 mb-1">
+              <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
+                <Sparkles className="h-5 w-5 text-[var(--text-primary)]" />
               </div>
-              <Check className="text-[var(--profit-color)] flex-shrink-0 mt-0.5" size={18} />
+              <DialogTitle className="text-2xl">Activate Your ggbots</DialogTitle>
             </div>
-          ))}
+            <DialogDescription>
+              Pay only for what you use
+            </DialogDescription>
+          </DialogHeader>
+
+          {/* Pricing Display */}
+          <div className="text-center my-4 p-4 bg-[var(--bg-secondary)] rounded-lg border border-[var(--border)]">
+            <div className="flex items-baseline justify-center gap-2 mb-3">
+              <span className="text-4xl font-bold text-[var(--text-primary)]">$0</span>
+              <span className="text-lg text-[var(--text-secondary)]">base fee</span>
+            </div>
+
+            {/* Cost Range Examples */}
+            <div className="grid grid-cols-3 gap-2">
+              <div className="bg-[var(--bg-tertiary)] rounded p-2">
+                <div className="text-xs text-[var(--text-muted)] mb-1">Budget</div>
+                <div className="font-semibold text-[var(--profit-color)]">&lt;$2/mo</div>
+                <div className="text-xs text-[var(--text-tertiary)] mt-1">Hourly</div>
+              </div>
+              <div className="bg-[var(--bg-tertiary)] rounded p-2">
+                <div className="text-xs text-[var(--text-muted)] mb-1">Active</div>
+                <div className="font-semibold text-[var(--accent)]">$10-35/mo</div>
+                <div className="text-xs text-[var(--text-tertiary)] mt-1">15-30min</div>
+              </div>
+              <div className="bg-[var(--bg-tertiary)] rounded p-2">
+                <div className="text-xs text-[var(--text-muted)] mb-1">Power</div>
+                <div className="font-semibold text-[var(--text-primary)]">$50-150/mo</div>
+                <div className="text-xs text-[var(--text-tertiary)] mt-1">5-15min</div>
+              </div>
+            </div>
+          </div>
+
+          {/* Features List - horizontal */}
+          <div className="flex justify-center gap-6 mb-4">
+            {features.map((feature, index) => (
+              <div key={index} className="flex items-center gap-2">
+                <span className="text-lg">{feature.icon}</span>
+                <span className="text-sm text-[var(--text-secondary)]">{feature.title}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-3 p-2 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
+              <p className="text-sm text-[var(--loss-color)]">{error}</p>
+            </div>
+          )}
         </div>
 
-        {/* Error Message */}
-        {error && (
-          <div className="mb-3 p-2 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
-            <p className="text-sm text-[var(--loss-color)]">{error}</p>
-          </div>
-        )}
-
-        {/* CTA Button */}
-        <button
-          onClick={handleUpgrade}
-          disabled={loading}
-          className="w-full bg-[var(--profit-color)] hover:opacity-90 disabled:opacity-50 text-white font-medium py-3 px-6 rounded-lg transition-opacity flex items-center justify-center gap-2"
-        >
-          {loading ? (
-            <>
-              <Loader2 className="animate-spin" size={20} />
-              Starting checkout...
-            </>
-          ) : (
-            <>
-              Activate Usage-Based Billing
-            </>
-          )}
-        </button>
-
-        {/* Footer */}
-        <div className="text-center mt-3">
-          <p className="text-xs text-[var(--text-tertiary)]">
-            No credit card required to start • Secure payment by Stripe
+        {/* Sticky CTA */}
+        <div className="flex-shrink-0 pt-4 border-t border-[var(--border)]">
+          <button
+            onClick={handleUpgrade}
+            disabled={loading}
+            className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--bg-primary)] font-medium py-3 px-6 rounded-lg transition-colors flex items-center justify-center gap-2"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="animate-spin" size={20} />
+                Starting checkout...
+              </>
+            ) : (
+              'Activate Usage-Based Billing'
+            )}
+          </button>
+          <p className="text-center text-xs text-[var(--text-tertiary)] mt-2">
+            Secure payment via Stripe
           </p>
         </div>
       </DialogContent>

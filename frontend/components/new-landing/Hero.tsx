@@ -36,7 +36,7 @@ export default function Hero() {
 
           {/* Subheadline */}
           <p className="text-lg md:text-xl text-ivory/70 mb-12 max-w-3xl mx-auto leading-relaxed font-sans">
-            Unlike rigid rule-based bots, our AI agents analyze market conditions, reason through decisions, and adapt your trading strategies in real-time - just like you would, but 24/7.
+            Become a vibetrader. Our AI agents analyze market conditions, reason through decisions, and adapt your trading strategies in real-time — just like you would, but 24/7.
           </p>
 
           {/* Primary CTA */}
