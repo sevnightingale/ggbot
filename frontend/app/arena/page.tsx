@@ -365,12 +365,12 @@ function ArenaContent() {
           </div>
         )}
 
-        {/* Live Rankings - Second */}
+        {/* Live Rankings with Expandable Details */}
         {!loading && data && rankedBots.length > 0 && (
           <>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-              <h3 className="font-display text-xl text-[var(--text-primary)]">Live Rankings</h3>
+              <h3 className="font-display text-xl text-[var(--text-primary)]">The Archetypes</h3>
             </div>
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden mb-8">
               <div className="divide-y divide-[var(--border)]">
@@ -379,254 +379,184 @@ function ArenaContent() {
                   const isPositive = pnlPercent >= 0
                   const color = getBotColor(bot.config_name)
                   const isLeader = index === 0
+                  const isExpanded = expandedCards.has(bot.config_id)
+                  const categories = getDataSourceCategories(bot.data_sources)
+                  const indicators = getAllIndicators(bot.data_sources)
 
                   return (
                     <div
                       key={bot.config_id}
-                      className={`px-4 py-4 transition-all duration-200 hover:bg-[var(--bg-tertiary)] cursor-default ${
+                      className={`transition-all duration-200 ${
                         isLeader ? 'bg-[var(--accent)]/10 border-l-4 border-l-[var(--accent)]' : ''
                       }`}
                     >
-                      <div className="flex items-center gap-4">
-                        {/* Rank with medal for top 3 */}
-                        <div className="w-10 text-center flex-shrink-0">
-                          {index === 0 ? (
-                            <span className="text-2xl">🥇</span>
-                          ) : index === 1 ? (
-                            <span className="text-2xl">🥈</span>
-                          ) : index === 2 ? (
-                            <span className="text-2xl">🥉</span>
-                          ) : (
-                            <span className="font-mono text-lg text-[var(--text-muted)]">{index + 1}</span>
-                          )}
-                        </div>
+                      {/* Main Row - Always visible */}
+                      <div
+                        className="px-4 py-4 cursor-pointer hover:bg-[var(--bg-tertiary)]"
+                        onClick={() => toggleCard(bot.config_id)}
+                      >
+                        <div className="flex items-center gap-4">
+                          {/* Rank with medal for top 3 */}
+                          <div className="w-10 text-center flex-shrink-0">
+                            {index === 0 ? (
+                              <span className="text-2xl">🥇</span>
+                            ) : index === 1 ? (
+                              <span className="text-2xl">🥈</span>
+                            ) : index === 2 ? (
+                              <span className="text-2xl">🥉</span>
+                            ) : (
+                              <span className="font-mono text-lg text-[var(--text-muted)]">{index + 1}</span>
+                            )}
+                          </div>
 
-                        {/* Avatar with color border */}
-                        <div className="flex items-center gap-3 flex-shrink-0">
-                          <Circle className="h-3 w-3" style={{ color, fill: color }} />
-                          {bot.profile_image_url ? (
-                            <img
-                              src={bot.profile_image_url}
-                              alt={bot.config_name}
-                              className="w-12 h-12 rounded-full object-cover border-2"
-                              style={{ borderColor: color }}
-                            />
-                          ) : (
-                            <div
-                              className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
-                              style={{ borderColor: color }}
-                            >
-                              <Bot className="h-6 w-6 text-[var(--text-muted)]" />
+                          {/* Avatar with color border */}
+                          <div className="flex items-center gap-3 flex-shrink-0">
+                            <Circle className="h-3 w-3" style={{ color, fill: color }} />
+                            {bot.profile_image_url ? (
+                              <img
+                                src={bot.profile_image_url}
+                                alt={bot.config_name}
+                                className="w-12 h-12 rounded-full object-cover border-2"
+                                style={{ borderColor: color }}
+                              />
+                            ) : (
+                              <div
+                                className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
+                                style={{ borderColor: color }}
+                              >
+                                <Bot className="h-6 w-6 text-[var(--text-muted)]" />
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Name + Description */}
+                          <div className="flex-1 min-w-0">
+                            <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                              {bot.config_name}
                             </div>
-                          )}
-                        </div>
+                            {bot.description ? (
+                              <p className="text-xs text-[var(--text-muted)] line-clamp-1">
+                                {bot.description}
+                              </p>
+                            ) : (
+                              <div className="text-xs text-[var(--text-muted)] font-mono">
+                                {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
+                              </div>
+                            )}
+                          </div>
 
-                        {/* Name + Meta */}
-                        <div className="flex-1 min-w-0">
-                          <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
-                            {bot.config_name}
+                          {/* Stats - hidden on mobile */}
+                          <div className="hidden md:flex items-center gap-8 flex-shrink-0">
+                            <div className="text-center">
+                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Trades</div>
+                              <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
+                            </div>
+                            <div className="text-center">
+                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Win Rate</div>
+                              <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
+                            </div>
                           </div>
-                          <div className="text-xs text-[var(--text-muted)] font-mono">
-                            {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
-                          </div>
-                        </div>
 
-                        {/* Stats - hidden on mobile */}
-                        <div className="hidden md:flex items-center gap-8 flex-shrink-0">
-                          <div className="text-center">
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Trades</div>
-                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
+                          {/* Equity + P&L */}
+                          <div className="text-right flex-shrink-0">
+                            <div className={`text-lg font-mono font-bold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                              {formatCurrency(bot.current_equity)}
+                            </div>
+                            <div className={`text-sm font-mono flex items-center justify-end gap-1 ${
+                              isPositive ? 'text-green-500' : 'text-red-500'
+                            }`}>
+                              {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                              {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
+                            </div>
                           </div>
-                          <div className="text-center">
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Win Rate</div>
-                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
-                          </div>
-                        </div>
 
-                        {/* Equity + P&L */}
-                        <div className="text-right flex-shrink-0">
-                          <div className={`text-lg font-mono font-bold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
-                            {formatCurrency(bot.current_equity)}
-                          </div>
-                          <div className={`text-sm font-mono flex items-center justify-end gap-1 ${
-                            isPositive ? 'text-green-500' : 'text-red-500'
-                          }`}>
-                            {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                            {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
-                          </div>
+                          {/* Expand toggle */}
+                          <ChevronDown
+                            className={`h-5 w-5 text-[var(--text-muted)] transition-transform duration-200 flex-shrink-0 ${
+                              isExpanded ? 'rotate-180' : ''
+                            }`}
+                          />
                         </div>
                       </div>
+
+                      {/* Expanded Details */}
+                      {isExpanded && (
+                        <div className="px-4 pb-4 pt-0">
+                          <div className="ml-14 pl-4 border-l-2 border-[var(--border)] space-y-4">
+                            {/* Full Description */}
+                            {bot.description && (
+                              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                                {bot.description}
+                              </p>
+                            )}
+
+                            {/* Config Info */}
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                              <div>
+                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Model</div>
+                                <div className="text-sm font-mono text-[var(--text-primary)]">{formatModel(bot.model)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Frequency</div>
+                                <div className="text-sm font-mono text-[var(--text-primary)]">{formatFrequency(bot.frequency)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Stop Loss</div>
+                                <div className="text-sm font-mono text-[var(--text-primary)]">{bot.stop_loss ? `${bot.stop_loss}%` : '—'}</div>
+                              </div>
+                              <div>
+                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Take Profit</div>
+                                <div className="text-sm font-mono text-[var(--text-primary)]">{bot.take_profit ? `${bot.take_profit}%` : '—'}</div>
+                              </div>
+                            </div>
+
+                            {/* Data Sources */}
+                            {categories.length > 0 && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">Data Sources</div>
+                                <div className="flex flex-wrap gap-1.5">
+                                  {categories.map(cat => (
+                                    <span
+                                      key={cat}
+                                      className="px-2 py-0.5 text-xs rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                                    >
+                                      {cat}
+                                    </span>
+                                  ))}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* Indicators */}
+                            {indicators.length > 0 && (
+                              <div>
+                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">
+                                  Indicators ({indicators.length})
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                  {indicators.slice(0, 12).map(ind => (
+                                    <span
+                                      key={ind}
+                                      className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-[var(--bg-primary)] text-[var(--text-muted)]"
+                                    >
+                                      {ind}
+                                    </span>
+                                  ))}
+                                  {indicators.length > 12 && (
+                                    <span className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-muted)]">
+                                      +{indicators.length - 12} more
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
               </div>
-            </div>
-          </>
-        )}
-
-        {/* Bot Cards Grid - Expandable Accordion */}
-        {!loading && data && data.bots.length > 0 && (
-          <>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-              <h3 className="font-display text-xl text-[var(--text-primary)]">The Archetypes</h3>
-            </div>
-            <div className="flex flex-wrap justify-center gap-4 mb-8">
-              {data.bots.map((bot, index) => {
-                const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
-                const isPositive = pnlPercent >= 0
-                const color = BOT_COLORS[index % BOT_COLORS.length]
-                const isExpanded = expandedCards.has(bot.config_id)
-                const categories = getDataSourceCategories(bot.data_sources)
-                const indicators = getAllIndicators(bot.data_sources)
-
-                return (
-                  <div
-                    key={bot.config_id}
-                    className="w-full md:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] xl:w-[calc(25%-0.75rem)] rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden transition-colors hover:border-[var(--border-hover)]"
-                  >
-                    {/* Collapsed View - Always visible */}
-                    <div
-                      className="p-5 cursor-pointer"
-                      onClick={() => toggleCard(bot.config_id)}
-                    >
-                      {/* Header */}
-                      <div className="flex items-center gap-3 mb-3">
-                        <Circle className="h-3 w-3" style={{ color, fill: color }} />
-                        {bot.profile_image_url ? (
-                          <img
-                            src={bot.profile_image_url}
-                            alt={bot.config_name}
-                            className="w-11 h-11 rounded-full object-cover border-2"
-                            style={{ borderColor: color }}
-                          />
-                        ) : (
-                          <div
-                            className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--bg-tertiary)] border-2"
-                            style={{ borderColor: color }}
-                          >
-                            <Bot className="h-5 w-5 text-[var(--text-muted)]" />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                            {bot.config_name}
-                          </div>
-                          <div className="text-xs text-[var(--text-muted)] font-mono">
-                            {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
-                          </div>
-                        </div>
-                        <ChevronDown
-                          className={`h-5 w-5 text-[var(--text-muted)] transition-transform duration-200 ${
-                            isExpanded ? 'rotate-180' : ''
-                          }`}
-                        />
-                      </div>
-
-                      {/* Description */}
-                      {bot.description && (
-                        <p className={`text-xs text-[var(--text-secondary)] mb-3 leading-relaxed ${
-                          isExpanded ? '' : 'line-clamp-2'
-                        }`}>
-                          {bot.description}
-                        </p>
-                      )}
-
-                      {/* Equity */}
-                      <div className="flex items-baseline justify-between">
-                        <span className="text-xl font-mono font-bold text-[var(--text-primary)]">
-                          {formatCurrency(bot.current_equity)}
-                        </span>
-                        <span className={`text-sm font-mono font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                          {isPositive ? '+' : ''}{pnlPercent.toFixed(1)}%
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Expanded View - Config Details */}
-                    {isExpanded && (
-                      <div className="px-5 pb-5 border-t border-[var(--border)] pt-4 space-y-4">
-                        {/* Config Info */}
-                        <div className="grid grid-cols-2 gap-3">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Model</div>
-                            <div className="text-sm font-mono text-[var(--text-primary)]">{formatModel(bot.model)}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Frequency</div>
-                            <div className="text-sm font-mono text-[var(--text-primary)]">{formatFrequency(bot.frequency)}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Stop Loss</div>
-                            <div className="text-sm font-mono text-[var(--text-primary)]">{bot.stop_loss ? `${bot.stop_loss}%` : '—'}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Take Profit</div>
-                            <div className="text-sm font-mono text-[var(--text-primary)]">{bot.take_profit ? `${bot.take_profit}%` : '—'}</div>
-                          </div>
-                        </div>
-
-                        {/* Data Sources */}
-                        {categories.length > 0 && (
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">Data Sources</div>
-                            <div className="flex flex-wrap gap-1.5">
-                              {categories.map(cat => (
-                                <span
-                                  key={cat}
-                                  className="px-2 py-0.5 text-xs rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                                >
-                                  {cat}
-                                </span>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Indicators */}
-                        {indicators.length > 0 && (
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">
-                              Indicators ({indicators.length})
-                            </div>
-                            <div className="flex flex-wrap gap-1">
-                              {indicators.slice(0, 12).map(ind => (
-                                <span
-                                  key={ind}
-                                  className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-[var(--bg-primary)] text-[var(--text-muted)]"
-                                >
-                                  {ind}
-                                </span>
-                              ))}
-                              {indicators.length > 12 && (
-                                <span className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-muted)]">
-                                  +{indicators.length - 12} more
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                        )}
-
-                        {/* Performance Stats */}
-                        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[var(--border)]">
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Trades</div>
-                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Win Rate</div>
-                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
-                          </div>
-                          <div>
-                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Open</div>
-                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.open_positions}</div>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
             </div>
           </>
         )}

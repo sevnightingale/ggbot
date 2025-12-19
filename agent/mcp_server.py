@@ -1091,6 +1091,8 @@ async def query_trade_observations(args: Dict[str, Any]) -> Dict[str, Any]:
         min_importance = args.get("min_importance")
         limit = args.get("limit", 10)
 
+        logger.info(f"Querying observations: symbol={symbol}, type={observation_type}, min_importance={min_importance}, limit={limit}")
+
         result = await agent_context.api_client.query_trade_observations(
             config_id=agent_context.config_id,
             symbol=symbol,
@@ -1099,7 +1101,29 @@ async def query_trade_observations(args: Dict[str, Any]) -> Dict[str, Any]:
             limit=limit
         )
 
+        # Check for API error response
+        if result.get("status") == "error":
+            error_msg = result.get("error", "Unknown API error")
+            logger.error(f"query_trade_observations API error: {error_msg}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"❌ API error querying observations: {error_msg}"
+                }]
+            }
+
+        # Check if response has expected structure
+        if "observations" not in result:
+            logger.warning(f"query_trade_observations unexpected response: {result}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"⚠️ Unexpected API response format. Raw: {str(result)[:200]}"
+                }]
+            }
+
         observations = result.get("observations", [])
+        logger.info(f"Query returned {len(observations)} observations")
 
         if not observations:
             return {
