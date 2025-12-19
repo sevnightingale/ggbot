@@ -222,8 +222,8 @@ function ArenaContent() {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       {/* Header with progress bar */}
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-primary)]/80 backdrop-blur">
-        <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
-          <a href="https://ggbots.ai" className="flex items-center gap-2">
+        <div className="relative flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
+          <a href="https://ggbots.ai" className="flex items-center gap-2 z-10">
             <Image
               src="/ggbots_logo.svg"
               alt="ggbots logo"
@@ -236,8 +236,8 @@ function ArenaContent() {
             />
           </a>
 
-          {/* Progress bar in center */}
-          <div className="hidden sm:flex items-center gap-3 flex-1 max-w-xs mx-8">
+          {/* Progress bar - absolutely centered */}
+          <div className="hidden sm:flex items-center gap-3 absolute left-1/2 -translate-x-1/2 w-64">
             <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">Day {daysSinceStart}</span>
             <div className="flex-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
               <div
@@ -252,7 +252,7 @@ function ArenaContent() {
             href="https://ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
-            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
+            className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] z-10"
           >
             <Zap className="h-4 w-4" />
             <span>Create Your ggbot</span>

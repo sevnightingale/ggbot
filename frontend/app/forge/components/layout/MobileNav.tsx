@@ -16,6 +16,7 @@ interface MobileNavProps {
   onRename: (configId: string, newName: string) => void
   onDuplicate: (configId: string) => void
   onDelete: (configId: string) => void
+  onResetAccount?: (configId: string) => void
   isBotAction: boolean
   // Tab navigation props
   activeTab?: 'monitor' | 'configure'
@@ -32,6 +33,7 @@ export function MobileNav({
   onRename,
   onDuplicate,
   onDelete,
+  onResetAccount,
   isBotAction,
   activeTab = 'monitor',
   onTabChange
@@ -111,6 +113,7 @@ export function MobileNav({
                 onRename={onRename}
                 onDuplicate={onDuplicate}
                 onDelete={onDelete}
+                onResetAccount={onResetAccount}
                 isBotAction={isBotAction}
                 className="w-full" // Remove grid classes for mobile
               />

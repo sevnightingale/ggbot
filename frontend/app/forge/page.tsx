@@ -940,7 +940,14 @@ function ForgeApp() {
       if (!originalBot) return
 
       const duplicateName = `Copy of ${originalBot.config_name}`
-      const newBot = await apiClient.createConfig(duplicateName, originalBot.config_data)
+      const newBot = await apiClient.createConfig(
+        duplicateName,
+        originalBot.config_data,
+        {
+          trading_mode: originalBot.trading_mode,
+          symphony_agent_id: originalBot.symphony_agent_id
+        }
+      )
 
       setAllBots(prev => [...prev, newBot])
       setSelectedConfigId(newBot.config_id)
@@ -1169,6 +1176,7 @@ function ForgeApp() {
         onRename={handleRenameBot}
         onDuplicate={handleDuplicateBot}
         onDelete={handleDeleteBot}
+        onResetAccount={handleResetAccount}
         isBotAction={isBotAction}
         activeTab={activeTab}
         onTabChange={setActiveTab}

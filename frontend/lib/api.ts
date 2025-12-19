@@ -226,12 +226,18 @@ export class ApiClient {
   }
 
   // Configuration Management
-  async createConfig(configName: string, configData: Partial<ConfigData>): Promise<BotConfiguration> {
+  async createConfig(
+    configName: string,
+    configData: Partial<ConfigData>,
+    options?: { trading_mode?: string; symphony_agent_id?: string }
+  ): Promise<BotConfiguration> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/config`, {
       method: 'POST',
       body: JSON.stringify({
         config_name: configName,
-        ...configData
+        ...configData,
+        ...(options?.trading_mode && { trading_mode: options.trading_mode }),
+        ...(options?.symphony_agent_id && { symphony_agent_id: options.symphony_agent_id })
       })
     })
 
