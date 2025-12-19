@@ -1106,6 +1106,16 @@ async def start_agent(
 
         subprocess.run(cmd, cwd='/home/sev/ggbot', check=True)
 
+        # Update config state to 'active'
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE configurations
+                    SET state = 'active', updated_at = NOW()
+                    WHERE config_id = %s
+                """, (config_id,))
+                conn.commit()
+
         logger.info(
             f"Agent started successfully",
             config_id=config_id,
@@ -1155,6 +1165,16 @@ async def stop_agent(
         # Clear Redis queues
         redis_client.delete(f"agent:{config_id}:messages")
         redis_client.delete(f"agent:{config_id}:responses")
+
+        # Update config state to 'inactive'
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE configurations
+                    SET state = 'inactive', updated_at = NOW()
+                    WHERE config_id = %s
+                """, (config_id,))
+                conn.commit()
 
         logger.info(f"Agent stopped successfully", config_id=config_id, agent_name=agent_name)
 

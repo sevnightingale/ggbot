@@ -475,7 +475,7 @@ function ArenaContent() {
               <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
               <h3 className="font-display text-xl text-[var(--text-primary)]">The Archetypes</h3>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 mb-8">
+            <div className="flex flex-wrap justify-center gap-4 mb-8">
               {data.bots.map((bot, index) => {
                 const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
                 const isPositive = pnlPercent >= 0
@@ -487,7 +487,7 @@ function ArenaContent() {
                 return (
                   <div
                     key={bot.config_id}
-                    className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden transition-colors hover:border-[var(--border-hover)]"
+                    className="w-full md:w-[calc(50%-0.5rem)] lg:w-[calc(33.333%-0.75rem)] xl:w-[calc(25%-0.75rem)] rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden transition-colors hover:border-[var(--border-hover)]"
                   >
                     {/* Collapsed View - Always visible */}
                     <div

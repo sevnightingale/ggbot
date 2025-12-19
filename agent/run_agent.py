@@ -626,7 +626,7 @@ Be disciplined and execute the strategy faithfully.
             account_result = await self.api_client.get_account_status(config_id=self.config_id)
             account = account_result.get('account', {})
             trading_mode = account_result.get('trading_mode', 'unknown')
-            balance = account.get('balance', 0)
+            balance = account.get('current_balance', account.get('balance', 0))
 
             # Get open positions
             positions_result = await self.api_client.get_positions(config_id=self.config_id)
