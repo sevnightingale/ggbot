@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
-import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap } from 'lucide-react'
+import { RefreshCw, Trophy, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
 
@@ -11,10 +11,20 @@ interface DataPoint {
   equity: number
 }
 
+interface DataSources {
+  technical_analysis?: { data_points: string[]; timeframes: string[] }
+  sentiment_social?: { data_points: string[]; timeframes: string[] }
+  news_regulatory?: { data_points: string[]; timeframes: string[] }
+  onchain_analytics?: { data_points: string[]; timeframes: string[] }
+  macro_economics?: { data_points: string[]; timeframes: string[] }
+  derivatives_leverage?: { data_points: string[]; timeframes: string[] }
+}
+
 interface BotData {
   config_id: string
   config_name: string
   profile_image_url: string | null
+  description: string | null
   data_points: DataPoint[]
   current_equity: number
   current_pnl: number
@@ -24,6 +34,14 @@ interface BotData {
   open_positions: number
   current_balance: number
   unrealized_pnl: number
+  // Config details
+  frequency: string | null
+  model: string | null
+  symbol: string | null
+  data_sources: DataSources | null
+  stop_loss: string | null
+  take_profit: string | null
+  max_margin: string | null
 }
 
 interface ArenaData {
@@ -43,43 +61,58 @@ const BOT_COLORS = [
   '#06b6d4', // cyan
 ]
 
-// Bot descriptions from NOTE.md
-const BOT_DESCRIPTIONS: Record<string, { frequency: string; symbol: string; tagline: string }> = {
-  'The Technician': {
-    frequency: '5min',
-    symbol: 'BTC',
-    tagline: 'Price is truth. A rapid-fire technical trader living in the charts.'
-  },
-  'The Sentinel': {
-    frequency: '15min',
-    symbol: 'BTC',
-    tagline: 'Guards capital above all else. A conservative tactician with tight stops.'
-  },
-  'The Herald': {
-    frequency: '30min',
-    symbol: 'BTC',
-    tagline: 'Markets move on narrative. Catches stories before price catches up.'
-  },
-  'The Contrarian': {
-    frequency: '1hr',
-    symbol: 'BTC',
-    tagline: 'The crowd is wrong at extremes. Bets against the herd with conviction.'
-  },
-  'The Arbiter': {
-    frequency: '4hr',
-    symbol: 'BTC',
-    tagline: 'Waits for the verdict. Acts only when every domain agrees.'
-  },
-  'The Compass': {
-    frequency: '1d',
-    symbol: 'BTC',
-    tagline: 'Macro sets the tide. Positions for regimes, not moves.'
-  },
-  'The Nomad': {
-    frequency: '1w',
-    symbol: 'Self-Evolving',
-    tagline: 'No fixed path. Learns, adapts, rewrites its own rules.'
+// Helper to format frequency display
+function formatFrequency(freq: string | null): string {
+  if (!freq) return '—'
+  const map: Record<string, string> = {
+    '5m': '5 min',
+    '15m': '15 min',
+    '30m': '30 min',
+    '1h': '1 hour',
+    '4h': '4 hours',
+    '1d': '1 day',
+    '1w': '1 week',
+    'agent_driven': 'Agent Driven'
   }
+  return map[freq] || freq
+}
+
+// Helper to format model name
+function formatModel(model: string | null): string {
+  if (!model) return '—'
+  const map: Record<string, string> = {
+    'grok': 'Grok',
+    'claude': 'Claude',
+    'deepseek': 'DeepSeek',
+    'gemini': 'Gemini',
+    'kimi': 'Kimi'
+  }
+  return map[model] || model
+}
+
+// Helper to get data source categories
+function getDataSourceCategories(sources: DataSources | null): string[] {
+  if (!sources) return []
+  const categories: string[] = []
+  if (sources.technical_analysis) categories.push('Technical')
+  if (sources.sentiment_social) categories.push('Sentiment')
+  if (sources.news_regulatory) categories.push('News')
+  if (sources.onchain_analytics) categories.push('On-chain')
+  if (sources.macro_economics) categories.push('Macro')
+  if (sources.derivatives_leverage) categories.push('Derivatives')
+  return categories
+}
+
+// Helper to get all indicators
+function getAllIndicators(sources: DataSources | null): string[] {
+  if (!sources) return []
+  const indicators: string[] = []
+  Object.values(sources).forEach(source => {
+    if (source?.data_points) {
+      indicators.push(...source.data_points)
+    }
+  })
+  return [...new Set(indicators)] // Remove duplicates
 }
 
 function ArenaContent() {
@@ -87,6 +120,19 @@ function ArenaContent() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [hours, setHours] = useState(504)
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
+
+  const toggleCard = (configId: string) => {
+    setExpandedCards(prev => {
+      const next = new Set(prev)
+      if (next.has(configId)) {
+        next.delete(configId)
+      } else {
+        next.add(configId)
+      }
+      return next
+    })
+  }
 
   const fetchData = useCallback(async () => {
     setLoading(true)
@@ -176,7 +222,7 @@ function ArenaContent() {
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
-      {/* Header with brass CTA */}
+      {/* Header with progress bar */}
       <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-primary)]/80 backdrop-blur">
         <div className="flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
           <a href="https://ggbots.ai" className="flex items-center gap-2">
@@ -191,6 +237,19 @@ function ArenaContent() {
               }}
             />
           </a>
+
+          {/* Progress bar in center */}
+          <div className="hidden sm:flex items-center gap-3 flex-1 max-w-xs mx-8">
+            <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">Day {daysSinceStart}</span>
+            <div className="flex-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
+              <div
+                className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+            <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">{daysRemaining} left</span>
+          </div>
+
           <a
             href="https://ggbots.ai"
             target="_blank"
@@ -198,7 +257,7 @@ function ArenaContent() {
             className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
           >
             <Zap className="h-4 w-4" />
-            <span>Create Bot</span>
+            <span>Create Your ggbot</span>
           </a>
         </div>
       </header>
@@ -208,45 +267,29 @@ function ArenaContent() {
         {/* Brass gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent)]/8 via-transparent to-transparent pointer-events-none" />
 
-        <div className="relative max-w-4xl mx-auto px-4 py-16 text-center">
-          {/* Live Badge */}
+        <div className="relative max-w-4xl mx-auto px-4 py-10 text-center">
+          {/* Badge */}
           <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-8"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
             style={{
-              backgroundColor: isLive ? 'color-mix(in srgb, var(--ember) 15%, transparent)' : 'color-mix(in srgb, var(--accent) 15%, transparent)',
-              border: `1px solid ${isLive ? 'var(--ember)' : 'var(--accent)'}`
+              backgroundColor: 'color-mix(in srgb, var(--accent) 15%, transparent)',
+              border: '1px solid var(--accent)'
             }}
           >
-            {isLive && <Circle className="h-2 w-2 fill-[var(--ember)] text-[var(--ember)] animate-pulse" />}
-            <Trophy className="h-4 w-4" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }} />
-            <span className="text-sm font-semibold uppercase tracking-wider" style={{ color: isLive ? 'var(--ember)' : 'var(--accent)' }}>
+            {isLive && <Circle className="h-2 w-2 fill-[var(--accent)] text-[var(--accent)] animate-pulse" />}
+            <Trophy className="h-4 w-4 text-[var(--accent)]" />
+            <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
               {isLive ? 'Live Competition' : 'Prototype Season'}
             </span>
           </div>
 
-          <h1 className="font-display text-5xl md:text-6xl lg:text-7xl mb-6">
-            <span className="text-[var(--text-primary)]">The </span>
-            <span className="text-[var(--accent)]">gg</span>
-            <span className="text-[var(--text-primary)]">Arena</span>
+          <h1 className="font-display text-5xl md:text-6xl text-[var(--accent)] mb-4">
+            The ggArena
           </h1>
 
-          <p className="text-lg text-[var(--text-secondary)] mb-10 max-w-xl mx-auto">
-            7 AI trading archetypes battle for supremacy over 21 days with $70,000 starting capital.
+          <p className="text-[var(--text-secondary)] max-w-xl mx-auto">
+            7 AI trading agents compete in vibe trading over 21 days — each starting with $10,000.
           </p>
-
-          {/* Progress Bar */}
-          <div className="max-w-lg mx-auto">
-            <div className="flex items-center justify-between text-sm mb-3">
-              <span className="font-mono text-[var(--text-muted)]">Day {daysSinceStart} of {totalDays}</span>
-              <span className="font-mono text-[var(--text-muted)]">{daysRemaining} days remaining</span>
-            </div>
-            <div className="h-2 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
-              <div
-                className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          </div>
         </div>
       </div>
 
@@ -301,7 +344,6 @@ function ArenaContent() {
                 const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
                 const isPositive = pnlPercent >= 0
                 const color = getBotColor(bot.config_name)
-                const description = BOT_DESCRIPTIONS[bot.config_name]
                 const isLeader = index === 0
 
                 return (
@@ -350,11 +392,9 @@ function ArenaContent() {
                         <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
                           {bot.config_name}
                         </div>
-                        {description && (
-                          <div className="text-xs text-[var(--text-muted)] font-mono">
-                            {description.frequency} · {description.symbol}
-                          </div>
-                        )}
+                        <div className="text-xs text-[var(--text-muted)] font-mono">
+                          {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
+                        </div>
                       </div>
 
                       {/* Stats - hidden on mobile */}
@@ -445,7 +485,7 @@ function ArenaContent() {
           </div>
         )}
 
-        {/* Bot Cards Grid */}
+        {/* Bot Cards Grid - Expandable Accordion */}
         {!loading && data && data.bots.length > 0 && (
           <>
             <div className="flex items-center gap-3 mb-6">
@@ -456,76 +496,155 @@ function ArenaContent() {
               {data.bots.map((bot, index) => {
                 const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
                 const isPositive = pnlPercent >= 0
-                const description = BOT_DESCRIPTIONS[bot.config_name]
                 const color = BOT_COLORS[index % BOT_COLORS.length]
+                const isExpanded = expandedCards.has(bot.config_id)
+                const categories = getDataSourceCategories(bot.data_sources)
+                const indicators = getAllIndicators(bot.data_sources)
 
                 return (
                   <div
                     key={bot.config_id}
-                    className="group rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-5 transition-colors hover:border-[var(--border-hover)]"
+                    className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden transition-colors hover:border-[var(--border-hover)]"
                   >
-                    {/* Header */}
-                    <div className="flex items-center gap-3 mb-4">
-                      <Circle className="h-3 w-3" style={{ color, fill: color }} />
-                      {bot.profile_image_url ? (
-                        <img
-                          src={bot.profile_image_url}
-                          alt={bot.config_name}
-                          className="w-11 h-11 rounded-full object-cover border-2"
-                          style={{ borderColor: color }}
-                        />
-                      ) : (
-                        <div
-                          className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--bg-tertiary)] border-2"
-                          style={{ borderColor: color }}
-                        >
-                          <Bot className="h-5 w-5 text-[var(--text-muted)]" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
-                          {bot.config_name}
-                        </div>
-                        {description && (
-                          <div className="text-xs text-[var(--text-muted)] font-mono">
-                            {description.frequency} · {description.symbol}
+                    {/* Collapsed View - Always visible */}
+                    <div
+                      className="p-5 cursor-pointer"
+                      onClick={() => toggleCard(bot.config_id)}
+                    >
+                      {/* Header */}
+                      <div className="flex items-center gap-3 mb-3">
+                        <Circle className="h-3 w-3" style={{ color, fill: color }} />
+                        {bot.profile_image_url ? (
+                          <img
+                            src={bot.profile_image_url}
+                            alt={bot.config_name}
+                            className="w-11 h-11 rounded-full object-cover border-2"
+                            style={{ borderColor: color }}
+                          />
+                        ) : (
+                          <div
+                            className="w-11 h-11 rounded-full flex items-center justify-center bg-[var(--bg-tertiary)] border-2"
+                            style={{ borderColor: color }}
+                          >
+                            <Bot className="h-5 w-5 text-[var(--text-muted)]" />
                           </div>
                         )}
+                        <div className="flex-1 min-w-0">
+                          <div className="text-sm font-semibold text-[var(--text-primary)] truncate">
+                            {bot.config_name}
+                          </div>
+                          <div className="text-xs text-[var(--text-muted)] font-mono">
+                            {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
+                          </div>
+                        </div>
+                        <ChevronDown
+                          className={`h-5 w-5 text-[var(--text-muted)] transition-transform duration-200 ${
+                            isExpanded ? 'rotate-180' : ''
+                          }`}
+                        />
+                      </div>
+
+                      {/* Description */}
+                      {bot.description && (
+                        <p className={`text-xs text-[var(--text-secondary)] mb-3 leading-relaxed ${
+                          isExpanded ? '' : 'line-clamp-2'
+                        }`}>
+                          {bot.description}
+                        </p>
+                      )}
+
+                      {/* Equity */}
+                      <div className="flex items-baseline justify-between">
+                        <span className="text-xl font-mono font-bold text-[var(--text-primary)]">
+                          {formatCurrency(bot.current_equity)}
+                        </span>
+                        <span className={`text-sm font-mono font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
+                          {isPositive ? '+' : ''}{pnlPercent.toFixed(1)}%
+                        </span>
                       </div>
                     </div>
 
-                    {/* Tagline */}
-                    {description && (
-                      <p className="text-xs text-[var(--text-secondary)] mb-4 leading-relaxed line-clamp-2">
-                        {description.tagline}
-                      </p>
+                    {/* Expanded View - Config Details */}
+                    {isExpanded && (
+                      <div className="px-5 pb-5 border-t border-[var(--border)] pt-4 space-y-4">
+                        {/* Config Info */}
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Model</div>
+                            <div className="text-sm font-mono text-[var(--text-primary)]">{formatModel(bot.model)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Frequency</div>
+                            <div className="text-sm font-mono text-[var(--text-primary)]">{formatFrequency(bot.frequency)}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Stop Loss</div>
+                            <div className="text-sm font-mono text-[var(--text-primary)]">{bot.stop_loss ? `${bot.stop_loss}%` : '—'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Take Profit</div>
+                            <div className="text-sm font-mono text-[var(--text-primary)]">{bot.take_profit ? `${bot.take_profit}%` : '—'}</div>
+                          </div>
+                        </div>
+
+                        {/* Data Sources */}
+                        {categories.length > 0 && (
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">Data Sources</div>
+                            <div className="flex flex-wrap gap-1.5">
+                              {categories.map(cat => (
+                                <span
+                                  key={cat}
+                                  className="px-2 py-0.5 text-xs rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
+                                >
+                                  {cat}
+                                </span>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Indicators */}
+                        {indicators.length > 0 && (
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">
+                              Indicators ({indicators.length})
+                            </div>
+                            <div className="flex flex-wrap gap-1">
+                              {indicators.slice(0, 12).map(ind => (
+                                <span
+                                  key={ind}
+                                  className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-[var(--bg-primary)] text-[var(--text-muted)]"
+                                >
+                                  {ind}
+                                </span>
+                              ))}
+                              {indicators.length > 12 && (
+                                <span className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-muted)]">
+                                  +{indicators.length - 12} more
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Performance Stats */}
+                        <div className="grid grid-cols-3 gap-3 pt-3 border-t border-[var(--border)]">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Trades</div>
+                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Win Rate</div>
+                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Open</div>
+                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.open_positions}</div>
+                          </div>
+                        </div>
+                      </div>
                     )}
-
-                    {/* Equity */}
-                    <div className="flex items-baseline justify-between mb-4">
-                      <span className="text-xl font-mono font-bold text-[var(--text-primary)]">
-                        {formatCurrency(bot.current_equity)}
-                      </span>
-                      <span className={`text-sm font-mono font-semibold ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-                        {isPositive ? '+' : ''}{pnlPercent.toFixed(1)}%
-                      </span>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-3 gap-3 pt-4 border-t border-[var(--border)]">
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Trades</div>
-                        <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Win</div>
-                        <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
-                      </div>
-                      <div>
-                        <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)]">Open</div>
-                        <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.open_positions}</div>
-                      </div>
-                    </div>
                   </div>
                 )
               })}
@@ -567,7 +686,7 @@ function ArenaContent() {
             className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
           >
             <Zap className="h-5 w-5" />
-            <span>Create Your Bot</span>
+            <span>Create Your ggbot</span>
             <ExternalLink className="h-5 w-5" />
           </a>
         </div>

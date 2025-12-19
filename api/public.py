@@ -40,13 +40,22 @@ async def get_arena_performance(
                 {
                     "config_id": "...",
                     "config_name": "The Nomad",
+                    "profile_image_url": "...",
+                    "description": "Bot description text",
                     "data_points": [{"timestamp": "...", "equity": 10500.50}, ...],
                     "current_equity": 10500.50,
                     "current_pnl": 500.50,
                     "initial_balance": 10000.00,
                     "total_trades": 45,
                     "win_rate": 0.67,
-                    "open_positions": 2
+                    "open_positions": 2,
+                    "frequency": "1h",
+                    "model": "grok",
+                    "symbol": "BTC/USDT",
+                    "data_sources": {...},
+                    "stop_loss": "5",
+                    "take_profit": "10",
+                    "max_margin": "20"
                 }
             ]
         }
@@ -72,7 +81,15 @@ async def get_arena_performance(
                     s.open_positions,
                     pa.initial_balance,
                     s.current_balance,
-                    s.unrealized_pnl
+                    s.unrealized_pnl,
+                    c.description,
+                    c.config_data->'decision'->>'analysis_frequency' as frequency,
+                    c.config_data->'llm_config'->>'model' as model,
+                    c.config_data->>'selected_pair' as symbol,
+                    c.config_data->'extraction'->'selected_data_sources' as data_sources,
+                    c.config_data->'trading'->'risk_management'->>'default_stop_loss_percent' as stop_loss,
+                    c.config_data->'trading'->'risk_management'->>'default_take_profit_percent' as take_profit,
+                    c.config_data->'trading'->'position_sizing'->>'max_margin_percent' as max_margin
                 FROM account_snapshots s
                 JOIN configurations c ON s.config_id = c.config_id
                 LEFT JOIN paper_accounts pa ON s.config_id = pa.config_id
@@ -99,12 +116,21 @@ async def get_arena_performance(
                 initial_balance = float(row[9] or 10000)
                 current_balance = float(row[10] or 0)
                 unrealized_pnl = float(row[11] or 0)
+                description = row[12]
+                frequency = row[13]
+                model = row[14]
+                symbol = row[15]
+                data_sources = row[16]  # JSONB - already parsed
+                stop_loss = row[17]
+                take_profit = row[18]
+                max_margin = row[19]
 
                 if config_id not in bots_data:
                     bots_data[config_id] = {
                         "config_id": config_id,
                         "config_name": config_name,
                         "profile_image_url": profile_image_url,
+                        "description": description,
                         "data_points": [],
                         "current_equity": total_equity,
                         "current_pnl": total_pnl,
@@ -113,7 +139,15 @@ async def get_arena_performance(
                         "win_rate": win_rate,
                         "open_positions": open_positions,
                         "current_balance": current_balance,
-                        "unrealized_pnl": unrealized_pnl
+                        "unrealized_pnl": unrealized_pnl,
+                        # Config details
+                        "frequency": frequency,
+                        "model": model,
+                        "symbol": symbol,
+                        "data_sources": data_sources,
+                        "stop_loss": stop_loss,
+                        "take_profit": take_profit,
+                        "max_margin": max_margin
                     }
 
                 # Add data point
