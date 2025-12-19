@@ -224,7 +224,7 @@ function ArenaContent() {
         <div className="relative flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
           <a href="https://ggbots.ai" className="flex items-center gap-2 z-10">
             <img
-              src="/ggbots_logo.svg"
+              src="https://ggbots.ai/ggbots_logo.svg"
               alt="ggbots logo"
               width={28}
               height={28}
@@ -274,32 +274,6 @@ function ArenaContent() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 py-8">
-        {/* Section Header with brass accent */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-1 h-8 rounded-full bg-[var(--accent)]" />
-            <h2 className="font-display text-2xl text-[var(--text-primary)]">Live Rankings</h2>
-          </div>
-          <div className="flex items-center gap-2">
-            <select
-              value={hours}
-              onChange={(e) => setHours(Number(e.target.value))}
-              className="px-3 py-2 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-sm font-mono transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] hover:border-[var(--accent)]"
-            >
-              <option value={168}>7 days</option>
-              <option value={336}>14 days</option>
-              <option value={504}>21 days</option>
-            </select>
-            <button
-              onClick={fetchData}
-              disabled={loading}
-              className="p-2.5 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] transition-all duration-200 hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
-            >
-              <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-
         {/* Error */}
         {error && (
           <div className="mb-6 p-4 rounded-2xl border border-[var(--ember)] bg-[var(--ember)]/10">
@@ -315,105 +289,32 @@ function ArenaContent() {
           </div>
         )}
 
-        {/* Rankings Card */}
-        {!loading && data && rankedBots.length > 0 && (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden mb-8">
-            <div className="divide-y divide-[var(--border)]">
-              {rankedBots.map((bot, index) => {
-                const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
-                const isPositive = pnlPercent >= 0
-                const color = getBotColor(bot.config_name)
-                const isLeader = index === 0
-
-                return (
-                  <div
-                    key={bot.config_id}
-                    className={`px-4 py-4 transition-all duration-200 hover:bg-[var(--bg-tertiary)] cursor-default ${
-                      isLeader ? 'bg-[var(--accent)]/10 border-l-4 border-l-[var(--accent)]' : ''
-                    }`}
-                  >
-                    <div className="flex items-center gap-4">
-                      {/* Rank with medal for top 3 */}
-                      <div className="w-10 text-center flex-shrink-0">
-                        {index === 0 ? (
-                          <span className="text-2xl">🥇</span>
-                        ) : index === 1 ? (
-                          <span className="text-2xl">🥈</span>
-                        ) : index === 2 ? (
-                          <span className="text-2xl">🥉</span>
-                        ) : (
-                          <span className="font-mono text-lg text-[var(--text-muted)]">{index + 1}</span>
-                        )}
-                      </div>
-
-                      {/* Avatar with color border */}
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <Circle className="h-3 w-3" style={{ color, fill: color }} />
-                        {bot.profile_image_url ? (
-                          <img
-                            src={bot.profile_image_url}
-                            alt={bot.config_name}
-                            className="w-12 h-12 rounded-full object-cover border-2"
-                            style={{ borderColor: color }}
-                          />
-                        ) : (
-                          <div
-                            className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
-                            style={{ borderColor: color }}
-                          >
-                            <Bot className="h-6 w-6 text-[var(--text-muted)]" />
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Name + Meta */}
-                      <div className="flex-1 min-w-0">
-                        <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
-                          {bot.config_name}
-                        </div>
-                        <div className="text-xs text-[var(--text-muted)] font-mono">
-                          {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
-                        </div>
-                      </div>
-
-                      {/* Stats - hidden on mobile */}
-                      <div className="hidden md:flex items-center gap-8 flex-shrink-0">
-                        <div className="text-center">
-                          <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Trades</div>
-                          <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
-                        </div>
-                        <div className="text-center">
-                          <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Win Rate</div>
-                          <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
-                        </div>
-                      </div>
-
-                      {/* Equity + P&L */}
-                      <div className="text-right flex-shrink-0">
-                        <div className={`text-lg font-mono font-bold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
-                          {formatCurrency(bot.current_equity)}
-                        </div>
-                        <div className={`text-sm font-mono flex items-center justify-end gap-1 ${
-                          isPositive ? 'text-green-500' : 'text-red-500'
-                        }`}>
-                          {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
-                          {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </div>
-        )}
-
-        {/* Chart Card */}
+        {/* Chart Card - First */}
         {!loading && data && chartData.length > 0 && (
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 mb-8">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-              <h3 className="font-display text-xl text-[var(--text-primary)]">Performance Over Time</h3>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
+                <h3 className="font-display text-xl text-[var(--text-primary)]">Performance Over Time</h3>
+              </div>
+              <div className="flex items-center gap-2">
+                <select
+                  value={hours}
+                  onChange={(e) => setHours(Number(e.target.value))}
+                  className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-sm font-mono transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] hover:border-[var(--accent)]"
+                >
+                  <option value={168}>7 days</option>
+                  <option value={336}>14 days</option>
+                  <option value={504}>21 days</option>
+                </select>
+                <button
+                  onClick={fetchData}
+                  disabled={loading}
+                  className="p-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] transition-all duration-200 hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+                >
+                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                </button>
+              </div>
             </div>
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={chartData}>
@@ -462,6 +363,105 @@ function ArenaContent() {
               </LineChart>
             </ResponsiveContainer>
           </div>
+        )}
+
+        {/* Live Rankings - Second */}
+        {!loading && data && rankedBots.length > 0 && (
+          <>
+            <div className="flex items-center gap-3 mb-6">
+              <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
+              <h3 className="font-display text-xl text-[var(--text-primary)]">Live Rankings</h3>
+            </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden mb-8">
+              <div className="divide-y divide-[var(--border)]">
+                {rankedBots.map((bot, index) => {
+                  const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
+                  const isPositive = pnlPercent >= 0
+                  const color = getBotColor(bot.config_name)
+                  const isLeader = index === 0
+
+                  return (
+                    <div
+                      key={bot.config_id}
+                      className={`px-4 py-4 transition-all duration-200 hover:bg-[var(--bg-tertiary)] cursor-default ${
+                        isLeader ? 'bg-[var(--accent)]/10 border-l-4 border-l-[var(--accent)]' : ''
+                      }`}
+                    >
+                      <div className="flex items-center gap-4">
+                        {/* Rank with medal for top 3 */}
+                        <div className="w-10 text-center flex-shrink-0">
+                          {index === 0 ? (
+                            <span className="text-2xl">🥇</span>
+                          ) : index === 1 ? (
+                            <span className="text-2xl">🥈</span>
+                          ) : index === 2 ? (
+                            <span className="text-2xl">🥉</span>
+                          ) : (
+                            <span className="font-mono text-lg text-[var(--text-muted)]">{index + 1}</span>
+                          )}
+                        </div>
+
+                        {/* Avatar with color border */}
+                        <div className="flex items-center gap-3 flex-shrink-0">
+                          <Circle className="h-3 w-3" style={{ color, fill: color }} />
+                          {bot.profile_image_url ? (
+                            <img
+                              src={bot.profile_image_url}
+                              alt={bot.config_name}
+                              className="w-12 h-12 rounded-full object-cover border-2"
+                              style={{ borderColor: color }}
+                            />
+                          ) : (
+                            <div
+                              className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
+                              style={{ borderColor: color }}
+                            >
+                              <Bot className="h-6 w-6 text-[var(--text-muted)]" />
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Name + Meta */}
+                        <div className="flex-1 min-w-0">
+                          <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                            {bot.config_name}
+                          </div>
+                          <div className="text-xs text-[var(--text-muted)] font-mono">
+                            {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
+                          </div>
+                        </div>
+
+                        {/* Stats - hidden on mobile */}
+                        <div className="hidden md:flex items-center gap-8 flex-shrink-0">
+                          <div className="text-center">
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Trades</div>
+                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
+                          </div>
+                          <div className="text-center">
+                            <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Win Rate</div>
+                            <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
+                          </div>
+                        </div>
+
+                        {/* Equity + P&L */}
+                        <div className="text-right flex-shrink-0">
+                          <div className={`text-lg font-mono font-bold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                            {formatCurrency(bot.current_equity)}
+                          </div>
+                          <div className={`text-sm font-mono flex items-center justify-end gap-1 ${
+                            isPositive ? 'text-green-500' : 'text-red-500'
+                          }`}>
+                            {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                            {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          </>
         )}
 
         {/* Bot Cards Grid - Expandable Accordion */}
