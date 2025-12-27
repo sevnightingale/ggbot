@@ -4,6 +4,17 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { RefreshCw, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
+import dynamic from 'next/dynamic'
+
+// Lazy load ArenaTimeline (uses lightweight-charts which needs client-side only)
+const ArenaTimeline = dynamic(() => import('@/components/arena-timeline'), {
+  ssr: false,
+  loading: () => (
+    <div className="h-[350px] rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
+      <span className="text-sm text-[var(--text-muted)]">Loading timeline...</span>
+    </div>
+  )
+})
 
 interface DataPoint {
   timestamp: string
@@ -477,6 +488,12 @@ function ArenaContent() {
                       {isExpanded && (
                         <div className="px-4 pb-4 pt-0">
                           <div className="ml-14 pl-4 border-l-2 border-[var(--border)] space-y-4">
+                            {/* Activity Timeline */}
+                            <div>
+                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">Activity Timeline</div>
+                              <ArenaTimeline configId={bot.config_id} height={300} />
+                            </div>
+
                             {/* Full Description */}
                             {bot.description && (
                               <p className="text-sm text-[var(--text-secondary)] leading-relaxed">

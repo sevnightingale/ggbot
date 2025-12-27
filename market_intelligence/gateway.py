@@ -300,6 +300,8 @@ class MarketIntelligence:
             category = 'agentic'
         elif 'ggshot' in snake_case or 'signals' in snake_case:
             category = 'signals'
+        elif 'funding' in snake_case or 'derivatives' in snake_case:
+            category = 'derivatives'
         else:
             # Default to market_data
             category = 'market_data'

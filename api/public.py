@@ -177,3 +177,256 @@ async def get_arena_performance(
         "competition_days": hours // 24,
         "bots": bots_list
     }
+
+
+@router.get("/arena/{config_id}/balance-series")
+async def get_arena_balance_series(config_id: str) -> Dict[str, Any]:
+    """
+    Get activity-based equity timeline for a public arena bot.
+
+    Public endpoint - only works for bots with is_public_performance = true.
+    Returns equity timeline from activities table (AI consciousness moments).
+
+    Args:
+        config_id: Bot configuration ID
+
+    Returns:
+        {
+            "status": "success",
+            "equity_series": [{"timestamp": "...", "total_equity": 123.45}, ...],
+            "current_equity": 123.45,
+            "initial_equity": 10000.0
+        }
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Verify this is a public arena bot
+            cur.execute("""
+                SELECT config_id, created_at
+                FROM configurations
+                WHERE config_id = %s
+                  AND is_public_performance = true
+                  AND state = 'active'
+            """, (config_id,))
+            config = cur.fetchone()
+
+            if not config:
+                return {"status": "error", "message": "Bot not found or not public"}
+
+            config_created = config[1]
+
+            # Get activities with equity data (AI's conscious moments)
+            cur.execute("""
+                SELECT
+                    created_at,
+                    total_equity
+                FROM activities
+                WHERE config_id = %s
+                  AND total_equity IS NOT NULL
+                ORDER BY created_at ASC
+            """, (config_id,))
+            activities = cur.fetchall()
+
+    # Build timeline from AI's observations
+    timeline = []
+    for act in activities:
+        timeline.append({
+            "timestamp": act[0].isoformat(),
+            "total_equity": float(act[1]) if act[1] is not None else 0
+        })
+
+    # Deduplicate by Unix second (lightweight-charts requires unique timestamps)
+    if timeline:
+        seen_seconds = {}
+        for point in timeline:
+            ts = datetime.fromisoformat(point['timestamp'].replace('Z', '+00:00'))
+            unix_second = int(ts.timestamp())
+            seen_seconds[unix_second] = point
+        timeline = list(seen_seconds.values())
+        timeline.sort(key=lambda x: x['timestamp'])
+
+    current_equity = timeline[-1]['total_equity'] if timeline else 10000.0
+    initial_equity = timeline[0]['total_equity'] if timeline else 10000.0
+
+    logger.info(f"Arena balance series: {config_id}, {len(timeline)} points")
+
+    return {
+        "status": "success",
+        "equity_series": timeline,
+        "current_equity": current_equity,
+        "initial_equity": initial_equity
+    }
+
+
+@router.get("/arena/{config_id}/activities")
+async def get_arena_activities(
+    config_id: str,
+    limit: int = Query(default=500, ge=1, le=1000)
+) -> Dict[str, Any]:
+    """
+    Get activities for a public arena bot.
+
+    Public endpoint - only works for bots with is_public_performance = true.
+    Returns activity events (trades, thoughts, waits, etc.) for timeline markers.
+
+    Args:
+        config_id: Bot configuration ID
+        limit: Max activities to return (default 500)
+
+    Returns:
+        {
+            "status": "success",
+            "activities": [
+                {
+                    "id": "uuid",
+                    "timestamp": "2025-12-01T10:30:00Z",
+                    "type": "trade_entry",
+                    "priority": 9,
+                    "data": {
+                        "summary": "Opened long BTC/USDT",
+                        "details": {...},
+                        "symbol": "BTC/USDT"
+                    }
+                }
+            ],
+            "count": 47
+        }
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Verify this is a public arena bot
+            cur.execute("""
+                SELECT config_id
+                FROM configurations
+                WHERE config_id = %s
+                  AND is_public_performance = true
+                  AND state = 'active'
+            """, (config_id,))
+            config = cur.fetchone()
+
+            if not config:
+                return {"status": "error", "message": "Bot not found or not public"}
+
+            # Get activities
+            cur.execute("""
+                SELECT
+                    activity_id, activity_type, activity_source, summary, details,
+                    trade_id, trade_type, decision_id, related_symbol,
+                    importance, created_at
+                FROM activities
+                WHERE config_id = %s
+                ORDER BY created_at DESC
+                LIMIT %s
+            """, (config_id, limit))
+            activities = cur.fetchall()
+
+    return {
+        "status": "success",
+        "activities": [
+            {
+                "id": str(a[0]),
+                "timestamp": a[10].isoformat(),
+                "type": a[1],
+                "priority": a[9],
+                "data": {
+                    "summary": a[3],
+                    "details": a[4],
+                    "symbol": a[8],
+                    "importance": a[9],
+                    "trade_id": str(a[5]) if a[5] else None,
+                    "trade_type": a[6]
+                }
+            }
+            for a in activities
+        ],
+        "count": len(activities)
+    }
+
+
+@router.get("/arena/{config_id}/metadata")
+async def get_arena_metadata(config_id: str) -> Dict[str, Any]:
+    """
+    Get metadata for a public arena bot.
+
+    Public endpoint - only works for bots with is_public_performance = true.
+    Returns bot name, performance metrics from paper trading.
+
+    Args:
+        config_id: Bot configuration ID
+
+    Returns:
+        {
+            "status": "success",
+            "metadata": {
+                "botName": "The Nomad",
+                "startingBalance": 10000,
+                "currentBalance": 10500,
+                "totalTrades": 12,
+                "winRate": 66.7,
+                "performance": 5.0,
+                "createdAt": "2025-12-01T00:00:00Z"
+            }
+        }
+    """
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            # Verify this is a public arena bot and get config info
+            cur.execute("""
+                SELECT c.config_id, c.config_name, c.created_at, pa.initial_balance
+                FROM configurations c
+                LEFT JOIN paper_accounts pa ON c.config_id = pa.config_id
+                WHERE c.config_id = %s
+                  AND c.is_public_performance = true
+                  AND c.state = 'active'
+            """, (config_id,))
+            config = cur.fetchone()
+
+            if not config:
+                return {"status": "error", "message": "Bot not found or not public"}
+
+            config_name = config[1]
+            created_at = config[2]
+            initial_balance = float(config[3]) if config[3] else 10000.0
+
+            # Get trade metrics
+            cur.execute("""
+                SELECT
+                    COUNT(*) as total_trades,
+                    SUM(CASE WHEN realized_pnl > 0 THEN 1 ELSE 0 END) as wins,
+                    SUM(realized_pnl) as total_pnl
+                FROM paper_trades
+                WHERE config_id = %s AND status = 'closed'
+            """, (config_id,))
+            metrics = cur.fetchone()
+
+            # Get current balance from latest snapshot
+            cur.execute("""
+                SELECT current_balance + COALESCE(unrealized_pnl, 0) as total_equity
+                FROM account_snapshots
+                WHERE config_id = %s
+                ORDER BY timestamp DESC
+                LIMIT 1
+            """, (config_id,))
+            latest = cur.fetchone()
+
+    total_trades = metrics[0] or 0
+    wins = metrics[1] or 0
+    total_pnl = float(metrics[2]) if metrics[2] else 0.0
+    current_balance = float(latest[0]) if latest else initial_balance
+    win_rate = (wins / total_trades * 100) if total_trades > 0 else 0
+    performance = ((current_balance - initial_balance) / initial_balance * 100) if initial_balance > 0 else 0
+
+    logger.info(f"Arena metadata: {config_id}, {config_name}")
+
+    return {
+        "status": "success",
+        "metadata": {
+            "botName": config_name,
+            "startingBalance": initial_balance,
+            "currentBalance": current_balance,
+            "totalTrades": total_trades,
+            "winRate": round(win_rate, 1),
+            "performance": round(performance, 2),
+            "createdAt": created_at.isoformat()
+        }
+    }

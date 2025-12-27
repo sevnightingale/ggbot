@@ -592,15 +592,14 @@ All test scripts and documentation complete, ready to run once APIs available:
 - [x] Live trading risk acknowledgment modal
 
 ### **Public Performance Features**
-**Dependencies**: ✅ RLS migration ready in `SQL.md` - see System Improvements → Security
+**Status**: ✅ Arena page complete with activity timeline integration
 
-**Architecture Decided**:
-- Per-bot privacy control via `configurations.is_public_performance`
-- No usernames shown (just bot names)
-- All activities public when opted in (trades, thoughts, market queries)
-- Public arena shows: Bot Name | Mode | P&L | Win Rate | Trades
-
-Implementation tracked under **System Improvements → Security → Backend API Updates** and **Frontend Implementation** sections.
+**Completed**:
+- [x] Per-bot privacy control via `configurations.is_public_performance`
+- [x] Public arena at /arena (arena.ggbots.ai subdomain)
+- [x] Backend: 4 public endpoints in api/public.py (performance, balance-series, activities, metadata)
+- [x] Frontend: ArenaTimeline component embedded in expandable bot cards
+- [x] Activity markers (trades, thoughts) visible on public timeline
 
 ### **Mobile Responsive Design**
 - [ ] Transform desktop 3-column to mobile single column
@@ -640,26 +639,16 @@ Implementation tracked under **System Improvements → Security → Backend API 
   - [x] Tested with user account (activities visible)
   - [x] Tested public access (aster.ggbots.ai working)
 
-- [ ] **Backend API Updates** (2-3 hours)
-  - [ ] Add `PATCH /api/v2/config/{config_id}/public` endpoint (toggle is_public_performance)
-  - [ ] Create `GET /api/v2/arena/leaderboard` endpoint (public bots only, no auth required)
-  - [ ] Create `GET /api/v2/arena/{config_id}` endpoint (public bot detail, no auth required)
-  - [ ] Update activities API endpoints to document public access behavior
-  - [ ] Add filters for public arena (trading_mode, timeframe, sort by performance)
-  - [ ] Test with RLS enabled (verify isolation works)
+- [x] **Backend API Updates** ✅ COMPLETE
+  - [x] Created public arena endpoints (api/public.py): performance, balance-series, activities, metadata
+  - [x] All endpoints verify is_public_performance=true before returning data
+  - [x] Filters: hours parameter for timeframe selection
 
-- [ ] **Frontend Implementation** (3-4 hours)
-  - [ ] Add privacy toggle in bot settings/config page
-    - [ ] Checkbox: "Show this bot's performance publicly"
-    - [ ] Warning: "Public bots show all activities (trades, thoughts, market queries)"
-    - [ ] Save calls PATCH endpoint
-  - [ ] Create `/arena` public leaderboard page
-    - [ ] Table: Bot Name | Mode | P&L | Win Rate | Trades | Performance %
-    - [ ] Filters: Trading Mode (All/Paper/Symphony/Aster), Timeframe (24h/7d/30d/All)
-    - [ ] Sort: By P&L, Win Rate, or Trade Count
-    - [ ] Click bot → navigate to `/view/{config_id}` (existing timeline page)
-  - [ ] Update `/view/{config_id}` to work without auth (already supports optional auth)
-  - [ ] Add "Make Public" button to bot rail dropdown menu
+- [x] **Frontend Implementation** ✅ COMPLETE
+  - [x] Created `/arena` public leaderboard page with expandable bot cards
+  - [x] ArenaTimeline component shows activity markers (trades, thoughts)
+  - [x] Deployed to arena.ggbots.ai subdomain
+  - [ ] Privacy toggle in bot settings (admin-only for now via DB)
 
 ### **System Robustness**
 - [ ] Add comprehensive error boundaries to frontend

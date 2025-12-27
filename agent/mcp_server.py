@@ -993,6 +993,8 @@ async def record_trade_observation(args: Dict[str, Any]) -> Dict[str, Any]:
         what_went_well = args.get("what_went_well")
         what_went_wrong = args.get("what_went_wrong")
 
+        logger.info(f"Recording observation: trade_id={trade_id}, type={observation_type}")
+
         # Handle JSON string if SDK serializes the dict
         predictive_data_points_raw = args.get("predictive_data_points")
         if isinstance(predictive_data_points_raw, str):
@@ -1020,6 +1022,9 @@ async def record_trade_observation(args: Dict[str, Any]) -> Dict[str, Any]:
         )
 
         if result.get("status") == "success":
+            observation_id = result.get("observation_id", "unknown")
+            logger.info(f"Observation recorded successfully: {observation_id}")
+
             # Auto-log activity to timeline
             log_activity_safe(
                 config_id=agent_context.config_id,
@@ -1043,15 +1048,18 @@ async def record_trade_observation(args: Dict[str, Any]) -> Dict[str, Any]:
                     "type": "text",
                     "text": f"✅ Trade observation recorded (importance: {importance}/10)\n\n"
                             f"Type: {observation_type}\n"
-                            f"Trade ID: {trade_id}\n\n"
+                            f"Trade ID: {trade_id}\n"
+                            f"Observation ID: {observation_id}\n\n"
                             f"This learning is now queryable for future reference."
                 }]
             }
         else:
+            error_msg = result.get('message') or result.get('error') or result.get('detail') or 'Unknown error'
+            logger.error(f"record_trade_observation API failed: {error_msg}, full response: {result}")
             return {
                 "content": [{
                     "type": "text",
-                    "text": f"⚠️ Failed to record observation: {result.get('message', 'Unknown error')}"
+                    "text": f"❌ Failed to record observation: {error_msg}"
                 }]
             }
 

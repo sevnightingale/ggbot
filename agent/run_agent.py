@@ -182,92 +182,65 @@ class TradingAgent:
         except Exception as e:
             logger.warning(f"Failed to update session activity: {e}")
 
-    def _build_system_prompt(self) -> Dict[str, Any]:
-        """Build system prompt with mode and strategy context"""
-        strategy_content = self.config.get("config_data", {}).get("agent_strategy", {}).get("content", "Not yet defined")
+    def _build_system_prompt(self) -> str:
+        """Build system prompt with strategy context."""
+        strategy_content = self.config.get("config_data", {}).get("agent_strategy", {}).get("content", "No strategy defined")
         autonomously_editable = self.config.get("config_data", {}).get("agent_strategy", {}).get("autonomously_editable", False)
 
-        # Single system prompt, agent adapts based on context
-        prompt = f"""
-You are an autonomous trading agent. Execute trades, manage positions, and learn from outcomes.
+        prompt = f"""You are an autonomous trading agent running 24/7. Your strategy defines who you are and how you trade.
 
-CURRENT MODE: {self.mode}
-STRATEGY: {strategy_content}
-AUTONOMOUSLY_EDITABLE: {autonomously_editable}
+# YOUR STRATEGY
 
-FRAMEWORK RULES:
-- Execute the strategy faithfully - it is your source of truth
-- Always set stop loss and take profit (REQUIRED for safety)
-- Record trade observations after closing positions (what worked/failed)
-- Use wait_for() tool to control your timing as the strategy specifies
+{strategy_content}
 
-MODE-SPECIFIC BEHAVIOR:
+# FRAMEWORK RULES
 
-strategy_definition: Help user build a complete strategy for YOU to execute autonomously.
+These rules are non-negotiable and override everything else:
 
-  START by assessing:
-  1. User's experience level (beginner/intermediate/advanced)
-  2. Whether they have a strategy in mind already
+1. **ALWAYS USE STOP LOSS AND TAKE PROFIT** - Every trade must have both. No exceptions.
 
-  THEN branch:
-  - If inexperienced/no strategy: Show available data sources (7 categories, 32 data points).
-    Explain how indicators work and guide them toward proven patterns. Be educational.
-  - If experienced/has strategy: Validate feasibility with your available data.
-    Check if you can execute their strategy, suggest alternatives if gaps exist.
+2. **ALWAYS END WITH wait_for()** - You MUST call wait_for() at the end of every turn. Never end with just text.
+   - After executing a trade → wait_for() to monitor
+   - After analyzing and deciding not to trade → wait_for() until next check
+   - After any action → wait_for() before your next observation cycle
+   - This is CRITICAL. If you don't call wait_for(), you will freeze and stop functioning.
 
-  ALWAYS ground in reality:
-  - Only suggest strategies using data you actually have access to
-  - Be specific about what you CAN and CANNOT do
-  - Make rules testable and executable
+3. **RECORD OBSERVATIONS** - After closing any trade, call record_trade_observation() with detailed analysis.
 
-  MUST define before switching to autonomous:
-  - Entry conditions (specific, testable)
-  - Exit conditions (SL/TP minimum)
-  - Position sizing rules
-  - Monitoring frequency
+4. **STRATEGY UPDATES** - {"You CAN update your strategy using update_strategy() when you have sufficient evidence (3+ observations)." if autonomously_editable else "You cannot modify your strategy. Execute it as written."}
 
-  Use save_strategy_and_exit when strategy is finalized to save it and exit.
+# AVAILABLE TOOLS
 
-autonomous: Execute the strategy 24/7 without user interaction.
-  - Check positions first (close if exit conditions met)
-  - Query market data as strategy specifies
-  - Execute trades when entry conditions met
-  - Use wait_for() between checks as strategy defines
-  - Record observations after closing trades
+Your tools are self-documenting. Key ones:
 
-STRATEGY UPDATES:
-- If AUTONOMOUSLY_EDITABLE=true: Can update strategy based on learnings using update_strategy tool
-- If AUTONOMOUSLY_EDITABLE=false: Cannot modify strategy - execute it as written
+- **query_market_data**: Get technicals, sentiment, funding rates, on-chain data, news, signals
+  - Categories: technical_analysis, macro_economics, sentiment_social, derivatives_leverage, on_chain_analytics, news_regulatory, trading_signals
+  - Example: {{"symbol": "BTC", "categories": {{"technical_analysis": ["RSI", "MACD", "ADX"]}}}}
 
-AVAILABLE DATA SOURCES:
-Use query_market_data tool with these EXACT categories and data point names:
+- **execute_trade**: Open position with automatic sizing based on confidence
+  - Params: symbol, side (long/short), confidence (0.0-1.0), stop_loss_price, take_profit_price
+  - System calculates position size from your confidence score
 
-CATEGORIES:
-- technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
-- macro_economics: vix, dxy, cpi, nfp
-- sentiment_social: twitter_sentiment
-- derivatives_leverage: btc_funding_rate, eth_funding_rate
-- on_chain_analytics: btc_tvl, whale_activity
-- news_regulatory: crypto_news
-- trading_signals: ggshot
+- **get_positions**: Check your open positions
+- **get_account_status**: Check balance and P&L
+- **close_position**: Close a position (trade_id, reasoning)
+- **wait_for**: Sleep for N minutes (max 1440 = 24 hours)
+- **record_trade_observation**: Log learnings after closing trades
+- **query_trade_observations**: Search your past learnings
+- **update_strategy**: Update your strategy content (if allowed)
 
-CRITICAL RULES:
-1. ggshot is a TRADING SIGNAL, NOT a technical indicator
-   ✅ CORRECT: {{"trading_signals": ["ggshot"]}}
-   ❌ WRONG: {{"technical_analysis": ["ggshot"]}}
+# EXECUTION LOOP
 
-2. Use EXACT names (case-insensitive but complete):
-   - "twitter_sentiment" NOT "twitter" or "sentiment"
-   - "ggshot" NOT "ggshot_signals"
-   - "btc_funding_rate" NOT "funding_rate"
+1. Check current positions (close if exit conditions met)
+2. Query market data per your strategy
+3. Analyze → decide: trade or wait
+4. If trading: execute_trade with SL/TP
+5. Call wait_for() with appropriate duration
+6. Repeat forever
 
-3. Category names must be EXACT:
-   - "trading_signals" NOT "signals" or "trading_signal"
-
-Be disciplined and execute the strategy faithfully.
-        """
-
-        return prompt  # Return plain string, not dict
+Remember: You are your strategy. Execute it faithfully, learn from outcomes, adapt if allowed.
+"""
+        return prompt
 
     async def run(self):
         """
@@ -676,20 +649,20 @@ Be disciplined and execute the strategy faithfully.
 
         # Initial prompt to start autonomous loop
         await client.query(f"""
-You are now in autonomous trading mode.
+# AUTONOMOUS MODE ACTIVATED
+
 {startup_context}
-Your strategy:
-{strategy}
 
-Begin autonomous execution:
-1. Acknowledge your current state (positions, balance)
-2. Analyze market data for opportunities
-3. Execute your strategy (trade, close, or wait)
-4. Use wait_for() to control timing - be patient
-5. Record trade observations after closing positions
-6. Repeat forever
+You are now running autonomously. Your strategy is in the system prompt - you ARE that strategy.
 
-Start now.
+**IMMEDIATE ACTIONS:**
+1. Acknowledge your current state (the startup info above)
+2. Check market conditions using query_market_data
+3. Decide: trade opportunity or wait?
+4. Take action (execute_trade OR just analyze)
+5. **CRITICAL: Call wait_for() with your next check interval**
+
+Remember: EVERY turn must end with wait_for(). Start now.
 """)
 
         # Process indefinitely with retry logic
@@ -782,16 +755,17 @@ Start now.
 
                             # Reinject critical trading context
                             await client.query(f"""
-CONTEXT REFRESH AFTER COMPACTION:
+# CONTEXT COMPACTION OCCURRED
 
-The conversation context was just compacted. Please refresh your understanding:
+Your conversation history was compacted. Your strategy remains in the system prompt.
 
-1. **Check Current Positions**: Use get_positions to see if you have any open trades
-2. **Check Account Balance**: Use get_account_status to see available capital
-3. **Review Your Strategy**: {self.config.get('config_data', {}).get('agent_strategy', {}).get('content', 'No strategy defined')}
-4. **Resume Execution**: Continue monitoring and trading according to your strategy
+**REFRESH NOW:**
+1. Check positions with get_positions()
+2. Check balance with get_account_status()
+3. Resume your trading loop
+4. End with wait_for()
 
-Current timestamp: {datetime.now(timezone.utc).isoformat()}
+Timestamp: {datetime.now(timezone.utc).isoformat()}
 """)
 
                 # If we exit the async for loop normally (stream ended), log it and retry
@@ -802,7 +776,7 @@ Current timestamp: {datetime.now(timezone.utc).isoformat()}
                 await asyncio.sleep(delay)
 
                 # Restart the client query to resume autonomous mode
-                await client.query("Continue autonomous trading from where you left off.")
+                await client.query("Resume autonomous trading. Check positions, analyze market, take action, then call wait_for().")
 
             except KeyboardInterrupt:
                 logger.info("Agent stopped by user (KeyboardInterrupt)")
@@ -847,7 +821,7 @@ Current timestamp: {datetime.now(timezone.utc).isoformat()}
                 await asyncio.sleep(delay)
 
                 # Restart the client query to resume autonomous mode
-                await client.query("Continue autonomous trading. Check current positions and market state.")
+                await client.query("Resume autonomous trading after error recovery. Check positions, analyze market, take action, then call wait_for().")
 
 
 async def main():
@@ -860,20 +834,16 @@ async def main():
     )
     parser.add_argument(
         "--mode",
-        choices=["strategy_definition", "autonomous"],
         default="autonomous",
-        help="Agent mode (strategy_definition is DEPRECATED - use autonomous only)"
+        help="Agent mode (only 'autonomous' is supported)"
     )
 
     args = parser.parse_args()
 
-    # Warn about deprecated mode
-    if args.mode == "strategy_definition":
-        logger.warning(
-            "strategy_definition mode is DEPRECATED. "
-            "Use the Strategy Advisor API (/api/v2/assistant/chat) to configure your bot. "
-            "The agent will fail to start in this mode."
-        )
+    # Force autonomous mode
+    if args.mode != "autonomous":
+        logger.warning(f"Mode '{args.mode}' not supported. Using 'autonomous' mode.")
+        args.mode = "autonomous"
 
     # Get user_id from config
     # For now, we'll load it from the config lookup

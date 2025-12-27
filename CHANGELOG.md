@@ -6,6 +6,43 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2025-12-27 - Error Log Fixes
+
+**binance_funding Adapter Path** - Fixed missing derivatives category in gateway.py
+- `_adapter_name_to_module()` lacked `funding`/`derivatives` pattern → defaulted to `market_data`
+- Added pattern: `elif 'funding' in snake_case or 'derivatives' in snake_case: category = 'derivatives'`
+- Also fixed YAML: `adapter: binance_funding` → `adapter: BinanceFundingAdapter` (class name convention)
+
+**WebSocket Queue Overflow** - Increased max_queue_size 100→1000
+- 700 streams (100 symbols × 7 TFs) overwhelmed default queue during burst events
+- `BinanceSocketManager(client, max_queue_size=1000)` in websocket_market_data_service.py:250
+
+**Redis Cache TTL** - Timeframe-aware TTL for higher timeframes
+- Fixed: 4h/1d/1w data expired before new candle arrived (1h TTL < candle interval)
+- Added `TIMEFRAME_TTL` mapping: 5m-30m=1h, 1h=2h, 4h=5h, 1d=25h, 1w=7.5d
+- All timeframes now maintain 200 candles (verified: BTC/USDT all TFs populated)
+
+---
+
+## 2025-12-27 - Arena Activity Timeline + TradeSettings Fix
+
+**Arena Timeline Integration** - Embedded TV-Timeline in arena bot cards
+- Backend: Added 3 public endpoints to api/public.py - balance-series, activities, metadata (all verify is_public_performance=true)
+- Frontend: Created components/arena-timeline.tsx - standalone component, no auth, public endpoints, 300px height
+- Arena page: Lazy-loaded timeline in expanded accordion, shows equity line + activity markers (trades, thoughts)
+
+**TradeSettings Critical Fix** - Fixed nested object data loss on config save
+- Bug: position_sizing sent as `{ max_margin_percent: X }` without spreading existing values
+- Parent's shallow merge replaced entire nested object, losing sibling fields
+- Fix: Added `...positionSizing` spread before updates (same pattern StrategyEditor uses)
+
+**TP/SL Label Clarification** - UI now explains price movement vs P&L
+- Labels changed: "Stop Loss (%)" → "Stop Loss (price drop %)", "Take Profit (%)" → "Take Profit (price gain %)"
+- Added helper text: "Close when price moves X% against/in your favor"
+- Added section description explaining leverage multiplier effect on P&L
+
+---
+
 ## 2025-12-19 - ggArena Bot Strategy Tuning
 
 **7 arena bots prepared for 21-day competition**

@@ -129,7 +129,7 @@ export function TradeSettings({
             type="number"
             value={(positionSizing.max_margin_percent as number) || 20}
             onChange={(e) => updateTradingConfig({
-                position_sizing: { max_margin_percent: Number(e.target.value) }
+                position_sizing: { ...positionSizing, max_margin_percent: Number(e.target.value) }
             })}
             min="1"
             max="100"
@@ -190,11 +190,14 @@ export function TradeSettings({
         <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">
           Risk Management
         </h3>
+        <p className="text-sm text-[var(--text-muted)] mb-4">
+          Set price movement thresholds to automatically close positions. With leverage, P&L impact is multiplied.
+        </p>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-              Stop Loss (%)
+              Stop Loss (price drop %)
             </label>
             <input
               type="number"
@@ -213,10 +216,15 @@ export function TradeSettings({
               placeholder="5"
             />
             <ValidationMessage error={stopLossValidation.error} />
+            {!stopLossValidation.error && (
+              <div className="text-xs text-[var(--text-muted)] mt-1">
+                Close when price moves {(riskManagement.default_stop_loss_percent as number) || 5}% against you
+              </div>
+            )}
           </div>
           <div>
             <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-              Take Profit (%)
+              Take Profit (price gain %)
             </label>
             <input
               type="number"
@@ -235,6 +243,11 @@ export function TradeSettings({
               placeholder="10"
             />
             <ValidationMessage error={takeProfitValidation.error} />
+            {!takeProfitValidation.error && (
+              <div className="text-xs text-[var(--text-muted)] mt-1">
+                Close when price moves {(riskManagement.default_take_profit_percent as number) || 10}% in your favor
+              </div>
+            )}
           </div>
         </div>
       </div>

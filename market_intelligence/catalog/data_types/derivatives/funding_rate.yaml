@@ -16,7 +16,7 @@ query_params:
     description: Include mark price and index price data
 
 sources:
-  - adapter: binance_funding
+  - adapter: BinanceFundingAdapter
     priority: 1
     required_env: []
     cost: free

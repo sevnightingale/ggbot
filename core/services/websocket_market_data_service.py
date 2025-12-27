@@ -77,6 +77,18 @@ class WebSocketMarketDataService:
         '1w': AsyncClient.KLINE_INTERVAL_1WEEK
     }
 
+    # Redis TTL per timeframe (seconds) - must survive between candle closes
+    # Higher timeframes need longer TTL since candles close less frequently
+    TIMEFRAME_TTL = {
+        '5m': 3600,      # 1 hour (12 candles in this period)
+        '15m': 3600,     # 1 hour (4 candles in this period)
+        '30m': 3600,     # 1 hour (2 candles in this period)
+        '1h': 7200,      # 2 hours (safe buffer)
+        '4h': 18000,     # 5 hours (1 candle + buffer)
+        '1d': 90000,     # 25 hours (1 candle + buffer)
+        '1w': 648000     # 7.5 days (1 candle + buffer)
+    }
+
     def __init__(self):
         self.redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
         self.redis_client = None
@@ -182,9 +194,11 @@ class WebSocketMarketDataService:
             symbol_slash = f"{symbol[:-4]}/{symbol[-4:]}"  # BTCUSDT -> BTC/USDT
             key = f"ws:candles:{symbol_slash}:{timeframe}:200"  # ws: prefix to avoid collision
 
+            # Use timeframe-aware TTL to ensure data survives between candle closes
+            ttl = self.TIMEFRAME_TTL.get(timeframe, 3600)
             await self.redis_client.setex(
                 key,
-                3600,  # 1 hour TTL
+                ttl,
                 pickle.dumps(candles)
             )
 
@@ -234,7 +248,8 @@ class WebSocketMarketDataService:
                 self._log.info(f"🔌 Connecting to Binance WebSocket (attempt {retry_count + 1})...")
 
                 # Create socket manager (fresh connection)
-                self.socket_manager = BinanceSocketManager(self.binance_client)
+                # Increased queue size from default 100 to handle 700 streams during burst events
+                self.socket_manager = BinanceSocketManager(self.binance_client, max_queue_size=1000)
                 multiplex_socket = self.socket_manager.multiplex_socket(streams)
 
                 last_message_time = time.time()
@@ -385,10 +400,11 @@ class WebSocketMarketDataService:
             # Keep only last 200
             candles = candles[-200:]
 
-            # Store back to Redis
+            # Store back to Redis with timeframe-aware TTL
+            ttl = self.TIMEFRAME_TTL.get(timeframe, 3600)
             await self.redis_client.setex(
                 key,
-                3600,  # 1 hour TTL
+                ttl,
                 pickle.dumps(candles)
             )
 

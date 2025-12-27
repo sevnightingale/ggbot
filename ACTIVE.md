@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-12-19 03:55:30 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-12-27 21:45:27 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -13,46 +13,47 @@
 
 ### Bot Statistics
 - **Total Bots**: 389
-- **Active Bots**: 1 (0.3%)
-  - Paper Trading: 1
+- **Active Bots**: 8 (2.1%)
+  - Paper Trading: 8
   - Live Trading: 0
-- **Inactive Bots**: 388
+- **Inactive Bots**: 381
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,492
-  - Wins: 1,658
-  - Losses: 3,834
-  - Platform Win Rate: 30.19%
-  - Total P&L: $-16,397.76
+- **Total Trades (All Time)**: 5,636
+  - Wins: 1,704
+  - Losses: 3,932
+  - Platform Win Rate: 30.23%
+  - Total P&L: $-17,485.07
 - **Recent Activity**:
-  - Last 24 hours: 15 trades
-  - Last 7 days: 56 trades
-  - Last 30 days: 62 trades
+  - Last 24 hours: 17 trades
+  - Last 7 days: 139 trades
+  - Last 30 days: 196 trades
 
 ### Open Positions
-- **Open Positions**: 0
-- **Unique Symbols**: 0
-- **Total Exposure**: $0.00
-- **Unrealized P&L**: $0.00
+- **Open Positions**: 2
+- **Unique Symbols**: 1
+- **Total Exposure**: $12,470.84
+- **Unrealized P&L**: $-30.41
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,927.85
+- **Average Balance**: $9,925.05
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
+- **BTC/USDT**: 7 bots
 - **ADA/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 224 decisions (avg confidence: 52.5%)
-- **enter**: 15 decisions (avg confidence: 62.4%)
-- **exit**: 14 decisions (avg confidence: 46.1%)
+- **wait**: 428 decisions (avg confidence: 33.5%)
+- **exit**: 18 decisions (avg confidence: 47.6%)
+- **enter**: 17 decisions (avg confidence: 61.3%)
 
 ### System Health
-- **Decisions (last hour)**: 11
+- **Decisions (last hour)**: 19
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -61,23 +62,23 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 14MB | 1d 18h | 69 |
-| x-bot | 🟢 online | 0% | 11MB | 1d 18h | 68 |
-| error-alerts | 🟢 online | 0% | 18MB | 1d 18h | 75 |
-| market-data-ws | 🟢 online | 1.7% | 27MB | 1d 18h | 70 |
-| ggbot | 🟢 online | 0.6% | 258MB | 1h 53m | 262 |
-| account-monitor | 🟢 online | 0% | 21MB | 1d 18h | 34 |
-| agent-3823aa15-02eb-460e-a88b-7c594d0ed8d0 | 🟢 online | 0% | 8MB | 1d 18h | 1 |
+| signal-listener | 🟢 online | 0% | 25MB | 8d 16h | 70 |
+| x-bot | 🟢 online | 0% | 26MB | 8d 16h | 69 |
+| error-alerts | 🟢 online | 0% | 25MB | 8d 16h | 76 |
+| market-data-ws | 🟢 online | 1.2% | 54MB | 8d 16h | 71 |
+| ggbot | 🟢 online | 0.5% | 296MB | 8d 13h | 265 |
+| account-monitor | 🟢 online | 0.3% | 40MB | 8d 16h | 35 |
+| agent-d38fd69e-ceb8-4746-b688-c890961d5c7b | 🟢 online | 0% | 29MB | 8d 16h | 1 |
 
 ### VM Resources
 
 - **Disk**: 40G / 78G (51%)
-- **Memory**: 2.7Gi / 3.8Gi
-- **CPU Load**: 0.16 / 0.19 / 0.25 (1m/5m/15m)
+- **Memory**: 2.3Gi / 3.8Gi
+- **CPU Load**: 0.58 / 0.23 / 0.11 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 13.68M)
+- **Redis**: 🟢 connected (Memory: 13.29M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -144,6 +145,12 @@
 - `GET /api/v2/activities/{config_id}` - Get all activities (trades, queries, thoughts, waits)
 - `GET /api/v2/snapshots/{config_id}/balance-series` - Get AI consciousness timeline (activities-only, Redis-cached equity)
 - `GET /api/v2/activities/{config_id}/metadata` - Get bot metadata (name, symbols, status)
+
+**Public Arena Endpoints** (no auth required)
+- `GET /api/v2/public/arena/performance` - Competition leaderboard (is_public_performance bots only)
+- `GET /api/v2/public/arena/{config_id}/balance-series` - Public bot equity timeline
+- `GET /api/v2/public/arena/{config_id}/activities` - Public bot activity events
+- `GET /api/v2/public/arena/{config_id}/metadata` - Public bot metadata
 
 **AI Assistant** (Production)
 - `POST /api/v2/assistant/chat` - Universal AI assistant for bot configuration (Claude Haiku function calling)
@@ -409,7 +416,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-12-19 03:55:32 UTC
+**Last Updated**: 2025-12-27 21:45:28 UTC
 
 ---
 
@@ -1256,7 +1263,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-12-19 03:55:32 UTC
+**Last Updated**: 2025-12-27 21:45:28 UTC
 
 ---
 
