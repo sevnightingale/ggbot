@@ -173,11 +173,11 @@ function ArenaContent() {
   const getChartData = () => {
     if (!data || data.bots.length === 0) return []
 
-    const timestampMap = new Map<string, Record<string, string | number>>()
+    const timestampMap = new Map<number, Record<string, number>>()
 
     data.bots.forEach((bot) => {
       bot.data_points.forEach((point) => {
-        const timestamp = point.timestamp
+        const timestamp = new Date(point.timestamp).getTime()
         if (!timestampMap.has(timestamp)) {
           timestampMap.set(timestamp, { timestamp })
         }
@@ -189,7 +189,7 @@ function ArenaContent() {
     })
 
     const chartData = Array.from(timestampMap.values())
-    chartData.sort((a, b) => new Date(a.timestamp as string).getTime() - new Date(b.timestamp as string).getTime())
+    chartData.sort((a, b) => a.timestamp - b.timestamp)
 
     return chartData
   }
@@ -203,7 +203,7 @@ function ArenaContent() {
     }).format(value)
   }
 
-  const formatTimestamp = (timestamp: string) => {
+  const formatTimestamp = (timestamp: number) => {
     const date = new Date(timestamp)
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
@@ -211,12 +211,17 @@ function ArenaContent() {
   const chartData = getChartData()
 
   // Competition timeline
-  const competitionStart = new Date('2025-12-18')
+  const competitionStart = new Date('2025-12-18T00:00:00Z')
+  const competitionEnd = new Date('2026-01-08T00:00:00Z') // 21 days later
   const today = new Date()
   const daysSinceStart = Math.max(0, Math.floor((today.getTime() - competitionStart.getTime()) / (1000 * 60 * 60 * 24)))
   const totalDays = 21
   const daysRemaining = Math.max(0, totalDays - daysSinceStart)
   const progressPercent = Math.min(100, Math.max(0, (daysSinceStart / totalDays) * 100))
+
+  // Chart domain timestamps for fixed x-axis
+  const chartDomainStart = competitionStart.getTime()
+  const chartDomainEnd = competitionEnd.getTime()
 
   // Sort bots by equity for rankings
   const rankedBots = data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
@@ -332,10 +337,13 @@ function ArenaContent() {
                 <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2d" />
                 <XAxis
                   dataKey="timestamp"
+                  type="number"
+                  domain={[chartDomainStart, chartDomainEnd]}
                   stroke="#8a8781"
                   tickFormatter={formatTimestamp}
                   tick={{ fill: '#8a8781', fontSize: 11 }}
                   axisLine={{ stroke: '#2a2a2d' }}
+                  scale="time"
                 />
                 <YAxis
                   stroke="#8a8781"
@@ -353,7 +361,7 @@ function ArenaContent() {
                     fontSize: '12px',
                     boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
                   }}
-                  labelFormatter={formatTimestamp}
+                  labelFormatter={(value: number) => formatTimestamp(value)}
                   formatter={(value: number) => [formatCurrency(value), '']}
                 />
                 <Legend

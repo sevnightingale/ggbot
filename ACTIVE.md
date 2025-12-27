@@ -234,6 +234,7 @@
 - **5-Second Check Intervals**: Continuous monitoring with on-change detection
 - **Redis Equity Cache**: Total equity cached every 5s for instant activity logging (30s TTL)
 - **Historical Snapshots**: 5-minute heartbeat storage in account_snapshots table
+- **Agent Watchdog**: Auto-restarts stale agent bots (>24h inactive) every 5 minutes via PM2
 - **Adapter Pattern**: Clean architecture for multiple trading mode data sources
 - **Documentation**: Complete implementation guide in DOCS/UNIFIED_ACCOUNT_MONITORING.md
 

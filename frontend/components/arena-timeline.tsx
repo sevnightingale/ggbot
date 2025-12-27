@@ -335,10 +335,36 @@ export default function ArenaTimeline({ configId, height = 350 }: ArenaTimelineP
         </div>
       )}
 
-      {/* Loading overlay */}
+      {/* Loading overlay with skeleton */}
       {loading && (
-        <div className="absolute inset-0 flex items-center justify-center" style={{ backgroundColor: 'rgba(11,11,12,0.8)' }}>
-          <div className="text-sm" style={{ color: VIBE.ivory }}>Loading timeline...</div>
+        <div className="absolute inset-0 flex flex-col" style={{ backgroundColor: VIBE.carbon }}>
+          {/* Skeleton chart area */}
+          <div className="flex-1 p-4 flex flex-col justify-end">
+            {/* Animated skeleton bars representing chart */}
+            <div className="flex items-end gap-1 h-full">
+              {[40, 55, 45, 60, 50, 70, 65, 55, 75, 60, 80, 70, 65, 85, 75, 70, 90, 80].map((h, i) => (
+                <div
+                  key={i}
+                  className="flex-1 rounded-t animate-pulse"
+                  style={{
+                    height: `${h}%`,
+                    backgroundColor: VIBE.hair,
+                    animationDelay: `${i * 50}ms`
+                  }}
+                />
+              ))}
+            </div>
+          </div>
+          {/* Loading text */}
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex items-center gap-2 px-4 py-2 rounded-lg" style={{ backgroundColor: 'rgba(11,11,12,0.9)' }}>
+              <div
+                className="w-4 h-4 border-2 rounded-full animate-spin"
+                style={{ borderColor: VIBE.hair, borderTopColor: VIBE.brass }}
+              />
+              <span className="text-sm" style={{ color: VIBE.ivory }}>Loading timeline...</span>
+            </div>
+          </div>
         </div>
       )}
 

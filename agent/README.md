@@ -1,7 +1,7 @@
 # Autonomous Trading Agent
 
-**Status**: Phase 3 Complete - Production Ready with Session Persistence
-**Last Updated**: 2025-12-04
+**Status**: Phase 4 Complete - Production Ready with Session Persistence + Watchdog
+**Last Updated**: 2025-12-27
 
 ---
 
@@ -281,6 +281,8 @@ Update trading strategy (experimental mode only).
 #### 11. `wait_for`
 Agent controls its own timing (max 24 hours).
 
+**⚠️ CRITICAL**: Agents MUST call `wait_for()` at the end of every turn. Failure to do so causes the agent to freeze indefinitely.
+
 **Parameters**:
 - `duration_minutes` (required): How long to sleep (max 1440)
 - `reason` (optional): Why waiting (logged)
@@ -290,13 +292,16 @@ Agent controls its own timing (max 24 hours).
 - `wait_for(240, "Letting position develop")`
 - `wait_for(15, "High volatility, checking frequently")`
 
-**System Prompt Guidance**:
+**System Prompt Enforcement**:
 ```
-PATIENCE & TIMING:
-- Markets need time to develop. Don't overthink or overquery.
-- After entering with SL/TP, wait hours. Let it play out.
+2. **ALWAYS END WITH wait_for()** - You MUST call wait_for() at the end of every turn.
+   - After executing a trade → wait_for() to monitor
+   - After analyzing and deciding not to trade → wait_for() until next check
+   - This is CRITICAL. If you don't call wait_for(), you will freeze.
+```
+
+**Timing Guidance**:
 - Volatile: 15-30 min | Normal: 1-2 hours | Position running: 4-6 hours
-```
 
 ---
 
@@ -408,10 +413,11 @@ CREATE TABLE agent_sessions (
 );
 ```
 
-**Health Monitoring**:
+**Health Monitoring & Watchdog**:
 - Agent updates `last_active_at` every 10 messages
-- Can detect hung agents (no activity >30 minutes)
-- Foundation for future auto-restart systems
+- **Agent Watchdog**: `account-monitor` service checks every 5 minutes for stale agents
+- If `last_active_at` > 24 hours, agent is auto-restarted via PM2
+- Prevents agents from getting stuck indefinitely
 
 **Documentation**: See `DOCS/completed/agent-session-resumption-implementation.md` for complete implementation details and testing instructions.
 
@@ -422,9 +428,9 @@ CREATE TABLE agent_sessions (
 ### Environment Variables
 
 ```bash
-# Agent Model (testing vs production)
-AGENT_MODEL=claude-sonnet-4-5-20250929  # Smartest for agents ($3/$15 per MTok)
-# AGENT_MODEL=claude-haiku-4-5-20251001  # Cheaper for testing ($1/$5 per MTok)
+# Agent Model
+AGENT_MODEL=claude-opus-4-5-20251101  # Production: Opus 4.5 (best reasoning)
+# AGENT_MODEL=claude-sonnet-4-5-20250929  # Alternative: Sonnet 4.5 (faster, cheaper)
 
 # Redis for message queues
 REDIS_URL=redis://localhost:6379
@@ -909,10 +915,16 @@ python agent/run_agent.py --config-id=<symphony-config> --mode=autonomous
 
 ## 🎯 Current Limitations & Known Issues
 
-1. **Single Agent Per Bot**: Multi-agent support (closure pattern) planned for Phase 4
+1. **Single Agent Per Bot**: Multi-agent support planned for future phases
 2. **Symphony Integration**: Pending API fixes (balance endpoint) - see Symphony section for details
 3. **Session Longevity**: Unknown if sessions expire after extended periods (needs testing)
-4. **Frontend Integration**: Agent chat UI complete, but strategy builder UX pending refinement
+
+**Fixed in 2025-12-27**:
+- ✅ **Agent Freeze Bug**: Agents would freeze if they ended a turn without calling `wait_for()`. System prompt now enforces this rule.
+- ✅ **Agent Watchdog**: Auto-restart for stale agents (>24h inactive) via account-monitor service
+- ✅ **Model Upgrade**: Switched to Opus 4.5 (`claude-opus-4-5-20251101`) for better reasoning
+- ✅ **System Prompt Cleanup**: Removed deprecated strategy_definition mode, streamlined prompts
+- ✅ **Observation Tool Logging**: Better error handling and logging for `record_trade_observation` and `query_trade_observations`
 
 **Fixed in 2025-11-13**:
 - ✅ **Trading Mode Detection**: Agent now correctly loads trading_mode from database (was: always started in paper mode)
