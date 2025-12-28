@@ -43,8 +43,22 @@ async def get_unified_dashboard_data(user_id: str) -> Dict[str, Any]:
             for bot in db_data['bots']:
                 _enhance_bot_with_runtime_data(bot)
 
-        # NOTE: Account data now comes from account_snapshots table (written by UniversalAccountMonitor)
-        # No need to enrich live positions/accounts - already handled by background monitor
+        # Enrich Symphony/Aster positions with live API data
+        # account_snapshots handles account-level metrics, but individual positions
+        # need enrichment because the DB query returns NULL for live position details
+        if db_data.get('bots') and db_data.get('positions'):
+            enriched_positions, enriched_accounts = await _enrich_live_positions_and_accounts(
+                db_data.get('bots', []),
+                db_data.get('positions', []),
+                db_data.get('accounts', [])
+            )
+            db_data['positions'] = enriched_positions
+            # Merge enriched accounts (don't replace, as paper accounts come from DB)
+            if enriched_accounts:
+                existing_config_ids = {a.get('config_id') for a in db_data.get('accounts', [])}
+                for account in enriched_accounts:
+                    if account.get('config_id') not in existing_config_ids:
+                        db_data['accounts'].append(account)
 
         return db_data
 
@@ -373,10 +387,10 @@ async def _enrich_live_positions_and_accounts(
             # Extract positions (odd indices: 1, 3, 5, ...)
             positions_result = results[i * 2 + 1]
             if isinstance(positions_result, list):
-                # Remove placeholder live positions from DB (they have NULL fields)
+                # Remove placeholder symphony positions from DB (they have NULL fields)
                 enriched_positions = [
                     p for p in enriched_positions
-                    if not (p.get('config_id') == config_id and p.get('source') == 'live')
+                    if not (p.get('config_id') == config_id and p.get('source') == 'symphony')
                 ]
 
                 # Add enriched Symphony positions
@@ -387,14 +401,18 @@ async def _enrich_live_positions_and_accounts(
                         'symbol': pos.get('symbol'),
                         'side': pos.get('side'),
                         'size_usd': pos.get('size_usd'),
+                        'collateral': pos.get('collateral'),  # Actual margin/collateral deployed
                         'entry_price': pos.get('entry_price'),
                         'current_price': pos.get('current_price'),
                         'unrealized_pnl': pos.get('unrealized_pnl'),
+                        'pnl_percentage': pos.get('pnl_percentage'),
                         'opened_at': pos.get('opened_at'),
                         'stop_loss': pos.get('stop_loss'),
                         'take_profit': pos.get('take_profit'),
+                        'liquidation_price': pos.get('liquidation_price'),
                         'leverage': pos.get('leverage'),
-                        'source': 'live'
+                        'status': pos.get('status', 'Open'),
+                        'source': 'symphony'  # Match frontend expectations for close routing
                     })
             elif isinstance(positions_result, Exception):
                 logger.warning(f"Failed to fetch Symphony positions for {config_id}: {positions_result}")

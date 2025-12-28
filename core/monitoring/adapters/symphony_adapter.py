@@ -62,21 +62,25 @@ class SymphonyAccountAdapter(AccountAdapter):
             num_open_positions = len(open_positions_list) if open_positions_list else 0
 
             # Calculate position metrics from open positions
-            position_value = Decimal('0')
+            # Now using collateralAmount for accurate margin tracking
+            position_value = Decimal('0')  # Total notional position size
             unrealized_pnl = Decimal('0')
+            margin_used = Decimal('0')  # Total collateral deployed
 
             if open_positions_list:
                 for pos in open_positions_list:
                     pos_value = Decimal(str(pos.get('size_usd', 0)))
                     pos_pnl = Decimal(str(pos.get('unrealized_pnl', 0)))
+                    pos_collateral = Decimal(str(pos.get('collateral', 0)))
                     position_value += pos_value
                     unrealized_pnl += pos_pnl
+                    margin_used += pos_collateral
 
             # Calculate realized P&L (total - unrealized)
             realized_pnl = total_pnl - unrealized_pnl
 
-            # Note: Symphony doesn't provide balance, margin, or advanced stats yet
-            # We'll fill these in when their API supports it
+            # Note: Symphony doesn't provide account balance yet
+            # But we now have margin_used from collateralAmount
 
             # Create snapshot
             snapshot = AccountSnapshot(
@@ -87,7 +91,7 @@ class SymphonyAccountAdapter(AccountAdapter):
                 timestamp=datetime.now(timezone.utc),
                 current_balance=None,  # Not available from Symphony API yet
                 available_balance=None,
-                margin_used=None,
+                margin_used=margin_used if margin_used > 0 else None,  # From collateralAmount
                 total_pnl=total_pnl,
                 realized_pnl=realized_pnl,
                 unrealized_pnl=unrealized_pnl,
@@ -105,7 +109,9 @@ class SymphonyAccountAdapter(AccountAdapter):
                 raw_data={
                     'metrics': metrics,
                     'source': 'symphony_api',
-                    'balance_available': False  # Flag for when balance API is added
+                    'balance_available': False,  # Flag for when balance API is added
+                    'margin_available': True,  # We now have collateralAmount from /agent/positions
+                    'total_collateral': float(margin_used) if margin_used else 0
                 }
             )
 

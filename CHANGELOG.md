@@ -22,6 +22,10 @@ Complete history of features, fixes, and improvements. For current status see AC
 - Added `TIMEFRAME_TTL` mapping: 5m-30m=1h, 1h=2h, 4h=5h, 1d=25h, 1w=7.5d
 - All timeframes now maintain 200 candles (verified: BTC/USDT all TFs populated)
 
+**Minor Fixes**
+- KC indicator alias: Added `kc→keltner` mapping in indicators.py (configs use 'KC', code expected 'keltner')
+- Volume log wording: Fixed "-99.5% above average" → "99.5% below average" in decision engine logs
+
 ---
 
 ## 2025-12-27 - Arena Activity Timeline + TradeSettings Fix

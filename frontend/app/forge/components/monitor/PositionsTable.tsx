@@ -10,15 +10,18 @@ interface Position {
   symbol: string
   side: string
   size_usd: number
+  collateral?: number  // Actual margin/collateral deployed (from Symphony collateralAmount)
   entry_price: number
   current_price: number
   unrealized_pnl: number
+  pnl_percentage?: number  // P&L as percentage (from Symphony pnlPercentage)
   status: string
   opened_at: string
   stop_loss?: number
   take_profit?: number
+  liquidation_price?: number  // Liquidation price (from Symphony)
   leverage: number
-  source?: 'paper' | 'live' | 'aster'  // Track position source
+  source?: 'paper' | 'live' | 'symphony' | 'aster'  // Track position source
 }
 
 interface PositionsTableProps {
@@ -77,8 +80,8 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
     return `${sign}${change.toFixed(2)}%`
   }
 
-  // Handle closing a position (paper, live, or aster)
-  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' | 'aster' = 'paper') => {
+  // Handle closing a position (paper, symphony, or aster)
+  const handleClosePosition = async (positionId: string, source: 'paper' | 'live' | 'symphony' | 'aster' = 'paper') => {
     if (!selectedConfigId) {
       console.error('No config ID selected')
       return
@@ -94,7 +97,7 @@ export function PositionsTable({ positions = [], className = '', selectedConfigI
       const headers = await apiClient.getAuthHeaders()
       const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
 
-      if (source === 'live') {
+      if (source === 'live' || source === 'symphony') {
         // Close live position via Symphony
         const response = await fetch(`${baseUrl}/api/v2/positions/live/${positionId}/close`, {
           method: 'POST',

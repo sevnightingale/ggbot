@@ -522,8 +522,8 @@ class SymphonyLiveTradingService:
                 return []
 
             # Step 4: Map Symphony positions to our format
-            # Symphony returns: {asset, isLong, entryPrice, currentPrice, pnlUSD, ...}
-            # We need: {symbol, side, entry_price, current_price, unrealized_pnl, ...}
+            # Symphony returns: {asset, isLong, entryPrice, currentPrice, pnlUSD, collateralAmount, ...}
+            # We need: {symbol, side, entry_price, current_price, unrealized_pnl, collateral, ...}
             positions = []
             for batch_id, created_at in open_trades:
                 # Find matching Symphony position by batch_id
@@ -536,11 +536,15 @@ class SymphonyLiveTradingService:
                         'entry_price': symphony_pos.get('entryPrice', 0),
                         'current_price': symphony_pos.get('currentPrice', 0),
                         'unrealized_pnl': symphony_pos.get('pnlUSD', 0),
+                        'pnl_percentage': symphony_pos.get('pnlPercentage', 0),
                         'opened_at': symphony_pos.get('createdTimestamp'),  # Use Symphony's timestamp, not our DB
-                        'size_usd': symphony_pos.get('positionSize', 0),  # Symphony uses positionSize not sizeUSD
+                        'size_usd': symphony_pos.get('positionSize', 0),  # Symphony uses positionSize (notional)
+                        'collateral': symphony_pos.get('collateralAmount', 0),  # Actual margin/collateral used
                         'leverage': symphony_pos.get('leverage', 1),
                         'stop_loss': symphony_pos.get('slPrice', 0) if symphony_pos.get('slPrice', 0) > 0 else None,
-                        'take_profit': symphony_pos.get('tpPrice', 0) if symphony_pos.get('tpPrice', 0) > 0 else None
+                        'take_profit': symphony_pos.get('tpPrice', 0) if symphony_pos.get('tpPrice', 0) > 0 else None,
+                        'liquidation_price': symphony_pos.get('liquidationPrice', 0) if symphony_pos.get('liquidationPrice', 0) > 0 else None,
+                        'status': symphony_pos.get('status', 'Open')
                     })
 
             return positions
