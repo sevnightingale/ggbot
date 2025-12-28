@@ -58,8 +58,8 @@ const formatPercent = (value: number | null | undefined): string => {
 
 const formatPnL = (value: number | null | undefined): string => {
   if (value == null) return '—'
-  const sign = value >= 0 ? '+' : ''
-  return `${sign}$${value.toFixed(2)}`
+  if (value >= 0) return `+$${value.toFixed(2)}`
+  return `-$${Math.abs(value).toFixed(2)}`
 }
 
 // Get activity type info
@@ -555,28 +555,25 @@ export default function ActivityModal({
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           />
 
-          {/* Modal - Fixed position, centered, with proper height constraints */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1, x: swipeDirection === 'left' ? -10 : swipeDirection === 'right' ? 10 : 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed z-50 flex flex-col rounded-xl border-2 overflow-hidden"
-            style={{
-              backgroundColor: VIBE.carbon,
-              borderColor: VIBE.brass,
-              // Mobile: full width with margins
-              // Desktop: centered fixed size
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)',
-              width: 'min(calc(100vw - 32px), 500px)',
-              maxHeight: 'min(calc(100vh - 64px), 700px)',
-            }}
-            onTouchStart={handleTouchStart}
-            onTouchMove={handleTouchMove}
-            onTouchEnd={handleTouchEnd}
-          >
+          {/* Centering wrapper - uses flexbox so transform can be used by Framer Motion */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
+            {/* Modal */}
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1, x: swipeDirection === 'left' ? -10 : swipeDirection === 'right' ? 10 : 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              className="flex flex-col rounded-xl border-2 overflow-hidden pointer-events-auto"
+              style={{
+                backgroundColor: VIBE.carbon,
+                borderColor: VIBE.brass,
+                width: 'min(calc(100vw - 32px), 500px)',
+                maxHeight: 'min(calc(100vh - 64px), 700px)',
+              }}
+              onTouchStart={handleTouchStart}
+              onTouchMove={handleTouchMove}
+              onTouchEnd={handleTouchEnd}
+            >
             {/* Header with navigation */}
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: VIBE.hair }}>
               {/* Prev button */}
@@ -655,7 +652,8 @@ export default function ActivityModal({
               <span className="hidden md:inline">Use ← → arrows to navigate • Esc to close</span>
               <span className="md:hidden">Swipe left/right to navigate • Tap outside to close</span>
             </div>
-          </motion.div>
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>
