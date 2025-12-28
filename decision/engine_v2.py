@@ -1813,11 +1813,13 @@ Take Profit: {take_profit_text}
             volume_analysis = f"""Timeframe: {timeframe} | Period: {period_used} candles
 Current Volume: {current_volume:,.0f} (last completed {timeframe} candle)
 Average Volume: {average_volume:,.0f} ({period_used}-period average)
-Volume Ratio: {volume_ratio:.2f}x | Above Average: {volume_increase_pct:+.1f}%
+Volume Ratio: {volume_ratio:.2f}x | vs Average: {volume_increase_pct:+.1f}%
 Confirmation Level: {confidence_level} - {confidence_desc}"""
-            
+
+            # Log with correct wording for above/below average
+            direction = "above" if volume_increase_pct >= 0 else "below"
             logger.bind(config_id=self.config_id, user_id=self.user_id).info(
-                f"Volume analysis for {symbol} ({timeframe}, {period_used} periods): {volume_increase_pct:+.1f}% above average ({confidence_level})"
+                f"Volume analysis for {symbol} ({timeframe}, {period_used} periods): {abs(volume_increase_pct):.1f}% {direction} average ({confidence_level})"
             )
             
             return volume_analysis

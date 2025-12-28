@@ -607,120 +607,131 @@ class TechnicalIndicators:
             Dictionary with results for each indicator
         """
         results = {}
-        
+
+        # Indicator name aliases for common abbreviations
+        aliases = {
+            "kc": "keltner",
+            "dc": "donchian",
+            "bb": "bbands",
+            "bbw": "bbwidth"
+        }
+
         for indicator in indicators:
             try:
-                if indicator.lower() == "rsi":
+                # Normalize indicator name using aliases
+                normalized = aliases.get(indicator.lower(), indicator.lower())
+
+                if normalized == "rsi":
                     length = params.get("rsi_length", 14)
                     results["rsi"] = self.calculate_rsi(df, length)
                 
-                elif indicator.lower() == "macd":
+                elif normalized == "macd":
                     fast = params.get("macd_fast", 12)
                     slow = params.get("macd_slow", 26)
                     signal = params.get("macd_signal", 9)
                     results["macd"] = self.calculate_macd(df, fast, slow, signal)
                 
-                elif indicator.lower() == "sma":
+                elif normalized == "sma":
                     length = params.get("sma_length", 20)
                     results["sma"] = self.calculate_sma(df, length)
                 
-                elif indicator.lower() == "ema":
+                elif normalized == "ema":
                     length = params.get("ema_length", 20)
                     results["ema"] = self.calculate_ema(df, length)
                 
-                elif indicator.lower() == "bollinger_bands":
+                elif normalized == "bollinger_bands":
                     length = params.get("bb_length", 20)
                     std = params.get("bb_std", 2.0)
                     results["bollinger_bands"] = self.calculate_bollinger_bands(df, length, std)
                 
-                elif indicator.lower() == "stochastic":
+                elif normalized == "stochastic":
                     k = params.get("stoch_k", 14)
                     d = params.get("stoch_d", 3)
                     results["stochastic"] = self.calculate_stochastic(df, k, d)
                 
-                elif indicator.lower() == "williams_r":
+                elif normalized == "williams_r":
                     length = params.get("williams_r_length", 14)
                     results["williams_r"] = self.calculate_williams_r(df, length)
                 
-                elif indicator.lower() in ["bb", "bollinger_bands"]:
+                elif normalized in ["bb", "bbands", "bollinger_bands"]:
                     length = params.get("bb_length", 20)
                     std = params.get("bb_std", 2.0)
                     results["bollinger_bands"] = self.calculate_bollinger_bands(df, length, std)
                 
-                elif indicator.lower() == "atr":
+                elif normalized == "atr":
                     length = params.get("atr_length", 14)
                     results["atr"] = self.calculate_atr(df, length)
                 
-                elif indicator.lower() == "adx":
+                elif normalized == "adx":
                     length = params.get("adx_length", 14)
                     results["adx"] = self.calculate_adx(df, length)
                 
-                elif indicator.lower() == "aroon":
+                elif normalized == "aroon":
                     length = params.get("aroon_length", 14)
                     results["aroon"] = self.calculate_aroon(df, length)
 
-                elif indicator.lower() == "bbands":
+                elif normalized == "bbands":
                     length = params.get("bbands_length", 20)
                     std = params.get("bbands_std", 2.0)
                     results["bbands"] = self.calculate_bollinger_bands(df, length, std)
 
-                elif indicator.lower() == "bbwidth":
+                elif normalized == "bbwidth":
                     length = params.get("bbwidth_length", 20)
                     std = params.get("bbwidth_std", 2.0)
                     results["bbwidth"] = self.calculate_bollinger_band_width(df, length, std)
 
-                elif indicator.lower() == "cci":
+                elif normalized == "cci":
                     length = params.get("cci_length", 20)
                     results["cci"] = self.calculate_cci(df, length)
 
-                elif indicator.lower() == "donchian":
+                elif normalized == "donchian":
                     length = params.get("donchian_length", 20)
                     results["donchian"] = self.calculate_donchian_channels(df, length)
 
-                elif indicator.lower() == "keltner":
+                elif normalized == "keltner":
                     length = params.get("keltner_length", 20)
                     multiplier = params.get("keltner_multiplier", 2.0)
                     results["keltner"] = self.calculate_keltner_channels(df, length, multiplier)
 
-                elif indicator.lower() == "mfi":
+                elif normalized == "mfi":
                     length = params.get("mfi_length", 14)
                     results["mfi"] = self.calculate_mfi(df, length)
 
-                elif indicator.lower() == "obv":
+                elif normalized == "obv":
                     results["obv"] = self.calculate_obv(df)
 
-                elif indicator.lower() == "psar":
+                elif normalized == "psar":
                     af_start = params.get("psar_af_start", 0.02)
                     af_increment = params.get("psar_af_increment", 0.02)
                     af_max = params.get("psar_af_max", 0.2)
                     results["psar"] = self.calculate_psar(df, af_start, af_increment, af_max)
 
-                elif indicator.lower() == "roc":
+                elif normalized == "roc":
                     length = params.get("roc_length", 10)
                     results["roc"] = self.calculate_roc(df, length)
 
-                elif indicator.lower() == "trix":
+                elif normalized == "trix":
                     length = params.get("trix_length", 14)
                     results["trix"] = self.calculate_trix(df, length)
 
-                elif indicator.lower() == "vortex":
+                elif normalized == "vortex":
                     length = params.get("vortex_length", 14)
                     results["vortex"] = self.calculate_vortex(df, length)
 
-                elif indicator.lower() == "vwap":
+                elif normalized == "vwap":
                     anchor = params.get("vwap_anchor", "D")
                     results["vwap"] = self.calculate_vwap(df, anchor)
 
-                elif indicator.lower() == "bbw":
+                elif normalized == "bbw":
                     length = params.get("bbw_length", 20)
                     std = params.get("bbw_std", 2.0)
                     results["bbw"] = self.calculate_bollinger_band_width(df, length, std)
 
-                elif indicator.lower() == "dc":
+                elif normalized == "dc":
                     length = params.get("dc_length", 20)
                     results["dc"] = self.calculate_donchian_channels(df, length)
 
-                elif indicator.lower() == "ggshot":
+                elif normalized == "ggshot":
                     # ggshot is a signal, not a technical indicator - skip gracefully
                     self._log.debug(f"Skipping '{indicator}' - signals are not calculated in extraction phase")
                     continue

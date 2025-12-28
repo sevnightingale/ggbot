@@ -15,7 +15,7 @@ import os
 import asyncio
 import json
 from typing import Any, Dict, List, Optional
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from loguru import logger
 import redis.asyncio as redis
 
@@ -931,7 +931,7 @@ async def wait_for(args: Dict[str, Any]) -> Dict[str, Any]:
         duration_minutes = min(args["duration_minutes"], 1440)  # Cap at 24 hours
         reason = args.get("reason", "No reason provided")
 
-        next_check = datetime.utcnow() + timedelta(minutes=duration_minutes)
+        next_check = datetime.now(timezone.utc) + timedelta(minutes=duration_minutes)
 
         logger.info(f"Agent waiting {duration_minutes}m: {reason}")
 

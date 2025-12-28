@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { RefreshCw, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
@@ -131,6 +131,12 @@ function ArenaContent() {
   const [error, setError] = useState<string | null>(null)
   const [hours, setHours] = useState(504)
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
+  const [mounted, setMounted] = useState(false)
+
+  // Fix hydration mismatch - only calculate date-based values on client
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const toggleCard = (configId: string) => {
     setExpandedCards(prev => {
@@ -208,23 +214,29 @@ function ArenaContent() {
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
   }
 
-  const chartData = getChartData()
+  // Memoize expensive calculations to avoid re-computing on accordion toggle
+  const chartData = useMemo(() => getChartData(), [data])
 
-  // Competition timeline
+  // Competition timeline - static dates (no hydration mismatch)
   const competitionStart = new Date('2025-12-18T00:00:00Z')
   const competitionEnd = new Date('2026-01-08T00:00:00Z') // 21 days later
-  const today = new Date()
-  const daysSinceStart = Math.max(0, Math.floor((today.getTime() - competitionStart.getTime()) / (1000 * 60 * 60 * 24)))
   const totalDays = 21
-  const daysRemaining = Math.max(0, totalDays - daysSinceStart)
-  const progressPercent = Math.min(100, Math.max(0, (daysSinceStart / totalDays) * 100))
 
-  // Chart domain timestamps for fixed x-axis
+  // Chart domain timestamps for fixed x-axis (static, safe for SSR)
   const chartDomainStart = competitionStart.getTime()
   const chartDomainEnd = competitionEnd.getTime()
 
-  // Sort bots by equity for rankings
-  const rankedBots = data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
+  // Dynamic values - only calculate on client to avoid hydration mismatch
+  const daysSinceStart = mounted
+    ? Math.max(0, Math.floor((Date.now() - competitionStart.getTime()) / (1000 * 60 * 60 * 24)))
+    : 0
+  const daysRemaining = Math.max(0, totalDays - daysSinceStart)
+  const progressPercent = Math.min(100, Math.max(0, (daysSinceStart / totalDays) * 100))
+
+  // Sort bots by equity for rankings (memoized)
+  const rankedBots = useMemo(() =>
+    data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
+  , [data])
 
   // Get color for a bot by its original index
   const getBotColor = (botName: string) => {
