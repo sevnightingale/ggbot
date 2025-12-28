@@ -101,15 +101,26 @@ function getActivityTypeInfo(activity: Activity): { label: string; icon: string;
 function TradeEntryContent({ activity }: { activity: Activity }) {
   const details = activity.data.details || {}
   const isLong = details.side === 'long'
+  const symbol = details.symbol || activity.data.symbol || 'N/A'
 
   return (
     <div className="space-y-4">
+      {/* Symbol and Side hero */}
+      <div className="text-center p-3 rounded-lg" style={{ backgroundColor: isLong ? 'rgba(22, 163, 74, 0.15)' : 'rgba(220, 38, 38, 0.15)' }}>
+        <div className="text-2xl font-bold" style={{ color: isLong ? '#16a34a' : '#dc2626' }}>
+          {isLong ? '↑ LONG' : '↓ SHORT'}
+        </div>
+        <div className="text-sm mt-1" style={{ color: VIBE.signal }}>{String(symbol)}</div>
+      </div>
+
       {/* Main trade info card */}
       <div className="grid grid-cols-2 gap-3">
-        <InfoCard label="Side" value={isLong ? 'LONG' : 'SHORT'} color={isLong ? '#16a34a' : '#dc2626'} />
         <InfoCard label="Entry Price" value={formatPrice(Number(details.entry_price))} />
         <InfoCard label="Position Size" value={formatPrice(Number(details.size_usd))} />
         <InfoCard label="Leverage" value={`${details.leverage || 1}x`} />
+        {details.margin_used != null && (
+          <InfoCard label="Margin" value={formatPrice(Number(details.margin_used))} />
+        )}
       </div>
 
       {/* Confidence bar */}
@@ -135,29 +146,36 @@ function TradeEntryContent({ activity }: { activity: Activity }) {
         </div>
       )}
 
-      {/* Risk levels */}
+      {/* Risk levels - check both naming conventions */}
       <div className="grid grid-cols-2 gap-3">
-        {details.stop_loss != null && (
+        {(details.stop_loss != null || details.stop_loss_price != null) && (
           <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)' }}>
             <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.ember }}>
               Stop Loss
             </div>
             <div className="font-mono" style={{ color: VIBE.ember }}>
-              {formatPrice(Number(details.stop_loss))}
+              {formatPrice(Number(details.stop_loss || details.stop_loss_price))}
             </div>
           </div>
         )}
-        {details.take_profit != null && (
+        {(details.take_profit != null || details.take_profit_price != null) && (
           <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(60, 166, 224, 0.1)' }}>
             <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.signal }}>
               Take Profit
             </div>
             <div className="font-mono" style={{ color: VIBE.signal }}>
-              {formatPrice(Number(details.take_profit))}
+              {formatPrice(Number(details.take_profit || details.take_profit_price))}
             </div>
           </div>
         )}
       </div>
+
+      {/* Liquidation price if available */}
+      {details.liquidation_price != null && (
+        <div className="text-sm text-center" style={{ color: VIBE.ember }}>
+          Liquidation: {formatPrice(Number(details.liquidation_price))}
+        </div>
+      )}
     </div>
   )
 }
@@ -166,9 +184,26 @@ function TradeExitContent({ activity }: { activity: Activity }) {
   const details = activity.data.details || {}
   const pnl = Number(details.pnl || 0)
   const isProfit = pnl >= 0
+  const isLong = details.side === 'long'
+  const symbol = details.symbol || activity.data.symbol || 'N/A'
+
+  // Format duration nicely
+  const formatDuration = (seconds: number) => {
+    const hours = Math.floor(seconds / 3600)
+    const mins = Math.floor((seconds % 3600) / 60)
+    if (hours > 0) return `${hours}h ${mins}m`
+    return `${mins}m`
+  }
 
   return (
     <div className="space-y-4">
+      {/* Symbol and result header */}
+      <div className="text-center">
+        <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
+          {isLong ? 'LONG' : 'SHORT'} {String(symbol)}
+        </div>
+      </div>
+
       {/* P&L Hero */}
       <div className="p-4 rounded-lg text-center" style={{ backgroundColor: isProfit ? 'rgba(22, 163, 74, 0.15)' : 'rgba(220, 38, 38, 0.15)' }}>
         <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
@@ -188,14 +223,24 @@ function TradeExitContent({ activity }: { activity: Activity }) {
       <div className="grid grid-cols-2 gap-3">
         <InfoCard label="Entry" value={formatPrice(Number(details.entry_price))} />
         <InfoCard label="Exit" value={formatPrice(Number(details.exit_price))} />
+        {details.size_usd != null && (
+          <InfoCard label="Size" value={formatPrice(Number(details.size_usd))} />
+        )}
+        {details.leverage != null && (
+          <InfoCard label="Leverage" value={`${details.leverage}x`} />
+        )}
+      </div>
+
+      {/* Duration and close reason */}
+      <div className="grid grid-cols-2 gap-3">
         {details.duration_seconds != null && (
           <InfoCard
             label="Duration"
-            value={`${Math.floor(Number(details.duration_seconds) / 60)}m`}
+            value={formatDuration(Number(details.duration_seconds))}
           />
         )}
         {details.close_reason != null && (
-          <InfoCard label="Reason" value={String(details.close_reason).replace(/_/g, ' ')} />
+          <InfoCard label="Close Reason" value={String(details.close_reason).replace(/_/g, ' ')} />
         )}
       </div>
 
@@ -510,14 +555,24 @@ export default function ActivityModal({
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           />
 
-          {/* Modal */}
+          {/* Modal - Fixed position, centered, with proper height constraints */}
           <motion.div
-            initial={{ opacity: 0, scale: 0.95, y: 20 }}
-            animate={{ opacity: 1, scale: 1, y: 0, x: swipeDirection === 'left' ? -10 : swipeDirection === 'right' ? 10 : 0 }}
-            exit={{ opacity: 0, scale: 0.95, y: 20 }}
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1, x: swipeDirection === 'left' ? -10 : swipeDirection === 'right' ? 10 : 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className="fixed inset-4 md:inset-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-full md:max-w-lg md:max-h-[80vh] z-50 flex flex-col rounded-xl border-2 overflow-hidden"
-            style={{ backgroundColor: VIBE.carbon, borderColor: VIBE.brass }}
+            className="fixed z-50 flex flex-col rounded-xl border-2 overflow-hidden"
+            style={{
+              backgroundColor: VIBE.carbon,
+              borderColor: VIBE.brass,
+              // Mobile: full width with margins
+              // Desktop: centered fixed size
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)',
+              width: 'min(calc(100vw - 32px), 500px)',
+              maxHeight: 'min(calc(100vh - 64px), 700px)',
+            }}
             onTouchStart={handleTouchStart}
             onTouchMove={handleTouchMove}
             onTouchEnd={handleTouchEnd}
