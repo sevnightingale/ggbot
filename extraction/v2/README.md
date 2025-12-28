@@ -27,7 +27,7 @@ extraction/v2/
 ├── __init__.py                     # Module exports
 ├── README.md                       # This documentation
 ├── extraction_engine.py            # Main orchestration engine
-├── data_client.py                  # Hummingbot API integration
+├── data_client.py                  # Market data client (WebSocket/REST)
 ├── indicators.py                   # Core pandas-ta calculations
 ├── preprocessor.py                 # Preprocessor router and factory
 ├── file_storage.py                 # JSON file storage system
@@ -133,18 +133,18 @@ print(f"Overall Status: {test_results['overall_status']}")
 - `extract_for_config()` - Configuration-driven extraction
 - `test_system()` - System health verification
 
-### **2. HummingbotDataClient** (`data_client.py`)
-**High-performance API client for market data fetching.**
+### **2. MarketDataClient** (`data_client.py`)
+**High-performance client for market data fetching via WebSocket cache and REST fallback.**
 
 **Features:**
-- Async HTTP client with connection pooling
+- WebSocket-first architecture (Binance streams via Redis cache)
+- REST API fallback for missing data
 - Automatic retry logic with exponential backoff
-- Multiple exchange connector support
-- Comprehensive error handling
+- Multi-exchange support for resilience
 - Connection lifecycle management
 
-**Supported Exchanges:**
-- KuCoin, Binance, OKX, Bybit, Gate.io, Kraken, Coinbase Pro, Huobi
+**Primary Source:**
+- Binance WebSocket (market-data-ws PM2 service) → Redis cache
 
 ### **3. TechnicalIndicators** (`indicators.py`) 
 **Core technical analysis engine using pandas-ta.**
@@ -439,8 +439,9 @@ SUPABASE_URL="https://your-project.supabase.co"
 SUPABASE_ANON_KEY="your-anon-key"
 SUPABASE_SERVICE_KEY="your-service-key"
 
-# Hummingbot API Configuration
-HUMMINGBOT_API_URL="http://localhost:8080"  # Default
+# Market Data Configuration (WebSocket + Redis)
+REDIS_HOST="localhost"
+REDIS_PORT="6379"
 ```
 
 ### **Integration with Existing Systems**
@@ -486,7 +487,7 @@ system_test = await engine.test_system()
 ### **Test Coverage**
 
 The system includes comprehensive tests for:
-- **API connectivity** - Hummingbot API connection and data retrieval
+- **API connectivity** - WebSocket/REST market data connection and retrieval
 - **Database connectivity** - Supabase connection and table access  
 - **Indicator calculations** - All 21 preprocessors with various inputs
 - **Storage systems** - File and database storage validation
@@ -754,11 +755,12 @@ class NewIndicatorPreprocessor(BasePreprocessor):
 ### **Common Issues**
 
 #### **Connection Errors**
-```python
-# Check Hummingbot API availability
-async with HummingbotDataClient() as client:
-    test_result = await client.test_connection()
-    print(test_result)
+```bash
+# Check WebSocket market data service
+pm2 status market-data-ws
+
+# Check Redis cache
+redis-cli PING  # Should return PONG
 ```
 
 #### **Database Connection Issues**
@@ -812,7 +814,7 @@ The modular architecture supports easy extension:
 - **Custom storage** - Implement additional storage backends  
 - **Enhanced analysis** - Extend base preprocessor capabilities
 - **Integration hooks** - Connect with external systems
-- **Custom data sources** - Beyond Hummingbot API integration
+- **Custom data sources** - Additional market data integrations
 
 ---
 

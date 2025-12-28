@@ -66,13 +66,18 @@ def get_platform_stats():
             """)
             mode_data = cur.fetchall()
             stats['active_paper_bots'] = 0
-            stats['active_live_bots'] = 0
+            stats['active_symphony_bots'] = 0
+            stats['active_aster_bots'] = 0
             for row in mode_data:
                 mode = row[0] or 'paper'
-                if mode == 'live':
-                    stats['active_live_bots'] = row[1]
-                else:
+                if mode == 'paper':
                     stats['active_paper_bots'] = row[1]
+                elif mode == 'symphony':
+                    stats['active_symphony_bots'] = row[1]
+                elif mode == 'aster':
+                    stats['active_aster_bots'] = row[1]
+            # Combined live count for backward compatibility
+            stats['active_live_bots'] = stats['active_symphony_bots'] + stats['active_aster_bots']
 
             # Trading activity
             cur.execute("""
@@ -203,7 +208,8 @@ def print_status_report(stats):
     print(f"Total Bots Created: {stats['total_bots']}")
     print(f"  Active: {stats['active_bots']} ({stats['active_bots']/stats['total_bots']*100:.1f}%)")
     print(f"    Paper: {stats['active_paper_bots']}")
-    print(f"    Live: {stats['active_live_bots']}")
+    print(f"    Symphony: {stats['active_symphony_bots']}")
+    print(f"    Aster: {stats['active_aster_bots']}")
     print(f"  Inactive: {stats['inactive_bots']}")
     print(f"Avg Bots per User: {stats['total_bots']/stats['users_with_bots']:.1f}")
 
@@ -962,8 +968,9 @@ def update_active_md(stats):
         "### Bot Statistics",
         f"- **Total Bots**: {stats['total_bots']}",
         f"- **Active Bots**: {stats['active_bots']} ({stats['active_bots']/stats['total_bots']*100:.1f}%)",
-        f"  - Paper Trading: {stats['active_paper_bots']}",
-        f"  - Live Trading: {stats['active_live_bots']}",
+        f"  - Paper: {stats['active_paper_bots']}",
+        f"  - Symphony (Live): {stats['active_symphony_bots']}",
+        f"  - Aster (DEX): {stats['active_aster_bots']}",
         f"- **Inactive Bots**: {stats['inactive_bots']}",
         f"- **Avg Bots per User**: {stats['total_bots']/stats['users_with_bots']:.1f}",
         "",

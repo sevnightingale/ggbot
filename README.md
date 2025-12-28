@@ -223,10 +223,18 @@ The ggbot repository is organized into the following top-level directories:
 
 ### **[Documentation System](DOCS/)**
 
-**Complete technical documentation** including:
-- **[Architecture specifications](DOCS/SPEC.md)** with detailed system design
-- **[API documentation](DOCS/API.md)** for all platform endpoints
-- **[Pipeline documentation](DOCS/FLOW.md)** for end-to-end process flows
+**Technical documentation** organized by status:
+
+| Document | Purpose |
+|----------|---------|
+| **[DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md)** | Database architecture decisions and design rationale |
+| **[PREPROCESSOR.md](DOCS/PREPROCESSOR.md)** | Market intelligence preprocessors (21 indicators) |
+| **[RESEND.md](DOCS/RESEND.md)** | Email service integration (Resend) |
+| **[MM.md](DOCS/MM.md)** | Market maker module (Avellaneda-Stoikov) |
+| **[UNIFIED_ACCOUNT_MONITORING.md](DOCS/UNIFIED_ACCOUNT_MONITORING.md)** | Account monitoring architecture |
+| **[ggARENA.md](DOCS/ggARENA.md)** | Arena competition system |
+
+**Subdirectories**: `todo/` (active planning), `completed/` (shipped features), `archive/` (historical reference)
 
 ---
 

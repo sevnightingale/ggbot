@@ -23,181 +23,6 @@ See planning doc for complete provider-specific instructions and verification st
 
 ---
 
-## 🏆 **HIGH PRIORITY - ggArena Bot Preparation** (2025-12-18)
-
-**Status**: ✅ COMPLETE (Tasks 1 & 2) - Ready for activation
-**Completed**: 2025-12-19
-
-### ~~Task 1: Strategy Deep-Dive & Optimization~~ ✅ DONE
-
-- Analyzed Technician: 4/5 big losers = longs against bearish 1H regime → added regime gating
-- Created strategy files: `trading/strategies/*.md` for all 7 bots
-- Added decision→trade linkage docs (paper_trades.decision_id = ENTRY only)
-
-### ~~Task 2: Tune Conservative Bots for Arena Activity~~ ✅ DONE
-
-- Revised all prompts with action bias: 0.55+ threshold (was 0.75+)
-- Removed paralysis language ("pass is default", "wait for perfect clarity")
-- Updated data sources: Compass (8 indicators), Arbiter (5 domains), Contrarian (oscillators+sentiment+funding)
-- Added descriptions + `is_public_performance=TRUE` for all 7 bots
-- The Nomad: Full meta-trader prompt created (adapts to what's working)
-
-**Arena Status**: 7 bots ready, 6 inactive + The Nomad active. Activate when launching competition.
-
----
-
-### **Task 3: Symphony Integration Debug** 🔌
-
-**Status**: BLOCKED - ggSignals making 91 enter decisions but 0 trades executing
-
-**Issue**: Symphony trades may be executing on Symphony side, but API calls failing to track/record them
-
-**Investigation Steps**:
-- [ ] Check Symphony credentials configured for user
-  - Query: `SELECT symphony_vault_id, symphony_smart_account FROM user_profiles WHERE user_id = '<admin_id>'`
-  - Verify vault decryption works
-- [ ] Check ggSignals paper account vs Symphony account
-  - Bot config shows `trading_mode='symphony'` but `paper_accounts` table has $10k
-  - Verify: Does Symphony mode use paper_accounts or live_trades table?
-- [ ] Review Symphony service execution logs
-  - Check: `pm2 logs ggbot | grep -i symphony`
-  - Look for: API call failures, auth errors, position creation failures
-- [ ] Test manual Symphony trade via API
-  - Call: `POST /api/v2/agent/execute-trade` with ggSignals config_id
-  - Verify: Trade executes on Symphony + records in live_trades table
-- [ ] Check decision → trade linking
-  - Query: ggSignals decisions with `decision_id` vs `live_trades.decision_id`
-  - Expected: 91 enter decisions should create 91 live_trades records (if conditions met)
-- [ ] Review Symphony service code
-  - File: `trading/live/symphony_service.py`
-  - Check: execute_trade() method, error handling, batch_id creation
-  - Verify: live_trades INSERT after Symphony API success
-- [ ] Check symbol compatibility
-  - BTC/USDT should be Symphony-compatible (verify in registry)
-  - Check: Symbol conversion BTC/USDT → Symphony format
-- [ ] API endpoint investigation
-  - File: `ggbot.py` orchestrator
-  - Check: Does scheduled_trading + symphony mode route to Symphony service?
-  - Expected flow: decision engine → trading router → symphony_service.execute_trade()
-
-**Potential Issues**:
-1. Symphony credentials not configured (vault_id NULL)
-2. Decision confidence < execution threshold (but 68% seems high enough)
-3. Position sizing calculation failing
-4. Symphony API authentication failing silently
-5. Orchestrator not routing Symphony bots correctly
-6. live_trades table constraint preventing INSERTs
-
-**Testing Plan**:
-- [ ] Activate ggSignals for 1 hour (test mode)
-- [ ] Monitor logs in real-time: `pm2 logs ggbot --lines 100`
-- [ ] Verify: Decision made → Trade execution attempted → Result logged
-- [ ] Check: Any error messages in logs?
-- [ ] Query live_trades table after 1 hour: Any new records?
-
-**Fix Actions** (TBD based on findings):
-- [ ] Configure Symphony credentials if missing
-- [ ] Fix position sizing if failing
-- [ ] Add error handling/logging if silent failures
-- [ ] Update orchestrator routing if misconfigured
-- [ ] Update documentation on Symphony mode behavior
-
-**Success Criteria**:
-- ggSignals makes decision with action='enter'
-- Symphony API receives trade request
-- Trade executes on Symphony (visible in Symphony dashboard)
-- live_trades table records new entry with provider='symphony'
-- Decision links to trade via decision_id
-
----
-
-## ✅ **DEPLOYED - Strategy Advisor (Character Creation UX)** (2025-12-05)
-
-**Status**: 🟢 PRODUCTION READY - Onboarding-focused prompt deployed
-
-### **Implementation Complete**
-- [x] Backend API endpoint: `POST /api/v2/assistant/chat`
-- [x] Claude Haiku 4.5 function calling with 3 tools
-- [x] **NEW**: Adaptive prompt with 4 scenarios (character creation, educational translator, thesis exploration, efficiency mode)
-- [x] **NEW**: Experience-level detection (beginner/intermediate/advanced)
-- [x] **NEW**: Strategy clarity detection (no idea/vague/specific)
-- [x] Bot-type aware system prompts (agent, scheduled, signal_validation)
-- [x] Frontend bottom sheet component (UniversalAIAssistant.tsx)
-- [x] Framer-motion draggable/collapsible UI
-- [x] Integrated into Forge configure pages
-- [x] Auto-refreshes config on AI updates
-- [x] Build test passing (TypeScript, ESLint clean)
-
-### **Character Creation Approach**
-For beginners with no strategy:
-- "Let's create your bot's personality!"
-- Evocative questions: patient vs aggressive, trust crowd vs fade, react to news vs ignore noise
-- Personality archetypes: The Contrarian, Momentum Rider, Patient Sniper
-- Bot naming encouraged
-- Translates personality into executable strategy
-
-### **Features**
-- Works for ALL 3 bot types (agent, scheduled, signal_validation)
-- Adapts conversation based on user experience + strategy clarity
-- Query 32 available data points across 7 categories
-- Load and update full bot configurations
-- Deep merge for partial updates (update just one field)
-- Cost: ~$0.016 per session (~$16/month for 1000 users)
-- Technical accuracy: reasoning_tier (economy/standard/premium), 7 model families
-
-### **Next Steps**
-- [ ] Test on production (Vercel deployment) with new prompt
-- [ ] Monitor Claude API costs and usage
-- [ ] Gather user feedback on character creation UX
-- [ ] A/B test conversion rates (form-based vs character creation)
-- [ ] Consider adding conversation persistence (Redis cache)
-
-### **Files Created/Modified**
-- `api/assistant.py` - Main chat endpoint with function calling
-- `frontend/components/UniversalAIAssistant.tsx` - Bottom sheet UI
-- `frontend/app/forge/page.tsx` - Integration with configure pages
-- `DOCS/todo/strategy_builder_api.md` - Planning documentation
-- `DOCS/archived/strategy_builder_agent_complex.md` - Old complex approach (archived)
-
----
-
-## ✅ **COMPLETE - Admin Dashboard** [ADMIN_DASHBOARD.md]
-
-**Status**: 🟢 COMPLETE (2025-12-05)
-**Planning Doc**: [DOCS/todo/ADMIN_DASHBOARD.md](DOCS/todo/ADMIN_DASHBOARD.md)
-
-**Summary**: Internal admin dashboard at `/admin` for platform management, restricted to admin user ID.
-
-### **Implementation Complete**
-- [x] Backend: `api/admin.py` with 14 endpoints (1084 lines)
-- [x] Platform stats: users, bots, trades, P&L, health
-- [x] PM2/VM/Redis monitoring with services table
-- [x] Billing overview: token usage, provider vs platform costs, unreported amounts
-- [x] User management: search by email, view/edit subscription tiers
-- [x] User detail page: editable fields, bot controls, token usage per bot
-- [x] Bot control: start/stop any bot, reset paper accounts
-- [x] Config editing: JSONB preview (form-based editor deferred)
-- [x] Bot performance comparison: equity curves chart (2025-12-14)
-- [x] Frontend: 4 pages with manual refresh
-- [x] Security: JWT → admin ID check → service role
-- [x] Environment variables set (ADMIN_USER_ID, NEXT_PUBLIC_ADMIN_USER_ID)
-- [x] Build passing, deployed to production
-
-### **Files Created**
-- `api/admin.py` - 14 admin endpoints (~1084 lines)
-- `frontend/app/admin/layout.tsx` - Admin auth check
-- `frontend/app/admin/page.tsx` - Dashboard overview
-- `frontend/app/admin/users/page.tsx` - User search + list
-- `frontend/app/admin/users/[user_id]/page.tsx` - User detail + edit
-- `frontend/app/admin/bots-comparison/page.tsx` - Bot equity comparison chart
-
-### **Next Steps (Optional)**
-- [ ] Form-based config editor (currently shows JSON preview)
-- [ ] Audit logging for admin actions
-- [ ] Multiple admin user support
-
----
-
 ## 🎲 **USX Staking Modal - Bot Competition Betting**
 
 **Status**: 🔵 PLANNING
@@ -205,12 +30,6 @@ For beginners with no strategy:
 **Complexity**: Medium (~6-8 hours)
 
 **Summary**: Gamification feature allowing users to stake USX (Scroll stablecoin) on which bot they think will win competitions. Standard Scroll staking (USX→sUSX) + simple DB record of bot choice. Competition logic deferred.
-
-### **Elegant Architecture**
-- Users stake normally via Scroll's USX/sUSX system (no custom contracts)
-- Modal records: `{ user_id, wallet_address, config_id, usx_amount, tx_hash }`
-- Single table: `usx_stakes`
-- All competition logic (winners, prizes, leaderboards) added later
 
 ### **User Flow**
 1. Click "Stake on Bot" → Modal opens
@@ -252,159 +71,96 @@ For beginners with no strategy:
 - [ ] End-to-end testing
 - [ ] Deploy to Vercel
 
-### **Deferred (Future Work)**
-- Competition logic (winners, prize distribution)
-- Leaderboard UI
-- Competition admin interface
-- Public competition pages
+---
 
-**Why defer**: Already have bot performance tracking via `account_snapshots`. Can determine winners retroactively. Staking mechanism is the hard part.
+## 🎨 **Activity Modal Redesign** [ACTIVITY_MODAL_REDESIGN.md]
+
+**Status**: 🟡 PHASE 1 COMPLETE
+**Planning Doc**: [DOCS/todo/ACTIVITY_MODAL_REDESIGN.md](DOCS/todo/ACTIVITY_MODAL_REDESIGN.md)
+**Complexity**: Medium (~4-6 hours)
+
+**Problem**: Bottom sheet for activity details is poor UX - unformatted text blobs, no navigation between activities, mobile-unfriendly.
+
+**Solution**: Replace with centered modal featuring carousel navigation through activities + structured content formatting.
+
+### **Phase 1: Modal Component (COMPLETE)**
+
+**Modal Navigation**:
+- [x] Created `activity-modal.tsx` - new centered modal component
+- [x] Swipe left/right (mobile) to navigate timeline
+- [x] Arrow keys (desktop) to navigate, Escape to close
+- [x] Visual swipe feedback during gesture
+
+**Content Formatting**:
+- [x] Structured display for each activity type (llm_thought, trade_entry, trade_exit, market_query)
+- [x] Type-specific formatters with proper layout and styling
+- [x] Trades show: entry/exit prices, P&L, duration, confidence, SL/TP
+- [x] LLM thoughts: action, confidence bar, reasoning (will parse structured sections when available)
+- [x] Market queries: collapsible data sections, metadata summary
+
+**Integration**:
+- [x] Integrated with tv-timeline.tsx (replaced bottom-sheet)
+- [x] All activities navigable via single modal
+- [x] Build passes, ready for testing
+
+### **Phase 2: LLM Output Restructure (TODO)**
+
+- [ ] Update prompts to output structured REASONING sections (KEY_SIGNAL, SUPPORTING, RISK, SUMMARY)
+- [ ] Update parser in `decision/engine_v2.py` to extract structured sections
+- [ ] Frontend already supports parsing structured format (will auto-render when available)
+
+See planning doc for full implementation phases and file list.
 
 ---
 
-## 🤖 **Agent - Session Persistence Testing & Monitoring**
+## 📊 **Strategy Advisor Analysis** [STRATEGY_ADVISOR_ANALYSIS.md]
 
-**Status**: Session resumption implemented (2025-11-08), needs production validation
+**Status**: 🔵 PLANNING
+**Planning Doc**: [DOCS/todo/STRATEGY_ADVISOR_ANALYSIS.md](DOCS/todo/STRATEGY_ADVISOR_ANALYSIS.md)
+**Complexity**: Medium-High (~8-12 hours)
 
-- [ ] **Test Crash Recovery**
-  - [ ] Restart live agent, verify session resumption logs
-  - [ ] Test compaction → crash → resume flow
-  - [ ] Validate conversation memory preserved
+**Problem**: Users have no automated way to understand why their bot wins or loses. Must manually browse activities with no statistical analysis or actionable recommendations.
 
-- [ ] **Monitor Session Behavior**
-  - [ ] Test session longevity (does it expire after 24 hours? 7 days?)
-  - [ ] Track health monitoring (`last_active_at` updates)
-  - [ ] Verify no session_id changes after compaction
+**Solution**: Enhance Strategy Advisor with button prompts and automated performance analysis.
 
-- [ ] **Health Check System**
-  - [ ] Implement auto-restart for hung agents (no activity >30 minutes)
-  - [ ] Add alerting for agent failures
-  - [ ] Track tool call frequency and errors
+### **Strategy Advisor Button Prompts**
+- [ ] Replace empty textbox with button grid
+- [ ] "Create Strategy" - Existing chat flow
+- [ ] "Analyze Performance" - Triggers automated analysis
+- [ ] "Improve Config" - Suggests optimizations
 
-- [ ] **Strategy Builder UX Refinement**
-  - [ ] Test real-time collaborative editing (user + agent editing same strategy)
-  - [ ] Verify SSE updates push agent edits to frontend
-  - [ ] Test debounced auto-save (1s delay)
+### **Automated Analysis Engine**
+- [ ] Basic stats: win rate, P&L, R:R ratio, break-even WR needed
+- [ ] Direction analysis: long vs short performance
+- [ ] Market data correlation: which indicator patterns predict wins/losses
+- [ ] Duration analysis: hold times, big loss identification
+- [ ] Confidence calibration: stated confidence vs actual win rate
+- [ ] AI synthesis: generate prioritized recommendations
 
----
+### **Example Output**
+```
+🚨 CRITICAL: Risk/Reward Inverted (0.75:1)
+   Avg win $10.22 vs avg loss $13.58
+   → Recommendation: Tighter stop loss (2-3%)
 
-## ✅ **COMPLETE - Strategy Advisor Unification & Agent Cleanup** [STRATEGY_UNIFICATION.md]
+🚨 CRITICAL: Shorts Underperforming (18% WR)
+   Longs: 37% WR, Shorts: 18% WR
+   → Recommendation: Only take long positions
 
-**Status**: 🟢 COMPLETE (2025-12-04)
-**Planning Doc**: [DOCS/todo/STRATEGY_UNIFICATION.md](DOCS/todo/STRATEGY_UNIFICATION.md)
+📊 PATTERN: 1H MACD Rising + Long = Best setup (42.9% WR)
+```
 
-**Goal**: Unify configuration experience across all bot types using the existing Strategy Advisor API. Remove old PM2-based strategy_definition mode and consolidate strategy fields.
-
-### **Summary of Changes**
-- Agent bots now use the same `ConfigureLayout` + `StrategyAdvisorPanel` as scheduled bots
-- Strategy saved to `decision.user_prompt` for ALL bot types (agent_strategy deprecated)
-- `strategy_definition` mode deprecated in both API and agent runner
-- AgentConfigurator.tsx deleted (old PM2 + Redis polling approach)
-- Build passes ✓
-
-### **Phase 1: Frontend Unification** ✅
-- [x] **Update ConfigureLayout.tsx** - Added `AgentStrategySection` component, agent mode shows simplified UI
-- [x] **Update page.tsx** - Removed AgentConfigurator routing, cleaned up agent state variables
-- [x] **Delete AgentConfigurator.tsx** - Removed entirely
-
-### **Phase 2: Strategy Field Consolidation** ✅
-- [x] **Update api/assistant.py** - Now only updates `decision.user_prompt`, agent_strategy deprecated
-
-### **Phase 3: Backend Cleanup** ✅
-- [x] **Update api/agent.py** - Returns 400 error for strategy_definition mode, always uses autonomous
-- [x] **Update agent/run_agent.py** - Raises ValueError if strategy_definition mode requested
-
-### **Phase 4: Documentation & Testing** ✅
-- [x] **Update agent/README.md** - Documented new architecture, marked strategy_definition as deprecated
-- [x] **Build test** - Frontend build passes
-
-### **Files Modified**
-| File | Changes |
-|------|---------|
-| `frontend/app/forge/components/configure/ConfigureLayout.tsx` | Added AgentStrategySection, conditional rendering |
-| `frontend/app/forge/page.tsx` | Removed AgentConfigurator routing, cleaned agent state |
-| `frontend/app/forge/components/configure/AgentConfigurator.tsx` | DELETED |
-| `api/assistant.py` | Updated to use decision.user_prompt, deprecated agent_strategy |
-| `api/agent.py` | Returns 400 for strategy_definition mode |
-| `agent/run_agent.py` | Raises error for strategy_definition mode |
-| `agent/README.md` | Updated documentation |
-
-### **Remaining Work (Future)**
-- [ ] Remove `agent_strategy` column from configurations table (after verifying no usage)
-- [ ] Clean up Redis endpoints `/message`, `/poll-response` (kept for now)
-- [ ] Production testing of agent configuration flow
+See planning doc for full technical architecture and implementation phases.
 
 ---
 
-## 📚 **Documentation - Prompt System Architecture Review**
+## ⏸️ **BLOCKED - External Dependencies**
 
-**Status**: 🟡 NEEDS REVIEW
-**Planning Doc**: [DOCS/todo/PROMPT_SYSTEM_ARCHITECTURE.md](DOCS/todo/PROMPT_SYSTEM_ARCHITECTURE.md)
-
-**Summary**: Comprehensive analysis of prompt generation system, trade settings integration, and position management flows.
-
-### **Documentation Complete**
-- [x] Output format instructions (exact LLM requirements)
-- [x] Trade settings integration (leverage, position sizing, SL/TP defaults)
-- [x] Position management mode (routing, data fetching, formatting)
-- [x] Complete flow diagrams (opportunity analysis + position management)
-- [x] Key design insights (separation of concerns, context continuity)
-- [x] 8 potential improvements identified
-
-### **Review Tasks**
-- [ ] Read complete documentation (PROMPT_SYSTEM_ARCHITECTURE.md)
-- [ ] Evaluate proposed improvements for priority/feasibility
-- [ ] Decide if any improvements should move to active development
-- [ ] Update system documentation if architecture changes are planned
-
-### **Potential Improvements to Consider**
-1. Add risk context to prompts (leverage, defaults visible to LLM)
-2. Dynamic TP/SL defaults based on volatility/timeframe
-3. Implement SL/TP trailing updates (currently LLM can suggest but system doesn't apply)
-4. Multi-position portfolio management
-5. Performance classification granularity improvements
-6. Feedback loop for default applications
-7. Structured output format (JSON schema)
-8. Portfolio context in opportunity analysis
-
----
-
-## 🏆 **AsterDEX - Production Hardening**
-
-**Status**: ✅ Core implementation complete, needs production hardening and testing
-
-### **SL/TP Improvements**
-- [ ] Add SL/TP conditional order creation (STOP_MARKET, TAKE_PROFIT_MARKET)
-- [ ] Add SL/TP order cancellation before close
-- [ ] Add leverage management (currently defaults to 10x)
-
-### **Error Handling**
-- [ ] Add rate limit tracking and backoff logic
-- [ ] Implement circuit breaker at 80% rate limit
-- [ ] Add retry logic with exponential backoff
-- [ ] Handle common API errors (-1121, -2010, etc.)
-
-### **Testing & Competition**
-- [ ] Execute 10 test trades successfully
-- [ ] Verify SL/TP conditional orders work
-- [ ] Test error scenarios (insufficient balance, invalid symbol)
-- [ ] Monitor rate limiting (no 429 errors)
-- [ ] Create competition strategy (high-frequency, 5-10 bots)
-- [ ] Monitor leaderboard ranking and total volume
-
----
-
-## 🌐 **Symphony Live Trading Integration**
+### Symphony Live Trading Integration
 
 **Status**: BLOCKED - Waiting for Symphony API fix
 
 **Blocker**: Symphony `/agent/all-positions` endpoint returns 404 (documented but not implemented)
-
-**What's Needed from Symphony Team**:
-```
-GET https://api.symphony.io/agent/all-positions?userAddress={WALLET_ADDRESS}
-Returns: accountSummary with totalEquity, availableBalance, marginUsed
-```
 
 **Our Work (Once API Fixed - ~2.5 hours)**:
 - [ ] Add `get_account_summary()` method to Symphony service
@@ -412,113 +168,19 @@ Returns: accountSummary with totalEquity, availableBalance, marginUsed
 - [ ] Update system prompt with Symphony capabilities
 - [ ] Test end-to-end with real credentials
 
-See: [agent/README.md](agent/README.md) "Symphony Integration Steps" for complete guide
+### Symphony Spot Trading - Monad (MON)
 
----
+**Status**: BLOCKED - Waiting for Symphony API deployment
 
-## 🪙 **Symphony Spot Trading - Monad (MON) Integration**
-
-**Status**: ⏸️ BLOCKED - Waiting for Symphony API deployment
-
-**Planning Doc**: [DOCS/symphony_spot_integration.md](DOCS/symphony_spot_integration.md)
-**Test Report**: [DOCS/symphony_spot_test_report.md](DOCS/symphony_spot_test_report.md)
-
-### **Overview**
-Symphony has launched spot trading support on Monad testnet for token swaps (not perpetuals). Integration is ready but waiting for API endpoints to go live.
-
-**MON Details**:
-- Chain: Monad (new Layer 1)
-- SID: 10056
-- Trading: Spot swaps only (no perps)
-- Status: Testnet active, eligible for trading rewards
-
-### **Current Blocker**
 Both spot trading endpoints return 404 (not deployed yet):
-- `GET /token/price` - Token price lookup (public)
-- `POST /agent/swap` - Execute spot swaps (auth required)
+- `GET /token/price` - Token price lookup
+- `POST /agent/swap` - Execute spot swaps
 
-**Symphony perp endpoints work perfectly** - credentials validated, 6 open positions found.
+All test scripts and documentation ready. See [DOCS/symphony_spot_integration.md](DOCS/symphony_spot_integration.md).
 
-### **Prepared Assets** ✅
-All test scripts and documentation complete, ready to run once APIs available:
+### Market Maker - Kuru Integration
 
-**Test Scripts** (4 files created):
-- [x] `trading/live/symphony_price_test.py` - Token price testing
-- [x] `trading/live/symphony_swap_test.py` - Spot swap execution
-- [x] `trading/live/symphony_endpoint_discovery.py` - Auto-discovery
-- [x] `trading/live/symphony_connectivity_test.py` - Credential validation ✅
-
-**Documentation**:
-- [x] Complete 5-phase integration plan
-- [x] Architecture decisions (separate service, reuse live_trades table)
-- [x] Symbol registry design (symphony_spot_compatible flag)
-- [x] Agent MCP tool specifications
-
-### **Integration Phases** (Once APIs Available)
-
-**Phase 1: Testing** (~30 min)
-- [ ] Run `symphony_price_test.py` to validate token price endpoint
-- [ ] Verify MON SID = 10056
-- [ ] Run `symphony_swap_test.py` to test swap execution
-- [ ] Test MON → USDC and USDC → MON swaps
-- [ ] Verify batchId tracking works
-
-**Phase 2: Symbol Registry** (~15 min)
-- [ ] Add MON to `core/symbols/registry.py`
-- [ ] Add `symphony_spot_compatible` flag
-- [ ] Add `sid` field (10056)
-- [ ] Add `chain` field ("monad")
-- [ ] Update standardizer with `is_symphony_spot_compatible()` method
-- [ ] Update standardizer with `get_symphony_sid()` method
-
-**Phase 3: Spot Trading Service** (~2-3 hours)
-- [ ] Create `trading/live/symphony_spot_service.py`
-- [ ] Implement `get_token_price()` method (public API)
-- [ ] Implement `execute_swap()` method (auth required)
-- [ ] Implement `calculate_swap_pnl()` for P&L tracking
-- [ ] Add swap history queries (if API supports)
-- [ ] Extend `live_trades` table with `provider='symphony_spot'`
-- [ ] Test end-to-end swap execution
-
-**Phase 4: Bot Configuration** (~2-3 hours)
-- [ ] Extend `trading_mode` to include `'symphony_spot'`
-- [ ] Update decision engine to handle spot signals (Buy → USDC→MON, Sell → MON→USDC)
-- [ ] Implement inventory tracking (track MON vs USDC holdings)
-- [ ] Add frontend trading mode selector option
-- [ ] Update symbol selector to show only spot-compatible symbols
-- [ ] Remove leverage/SL/TP fields for spot mode in settings
-
-**Phase 5: Agent Integration** (~1-2 hours)
-- [ ] Create `execute_spot_swap` MCP tool
-- [ ] Update agent system prompt with spot trading capabilities
-- [ ] Add inventory management to agent strategy
-- [ ] Test autonomous spot trading
-- [ ] Verify activity logging for swaps
-
-### **Next Actions**
-- [ ] Contact Symphony team to ask:
-  - When will `/token/price` and `/agent/swap` be deployed?
-  - Is there a testnet/staging URL for early testing?
-  - Do spot endpoints require different auth (Privy vs API key)?
-  - What's the ETA for Monad spot trading going live?
-- [ ] Monitor Symphony Discord/docs for deployment announcements
-- [ ] Test endpoints periodically for availability
-
-**Estimated Time**: 6-9 hours once APIs are deployed (all groundwork complete)
-
-**Files Created**:
-- `trading/live/symphony_price_test.py`
-- `trading/live/symphony_swap_test.py`
-- `trading/live/symphony_endpoint_discovery.py`
-- `trading/live/symphony_connectivity_test.py`
-- `DOCS/symphony_spot_integration.md`
-- `DOCS/symphony_spot_test_report.md`
-
----
-
-## 📊 **Market Maker - Kuru Integration**
-
-**Status**: ⏸️ WAITING - Module complete, needs Kuru API launch (Monday Nov 24?)
+**Status**: WAITING - Module complete, needs Kuru API launch
 
 **What's Ready**:
 - [x] Core Avellaneda-Stoikov engine (~900 lines)
@@ -527,33 +189,10 @@ All test scripts and documentation complete, ready to run once APIs available:
 - [x] Kuru adapter template (needs real API docs)
 
 **Next Steps (When Kuru Launches)**:
-- [ ] **Get API Access** (~30 min)
-  - [ ] Register on Kuru platform
-  - [ ] Obtain API key + secret
-  - [ ] Read official API documentation
-
-- [ ] **Update KuruAdapter** (~1-2 hours)
-  - [ ] Update authentication method (currently assumes HMAC-SHA256)
-  - [ ] Fix endpoint URLs in `market_maker/exchanges/kuru.py`
-  - [ ] Update request/response parsing based on actual API format
-  - [ ] Confirm symbol format (CHOG-USDC vs CHOG/USDC vs CHOG_USDC)
-  - [ ] Add WebSocket integration for real-time fills
-
-- [ ] **Testing** (~2-3 hours)
-  - [ ] Test with $100-200 order size, $2k capital
-  - [ ] Validate orderbook fetching works
-  - [ ] Confirm limit orders placed successfully
-  - [ ] Monitor fill rate and spread competitiveness
-  - [ ] Test inventory rebalancing logic
-  - [ ] Verify P&L tracking accuracy (account for fees)
-
-- [ ] **Production Deployment** (if successful)
-  - [ ] Scale gradually ($500 orders, $5k capital after 24h)
-  - [ ] Monitor for adverse selection (consecutive fills one side)
-  - [ ] Add missing features: rebalancing, error handling, market impact detection
-  - [ ] Consider integration with ggbots monitoring/logging
-
-**Files**: `market_maker/`, `DOCS/MM.md`
+- [ ] Register on Kuru platform, get API credentials
+- [ ] Update KuruAdapter with actual endpoints/auth
+- [ ] Test with small capital ($100-200 orders, $2k capital)
+- [ ] Production deployment if successful
 
 ---
 
@@ -579,140 +218,9 @@ All test scripts and documentation complete, ready to run once APIs available:
 
 ---
 
-## 🎨 **User Experience & Frontend**
-
-### **Bot Creation UX**
-- [x] Add name field to bot creation modal (completed 2025-11-13)
-
-### **Legal & Compliance** ✅ COMPLETE
-- [x] Terms of Service page (/terms)
-- [x] Privacy Policy page (/privacy)
-- [x] Footer component with legal links
-- [x] Signup page disclaimer
-- [x] Live trading risk acknowledgment modal
-
-### **Public Performance Features**
-**Status**: ✅ Arena page complete with activity timeline integration
-
-**Completed**:
-- [x] Per-bot privacy control via `configurations.is_public_performance`
-- [x] Public arena at /arena (arena.ggbots.ai subdomain)
-- [x] Backend: 4 public endpoints in api/public.py (performance, balance-series, activities, metadata)
-- [x] Frontend: ArenaTimeline component embedded in expandable bot cards
-- [x] Activity markers (trades, thoughts) visible on public timeline
-
-### **Mobile Responsive Design**
-- [ ] Transform desktop 3-column to mobile single column
-- [ ] Implement 70%-width slide-in drawers
-- [ ] Create bottom tab system for drawer triggers
-- [ ] Add touch gestures for carousel navigation
-
-### **Status Messaging Improvements**
-- [ ] Change "next run..." to "waiting for next candle close..."
-- [ ] Add explanatory tooltips for bot status states
-- [ ] Improve activation/deactivation feedback
-
----
-
-## 🔧 **System Improvements**
-
-### **Security & Data Access**
-**Priority**: HIGH - Current RLS rules may allow unauthorized access to some tables
-
-**Status**: ✅ SQL migration executed and verified
-
-- [x] **Supabase RLS Audit** ✅ COMPLETE
-  - [x] Identified 3 tables with RLS issues:
-    - `activities`: Policy exists but RLS disabled (intentional for aster.ggbots.ai)
-    - `agent_sessions`: No RLS at all (medium risk)
-    - `llm_models`: No RLS (low risk, reference data)
-  - [x] Documented authentication flows (user JWT, service role bypass, optional auth for public viewing)
-  - [x] Architecture decision: Per-bot privacy via `configurations.is_public_performance`
-
-- [x] **Execute SQL Migration** ✅ COMPLETE (2025-11-13)
-  - [x] Reviewed SQL commands in `SQL.md`
-  - [x] Executed Step 1: Add `is_public_performance` column
-  - [x] Executed Step 2: Fix activities table RLS (2 policies)
-  - [x] Executed Step 3: Fix agent_sessions table RLS
-  - [x] Executed Step 4: Fix llm_models table RLS
-  - [x] Verified Step 5-6: Policies active and working
-  - [x] Tested with user account (activities visible)
-  - [x] Tested public access (aster.ggbots.ai working)
-
-- [x] **Backend API Updates** ✅ COMPLETE
-  - [x] Created public arena endpoints (api/public.py): performance, balance-series, activities, metadata
-  - [x] All endpoints verify is_public_performance=true before returning data
-  - [x] Filters: hours parameter for timeframe selection
-
-- [x] **Frontend Implementation** ✅ COMPLETE
-  - [x] Created `/arena` public leaderboard page with expandable bot cards
-  - [x] ArenaTimeline component shows activity markers (trades, thoughts)
-  - [x] Deployed to arena.ggbots.ai subdomain
-  - [ ] Privacy toggle in bot settings (admin-only for now via DB)
-
-### **System Robustness**
-- [ ] Add comprehensive error boundaries to frontend
-- [ ] Implement graceful API failure handling with retries
-- [ ] Add circuit breakers for external service failures
-- [ ] Improve logging and error taxonomy
-- [ ] Plan upgrade from Node.js 18 to Node.js 20+
-
-### **Code Quality**
-- [ ] Run `ruff` + `black` for Python formatting
-- [ ] Remove unused imports and clean up hygiene
-- [ ] Add proper TypeScript types for signal_data structures
-
----
-
-## 📚 **Documentation**
-
-### **Missing/Incomplete READMEs**
-- [ ] Create `api/README.md` (document agent endpoints)
-- [ ] Create `core/config/README.md` (config system architecture)
-
-### **README Reviews & Updates**
-- [ ] Review `market_intelligence/README.md` (verify 32 data points, update cost to $195/month)
-- [ ] Review `decision/README.md` (verify V2 template system)
-- [ ] Review `trading/README.md` (verify WebSocket migration complete)
-- [ ] Review `database/README.md` (add agent_sessions, trade_observations tables)
-- [ ] Review `frontend/README.md` (verify Forge architecture)
-
-### **Documentation Consistency**
-- [ ] Ensure ACTIVE.md and module READMEs don't contradict
-- [ ] Verify README.md links to all module READMEs
-- [ ] Remove legacy/outdated information
-
----
-
-## 🧪 **Testing & Validation**
-
-### **Symbol Coverage**
-- [ ] Test all 142 crypto symbols for data availability
-- [ ] Verify WebSocket + REST fallback for all pairs
-- [ ] Create symbol blacklist for unsupported pairs
-
-### **Technical Analysis Validation**
-- [ ] Test all 21 indicator preprocessors individually
-- [ ] Validate calculations against reference implementations
-- [ ] Edge case testing (low volume, missing data, extreme movements)
-
-### **Load Testing**
-- [ ] Test system with multiple concurrent bots
-- [ ] Validate database performance under load
-- [ ] Test SSE stream with many connected clients
-- [ ] Cross-browser compatibility testing
-
-### **Security**
-- [ ] Audit API endpoints for vulnerabilities
-- [ ] Test rate limiting and authentication flows
-- [ ] Validate data isolation between users
-
----
-
 ## 📚 Documentation References
 
 - **New Claude Code Instances**: `GO.md` - Start here for onboarding
 - **Current Status**: `ACTIVE.md` - Production system status
 - **Complete History**: `CHANGELOG.md` - All completed features and fixes
 - **Architecture**: `README.md` - Platform overview
-

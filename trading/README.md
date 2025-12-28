@@ -43,7 +43,7 @@ Both modes share the same decision engine, configuration system, and dashboard i
 
 ### Paper Trading Flow
 ```
-Decision Module → Supabase Paper Trading Service → Hummingbot Market Data → Supabase DB
+Decision Module → Supabase Paper Trading Service → WebSocket Market Data → Supabase DB
                           ↓                              ↓                     ↓
                   Trade Execution                  Real Prices         Position Tracking
                           ↓                              ↓                     ↓
@@ -154,30 +154,44 @@ CREATE TABLE live_trades (
 
 ### Symphony Data Enrichment
 
-The SSE dashboard stream automatically enriches live bot data:
+The SSE dashboard stream automatically enriches live bot data via `_enrich_live_positions_and_accounts()`:
 
 **For Live Positions** (`core/sse/dashboard_data.py`):
 ```python
-# Database returns placeholder with batch_id
-# Symphony API queried for full position details:
+# Database returns placeholder with batch_id (NULL fields)
+# Symphony API queried via get_open_positions() for full details:
 {
     "position_id": "batch-uuid",
     "symbol": "BTC-USDT",
-    "side": "short",
-    "size_usd": 10.43,              # From Symphony positionSize
-    "entry_price": 111480.45,       # From Symphony entryPrice
-    "current_price": 111565.50,     # From Symphony currentPrice
-    "unrealized_pnl": -0.008,       # From Symphony pnlUSD
-    "opened_at": "2025-10-25T10:30:58.809Z",  # Symphony createdTimestamp
-    "stop_loss": 115000.00,         # From Symphony slPrice (if set)
-    "take_profit": 108000.00,       # From Symphony tpPrice (if set)
+    "side": "long",
+    "size_usd": 8.19,               # From Symphony positionSize (notional)
+    "collateral": 7.45,             # From Symphony collateralAmount (actual margin)
+    "entry_price": 86365.31,        # From Symphony entryPrice
+    "current_price": 87684.59,      # From Symphony currentPrice
+    "unrealized_pnl": 0.12,         # From Symphony pnlUSD
+    "pnl_percentage": 1.68,         # From Symphony pnlPercentage
+    "opened_at": "2025-12-17T10:04:50.432Z",  # Symphony createdTimestamp
+    "stop_loss": 82058.49,          # From Symphony slPrice (if set)
+    "take_profit": 95015.10,        # From Symphony tpPrice (if set)
+    "liquidation_price": 29091.12,  # From Symphony liquidationPrice
     "leverage": 1.1,                # From Symphony leverage
-    "source": "live"                # Tags for frontend routing
+    "status": "Open",               # From Symphony status (Open/Closed/Liquidated)
+    "source": "symphony"            # Tags for frontend routing
 }
 ```
 
-**For Account Metrics**:
+**Key Fields** (from `/agent/positions` endpoint):
+| Field | Symphony Field | Description |
+|-------|---------------|-------------|
+| `collateral` | `collateralAmount` | Actual margin used (divide size_usd by leverage) |
+| `size_usd` | `positionSize` | Total notional position size |
+| `pnl_percentage` | `pnlPercentage` | P&L as percentage |
+| `liquidation_price` | `liquidationPrice` | Auto-liquidation price |
+| `status` | `status` | Open, Closed, or Liquidated |
+
+**For Account Metrics** (`core/monitoring/adapters/symphony_adapter.py`):
 - Queries `/agent/positions` for open positions count
+- Sums `collateralAmount` for total margin used (`margin_used` in account_snapshots)
 - Queries `/agent/batches` for closed trade history
 - Calculates win/loss, total P&L from batch results
 - **Note**: Balance not available (users track on Symphony dashboard)
@@ -650,11 +664,11 @@ python scripts/test_symphony_metrics.py --user-id <uuid> --config-id <uuid>
 ## Core Components
 
 ### MarketDataAdapter (`trading/paper/market_data.py`)
-Real-time market data integration with Hummingbot API.
+Real-time market data via Binance WebSocket service with Redis caching.
 
 **Features:**
-- **KuCoin Connector**: Primary exchange for all 141 supported cryptocurrency pairs
-- **Symbol Conversion**: Automatic translation between internal (`BTC/USDT`) and Hummingbot (`BTC-USDT`) formats
+- **Binance WebSocket**: Primary source for all 141 supported cryptocurrency pairs (via market-data-ws PM2 service)
+- **Symbol Conversion**: Automatic translation between internal formats via UniversalSymbolStandardizer
 - **Price Caching**: 30-second TTL for efficient API usage
 - **Realistic Spreads**: 0.05% bid/ask spread simulation for paper trading
 - **Batch Processing**: Multiple symbol price fetching for performance
@@ -687,7 +701,7 @@ prices = await adapter.get_multiple_prices(['BTC/USDT', 'ETH/USDT'])
 
 **Trade Lifecycle:**
 1. **Intent Processing**: Accepts Decision Module trade intents
-2. **Market Data**: Fetches current price from Hummingbot API
+2. **Market Data**: Fetches current price from WebSocket cache (Redis)
 3. **Position Sizing**: Calculates size based on confidence score
 4. **Execution**: Creates paper trade with realistic fill prices
 5. **Monitoring**: Real-time P&L updates every 7 seconds
@@ -813,11 +827,11 @@ Complete audit trail of all paper orders.
 
 ### Environment Variables
 ```bash
-# Paper Trading Settings
-HBOT_USERNAME="sev"                    # Hummingbot API username
-HBOT_PASSWORD="your_hummingbot_password"      # Hummingbot API password
+# Paper Trading Settings (uses WebSocket market data service)
+REDIS_HOST="localhost"                 # Redis for WebSocket price cache
+REDIS_PORT="6379"                      # Redis port
 
-# Optional Configuration  
+# Optional Configuration
 PAPER_TRADING_URL="http://localhost:8000/paper/execute"  # Custom endpoint URL
 ```
 
@@ -888,7 +902,7 @@ intent = {
 
 # Paper trading executes automatically
 # Position size: 0.75 × 10% × $10k = $750
-# Entry: BTC @ $111,092 (mid-price from Hummingbot API)
+# Entry: BTC @ $111,092 (mid-price from WebSocket cache)
 # Result: 0.00675 BTC position with automated risk management
 ```
 
@@ -919,16 +933,16 @@ response = await client.post(paper_trading_url, json=intent)
 
 ## Symbol Support
 
-**All 141 cryptocurrency pairs** supported through KuCoin connector:
+**All 141 cryptocurrency pairs** supported via Binance WebSocket:
 - **Major Pairs**: BTC/USDT, ETH/USDT, SOL/USDT, etc.
 - **Symbol Conversion**: Automatic format translation via UniversalSymbolStandardizer
-- **Trading Rules**: Real-time min order sizes, tick sizes from Hummingbot API
+- **Trading Rules**: Real-time min order sizes, tick sizes from exchange APIs
 
 ## Performance Characteristics
 
 ### Resource Usage
 - **Memory**: ~15KB per update cycle (flat, no accumulation)
-- **API Calls**: ~514 calls/hour to Hummingbot API (localhost)
+- **API Calls**: Minimal - prices cached in Redis from WebSocket stream
 - **Database**: Simple UPDATE queries, indexed by trade_id
 - **CPU**: Minimal for price comparisons and P&L calculations
 
@@ -970,15 +984,13 @@ WHERE status = 'open';
 
 ### Connectivity Testing
 ```bash
-# Test Hummingbot API integration
-python test_hummingbot_api.py
+# Test WebSocket market data service
+pm2 status market-data-ws
 
-# Expected output:
-# ✅ Health Check: healthy
-# ✅ Symbol Conversion: BTC/USDT → BTC-USDT  
-# ✅ Price Fetching: BTC/USDT: $111,092.50
-# ✅ Trading Rules: Min size 0.00001 BTC
-# ✅ Multiple Prices: BTC, ETH prices fetched
+# Test Redis price cache
+redis-cli GET "price:BTCUSDT"
+
+# Expected: Valid JSON with bid/ask/timestamp
 ```
 
 ### End-to-End Testing (UPDATED)
@@ -1030,8 +1042,8 @@ curl http://localhost:8000/api/v2/bot/{config_id}/account
 
 ### Startup Sequence (V2.0)
 1. **Supabase Setup**: Ensure paper_accounts, paper_trades, paper_orders tables exist (with `margin_used` field)
-2. **Environment Setup**: Configure SUPABASE_URL, SUPABASE_SERVICE_KEY, HBOT credentials
-3. **Service Health**: Verify Supabase and Hummingbot API connectivity
+2. **Environment Setup**: Configure SUPABASE_URL, SUPABASE_SERVICE_KEY, REDIS credentials
+3. **Service Health**: Verify Supabase and WebSocket market data connectivity
 4. **Background Task**: Position monitoring running at 3-second intervals with batch optimization
 5. **API Endpoints**: Dashboard routes available at `/api/v2/bot/*` with leverage-corrected P&L
 
@@ -1060,7 +1072,7 @@ updated_count = await service.update_position_prices()  # Updates all open posit
 ### Scaling Considerations
 - **Multi-Strategy**: Each config_id gets isolated paper account
 - **Resource Limits**: 7-second updates scale well to 100+ positions
-- **API Rate Limits**: Hummingbot API (localhost) handles 500+ calls/hour easily
+- **API Rate Limits**: WebSocket stream eliminates REST API rate limit concerns
 - **Database Performance**: Optimized indexes for position lookups
 
 ---

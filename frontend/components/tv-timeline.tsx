@@ -5,7 +5,7 @@ import { createChart, ColorType, LineStyle } from 'lightweight-charts';
 import type { IChartApi, ISeriesApi, LineData, Time, SeriesMarker } from 'lightweight-charts';
 import { createClientComponentClient } from '@supabase/auth-helpers-nextjs';
 import type { Session } from '@supabase/supabase-js';
-import BottomSheet from './bottom-sheet';
+import ActivityModal from './activity-modal';
 import ReactMarkdown from 'react-markdown';
 import { useTheme } from '@/lib/theme';
 
@@ -34,23 +34,6 @@ const getThemeColors = (isDark: boolean) => ({
     lilac: '#8B7CF2',      // thoughts (same as dark)
   }
 })[isDark ? 'dark' : 'light'];
-
-// Formatting helpers for activity data (handles null/undefined gracefully)
-const formatActivityPrice = (price: number | null | undefined): string => {
-  if (price == null) return '—';
-  return `$${price.toFixed(2)}`;
-};
-
-const formatActivityPercent = (value: number | null | undefined): string => {
-  if (value == null) return 'N/A';
-  return `${(value * 100).toFixed(1)}%`;
-};
-
-const formatActivityUSD = (value: number | null | undefined): string => {
-  if (value == null) return '—';
-  const sign = value >= 0 ? '+' : '';
-  return `${sign}$${value.toFixed(2)}`;
-};
 
 interface BalancePoint {
   timestamp: string;
@@ -170,6 +153,7 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
   const [metadata, setMetadata] = useState<ActivityMetadata | null>(null);
   const [selectedActivity, setSelectedActivity] = useState<Activity | null>(null);
   const [detailActivities, setDetailActivities] = useState<Activity[]>([]);
+  const [currentActivityIndex, setCurrentActivityIndex] = useState<number>(0);
   const [crosshairPosition, setCrosshairPosition] = useState<{ x: number; y: number } | null>(null);
   const [latestActivity, setLatestActivity] = useState<Activity | null>(null);
   const [statusText, setStatusText] = useState<string>('');
@@ -180,6 +164,8 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
   // Map to lookup activities by timestamp (can have multiple activities at same time)
   const activitiesMapRef = useRef<Map<number, Activity[]>>(new Map());
+  // All activities sorted chronologically for modal navigation
+  const allActivitiesSortedRef = useRef<Activity[]>([]);
 
   // Refs to avoid stale closures and enable cross-effect communication
   const sessionRef = useRef<Session | null>(null);
@@ -381,7 +367,12 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
 
       if (activities && activities.length > 0) {
         console.log('Fast click on activities:', activities, 'duration:', clickDuration, 'ms');
-        setDetailActivities(activities);
+        // Open modal with all activities, starting at the clicked one
+        const allSorted = allActivitiesSortedRef.current;
+        const clickedActivity = activities[0]; // Primary activity at this timestamp
+        const startIndex = allSorted.findIndex(a => a.id === clickedActivity.id);
+        setDetailActivities(allSorted);
+        setCurrentActivityIndex(startIndex >= 0 ? startIndex : 0);
       }
     });
 
@@ -569,12 +560,17 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
             // Set the grouped activities in the ref
             activitiesMapRef.current = groupedByTimestamp;
 
-            // Update latest activity for status display
-            const sortedActivities = activities.sort((a, b) =>
+            // Store all activities sorted chronologically (oldest first) for modal navigation
+            allActivitiesSortedRef.current = [...activities].sort((a, b) =>
+              new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime()
+            );
+
+            // Update latest activity for status display (most recent first)
+            const sortedActivitiesDesc = [...activities].sort((a, b) =>
               new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
             );
-            if (sortedActivities.length > 0) {
-              setLatestActivity(sortedActivities[0]);
+            if (sortedActivitiesDesc.length > 0) {
+              setLatestActivity(sortedActivitiesDesc[0]);
             }
 
             // Create one marker per timestamp based on priority
@@ -1043,14 +1039,11 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
                   zIndex: 10
                 }}
                 onClick={() => {
-                  // Get all activities at this timestamp and open bottom sheet
-                  const timestamp = Math.floor(new Date(selectedActivity.timestamp).getTime() / 1000);
-                  const activities = activitiesMapRef.current.get(timestamp);
-                  if (activities && activities.length > 0) {
-                    setDetailActivities(activities);
-                  } else {
-                    setDetailActivities([selectedActivity]);
-                  }
+                  // Open modal with all activities, starting at the hovered one
+                  const allSorted = allActivitiesSortedRef.current;
+                  const startIndex = allSorted.findIndex(a => a.id === selectedActivity.id);
+                  setDetailActivities(allSorted);
+                  setCurrentActivityIndex(startIndex >= 0 ? startIndex : 0);
                 }}
               >
                 <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
@@ -1157,604 +1150,14 @@ export default function TVTimeline({ configId, title, variant = 'standalone' }: 
         </div>
       </section>
 
-      {/* Activity Detail Bottom Sheet */}
-      <BottomSheet
+      {/* Activity Detail Modal */}
+      <ActivityModal
         isOpen={detailActivities.length > 0}
+        activities={detailActivities}
+        currentIndex={currentActivityIndex}
         onClose={() => setDetailActivities([])}
-        title={
-          detailActivities.length === 1
-            ? detailActivities[0].type === 'trade_entry' && detailActivities[0].data?.details?.side === 'long' ? 'Long Entry' :
-              detailActivities[0].type === 'trade_entry' && detailActivities[0].data?.details?.side === 'short' ? 'Short Entry' :
-              detailActivities[0].type === 'trade_exit' ? 'Position Closed' :
-              detailActivities[0].type === 'market_query' ? 'Market Query' :
-              detailActivities[0].type === 'llm_thought' ? 'Agent Thought' :
-              detailActivities[0].type === 'price_check' ? 'Price Check' :
-              detailActivities[0].type === 'agent_wait' ? 'Agent Waiting' :
-              detailActivities[0].type === 'observation_recorded' ? 'Observation' :
-              detailActivities[0].type === 'strategy_updated' ? 'Strategy Update' :
-              detailActivities[0].type === 'signal_received' ? 'Signal Received' :
-              detailActivities[0].type === 'bot_created' ? 'Bot Created' :
-              'Activity'
-            : `${detailActivities.length} Activities`
-        }
-      >
-        {detailActivities.length > 0 && (
-          <div className="px-6 py-4 space-y-6">
-            {/* Show timestamp once at top if all activities share same timestamp */}
-            <div>
-              <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                Timestamp
-              </div>
-              <div className="text-sm font-mono">
-                {new Date(detailActivities[0].timestamp).toLocaleString('en-US', {
-                  dateStyle: 'medium',
-                  timeStyle: 'medium'
-                })}
-              </div>
-            </div>
-
-            {/* Loop through all activities */}
-            {detailActivities.map((detailActivity, index) => (
-              <div key={detailActivity.id || index} className="pb-6 border-b last:border-b-0" style={{ borderColor: VIBE.hair }}>
-                {/* Activity Type Badge */}
-                <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold mb-4" style={{
-                  backgroundColor:
-                    detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'long' ? '#16a34a' :
-                    detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'short' ? '#dc2626' :
-                    detailActivity.type === 'trade_exit' ? '#9ca3af' :
-                    detailActivity.type === 'market_query' ? VIBE.signal :
-                    detailActivity.type === 'llm_thought' ? VIBE.brass :
-                    detailActivity.type === 'agent_wait' ? VIBE.ivory :
-                    detailActivity.type === 'bot_created' ? '#16a34a' : VIBE.brass,
-                  color: detailActivity.type === 'agent_wait' ? VIBE.obsidian : VIBE.ivory
-                }}>
-                  {detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'long' && '↑ Long Entry'}
-                  {detailActivity.type === 'trade_entry' && detailActivity.data?.details?.side === 'short' && '↓ Short Entry'}
-                  {detailActivity.type === 'trade_exit' && '⨯ Position Closed'}
-                  {detailActivity.type === 'market_query' && '📊 Market Query'}
-                  {detailActivity.type === 'llm_thought' && '💭 Agent Thought'}
-                  {detailActivity.type === 'price_check' && '💱 Price Check'}
-                  {detailActivity.type === 'agent_wait' && '⏸ Waiting'}
-                  {detailActivity.type === 'observation_recorded' && '📝 Observation'}
-                  {detailActivity.type === 'strategy_updated' && '⚙️ Strategy Update'}
-                  {detailActivity.type === 'signal_received' && '📡 Signal Received'}
-                  {detailActivity.type === 'bot_created' && '🤖 Bot Created'}
-                </div>
-
-                {/* Type-specific content */}
-                <div className="space-y-4">
-
-            {/* TRADE ENTRY/EXIT SPECIFIC FIELDS */}
-            {(detailActivity.type === 'trade_entry' || detailActivity.type === 'trade_exit') ? (
-              <>
-                {/* Confidence */}
-                {detailActivity.data.details?.confidence != null ? (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Confidence
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="flex-1 bg-black bg-opacity-30 rounded-full h-2 overflow-hidden">
-                        <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${(Number(detailActivity.data.details.confidence) || 0) * 100}%`,
-                            backgroundColor: VIBE.signal
-                          }}
-                        />
-                      </div>
-                      <span className="text-sm font-semibold">{formatActivityPercent(Number(detailActivity.data.details.confidence))}</span>
-                    </div>
-                  </div>
-                 ) : null}
-
-                {/* Leverage */}
-                {detailActivity.data.details?.leverage != null ? (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Leverage
-                    </div>
-                    <div className="text-lg font-semibold">{String(detailActivity.data.details.leverage)}x</div>
-                  </div>
-                 ) : null}
-
-                {/* Entry Price */}
-                {detailActivity.data.details?.entry_price != null ? (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Entry Price
-                    </div>
-                    <div className="text-lg font-mono">{formatActivityPrice(Number(detailActivity.data.details.entry_price))}</div>
-                  </div>
-                 ) : null}
-
-                {/* Exit Price (for trade_exit) */}
-                {detailActivity.data.details?.exit_price != null ? (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Exit Price
-                    </div>
-                    <div className="text-lg font-mono">{formatActivityPrice(Number(detailActivity.data.details.exit_price))}</div>
-                  </div>
-                 ) : null}
-
-                {/* P&L (for trade_exit) */}
-                {detailActivity.data.details?.pnl != null ? (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      P&L
-                    </div>
-                    <div className="flex items-baseline gap-2">
-                      <div className="text-lg font-semibold" style={{ color: Number(detailActivity.data.details.pnl) >= 0 ? VIBE.signal : VIBE.ember }}>
-                        {formatActivityUSD(Number(detailActivity.data.details.pnl))}
-                      </div>
-                      {detailActivity.data.details?.pnl_pct != null && (
-                        <div className="text-sm" style={{ color: Number(detailActivity.data.details.pnl) >= 0 ? VIBE.signal : VIBE.ember }}>
-                          ({Number(detailActivity.data.details.pnl_pct).toFixed(2)}%)
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                 ) : null}
-
-                {/* Trade Duration & Fees (for trade_exit) */}
-                {detailActivity.type === 'trade_exit' && (
-                  <div className="grid grid-cols-2 gap-4">
-                    {detailActivity.data.details?.duration_seconds != null && (
-                      <div>
-                        <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                          Duration
-                        </div>
-                        <div className="text-sm">
-                          {Math.floor(Number(detailActivity.data.details.duration_seconds) / 3600)}h {Math.floor((Number(detailActivity.data.details.duration_seconds) % 3600) / 60)}m
-                        </div>
-                      </div>
-                    )}
-                    {detailActivity.data.details?.total_fees != null && (
-                      <div>
-                        <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                          Fees
-                        </div>
-                        <div className="text-sm font-mono" style={{ color: VIBE.ember }}>
-                          -${Number(detailActivity.data.details.total_fees).toFixed(2)}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Close Reason (for trade_exit - important for agents) */}
-                {detailActivity.type === 'trade_exit' && detailActivity.data.details?.close_reason && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Close Reason
-                    </div>
-                    <div className="text-sm px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(237,235,231,0.05)' }}>
-                      {String(detailActivity.data.details.close_reason)}
-                    </div>
-                  </div>
-                )}
-
-                {/* Size USD */}
-                {detailActivity.data.details?.size_usd != null ? (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Position Size
-                    </div>
-                    <div className="text-lg font-mono">{formatActivityPrice(Number(detailActivity.data.details.size_usd))}</div>
-                  </div>
-                 ) : null}
-
-                {/* Stop Loss / Take Profit Grid */}
-                <div className="grid grid-cols-2 gap-4">
-                  {detailActivity.data.details?.stop_loss != null ? (
-                    <div>
-                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                        Stop Loss
-                      </div>
-                      <div className="text-sm font-mono" style={{ color: VIBE.ember }}>
-                        {formatActivityPrice(Number(detailActivity.data.details.stop_loss))}
-                      </div>
-                    </div>
-                  ) : null}
-
-                  {detailActivity.data.details?.take_profit != null ? (
-                    <div>
-                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                        Take Profit
-                      </div>
-                      <div className="text-sm font-mono" style={{ color: VIBE.signal }}>
-                        {formatActivityPrice(Number(detailActivity.data.details.take_profit))}
-                      </div>
-                    </div>
-                  ) : null}
-                </div>
-              </>
-            ) : null}
-
-            {/* MARKET QUERY SPECIFIC FIELDS */}
-            {detailActivity.type === 'market_query' && detailActivity.data.details ? (
-              <>
-                {/* Symbol & Timeframe */}
-                <div className="grid grid-cols-2 gap-4 mb-4">
-                  {Boolean((detailActivity.data.details as Record<string, unknown>).symbol) && (
-                    <div>
-                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                        Symbol
-                      </div>
-                      <div className="text-lg font-mono" style={{ color: VIBE.signal }}>
-                        {String((detailActivity.data.details as Record<string, unknown>).symbol)}
-                      </div>
-                    </div>
-                  )}
-                  {Boolean((detailActivity.data.details as Record<string, unknown>).timeframe) && (
-                    <div>
-                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                        Timeframe
-                      </div>
-                      <div className="text-lg font-semibold">
-                        {String((detailActivity.data.details as Record<string, unknown>).timeframe)}
-                      </div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Categories Queried */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).categories) && (
-                  <div className="mb-4">
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Categories Queried
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                      {Object.keys((detailActivity.data.details as Record<string, unknown>).categories as Record<string, unknown>).map((category) => (
-                        <div key={category} className="px-2 py-1 rounded-lg text-xs" style={{ backgroundColor: 'rgba(60, 166, 224, 0.15)', color: VIBE.signal }}>
-                          {category.replace(/_/g, ' ')}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {/* Query Mode Badge */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).query_mode) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Query Mode
-                    </div>
-                    <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
-                      backgroundColor: 'rgba(60, 166, 224, 0.2)',
-                      color: VIBE.signal
-                    }}>
-                      {String((detailActivity.data.details as Record<string, unknown>).query_mode).replace(/_/g, ' ')}
-                    </div>
-                  </div>
-                )}
-
-                {/* Current Price & Data Age */}
-                <div className="grid grid-cols-2 gap-4">
-                  {Boolean((detailActivity.data.details as Record<string, unknown>).current_price) && (
-                    <div>
-                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                        Price at Query
-                      </div>
-                      <div className="text-lg font-mono">${Number((detailActivity.data.details as Record<string, unknown>).current_price).toFixed(2)}</div>
-                    </div>
-                  )}
-                  {(detailActivity.data.details as Record<string, unknown>).data_age_seconds != null && (
-                    <div>
-                      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                        Data Age
-                      </div>
-                      <div className="text-sm">{Math.floor(Number((detailActivity.data.details as Record<string, unknown>).data_age_seconds) / 60)}m {Number((detailActivity.data.details as Record<string, unknown>).data_age_seconds) % 60}s</div>
-                    </div>
-                  )}
-                </div>
-
-                {/* Metadata Summary */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).metadata) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Query Summary
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {Boolean(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).timeframes_analyzed) && (
-                        <div>
-                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Timeframes:</span> {(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).timeframes_analyzed as string[]).length}
-                        </div>
-                      )}
-                      {Boolean(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count) && (
-                        <div>
-                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Indicators:</span> {String(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).indicators_count)}
-                        </div>
-                      )}
-                      {Boolean(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).total_prompt_tokens) && (
-                        <div>
-                          <span className="text-xs" style={{ color: 'rgba(237,235,231,0.6)' }}>Tokens:</span> {Number(((detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>).total_prompt_tokens).toLocaleString()}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Formatted Data Sections (Collapsible) */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).formatted_data) && (
-                  <div className="space-y-3">
-                    <div className="text-xs uppercase tracking-wider" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Data Sent to LLM
-                    </div>
-                    {Object.entries((detailActivity.data.details as Record<string, unknown>).formatted_data as Record<string, unknown>).map(([sectionName, sectionText]) => {
-                      if (!sectionText) return null;
-                      const metadata = (detailActivity.data.details as Record<string, unknown>).metadata as Record<string, unknown>;
-                      const breakdown = metadata?.breakdown as Record<string, unknown>;
-                      const tokens = breakdown?.[`${sectionName}_tokens`] || 0;
-                      return (
-                        <details key={sectionName} className="rounded-lg border" style={{ borderColor: VIBE.hair, backgroundColor: 'rgba(193, 168, 125, 0.05)' }}>
-                          <summary className="cursor-pointer px-4 py-3 font-semibold text-sm flex items-center justify-between" style={{ color: VIBE.brass }}>
-                            <span>{sectionName.replace(/_/g, ' ').toUpperCase()}</span>
-                            {Number(tokens) > 0 && (
-                              <span className="text-xs font-mono px-2 py-1 rounded" style={{ backgroundColor: 'rgba(193, 168, 125, 0.2)' }}>
-                                {Number(tokens).toLocaleString()} tokens
-                              </span>
-                            )}
-                          </summary>
-                          <div className="px-4 pb-4 max-h-96 overflow-y-auto">
-                            <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: VIBE.ivory }}>
-                              {String(sectionText)}
-                            </pre>
-                          </div>
-                        </details>
-                      );
-                    })}
-                  </div>
-                )}
-              </>
-            ) : null}
-
-            {/* LLM THOUGHT SPECIFIC FIELDS */}
-            {detailActivity.type === 'llm_thought' && detailActivity.data.details && ((detailActivity.data.details as Record<string, unknown>).thought || (detailActivity.data.details as Record<string, unknown>).reasoning) ? (
-              <div>
-                <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                  Agent Thought
-                </div>
-                <div
-                  className="prose prose-invert prose-sm max-w-none"
-                  style={{ color: VIBE.ivory }}
-                >
-                  <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).thought || (detailActivity.data.details as Record<string, unknown>).reasoning)}</ReactMarkdown>
-                </div>
-
-                {detailActivity.data.details.balance != null && typeof detailActivity.data.details.balance === 'number' ? (
-                  <div className="mt-4 p-3 rounded-lg" style={{ backgroundColor: 'rgba(0, 217, 255, 0.1)' }}>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Balance at Time
-                    </div>
-                    <div className="text-lg font-semibold" style={{ color: VIBE.signal }}>
-                      {formatActivityPrice(detailActivity.data.details.balance)}
-                    </div>
-                  </div>
-                 ) : null}
-              </div>
-            ) : null}
-
-            {/* AGENT WAIT SPECIFIC FIELDS */}
-            {detailActivity.type === 'agent_wait' && detailActivity.data.details ? (
-              <>
-                {detailActivity.data.details.duration_minutes && typeof detailActivity.data.details.duration_minutes === 'number' && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Wait Duration
-                    </div>
-                    <div className="text-lg font-semibold">{detailActivity.data.details.duration_minutes} minutes</div>
-                  </div>
-                 )}
-
-                {detailActivity.data.details.next_check_at && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Next Check
-                    </div>
-                    <div className="text-sm font-mono">
-                      {new Date(String(detailActivity.data.details.next_check_at)).toLocaleString('en-US', {
-                        dateStyle: 'medium',
-                        timeStyle: 'medium'
-                      })}
-                    </div>
-                  </div>
-                 )}
-
-                {detailActivity.data.details.reason && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Reason
-                    </div>
-                    <div
-                      className="prose prose-invert prose-sm max-w-none"
-                      style={{ color: VIBE.ivory }}
-                    >
-                      <ReactMarkdown>{String(detailActivity.data.details.reason)}</ReactMarkdown>
-                    </div>
-                  </div>
-                 )}
-              </>
-            ) : null}
-
-            {/* OBSERVATION RECORDED SPECIFIC FIELDS (Agent Learnings) */}
-            {detailActivity.type === 'observation_recorded' && detailActivity.data.details ? (
-              <div className="space-y-4">
-                {/* Observation Type Badge */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).observation_type) && (
-                  <div className="inline-block px-3 py-1 rounded-lg text-xs uppercase tracking-wider font-semibold" style={{
-                    backgroundColor: String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? 'rgba(22, 163, 74, 0.2)' : 'rgba(220, 38, 38, 0.2)',
-                    color: String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? '#16a34a' : '#dc2626'
-                  }}>
-                    {String((detailActivity.data.details as Record<string, unknown>).observation_type) === 'win_analysis' ? '✓ Win Analysis' : '✗ Loss Analysis'}
-                  </div>
-                )}
-
-                {/* What Went Well */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).what_went_well) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: '#16a34a' }}>
-                      What Went Well
-                    </div>
-                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(22, 163, 74, 0.1)' }}>
-                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).what_went_well)}</ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-
-                {/* What Went Wrong */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).what_went_wrong) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: '#dc2626' }}>
-                      What Went Wrong
-                    </div>
-                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)' }}>
-                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).what_went_wrong)}</ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-
-                {/* Decision Review */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).decision_review) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.brass }}>
-                      Decision Review
-                    </div>
-                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(193, 168, 125, 0.1)' }}>
-                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).decision_review)}</ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-
-                {/* Predictive Data Points */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).predictive_data_points) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.signal }}>
-                      Key Data Points
-                    </div>
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      {Object.entries((detailActivity.data.details as Record<string, unknown>).predictive_data_points as Record<string, unknown>).map(([key, value]) => (
-                        <div key={key} className="px-2 py-1 rounded" style={{ backgroundColor: 'rgba(60, 166, 224, 0.1)' }}>
-                          <span style={{ color: 'rgba(237,235,231,0.6)' }}>{key}:</span> {String(value)}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {/* STRATEGY UPDATED SPECIFIC FIELDS (Agent Evolution) */}
-            {detailActivity.type === 'strategy_updated' && detailActivity.data.details ? (
-              <div className="space-y-4">
-                {/* Version Change */}
-                <div className="flex items-center gap-3">
-                  <div className="px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(237,235,231,0.1)' }}>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      From
-                    </div>
-                    <div className="text-lg font-semibold">
-                      v{String((detailActivity.data.details as Record<string, unknown>).old_version || '?')}
-                    </div>
-                  </div>
-                  <div style={{ color: VIBE.brass, fontSize: '24px' }}>→</div>
-                  <div className="px-3 py-2 rounded-lg" style={{ backgroundColor: 'rgba(193, 168, 125, 0.2)' }}>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.brass }}>
-                      To
-                    </div>
-                    <div className="text-lg font-semibold" style={{ color: VIBE.brass }}>
-                      v{String((detailActivity.data.details as Record<string, unknown>).new_version || '?')}
-                    </div>
-                  </div>
-                </div>
-
-                {/* Reason for Update */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).reason) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-2" style={{ color: VIBE.brass }}>
-                      Reason for Evolution
-                    </div>
-                    <div className="text-sm px-3 py-2 rounded-lg prose prose-invert prose-sm max-w-none" style={{ backgroundColor: 'rgba(193, 168, 125, 0.1)' }}>
-                      <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).reason)}</ReactMarkdown>
-                    </div>
-                  </div>
-                )}
-
-                {/* New Strategy Content (Collapsible) */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).new_strategy_content) && (
-                  <details className="rounded-lg border" style={{ borderColor: VIBE.hair, backgroundColor: 'rgba(193, 168, 125, 0.05)' }}>
-                    <summary className="cursor-pointer px-4 py-3 font-semibold text-sm" style={{ color: VIBE.brass }}>
-                      View New Strategy Content
-                    </summary>
-                    <div className="px-4 pb-4 max-h-96 overflow-y-auto">
-                      <div className="prose prose-invert prose-sm max-w-none">
-                        <ReactMarkdown>{String((detailActivity.data.details as Record<string, unknown>).new_strategy_content)}</ReactMarkdown>
-                      </div>
-                    </div>
-                  </details>
-                )}
-              </div>
-            ) : null}
-
-            {/* BOT CREATED SPECIFIC FIELDS */}
-            {detailActivity.type === 'bot_created' && detailActivity.data.details ? (
-              <div className="grid grid-cols-2 gap-4">
-                {/* Trading Mode */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).trading_mode) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Trading Mode
-                    </div>
-                    <div className="text-lg font-semibold" style={{ color: '#16a34a' }}>
-                      {String((detailActivity.data.details as Record<string, unknown>).trading_mode).toUpperCase()}
-                    </div>
-                  </div>
-                )}
-
-                {/* Config Type */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).config_type) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Bot Type
-                    </div>
-                    <div className="text-sm">
-                      {String((detailActivity.data.details as Record<string, unknown>).config_type).replace(/_/g, ' ')}
-                    </div>
-                  </div>
-                )}
-
-                {/* Selected Pair */}
-                {Boolean((detailActivity.data.details as Record<string, unknown>).selected_pair) && (
-                  <div>
-                    <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                      Trading Pair
-                    </div>
-                    <div className="text-sm font-mono" style={{ color: VIBE.signal }}>
-                      {String((detailActivity.data.details as Record<string, unknown>).selected_pair)}
-                    </div>
-                  </div>
-                )}
-              </div>
-            ) : null}
-
-            {/* Summary (for all types that have it) */}
-            {detailActivity.data.summary ? (
-              <div>
-                <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
-                  Summary
-                </div>
-                <div className="prose prose-invert prose-sm max-w-none" style={{ color: VIBE.ivory }}>
-                  <ReactMarkdown>{detailActivity.data.summary}</ReactMarkdown>
-                </div>
-              </div>
-            ) : null}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </BottomSheet>
+        onNavigate={(index) => setCurrentActivityIndex(index)}
+      />
     </div>
   );
 }

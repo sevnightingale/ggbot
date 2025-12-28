@@ -1,6 +1,6 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2025-12-28 05:44:43 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2025-12-28 12:26:23 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
@@ -9,51 +9,51 @@
 - **Total Users**: 264
 - **Pro Users (ggbase)**: 0 (0 active subscriptions)
 - **Free Users**: 259
-- **Users with Bots**: 258 (97.7%)
+- **Users with Bots**: 257 (97.3%)
 
 ### Bot Statistics
-- **Total Bots**: 389
+- **Total Bots**: 388
 - **Active Bots**: 8 (2.1%)
-  - Paper Trading: 8
-  - Live Trading: 0
-- **Inactive Bots**: 381
+  - Paper: 7
+  - Symphony (Live): 1
+  - Aster (DEX): 0
+- **Inactive Bots**: 380
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,640
+- **Total Trades (All Time)**: 5,645
   - Wins: 1,704
-  - Losses: 3,936
-  - Platform Win Rate: 30.21%
-  - Total P&L: $-17,612.17
+  - Losses: 3,941
+  - Platform Win Rate: 30.19%
+  - Total P&L: $-17,723.00
 - **Recent Activity**:
-  - Last 24 hours: 19 trades
-  - Last 7 days: 135 trades
-  - Last 30 days: 202 trades
+  - Last 24 hours: 17 trades
+  - Last 7 days: 130 trades
+  - Last 30 days: 206 trades
 
 ### Open Positions
-- **Open Positions**: 4
+- **Open Positions**: 3
 - **Unique Symbols**: 1
-- **Total Exposure**: $44,420.20
-- **Unrealized P&L**: $-49.58
+- **Total Exposure**: $29,495.35
+- **Unrealized P&L**: $0.62
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,924.72
+- **Average Balance**: $9,924.24
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,420.76
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 7 bots
-- **ADA/USDT**: 1 bots
+- **BTC/USDT**: 8 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 423 decisions (avg confidence: 34.5%)
-- **enter**: 18 decisions (avg confidence: 61.7%)
-- **exit**: 18 decisions (avg confidence: 47.9%)
+- **wait**: 433 decisions (avg confidence: 35.6%)
+- **enter**: 17 decisions (avg confidence: 62.5%)
+- **exit**: 17 decisions (avg confidence: 56.4%)
 
 ### System Health
-- **Decisions (last hour)**: 16
+- **Decisions (last hour)**: 22
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -62,24 +62,35 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 18MB | 9d 0h | 70 |
-| x-bot | 🟢 online | 0% | 20MB | 9d 0h | 69 |
-| error-alerts | 🟢 online | 0% | 14MB | 9d 0h | 76 |
-| market-data-ws | 🟢 online | 0% | 143MB | 7h 33m | 72 |
-| ggbot | 🟢 online | 0% | 287MB | 14m | 267 |
-| account-monitor | 🟢 online | 0% | 86MB | 7h 32m | 36 |
-| agent-d38fd69e-ceb8-4746-b688-c890961d5c7b | 🟢 online | 0% | 60MB | 7h 22m | 5 |
+| signal-listener | 🟢 online | 0% | 18MB | 9d 7h | 70 |
+| x-bot | 🔴 stopped | 0% | 0MB | 9d 7h | 69 |
+| error-alerts | 🟢 online | 0% | 20MB | 9d 7h | 76 |
+| market-data-ws | 🟢 online | 1.1% | 102MB | 14h 15m | 72 |
+| ggbot | 🟢 online | 3.3% | 400MB | 6h 3m | 268 |
+| account-monitor | 🟢 online | 1.6% | 151MB | 14h 14m | 36 |
+| agent-d38fd69e-ceb8-4746-b688-c890961d5c7b | 🟢 online | 0% | 55MB | 14h 4m | 5 |
 
 ### VM Resources
 
 - **Disk**: 40G / 78G (52%)
-- **Memory**: 1.9Gi / 3.8Gi
-- **CPU Load**: 0.45 / 0.33 / 0.37 (1m/5m/15m)
+- **Memory**: 2.4Gi / 3.8Gi
+- **CPU Load**: 0.54 / 0.38 / 0.22 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 17.06M)
+- **Redis**: 🟢 connected (Memory: 18.30M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
+
+### Python Virtual Environments
+
+| Directory | Purpose | Size |
+|-----------|---------|------|
+| `.venv/` | Main ggbot application (all PM2 services except agents) | ~1.5GB |
+| `.venv-agent/` | Isolated Claude Agent SDK environment for autonomous agents | ~42MB |
+
+**Why two venvs?** Autonomous agents (config_type='agent') run via Claude Agent SDK which has specific dependency requirements. To avoid conflicts with the main ggbot dependencies, agents spawn in an isolated venv. When an agent starts, `api/agent.py` launches it via PM2 with `--interpreter .venv-agent/bin/python`.
+
+**Agent venv dependencies**: `claude-agent-sdk`, `psycopg2-binary`, `redis`, `httpx`, `loguru` (see `requirements-agent.txt`)
 
 ---
 
@@ -417,7 +428,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2025-12-28 05:44:44 UTC
+**Last Updated**: 2025-12-28 12:26:24 UTC
 
 ---
 
@@ -1264,7 +1275,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2025-12-28 05:44:44 UTC
+**Last Updated**: 2025-12-28 12:26:24 UTC
 
 ---
 
