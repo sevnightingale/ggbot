@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback } from 'react'
-import { Crown, Clock, CheckSquare, Bot, Rocket, Loader2, AlertCircle, Zap } from 'lucide-react'
+import { Bot, Rocket, Loader2, AlertCircle, Zap } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -28,7 +28,7 @@ export function BotCreationModal({
   onConfirm,
   existingBotCount
 }: BotCreationModalProps) {
-  const [selectedType, setSelectedType] = useState<BotType>('scheduled_trading')
+  const selectedType: BotType = 'scheduled_trading' // Hardcoded for now - agents disabled
   const [tradingMode, setTradingMode] = useState<TradingMode>('paper')
   const [symphonyAgentId, setSymphonyAgentId] = useState('')
   const [botName, setBotName] = useState('')
@@ -36,9 +36,7 @@ export function BotCreationModal({
   const [symphonyConnected, setSymphonyConnected] = useState(false)
   const [asterConnected, setAsterConnected] = useState(false)
   const [checkingConnections, setCheckingConnections] = useState(true)
-  const { canAccess } = usePermissions()
-
-  const hasAgentAccess = canAccess('agents')
+  const { canAccess: _canAccess } = usePermissions() // Keep import for future use
 
   // Generate default bot name based on type and mode
   const generateDefaultName = useCallback(() => {
@@ -98,36 +96,6 @@ export function BotCreationModal({
     }
   }
 
-  const botTypes = [
-    {
-      type: 'scheduled_trading' as const,
-      Icon: Clock,
-      label: 'Scheduled Trading',
-      description: 'Automated trading on a fixed schedule (5m, 15m, 1h, etc.)',
-      color: 'var(--agent-extraction)',
-      available: true,
-      tier: 'Free'
-    },
-    {
-      type: 'signal_validation' as const,
-      Icon: CheckSquare,
-      label: 'Signal Validation',
-      description: 'Validate external signals (Telegram, webhooks) with AI analysis',
-      color: 'var(--agent-decision)',
-      available: true,
-      tier: 'Free'
-    },
-    {
-      type: 'agent' as const,
-      Icon: Bot,
-      label: 'Agent',
-      description: 'Autonomous AI agent that defines its own trading strategy through conversation',
-      color: '#9333ea', // purple-600
-      available: hasAgentAccess,
-      tier: 'Pro'
-    }
-  ]
-
   const tradingModes = [
     {
       mode: 'paper' as const,
@@ -164,14 +132,7 @@ export function BotCreationModal({
   ]
 
   const handleConfirm = () => {
-    const selectedBotType = botTypes.find(t => t.type === selectedType)
     const selectedTradingMode = tradingModes.find(m => m.mode === tradingMode)
-
-    // Check bot type availability
-    if (!selectedBotType?.available) {
-      setUpgradeModalOpen(true)
-      return
-    }
 
     // Check trading mode availability
     if (!selectedTradingMode?.available) {
@@ -215,7 +176,7 @@ export function BotCreationModal({
         <DialogHeader>
           <DialogTitle className="text-2xl">Create New Bot</DialogTitle>
           <DialogDescription>
-            Choose the type of bot you want to create
+            Configure your new trading bot
           </DialogDescription>
         </DialogHeader>
 
@@ -236,66 +197,6 @@ export function BotCreationModal({
           </p>
         </div>
 
-        {/* Bot Type Selection */}
-        <div className="space-y-3 py-4 border-t border-[var(--border)]">
-          <div className="mb-3">
-            <h3 className="text-sm font-semibold text-[var(--text-primary)] mb-1">Bot Type</h3>
-            <p className="text-xs text-[var(--text-secondary)]">Choose what kind of bot to create</p>
-          </div>
-
-          <div className="space-y-2">
-            {botTypes.map(({ type, Icon, label, description, color, available, tier }) => (
-              <button
-                key={type}
-                onClick={() => setSelectedType(type)}
-                className={`w-full p-3 rounded-lg border-2 transition-all text-left ${
-                  selectedType === type
-                    ? 'border-[var(--accent)] bg-[var(--accent)]/10'
-                    : 'border-[var(--border)] hover:border-[var(--border-hover)]'
-                } ${!available ? 'opacity-60' : ''}`}
-              >
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center"
-                    style={{ backgroundColor: available ? `${color}20` : 'var(--bg-tertiary)' }}
-                  >
-                    <Icon className="h-5 w-5" style={{ color: available ? color : 'var(--text-muted)' }} />
-                  </div>
-
-                  <div className="flex-1">
-                    <div className="flex items-center gap-2 mb-0.5">
-                      <span className="text-sm font-medium text-[var(--text-primary)]">
-                        {label}
-                      </span>
-                      {!available && tier === 'Pro' && (
-                        <Crown className="h-3 w-3 text-[var(--text-muted)]" />
-                      )}
-                      <span className="text-xs px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
-                        {tier}
-                      </span>
-                    </div>
-
-                    <p className="text-xs text-[var(--text-secondary)]">
-                      {description}
-                    </p>
-                  </div>
-
-                  <div className={`flex-shrink-0 w-4 h-4 rounded-full border-2 ${
-                    selectedType === type
-                      ? 'border-[var(--accent)] bg-[var(--accent)]'
-                      : 'border-[var(--border)]'
-                  }`}>
-                    {selectedType === type && (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <div className="w-1.5 h-1.5 rounded-full bg-obsidian"></div>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
 
         {/* Trading Mode Selection */}
         <div className="space-y-3 py-4 border-t border-[var(--border)]">
@@ -338,9 +239,6 @@ export function BotCreationModal({
                           <span className="text-sm font-medium text-[var(--text-primary)]">
                             {label}
                           </span>
-                          {!available && (
-                            <Crown className="h-3 w-3 text-[var(--text-muted)]" />
-                          )}
                           <span className="text-xs px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
                             {tier}
                           </span>
@@ -415,7 +313,7 @@ export function BotCreationModal({
             onClick={handleConfirm}
             className="px-4 py-2 rounded-lg bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#edebe7] dark:text-[#1a1816] font-medium transition-colors"
           >
-            {botTypes.find(t => t.type === selectedType)?.available ? 'Create Bot' : 'Upgrade to Create'}
+            Create Bot
           </button>
         </div>
       </DialogContent>
