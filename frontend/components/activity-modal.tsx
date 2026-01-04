@@ -320,7 +320,7 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
             Reasoning
           </div>
           <div className="prose prose-invert prose-sm max-w-none text-sm" style={{ color: VIBE.ivory }}>
-            <ReactMarkdown>{thought.slice(0, 800) + (thought.length > 800 ? '...' : '')}</ReactMarkdown>
+            <ReactMarkdown>{thought}</ReactMarkdown>
           </div>
         </div>
       )}
@@ -376,9 +376,9 @@ function MarketQueryContent({ activity }: { activity: Activity }) {
               <summary className="cursor-pointer px-3 py-2 text-sm font-medium" style={{ color: VIBE.brass }}>
                 {key.replace(/_/g, ' ').toUpperCase()}
               </summary>
-              <div className="px-3 pb-3 max-h-48 overflow-y-auto">
+              <div className="px-3 pb-3 overflow-y-auto">
                 <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: 'rgba(237,235,231,0.8)' }}>
-                  {String(value).slice(0, 2000)}
+                  {String(value)}
                 </pre>
               </div>
             </details>
