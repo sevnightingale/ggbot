@@ -126,12 +126,12 @@ export function StrategyAdvisorPanel({
       try {
         const baseUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
         const response = await apiClient.authenticatedFetch(
-          `${baseUrl}/api/v2/bots/${configId}/stats`
+          `${baseUrl}/api/v2/bot/${configId}/account`
         )
         if (response.ok) {
           const data = await response.json()
-          // Check if there's at least 1 closed trade
-          setHasClosedTrades((data.total_trades || 0) > 0)
+          // Check if there's at least 1 closed trade (total_trades is nested under account)
+          setHasClosedTrades((data.account?.total_trades || 0) > 0)
         }
       } catch (error) {
         console.error('Failed to check trade count:', error)
