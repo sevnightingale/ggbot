@@ -6,6 +6,37 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-04 - Strategy Advisor Performance Analysis
+
+Universal bot performance analysis engine. Surfaces hidden patterns users couldn't see manually.
+
+**Backend** (`core/services/performance_analyzer.py`):
+- Basic stats: WR, R:R ratio, breakeven WR, P&L
+- Direction breakdown: long vs short performance
+- Universal pattern extraction from market_query (technical + sentiment + volume)
+- Pattern combination analysis: 2-pattern combos, confirmation vs risk patterns
+- Timeframe alignment: multi-TF correlation with outcomes
+- Exit reasoning classification: thesis_complete, trend_override, capitulation
+- Confidence calibration: expected vs actual win rates per bucket
+- Claude Haiku LLM synthesis for actionable recommendations
+
+**API**: `/api/v2/assistant/analyze/{config_id}` - returns full analysis with AI insights
+
+**Frontend** (`StrategyAdvisorPanel.tsx`):
+- Quick action buttons: Analyze Performance, Improve Win Rate, Reduce Losses, Optimize Strategy
+- Inline analysis report with stats, patterns, critical issues, positive edges, recommendations
+- Pattern display: best/worst combinations with win rate and P&L
+
+**Key Insight**: Found that "15M_divergence + any" patterns = -$500 P&L, while "4H_divergence + short" = +$650. Confidence >70% = worse outcomes (overconfidence). Exit classification revealed "trend_override" exits = 0% WR, -$842.
+
+---
+
+## 2026-01-04 - Activity Modal Redesign
+
+Replaced bottom-sheet with centered modal for activity details. New `activity-modal.tsx` component with carousel navigation (swipe mobile, arrows desktop). Type-specific formatters for trade_entry, trade_exit, llm_thought, market_query. Fixed Framer Motion transform conflict by using flexbox centering wrapper. Updated all 3 decision prompts with structured REASONING format (KEY_SIGNAL, SUPPORTING, RISK, SUMMARY) - frontend parses with graceful fallback.
+
+---
+
 ## 2025-12-28 - Symphony Position Display Fix
 
 **Root Cause**: SSE dashboard returned NULL for Symphony positions, enrichment function existed but never called

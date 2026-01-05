@@ -75,82 +75,50 @@ See planning doc for complete provider-specific instructions and verification st
 
 ## 🎨 **Activity Modal Redesign** [ACTIVITY_MODAL_REDESIGN.md]
 
-**Status**: 🟡 PHASE 1 COMPLETE
+**Status**: 🟢 COMPLETE
 **Planning Doc**: [DOCS/todo/ACTIVITY_MODAL_REDESIGN.md](DOCS/todo/ACTIVITY_MODAL_REDESIGN.md)
-**Complexity**: Medium (~4-6 hours)
 
-**Problem**: Bottom sheet for activity details is poor UX - unformatted text blobs, no navigation between activities, mobile-unfriendly.
+**Problem**: Bottom sheet for activity details was poor UX - unformatted text blobs, no navigation between activities, mobile-unfriendly.
 
-**Solution**: Replace with centered modal featuring carousel navigation through activities + structured content formatting.
+**Solution**: Centered modal with carousel navigation + structured LLM output formatting.
 
 ### **Phase 1: Modal Component (COMPLETE)**
 
-**Modal Navigation**:
-- [x] Created `activity-modal.tsx` - new centered modal component
-- [x] Swipe left/right (mobile) to navigate timeline
-- [x] Arrow keys (desktop) to navigate, Escape to close
-- [x] Visual swipe feedback during gesture
+- [x] Created `activity-modal.tsx` - centered modal with swipe/arrow navigation
+- [x] Type-specific formatters (trade_entry, trade_exit, llm_thought, market_query)
+- [x] Integrated with tv-timeline.tsx, replaced bottom-sheet
 
-**Content Formatting**:
-- [x] Structured display for each activity type (llm_thought, trade_entry, trade_exit, market_query)
-- [x] Type-specific formatters with proper layout and styling
-- [x] Trades show: entry/exit prices, P&L, duration, confidence, SL/TP
-- [x] LLM thoughts: action, confidence bar, reasoning (will parse structured sections when available)
-- [x] Market queries: collapsible data sections, metadata summary
+### **Phase 2: LLM Output Restructure (COMPLETE)**
 
-**Integration**:
-- [x] Integrated with tv-timeline.tsx (replaced bottom-sheet)
-- [x] All activities navigable via single modal
-- [x] Build passes, ready for testing
-
-### **Phase 2: LLM Output Restructure (TODO)**
-
-- [ ] Update prompts to output structured REASONING sections (KEY_SIGNAL, SUPPORTING, RISK, SUMMARY)
-- [ ] Update parser in `decision/engine_v2.py` to extract structured sections
-- [ ] Frontend already supports parsing structured format (will auto-render when available)
-
-See planning doc for full implementation phases and file list.
+- [x] Updated all 3 prompts with structured REASONING format (KEY_SIGNAL, SUPPORTING, RISK, SUMMARY)
+- [x] Frontend parses structured sections with graceful fallback to raw text
+- [x] No backend parser changes needed (frontend-only parsing)
 
 ---
 
 ## 📊 **Strategy Advisor Analysis** [STRATEGY_ADVISOR_ANALYSIS.md]
 
-**Status**: 🔵 PLANNING
+**Status**: 🟢 COMPLETE
 **Planning Doc**: [DOCS/todo/STRATEGY_ADVISOR_ANALYSIS.md](DOCS/todo/STRATEGY_ADVISOR_ANALYSIS.md)
-**Complexity**: Medium-High (~8-12 hours)
+**Completed**: 2026-01-04
 
-**Problem**: Users have no automated way to understand why their bot wins or loses. Must manually browse activities with no statistical analysis or actionable recommendations.
+**Problem**: Users had no automated way to understand why their bot wins or loses.
 
-**Solution**: Enhance Strategy Advisor with button prompts and automated performance analysis.
+**Solution**: Universal performance analysis with pattern correlation and AI-synthesized recommendations.
 
-### **Strategy Advisor Button Prompts**
-- [ ] Replace empty textbox with button grid
-- [ ] "Create Strategy" - Existing chat flow
-- [ ] "Analyze Performance" - Triggers automated analysis
-- [ ] "Improve Config" - Suggests optimizations
-
-### **Automated Analysis Engine**
-- [ ] Basic stats: win rate, P&L, R:R ratio, break-even WR needed
-- [ ] Direction analysis: long vs short performance
-- [ ] Market data correlation: which indicator patterns predict wins/losses
-- [ ] Duration analysis: hold times, big loss identification
-- [ ] Confidence calibration: stated confidence vs actual win rate
-- [ ] AI synthesis: generate prioritized recommendations
-
-### **Example Output**
-```
-🚨 CRITICAL: Risk/Reward Inverted (0.75:1)
-   Avg win $10.22 vs avg loss $13.58
-   → Recommendation: Tighter stop loss (2-3%)
-
-🚨 CRITICAL: Shorts Underperforming (18% WR)
-   Longs: 37% WR, Shorts: 18% WR
-   → Recommendation: Only take long positions
-
-📊 PATTERN: 1H MACD Rising + Long = Best setup (42.9% WR)
-```
-
-See planning doc for full technical architecture and implementation phases.
+### **What Was Built**
+- [x] `core/services/performance_analyzer.py` - Universal analysis engine
+- [x] Basic stats: win rate, P&L, R:R ratio, breakeven WR
+- [x] Direction analysis: long vs short performance
+- [x] Universal pattern extraction from all market_query data types
+- [x] Pattern combination analysis (2-pattern combos, confirmation vs risk)
+- [x] Timeframe alignment analysis
+- [x] Exit reasoning classification (thesis_complete, trend_override, etc.)
+- [x] Confidence calibration (expected vs actual win rates)
+- [x] Claude Haiku LLM synthesis for recommendations
+- [x] `/api/v2/assistant/analyze/{config_id}` endpoint
+- [x] Updated StrategyAdvisorPanel with button prompts
+- [x] Integrated analysis report display in frontend
 
 ---
 

@@ -725,3 +725,87 @@ async def universal_assistant_chat(
     except Exception as e:
         logger.error(f"AI assistant chat error: {e}")
         raise HTTPException(500, f"Chat error: {str(e)}")
+
+
+# ============================================================================
+# Performance Analysis Endpoint
+# ============================================================================
+
+class AnalyzeResponse(BaseModel):
+    """Response model for performance analysis."""
+    success: bool
+    config_id: str
+    config_name: str
+    trade_count: int
+    message: str = ""
+    report: Dict[str, Any] = {}
+
+
+@router.get("/assistant/analyze/{config_id}", response_model=AnalyzeResponse)
+async def analyze_bot_performance_endpoint(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """
+    Analyze a bot's trading performance.
+
+    Returns comprehensive analysis including:
+    - Basic stats (win rate, R:R ratio, P&L)
+    - Direction breakdown (long vs short performance)
+    - Confidence calibration (predicted vs actual win rates)
+    - Exit reasoning classification
+    - Pattern analysis (confirmation vs risk patterns)
+    - Pattern combinations (best/worst 2-pattern combos)
+    - Timeframe alignment analysis
+    - AI-synthesized insights and recommendations
+    """
+    from core.services.performance_analyzer import analyze_bot_performance
+
+    try:
+        # Verify config ownership
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT user_id FROM configurations WHERE config_id = %s
+                """, (config_id,))
+                result = cur.fetchone()
+
+                if not result:
+                    raise HTTPException(404, "Configuration not found")
+
+                if result[0] != current_user.user_id:
+                    raise HTTPException(403, "Not authorized to analyze this bot")
+
+        # Run analysis
+        report = await analyze_bot_performance(config_id, include_llm_insights=True)
+
+        # Check minimum trades
+        if report.trade_count < 10:
+            return AnalyzeResponse(
+                success=False,
+                config_id=config_id,
+                config_name=report.config_name,
+                trade_count=report.trade_count,
+                message=f"Need at least 10 trades for meaningful analysis. Current: {report.trade_count}",
+                report={}
+            )
+
+        logger.bind(
+            user_id=current_user.user_id,
+            config_id=config_id,
+            trade_count=report.trade_count
+        ).info("Performance analysis completed via API")
+
+        return AnalyzeResponse(
+            success=True,
+            config_id=config_id,
+            config_name=report.config_name,
+            trade_count=report.trade_count,
+            report=report.to_dict()
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Performance analysis error: {e}")
+        raise HTTPException(500, f"Analysis error: {str(e)}")
