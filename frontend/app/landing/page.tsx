@@ -6,6 +6,7 @@ import PersonalStory from '@/components/new-landing/PersonalStory'
 import Features from '@/components/new-landing/Features'
 import FAQ from '@/components/new-landing/FAQ'
 import Pricing from '@/components/new-landing/Pricing'
+import Footer from '@/components/new-landing/Footer'
 
 export default function NewLandingPage() {
   return (
@@ -18,6 +19,7 @@ export default function NewLandingPage() {
       <Features />
       <FAQ />
       <Pricing />
+      <Footer />
     </main>
   )
 }

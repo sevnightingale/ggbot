@@ -22,7 +22,7 @@ export default function Header() {
           {/* Logo */}
           <div className="flex-shrink-0">
             <Image
-              src="/ggbots_logo.svg"
+              src="/ggbots_logo.png"
               alt="ggbots.ai"
               width={120}
               height={40}

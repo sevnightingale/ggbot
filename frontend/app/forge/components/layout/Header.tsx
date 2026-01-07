@@ -35,14 +35,11 @@ export function Header({}: HeaderProps) {
         <div className="flex items-center gap-6">
           <div className="h-8 w-8 flex items-center justify-center">
             <Image
-              src="/ggbots_logo.svg"
+              src="/ggbots_logo.png"
               alt="ggbots logo"
               width={28}
               height={28}
-              className="h-7 w-auto text-[var(--text-primary)]"
-              style={{
-                filter: 'brightness(0) saturate(100%) invert(var(--logo-invert, 12%)) sepia(12%) saturate(584%) hue-rotate(200deg) brightness(95%) contrast(89%)'
-              }}
+              className="h-7 w-auto"
             />
           </div>
 

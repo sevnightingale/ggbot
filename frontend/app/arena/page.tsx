@@ -275,7 +275,7 @@ function ArenaContent() {
         <div className="relative flex items-center justify-between px-4 py-3 max-w-7xl mx-auto">
           <a href="https://ggbots.ai" className="flex items-center gap-2 z-10">
             <img
-              src="https://ggbots.ai/ggbots_logo.svg"
+              src="https://ggbots.ai/ggbots_logo.png"
               alt="ggbots logo"
               width={28}
               height={28}
