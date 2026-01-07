@@ -6,6 +6,31 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-07 - ggArena Season 1 Launch Prep
+
+**Arena Page Redesign** (`frontend/app/arena/page.tsx`):
+- Season 1 hero section: badge, $2,500 prize pool, countdown timer to Jan 21 12:00 UTC
+- Updated dates from prototype (Dec 18 - Jan 8) to Season 1 (Jan 21 - Feb 11)
+- "Training Ground" framing for 7 prototype bots as examples
+- Countdown timer with live seconds update, hydration-safe with `mounted` check
+
+**Registration Mechanism** (`ggbot.py:3842-3943`):
+- `POST /api/v2/bot/{config_id}/arena/register` - validates bot active + user subscribed, sets `is_public_performance = true`
+- `POST /api/v2/bot/{config_id}/arena/unregister` - removes bot from competition
+- Eligibility: must have active subscription + bot in 'active' state
+
+**Frontend Registration Flow** (`frontend/components/arena-registration-modal.tsx`, `ActivationBar.tsx`):
+- Registration modal with competition details, dates, prize info, account reset warning
+- "Enter Arena" button in ActivationBar (paper trading bots only)
+- "In Arena" badge shows when bot registered (`is_public_performance = true`)
+- Added `is_public_performance` to `BotConfiguration` interface (`lib/api.ts`)
+
+**Infrastructure** (also this session):
+- Fixed 502 timeout issue: nginx proxy_read_timeout 300s, proxy_buffering off for SSE
+- Increased APScheduler jitter 15s → 30s to spread bot execution load
+
+---
+
 ## 2026-01-06 - Reasoning Tier Fix + Billing Accuracy + Upgrade Modal Redesign
 
 **Reasoning Tier Bug** (`core/config/schemas.py`, `core/config/models.py`):
