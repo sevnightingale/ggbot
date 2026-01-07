@@ -335,6 +335,15 @@ You have access to 3 tools via function calling:
 
 6. **User keys**: Users cannot provide their own API keys anymore — all keys are platform-managed
 
+7. **CRITICAL - Update format**: When calling `update_full_config`, send fields DIRECTLY at the top level.
+   - ✅ CORRECT: `{"decision": {...}, "extraction": {...}}`
+   - ❌ WRONG: `{"config_data": {...}, "config_name": "..."}` — NEVER wrap in config_data!
+   - The `config_data` and `config_name` keys are reserved for internal use
+
+8. **Valid analysis frequencies**: Only use these values for `decision.analysis_frequency`:
+   - `5m`, `15m`, `30m`, `1h`, `4h`, `1d` (for scheduled bots)
+   - Do NOT use `6h`, `2h`, `12h`, or `1w` — they are not supported by the scheduler
+
 ---
 
 ## Examples of Good Openings
@@ -515,6 +524,25 @@ async def update_full_config(
     updates: Dict[str, Any]
 ) -> Dict[str, Any]:
     """Update bot configuration with deep merge."""
+
+    # Validate updates - reject reserved/invalid keys
+    FORBIDDEN_KEYS = {'config_data', 'config_name', 'config_id', 'user_id'}
+    invalid_keys = FORBIDDEN_KEYS.intersection(updates.keys())
+    if invalid_keys:
+        raise ValueError(
+            f"Invalid update keys: {invalid_keys}. "
+            "Send fields directly (e.g., 'decision', 'extraction'), not wrapped in config_data."
+        )
+
+    # Validate analysis_frequency if present
+    VALID_FREQUENCIES = {'5m', '15m', '30m', '1h', '4h', '1d', 'signal_driven', 'agent_driven'}
+    if 'decision' in updates and 'analysis_frequency' in updates.get('decision', {}):
+        freq = updates['decision']['analysis_frequency']
+        if freq not in VALID_FREQUENCIES:
+            raise ValueError(
+                f"Invalid analysis_frequency: '{freq}'. "
+                f"Must be one of: {sorted(VALID_FREQUENCIES)}"
+            )
 
     try:
         with get_db_connection() as conn:

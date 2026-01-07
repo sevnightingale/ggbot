@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react'
-import { RefreshCw, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
+import { RefreshCw, Bot, TrendingUp, TrendingDown, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
 
@@ -305,17 +305,19 @@ function ArenaContent() {
             />
           </a>
 
-          {/* Progress bar - absolutely centered */}
-          <div className="hidden sm:flex items-center gap-3 absolute left-1/2 -translate-x-1/2 w-64">
-            <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">Day {daysSinceStart}</span>
-            <div className="flex-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
-              <div
-                className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
-                style={{ width: `${progressPercent}%` }}
-              />
+          {/* Progress bar - only show once competition has started */}
+          {mounted && daysSinceStart > 0 && (
+            <div className="hidden sm:flex items-center gap-3 absolute left-1/2 -translate-x-1/2 w-64">
+              <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">Day {daysSinceStart}</span>
+              <div className="flex-1 h-1.5 bg-[var(--bg-tertiary)] rounded-full overflow-hidden border border-[var(--border)]">
+                <div
+                  className="h-full bg-[var(--accent)] rounded-full transition-all duration-500"
+                  style={{ width: `${progressPercent}%` }}
+                />
+              </div>
+              <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">{daysRemaining} left</span>
             </div>
-            <span className="text-xs font-mono text-[var(--text-muted)] whitespace-nowrap">{daysRemaining} left</span>
-          </div>
+          )}
 
           <a
             href="https://app.ggbots.ai"
@@ -351,9 +353,11 @@ function ArenaContent() {
             $2,500 Prize Pool
           </div>
 
-          <p className="text-[var(--text-secondary)] max-w-xl mx-auto mb-8">
-            Build your AI trading bot and compete against the best.
-            21 days. Top 3 get funded live trading on Symphony.
+          <p className="text-lg text-[var(--text-secondary)] max-w-xl mx-auto mb-3">
+            Your AI vs theirs. 21 days. Winner takes all.
+          </p>
+          <p className="text-sm text-[var(--text-muted)] max-w-md mx-auto mb-8">
+            Top 3 get real capital to trade live.
           </p>
 
           {/* Countdown Timer - isolated component so it doesn't re-render the whole page */}
@@ -367,8 +371,47 @@ function ArenaContent() {
             className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-base font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
           >
             <Zap className="h-5 w-5" />
-            <span>Create Your ggbot</span>
+            <span>Enter the Arena</span>
           </a>
+        </div>
+      </div>
+
+      {/* How It Works */}
+      <div className="border-b border-[var(--border)] bg-[var(--bg-secondary)]/50">
+        <div className="max-w-4xl mx-auto px-4 py-10">
+          <h2 className="text-center text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-8">
+            How It Works
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">1</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Build</div>
+              <p className="text-xs text-[var(--text-muted)]">Create your AI trading bot — pick a model, set your strategy</p>
+            </div>
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">2</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Subscribe</div>
+              <p className="text-xs text-[var(--text-muted)]">Usage-based pricing starts your bot. Most users spend &lt;$5/mo</p>
+            </div>
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">3</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Enter</div>
+              <p className="text-xs text-[var(--text-muted)]">Click &quot;Enter Arena&quot; on your bot. All accounts reset to $10k on Jan 21</p>
+            </div>
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">4</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Win</div>
+              <p className="text-xs text-[var(--text-muted)]">Highest equity after 21 days wins. Top 3 split the prize pool</p>
+            </div>
+          </div>
         </div>
       </div>
 
@@ -468,22 +511,17 @@ function ArenaContent() {
           </div>
         )}
 
-        {/* Training Ground - Prototype Bots */}
+        {/* Leaderboard */}
         {!loading && data && rankedBots.length > 0 && (
           <>
-            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-tertiary)]/50 p-6 mb-8">
-              <div className="flex items-center gap-3 mb-3">
-                <div className="w-1 h-6 rounded-full bg-[var(--text-muted)]" />
-                <h3 className="font-display text-xl text-[var(--text-primary)]">Training Ground</h3>
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center gap-3">
+                <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
+                <h3 className="font-display text-xl text-[var(--text-primary)]">Leaderboard</h3>
               </div>
-              <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-2xl">
-                Study these prototype bots to see what&apos;s possible. Each showcases a different trading strategy —
-                from technical analysis purists to sentiment-driven contrarians. Use them as inspiration for your own build.
+              <p className="text-xs text-[var(--text-muted)]">
+                Prototype bots — study their strategies for inspiration
               </p>
-            </div>
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-              <h3 className="font-display text-xl text-[var(--text-primary)]">The Archetypes</h3>
             </div>
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden mb-8">
               <div className="divide-y divide-[var(--border)]">
@@ -723,25 +761,32 @@ function ArenaContent() {
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--accent)]/10 via-[var(--accent)]/5 to-transparent pointer-events-none" />
 
         <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
-          <div
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6"
-            style={{
-              backgroundColor: 'color-mix(in srgb, var(--signal) 15%, transparent)',
-              border: '1px solid var(--signal)'
-            }}
-          >
-            <span className="text-sm font-semibold uppercase tracking-wider text-[var(--signal)]">
-              Season 1 · January 2026
-            </span>
-          </div>
-
           <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4">
             Ready to Compete?
           </h2>
 
-          <p className="text-lg text-[var(--text-secondary)] mb-10 max-w-md mx-auto">
-            Build your own AI trading bot and enter the arena.
+          <p className="text-lg text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
+            21 days. One winner. Real prizes.
           </p>
+
+          {/* Prize Breakdown */}
+          <div className="flex justify-center gap-6 mb-10">
+            <div className="text-center">
+              <div className="text-2xl mb-1">🥇</div>
+              <div className="text-lg font-mono font-bold text-[var(--accent)]">$1,500</div>
+              <div className="text-xs text-[var(--text-muted)]">+ funded trading</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl mb-1">🥈</div>
+              <div className="text-lg font-mono font-bold text-[var(--text-primary)]">$700</div>
+              <div className="text-xs text-[var(--text-muted)]">+ funded trading</div>
+            </div>
+            <div className="text-center">
+              <div className="text-2xl mb-1">🥉</div>
+              <div className="text-lg font-mono font-bold text-[var(--text-primary)]">$300</div>
+              <div className="text-xs text-[var(--text-muted)]">+ funded trading</div>
+            </div>
+          </div>
 
           <a
             href="https://app.ggbots.ai"
@@ -750,9 +795,12 @@ function ArenaContent() {
             className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
           >
             <Zap className="h-5 w-5" />
-            <span>Create Your ggbot</span>
-            <ExternalLink className="h-5 w-5" />
+            <span>Start Building</span>
           </a>
+
+          <p className="mt-6 text-xs text-[var(--text-muted)]">
+            Competition starts January 21st, 12:00 UTC
+          </p>
         </div>
       </div>
     </div>
