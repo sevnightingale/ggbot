@@ -318,7 +318,7 @@ function ArenaContent() {
           </div>
 
           <a
-            href="https://ggbots.ai"
+            href="https://app.ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] z-10"
@@ -744,7 +744,7 @@ function ArenaContent() {
           </p>
 
           <a
-            href="https://ggbots.ai"
+            href="https://app.ggbots.ai"
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex items-center gap-3 px-8 py-4 rounded-xl text-lg font-semibold transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
