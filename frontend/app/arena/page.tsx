@@ -5,6 +5,58 @@ import { RefreshCw, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, Ch
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
 
+// Isolated countdown component - only this re-renders every second, not the whole page
+function CountdownTimer({ targetTime }: { targetTime: number }) {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now()
+      const diff = targetTime - now
+      if (diff > 0) {
+        setTimeLeft({
+          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((diff % (1000 * 60)) / 1000)
+        })
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [targetTime])
+
+  if (!mounted || (timeLeft.days + timeLeft.hours + timeLeft.minutes + timeLeft.seconds === 0)) {
+    return null
+  }
+
+  return (
+    <div className="flex justify-center gap-3 mb-8">
+      <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+        <span className="text-2xl font-mono font-bold text-[var(--accent)]">{timeLeft.days}</span>
+        <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Days</span>
+      </div>
+      <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+        <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.hours).padStart(2, '0')}</span>
+        <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Hours</span>
+      </div>
+      <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+        <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.minutes).padStart(2, '0')}</span>
+        <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Min</span>
+      </div>
+      <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+        <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.seconds).padStart(2, '0')}</span>
+        <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Sec</span>
+      </div>
+    </div>
+  )
+}
 
 interface DataPoint {
   timestamp: string
@@ -122,34 +174,14 @@ function ArenaContent() {
   const [hours, setHours] = useState(504)
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
-  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
 
-  // Competition start time for countdown
+  // Competition start time for countdown (static, no state needed here)
   const competitionStartTime = new Date('2026-01-21T12:00:00Z').getTime()
 
   // Fix hydration mismatch - only calculate date-based values on client
   useEffect(() => {
     setMounted(true)
   }, [])
-
-  // Countdown timer effect
-  useEffect(() => {
-    const timer = setInterval(() => {
-      const now = Date.now()
-      const diff = competitionStartTime - now
-      if (diff > 0) {
-        setTimeLeft({
-          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
-          hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
-          minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
-          seconds: Math.floor((diff % (1000 * 60)) / 1000)
-        })
-      } else {
-        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
-      }
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [competitionStartTime])
 
   const toggleCard = (configId: string) => {
     setExpandedCards(prev => {
@@ -324,27 +356,8 @@ function ArenaContent() {
             21 days. Top 3 get funded live trading on Symphony.
           </p>
 
-          {/* Countdown Timer */}
-          {mounted && timeLeft.days + timeLeft.hours + timeLeft.minutes + timeLeft.seconds > 0 && (
-            <div className="flex justify-center gap-3 mb-8">
-              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
-                <span className="text-2xl font-mono font-bold text-[var(--accent)]">{timeLeft.days}</span>
-                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Days</span>
-              </div>
-              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
-                <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.hours).padStart(2, '0')}</span>
-                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Hours</span>
-              </div>
-              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
-                <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.minutes).padStart(2, '0')}</span>
-                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Min</span>
-              </div>
-              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
-                <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.seconds).padStart(2, '0')}</span>
-                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Sec</span>
-              </div>
-            </div>
-          )}
+          {/* Countdown Timer - isolated component so it doesn't re-render the whole page */}
+          <CountdownTimer targetTime={competitionStartTime} />
 
           {/* CTA Button */}
           <a
