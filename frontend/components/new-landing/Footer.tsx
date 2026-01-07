@@ -30,8 +30,8 @@ export default function Footer() {
             <Image
               src="/ggbots_logo.png"
               alt="ggbots.ai"
-              width={100}
-              height={32}
+              width={120}
+              height={40}
               className="h-6 w-auto"
             />
             <p className="text-ivory/50 text-sm">

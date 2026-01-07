@@ -10,6 +10,7 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import { Trophy, Calendar, DollarSign, Zap, AlertCircle } from 'lucide-react'
+import { createClient } from '@/lib/supabase'
 
 interface ArenaRegistrationModalProps {
   isOpen: boolean
@@ -34,9 +35,20 @@ export function ArenaRegistrationModal({
     setError(null)
 
     try {
+      // Get auth session for API call
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+
+      if (!session?.access_token) {
+        throw new Error('Please sign in to register for the Arena')
+      }
+
       const response = await fetch(`/api/v2/bot/${configId}/arena/register`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        }
       })
 
       if (!response.ok) {

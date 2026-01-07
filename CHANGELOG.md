@@ -8,6 +8,16 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ## 2026-01-07 - ggArena Season 1 Launch Prep
 
+**Navigation & Polish** (CC Instance B):
+- Arena link added to Header navbar (`Header.tsx`)
+- Dismissible Season 1 announcement banner below header (`forge/page.tsx`)
+- Social links (X, Telegram) added to header with inline SVG icons
+- Removed floating HelpWidget, social links now in header
+- Removed "Free" tier labels from bot creation modal (`BotCreationModal.tsx`)
+- Fixed light mode theme issues: StrategyAdvisorPanel button text, BotImageUpload icon colors
+- Fixed empty state message: "Setting up your ggbot" → "Create your first ggbot"
+- Added landing page footer with Terms, Privacy links + social icons (`new-landing/Footer.tsx`)
+
 **Arena Page Redesign** (`frontend/app/arena/page.tsx`):
 - Season 1 hero section: badge, $2,500 prize pool, countdown timer to Jan 21 12:00 UTC
 - Updated dates from prototype (Dec 18 - Jan 8) to Season 1 (Jan 21 - Feb 11)

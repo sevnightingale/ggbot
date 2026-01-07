@@ -32,20 +32,20 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [x] Create registration confirmation modal (frontend)
 - [x] Add "Enter Arena" button to bot config page
 
-**Navigation & Branding** (Other CC working on these):
-- [ ] Add ggArena link to navbar
-- [ ] Add banner message about Season 1 (Jan 21st)
+**Navigation & Branding**:
+- [x] Add ggArena link to navbar
+- [x] Add banner message about Season 1 (Jan 21st)
 - [ ] Update logo everywhere
 - [ ] Update favicon
 
 ### **Phase 2: Critical Polish (Tonight/Tomorrow)**
 
 - [ ] Fix duplicate and reset buttons
-- [ ] Fix "Setting up your ggbot" message (shows when no bots exist, misleading)
-- [ ] Remove "free" labels from bot creation modal (usage-based now)
-- [ ] Fix theme/light mode issues (strategy advisor buttons, image upload icon)
-- [ ] Remove floating question mark helper icon
-- [ ] Add socials to footer or navbar (mobile-friendly)
+- [x] Fix "Setting up your ggbot" message (shows when no bots exist, misleading)
+- [x] Remove "free" labels from bot creation modal (usage-based now)
+- [x] Fix theme/light mode issues (strategy advisor buttons, image upload icon)
+- [x] Remove floating question mark helper icon
+- [x] Add socials to header + landing footer (Twitter/X, Telegram)
 
 ### **Phase 3: Before Jan 21**
 

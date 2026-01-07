@@ -31,31 +31,27 @@ export function Header({}: HeaderProps) {
   return (
     <header className="sticky top-0 z-40 border-b border-[var(--border)] bg-[var(--bg-primary)]/80 backdrop-blur">
       <div className="flex items-center justify-between px-4 py-3">
-        {/* Left: Logo + Nav */}
-        <div className="flex items-center gap-6">
-          <div className="h-8 w-8 flex items-center justify-center">
-            <Image
-              src="/ggbots_logo.png"
-              alt="ggbots logo"
-              width={28}
-              height={28}
-              className="h-7 w-auto"
-            />
-          </div>
-
-          {/* Navigation */}
-          <nav className="hidden md:flex items-center gap-4">
-            <Link
-              href="/arena"
-              className="text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-            >
-              Arena
-            </Link>
-          </nav>
+        {/* Left: Logo */}
+        <div className="h-8 w-8 flex items-center justify-center">
+          <Image
+            src="/ggbots_logo.png"
+            alt="ggbots logo"
+            width={28}
+            height={28}
+            className="h-7 w-auto"
+          />
         </div>
 
-        {/* Right: Social + Theme + Profile */}
+        {/* Right: Arena + Social + Theme + Profile */}
         <div className="flex items-center gap-3">
+          {/* ggArena Link */}
+          <Link
+            href="/arena"
+            className="hidden sm:block text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            ggArena
+          </Link>
+
           {/* Social Links */}
           <div className="hidden sm:flex items-center gap-2">
             <a
