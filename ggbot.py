@@ -1726,7 +1726,8 @@ async def get_config(
                         created_at,
                         updated_at,
                         config_data,
-                        profile_image_url
+                        profile_image_url,
+                        is_public_performance
                     FROM configurations
                     WHERE config_id = %s
                 """, (config_id,))
@@ -1747,7 +1748,8 @@ async def get_config(
                     "created_at": row[7].isoformat() if row[7] else None,
                     "updated_at": row[8].isoformat() if row[8] else None,
                     "config_data": row[9],
-                    "profile_image_url": row[10]
+                    "profile_image_url": row[10],
+                    "is_public_performance": row[11] or False
                 }
 
         return {
@@ -3877,6 +3879,7 @@ async def register_for_arena(
             )
 
         # 4. Set is_public_performance = true
+        from core.common.db import get_db_connection
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
@@ -3919,6 +3922,7 @@ async def unregister_from_arena(
             raise HTTPException(status_code=404, detail="Configuration not found")
 
         # 2. Set is_public_performance = false
+        from core.common.db import get_db_connection
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""

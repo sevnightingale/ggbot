@@ -35,6 +35,7 @@ class BotConfigV2:
         trading_mode: str = "paper",
         symphony_agent_id: Optional[str] = None,
         profile_image_url: Optional[str] = None,
+        is_public_performance: bool = False,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -54,6 +55,7 @@ class BotConfigV2:
         self.trading_mode = trading_mode
         self.symphony_agent_id = symphony_agent_id
         self.profile_image_url = profile_image_url
+        self.is_public_performance = is_public_performance
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -68,6 +70,7 @@ class BotConfigV2:
             "trading_mode": self.trading_mode,
             "symphony_agent_id": self.symphony_agent_id,
             "profile_image_url": self.profile_image_url,
+            "is_public_performance": self.is_public_performance,
             "config_data": {
                 "schema_version": self.schema_version,
                 "selected_pair": self.selected_pair,
@@ -120,6 +123,8 @@ class BotConfigV2:
             state=data.get("state", "inactive"),
             trading_mode=data.get("trading_mode", "paper"),
             symphony_agent_id=data.get("symphony_agent_id"),
+            profile_image_url=data.get("profile_image_url"),
+            is_public_performance=data.get("is_public_performance", False),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -274,7 +279,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url
+                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -289,6 +294,7 @@ class ConfigService:
                     trading_mode = result[5] or "paper"
                     symphony_agent_id = result[6]
                     profile_image_url = result[7]
+                    state = result[8] or "inactive"
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -310,6 +316,7 @@ class ConfigService:
                             "trading_mode": trading_mode,
                             "symphony_agent_id": symphony_agent_id,
                             "profile_image_url": profile_image_url,
+                            "state": state,
                             "created_at": result[2].isoformat() if result[2] else None,
                             "updated_at": result[3].isoformat() if result[3] else None
                         }
@@ -326,6 +333,7 @@ class ConfigService:
                         flattened_config["trading_mode"] = trading_mode
                         flattened_config["symphony_agent_id"] = symphony_agent_id
                         flattened_config["profile_image_url"] = profile_image_url
+                        flattened_config["state"] = state
                         if "created_at" not in flattened_config and result[2]:
                             flattened_config["created_at"] = result[2].isoformat()
                         if "updated_at" not in flattened_config and result[3]:
@@ -354,14 +362,14 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type,
-                               trading_mode, symphony_agent_id, profile_image_url
+                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance
                         FROM configurations
                         WHERE user_id = %s
                         ORDER BY created_at DESC
                     """, (user_id,))
 
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url = row
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance = row
 
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -387,6 +395,7 @@ class ConfigService:
                                 "trading_mode": trading_mode or "paper",
                                 "symphony_agent_id": symphony_agent_id,
                                 "profile_image_url": profile_image_url,
+                                "is_public_performance": is_public_performance or False,
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -402,6 +411,7 @@ class ConfigService:
                             flattened_config["trading_mode"] = trading_mode or "paper"
                             flattened_config["symphony_agent_id"] = symphony_agent_id
                             flattened_config["profile_image_url"] = profile_image_url
+                            flattened_config["is_public_performance"] = is_public_performance or False
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:

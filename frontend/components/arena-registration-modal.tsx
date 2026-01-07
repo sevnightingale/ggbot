@@ -9,7 +9,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from '@/components/ui/dialog'
-import { Trophy, Calendar, DollarSign, Zap, AlertCircle } from 'lucide-react'
+import { Trophy, Calendar, DollarSign, Zap, AlertCircle, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 
 interface ArenaRegistrationModalProps {
@@ -29,6 +29,7 @@ export function ArenaRegistrationModal({
 }: ArenaRegistrationModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState(false)
 
   const handleRegister = async () => {
     setLoading(true)
@@ -56,13 +57,44 @@ export function ArenaRegistrationModal({
         throw new Error(data.detail || 'Registration failed')
       }
 
+      // Show success state
+      setSuccess(true)
       onSuccess()
-      onClose()
+
+      // Auto-close after delay
+      setTimeout(() => {
+        onClose()
+        setSuccess(false)
+      }, 2000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
       setLoading(false)
     }
+  }
+
+  // Success state UI
+  if (success) {
+    return (
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-md">
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="rounded-full bg-green-500/20 p-4 mb-4">
+              <CheckCircle className="h-12 w-12 text-green-500" />
+            </div>
+            <h3 className="text-xl font-semibold text-[var(--text-primary)] mb-2">
+              You&apos;re In!
+            </h3>
+            <p className="text-[var(--text-secondary)] text-center">
+              &quot;{configName}&quot; is registered for ggArena Season 1
+            </p>
+            <p className="text-sm text-[var(--text-muted)] mt-2">
+              Competition starts January 21st
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    )
   }
 
   return (
