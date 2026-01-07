@@ -40,7 +40,7 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ### **Phase 2: Critical Polish (Tonight/Tomorrow)**
 
-- [ ] Fix duplicate and reset buttons
+- [x] Fix duplicate and reset buttons (missing config_type, UI not refreshing)
 - [x] Fix "Setting up your ggbot" message (shows when no bots exist, misleading)
 - [x] Remove "free" labels from bot creation modal (usage-based now)
 - [x] Fix theme/light mode issues (strategy advisor buttons, image upload icon)

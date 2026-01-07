@@ -18,6 +18,10 @@ Complete history of features, fixes, and improvements. For current status see AC
 - Fixed empty state message: "Setting up your ggbot" → "Create your first ggbot"
 - Added landing page footer with Terms, Privacy links + social icons (`new-landing/Footer.tsx`)
 
+**Duplicate & Reset Button Fixes** (`api.ts`, `page.tsx`):
+- Duplicate: Added `config_type` to `createConfig` API call (422 error fix)
+- Reset: Added immediate `setAccounts` update after reset (UI now reflects $10k balance instantly)
+
 **Arena Page Redesign** (`frontend/app/arena/page.tsx`):
 - Season 1 hero section: badge, $2,500 prize pool, countdown timer to Jan 21 12:00 UTC
 - Updated dates from prototype (Dec 18 - Jan 8) to Season 1 (Jan 21 - Feb 11)

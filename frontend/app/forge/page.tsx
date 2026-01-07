@@ -946,6 +946,7 @@ function ForgeApp() {
         duplicateName,
         originalBot.config_data,
         {
+          config_type: originalBot.config_type,
           trading_mode: originalBot.trading_mode,
           symphony_agent_id: originalBot.symphony_agent_id
         }
@@ -996,8 +997,20 @@ function ForgeApp() {
       console.log(`✅ Account reset: ${result.message}`)
       console.log(`📊 Positions closed: ${result.positions_closed}, New balance: $${result.new_balance}`)
 
-      // Refresh accounts data to show new balance
-      // The SSE stream will automatically update the UI with the new account state
+      // Update local accounts state immediately for instant UI feedback
+      setAccounts(prev => prev.map(account =>
+        account.config_id === configId
+          ? {
+              ...account,
+              current_balance: result.new_balance,
+              total_pnl: 0,
+              unrealized_pnl: 0,
+              total_equity: result.new_balance,
+              win_rate: 0,
+              total_trades: 0,
+            }
+          : account
+      ))
 
     } catch (error) {
       console.error('❌ Failed to reset account:', error)
