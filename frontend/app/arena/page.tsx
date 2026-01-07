@@ -4,17 +4,7 @@ import React, { useState, useEffect, useCallback, useMemo } from 'react'
 import { RefreshCw, Bot, TrendingUp, TrendingDown, ExternalLink, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
-import dynamic from 'next/dynamic'
 
-// Lazy load ArenaTimeline (uses lightweight-charts which needs client-side only)
-const ArenaTimeline = dynamic(() => import('@/components/arena-timeline'), {
-  ssr: false,
-  loading: () => (
-    <div className="h-[350px] rounded-lg bg-[var(--bg-tertiary)] flex items-center justify-center">
-      <span className="text-sm text-[var(--text-muted)]">Loading timeline...</span>
-    </div>
-  )
-})
 
 interface DataPoint {
   timestamp: string
@@ -585,79 +575,121 @@ function ArenaContent() {
 
                       {/* Expanded Details */}
                       {isExpanded && (
-                        <div className="px-4 pb-4 pt-0">
-                          <div className="ml-14 pl-4 border-l-2 border-[var(--border)] space-y-4">
-                            {/* Activity Timeline */}
-                            <div>
-                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">Activity Timeline</div>
-                              <ArenaTimeline configId={bot.config_id} height={300} />
-                            </div>
-
-                            {/* Full Description */}
+                        <div className="px-4 pb-5 pt-2">
+                          <div className="ml-14 space-y-5">
+                            {/* Description */}
                             {bot.description && (
-                              <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                              <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-2xl">
                                 {bot.description}
                               </p>
                             )}
 
-                            {/* Config Info */}
-                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                              <div>
-                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Model</div>
-                                <div className="text-sm font-mono text-[var(--text-primary)]">{formatModel(bot.model)}</div>
+                            {/* Two-column layout for Strategy + Risk */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                              {/* Strategy Configuration */}
+                              <div className="rounded-xl bg-[var(--bg-tertiary)]/50 p-4">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
+                                  Strategy
+                                </div>
+                                <div className="space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">AI Model</span>
+                                    <span className="text-sm font-medium text-[var(--text-primary)]">{formatModel(bot.model)}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Trading Pair</span>
+                                    <span className="text-sm font-mono font-medium text-[var(--text-primary)]">{bot.symbol || 'BTC/USDT'}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Decision Frequency</span>
+                                    <span className="text-sm font-medium text-[var(--text-primary)]">{formatFrequency(bot.frequency)}</span>
+                                  </div>
+                                  {bot.max_margin && (
+                                    <div className="flex justify-between items-center">
+                                      <span className="text-sm text-[var(--text-muted)]">Max Position</span>
+                                      <span className="text-sm font-medium text-[var(--text-primary)]">{bot.max_margin}%</span>
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                              <div>
-                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Frequency</div>
-                                <div className="text-sm font-mono text-[var(--text-primary)]">{formatFrequency(bot.frequency)}</div>
-                              </div>
-                              <div>
-                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Stop Loss</div>
-                                <div className="text-sm font-mono text-[var(--text-primary)]">{bot.stop_loss ? `${bot.stop_loss}%` : '—'}</div>
-                              </div>
-                              <div>
-                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Take Profit</div>
-                                <div className="text-sm font-mono text-[var(--text-primary)]">{bot.take_profit ? `${bot.take_profit}%` : '—'}</div>
+
+                              {/* Risk Management */}
+                              <div className="rounded-xl bg-[var(--bg-tertiary)]/50 p-4">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
+                                  Risk Management
+                                </div>
+                                <div className="space-y-3">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Stop Loss</span>
+                                    <span className={`text-sm font-mono font-medium ${bot.stop_loss ? 'text-red-400' : 'text-[var(--text-muted)]'}`}>
+                                      {bot.stop_loss ? `-${bot.stop_loss}%` : 'Not set'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Take Profit</span>
+                                    <span className={`text-sm font-mono font-medium ${bot.take_profit ? 'text-green-400' : 'text-[var(--text-muted)]'}`}>
+                                      {bot.take_profit ? `+${bot.take_profit}%` : 'Not set'}
+                                    </span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Open Positions</span>
+                                    <span className="text-sm font-mono font-medium text-[var(--text-primary)]">{bot.open_positions}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Unrealized P&L</span>
+                                    <span className={`text-sm font-mono font-medium ${bot.unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                      {bot.unrealized_pnl >= 0 ? '+' : ''}{formatCurrency(bot.unrealized_pnl)}
+                                    </span>
+                                  </div>
+                                </div>
                               </div>
                             </div>
 
-                            {/* Data Sources */}
-                            {categories.length > 0 && (
-                              <div>
-                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">Data Sources</div>
-                                <div className="flex flex-wrap gap-1.5">
-                                  {categories.map(cat => (
-                                    <span
-                                      key={cat}
-                                      className="px-2 py-0.5 text-xs rounded-full bg-[var(--bg-tertiary)] text-[var(--text-secondary)]"
-                                    >
-                                      {cat}
-                                    </span>
-                                  ))}
+                            {/* Data Sources & Indicators */}
+                            {(categories.length > 0 || indicators.length > 0) && (
+                              <div className="rounded-xl bg-[var(--bg-tertiary)]/50 p-4">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
+                                  Market Intelligence
                                 </div>
-                              </div>
-                            )}
 
-                            {/* Indicators */}
-                            {indicators.length > 0 && (
-                              <div>
-                                <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-2">
-                                  Indicators ({indicators.length})
-                                </div>
-                                <div className="flex flex-wrap gap-1">
-                                  {indicators.slice(0, 12).map(ind => (
-                                    <span
-                                      key={ind}
-                                      className="px-1.5 py-0.5 text-[10px] font-mono rounded bg-[var(--bg-primary)] text-[var(--text-muted)]"
-                                    >
-                                      {ind}
-                                    </span>
-                                  ))}
-                                  {indicators.length > 12 && (
-                                    <span className="px-1.5 py-0.5 text-[10px] font-mono text-[var(--text-muted)]">
-                                      +{indicators.length - 12} more
-                                    </span>
-                                  )}
-                                </div>
+                                {categories.length > 0 && (
+                                  <div className="mb-3">
+                                    <div className="text-xs text-[var(--text-muted)] mb-2">Data Sources</div>
+                                    <div className="flex flex-wrap gap-2">
+                                      {categories.map(cat => (
+                                        <span
+                                          key={cat}
+                                          className="px-3 py-1 text-xs rounded-lg bg-[var(--bg-secondary)] text-[var(--text-primary)] border border-[var(--border)]"
+                                        >
+                                          {cat}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  </div>
+                                )}
+
+                                {indicators.length > 0 && (
+                                  <div>
+                                    <div className="text-xs text-[var(--text-muted)] mb-2">
+                                      Technical Indicators ({indicators.length})
+                                    </div>
+                                    <div className="flex flex-wrap gap-1.5">
+                                      {indicators.slice(0, 15).map(ind => (
+                                        <span
+                                          key={ind}
+                                          className="px-2 py-0.5 text-[11px] font-mono rounded bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border)]"
+                                        >
+                                          {ind}
+                                        </span>
+                                      ))}
+                                      {indicators.length > 15 && (
+                                        <span className="px-2 py-0.5 text-[11px] font-mono text-[var(--text-muted)]">
+                                          +{indicators.length - 15} more
+                                        </span>
+                                      )}
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )}
                           </div>
