@@ -61,11 +61,19 @@ class LLMConfig(BaseModel):
     """LLM provider configuration."""
     provider: str = Field(default="default")
     model: Optional[str] = Field(default="default")
-    thinking_mode: bool = Field(default=False, description="Enable extended reasoning mode (higher cost, better quality)")
+    reasoning_tier: Optional[str] = Field(default="standard", description="Reasoning tier: economy (fast/cheap), standard (balanced), premium (best quality)")
+    thinking_mode: bool = Field(default=False, description="DEPRECATED: Use reasoning_tier instead. Kept for backward compatibility.")
 
     # Deprecated: Users can no longer bring their own keys
     use_platform_keys: bool = True
     use_own_key: bool = False
+
+    @field_validator('reasoning_tier')
+    def validate_reasoning_tier(cls, v):
+        valid_tiers = ['economy', 'standard', 'premium', None]
+        if v not in valid_tiers:
+            raise ValueError(f"reasoning_tier must be one of {valid_tiers}")
+        return v or 'standard'  # Default to standard if None
 
     @field_validator('provider')
     def validate_provider(cls, v):

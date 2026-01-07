@@ -116,9 +116,10 @@ See planning doc for complete provider-specific instructions and verification st
 - [x] Exit reasoning classification (thesis_complete, trend_override, etc.)
 - [x] Confidence calibration (expected vs actual win rates)
 - [x] Claude Haiku LLM synthesis for recommendations
+- [x] Exit analysis caveat (LLM instructed: no counterfactual data for early exits)
 - [x] `/api/v2/assistant/analyze/{config_id}` endpoint
-- [x] Updated StrategyAdvisorPanel with button prompts
-- [x] Integrated analysis report display in frontend
+- [x] Two buttons: "Create Strategy" (always), "Analyze Performance" (when trades exist)
+- [x] "Discuss with Strategy Advisor" sends report summary to chat
 
 ---
 

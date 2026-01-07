@@ -74,7 +74,7 @@ Legacy/Archive (Moved to /archive/):
 ├── BotImageUpload.tsx      # Bot profile image uploader - drag-drop, auto-resize to 1024×1024, Supabase Storage
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
 ├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
-├── UpgradeModal.tsx        # Stripe checkout modal with monthly/annual pricing toggle
+├── UpgradeModal.tsx        # Bot-specific cost estimate modal with Stripe checkout (model+tier+frequency based)
 └── ValidationMessage.tsx   # Error/warning message component with icons
 
 /components/ui/              # shadcn UI components
@@ -374,17 +374,18 @@ const canUseSignals = canAccess('ggshot')
 
 ### **Upgrade Flow (Stripe Integration)**
 ```typescript
-// PermissionGate with UpgradeModal
-import { UpgradeModal } from '@/components/UpgradeModal'
+// ActivationBar passes bot config to UpgradeModal for cost estimate
+<UpgradeModal
+  open={upgradeModalOpen}
+  onOpenChange={setUpgradeModalOpen}
+  botConfig={selectedBot}  // Bot-specific cost estimate
+/>
 
-<PermissionGate feature="telegram_publishing">
-  <TelegramSettings />
-</PermissionGate>
-
-// Auto-shows upgrade prompt with modal trigger:
-// - Monthly/Annual pricing toggle
-// - 14-day free trial messaging
-// - Early adopter coupon input
+// Modal shows:
+// - Bot name ("Activate The Technician")
+// - Value prop ("trade 24/7 while you sleep")
+// - Cost estimate based on model + tier + frequency (~$X-Y/mo)
+// - Trust bullets (pay only for AI decisions, no base fee, etc.)
 // - Redirects to Stripe Checkout on confirm
 ```
 

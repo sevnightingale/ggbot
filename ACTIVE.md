@@ -1,46 +1,46 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-04 07:57:53 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-07 02:57:44 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 266
+- **Total Users**: 270
 - **Pro Users (ggbase)**: 0 (0 active subscriptions)
-- **Free Users**: 261
-- **Users with Bots**: 259 (97.4%)
+- **Free Users**: 265
+- **Users with Bots**: 263 (97.4%)
 
 ### Bot Statistics
-- **Total Bots**: 390
+- **Total Bots**: 396
 - **Active Bots**: 7 (1.8%)
   - Paper: 6
   - Symphony (Live): 1
   - Aster (DEX): 0
-- **Inactive Bots**: 383
+- **Inactive Bots**: 389
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,748
-  - Wins: 1,746
-  - Losses: 4,002
-  - Platform Win Rate: 30.38%
-  - Total P&L: $-17,552.66
+- **Total Trades (All Time)**: 5,834
+  - Wins: 1,780
+  - Losses: 4,054
+  - Platform Win Rate: 30.51%
+  - Total P&L: $-17,710.18
 - **Recent Activity**:
-  - Last 24 hours: 14 trades
-  - Last 7 days: 108 trades
-  - Last 30 days: 306 trades
+  - Last 24 hours: 46 trades
+  - Last 7 days: 157 trades
+  - Last 30 days: 389 trades
 
 ### Open Positions
-- **Open Positions**: 6
+- **Open Positions**: 3
 - **Unique Symbols**: 1
-- **Total Exposure**: $103,222.20
-- **Unrealized P&L**: $1,600.53
+- **Total Exposure**: $43,564.24
+- **Unrealized P&L**: $1,526.62
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,925.06
+- **Average Balance**: $9,925.80
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $10,890.41
+- **Highest Balance**: $10,911.44
 
 ### Top Trading Symbols (Active Bots)
 
@@ -48,9 +48,9 @@
 
 ### Decision Activity (24h)
 
-- **wait**: 465 decisions (avg confidence: 47.5%)
-- **enter**: 21 decisions (avg confidence: 67.3%)
-- **exit**: 19 decisions (avg confidence: 61.8%)
+- **wait**: 401 decisions (avg confidence: 44.7%)
+- **exit**: 54 decisions (avg confidence: 48.0%)
+- **enter**: 52 decisions (avg confidence: 63.0%)
 
 ### System Health
 - **Decisions (last hour)**: 21
@@ -62,22 +62,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0.1% | 14MB | 16d 2h | 70 |
-| x-bot | 🔴 stopped | 0% | 0MB | 16d 2h | 69 |
-| error-alerts | 🟢 online | 0% | 20MB | 16d 2h | 76 |
-| market-data-ws | 🟢 online | 1.6% | 35MB | 7d 9h | 72 |
-| ggbot | 🟢 online | 2.9% | 302MB | 20m | 270 |
-| account-monitor | 🟢 online | 2.5% | 252MB | 11h 9m | 44 |
+| signal-listener | 🟢 online | 0% | 14MB | 18d 21h | 70 |
+| x-bot | 🔴 stopped | 0% | 0MB | 18d 21h | 69 |
+| error-alerts | 🟢 online | 0% | 20MB | 18d 21h | 76 |
+| market-data-ws | 🟢 online | 2% | 24MB | 10d 4h | 72 |
+| ggbot | 🟢 online | 3.3% | 440MB | 1d 19h | 272 |
+| account-monitor | 🟢 online | 2.4% | 296MB | 14h 36m | 48 |
 
 ### VM Resources
 
-- **Disk**: 41G / 78G (52%)
-- **Memory**: 2.2Gi / 3.8Gi
-- **CPU Load**: 1.51 / 0.71 / 0.42 (1m/5m/15m)
+- **Disk**: 40G / 78G (52%)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 0.95 / 0.89 / 0.65 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 19.92M)
+- **Redis**: 🟢 connected (Memory: 21.68M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -264,12 +264,11 @@
 
 ### **Metered Billing System** (Production Live - 2025-11-16)
 - **Stripe Billing Meters**: Tracks LLM usage costs with 70% markup
+- **Actual Cost Billing**: Uses OpenRouter's actual `usage.cost` for tier-accurate pricing (economy/standard/premium)
 - **Daily Reporting**: APScheduler job runs midnight UTC, aggregates unreported activities
 - **Activity Logging**: All LLM calls tracked with provider/platform costs, tokens (input/output/reasoning)
 - **Meter Aggregation**: Real-time event reporting, Stripe aggregates for billing period
 - **Weekly Invoicing**: Usage-based subscriptions billed weekly (configurable)
-- **Production Metrics**: $0.107734 aggregated current period, 17 activities reported to date
-- **Next Invoice**: Nov 20, 2025 @ 19:04:46 UTC (first production invoice)
 - **Documentation**: Complete guide in DOCS/completed/METERED_BILLING_IMPLEMENTATION.md
 
 ### **Market Intelligence**
@@ -416,7 +415,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-04 07:57:55 UTC
+**Last Updated**: 2026-01-07 02:57:45 UTC
 
 ---
 
@@ -1263,7 +1262,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-04 07:57:55 UTC
+**Last Updated**: 2026-01-07 02:57:45 UTC
 
 ---
 

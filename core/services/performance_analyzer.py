@@ -887,6 +887,8 @@ Analyze this data and provide:
 2. POSITIVE EDGES (1-3): What's working well that should be preserved or expanded.
 3. RECOMMENDATIONS (2-4): Specific, actionable changes to improve performance.
 
+IMPORTANT: For exit analysis, be cautious about recommending changes to early exit behavior. We only see P&L at exit time - we cannot know if holding longer would have hit TP (better) or SL (worse). Early exits with losses may have actually avoided larger losses. Frame exit observations as patterns to investigate, not definitive problems to fix.
+
 For each item, provide:
 - "title": Brief title (5-10 words)
 - "detail": Specific explanation with numbers from the data
@@ -970,6 +972,7 @@ Focus on the most impactful findings. Reference specific patterns, percentages, 
 
         # Exit classifications
         lines.append(f"\n## EXIT ANALYSIS")
+        lines.append("(NOTE: Early exits may have avoided worse losses - we cannot know counterfactual outcomes)")
         for ec in report.exit_classifications:
             lines.append(f"- {ec.exit_type}: {ec.trades} trades, {ec.win_rate*100:.0f}% WR, ${ec.total_pnl:.2f}")
 
@@ -1018,14 +1021,8 @@ Focus on the most impactful findings. Reference specific patterns, percentages, 
                     "impact": f"${abs(cb.total_pnl):.0f} lost to overconfident trades"
                 })
 
-        # Check exit classifications
-        for ec in report.exit_classifications:
-            if ec.exit_type == 'trend_override' and ec.total_pnl < -100:
-                report.critical_issues.append({
-                    "title": "Trend override exits losing money",
-                    "detail": f"{ec.trades} trades exited due to trend strength, all losses",
-                    "impact": f"${abs(ec.total_pnl):.0f} lost to capitulation"
-                })
+        # Note: We don't flag exit types as critical issues because we lack counterfactual data.
+        # Early exits may have avoided larger losses - we only see P&L at exit time.
 
         # Add positive edge for best direction
         if report.direction_stats:

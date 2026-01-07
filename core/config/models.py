@@ -72,12 +72,22 @@ class LLMConfig(BaseModel):
     """LLM configuration for decision making."""
     provider: LLMProvider = Field(default=LLMProvider.DEFAULT, description="LLM provider selection")
     model: Optional[str] = Field(default="default", description="Specific model to use for the provider")
+    reasoning_tier: Optional[str] = Field(default="standard", description="Reasoning tier: economy, standard, or premium")
+    thinking_mode: bool = Field(default=False, description="DEPRECATED: Use reasoning_tier instead")
     use_platform_keys: bool = Field(default=True, description="Use platform-managed API keys vs user's own keys")
     use_own_key: bool = Field(default=False, description="Use user's own API keys instead of platform keys")
     openai_api_key: Optional[str] = Field(None, description="User's OpenAI API key (encrypted in vault)")
     deepseek_api_key: Optional[str] = Field(None, description="User's DeepSeek API key (encrypted in vault)")
     anthropic_api_key: Optional[str] = Field(None, description="User's Anthropic API key (encrypted in vault)")
-    
+
+    @field_validator('reasoning_tier')
+    @classmethod
+    def validate_reasoning_tier(cls, v):
+        valid_tiers = ['economy', 'standard', 'premium', None]
+        if v not in valid_tiers:
+            raise ValueError(f"reasoning_tier must be one of {valid_tiers}")
+        return v or 'standard'
+
     @field_validator('openai_api_key', 'deepseek_api_key', 'anthropic_api_key')
     @classmethod
     def validate_api_key_format(cls, v):

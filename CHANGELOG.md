@@ -6,6 +6,32 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-06 - Reasoning Tier Fix + Billing Accuracy + Upgrade Modal Redesign
+
+**Reasoning Tier Bug** (`core/config/schemas.py`, `core/config/models.py`):
+- `LLMConfig` Pydantic model missing `reasoning_tier` field → silently dropped on config load
+- Bots configured economy/premium all ran as standard tier
+- Added field with validator, backward compat with `thinking_mode`
+
+**Billing Fix** (`decision/engine_v2.py:816-831`):
+- Was using static `llm_models` table pricing (standard tier only)
+- Economy users overcharged ~3x, premium users undercharged ~6x
+- Now uses actual OpenRouter cost from `usage['cost']` + 70% markup
+- Fallback to calculated cost if actual unavailable
+
+**Upgrade Modal Redesign** (`frontend/components/UpgradeModal.tsx`, `ActivationBar.tsx`):
+- Netflix-style checkout: bot name, value prop, cost estimate, trust bullets
+- Bot-specific pricing based on model + tier + frequency
+- Real cost data from production testing all 21 model+tier combinations
+- Test script: `scripts/test_model_tier_costs.py`
+
+**Extraction Fix** (`ggbot.py:580-610`):
+- `_extract_indicators_from_config()` was collecting ALL data_points from ALL sources
+- Market intelligence points (btc_funding_rate, etc.) passed to technical indicator calculator → warnings
+- Fixed to only extract from `technical_analysis` source
+
+---
+
 ## 2026-01-04 - Strategy Advisor Performance Analysis
 
 Universal bot performance analysis engine. Surfaces hidden patterns users couldn't see manually.
@@ -19,15 +45,15 @@ Universal bot performance analysis engine. Surfaces hidden patterns users couldn
 - Exit reasoning classification: thesis_complete, trend_override, capitulation
 - Confidence calibration: expected vs actual win rates per bucket
 - Claude Haiku LLM synthesis for actionable recommendations
+- Exit analysis caveat: LLM instructed early exits may have avoided worse losses (no counterfactual data)
 
 **API**: `/api/v2/assistant/analyze/{config_id}` - returns full analysis with AI insights
 
 **Frontend** (`StrategyAdvisorPanel.tsx`):
-- Quick action buttons: Analyze Performance, Improve Win Rate, Reduce Losses, Optimize Strategy
+- Two buttons: "Create Strategy" (always), "Analyze Performance" (when bot has closed trades)
+- Uses `/api/v2/bot/{config_id}/account` to check trade count
 - Inline analysis report with stats, patterns, critical issues, positive edges, recommendations
-- Pattern display: best/worst combinations with win rate and P&L
-
-**Key Insight**: Found that "15M_divergence + any" patterns = -$500 P&L, while "4H_divergence + short" = +$650. Confidence >70% = worse outcomes (overconfidence). Exit classification revealed "trend_override" exits = 0% WR, -$842.
+- "Discuss with Strategy Advisor" sends report summary to chat for follow-up discussion
 
 ---
 

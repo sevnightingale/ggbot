@@ -578,28 +578,35 @@ class GGBotOrchestrator:
             )
     
     def _extract_indicators_from_config(self, extraction_config: Dict) -> List[str]:
-        """Extract indicators from user's extraction config."""
+        """Extract technical indicators from user's extraction config.
+
+        Only extracts from 'technical_analysis' source. Market intelligence sources
+        (derivatives_leverage, macro_economics, sentiment_social, etc.) are handled
+        separately by market_intelligence.orchestrator.fetch_market_intelligence().
+        """
         requested_indicators = []
-        
+
         if "selected_data_sources" in extraction_config:
             data_sources = extraction_config.get("selected_data_sources", {})
-            for source_name, source_config in data_sources.items():
-                if isinstance(source_config, dict) and source_name != "signals":
-                    # Get data points from non-signal sources
-                    data_points = source_config.get("data_points", [])
-                    requested_indicators.extend(data_points)
-                        
+            # Only extract from technical_analysis source
+            # Other sources are handled by the market_intelligence orchestrator
+            ta_config = data_sources.get("technical_analysis", {})
+            if isinstance(ta_config, dict):
+                data_points = ta_config.get("data_points", [])
+                requested_indicators.extend(data_points)
+
         elif "indicators" in extraction_config:
             requested_indicators = extraction_config["indicators"]
         else:
+            # Legacy format fallback
             data_sources = extraction_config.get("data_sources", {})
             for category, indicators in data_sources.items():
                 if isinstance(indicators, list):
                     requested_indicators.extend(indicators)
-        
+
         if not requested_indicators:
             requested_indicators = ["rsi", "macd", "ema"]
-            
+
         return requested_indicators
     
     def _extract_timeframes_from_config(self, extraction_config: Dict) -> List[str]:

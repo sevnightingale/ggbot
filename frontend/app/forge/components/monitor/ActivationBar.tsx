@@ -210,6 +210,7 @@ export function ActivationBar({
       <UpgradeModal
         open={upgradeModalOpen}
         onOpenChange={setUpgradeModalOpen}
+        botConfig={selectedBot}
       />
 
       {/* Risk Acknowledgment Modal */}

@@ -813,14 +813,22 @@ Take Profit: {take_profit_text}
             # Detect thinking mode from metadata or usage
             thinking_mode = usage.get('thinking_mode', False)
 
-            # Calculate costs with 70% markup
-            provider_cost, platform_cost = llm_pricing_service.calculate_cost(
-                input_tokens=input_tokens,
-                output_tokens=output_tokens,
-                provider=provider,
-                model=model,
-                thinking_mode=thinking_mode
-            )
+            # Use actual OpenRouter cost if available (more accurate for tier-based pricing)
+            # OpenRouter returns the real cost in usage['cost'] which accounts for the actual
+            # model used (e.g., grok-3-mini vs grok-4 have very different prices)
+            actual_cost = usage.get('cost')
+            if actual_cost is not None and actual_cost > 0:
+                provider_cost = float(actual_cost)
+                platform_cost = provider_cost * 1.70  # 70% markup
+            else:
+                # Fallback to calculated cost from llm_models table
+                provider_cost, platform_cost = llm_pricing_service.calculate_cost(
+                    input_tokens=input_tokens,
+                    output_tokens=output_tokens,
+                    provider=provider,
+                    model=model,
+                    thinking_mode=thinking_mode
+                )
 
             # Build activity summary
             action = decision_data.get('action', 'wait')
