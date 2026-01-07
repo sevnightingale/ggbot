@@ -1220,15 +1220,15 @@ async def run_once(user_id: str, config_id: str, timeframe: str):
             await redis_client.aclose()
 
 
-def add_bot_job(user_id: str, config_id: str, timeframe: str, jitter: int = 15):
+def add_bot_job(user_id: str, config_id: str, timeframe: str, jitter: int = 30):
     """
     Add a scheduled job for a bot configuration.
-    
+
     Args:
         user_id: User ID
-        config_id: Configuration ID  
+        config_id: Configuration ID
         timeframe: Trading timeframe
-        jitter: Random jitter in seconds (default 15)
+        jitter: Random jitter in seconds (default 30, spread load to prevent API timeouts)
     """
     trigger = cron_for(timeframe)
     job_id = f"bot:{user_id}:{config_id}:{timeframe}"
