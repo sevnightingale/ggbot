@@ -104,7 +104,6 @@ export function BotCreationModal({
       description: 'Practice with virtual money, no risk',
       color: 'var(--agent-extraction)',
       available: true,
-      tier: 'Free',
       requiresConnection: false
     },
     {
@@ -114,7 +113,6 @@ export function BotCreationModal({
       description: 'Real trades via Symphony.io',
       color: 'var(--signal)', // signal blue
       available: true,
-      tier: 'Free',
       requiresConnection: true,
       connected: symphonyConnected
     },
@@ -125,7 +123,6 @@ export function BotCreationModal({
       description: 'Real trades on AsterDEX',
       color: 'var(--ember)', // ember red
       available: true,
-      tier: 'Free',
       requiresConnection: true,
       connected: asterConnected
     }
@@ -211,7 +208,7 @@ export function BotCreationModal({
             </div>
           ) : (
             <div className="space-y-2">
-              {tradingModes.map(({ mode, Icon, label, description, color, available, tier, requiresConnection, connected }) => {
+              {tradingModes.map(({ mode, Icon, label, description, color, available, requiresConnection, connected }) => {
                 const isDisabled = !available || (requiresConnection && !connected)
                 const showWarning = requiresConnection && !connected
 
@@ -238,9 +235,6 @@ export function BotCreationModal({
                         <div className="flex items-center gap-2 mb-0.5">
                           <span className="text-sm font-medium text-[var(--text-primary)]">
                             {label}
-                          </span>
-                          <span className="text-xs px-1.5 py-0.5 rounded-full bg-[var(--bg-tertiary)] text-[var(--text-muted)]">
-                            {tier}
                           </span>
                           {showWarning && (
                             <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">

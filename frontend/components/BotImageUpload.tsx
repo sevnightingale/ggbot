@@ -246,14 +246,14 @@ export function BotImageUpload({
             className="w-full h-full object-cover"
           />
         ) : (
-          <div className="w-full h-full flex items-center justify-center bg-bg-tertiary text-text-tertiary text-xs">
+          <div className="w-full h-full flex items-center justify-center bg-[var(--bg-tertiary)] text-[var(--text-muted)] text-xs">
             <Upload className="h-4 w-4" />
           </div>
         )}
 
         {uploading && (
-          <div className="absolute inset-0 flex items-center justify-center bg-bg-primary/80">
-            <Loader2 className="h-4 w-4 animate-spin text-brass" />
+          <div className="absolute inset-0 flex items-center justify-center bg-[var(--bg-primary)]/80">
+            <Loader2 className="h-4 w-4 animate-spin text-[var(--accent)]" />
           </div>
         )}
 

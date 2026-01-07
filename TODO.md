@@ -16,23 +16,23 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - **Winning Criteria**: Highest equity after 21 days
 - **Eligibility**: Active bots with usage-based subscription
 
-### **Phase 1: Tonight (Jan 7) - Launch Prep**
+### **Phase 1: Tonight (Jan 7) - Launch Prep** ✅ COMPLETE
 
 **Arena Page Updates**:
-- [ ] Update hero copy: Season 1 framing, $2,500 prize pool, dates
-- [ ] Add countdown timer component (to Jan 21 12:00 UTC)
-- [ ] Reframe prototype bots as "Training Ground" / examples
-- [ ] Update hardcoded dates (Dec 18 - Jan 8) → (Jan 21 - Feb 11)
+- [x] Update hero copy: Season 1 framing, $2,500 prize pool, dates
+- [x] Add countdown timer component (to Jan 21 12:00 UTC)
+- [x] Reframe prototype bots as "Training Ground" / examples
+- [x] Update hardcoded dates (Dec 18 - Jan 8) → (Jan 21 - Feb 11)
 - [ ] Add "Registered Competitors" section (for future registrations)
 
 **Registration Mechanism**:
-- [ ] Create `POST /api/v2/bot/{config_id}/arena/register` endpoint
-- [ ] Validate: user owns bot, bot active, user subscribed
-- [ ] Set `is_public_performance = true` on registration
-- [ ] Create registration confirmation modal (frontend)
-- [ ] Add "Enter Arena" button to bot config page
+- [x] Create `POST /api/v2/bot/{config_id}/arena/register` endpoint
+- [x] Validate: user owns bot, bot active, user subscribed
+- [x] Set `is_public_performance = true` on registration
+- [x] Create registration confirmation modal (frontend)
+- [x] Add "Enter Arena" button to bot config page
 
-**Navigation & Branding**:
+**Navigation & Branding** (Other CC working on these):
 - [ ] Add ggArena link to navbar
 - [ ] Add banner message about Season 1 (Jan 21st)
 - [ ] Update logo everywhere

@@ -1,7 +1,6 @@
 import React from 'react'
 import { createServerClient } from '@/lib/supabase-server'
 import { redirect } from 'next/navigation'
-import { HelpWidget } from '@/components/HelpWidget'
 
 export default async function ForgeLayout({
   children,
@@ -42,7 +41,6 @@ export default async function ForgeLayout({
   return (
     <>
       {children}
-      <HelpWidget />
     </>
   )
 }

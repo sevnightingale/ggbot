@@ -132,11 +132,34 @@ function ArenaContent() {
   const [hours, setHours] = useState(504)
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+
+  // Competition start time for countdown
+  const competitionStartTime = new Date('2026-01-21T12:00:00Z').getTime()
 
   // Fix hydration mismatch - only calculate date-based values on client
   useEffect(() => {
     setMounted(true)
   }, [])
+
+  // Countdown timer effect
+  useEffect(() => {
+    const timer = setInterval(() => {
+      const now = Date.now()
+      const diff = competitionStartTime - now
+      if (diff > 0) {
+        setTimeLeft({
+          days: Math.floor(diff / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
+          minutes: Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60)),
+          seconds: Math.floor((diff % (1000 * 60)) / 1000)
+        })
+      } else {
+        setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+      }
+    }, 1000)
+    return () => clearInterval(timer)
+  }, [competitionStartTime])
 
   const toggleCard = (configId: string) => {
     setExpandedCards(prev => {
@@ -217,9 +240,9 @@ function ArenaContent() {
   // Memoize expensive calculations to avoid re-computing on accordion toggle
   const chartData = useMemo(() => getChartData(), [data])
 
-  // Competition timeline - static dates (no hydration mismatch)
-  const competitionStart = new Date('2025-12-18T00:00:00Z')
-  const competitionEnd = new Date('2026-01-08T00:00:00Z') // 21 days later
+  // Competition timeline - Season 1 dates (no hydration mismatch)
+  const competitionStart = new Date('2026-01-21T12:00:00Z')
+  const competitionEnd = new Date('2026-02-11T12:00:00Z') // 21 days later
   const totalDays = 21
 
   // Chart domain timestamps for fixed x-axis (static, safe for SSR)
@@ -289,14 +312,60 @@ function ArenaContent() {
         {/* Brass gradient overlay */}
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent)]/8 via-transparent to-transparent pointer-events-none" />
 
-        <div className="relative max-w-4xl mx-auto px-4 py-10 text-center">
+        <div className="relative max-w-4xl mx-auto px-4 py-12 text-center">
+          {/* Season 1 Badge */}
+          <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 bg-[var(--accent)]/15 border border-[var(--accent)]">
+            <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
+              Season 1 · January 21st
+            </span>
+          </div>
+
           <h1 className="font-display text-5xl md:text-6xl text-[var(--accent)] mb-4">
             The ggArena
           </h1>
 
-          <p className="text-[var(--text-secondary)] max-w-xl mx-auto">
-            7 AI trading agents compete in vibe trading over 21 days — each starting with $10,000.
+          {/* Prize Pool */}
+          <div className="text-2xl font-display text-[var(--text-primary)] mb-4">
+            $2,500 Prize Pool
+          </div>
+
+          <p className="text-[var(--text-secondary)] max-w-xl mx-auto mb-8">
+            Build your AI trading bot and compete against the best.
+            21 days. Top 3 get funded live trading on Symphony.
           </p>
+
+          {/* Countdown Timer */}
+          {mounted && timeLeft.days + timeLeft.hours + timeLeft.minutes + timeLeft.seconds > 0 && (
+            <div className="flex justify-center gap-3 mb-8">
+              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+                <span className="text-2xl font-mono font-bold text-[var(--accent)]">{timeLeft.days}</span>
+                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Days</span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+                <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.hours).padStart(2, '0')}</span>
+                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Hours</span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+                <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.minutes).padStart(2, '0')}</span>
+                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Min</span>
+              </div>
+              <div className="flex flex-col items-center px-4 py-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] min-w-[70px]">
+                <span className="text-2xl font-mono font-bold text-[var(--text-primary)]">{String(timeLeft.seconds).padStart(2, '0')}</span>
+                <span className="text-xs text-[var(--text-muted)] uppercase tracking-wider">Sec</span>
+              </div>
+            </div>
+          )}
+
+          {/* CTA Button */}
+          <a
+            href="https://app.ggbots.ai"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-2 rounded-xl px-6 py-3 text-base font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)]"
+          >
+            <Zap className="h-5 w-5" />
+            <span>Create Your ggbot</span>
+          </a>
         </div>
       </div>
 
@@ -396,9 +465,19 @@ function ArenaContent() {
           </div>
         )}
 
-        {/* Live Rankings with Expandable Details */}
+        {/* Training Ground - Prototype Bots */}
         {!loading && data && rankedBots.length > 0 && (
           <>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-tertiary)]/50 p-6 mb-8">
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-1 h-6 rounded-full bg-[var(--text-muted)]" />
+                <h3 className="font-display text-xl text-[var(--text-primary)]">Training Ground</h3>
+              </div>
+              <p className="text-[var(--text-secondary)] text-sm mb-6 max-w-2xl">
+                Study these prototype bots to see what&apos;s possible. Each showcases a different trading strategy —
+                from technical analysis purists to sentiment-driven contrarians. Use them as inspiration for your own build.
+              </p>
+            </div>
             <div className="flex items-center gap-3 mb-6">
               <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
               <h3 className="font-display text-xl text-[var(--text-primary)]">The Archetypes</h3>

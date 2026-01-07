@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useState } from 'react'
-import { Clock, Play, PauseCircle, Zap, Crown } from 'lucide-react'
+import { Clock, Play, PauseCircle, Zap, Crown, Trophy, CheckCircle } from 'lucide-react'
 import { BotConfiguration } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
 import { BotImageUpload } from '@/components/BotImageUpload'
+import { ArenaRegistrationModal } from '@/components/arena-registration-modal'
 
 interface AccountMetrics {
   totalEquity: number
@@ -66,8 +67,11 @@ export function ActivationBar({
   const { canAccess } = usePermissions()
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [riskModalOpen, setRiskModalOpen] = useState(false)
+  const [arenaModalOpen, setArenaModalOpen] = useState(false)
 
   const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
+  const isRegisteredForArena = selectedBot.is_public_performance === true
+  const isPaperTrading = selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
 
   const handleActivate = () => {
     if (!canAccess('bot_activation')) {
@@ -136,6 +140,26 @@ export function ActivationBar({
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">
+              {/* Enter Arena Button - Only for paper trading bots */}
+              {isPaperTrading && (
+                isRegisteredForArena ? (
+                  <div className="inline-flex items-center gap-1.5 rounded-xl border border-green-500/30 bg-green-500/10 px-3 py-1.5 text-sm text-green-500">
+                    <CheckCircle className="h-4 w-4" />
+                    <span>In Arena</span>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setArenaModalOpen(true)}
+                    disabled={!isActive}
+                    className="inline-flex items-center gap-2 rounded-xl border border-[var(--accent)]/50 px-3 py-1.5 text-sm hover:bg-[var(--accent)]/10 text-[var(--accent)] disabled:opacity-50 disabled:cursor-not-allowed"
+                    title={!isActive ? 'Activate your bot first to enter the Arena' : 'Register for ggArena Season 1'}
+                  >
+                    <Trophy className="h-4 w-4" />
+                    <span>Enter Arena</span>
+                  </button>
+                )
+              )}
+
               <button
                 onClick={handleManualTrigger}
                 disabled={isManualTriggering || isStarting || isStopping}
@@ -220,6 +244,18 @@ export function ActivationBar({
         onAccept={handleRiskAccepted}
         tradingMode={selectedBot.trading_mode || 'paper'}
         botName={selectedBot.config_name || 'Untitled Bot'}
+      />
+
+      {/* Arena Registration Modal */}
+      <ArenaRegistrationModal
+        isOpen={arenaModalOpen}
+        onClose={() => setArenaModalOpen(false)}
+        configId={selectedBot.config_id}
+        configName={selectedBot.config_name || 'Untitled Bot'}
+        onSuccess={() => {
+          // Trigger a refresh - the SSE will pick up the change
+          window.location.reload()
+        }}
       />
     </>
   )

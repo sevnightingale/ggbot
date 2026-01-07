@@ -527,7 +527,7 @@ export function StrategyAdvisorPanel({
                 <div
                   className={`max-w-[80%] rounded-lg px-4 py-2 ${
                     msg.role === 'user'
-                      ? 'bg-[var(--accent)] text-[var(--bg-primary)]'
+                      ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816]'
                       : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border)]'
                   }`}
                 >
@@ -589,7 +589,7 @@ export function StrategyAdvisorPanel({
           <Button
             onClick={sendMessage}
             disabled={loading || !input.trim()}
-            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] font-medium px-6"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#edebe7] dark:text-[#1a1816] font-medium px-6"
           >
             Send
           </Button>

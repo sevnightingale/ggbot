@@ -3839,6 +3839,110 @@ async def reset_account(
         raise HTTPException(status_code=500, detail=f"Failed to reset account: {str(e)}")
 
 
+@app.post("/api/v2/bot/{config_id}/arena/register")
+async def register_for_arena(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Register a bot for ggArena Season 1 competition.
+
+    Requirements:
+    - User must own the bot
+    - Bot must be in 'active' state
+    - User must have active subscription (usage-based)
+
+    Sets is_public_performance = true for the configuration.
+    Account will be reset to $10k when competition starts (Jan 21).
+    """
+    try:
+        # 1. Verify user owns this configuration
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # 2. Verify bot is active
+        if config.state != 'active':
+            raise HTTPException(
+                status_code=400,
+                detail="Bot must be active to enter the Arena. Start your bot first."
+            )
+
+        # 3. Verify user has active subscription
+        profile = await user_service.get_profile(current_user.user_id)
+        if not profile or not profile.can_use_premium_features:
+            raise HTTPException(
+                status_code=403,
+                detail="Arena registration requires an active subscription."
+            )
+
+        # 4. Set is_public_performance = true
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE configurations
+                    SET is_public_performance = true, updated_at = CURRENT_TIMESTAMP
+                    WHERE config_id = %s AND user_id = %s
+                """, (config_id, current_user.user_id))
+                conn.commit()
+
+        logger.info(f"Bot registered for Arena: config_id={config_id}, user_id={current_user.user_id}")
+
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "message": "Your bot is registered for ggArena Season 1! Account will be reset to $10,000 on January 21st.",
+            "competition_start": "2026-01-21T12:00:00Z"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to register bot for arena {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Registration failed: {str(e)}")
+
+
+@app.post("/api/v2/bot/{config_id}/arena/unregister")
+async def unregister_from_arena(
+    config_id: str,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Remove bot from ggArena competition.
+
+    Sets is_public_performance = false for the configuration.
+    """
+    try:
+        # 1. Verify user owns this configuration
+        config = await config_service.get_config(config_id, current_user.user_id)
+        if not config:
+            raise HTTPException(status_code=404, detail="Configuration not found")
+
+        # 2. Set is_public_performance = false
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE configurations
+                    SET is_public_performance = false, updated_at = CURRENT_TIMESTAMP
+                    WHERE config_id = %s AND user_id = %s
+                """, (config_id, current_user.user_id))
+                conn.commit()
+
+        logger.info(f"Bot unregistered from Arena: config_id={config_id}, user_id={current_user.user_id}")
+
+        return {
+            "status": "success",
+            "config_id": config_id,
+            "message": "Your bot has been removed from ggArena Season 1."
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to unregister bot from arena {config_id}: {e}")
+        raise HTTPException(status_code=500, detail=f"Unregistration failed: {str(e)}")
+
+
 @app.get("/api/v2/scheduler/status")
 async def get_scheduler_status(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)

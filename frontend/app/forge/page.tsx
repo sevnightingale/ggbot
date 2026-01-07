@@ -17,7 +17,8 @@ import { PositionsTable } from './components/monitor/PositionsTable'
 import TVTimeline from '@/components/tv-timeline'
 import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { BotCreationModal } from './components/modals/BotCreationModal'
-import { Wrench } from 'lucide-react'
+import { Wrench, X } from 'lucide-react'
+import Link from 'next/link'
 
 interface Position {
   trade_id: string
@@ -87,6 +88,7 @@ function ForgeApp() {
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
   const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
+  const [showArenaBanner, setShowArenaBanner] = useState(true)
 
   // Use ref to track selectedConfigId for SSE filtering without causing reconnections
   const selectedConfigIdRef = useRef(selectedConfigId)
@@ -1034,6 +1036,28 @@ function ForgeApp() {
     <div className="min-h-screen bg-[var(--bg-primary)]">
       <Header />
 
+      {/* ggArena Season 1 Announcement Banner */}
+      {showArenaBanner && (
+        <div className="bg-[var(--accent)]/10 border-b border-[var(--accent)]/20">
+          <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+            <p className="text-sm text-[var(--text-primary)]">
+              <span className="font-semibold">ggArena Season 1</span>
+              <span className="text-[var(--text-secondary)]"> — $2,500 prize pool, starts Jan 21st! </span>
+              <Link href="/arena" className="text-[var(--accent)] hover:underline">
+                Learn more →
+              </Link>
+            </p>
+            <button
+              onClick={() => setShowArenaBanner(false)}
+              className="p-1 text-[var(--text-muted)] hover:text-[var(--text-primary)] transition-colors"
+              aria-label="Dismiss banner"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Error Banner */}
       {loadError && (
         <div className="max-w-7xl mx-auto px-4 pt-4">
@@ -1158,8 +1182,8 @@ function ForgeApp() {
               ) : (
                 <EmptyState
                   Icon={Wrench}
-                  title="Setting up your ggbot"
-                  description="Please wait while we create your bot..."
+                  title="Create your first ggbot"
+                  description="Click the + button to get started with your first trading bot."
                 />
               )}
             </div>

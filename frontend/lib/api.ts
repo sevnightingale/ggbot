@@ -103,6 +103,7 @@ export interface BotConfiguration {
   trading_mode?: 'paper' | 'symphony' | 'aster'
   symphony_agent_id?: string
   profile_image_url?: string | null
+  is_public_performance?: boolean
   created_at: string
   updated_at: string
 }
