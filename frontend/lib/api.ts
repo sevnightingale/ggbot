@@ -629,6 +629,50 @@ export class ApiClient {
     }
   }
 
+  // Credit Balance
+  async getCreditBalance(): Promise<{ available_usd: number; ledger_usd: number }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/credits/balance`)
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to get credit balance')
+    }
+
+    return await response.json()
+  }
+
+  // Purchase Credits via Stripe
+  async purchaseCredits(amountCents: number): Promise<{ checkout_url: string }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/credits/purchase`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount_cents: amountCents })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to create credit checkout')
+    }
+
+    return await response.json()
+  }
+
+  // Purchase Credits via Crypto (NOWPayments)
+  async purchaseCreditsCrypto(amountCents: number): Promise<{ invoice_url: string }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/credits/crypto-checkout`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ amount_cents: amountCents })
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to create crypto checkout')
+    }
+
+    return await response.json()
+  }
+
   // Trade History with Decisions
   async getTradeHistoryWithDecisions(configId: string, limit: number = 50): Promise<{
     status: string

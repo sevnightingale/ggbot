@@ -6,7 +6,7 @@ Queries Symphony API to create account snapshots.
 
 from datetime import datetime, timezone
 from decimal import Decimal
-from typing import Optional, Set, Dict
+from typing import Optional, Set, Dict, List
 from core.domain.account_snapshot import AccountAdapter, AccountSnapshot
 from trading.live.symphony_service import SymphonyLiveTradingService
 from core.common.db import get_db_connection
@@ -115,8 +115,8 @@ class SymphonyAccountAdapter(AccountAdapter):
                 }
             )
 
-            # Detect and log any closed positions
-            await self._detect_and_log_closes(config_id, user_id)
+            # Detect and log any closed positions (pass already-fetched positions to avoid duplicate API call)
+            await self._detect_and_log_closes(config_id, user_id, open_positions_list)
 
             return snapshot
 
@@ -124,18 +124,24 @@ class SymphonyAccountAdapter(AccountAdapter):
             self._log.error(f"Failed to get Symphony account snapshot for {config_id}: {e}")
             return None
 
-    async def _detect_and_log_closes(self, config_id: str, user_id: str):
+    async def _detect_and_log_closes(self, config_id: str, user_id: str, open_positions: Optional[List] = None):
         """
         Detect closed Symphony positions and log trade_exit activities.
 
         Compares current open positions to cached positions to find closes.
+
+        Args:
+            config_id: Bot configuration ID
+            user_id: User ID
+            open_positions: Pre-fetched open positions (avoids duplicate API call)
         """
         from core.common.activity_logger import log_activity_safe
         from core.symbols import UniversalSymbolStandardizer
 
         try:
-            # Get current open positions from Symphony
-            open_positions = await self.symphony_service.get_open_positions(config_id)
+            # Use pre-fetched positions if available, otherwise fetch (fallback)
+            if open_positions is None:
+                open_positions = await self.symphony_service.get_open_positions(config_id)
             current_open = {pos.get('batch_id') for pos in open_positions if pos.get('batch_id')}
 
             # Get last seen open positions

@@ -20,15 +20,24 @@ NOT responsible for:
 
 import asyncio
 import aiohttp
-from typing import Dict, Any, List, Optional
+import time
+from typing import Dict, Any, List, Optional, Tuple
 from decimal import Decimal
 from datetime import datetime
+from dataclasses import dataclass
 
 from core.common.logger import logger
 from core.common.db import get_db_connection
 from core.common.activity_logger import log_activity_safe
 from core.auth.vault_utils import VaultManager
 from core.symbols import UniversalSymbolStandardizer
+
+
+@dataclass
+class CachedResponse:
+    """Cached API response with expiration."""
+    data: Any
+    expires_at: float  # Unix timestamp
 
 
 class SymphonyLiveTradingService:
@@ -46,6 +55,76 @@ class SymphonyLiveTradingService:
         self.settlement_wait = 3  # seconds - wait for Symphony to settle trade
         self.standardizer = UniversalSymbolStandardizer()
         self._log = logger.bind(component="symphony_service")
+        # Reusable HTTP session to prevent inotify/aiodns leaks
+        self._session: Optional[aiohttp.ClientSession] = None
+
+        # Response cache to reduce API calls
+        # Key: "method:agent_id" or "method:agent_id:param"
+        # Value: CachedResponse with data and expiration
+        self._cache: Dict[str, CachedResponse] = {}
+        self._cache_ttl = 10  # seconds - positions/batches cache lifetime
+        self._cache_hits = 0
+        self._cache_misses = 0
+
+    async def _get_session(self) -> aiohttp.ClientSession:
+        """Get or create reusable HTTP session."""
+        if self._session is None or self._session.closed:
+            # Create session with timeout config
+            timeout = aiohttp.ClientTimeout(total=self.timeout)
+            self._session = aiohttp.ClientSession(timeout=timeout)
+        return self._session
+
+    async def close(self):
+        """Close the HTTP session. Call on shutdown."""
+        if self._session and not self._session.closed:
+            await self._session.close()
+            self._session = None
+
+    def _get_cached(self, cache_key: str) -> Optional[Any]:
+        """Get cached response if not expired."""
+        if cache_key in self._cache:
+            cached = self._cache[cache_key]
+            if time.time() < cached.expires_at:
+                self._cache_hits += 1
+                return cached.data
+            # Expired - remove from cache
+            del self._cache[cache_key]
+        self._cache_misses += 1
+        return None
+
+    def _set_cached(self, cache_key: str, data: Any, ttl: Optional[float] = None):
+        """Cache response with TTL."""
+        ttl = ttl or self._cache_ttl
+        self._cache[cache_key] = CachedResponse(
+            data=data,
+            expires_at=time.time() + ttl
+        )
+
+    def invalidate_cache(self, pattern: Optional[str] = None):
+        """
+        Invalidate cache entries.
+
+        Args:
+            pattern: If provided, only invalidate keys containing this string.
+                    If None, invalidate all cache entries.
+        """
+        if pattern is None:
+            self._cache.clear()
+        else:
+            keys_to_remove = [k for k in self._cache if pattern in k]
+            for key in keys_to_remove:
+                del self._cache[key]
+
+    def get_cache_stats(self) -> Dict[str, Any]:
+        """Get cache statistics for monitoring."""
+        total = self._cache_hits + self._cache_misses
+        hit_rate = (self._cache_hits / total * 100) if total > 0 else 0
+        return {
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+            "hit_rate": f"{hit_rate:.1f}%",
+            "cached_entries": len(self._cache)
+        }
 
     async def execute_trade_intent(self, intent: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -296,7 +375,7 @@ class SymphonyLiveTradingService:
             }
 
         except Exception as e:
-            self._log.error(f"Symphony trade execution failed: {e}")
+            self._log.error(f"Symphony trade execution failed: {type(e).__name__}: {e}")
             return {
                 "status": "error",
                 "reason": str(e),
@@ -826,22 +905,24 @@ class SymphonyLiveTradingService:
         self._log.info(f"Opening Symphony position: {action} {symbol} @ {weight:.1f}% weight, {leverage}x leverage")
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, headers=headers, timeout=self.timeout) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        batch_id = data.get('batchId')
-                        self._log.info(f"Symphony position opened: batch_id={batch_id}")
-                        return batch_id
-                    else:
-                        error_text = await response.text()
-                        self._log.error(f"Symphony API error {response.status}: {error_text}")
-                        return None
+            session = await self._get_session()
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    batch_id = data.get('batchId')
+                    # Invalidate positions cache since we just opened a new position
+                    self.invalidate_cache(f"positions:{agent_id}")
+                    self._log.info(f"Symphony position opened: batch_id={batch_id}")
+                    return batch_id
+                else:
+                    error_text = await response.text()
+                    self._log.error(f"Symphony API error {response.status}: {error_text}")
+                    return None
         except asyncio.TimeoutError:
             self._log.error(f"Symphony API timeout after {self.timeout}s")
             return None
         except Exception as e:
-            self._log.error(f"Symphony API request failed: {e}")
+            self._log.error(f"Symphony API request failed: {type(e).__name__}: {e}")
             return None
 
     async def _close_symphony_position(
@@ -868,30 +949,47 @@ class SymphonyLiveTradingService:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(url, json=payload, headers=headers, timeout=self.timeout) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        self._log.info(f"Symphony position closed: batch_id={batch_id}, successful={data.get('successful')}")
-                        return True
-                    else:
-                        error_text = await response.text()
-                        self._log.error(f"Symphony close error {response.status}: {error_text}")
-                        return False
+            session = await self._get_session()
+            async with session.post(url, json=payload, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    # Invalidate positions cache since we just closed a position
+                    self.invalidate_cache(f"positions:{agent_id}")
+                    self._log.info(f"Symphony position closed: batch_id={batch_id}, successful={data.get('successful')}")
+                    return True
+                else:
+                    error_text = await response.text()
+                    self._log.error(f"Symphony close error {response.status}: {error_text}")
+                    return False
         except Exception as e:
-            self._log.error(f"Symphony close request failed: {e}")
+            self._log.error(f"Symphony close request failed: {type(e).__name__}: {e}")
             return False
 
     async def _get_symphony_positions(
         self,
         api_key: str,
-        agent_id: str
+        agent_id: str,
+        use_cache: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Query Symphony API for all open positions.
 
+        Args:
+            api_key: Symphony API key
+            agent_id: Symphony agent ID
+            use_cache: If True, return cached response if available (default True)
+
         Returns list of position dicts.
         """
+        cache_key = f"positions:{agent_id}"
+
+        # Check cache first (unless explicitly bypassed)
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                self._log.debug(f"Cache HIT for positions:{agent_id[:8]}...")
+                return cached
+
         url = f"{self.base_url}/agent/positions"
 
         headers = {
@@ -903,38 +1001,56 @@ class SymphonyLiveTradingService:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, headers=headers, timeout=self.timeout) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        all_positions = data.get('positions', [])
+            session = await self._get_session()
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    all_positions = data.get('positions', [])
 
-                        # Filter to only truly open positions (exclude "Closed" status)
-                        open_positions = [
-                            p for p in all_positions
-                            if p.get('status', '').lower() != 'closed' and p.get('entryPrice', 0) > 0
-                        ]
+                    # Filter to only truly open positions (exclude "Closed" status)
+                    open_positions = [
+                        p for p in all_positions
+                        if p.get('status', '').lower() != 'closed' and p.get('entryPrice', 0) > 0
+                    ]
 
-                        self._log.info(f"Retrieved {len(open_positions)} open positions from Symphony ({len(all_positions)} total including closed)")
-                        return open_positions
-                    else:
-                        error_text = await response.text()
-                        self._log.error(f"Symphony positions error {response.status}: {error_text}")
-                        return []
+                    # Cache the result
+                    self._set_cached(cache_key, open_positions)
+
+                    self._log.info(f"Retrieved {len(open_positions)} open positions from Symphony ({len(all_positions)} total including closed)")
+                    return open_positions
+                else:
+                    error_text = await response.text()
+                    self._log.error(f"Symphony positions error {response.status}: {error_text}")
+                    return []
         except Exception as e:
-            self._log.error(f"Symphony positions request failed: {e}")
+            self._log.error(f"Symphony positions request failed: {type(e).__name__}: {e}")
             return []
 
     async def _get_symphony_batches(
         self,
         api_key: str,
-        agent_id: str
+        agent_id: str,
+        use_cache: bool = True
     ) -> List[Dict[str, Any]]:
         """
         Query Symphony API for all batches (trade history).
 
+        Args:
+            api_key: Symphony API key
+            agent_id: Symphony agent ID
+            use_cache: If True, return cached response if available (default True)
+
         Returns list of batch dicts with status, timestamp, etc.
         """
+        cache_key = f"batches:{agent_id}"
+
+        # Check cache first
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                self._log.debug(f"Cache HIT for batches:{agent_id[:8]}...")
+                return cached
+
         url = f"{self.base_url}/agent/batches"
 
         headers = {
@@ -946,31 +1062,51 @@ class SymphonyLiveTradingService:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, headers=headers, timeout=self.timeout) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        batches = data.get('batches', [])
-                        self._log.info(f"Retrieved {len(batches)} batches from Symphony")
-                        return batches
-                    else:
-                        error_text = await response.text()
-                        self._log.error(f"Symphony batches error {response.status}: {error_text}")
-                        return []
+            session = await self._get_session()
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    batches = data.get('batches', [])
+
+                    # Cache the result
+                    self._set_cached(cache_key, batches)
+
+                    self._log.info(f"Retrieved {len(batches)} batches from Symphony")
+                    return batches
+                else:
+                    error_text = await response.text()
+                    self._log.error(f"Symphony batches error {response.status}: {error_text}")
+                    return []
         except Exception as e:
-            self._log.error(f"Symphony batches request failed: {e}")
+            self._log.error(f"Symphony batches request failed: {type(e).__name__}: {e}")
             return []
 
     async def _get_batch_positions(
         self,
         api_key: str,
-        batch_id: str
+        batch_id: str,
+        use_cache: bool = True
     ) -> Dict[str, Any]:
         """
         Query Symphony API for positions in a specific batch.
 
+        Args:
+            api_key: Symphony API key
+            batch_id: Symphony batch ID
+            use_cache: If True, return cached response if available (default True)
+                      Closed batch data never changes, so longer cache TTL is used.
+
         Returns dict with positions and orders arrays.
         """
+        cache_key = f"batch_positions:{batch_id}"
+
+        # Check cache first - use longer TTL for batch positions (5 minutes)
+        # since closed batch data is immutable
+        if use_cache:
+            cached = self._get_cached(cache_key)
+            if cached is not None:
+                return cached
+
         url = f"{self.base_url}/agent/batch-positions"
 
         headers = {
@@ -982,15 +1118,17 @@ class SymphonyLiveTradingService:
         }
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(url, params=params, headers=headers, timeout=self.timeout) as response:
-                    if response.status == 200:
-                        data = await response.json()
-                        return data
-                    else:
-                        error_text = await response.text()
-                        self._log.error(f"Symphony batch-positions error {response.status}: {error_text}")
-                        return {}
+            session = await self._get_session()
+            async with session.get(url, params=params, headers=headers) as response:
+                if response.status == 200:
+                    data = await response.json()
+                    # Cache with 5-minute TTL (closed batch data is immutable)
+                    self._set_cached(cache_key, data, ttl=300)
+                    return data
+                else:
+                    error_text = await response.text()
+                    self._log.error(f"Symphony batch-positions error {response.status}: {error_text}")
+                    return {}
         except Exception as e:
-            self._log.error(f"Symphony batch-positions request failed: {e}")
+            self._log.error(f"Symphony batch-positions request failed: {type(e).__name__}: {e}")
             return {}

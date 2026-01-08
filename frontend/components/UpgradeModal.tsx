@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
-import { Loader2, Check, Bot } from 'lucide-react'
+import { Loader2, Check, Bot, ChevronLeft } from 'lucide-react'
 import {
   Dialog,
   DialogContent,
@@ -9,12 +9,15 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { apiClient, BotConfiguration } from '@/lib/api'
+import { CreditPicker } from '@/components/CreditPicker'
 
 interface UpgradeModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   botConfig?: BotConfiguration  // The specific bot being activated
 }
+
+type PaymentMode = 'choose' | 'usage' | 'prepay'
 
 // Cost per decision by model and tier (with 70% markup already included)
 // Based on real testing with production prompts (2026-01-05)
@@ -45,6 +48,7 @@ const FREQUENCY_TO_DECISIONS: Record<string, number> = {
 export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [paymentMode, setPaymentMode] = useState<PaymentMode>('choose')
 
   // Calculate estimate based on bot config
   const estimate = useMemo(() => {
@@ -103,83 +107,162 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
 
   const botName = botConfig?.config_name || 'Your Bot'
 
+  // Reset payment mode when modal closes
+  const handleOpenChange = (open: boolean) => {
+    if (!open) {
+      setPaymentMode('choose')
+      setError(null)
+    }
+    onOpenChange(open)
+  }
+
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="max-w-sm p-0 gap-0 overflow-hidden">
         {/* Header */}
         <div className="p-6 pb-4">
           <DialogHeader>
             <DialogTitle className="text-xl font-semibold flex items-center gap-2">
+              {paymentMode !== 'choose' && (
+                <button
+                  onClick={() => setPaymentMode('choose')}
+                  className="p-1 -ml-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
+                >
+                  <ChevronLeft size={20} className="text-[var(--text-secondary)]" />
+                </button>
+              )}
               <Bot size={20} className="text-[var(--accent)]" />
-              Activate {botName}
+              {paymentMode === 'prepay' ? 'Prepay Credits' : `Activate ${botName}`}
             </DialogTitle>
           </DialogHeader>
           <p className="text-sm text-[var(--text-secondary)] mt-2">
-            Your bot will analyze markets and trade 24/7 while you sleep.
+            {paymentMode === 'prepay'
+              ? 'Buy credits upfront. Use until empty, never expires.'
+              : 'Your bot will analyze markets and trade 24/7 while you sleep.'
+            }
           </p>
         </div>
 
-        {/* Estimate Card */}
-        <div className="px-6 pb-4">
-          <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
-            <div className="text-center">
-              <div className="text-sm text-[var(--text-secondary)] mb-1">
-                Estimated cost
+        {/* Choose Payment Mode */}
+        {paymentMode === 'choose' && (
+          <>
+            <div className="px-6 pb-4 space-y-3">
+              {/* Pay as you go option */}
+              <button
+                onClick={() => setPaymentMode('usage')}
+                className="w-full p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
+              >
+                <div className="font-medium text-[var(--text-primary)]">Pay as you go</div>
+                <div className="text-sm text-[var(--text-secondary)] mt-1">
+                  Billed monthly for actual usage
+                </div>
+                <div className="text-xs text-[var(--text-tertiary)] mt-2">
+                  ~${estimate.low}-{estimate.high}/mo typical
+                </div>
+              </button>
+
+              {/* Prepay credits option */}
+              <button
+                onClick={() => setPaymentMode('prepay')}
+                className="w-full p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
+              >
+                <div className="font-medium text-[var(--text-primary)]">Prepay credits</div>
+                <div className="text-sm text-[var(--text-secondary)] mt-1">
+                  Buy credits upfront, use until empty
+                </div>
+                <div className="text-xs text-[var(--text-tertiary)] mt-2">
+                  Card or crypto • Never expires
+                </div>
+              </button>
+            </div>
+
+            {/* Trust Points */}
+            <div className="px-6 pb-6 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
+                <span>Pay only for AI decisions</span>
               </div>
-              <div className="text-3xl font-bold text-[var(--text-primary)]">
-                ~${estimate.low}-{estimate.high}
-                <span className="text-base font-normal text-[var(--text-tertiary)]">/mo</span>
-              </div>
-              <div className="text-xs text-[var(--text-tertiary)] mt-1">
-                {estimate.hasConfig ? 'Based on your configuration' : 'Typical range for most bots'}
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
+                <span>No base fee, cancel anytime</span>
               </div>
             </div>
-          </div>
-        </div>
-
-        {/* Trust Points */}
-        <div className="px-6 pb-6 space-y-2">
-          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-            <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
-            <span>Pay only for AI decisions</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-            <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
-            <span>No base fee, cancel anytime</span>
-          </div>
-          <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
-            <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
-            <span>Full control over spending</span>
-          </div>
-        </div>
-
-        {/* Error Message */}
-        {error && (
-          <div className="mx-6 mb-4 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
-            <p className="text-sm text-[var(--loss-color)]">{error}</p>
-          </div>
+          </>
         )}
 
-        {/* CTA */}
-        <div className="p-6 pt-0">
-          <button
-            onClick={handleUpgrade}
-            disabled={loading}
-            className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--bg-primary)] font-medium py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
-          >
-            {loading ? (
-              <>
-                <Loader2 className="animate-spin" size={18} />
-                Starting checkout...
-              </>
-            ) : (
-              'Continue to Payment'
+        {/* Usage-based flow */}
+        {paymentMode === 'usage' && (
+          <>
+            {/* Estimate Card */}
+            <div className="px-6 pb-4">
+              <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                <div className="text-center">
+                  <div className="text-sm text-[var(--text-secondary)] mb-1">
+                    Estimated cost
+                  </div>
+                  <div className="text-3xl font-bold text-[var(--text-primary)]">
+                    ~${estimate.low}-{estimate.high}
+                    <span className="text-base font-normal text-[var(--text-tertiary)]">/mo</span>
+                  </div>
+                  <div className="text-xs text-[var(--text-tertiary)] mt-1">
+                    {estimate.hasConfig ? 'Based on your configuration' : 'Typical range for most bots'}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Trust Points */}
+            <div className="px-6 pb-6 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
+                <span>Pay only for AI decisions</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
+                <span>No base fee, cancel anytime</span>
+              </div>
+              <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
+                <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
+                <span>Full control over spending</span>
+              </div>
+            </div>
+
+            {/* Error Message */}
+            {error && (
+              <div className="mx-6 mb-4 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
+                <p className="text-sm text-[var(--loss-color)]">{error}</p>
+              </div>
             )}
-          </button>
-          <p className="text-center text-xs text-[var(--text-tertiary)] mt-3">
-            Secure checkout via Stripe
-          </p>
-        </div>
+
+            {/* CTA */}
+            <div className="p-6 pt-0">
+              <button
+                onClick={handleUpgrade}
+                disabled={loading}
+                className="w-full bg-[var(--accent)] hover:bg-[var(--accent-hover)] disabled:opacity-50 text-[var(--bg-primary)] font-medium py-3 px-6 rounded-xl transition-colors flex items-center justify-center gap-2"
+              >
+                {loading ? (
+                  <>
+                    <Loader2 className="animate-spin" size={18} />
+                    Starting checkout...
+                  </>
+                ) : (
+                  'Continue to Payment'
+                )}
+              </button>
+              <p className="text-center text-xs text-[var(--text-tertiary)] mt-3">
+                Secure checkout via Stripe
+              </p>
+            </div>
+          </>
+        )}
+
+        {/* Prepay credits flow */}
+        {paymentMode === 'prepay' && (
+          <div className="px-6 pb-6">
+            <CreditPicker />
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   )

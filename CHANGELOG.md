@@ -8,6 +8,18 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ## 2026-01-07 - ggArena Season 1 Launch Prep
 
+**Arena Page UX Overhaul** (`frontend/app/arena/page.tsx`):
+- Performance fix: Extracted countdown timer to isolated component (was re-rendering entire page every second including heavy Recharts)
+- Removed ArenaTimeline component (lightweight-charts) from expanded cards — was causing lag on expand
+- Restructured bot details: Strategy + Risk Management cards, Market Intelligence section
+- Hero copy sharpened: "Your AI vs theirs. 21 days. Winner takes all." + "Top 3 get real capital to trade live."
+- Added 4-step "How It Works" section: Build → Subscribe → Enter → Win
+- Merged "Training Ground" + "The Archetypes" into single "Leaderboard" section
+- Footer CTA: Added prize breakdown (🥇$1,500 / 🥈$700 / 🥉$300) + deadline urgency
+- Progress bar hidden until competition starts (was showing confusing "Day 0")
+- Varied CTAs: "Create Your ggbot" (header) / "Enter the Arena" (hero) / "Start Building" (footer)
+- All CTA links updated to app.ggbots.ai (direct to app, not landing)
+
 **Navigation & Polish** (CC Instance B):
 - Arena link added to Header navbar (`Header.tsx`)
 - Dismissible Season 1 announcement banner below header (`forge/page.tsx`)

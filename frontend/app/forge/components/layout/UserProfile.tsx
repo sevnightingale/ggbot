@@ -1,12 +1,13 @@
 'use client'
 
 import React, { useState, useEffect } from 'react'
-import { User, LogOut, Crown, CreditCard, Settings } from 'lucide-react'
+import { User, LogOut, Crown, CreditCard, Settings, Plus, Coins } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { SettingsModal } from '@/components/SettingsModal'
+import { AddCreditsModal } from '@/components/AddCreditsModal'
 import { apiClient } from '@/lib/api'
 
 interface UserProfileProps {
@@ -29,6 +30,8 @@ export function UserProfile({}: UserProfileProps) {
   const [loading, setLoading] = useState(true)
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [addCreditsOpen, setAddCreditsOpen] = useState(false)
+  const [creditBalance, setCreditBalance] = useState<number | null>(null)
   const router = useRouter()
   const supabase = createClient()
   const { userProfile } = usePermissions()
@@ -60,6 +63,23 @@ export function UserProfile({}: UserProfileProps) {
 
     getUserData()
   }, [supabase.auth])
+
+  // Fetch credit balance (only for usage_based users)
+  useEffect(() => {
+    const fetchCreditBalance = async () => {
+      if (userProfile?.subscription_tier === 'usage_based') {
+        try {
+          const { available_usd } = await apiClient.getCreditBalance()
+          setCreditBalance(available_usd)
+        } catch (err) {
+          console.error('Failed to fetch credit balance:', err)
+          setCreditBalance(null)
+        }
+      }
+    }
+
+    fetchCreditBalance()
+  }, [userProfile?.subscription_tier])
 
   // Logout handler
   const handleLogout = async () => {
@@ -168,6 +188,14 @@ export function UserProfile({}: UserProfileProps) {
                   </div>
                 )}
               </div>
+
+              {/* Credit Balance (usage_based only) */}
+              {isUsageBased && creditBalance !== null && (
+                <div className="mt-2 flex items-center gap-1 text-xs text-[var(--text-secondary)]">
+                  <Coins className="h-3 w-3" />
+                  <span>Credits: ${creditBalance.toFixed(2)}</span>
+                </div>
+              )}
             </div>
 
             {/* Menu Items */}
@@ -181,11 +209,23 @@ export function UserProfile({}: UserProfileProps) {
                 }}
               />
               {hasPaidTier ? (
-                <MenuButton
-                  icon={CreditCard}
-                  label="Manage Billing"
-                  onClick={handleManageBilling}
-                />
+                <>
+                  {isUsageBased && (
+                    <MenuButton
+                      icon={Plus}
+                      label="Add Credits"
+                      onClick={() => {
+                        setIsOpen(false)
+                        setAddCreditsOpen(true)
+                      }}
+                    />
+                  )}
+                  <MenuButton
+                    icon={CreditCard}
+                    label="Manage Billing"
+                    onClick={handleManageBilling}
+                  />
+                </>
               ) : (
                 <MenuButton
                   icon={Crown}
@@ -213,6 +253,13 @@ export function UserProfile({}: UserProfileProps) {
       <SettingsModal
         open={settingsOpen}
         onOpenChange={setSettingsOpen}
+      />
+
+      {/* Add Credits Modal */}
+      <AddCreditsModal
+        open={addCreditsOpen}
+        onOpenChange={setAddCreditsOpen}
+        currentBalance={creditBalance ?? undefined}
       />
     </div>
   )

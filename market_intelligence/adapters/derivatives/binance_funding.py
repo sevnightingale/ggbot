@@ -200,5 +200,5 @@ class BinanceFundingAdapter(DataAdapter):
         except AdapterError:
             raise
         except Exception as e:
-            self._log.error(f"Error fetching funding rate for {symbol}: {e}")
-            raise AdapterError(f"Failed to fetch funding rate: {str(e)}")
+            self._log.error(f"Error fetching funding rate for {symbol}: {type(e).__name__}: {e}")
+            raise AdapterError(f"Failed to fetch funding rate: {type(e).__name__}: {e}")

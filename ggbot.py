@@ -4076,6 +4076,10 @@ class CheckoutRequest(BaseModel):
     plan: str  # 'usage', 'monthly', or 'annual'
     coupon: Optional[str] = None
 
+
+class CreditPurchaseRequest(BaseModel):
+    amount_cents: int  # Amount in cents: 1000 = $10, 2500 = $25, etc.
+
 @app.post("/api/v2/create-checkout-session")
 async def create_checkout_session(
     request: CheckoutRequest,
@@ -4265,43 +4269,91 @@ async def get_current_user_profile(
 # =============================================================================
 
 async def handle_checkout_completed(session):
-    """Handle successful checkout - activate subscription."""
+    """Handle successful checkout - activate subscription and/or create credit grant."""
     from core.common.db import get_db_connection
 
-    user_id = session['metadata']['user_id']
+    metadata = session.get('metadata', {})
+    user_id = metadata.get('user_id')
     customer_id = session['customer']
-    subscription_id = session['subscription']
+    subscription_id = session.get('subscription')  # May be None for payment mode
 
-    # Get plan from session metadata
-    plan = session.get('subscription_data', {}).get('metadata', {}).get('plan', 'usage')
+    # Check if this is a credit purchase
+    is_credit_purchase = metadata.get('type') == 'credit_purchase'
 
-    # Map plan to subscription tier
-    tier_map = {
-        'usage': 'usage_based',
-        'monthly': 'pro',
-        'annual': 'pro'
-    }
-    subscription_tier = tier_map.get(plan, 'usage_based')
+    if is_credit_purchase:
+        # Create Stripe Credit Grant
+        amount_cents = int(metadata.get('amount_cents', 0))
+        if amount_cents > 0:
+            try:
+                stripe.billing.CreditGrant.create(
+                    customer=customer_id,
+                    name=f"${amount_cents / 100:.0f} Credit Pack",
+                    applicability_config={
+                        'scope': {'price_type': 'metered'}
+                    },
+                    category='paid',
+                    amount={
+                        'type': 'monetary',
+                        'monetary': {
+                            'value': amount_cents,
+                            'currency': 'usd'
+                        }
+                    }
+                )
+                logger.bind(user_id=user_id).info(
+                    f"Credit grant created: ${amount_cents / 100:.2f}"
+                )
+            except stripe.error.StripeError as e:
+                logger.error(f"Failed to create credit grant: {e}")
+                # Don't raise - subscription still needs to be processed
 
-    # For ongoing subscriptions, subscription_expires_at should be NULL
-    # Only set expiration date when subscription is cancelled
-    with get_db_connection() as conn:
-        with conn.cursor() as cur:
-            cur.execute("""
-                UPDATE user_profiles
-                SET subscription_tier = %s,
-                    subscription_status = 'active',
-                    stripe_customer_id = %s,
-                    stripe_subscription_id = %s,
-                    subscription_expires_at = NULL,
-                    updated_at = NOW()
-                WHERE user_id = %s
-            """, (subscription_tier, customer_id, subscription_id, user_id))
-            conn.commit()
+    # Handle subscription activation if present (new subscriber or regular upgrade)
+    if subscription_id:
+        # Get plan from subscription_data metadata
+        plan = session.get('subscription_data', {}).get('metadata', {}).get('plan', 'usage')
 
-    logger.bind(user_id=user_id).info(
-        f"Subscription activated: tier={subscription_tier}, plan={plan}, Customer: {customer_id}, Subscription: {subscription_id}"
-    )
+        # Map plan to subscription tier
+        tier_map = {
+            'usage': 'usage_based',
+            'monthly': 'pro',
+            'annual': 'pro'
+        }
+        subscription_tier = tier_map.get(plan, 'usage_based')
+
+        # For ongoing subscriptions, subscription_expires_at should be NULL
+        # Only set expiration date when subscription is cancelled
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE user_profiles
+                    SET subscription_tier = %s,
+                        subscription_status = 'active',
+                        stripe_customer_id = %s,
+                        stripe_subscription_id = %s,
+                        subscription_expires_at = NULL,
+                        updated_at = NOW()
+                    WHERE user_id = %s
+                """, (subscription_tier, customer_id, subscription_id, user_id))
+                conn.commit()
+
+        logger.bind(user_id=user_id).info(
+            f"Subscription activated: tier={subscription_tier}, plan={plan}, Customer: {customer_id}, Subscription: {subscription_id}"
+        )
+    elif is_credit_purchase:
+        # Payment mode (existing subscriber) - just update customer_id if needed
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE user_profiles
+                    SET stripe_customer_id = %s,
+                        updated_at = NOW()
+                    WHERE user_id = %s AND stripe_customer_id IS NULL
+                """, (customer_id, user_id))
+                conn.commit()
+
+        logger.bind(user_id=user_id).info(
+            f"Credit purchase completed (existing subscriber): Customer: {customer_id}"
+        )
 
 
 async def handle_subscription_updated(subscription):
@@ -4375,6 +4427,377 @@ async def handle_payment_failed(invoice):
             conn.commit()
 
     logger.warning(f"Payment failed for subscription: {subscription_id}")
+
+
+# =============================================================================
+# CREDITS ENDPOINTS
+# =============================================================================
+
+def get_stripe_customer_id(user_id: str) -> str | None:
+    """Get Stripe customer ID from database (read-only, doesn't create)."""
+    from core.common.db import get_db_connection
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT stripe_customer_id
+                FROM user_profiles
+                WHERE user_id = %s
+            """, (user_id,))
+            result = cur.fetchone()
+
+    return result[0] if result and result[0] else None
+
+
+def has_usage_based_subscription(user_id: str) -> bool:
+    """Check if user has an active usage_based subscription."""
+    from core.common.db import get_db_connection
+
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT subscription_tier, subscription_status
+                FROM user_profiles
+                WHERE user_id = %s
+            """, (user_id,))
+            result = cur.fetchone()
+
+    if not result:
+        return False
+
+    tier, status = result
+    # User has usage_based subscription if tier is usage_based and status is active
+    return tier == 'usage_based' and status == 'active'
+
+
+@app.get("/api/v2/credits/balance")
+async def get_credit_balance(current_user: AuthenticatedUser = Depends(get_current_user_v2)):
+    """Get user's credit balance from Stripe Credit Grants."""
+    customer_id = get_stripe_customer_id(str(current_user.user_id))
+
+    if not customer_id:
+        return {'available_usd': 0.0, 'ledger_usd': 0.0}
+
+    try:
+        # Query Stripe Credit Balance Summary for metered price types
+        summary = stripe.billing.CreditBalanceSummary.retrieve(
+            customer=customer_id,
+            filter={
+                'type': 'applicability_scope',
+                'applicability_scope': {'price_type': 'metered'}
+            }
+        )
+
+        # Extract balance from response
+        # Stripe returns available_balance and ledger_balance (not available/ledger)
+        if summary.balances and len(summary.balances) > 0:
+            balance = summary.balances[0]
+            available = balance.available_balance.monetary.value / 100 if balance.available_balance else 0
+            ledger = balance.ledger_balance.monetary.value / 100 if balance.ledger_balance else 0
+        else:
+            available = 0.0
+            ledger = 0.0
+
+        return {
+            'available_usd': available,
+            'ledger_usd': ledger
+        }
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error fetching credit balance: {e}")
+        raise HTTPException(500, f"Error fetching credit balance: {str(e)}")
+
+
+@app.post("/api/v2/credits/purchase")
+async def purchase_credits(
+    request: CreditPurchaseRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """Create Stripe Checkout session for credit purchase.
+
+    If user is free tier: Creates subscription + credit purchase in one checkout.
+    If user already has subscription: Creates one-time payment for credits.
+    """
+    amount_cents = request.amount_cents
+
+    # Validate amount (min $5, max $500)
+    if amount_cents < 500:
+        raise HTTPException(400, "Minimum credit purchase is $5")
+    if amount_cents > 50000:
+        raise HTTPException(400, "Maximum credit purchase is $500")
+
+    try:
+        # Get or create Stripe customer
+        customer_id = await get_or_create_stripe_customer(
+            str(current_user.user_id),
+            current_user.email
+        )
+
+        # Check if user needs subscription
+        needs_subscription = not has_usage_based_subscription(str(current_user.user_id))
+
+        # Credit purchase line item (one-time)
+        credit_line_item = {
+            'price_data': {
+                'currency': 'usd',
+                'unit_amount': amount_cents,
+                'product_data': {
+                    'name': f'${amount_cents / 100:.0f} Credit Pack',
+                    'description': 'Prepaid credits for ggbots usage. Never expires.'
+                }
+            },
+            'quantity': 1
+        }
+
+        if needs_subscription:
+            # Free user: Create subscription + one-time credit purchase
+            # Stripe Checkout supports mixing subscription and one-time items
+            usage_price_id = os.environ.get('STRIPE_PRICE_ID_USAGE')
+            if not usage_price_id:
+                raise HTTPException(500, "Usage price not configured")
+
+            session = stripe.checkout.Session.create(
+                customer=customer_id,
+                mode='subscription',
+                line_items=[
+                    {'price': usage_price_id},  # $0 metered subscription
+                    credit_line_item  # One-time credit purchase
+                ],
+                success_url=f"{os.environ['FRONTEND_URL']}/credits/success?session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{os.environ['FRONTEND_URL']}/forge",
+                subscription_data={
+                    'metadata': {
+                        'user_id': str(current_user.user_id),
+                        'plan': 'usage'
+                    }
+                },
+                metadata={
+                    'user_id': str(current_user.user_id),
+                    'type': 'credit_purchase',
+                    'amount_cents': str(amount_cents)
+                }
+            )
+        else:
+            # Existing subscriber: Just one-time payment for credits
+            session = stripe.checkout.Session.create(
+                customer=customer_id,
+                mode='payment',
+                line_items=[credit_line_item],
+                success_url=f"{os.environ['FRONTEND_URL']}/credits/success?session_id={{CHECKOUT_SESSION_ID}}",
+                cancel_url=f"{os.environ['FRONTEND_URL']}/forge",
+                metadata={
+                    'user_id': str(current_user.user_id),
+                    'type': 'credit_purchase',
+                    'amount_cents': str(amount_cents)
+                }
+            )
+
+        logger.bind(user_id=str(current_user.user_id)).info(
+            f"Created credit purchase checkout: ${amount_cents/100:.2f}, needs_subscription={needs_subscription}"
+        )
+
+        return {'checkout_url': session.url}
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error creating credit checkout: {e}")
+        raise HTTPException(500, f"Payment system error: {str(e)}")
+
+
+@app.post("/api/v2/credits/crypto-checkout")
+async def create_crypto_checkout(
+    request: CreditPurchaseRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """Create NOWPayments invoice for crypto credit purchase."""
+    import httpx
+
+    amount_cents = request.amount_cents
+
+    # Validate amount (min $5, max $500)
+    if amount_cents < 500:
+        raise HTTPException(400, "Minimum credit purchase is $5")
+    if amount_cents > 50000:
+        raise HTTPException(400, "Maximum credit purchase is $500")
+
+    amount_usd = amount_cents / 100
+
+    api_key = os.environ.get("PAYMENTS_API_KEY")
+    if not api_key:
+        raise HTTPException(500, "Crypto payments not configured")
+
+    try:
+        async with httpx.AsyncClient() as client:
+            response = await client.post(
+                "https://api.nowpayments.io/v1/invoice",
+                headers={
+                    "x-api-key": api_key,
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "price_amount": amount_usd,
+                    "price_currency": "usd",
+                    "order_id": f"credits_{current_user.user_id}_{amount_cents}",
+                    "order_description": f"${amount_usd:.0f} Credit Pack for ggbots",
+                    "ipn_callback_url": f"{os.environ.get('API_URL', 'https://api.ggbots.ai')}/api/v2/webhooks/nowpayments",
+                    "success_url": f"{os.environ['FRONTEND_URL']}/credits/success",
+                    "cancel_url": f"{os.environ['FRONTEND_URL']}/forge"
+                },
+                timeout=30.0
+            )
+
+            if response.status_code != 200:
+                logger.error(f"NOWPayments API error: {response.status_code} - {response.text}")
+                raise HTTPException(500, "Crypto payment service error")
+
+            data = response.json()
+
+        logger.bind(user_id=str(current_user.user_id)).info(
+            f"Created crypto checkout: ${amount_usd:.2f}, invoice_id={data.get('id')}"
+        )
+
+        return {"invoice_url": data["invoice_url"]}
+
+    except httpx.RequestError as e:
+        logger.error(f"NOWPayments request error: {e}")
+        raise HTTPException(500, "Crypto payment service unavailable")
+
+
+@app.post("/api/v2/webhooks/nowpayments")
+async def nowpayments_webhook(request: Request):
+    """Handle NOWPayments IPN callback - create credit grant after crypto payment."""
+    import hmac
+    import hashlib
+
+    # Get IPN secret for signature verification
+    ipn_secret = os.environ.get("PAYMENTS_IPN_KEY")
+    if not ipn_secret:
+        logger.error("PAYMENTS_IPN_KEY not configured")
+        raise HTTPException(500, "Webhook not configured")
+
+    # Verify HMAC-SHA512 signature
+    signature = request.headers.get("x-nowpayments-sig")
+    body = await request.body()
+
+    try:
+        body_dict = json.loads(body)
+    except json.JSONDecodeError:
+        raise HTTPException(400, "Invalid JSON")
+
+    # NOWPayments signature: HMAC-SHA512 of sorted JSON
+    sorted_body = json.dumps(body_dict, separators=(',', ':'), sort_keys=True)
+    expected_sig = hmac.new(
+        ipn_secret.encode(),
+        sorted_body.encode(),
+        hashlib.sha512
+    ).hexdigest()
+
+    if signature != expected_sig:
+        logger.warning("NOWPayments webhook signature mismatch")
+        raise HTTPException(403, "Invalid signature")
+
+    # Check payment status
+    payment_status = body_dict.get("payment_status")
+    if payment_status != "finished":
+        # Payment not complete yet - acknowledge but don't process
+        logger.info(f"NOWPayments webhook: status={payment_status}, ignoring")
+        return {"status": "ignored", "reason": f"status is {payment_status}"}
+
+    # Extract user_id and amount from order_id (format: "credits_{user_id}_{amount_cents}")
+    order_id = body_dict.get("order_id", "")
+    if not order_id.startswith("credits_"):
+        logger.error(f"Invalid order_id format: {order_id}")
+        raise HTTPException(400, "Invalid order_id")
+
+    parts = order_id.split("_")
+    if len(parts) != 3:
+        logger.error(f"Invalid order_id format: {order_id}")
+        raise HTTPException(400, "Invalid order_id format")
+
+    user_id = parts[1]
+    amount_cents = int(parts[2])
+
+    # Get user email for Stripe customer creation
+    from core.common.db import get_db_connection
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT au.email
+                FROM user_profiles up
+                JOIN auth.users au ON up.user_id = au.id
+                WHERE up.user_id = %s
+            """, (user_id,))
+            result = cur.fetchone()
+
+    if not result:
+        logger.error(f"User not found: {user_id}")
+        raise HTTPException(400, "User not found")
+
+    email = result[0]
+
+    # Get or create Stripe customer
+    customer_id = await get_or_create_stripe_customer(user_id, email)
+
+    # Ensure user has usage_based subscription (required for credit grants)
+    if not has_usage_based_subscription(user_id):
+        # Create subscription programmatically
+        usage_price_id = os.environ.get('STRIPE_PRICE_ID_USAGE')
+        if usage_price_id:
+            try:
+                subscription = stripe.Subscription.create(
+                    customer=customer_id,
+                    items=[{'price': usage_price_id}],
+                    metadata={'user_id': user_id, 'plan': 'usage'}
+                )
+
+                # Update user profile
+                with get_db_connection() as conn:
+                    with conn.cursor() as cur:
+                        cur.execute("""
+                            UPDATE user_profiles
+                            SET subscription_tier = 'usage_based',
+                                subscription_status = 'active',
+                                stripe_customer_id = %s,
+                                stripe_subscription_id = %s,
+                                subscription_expires_at = NULL,
+                                updated_at = NOW()
+                            WHERE user_id = %s
+                        """, (customer_id, subscription.id, user_id))
+                        conn.commit()
+
+                logger.bind(user_id=user_id).info(
+                    f"Created subscription via crypto payment: {subscription.id}"
+                )
+            except stripe.error.StripeError as e:
+                logger.error(f"Failed to create subscription: {e}")
+                raise HTTPException(500, "Failed to create subscription")
+
+    # Create Stripe Credit Grant
+    try:
+        stripe.billing.CreditGrant.create(
+            customer=customer_id,
+            name=f"${amount_cents / 100:.0f} Credit Pack (Crypto)",
+            applicability_config={
+                'scope': {'price_type': 'metered'}
+            },
+            category='paid',
+            amount={
+                'type': 'monetary',
+                'monetary': {
+                    'value': amount_cents,
+                    'currency': 'usd'
+                }
+            }
+        )
+
+        logger.bind(user_id=user_id).info(
+            f"Crypto credit grant created: ${amount_cents / 100:.2f}"
+        )
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Failed to create credit grant: {e}")
+        raise HTTPException(500, "Failed to create credit grant")
+
+    return {"status": "success"}
 
 
 # =============================================================================
