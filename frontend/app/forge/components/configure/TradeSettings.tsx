@@ -201,11 +201,11 @@ export function TradeSettings({
             </label>
             <input
               type="number"
-              value={(riskManagement.default_stop_loss_percent as number) || 5}
+              value={(riskManagement.default_stop_loss_percent as number) || 1.5}
               onChange={(e) => updateTradingConfig({
                   risk_management: { ...riskManagement, default_stop_loss_percent: Number(e.target.value) }
               })}
-              min="1"
+              min="0.5"
               max="50"
               step="0.1"
               className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
@@ -213,12 +213,12 @@ export function TradeSettings({
                   ? 'border-red-500 focus:ring-red-500'
                   : 'border-[var(--border)] focus:ring-rose-500'
               }`}
-              placeholder="5"
+              placeholder="1.5"
             />
             <ValidationMessage error={stopLossValidation.error} />
             {!stopLossValidation.error && (
               <div className="text-xs text-[var(--text-muted)] mt-1">
-                Close when price moves {(riskManagement.default_stop_loss_percent as number) || 5}% against you
+                Close when price moves {(riskManagement.default_stop_loss_percent as number) || 1.5}% against you
               </div>
             )}
           </div>
@@ -228,11 +228,11 @@ export function TradeSettings({
             </label>
             <input
               type="number"
-              value={(riskManagement.default_take_profit_percent as number) || 10}
+              value={(riskManagement.default_take_profit_percent as number) || 3}
               onChange={(e) => updateTradingConfig({
                   risk_management: { ...riskManagement, default_take_profit_percent: Number(e.target.value) }
               })}
-              min="1"
+              min="0.5"
               max="500"
               step="0.1"
               className={`w-full p-3 rounded-xl bg-[var(--bg-primary)] border text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:border-transparent ${
@@ -240,12 +240,12 @@ export function TradeSettings({
                   ? 'border-red-500 focus:ring-red-500'
                   : 'border-[var(--border)] focus:ring-emerald-500'
               }`}
-              placeholder="10"
+              placeholder="3"
             />
             <ValidationMessage error={takeProfitValidation.error} />
             {!takeProfitValidation.error && (
               <div className="text-xs text-[var(--text-muted)] mt-1">
-                Close when price moves {(riskManagement.default_take_profit_percent as number) || 10}% in your favor
+                Close when price moves {(riskManagement.default_take_profit_percent as number) || 3}% in your favor
               </div>
             )}
           </div>

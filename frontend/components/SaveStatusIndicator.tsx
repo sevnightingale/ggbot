@@ -8,6 +8,7 @@ import { SaveStatus } from '@/lib/hooks/useAutoSave'
 interface SaveStatusIndicatorProps {
   status: SaveStatus
   error?: Error | null
+  message?: string | null  // Custom message to display (e.g., "Resetting...", "Account reset")
   className?: string
 }
 
@@ -23,6 +24,7 @@ interface SaveStatusIndicatorProps {
 export function SaveStatusIndicator({
   status,
   error,
+  message,
   className = ''
 }: SaveStatusIndicatorProps) {
   const showIndicator = status !== 'idle'
@@ -56,9 +58,9 @@ export function SaveStatusIndicator({
 
           {/* Text */}
           <span className="font-medium">
-            {status === 'saving' && 'Saving...'}
-            {status === 'saved' && 'Saved'}
-            {status === 'error' && (error?.message || 'Save failed')}
+            {status === 'saving' && (message || 'Saving...')}
+            {status === 'saved' && (message || 'Saved')}
+            {status === 'error' && (error?.message || 'Failed')}
           </span>
         </motion.div>
       )}

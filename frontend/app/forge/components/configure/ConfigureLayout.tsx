@@ -146,7 +146,7 @@ export function ConfigureLayout({
   className = ''
 }: ConfigureLayoutProps) {
   const [activeConfigTab, setActiveConfigTab] = useState<ConfigTabType>('strategy')
-  const { globalStatus, globalError } = useSaveStatus()
+  const { globalStatus, globalError, globalMessage } = useSaveStatus()
 
   // Local state for MarketDataSelector
   const [marketDataActiveTab, setMarketDataActiveTab] = useState('technical_analysis')
@@ -184,6 +184,7 @@ export function ConfigureLayout({
         <SaveStatusIndicator
           status={globalStatus}
           error={globalError}
+          message={globalMessage}
         />
       </div>
 

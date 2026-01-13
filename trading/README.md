@@ -473,7 +473,7 @@ ASTER_PRIVATE_KEY=0x573302a9...                                  # Pro API priva
             "account_percent": 10.0             // 10% of balance per trade
         },
         "risk_management": {
-            "default_stop_loss_percent": 2.0,   // Applied if decision doesn't provide
+            "default_stop_loss_percent": 1.5,   // Applied if decision doesn't provide
             "default_take_profit_percent": 3.0
         }
     }
@@ -568,8 +568,8 @@ python scripts/cross_reference_aster_symbols.py
             "max_position_percent": 10.0
         },
         "risk_management": {
-            "default_stop_loss_percent": 2.0,   // Applied if decision doesn't provide
-            "default_take_profit_percent": 5.0
+            "default_stop_loss_percent": 1.5,   // Applied if decision doesn't provide
+            "default_take_profit_percent": 3.0
         }
     }
 }

@@ -57,25 +57,25 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('macro_economics', 'vix'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'vix_index'},
-        'cache_ttl': 900  # 15 minutes - VIX updates every 15 seconds during trading hours
+        'cache_ttl': 14400  # 4 hours - VIX is context, not trigger; saves $0.025/query
     },
 
     ('macro_economics', 'dxy'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'dxy_index'},
-        'cache_ttl': 900  # 15 minutes - DXY updates continuously during trading
+        'cache_ttl': 14400  # 4 hours - DXY moves slowly relative to crypto volatility
     },
 
     ('macro_economics', 'cpi'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'cpi_inflation'},
-        'cache_ttl': 86400  # 24 hours - CPI released monthly, no need for frequent updates
+        'cache_ttl': 86400  # 24 hours - CPI released monthly
     },
 
     ('macro_economics', 'nfp'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'nfp_jobs'},
-        'cache_ttl': 86400  # 24 hours - NFP released monthly, no need for frequent updates
+        'cache_ttl': 86400  # 24 hours - NFP released monthly
     },
 
     # ========================================================================
@@ -84,7 +84,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     ('onchain_analytics', 'btc_tvl'): {
         'data_type': 'grok_agentic',
         'params_template': {'query_type': 'btc_tvl'},
-        'cache_ttl': 3600  # 1 hour - TVL updates hourly from DefiLlama
+        'cache_ttl': 21600  # 6 hours - TVL changes very slowly
     },
 
     ('onchain_analytics', 'whale_activity'): {
@@ -93,7 +93,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'query_type': 'whale_activity',
             'symbol': '{symbol}'
         },
-        'cache_ttl': 1800  # 30 minutes - whale alerts are real-time but expensive to query
+        'cache_ttl': 7200  # 2 hours - whale moves take time to matter
     },
 
     # ========================================================================
@@ -105,7 +105,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'query_type': 'twitter_sentiment',
             'symbol': '{symbol}'
         },
-        'cache_ttl': 1800  # 30 minutes - sentiment shifts quickly but not second-by-second
+        'cache_ttl': 14400  # 4 hours - sentiment doesn't flip in minutes; $0.05/query (web+X)
     },
 
     # ========================================================================
@@ -117,7 +117,75 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'query_type': 'crypto_news',
             'symbol': '{symbol}'
         },
-        'cache_ttl': 600  # 10 minutes - breaking news needs faster refresh
+        'cache_ttl': 7200  # 2 hours - breaking news is rarely actionable in 10 min
+    },
+
+    # ========================================================================
+    # LEGACY CATEGORY ALIASES (for backward compatibility)
+    # Maps old category names to correct catalog entries
+    # ========================================================================
+    # on_chain -> onchain_analytics
+    ('on_chain', 'whale_activity'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'whale_activity', 'symbol': '{symbol}'},
+        'cache_ttl': 7200
+    },
+    ('on_chain', 'btc_tvl'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'btc_tvl'},
+        'cache_ttl': 21600
+    },
+    ('on_chain', 'Whale Activity'): {  # Display name variant
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'whale_activity', 'symbol': '{symbol}'},
+        'cache_ttl': 7200
+    },
+
+    # news_events / news -> news_regulatory
+    ('news_events', 'crypto_news'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'crypto_news', 'symbol': '{symbol}'},
+        'cache_ttl': 7200
+    },
+    ('news', 'crypto_news'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'crypto_news', 'symbol': '{symbol}'},
+        'cache_ttl': 7200
+    },
+    ('news', 'Crypto News Feed'): {  # Display name variant
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'crypto_news', 'symbol': '{symbol}'},
+        'cache_ttl': 7200
+    },
+
+    # sentiment -> sentiment_social
+    ('sentiment', 'twitter_sentiment'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'twitter_sentiment', 'symbol': '{symbol}'},
+        'cache_ttl': 14400
+    },
+    ('sentiment', 'Twitter Sentiment'): {  # Display name variant
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'twitter_sentiment', 'symbol': '{symbol}'},
+        'cache_ttl': 14400
+    },
+
+    # derivatives -> derivatives_leverage
+    ('derivatives', 'btc_funding_rate'): {
+        'data_type': 'funding_rate',
+        'params_template': {'symbol': 'BTC/USDT', 'include_mark_price': True}
+    },
+    ('derivatives', 'eth_funding_rate'): {
+        'data_type': 'funding_rate',
+        'params_template': {'symbol': 'ETH/USDT', 'include_mark_price': True}
+    },
+    ('derivatives', 'BTC Funding Rate'): {  # Display name variant
+        'data_type': 'funding_rate',
+        'params_template': {'symbol': 'BTC/USDT', 'include_mark_price': True}
+    },
+    ('derivatives', 'ETH Funding Rate'): {  # Display name variant
+        'data_type': 'funding_rate',
+        'params_template': {'symbol': 'ETH/USDT', 'include_mark_price': True}
     },
 }
 

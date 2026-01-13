@@ -362,7 +362,7 @@ Return ONLY the JSON object, no markdown formatting.""",
 
         # Create chat with tools
         chat = client.chat.create(
-            model="grok-4-fast",  # Optimized for agentic tool calling
+            model="grok-4-1-fast",  # Optimized for agentic tool calling
             tools=tools if tools else [web_search()]  # Fallback to web search
         )
 
@@ -422,7 +422,7 @@ Return ONLY the JSON object, no markdown formatting.""",
                 'reasoning_tokens': reasoning_tokens,
                 'total_tokens': usage.total_tokens if usage else 0,
                 'estimated_cost': estimated_cost,
-                'model': 'grok-4-fast',
+                'model': 'grok-4-1-fast',
                 'tools_used': list(set(tc['tool'] for tc in tool_calls_made))
             }
 
@@ -522,29 +522,31 @@ Return ONLY the JSON object, no markdown formatting.""",
         """
         Estimate query cost based on token usage.
 
-        grok-4-fast pricing:
-        - Input: $0.50 / 1M tokens
-        - Output: $2.00 / 1M tokens
-        - Tool calls: ~$0.01-0.05 per call (varies)
+        grok-4-1-fast pricing (2026):
+        - Input: $0.20 / 1M tokens
+        - Output: $0.50 / 1M tokens
+        - Live Search: $25.00 / 1K sources = $0.025 per source
+
+        Note: Each source type (web, X) counts as one source regardless of citations.
         """
         if not usage:
             return 0.0
 
-        # Token costs
-        prompt_cost = (usage.prompt_tokens / 1_000_000) * 0.50
-        completion_cost = (usage.completion_tokens / 1_000_000) * 2.00
+        # Token costs (updated pricing)
+        prompt_cost = (usage.prompt_tokens / 1_000_000) * 0.20
+        completion_cost = (usage.completion_tokens / 1_000_000) * 0.50
 
-        # Tool call costs (rough estimate)
-        tool_cost = 0.0
+        # Live Search costs: $25/1K sources = $0.025 per source
+        # Each source type (web_search, x_search) = 1 source
+        source_cost = 0.0
         if hasattr(usage, 'server_side_tool_usage'):
             tool_usage = usage.server_side_tool_usage or {}
             for tool_type, count in tool_usage.items():
-                if 'WEB_SEARCH' in tool_type:
-                    tool_cost += count * 0.02  # ~$0.02 per web search
-                elif 'X_SEARCH' in tool_type:
-                    tool_cost += count * 0.03  # ~$0.03 per X search
-                elif 'CODE' in tool_type:
-                    tool_cost += count * 0.01  # ~$0.01 per code execution
+                if 'WEB_SEARCH' in tool_type.upper():
+                    source_cost += 0.025  # 1 web source = $0.025
+                elif 'X_SEARCH' in tool_type.upper():
+                    source_cost += 0.025  # 1 X source = $0.025
+                # Code execution is free (no additional cost)
 
-        total = prompt_cost + completion_cost + tool_cost
+        total = prompt_cost + completion_cost + source_cost
         return total

@@ -104,8 +104,8 @@ class PositionSizingConfig(BaseModel):
 
 class RiskManagementConfig(BaseModel):
     """Risk management configuration."""
-    default_stop_loss_percent: Optional[float] = Field(5.0, ge=0.5, le=50.0, description="Default stop loss percentage")
-    default_take_profit_percent: Optional[float] = Field(10.0, ge=0.5, le=500.0, description="Default take profit percentage")
+    default_stop_loss_percent: Optional[float] = Field(1.5, ge=0.5, le=50.0, description="Default stop loss percentage")
+    default_take_profit_percent: Optional[float] = Field(3.0, ge=0.5, le=500.0, description="Default take profit percentage")
 
     @field_validator('default_stop_loss_percent', 'default_take_profit_percent')
     @classmethod

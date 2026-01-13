@@ -1,8 +1,8 @@
 # Market Data System - Complete Architecture
 
 **Status**: ✅ Production Deployed
-**Version**: Phase 1 Complete (32 data points live)
-**Last Updated**: 2025-10-28
+**Version**: Phase 1 Complete (32 data points live, cost-optimized)
+**Last Updated**: 2026-01-13
 
 The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **32 data points** across **7 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
 
@@ -422,17 +422,17 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | | BTC Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
 | | ETH Funding Rate | BinanceFunding | FREE | 1 hour | 🆓 |
 | **Macro Economics** (4 indicators) |
-| | VIX Volatility Index | OpenRouter/Perplexity | ~$0.01 | 15 min | 🆓 |
-| | DXY Dollar Index | OpenRouter/Perplexity | ~$0.01 | 15 min | 🆓 |
-| | CPI Inflation | OpenRouter/Perplexity | ~$0.01 | 24 hours | 🆓 |
-| | NFP Jobs Report | OpenRouter/Perplexity | ~$0.01 | 24 hours | 🆓 |
+| | VIX Volatility Index | GrokAgentic | ~$0.025 | 4 hours | 🆓 |
+| | DXY Dollar Index | GrokAgentic | ~$0.025 | 4 hours | 🆓 |
+| | CPI Inflation | GrokAgentic | ~$0.025 | 24 hours | 🆓 |
+| | NFP Jobs Report | GrokAgentic | ~$0.025 | 24 hours | 🆓 |
 | **On-Chain Analytics** (2 sources) |
-| | BTC TVL in DeFi | GrokAgentic | ~$0.0017 | 1 hour | 🆓 |
-| | Whale Activity | GrokAgentic | ~$0.0134 | 30 min | 🆓 |
+| | BTC TVL in DeFi | GrokAgentic | ~$0.025 | 6 hours | 🆓 |
+| | Whale Activity | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
 | **Sentiment & Social** (1 source) |
-| | Twitter/X Sentiment | GrokAgentic | ~$0.0637 | 30 min | 🆓 |
+| | Twitter/X Sentiment | GrokAgentic | ~$0.05 | 4 hours | 🆓 |
 | **News & Regulatory** (1 source) |
-| | Crypto News Headlines | GrokAgentic | ~$0.0149 | 10 min | 🆓 |
+| | Crypto News Headlines | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
 
 **Total**: 32 data points (31 FREE, 1 Premium*)
 
@@ -850,13 +850,21 @@ With Smart Caching + Hybrid (Custom TTL per data type):
 
 ### **Cache Hit Rate Optimization**
 
-**Custom TTL Strategy**:
+**Custom TTL Strategy** (2026-01-13 cost optimization):
 - **Static data** (CPI, NFP) → 24 hours → 96% fewer queries
-- **Slow-moving** (BTC TVL) → 1 hour → 80% fewer queries
-- **Moderate** (sentiment) → 30 minutes → 60% fewer queries
-- **Fast-moving** (news) → 10 minutes → 40% fewer queries
+- **Slow-moving** (BTC TVL) → 6 hours → 95% fewer queries
+- **Moderate** (VIX, DXY, sentiment) → 4 hours → 94% fewer queries
+- **Semi-fast** (news, whale) → 2 hours → 88% fewer queries
 
-**Result**: ~80% cache hit rate across all data types = **5x cost reduction**
+**Result**: ~95% cache hit rate across all data types = **20x cost reduction**
+
+**Cache Key Pattern**: `intel:grok:{query_type}:{symbol}` (fixed 2026-01-13)
+
+**Legacy Category Aliases** (backward compatibility):
+- `on_chain` → `onchain_analytics`
+- `sentiment` → `sentiment_social`
+- `news` / `news_events` → `news_regulatory`
+- `derivatives` → `derivatives_leverage`
 
 ---
 
@@ -1162,4 +1170,4 @@ print(f"Fetched {sum(len(cat) for cat in result.values())} data points")
 
 **The Market Data System represents ggbots' complete data pipeline - from user configuration to AI-driven trading decisions, orchestrating 32 data points across 7 categories with production-proven performance, cost efficiency, and extensibility.** 🚀
 
-**Phase 1 Status**: ✅ **PRODUCTION DEPLOYED** (2025-10-28)
+**Phase 1 Status**: ✅ **PRODUCTION DEPLOYED** (2025-10-28, cost-optimized 2026-01-13)

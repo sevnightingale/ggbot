@@ -6,8 +6,9 @@ import { SaveStatus } from '@/lib/hooks/useAutoSave'
 interface SaveStatusContextType {
   globalStatus: SaveStatus
   globalError: Error | null
-  registerSave: (id: string) => void
-  completeSave: (id: string) => void
+  globalMessage: string | null  // Custom message for operations (e.g., "Resetting...", "Account reset")
+  registerSave: (id: string, message?: string) => void
+  completeSave: (id: string, message?: string) => void
   failSave: (id: string, error: Error) => void
 }
 
@@ -17,13 +18,15 @@ export function SaveStatusProvider({ children }: { children: ReactNode }) {
   const [activeSaves, setActiveSaves] = useState<Set<string>>(new Set())
   const [lastError, setLastError] = useState<Error | null>(null)
   const [lastCompleteTime, setLastCompleteTime] = useState<number>(0)
+  const [currentMessage, setCurrentMessage] = useState<string | null>(null)  // Custom operation message
   const [, forceUpdate] = useState({})  // Dummy state to force re-render
   const hideTimerRef = useRef<NodeJS.Timeout | null>(null)
 
   // Register that a save operation started
-  const registerSave = useCallback((id: string) => {
+  const registerSave = useCallback((id: string, message?: string) => {
     setActiveSaves(prev => new Set(prev).add(id))
     setLastError(null)
+    setCurrentMessage(message || null)  // Set custom message if provided
     // Clear any pending hide timer
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current)
@@ -32,19 +35,21 @@ export function SaveStatusProvider({ children }: { children: ReactNode }) {
   }, [])
 
   // Mark a save operation as complete
-  const completeSave = useCallback((id: string) => {
+  const completeSave = useCallback((id: string, message?: string) => {
     setActiveSaves(prev => {
       const next = new Set(prev)
       next.delete(id)
       return next
     })
     setLastCompleteTime(Date.now())
+    setCurrentMessage(message || null)  // Set custom success message if provided
 
     // Schedule a re-render after 2s to hide the "Saved" indicator
     if (hideTimerRef.current) {
       clearTimeout(hideTimerRef.current)
     }
     hideTimerRef.current = setTimeout(() => {
+      setCurrentMessage(null)  // Clear message when indicator hides
       forceUpdate({})  // Force re-render to transition from 'saved' to 'idle'
     }, 2100)  // Slightly longer than 2s to ensure the check passes
   }, [])
@@ -82,6 +87,7 @@ export function SaveStatusProvider({ children }: { children: ReactNode }) {
       value={{
         globalStatus,
         globalError: lastError,
+        globalMessage: currentMessage,
         registerSave,
         completeSave,
         failSave,

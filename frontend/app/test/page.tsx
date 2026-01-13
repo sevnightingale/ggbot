@@ -61,8 +61,8 @@ export default function TestPage() {
         max_margin_percent: 20.0
       },
       risk_management: {
-        default_stop_loss_percent: 5.0,
-        default_take_profit_percent: 10.0
+        default_stop_loss_percent: 1.5,
+        default_take_profit_percent: 3.0
       },
       exchange_config: {
         exchange_type: "cex",

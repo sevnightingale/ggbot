@@ -5,13 +5,14 @@ import { createClient } from '@/lib/supabase'
 import { apiClient, BotConfiguration, ConfigData, DataSource } from '@/lib/api'
 import { ThemeProvider } from '@/lib/theme'
 import { PermissionProvider, usePermissions } from '@/lib/permissions'
-import { SaveStatusProvider } from '@/lib/contexts/SaveStatusContext'
+import { SaveStatusProvider, useSaveStatus } from '@/lib/contexts/SaveStatusContext'
 import { useBatchedConfigSave } from '@/lib/hooks/useBatchedConfigSave'
 import { Header } from './components/layout/Header'
 import { BotRail } from './components/layout/BotRail'
 import { TabNavigation } from './components/layout/TabNavigation'
 import { MobileNav } from './components/layout/MobileNav'
 import { EmptyState } from './components/shared/EmptyState'
+import { LoadingSkeleton } from './components/shared/LoadingSkeleton'
 import { ActivationBar } from './components/monitor/ActivationBar'
 import { PositionsTable } from './components/monitor/PositionsTable'
 import TVTimeline from '@/components/tv-timeline'
@@ -74,6 +75,9 @@ function ForgeApp() {
 
   // Permission loading - always call hook, but only use when user exists
   const { loading: permissionsLoading } = usePermissions()
+
+  // Save status context - for operation feedback (optimistic updates)
+  const { registerSave, completeSave, failSave } = useSaveStatus()
 
   // Core bot data - all local state with multi-bot support
   const [allBots, setAllBots] = useState<BotConfiguration[]>([])
@@ -262,8 +266,8 @@ function ForgeApp() {
           max_margin_percent: 20.0
         },
         risk_management: {
-          default_stop_loss_percent: 5.0,
-          default_take_profit_percent: 10.0
+          default_stop_loss_percent: 1.5,
+          default_take_profit_percent: 3.0
         }
       }
     }
@@ -328,8 +332,8 @@ function ForgeApp() {
           max_margin_percent: 20.0
         },
         risk_management: {
-          default_stop_loss_percent: 5.0,
-          default_take_profit_percent: 10.0
+          default_stop_loss_percent: 1.5,
+          default_take_profit_percent: 3.0
         }
       },
       telegram_integration: {
@@ -921,13 +925,30 @@ function ForgeApp() {
   const handleRenameBot = async (configId: string, newName: string) => {
     setIsBotAction(true)
 
+    // 1. Capture previous name for rollback
+    const previousBot = allBots.find(bot => bot.config_id === configId)
+    if (!previousBot) {
+      setIsBotAction(false)
+      return
+    }
+    const previousName = previousBot.config_name
+
+    // 2. Optimistic update - IMMEDIATE (name changes instantly)
+    setAllBots(prev => prev.map(bot =>
+      bot.config_id === configId ? { ...bot, config_name: newName } : bot
+    ))
+
+    // 3. API call
     try {
-      const updatedBot = await apiClient.updateConfig(configId, {}, newName)
-      setAllBots(prev => prev.map(bot =>
-        bot.config_id === configId ? updatedBot : bot
-      ))
+      await apiClient.updateConfig(configId, {}, newName)
+      // Silent success - UI already updated
     } catch (error) {
+      // 4. Rollback + error feedback
       console.error('❌ Failed to rename bot:', error)
+      setAllBots(prev => prev.map(bot =>
+        bot.config_id === configId ? { ...bot, config_name: previousName } : bot
+      ))
+      failSave('rename-bot', new Error('Failed to rename bot'))
     } finally {
       setIsBotAction(false)
     }
@@ -937,13 +958,29 @@ function ForgeApp() {
   const handleDuplicateBot = async (configId: string) => {
     setIsBotAction(true)
 
-    try {
-      const originalBot = allBots.find(bot => bot.config_id === configId)
-      if (!originalBot) return
+    const originalBot = allBots.find(bot => bot.config_id === configId)
+    if (!originalBot) {
+      setIsBotAction(false)
+      return
+    }
 
-      const duplicateName = `Copy of ${originalBot.config_name}`
+    // 1. Create optimistic placeholder with temp ID
+    const tempId = `temp-${Date.now()}`
+    const optimisticBot: BotConfiguration = {
+      ...originalBot,
+      config_id: tempId,
+      config_name: `Copy of ${originalBot.config_name}`,
+      state: 'inactive'
+    }
+
+    // 2. Optimistic add - IMMEDIATE (new bot appears instantly)
+    setAllBots(prev => [...prev, optimisticBot])
+    setSelectedConfigId(tempId)
+
+    // 3. API call
+    try {
       const newBot = await apiClient.createConfig(
-        duplicateName,
+        optimisticBot.config_name,
         originalBot.config_data,
         {
           config_type: originalBot.config_type,
@@ -952,10 +989,17 @@ function ForgeApp() {
         }
       )
 
-      setAllBots(prev => [...prev, newBot])
+      // 4. Replace placeholder with real bot (silent success)
+      setAllBots(prev => prev.map(bot =>
+        bot.config_id === tempId ? newBot : bot
+      ))
       setSelectedConfigId(newBot.config_id)
     } catch (error) {
+      // 5. Rollback + error feedback
       console.error('❌ Failed to duplicate bot:', error)
+      setAllBots(prev => prev.filter(bot => bot.config_id !== tempId))
+      setSelectedConfigId(configId)  // Back to original
+      failSave('duplicate-bot', new Error('Failed to duplicate bot'))
     } finally {
       setIsBotAction(false)
     }
@@ -965,23 +1009,33 @@ function ForgeApp() {
   const handleDeleteBot = async (configId: string) => {
     setIsBotAction(true)
 
+    // 1. Capture previous state for rollback
+    const previousBots = allBots
+    const wasSelected = selectedConfigId === configId
+
+    // 2. Optimistic update - IMMEDIATE (bot disappears instantly)
+    setAllBots(prev => {
+      const updatedBots = prev.filter(bot => bot.config_id !== configId)
+      if (wasSelected) {
+        setSelectedConfigId(updatedBots.length > 0 ? updatedBots[0].config_id : null)
+        setEditingConfigData(null)
+        setEditingTableFields(null)
+      }
+      return updatedBots
+    })
+
+    // 3. API call (async, user already sees update)
     try {
       await apiClient.deleteConfig(configId)
-
-      setAllBots(prev => {
-        const updatedBots = prev.filter(bot => bot.config_id !== configId)
-
-        if (selectedConfigId === configId) {
-          setSelectedConfigId(updatedBots.length > 0 ? updatedBots[0].config_id : null)
-          // Clear editing state if deleting currently editing bot
-          setEditingConfigData(null)
-          setEditingTableFields(null)
-        }
-
-        return updatedBots
-      })
+      // Success: No feedback needed - UI already updated
     } catch (error) {
+      // 4. Rollback + show error feedback
       console.error('❌ Failed to delete bot:', error)
+      setAllBots(previousBots)
+      if (wasSelected) {
+        setSelectedConfigId(configId)
+      }
+      failSave('delete-bot', new Error('Failed to delete bot'))
     } finally {
       setIsBotAction(false)
     }
@@ -991,29 +1045,36 @@ function ForgeApp() {
   const handleResetAccount = async (configId: string) => {
     setIsBotAction(true)
 
+    // 1. Capture previous account state for rollback
+    const previousAccounts = accounts
+
+    // 2. Optimistic update - IMMEDIATE + show feedback
+    registerSave('reset-account', 'Resetting...')
+    setAccounts(prev => prev.map(account =>
+      account.config_id === configId
+        ? {
+            ...account,
+            current_balance: 10000,
+            total_pnl: 0,
+            unrealized_pnl: 0,
+            total_equity: 10000,
+            win_rate: 0,
+            total_trades: 0,
+          }
+        : account
+    ))
+
+    // 3. API call
     try {
       const result = await apiClient.resetAccount(configId)
-
       console.log(`✅ Account reset: ${result.message}`)
       console.log(`📊 Positions closed: ${result.positions_closed}, New balance: $${result.new_balance}`)
-
-      // Update local accounts state immediately for instant UI feedback
-      setAccounts(prev => prev.map(account =>
-        account.config_id === configId
-          ? {
-              ...account,
-              current_balance: result.new_balance,
-              total_pnl: 0,
-              unrealized_pnl: 0,
-              total_equity: result.new_balance,
-              win_rate: 0,
-              total_trades: 0,
-            }
-          : account
-      ))
-
+      completeSave('reset-account', 'Account reset')
     } catch (error) {
+      // 4. Rollback + error feedback
       console.error('❌ Failed to reset account:', error)
+      setAccounts(previousAccounts)
+      failSave('reset-account', new Error('Failed to reset account'))
     } finally {
       setIsBotAction(false)
     }
@@ -1022,8 +1083,31 @@ function ForgeApp() {
   if (loading) {
     return (
       <ThemeProvider>
-        <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-          <div className="text-[var(--text-secondary)]">Loading forge...</div>
+        <div className="min-h-screen bg-[var(--bg-primary)]">
+          {/* Skeleton Header */}
+          <div className="h-16 border-b border-[var(--border)] px-4 flex items-center justify-between">
+            <LoadingSkeleton variant="text" className="w-24 h-6" />
+            <div className="flex gap-4">
+              <LoadingSkeleton variant="circle" className="w-8 h-8" />
+              <LoadingSkeleton variant="circle" className="w-8 h-8" />
+            </div>
+          </div>
+
+          {/* Skeleton Grid */}
+          <div className="max-w-7xl mx-auto grid grid-cols-12 gap-4 px-4 py-4">
+            {/* BotRail skeleton */}
+            <div className="col-span-3 hidden md:block space-y-2">
+              {[1, 2, 3].map(i => (
+                <LoadingSkeleton key={i} variant="card" className="h-16" />
+              ))}
+            </div>
+
+            {/* Main content skeleton */}
+            <div className="col-span-12 md:col-span-9 space-y-4">
+              <LoadingSkeleton variant="card" className="h-24" />
+              <LoadingSkeleton variant="card" className="h-[400px]" />
+            </div>
+          </div>
         </div>
       </ThemeProvider>
     )
@@ -1039,8 +1123,31 @@ function ForgeApp() {
 
   if (user && permissionsLoading) {
     return (
-      <div className="min-h-screen bg-[var(--bg-primary)] flex items-center justify-center">
-        <div className="text-[var(--text-secondary)]">Loading permissions...</div>
+      <div className="min-h-screen bg-[var(--bg-primary)]">
+        {/* Skeleton Header */}
+        <div className="h-16 border-b border-[var(--border)] px-4 flex items-center justify-between">
+          <LoadingSkeleton variant="text" className="w-24 h-6" />
+          <div className="flex gap-4">
+            <LoadingSkeleton variant="circle" className="w-8 h-8" />
+            <LoadingSkeleton variant="circle" className="w-8 h-8" />
+          </div>
+        </div>
+
+        {/* Skeleton Grid */}
+        <div className="max-w-7xl mx-auto grid grid-cols-12 gap-4 px-4 py-4">
+          {/* BotRail skeleton */}
+          <div className="col-span-3 hidden md:block space-y-2">
+            {[1, 2, 3].map(i => (
+              <LoadingSkeleton key={i} variant="card" className="h-16" />
+            ))}
+          </div>
+
+          {/* Main content skeleton */}
+          <div className="col-span-12 md:col-span-9 space-y-4">
+            <LoadingSkeleton variant="card" className="h-24" />
+            <LoadingSkeleton variant="card" className="h-[400px]" />
+          </div>
+        </div>
       </div>
     )
   }

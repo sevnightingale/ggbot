@@ -25,4 +25,5 @@ sources:
 
 cache:
   backend: redis
-  ttl: 3600  # 1 hour default (can be overridden per data type)
+  ttl: 14400  # 4 hours default - extended to reduce API costs
+  key_pattern: "intel:grok:{query_type}:{symbol}"  # Include query_type to avoid key collisions

@@ -35,8 +35,8 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 **Navigation & Branding**:
 - [x] Add ggArena link to navbar
 - [x] Add banner message about Season 1 (Jan 21st)
-- [ ] Update logo everywhere
-- [ ] Update favicon
+- [x] Update logo everywhere
+- [x] Update favicon
 
 ### **Phase 2: Critical Polish (Tonight/Tomorrow)** ✅ COMPLETE
 
@@ -53,14 +53,14 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 ### **Phase 3: Before Jan 21**
 
 **Infrastructure**:
-- [ ] Create `scripts/arena_reset.py` - bulk reset all registered bots to $10k
-- [ ] Test reset script on staging
+- [x] Create `scripts/arena_reset.py` - bulk reset all registered bots to $10k
+- [x] Test reset script (tested on The Technician, verified dry-run on all 7 bots)
 - [ ] Add `arena_registered_at` timestamp column (optional)
 
 **Communications**:
-- [ ] Draft launch email for ggbots v2 + ggArena announcement
-- [ ] Draft Telegram post for same
-- [ ] Post launch tweet + video (Jan 8)
+- [x] Draft launch email for ggbots v2 + ggArena announcement
+- [x] Draft Telegram post for same
+- [x] Post launch tweet + video (Jan 8)
 
 **Polish**:
 - [ ] Fix Google auth showing Supabase project ID
@@ -223,6 +223,186 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ---
 
+## 🧠 **Rei Agent Integration - Persistent Learning Trading Agent**
+
+**Status**: 🔵 PLANNING - Awaiting beta access
+**Planning Doc**: [DOCS/todo/REI_AGENT_INTEGRATION.md](DOCS/todo/REI_AGENT_INTEGRATION.md)
+**Complexity**: Medium (~2-3 weeks including testing)
+
+**Summary**: Integrate Reilabs' Rei Core reasoning engine with existing Claude SDK agent to create a hybrid architecture where Claude orchestrates (execution, timing, tools) and Rei reasons (learning, memory, pattern recognition). Enables **persistent learning at inference time** - the agent genuinely improves from trading experience.
+
+### **Why This Matters**
+- Current agent is stateless - each decision starts fresh
+- `trade_observations` exist but don't influence future decisions
+- Previous attempt to build learning "was kinda sucking" - LLMs aren't designed for this
+- Rei Core is specifically built for inference-time learning
+
+### **Architecture: Claude + Rei Hybrid**
+
+```
+Claude Agent (Orchestrator)     Rei Unit (Brain)
+├── Wake up on schedule         ├── Receives market context
+├── Gather market data          ├── Reasons through concept space
+├── Consult Rei for decision ──→├── Returns: action, confidence
+├── Execute trades              ├── LEARNS from outcomes
+└── Report outcomes to Rei ────→└── Builds trading intuition
+```
+
+### **Phase 0: Access & Setup** (BLOCKED)
+- [ ] Request Rei beta access (Discord/Telegram)
+- [ ] Create test Unit in Rei Factory
+- [ ] Get Agent Secret Key
+- [ ] Understand pricing/rate limits
+
+### **Phase 1: Rei Service Client** (~2-3 hours)
+- [ ] Create `core/services/rei_service.py`
+- [ ] Implement chat_completion with retry/backoff
+- [ ] Add to `.env.example`: `REI_AGENT_SECRET_KEY`
+- [ ] Test with simple query
+
+### **Phase 2: MCP Tools** (~3-4 hours)
+- [ ] Create `agent/mcp_tools/rei_tools.py`
+- [ ] Implement `ask_rei_decision` tool
+- [ ] Implement `report_trade_outcome` tool (feedback loop)
+- [ ] Register tools in MCP server
+
+### **Phase 3: Configuration** (~1-2 hours)
+- [ ] Add `rei_enabled`, `rei_unit_id` to AgentStrategy
+- [ ] Create vault storage for Rei secrets
+- [ ] Add API endpoint to store Rei credentials
+
+### **Phase 4: Agent System Prompt** (~1-2 hours)
+- [ ] Update system prompt with Rei instructions
+- [ ] Define decision output format
+- [ ] Add Claude + Rei interaction examples
+
+### **Phase 5: Unit Initialization** (~2-3 hours)
+- [ ] Design primordial initialization flow
+- [ ] Extract strategy rules from config as primordials
+- [ ] Test primordial persistence
+
+### **Phase 6: Testing & Validation** (~1 week)
+- [ ] Create test agent with Rei enabled
+- [ ] Run in paper trading for 50+ trades
+- [ ] Compare vs identical Claude-only agent
+- [ ] Measure: win rate, confidence calibration, learning evidence
+
+### **Success Metrics**
+| Metric | Current | Target |
+|--------|---------|--------|
+| Win rate | ~30% | >40% after learning |
+| Confidence calibration | Poor | <10% gap |
+| Adaptation | Manual prompts | Automatic |
+
+### **Key Files**
+- `core/services/rei_service.py` - NEW
+- `agent/mcp_tools/rei_tools.py` - NEW
+- `core/config/models.py` - ADD rei_enabled, rei_unit_id
+- `agent/prompts/system.md` - UPDATE
+
+---
+
+## ⚡ **Frontend Snappiness - React Query & Optimistic Updates**
+
+**Status**: 🔵 PLANNED
+**Complexity**: Low-Medium (~1-2 days total)
+**Priority**: Medium - UX improvement, not blocking
+
+**Problem**: Frontend feels sluggish due to missing modern data-fetching patterns. Every page mount re-fetches data, actions wait for API before updating UI, loading states are plain text instead of skeletons.
+
+**Current State**:
+- ✅ SSE real-time updates (excellent)
+- ✅ Batched config saves with dirty tracking (excellent)
+- ✅ LoadingSkeleton component exists
+- ❌ No server state caching (React Query / SWR)
+- ❌ Most mutations wait for API before UI update
+- ❌ Text-based loading states ("Loading forge...")
+
+### **Phase 1: Quick Wins** (~2-3 hours)
+
+**Optimistic Updates** - Update UI immediately, rollback on error:
+- [ ] `handleDeleteBot` - Remove from list immediately, rollback on failure
+- [ ] `handleRenameBot` - Update name immediately, rollback on failure
+- [ ] `handleDuplicateBot` - Add to list immediately, rollback on failure
+- [ ] `startBot` / `stopBot` - Already partially optimistic, verify complete
+
+**Skeleton Loading States** - Replace text with structure:
+- [ ] Main page loading → Skeleton grid (BotRail + main content)
+- [ ] Permissions loading → Keep header visible, skeleton content
+- [ ] Bot switching → Skeleton for positions/timeline while loading
+
+**Files**: `frontend/app/forge/page.tsx`
+
+### **Phase 2: React Query Integration** (~4-6 hours)
+
+**Setup**:
+- [ ] Install `@tanstack/react-query`
+- [ ] Create `frontend/lib/providers.tsx` with QueryClientProvider
+- [ ] Wrap app in provider (layout.tsx or page.tsx)
+- [ ] Configure staleTime, refetchOnWindowFocus
+
+**Convert Core Fetches**:
+- [ ] `useBots()` - Replace `listConfigs` useState with useQuery
+- [ ] `useBot(configId)` - Single bot fetch with caching
+- [ ] `useDataSources()` - Data sources (rarely changes, long staleTime)
+- [ ] `useUserProfile()` - User profile/permissions
+
+**Mutation Hooks with Optimistic Updates**:
+- [ ] `useDeleteBot()` - Optimistic remove + rollback
+- [ ] `useCreateBot()` - Optimistic add + rollback
+- [ ] `useUpdateBot()` - Optimistic update + rollback
+
+**Files**:
+- `frontend/lib/queries.ts` (NEW)
+- `frontend/lib/providers.tsx` (NEW)
+- `frontend/app/forge/page.tsx`
+
+### **Phase 3: Advanced Patterns** (~2-3 hours, optional)
+
+- [ ] Prefetch bot data on hover in BotRail
+- [ ] Background refetch on window focus
+- [ ] Infinite scroll for trade history (if needed)
+- [ ] React Query DevTools for debugging
+
+### **Benefits**
+
+| Before | After |
+|--------|-------|
+| Re-fetch on every page visit | Cached for 30s, instant on return |
+| Delete waits 200-500ms for API | Instant removal, async confirmation |
+| Plain "Loading..." text | Skeleton shows page structure |
+| Manual loading/error states | Built-in with React Query |
+| No request deduplication | Auto-deduped concurrent requests |
+
+### **Implementation Notes**
+
+**SSE + React Query Coexistence**:
+```typescript
+// SSE pushes updates → invalidate React Query cache
+stream.addEventListener('dashboard', (event) => {
+  queryClient.setQueryData(['bots'], data.bots)  // Direct update
+  // OR
+  queryClient.invalidateQueries(['bots'])  // Trigger refetch
+})
+```
+
+**Optimistic Delete Pattern**:
+```typescript
+const useDeleteBot = () => useMutation({
+  mutationFn: (id) => apiClient.deleteConfig(id),
+  onMutate: async (id) => {
+    await queryClient.cancelQueries(['bots'])
+    const previous = queryClient.getQueryData(['bots'])
+    queryClient.setQueryData(['bots'], old => old.filter(b => b.config_id !== id))
+    return { previous }
+  },
+  onError: (err, id, ctx) => queryClient.setQueryData(['bots'], ctx.previous),
+  onSettled: () => queryClient.invalidateQueries(['bots']),
+})
+```
+
+---
+
 ## 🎨 **Activity Modal Redesign** [ACTIVITY_MODAL_REDESIGN.md]
 
 **Status**: 🟢 COMPLETE
@@ -317,7 +497,7 @@ All test scripts and documentation ready. See [DOCS/symphony_spot_integration.md
 
 ## 🧠 **Market Intelligence - Future Phases**
 
-**Phase 1 Complete**: 8 Grok sources live ($195/month platform cost)
+**Phase 1 Complete**: 8 Grok sources live, cost-optimized ($7-10/week with 4hr TTLs)
 
 ### **Phase 2: Premium On-Chain** ($100-500/month)
 - [ ] Whale wallet tracking (Nansen/Arkham)

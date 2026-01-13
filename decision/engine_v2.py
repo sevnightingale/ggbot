@@ -803,6 +803,8 @@ Take Profit: {take_profit_text}
             llm_config = self.config.llm_config if hasattr(self.config, 'llm_config') else {}
             provider = llm_config.get('provider', 'openrouter')
             model = metadata.get('model', 'unknown')
+            openrouter_model = metadata.get('openrouter_model', None)  # Actual model ID (e.g., anthropic/claude-opus-4.5)
+            reasoning_tier = metadata.get('reasoning_tier', None)  # economy/standard/premium
 
             # Extract token usage
             usage = metadata.get('usage', {})
@@ -848,6 +850,9 @@ Take Profit: {take_profit_text}
                     'symbol': symbol,
                     'stop_loss_price': decision_data.get('stop_loss_price'),
                     'take_profit_price': decision_data.get('take_profit_price'),
+                    # Audit fields for billing verification
+                    'openrouter_model': openrouter_model,  # Actual model used (e.g., anthropic/claude-opus-4.5)
+                    'reasoning_tier': reasoning_tier,  # economy/standard/premium
                 },
                 provider=provider,
                 model=model,

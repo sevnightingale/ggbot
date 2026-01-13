@@ -6,6 +6,59 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-13 - Market Intelligence Cost Optimization + ggArena Reset Script
+
+**Market Intelligence Fixes** (`market_intelligence/`):
+- Fixed cache key bug: All Grok queries shared same key `intel:grok_agentic:{symbol}` (literal) → now `intel:grok:{query_type}:{symbol}`
+- Updated model: `grok-4-fast` → `grok-4-1-fast` (current XAI model)
+- Extended TTLs: VIX/DXY 15min→4hr, Twitter 30min→4hr, News 10min→2hr, Whale 30min→2hr, TVL 1hr→6hr
+- Added legacy category aliases: `on_chain`→`onchain_analytics`, `sentiment`→`sentiment_social`, `news`→`news_regulatory`, etc.
+- Updated cost estimate: Input $0.50→$0.20/1M, Output $2.00→$0.50/1M, Live Search $0.025/source
+- Expected savings: $50/week → ~$7-10/week (80-86% reduction)
+
+**ggArena Reset Script** (`scripts/arena_reset.py`):
+- Bulk reset all arena-registered bots (`is_public_performance=true`) to $10k
+- Dry-run by default, `--execute` flag for actual reset, `--notify` for notifications
+- Tested on The Technician (verified $7,233→$10,000 reset)
+
+**Landing Page Privacy Links** (`frontend/components/new-landing/Header.tsx`):
+- Added Privacy/Terms links next to logo in header (Google OAuth requirement)
+- Desktop: subtle `text-xs text-ivory/40` links
+- Mobile: added to hamburger menu with separator
+
+---
+
+## 2026-01-13 - Bot Performance Analysis Framework + Platform Defaults
+
+**Bot Analysis Methodology** (`trading/ANALYSIS.md`):
+- New documentation: 10-step analysis methodology for evaluating bot performance
+- Covers: baseline metrics, confidence calibration, close reason analysis, indicator correlation
+- Includes SQL query patterns, common pitfalls (sample size, survivorship bias, market regime)
+- Example analysis flow based on Contrarian bot deep-dive (44 trades)
+
+**Contrarian v2 Strategy** (`NOTE.md`):
+- Data-driven strategy revision based on 44-trade analysis
+- Key findings: long_oversold 91.7% WR, ADX>35 55.6% WR (danger zone), funding rates 53.8% WR (removed)
+- Added mandatory direction alignment, ADX hard block at 35, exit logic fix ("oscillators normalizing" = hold, not exit)
+- Simplified data points: removed funding rates, MACD, OBV, Aroon
+
+**Default SL/TP Update** (`core/config/models.py:107-108`, `frontend/app/forge/page.tsx`, `frontend/app/forge/components/configure/TradeSettings.tsx`):
+- Changed platform defaults from 5%/10% to 1.5%/3% (price movement)
+- Analysis showed actual trades move 0.3-2.3%, old defaults never triggered
+- Tighter safety net: 15% position loss at SL vs 50% previously (with 10x leverage)
+
+**LLM Models Display Names** (`llm_models` table):
+- Updated all 7 models to show tier variants in description
+- Format: "Economy: X | Standard: Y | Premium: Z"
+- Clarifies that tier selection changes actual model (e.g., Claude Premium = Opus 4.5)
+
+**Activity Logging Enhancement** (`decision/engine_v2.py:806-807, 853-855`):
+- Added `openrouter_model` and `reasoning_tier` to activity details JSON
+- Enables audit verification: confirm Claude Premium actually called claude-opus-4.5
+- Billing accuracy unchanged (uses OpenRouter's actual cost), adds human auditability
+
+---
+
 ## 2026-01-13 - Strategy Advisor Fixes
 
 **Strategy Advisor f-string Bug** (`api/assistant.py:338-341`):
