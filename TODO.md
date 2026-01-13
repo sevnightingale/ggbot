@@ -173,42 +173,6 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ---
 
-## 💳 **Credit Packs & Crypto Payments**
-
-**Status**: 🔵 PLANNING
-**Planning Doc**: [DOCS/todo/CREDIT_PACKS.md](DOCS/todo/CREDIT_PACKS.md)
-**Complexity**: Medium (~10-14 hours)
-
-**Summary**: Allow users to prepay for usage credits via Stripe (card) or NOWPayments (crypto). Credits apply automatically to metered billing via Stripe Credit Grants.
-
-### **Key Design**
-
-- Credits = prepayment for usage-based billing (user must be on `usage_based` tier)
-- Free user buys credits → Creates subscription + credit grant
-- Usage-based user buys credits → Just creates credit grant
-- Credits never expire, auto-apply to invoices
-
-### **Implementation**
-
-**Backend** (~4 hours):
-- [ ] `GET /api/v2/credits/balance` - Query Stripe credit balance
-- [ ] `POST /api/v2/credits/purchase` - Stripe Checkout (subscription if needed + credits)
-- [ ] `POST /api/v2/webhooks/nowpayments` - IPN handler → create credit grant
-- [ ] Update `handle_checkout_completed` for credit purchase type
-
-**Frontend** (~4-6 hours):
-- [ ] Update `UpgradeModal.tsx` - Add "Prepay credits" option alongside "Pay as you go"
-- [ ] Update `UserProfile.tsx` - Add credit balance, usage display, "Add Credits" button
-- [ ] Create `CreditPicker.tsx` - Amount selector ($10/$25/$50/$100) + Card/Crypto toggle
-
-**NOWPayments Setup**:
-- [x] Account created, API keys in .env
-- [ ] Set IPN Secret Key in Payment Settings (for webhook signature verification)
-
-**Note**: Using Create Invoice API (not static widgets) - allows dynamic amounts + user identification via `order_id`
-
----
-
 ## 🎲 **USX Staking Modal - Bot Competition Betting**
 
 **Status**: 🔵 PLANNING

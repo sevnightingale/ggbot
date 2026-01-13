@@ -28,10 +28,13 @@
 ```
 Production Pages:
 ├── /forge                    # Main application (Forge architecture)
+├── /arena                   # ggArena competition page
 ├── /new-landing             # Modern landing page (ready to replace /landing)
 ├── /login                   # Supabase authentication (login)
 ├── /signup                  # Supabase authentication (signup)
-└── /auth/callback           # Email verification handler
+├── /auth/callback           # Email verification handler
+├── /success                 # Subscription success page
+└── /credits/success         # Credit purchase success page
 
 Legacy/Archive (Moved to /archive/):
 ├── frontend-dashboard       # Deprecated WebSocket-based dashboard
@@ -74,7 +77,9 @@ Legacy/Archive (Moved to /archive/):
 ├── BotImageUpload.tsx      # Bot profile image uploader - drag-drop, auto-resize to 1024×1024, Supabase Storage
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
 ├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
-├── UpgradeModal.tsx        # Bot-specific cost estimate modal with Stripe checkout (model+tier+frequency based)
+├── UpgradeModal.tsx        # Payment chooser: "Pay as you go" vs "Prepay credits" with Stripe checkout
+├── CreditPicker.tsx        # Credit amount selector ($10-$100) with Card/Crypto payment toggle
+├── AddCreditsModal.tsx     # Modal wrapper for CreditPicker (for existing subscribers)
 └── ValidationMessage.tsx   # Error/warning message component with icons
 
 /components/ui/              # shadcn UI components

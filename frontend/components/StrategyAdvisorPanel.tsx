@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Sparkles, BarChart3, Wand2, AlertTriangle, TrendingUp, Target, Loader2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { apiClient } from '@/lib/api'
@@ -119,6 +119,21 @@ export function StrategyAdvisorPanel({
   const [analysisError, setAnalysisError] = useState<string | null>(null)
   const [hasClosedTrades, setHasClosedTrades] = useState(false)
   const [checkingTrades, setCheckingTrades] = useState(true)
+
+  // Ref for the scrollable messages container
+  const messagesContainerRef = useRef<HTMLDivElement>(null)
+
+  // Auto-scroll to bottom when messages change or loading state changes
+  useEffect(() => {
+    if (messagesContainerRef.current) {
+      // Small delay to ensure DOM has updated with new content
+      requestAnimationFrame(() => {
+        if (messagesContainerRef.current) {
+          messagesContainerRef.current.scrollTop = messagesContainerRef.current.scrollHeight
+        }
+      })
+    }
+  }, [messages, loading])
 
   // Check if bot has any closed trades on mount
   useEffect(() => {
@@ -460,7 +475,10 @@ export function StrategyAdvisorPanel({
       </div>
 
       {/* Messages area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0">
+      <div
+        ref={messagesContainerRef}
+        className="flex-1 overflow-y-auto p-4 space-y-4 min-h-0"
+      >
         {/* Show analysis report if available and toggled */}
         {showAnalysis && analysisReport ? (
           renderAnalysisReport()

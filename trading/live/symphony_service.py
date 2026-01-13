@@ -1018,6 +1018,11 @@ class SymphonyLiveTradingService:
 
                     self._log.info(f"Retrieved {len(open_positions)} open positions from Symphony ({len(all_positions)} total including closed)")
                     return open_positions
+                elif response.status == 429:
+                    # Rate limited - cache empty response with 60s backoff to prevent hammering
+                    self._log.error(f"Symphony positions rate limited (429) - backing off 60s")
+                    self._set_cached(cache_key, [], ttl=60)
+                    return []
                 else:
                     error_text = await response.text()
                     self._log.error(f"Symphony positions error {response.status}: {error_text}")
@@ -1073,6 +1078,11 @@ class SymphonyLiveTradingService:
 
                     self._log.info(f"Retrieved {len(batches)} batches from Symphony")
                     return batches
+                elif response.status == 429:
+                    # Rate limited - cache empty response with 60s backoff
+                    self._log.error(f"Symphony batches rate limited (429) - backing off 60s")
+                    self._set_cached(cache_key, [], ttl=60)
+                    return []
                 else:
                     error_text = await response.text()
                     self._log.error(f"Symphony batches error {response.status}: {error_text}")
@@ -1125,6 +1135,11 @@ class SymphonyLiveTradingService:
                     # Cache with 5-minute TTL (closed batch data is immutable)
                     self._set_cached(cache_key, data, ttl=300)
                     return data
+                elif response.status == 429:
+                    # Rate limited - cache empty response with 60s backoff
+                    self._log.error(f"Symphony batch-positions rate limited (429) - backing off 60s")
+                    self._set_cached(cache_key, {}, ttl=60)
+                    return {}
                 else:
                     error_text = await response.text()
                     self._log.error(f"Symphony batch-positions error {response.status}: {error_text}")

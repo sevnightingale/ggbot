@@ -6,6 +6,52 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-13 - Strategy Advisor Fixes
+
+**Strategy Advisor f-string Bug** (`api/assistant.py:338-341`):
+- Fixed "Invalid format specifier ' Ellipsis, "extraction": Ellipsis'" error
+- Cause: Unescaped `{...}` in system prompt f-string — Python interpreted `...` (Ellipsis) as format specifier
+- Fix: Escaped curly braces as `{{...}}` in JSON example lines 339-340
+
+**StrategyAdvisorPanel Auto-Scroll** (`frontend/components/StrategyAdvisorPanel.tsx:123-136, 478-480`):
+- Added `useRef` for messages container, `useEffect` to auto-scroll on new messages
+- Uses `scrollTop = scrollHeight` on container (not `scrollIntoView`) to prevent page scroll
+- `requestAnimationFrame` ensures DOM painted before scrolling
+
+---
+
+## 2026-01-08 - Credit Packs & Crypto Payments
+
+**Planning Doc**: [DOCS/completed/CREDIT_PACKS.md](DOCS/completed/CREDIT_PACKS.md)
+
+**Credit Packs System** (`ggbot.py:4380-4800`):
+- `GET /api/v2/credits/balance` - Returns Stripe credit balance (available_usd, ledger_usd)
+- `POST /api/v2/credits/purchase` - Stripe Checkout for credit packs; auto-creates subscription for free users
+- `POST /api/v2/credits/crypto-checkout` - Creates NOWPayments invoice with dynamic amounts
+- `POST /api/v2/webhooks/nowpayments` - IPN handler with HMAC-SHA512 signature verification
+- Updated `handle_checkout_completed` to create Stripe Credit Grants on payment success
+- Helper functions: `get_stripe_customer_id()`, `has_usage_based_subscription()`
+
+**Frontend Components** (`frontend/components/`):
+- `CreditPicker.tsx` - Amount selector ($10/$25/$50/$100) + Card/Crypto payment toggle
+- `AddCreditsModal.tsx` - Modal wrapper for existing subscribers to add credits
+- `UpgradeModal.tsx` - Added payment mode chooser: "Pay as you go" vs "Prepay credits"
+- `UserProfile.tsx` - Credit balance display in dropdown, "Add Credits" button for usage_based users
+- `/credits/success/page.tsx` - Success page after credit purchase
+
+**API Client** (`frontend/lib/api.ts`):
+- `getCreditBalance()` - Fetch user's credit balance
+- `purchaseCredits(amountCents)` - Create Stripe checkout for credits
+- `purchaseCreditsCrypto(amountCents)` - Create NOWPayments invoice
+
+**Integration Notes**:
+- Stripe Credit Grants apply automatically to metered billing invoices
+- NOWPayments IPN sends webhooks: waiting → confirming → sending → finished
+- Credits created on `finished` status; signature verified with HMAC-SHA512
+- IPN Callback URL: `https://ggbots-api.nightingale.business/api/v2/webhooks/nowpayments`
+
+---
+
 ## 2026-01-07 - ggArena Season 1 Launch Prep
 
 **Arena Page UX Overhaul** (`frontend/app/arena/page.tsx`):

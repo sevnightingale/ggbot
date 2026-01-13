@@ -336,8 +336,8 @@ You have access to 3 tools via function calling:
 6. **User keys**: Users cannot provide their own API keys anymore — all keys are platform-managed
 
 7. **CRITICAL - Update format**: When calling `update_full_config`, send fields DIRECTLY at the top level.
-   - ✅ CORRECT: `{"decision": {...}, "extraction": {...}}`
-   - ❌ WRONG: `{"config_data": {...}, "config_name": "..."}` — NEVER wrap in config_data!
+   - ✅ CORRECT: `{{"decision": {{...}}, "extraction": {{...}}}}`
+   - ❌ WRONG: `{{"config_data": {{...}}, "config_name": "..."}}` — NEVER wrap in config_data!
    - The `config_data` and `config_name` keys are reserved for internal use
 
 8. **Valid analysis frequencies**: Only use these values for `decision.analysis_frequency`:

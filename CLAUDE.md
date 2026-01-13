@@ -1,6 +1,7 @@
 # ggbot Development Guide
 
 **For onboarding**: Read `GO.md` first for complete project context.
+**For documentation updates**: Use `@OK.md` mid-session to update docs properly.
 **For architecture**: See `README.md`
 **For current status**: See `ACTIVE.md`
 
@@ -220,6 +221,7 @@ case 'live_trading':
 ## Documentation Structure
 
 - **GO.md** - Start here for onboarding procedure
+- **OK.md** - Mid-session documentation update workflow (invoke with `@OK.md`)
 - **README.md** - Architecture overview and platform capabilities
 - **ACTIVE.md** - Current production status, services, ports, commands
 - **TODO.md** - Current development tasks and roadmap
