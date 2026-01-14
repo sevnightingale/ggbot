@@ -137,6 +137,11 @@ async def fetch_market_intelligence(
                 params = mapping['params_template'].copy()
                 params = _replace_param_templates(params, symbol=symbol)
 
+                # Always include symbol in params for cache key generation
+                # (even for non-symbol-specific queries like VIX, DXY, CPI, NFP)
+                if 'symbol' not in params:
+                    params['symbol'] = symbol
+
                 # Get cache TTL override if specified
                 cache_ttl_override = mapping.get('cache_ttl')
 

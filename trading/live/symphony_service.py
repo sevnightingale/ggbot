@@ -910,9 +910,28 @@ class SymphonyLiveTradingService:
                 if response.status == 200:
                     data = await response.json()
                     batch_id = data.get('batchId')
+                    successful = data.get('successful', 0)
+                    failed = data.get('failed', 0)
+
+                    # CRITICAL: Check if any trades actually executed
+                    if successful == 0:
+                        # Trade was NOT actually executed - Symphony created batch but nothing happened
+                        results = data.get('results', [])
+                        error_details = []
+                        for r in results:
+                            result = r.get('result', {})
+                            if not result.get('success'):
+                                error_details.append(f"{r.get('smartAccount', 'unknown')}: {result}")
+
+                        self._log.error(
+                            f"Symphony batch created but 0 trades executed! "
+                            f"batch_id={batch_id}, failed={failed}, details={error_details}"
+                        )
+                        return None
+
                     # Invalidate positions cache since we just opened a new position
                     self.invalidate_cache(f"positions:{agent_id}")
-                    self._log.info(f"Symphony position opened: batch_id={batch_id}")
+                    self._log.info(f"Symphony position opened: batch_id={batch_id}, successful={successful}, failed={failed}")
                     return batch_id
                 else:
                     error_text = await response.text()
@@ -953,9 +972,29 @@ class SymphonyLiveTradingService:
             async with session.post(url, json=payload, headers=headers) as response:
                 if response.status == 200:
                     data = await response.json()
+                    successful = data.get('successful', 0)
+                    skipped = data.get('skipped', 0)
+                    failed = data.get('failed', 0)
+
+                    # CRITICAL: Check if close actually succeeded
+                    # skipped > 0 is also OK (means position was already closed)
+                    if successful == 0 and skipped == 0:
+                        results = data.get('results', [])
+                        error_details = []
+                        for r in results:
+                            result = r.get('result', {})
+                            if not result.get('success') and not result.get('skipped'):
+                                error_details.append(f"{r.get('smartAccount', 'unknown')}: {result}")
+
+                        self._log.error(
+                            f"Symphony batch close failed! "
+                            f"batch_id={batch_id}, failed={failed}, details={error_details}"
+                        )
+                        return False
+
                     # Invalidate positions cache since we just closed a position
                     self.invalidate_cache(f"positions:{agent_id}")
-                    self._log.info(f"Symphony position closed: batch_id={batch_id}, successful={data.get('successful')}")
+                    self._log.info(f"Symphony position closed: batch_id={batch_id}, successful={successful}, skipped={skipped}, failed={failed}")
                     return True
                 else:
                     error_text = await response.text()

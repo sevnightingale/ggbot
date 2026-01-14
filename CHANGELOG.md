@@ -6,6 +6,33 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-13 - Frontend Snappiness Phase 1
+
+**Optimistic Updates** (`frontend/app/forge/page.tsx`):
+- `handleDeleteBot`: Instant removal → API → rollback on error
+- `handleDuplicateBot`: Temp placeholder → API → replace with real ID
+- `handleRenameBot`: Instant name change → API → rollback on error
+- `handleResetAccount`: Instant $10k + "Resetting..." → API → "Account reset" or rollback
+
+**SaveStatusContext Extension** (`frontend/lib/contexts/SaveStatusContext.tsx`):
+- Added `globalMessage` state for custom operation feedback
+- `registerSave(id, message?)` / `completeSave(id, message?)` now accept optional messages
+- SaveStatusIndicator displays custom text instead of "Saving..."/"Saved"
+
+**Skeleton Loading States** (`frontend/app/forge/page.tsx`):
+- Replaced "Loading forge..." text with skeleton grid (header + BotRail + main content)
+- Replaced "Loading permissions..." text with same skeleton layout
+- Uses existing LoadingSkeleton component (text, card, circle variants)
+
+**Bot Switching Skeleton** (`frontend/app/forge/page.tsx`):
+- Added `isBotSwitching` state, triggered in `handleBotSelection`
+- Monitor tab shows skeleton cards during bot switch (500ms timeout)
+- Prevents stale data flash when switching between bots (SSE push delay)
+
+**UX Impact**: Delete/duplicate/rename now feel instant (0ms perceived latency vs 200-500ms before). Bot switching shows skeleton instead of stale data.
+
+---
+
 ## 2026-01-13 - Market Intelligence Cost Optimization + ggArena Reset Script
 
 **Market Intelligence Fixes** (`market_intelligence/`):

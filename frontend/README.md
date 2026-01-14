@@ -73,7 +73,7 @@ Legacy/Archive (Moved to /archive/):
 ├── tv-timeline.tsx         # AI consciousness timeline - bot's subjective awareness moments with equity chart
 ├── bottom-sheet.tsx        # Framer Motion slide-up drawer (centered on desktop) for activity details
 ├── StrategyAdvisorPanel.tsx # Inline AI chat for bot configuration (500px fixed, markdown rendering)
-├── SaveStatusIndicator.tsx # Global auto-save status (Saving → Saved → Error)
+├── SaveStatusIndicator.tsx # Global operation status (Saving/Saved/Error) with custom message support
 ├── BotImageUpload.tsx      # Bot profile image uploader - drag-drop, auto-resize to 1024×1024, Supabase Storage
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
 ├── SymbolSelector.tsx      # Symbol dropdown with search (141 validated pairs)
@@ -97,7 +97,7 @@ Legacy/Archive (Moved to /archive/):
 │   ├── useBatchedConfigSave.ts  # Unified batched config save with dirty tracking (2025-12-04)
 │   └── useAutoSave.ts      # Legacy: Debounced auto-save (deprecated, use useBatchedConfigSave)
 ├── contexts/
-│   └── SaveStatusContext.tsx # Global save status coordination
+│   └── SaveStatusContext.tsx # Global operation status (supports custom messages for bot operations)
 ├── api.ts                  # API client with Stripe methods
 ├── theme.tsx               # Dark/light theme provider
 └── supabase.ts             # Supabase client setup
@@ -112,6 +112,7 @@ Legacy/Archive (Moved to /archive/):
 - **Multi-Bot Native**: `selectedConfigId` pattern with seamless switching
 - **SSE Real-time**: Server-Sent Events replace complex WebSocket patterns
 - **Unified Batched Save**: Single hook manages all config saves with 5s debounce + dirty field tracking (2025-12-04)
+- **Optimistic Updates**: Bot operations (delete/duplicate/rename/reset) update UI immediately, rollback on error (2026-01-13)
 - **AI-First Configuration**: Strategy Advisor inline chat panel for collaborative bot setup
 
 ### **Real-time Data Flow**
@@ -189,6 +190,34 @@ if (!isFieldDirty('decision')) {
 - **Dirty fields** (user editing): User wins, preserved
 - **Non-dirty fields**: Updated from SSE
 - **After save completes**: Dirty tracking clears
+
+### **Optimistic Update Pattern** (2026-01-13)
+
+Bot operations use optimistic updates - UI changes immediately, API runs async, rollback on error:
+
+```typescript
+// Pattern: Capture → Update → API → Rollback on error
+const handleDeleteBot = async (configId: string) => {
+  // 1. Capture previous state for rollback
+  const previousBots = allBots
+
+  // 2. Optimistic update - IMMEDIATE
+  setAllBots(prev => prev.filter(bot => bot.config_id !== configId))
+
+  // 3. API call (async, user already sees result)
+  try {
+    await apiClient.deleteConfig(configId)
+  } catch (error) {
+    // 4. Rollback on failure + show error
+    setAllBots(previousBots)
+    failSave('delete-bot', new Error('Failed to delete bot'))
+  }
+}
+```
+
+**Applies to**: `handleDeleteBot`, `handleDuplicateBot`, `handleRenameBot`, `handleResetAccount`
+
+**Feedback**: Uses `useSaveStatus()` from SaveStatusContext for error display. Reset shows "Resetting..." → "Account reset".
 
 ---
 

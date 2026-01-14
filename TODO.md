@@ -304,34 +304,22 @@ Claude Agent (Orchestrator)     Rei Unit (Brain)
 
 ## ⚡ **Frontend Snappiness - React Query & Optimistic Updates**
 
-**Status**: 🔵 PLANNED
+**Status**: 🟡 PHASE 1 COMPLETE
 **Complexity**: Low-Medium (~1-2 days total)
 **Priority**: Medium - UX improvement, not blocking
-
-**Problem**: Frontend feels sluggish due to missing modern data-fetching patterns. Every page mount re-fetches data, actions wait for API before updating UI, loading states are plain text instead of skeletons.
 
 **Current State**:
 - ✅ SSE real-time updates (excellent)
 - ✅ Batched config saves with dirty tracking (excellent)
 - ✅ LoadingSkeleton component exists
+- ✅ Optimistic updates for delete/rename/duplicate/reset (2026-01-13)
+- ✅ Skeleton loading states (2026-01-13)
+- ✅ SaveStatusContext extended for custom operation feedback (2026-01-13)
 - ❌ No server state caching (React Query / SWR)
-- ❌ Most mutations wait for API before UI update
-- ❌ Text-based loading states ("Loading forge...")
 
-### **Phase 1: Quick Wins** (~2-3 hours)
+### **Phase 1: Quick Wins** ✅ COMPLETE (2026-01-13)
 
-**Optimistic Updates** - Update UI immediately, rollback on error:
-- [ ] `handleDeleteBot` - Remove from list immediately, rollback on failure
-- [ ] `handleRenameBot` - Update name immediately, rollback on failure
-- [ ] `handleDuplicateBot` - Add to list immediately, rollback on failure
-- [ ] `startBot` / `stopBot` - Already partially optimistic, verify complete
-
-**Skeleton Loading States** - Replace text with structure:
-- [ ] Main page loading → Skeleton grid (BotRail + main content)
-- [ ] Permissions loading → Keep header visible, skeleton content
-- [ ] Bot switching → Skeleton for positions/timeline while loading
-
-**Files**: `frontend/app/forge/page.tsx`
+See CHANGELOG.md entry for details.
 
 ### **Phase 2: React Query Integration** (~4-6 hours)
 

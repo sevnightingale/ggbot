@@ -91,6 +91,7 @@ function ForgeApp() {
   const [isManualTriggering, setIsManualTriggering] = useState(false)
   const [isCreatingNew, setIsCreatingNew] = useState(false)
   const [isBotAction, setIsBotAction] = useState(false)
+  const [isBotSwitching, setIsBotSwitching] = useState(false)  // Show skeleton during bot switch
   const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
   const [showArenaBanner, setShowArenaBanner] = useState(true)
 
@@ -826,6 +827,9 @@ function ForgeApp() {
 
   // Handle bot switching with clean state reset
   const handleBotSelection = (configId: string) => {
+    // Skip if already on this bot
+    if (configId === selectedConfigId) return
+
     // Always reset to monitor tab when switching bots
     setActiveTab('monitor')
 
@@ -833,8 +837,14 @@ function ForgeApp() {
     setEditingConfigData(null)
     setEditingTableFields(null)
 
+    // Show skeleton during transition (SSE will clear it via data push)
+    setIsBotSwitching(true)
+
     // Switch to the new bot
     setSelectedConfigId(configId)
+
+    // Clear switching state after SSE has time to populate (~500ms)
+    setTimeout(() => setIsBotSwitching(false), 500)
   }
 
   // Config update callback for AI Assistant and child components
@@ -1269,24 +1279,32 @@ function ForgeApp() {
             <div className="flex-1 pb-8">
               {selectedBot ? (
                 activeTab === 'monitor' ? (
-                  <div className="space-y-3">
-                    {/* Activity Timeline - Full Width */}
-                    <TVTimeline
-                      configId={selectedConfigId || ''}
-                      title={selectedBot.config_name}
-                      variant="embedded"
-                    />
+                  isBotSwitching ? (
+                    // Skeleton during bot switch - prevents showing stale data
+                    <div className="space-y-3">
+                      <LoadingSkeleton variant="card" className="h-[400px]" />
+                      <LoadingSkeleton variant="card" className="h-48" />
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {/* Activity Timeline - Full Width */}
+                      <TVTimeline
+                        configId={selectedConfigId || ''}
+                        title={selectedBot.config_name}
+                        variant="embedded"
+                      />
 
-                    {/* PositionsTable - Active trades (full width) */}
-                    <PositionsTable
-                      positions={positions}
-                      selectedConfigId={selectedConfigId ?? undefined}
-                      onPositionClosed={() => {
-                        // SSE will automatically refresh positions, but log the event
-                        console.log('Position closed, waiting for SSE update...')
-                      }}
-                    />
-                  </div>
+                      {/* PositionsTable - Active trades (full width) */}
+                      <PositionsTable
+                        positions={positions}
+                        selectedConfigId={selectedConfigId ?? undefined}
+                        onPositionClosed={() => {
+                          // SSE will automatically refresh positions, but log the event
+                          console.log('Position closed, waiting for SSE update...')
+                        }}
+                      />
+                    </div>
+                  )
                 ) : (
                   // Configure mode: ConfigureLayout handles ALL bot types
                   // (agent mode shows simplified UI via conditional rendering in ConfigureLayout)
