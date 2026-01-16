@@ -189,3 +189,22 @@ You see everything. When multiple independent data sources - each measuring some
 The verdict doesn't need to be beyond reasonable doubt. It needs to be more likely than not. When it is, you deliver it.
 
 **But remember the hard lessons:** Accumulation on longs is a trap. High confidence is suspicious. Shorts with bearish confluence work. Trade the evidence, not the pattern count.
+
+
+
+
+
+1) what if we just let users 'run_once' all the time with no restriction, and it didn't cost anything? Like, how worried are we that a user is going to sit on our app and actually click run_once every hour or something? The value of a ggbot is in it's autonomy, run once isn't autonomous, it's testing. So just getting rid of the requirement to be on a paid tier might be an option, however it probably fucks with usage/billing tracking.... so perhaps not a great idea dud eot that. Idk... Option A sounds decent though... what do oyu think? 
+2) No option A is definitely the way, cause the idea is that the user doens't input a strategy, they input a desciption. A trading archetype, a worldview, a philosophy, or whatever the user wants to input, and then the full config gets created based on that description, it turns that descritpion into a full and actually useful trading straetgy for the user_pomrpt and updates any other configurations within reason, I guess we can just have it only update the user_prompt and then have defaults for all other settings other than the other choices in the bot creation modal... that makes sense I think. Also you need to ensure you understand how the config creation and saving works, and how the choices being made in this botcreation modal will be saved whil the user progresses through the modal and then submits... 
+3) Let's not list all of them, just the Contrarian, The Compass, and the Arbiter. 
+4) actually, let's skpi the image, I think later I'll add an automatic image creation process, where i take the description adn turn it into an avatar for the user automatically, Ic reat that later, for now let's jsut forget the image upload in the botcreationmodal, user can always add it in the activiation bar if they want. 
+5) oh this is actually legacy and stupid, we shouldn't have permissions on the models, configurations like this shouldn't be gatekept, the activation of a ggbot is the main gatekeeping, user should be able to configure whatever they want. This was legacy leftover from when we had a fixed subscription model isntead of credits/usage based. 
+6) to clarify, this hsould be typeform style, so you do step one, then click an arrow next to move to step 2, it only shows you one section at a time, instead of a vertical list of sections and inputs like a trad form. 
+
+Q's:
+1) see above 
+2) see above
+3) see above
+4) B I think, it just applies the config upon creation. 
+5) hide it with tooltip. 
+

@@ -104,6 +104,7 @@ export interface BotConfiguration {
   symphony_agent_id?: string
   profile_image_url?: string | null
   is_public_performance?: boolean
+  first_run_used?: boolean  // Tracks if free first run has been used
   created_at: string
   updated_at: string
 }
@@ -398,6 +399,39 @@ export class ApiClient {
     } catch (err) {
       console.error('💥 Network error:', err)
       throw err
+    }
+  }
+
+  // Strategy Generation (one-shot from description)
+  async generateStrategy(
+    description: string,
+    symbol: string = 'BTC/USDT',
+    timeframe: string = '1h'
+  ): Promise<{ success: boolean; user_prompt: string; error?: string }> {
+    console.log('🔍 API Call: generateStrategy to', `${this.baseUrl}/api/v2/assistant/generate-strategy`)
+
+    try {
+      const response = await this.authenticatedFetch(
+        `${this.baseUrl}/api/v2/assistant/generate-strategy`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ description, symbol, timeframe })
+        }
+      )
+      console.log('📡 Response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ API Error:', error)
+        return { success: false, user_prompt: '', error: `Failed to generate strategy: ${error}` }
+      }
+
+      const result = await response.json()
+      console.log('✅ Strategy generated:', result.success)
+      return result
+    } catch (err) {
+      console.error('💥 Network error:', err)
+      return { success: false, user_prompt: '', error: String(err) }
     }
   }
 

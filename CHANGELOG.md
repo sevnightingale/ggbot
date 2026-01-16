@@ -6,6 +6,45 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-16 - Rei Agent Integration
+
+**Planning Doc**: [DOCS/completed/REI_AGENT_INTEGRATION.md](DOCS/completed/REI_AGENT_INTEGRATION.md)
+
+**Architecture**: Claude (orchestrator) + Rei (brain) hybrid. Claude handles execution/timing/tools, Rei handles reasoning/learning/pattern recognition. Enables persistent learning at inference time.
+
+**Rei Service Client** (`core/services/rei_service.py`):
+- Async HTTP client for Rei API (`api.reilabs.org`)
+- `chat_completion()` with JSON response format, retry/backoff
+- Auth via `REI_01_UNIT_SECRET` env var
+
+**MCP Tools** (`agent/mcp_server.py:1305-1700`):
+- `query_market_data_for_rei` - Fetches 21 technicals + 11 intel, stores in session buffer
+- `consult_rei_for_decision` - Sends data to Rei, returns action/confidence/TP/SL
+- `report_trade_outcome_to_rei` - Sends closed trade results for Rei learning
+
+**Configuration** (`core/config/schemas.py`):
+- Added `rei_enabled: bool` to AgentConfigData
+
+**System Prompt** (`agent/run_agent.py:232-279`):
+- Conditional Rei section when `rei_enabled=true`
+- Rei-specific EXECUTION LOOP: query_market_data_for_rei → consult_rei → execute/wait → report_outcome
+- "CRITICAL: Rei is your decision maker. Do NOT analyze charts yourself."
+
+**Session Buffer** (`agent/session_buffer.py`):
+- Already existed; used to pass ~15-20KB market data between tool calls without Claude carrying JSON
+
+**Data Flow**:
+1. Claude calls `query_market_data_for_rei(BTC, 4h)` → stores 32 data points in buffer
+2. Claude calls `consult_rei_for_decision(positions, balance)` → Rei analyzes, returns JSON
+3. Claude executes trade or waits based on Rei's confidence (60% threshold)
+4. When trade closes → `report_trade_outcome_to_rei()` for learning feedback
+
+**Verified Data**: 21/21 technical indicators received, 8/11 market intel (missing: eth_funding_rate, btc_tvl, whale_activity)
+
+**Test Bot**: "The Nightingale" (config_id: 5b77d429-5da4-4d69-8aba-50d916e4b6b8) running with Rei integration
+
+---
+
 ## 2026-01-16 - Frontend Usage Display
 
 **Continuation of**: [DOCS/completed/USAGE_BILLING_TRACKING.md](DOCS/completed/USAGE_BILLING_TRACKING.md)

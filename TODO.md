@@ -63,18 +63,75 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - [x] Post launch tweet + video (Jan 8)
 
 **Polish**:
-- [ ] Fix Google auth showing Supabase project ID
+- [x] Fix Google auth showing Supabase project ID
 - [ ] Update x-bot to different account
 
 ### **Phase 4: Future (Post-Launch)**
 
 - [ ] Inline arena bot creation modal (components exist, just need flow)
-- [ ] Full onboarding flow reassessment
+- [x] Full onboarding flow reassessment → See Onboarding Revamp section below
 
 ### **Open Questions**
 1. Late registrations after Jan 21 - allow with fresh $10k?
 2. Should Sev's 7 prototype bots compete in Season 1?
 3. Multiple bots per user - allowed?
+
+---
+
+## 🎯 **HIGH PRIORITY - Onboarding Revamp** [ONBOARDING_REVAMP.md]
+
+**Status**: 🔵 PLANNING
+**Planning Doc**: [DOCS/todo/ONBOARDING_REVAMP.md](DOCS/todo/ONBOARDING_REVAMP.md)
+**Complexity**: Medium (~2-3 days)
+**Priority**: High - First impression for new users
+
+**Problem**: Current new user experience is poor - auto-created "Default ggbot" with bad RSI strategy, no guidance, no investment in the bot.
+
+**Solution**: Transform BotCreationModal into Typeform-style guided experience:
+- One step at a time with arrow navigation
+- Description-based strategy generation via LLM
+- 3 archetype templates (Contrarian, Compass, Arbiter)
+- First run free for new bots
+- Non-closable modal for users with 0 bots
+
+### **Phase 1: Backend** (~3-4 hours)
+
+- [ ] Add `first_run_used` column to configurations table
+- [ ] Create `POST /api/v2/assistant/generate-strategy` endpoint
+- [ ] Modify orchestrate endpoint for first-run permission bypass
+- [ ] Test endpoint with various descriptions
+
+### **Phase 2: Frontend - Modal Structure** (~4-5 hours)
+
+- [ ] Refactor BotCreationModal to 5-step structure
+- [ ] Step 1: Bot name (pre-filled "ggbot N")
+- [ ] Step 2: Trading mode (Paper/Symphony/Aster)
+- [ ] Step 3: Symbol & timeframe selection
+- [ ] Step 4: Strategy description + archetype buttons
+- [ ] Step 5: AI model & reasoning tier selection
+- [ ] Progress bar and navigation arrows
+
+### **Phase 3: Frontend - Integration** (~3-4 hours)
+
+- [ ] Create `archetypes.ts` with Contrarian/Compass/Arbiter configs
+- [ ] Implement archetype click → apply config, skip to final step
+- [ ] Add strategy generation API call for custom descriptions
+- [ ] Reuse model selector from StrategyEditor (remove permission gating)
+- [ ] Handle loading states during generation
+
+### **Phase 4: Frontend - New User Flow** (~2-3 hours)
+
+- [ ] Auto-open modal for users with 0 bots
+- [ ] Hide X button with tooltip "Create your first bot to continue"
+- [ ] Trigger first run automatically on creation
+- [ ] Show success alert ("Bot created!")
+- [ ] Test complete flow end-to-end
+
+### **Phase 5: Cleanup** (~1-2 hours)
+
+- [ ] Remove `canAccess('premium_llms')` from StrategyEditor (legacy)
+- [ ] Clean up any unused permission checks
+- [ ] Update related documentation
 
 ---
 
@@ -220,85 +277,6 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 - [ ] Integrate modal with existing UI
 - [ ] End-to-end testing
 - [ ] Deploy to Vercel
-
----
-
-## 🧠 **Rei Agent Integration - Persistent Learning Trading Agent**
-
-**Status**: 🔵 PLANNING - Awaiting beta access
-**Planning Doc**: [DOCS/todo/REI_AGENT_INTEGRATION.md](DOCS/todo/REI_AGENT_INTEGRATION.md)
-**Complexity**: Medium (~2-3 weeks including testing)
-
-**Summary**: Integrate Reilabs' Rei Core reasoning engine with existing Claude SDK agent to create a hybrid architecture where Claude orchestrates (execution, timing, tools) and Rei reasons (learning, memory, pattern recognition). Enables **persistent learning at inference time** - the agent genuinely improves from trading experience.
-
-### **Why This Matters**
-- Current agent is stateless - each decision starts fresh
-- `trade_observations` exist but don't influence future decisions
-- Previous attempt to build learning "was kinda sucking" - LLMs aren't designed for this
-- Rei Core is specifically built for inference-time learning
-
-### **Architecture: Claude + Rei Hybrid**
-
-```
-Claude Agent (Orchestrator)     Rei Unit (Brain)
-├── Wake up on schedule         ├── Receives market context
-├── Gather market data          ├── Reasons through concept space
-├── Consult Rei for decision ──→├── Returns: action, confidence
-├── Execute trades              ├── LEARNS from outcomes
-└── Report outcomes to Rei ────→└── Builds trading intuition
-```
-
-### **Phase 0: Access & Setup** (BLOCKED)
-- [ ] Request Rei beta access (Discord/Telegram)
-- [ ] Create test Unit in Rei Factory
-- [ ] Get Agent Secret Key
-- [ ] Understand pricing/rate limits
-
-### **Phase 1: Rei Service Client** (~2-3 hours)
-- [ ] Create `core/services/rei_service.py`
-- [ ] Implement chat_completion with retry/backoff
-- [ ] Add to `.env.example`: `REI_AGENT_SECRET_KEY`
-- [ ] Test with simple query
-
-### **Phase 2: MCP Tools** (~3-4 hours)
-- [ ] Create `agent/mcp_tools/rei_tools.py`
-- [ ] Implement `ask_rei_decision` tool
-- [ ] Implement `report_trade_outcome` tool (feedback loop)
-- [ ] Register tools in MCP server
-
-### **Phase 3: Configuration** (~1-2 hours)
-- [ ] Add `rei_enabled`, `rei_unit_id` to AgentStrategy
-- [ ] Create vault storage for Rei secrets
-- [ ] Add API endpoint to store Rei credentials
-
-### **Phase 4: Agent System Prompt** (~1-2 hours)
-- [ ] Update system prompt with Rei instructions
-- [ ] Define decision output format
-- [ ] Add Claude + Rei interaction examples
-
-### **Phase 5: Unit Initialization** (~2-3 hours)
-- [ ] Design primordial initialization flow
-- [ ] Extract strategy rules from config as primordials
-- [ ] Test primordial persistence
-
-### **Phase 6: Testing & Validation** (~1 week)
-- [ ] Create test agent with Rei enabled
-- [ ] Run in paper trading for 50+ trades
-- [ ] Compare vs identical Claude-only agent
-- [ ] Measure: win rate, confidence calibration, learning evidence
-
-### **Success Metrics**
-| Metric | Current | Target |
-|--------|---------|--------|
-| Win rate | ~30% | >40% after learning |
-| Confidence calibration | Poor | <10% gap |
-| Adaptation | Manual prompts | Automatic |
-
-### **Key Files**
-- `core/services/rei_service.py` - NEW
-- `agent/mcp_tools/rei_tools.py` - NEW
-- `core/config/models.py` - ADD rei_enabled, rei_unit_id
-- `agent/prompts/system.md` - UPDATE
 
 ---
 

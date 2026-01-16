@@ -756,6 +756,160 @@ async def universal_assistant_chat(
 
 
 # ============================================================================
+# Strategy Generation Endpoint (One-Shot)
+# ============================================================================
+
+class GenerateStrategyRequest(BaseModel):
+    """Request model for one-shot strategy generation."""
+    description: str
+    symbol: str = "BTC/USDT"
+    timeframe: str = "1h"
+
+
+class GenerateStrategyResponse(BaseModel):
+    """Response model for strategy generation."""
+    success: bool
+    user_prompt: str = ""
+    error: str | None = None
+
+
+STRATEGY_GENERATION_PROMPT = """You are a trading strategy translator. Your job is to convert a user's description of their trading philosophy, worldview, or bot personality into a concrete, executable trading strategy.
+
+The user will provide:
+- A description of how they want their bot to trade (could be personality-based, philosophical, or specific)
+- The symbol they want to trade (e.g., BTC/USDT)
+- The timeframe for analysis (e.g., 1h, 4h)
+
+Your task is to output ONLY the strategy text (user_prompt) that will be used by the trading decision engine. The strategy should be in markdown format with clear sections.
+
+## Output Format
+
+Your response should follow this structure:
+
+```
+# [Bot Name/Personality]
+
+## Identity
+[1-2 sentences describing the bot's trading personality and philosophy]
+
+## Entry Rules
+### Long Entries
+- [Specific conditions for going long]
+- [Include indicators, thresholds, sentiment conditions]
+
+### Short Entries
+- [Specific conditions for going short]
+- [Include indicators, thresholds, sentiment conditions]
+
+## Exit Rules
+- Take profit: [Specific conditions]
+- Stop loss: [Specific conditions]
+- Early exit: [Optional conditions]
+
+## Confidence Levels
+- 0.75+: [High confidence conditions]
+- 0.60-0.75: [Medium confidence conditions]
+- 0.55-0.60: [Lower confidence conditions]
+- Below 0.55: Pass (wait for better setup)
+
+## Risk Management
+- Max position size: [Guidance]
+- Stop loss placement: [Guidance]
+```
+
+## Guidelines
+
+1. **Be specific**: Convert vague descriptions into concrete rules with actual indicator values
+2. **Include confidence thresholds**: Always specify when to trade with high vs medium vs low confidence
+3. **Add risk management**: Every strategy needs stop loss and take profit guidance
+4. **Match the personality**: If they want a cautious bot, reflect that in the rules. If aggressive, likewise.
+5. **Keep it executable**: The trading engine will read this, so make it clear and actionable
+6. **Use available indicators**: RSI, MACD, Bollinger Bands, EMA, SMA, Stochastic, CCI, ATR, OBV, VWAP, ADX, Aroon, etc.
+7. **Consider sentiment**: Can include twitter_sentiment, funding rates, whale_activity if relevant to their description
+
+## Examples
+
+If user says "A bot that fades the crowd when everyone is panicking or euphoric":
+- Convert to: Mean-reversion strategy with RSI oversold/overbought levels, sentiment extremes triggering entries
+
+If user says "A patient sniper that waits for the perfect moment":
+- Convert to: High-threshold strategy with multiple confirmation requirements, only trading when 4+ indicators align
+
+If user says "An aggressive scalper that catches quick moves":
+- Convert to: Momentum-following strategy on lower timeframes, tight stops, quick profits
+
+Now generate the strategy based on the user's description."""
+
+
+@router.post("/assistant/generate-strategy", response_model=GenerateStrategyResponse)
+async def generate_strategy_from_description(
+    request: GenerateStrategyRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """
+    One-shot strategy generation from user description.
+
+    Takes a description of trading philosophy/personality and generates
+    a complete trading strategy (user_prompt) for the decision engine.
+
+    This is used during bot creation to convert the user's description
+    into an actionable trading strategy.
+    """
+    try:
+        # Initialize Anthropic client
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+        # Build the user message
+        user_message = f"""Generate a trading strategy based on this description:
+
+**Description**: {request.description}
+**Symbol**: {request.symbol}
+**Timeframe**: {request.timeframe}
+
+Convert this into a complete, executable trading strategy following the format in your instructions."""
+
+        # Call Claude Haiku (fast and cheap for this task)
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=2048,
+            system=STRATEGY_GENERATION_PROMPT,
+            messages=[{
+                "role": "user",
+                "content": user_message
+            }]
+        )
+
+        # Extract the response text
+        strategy_text = ""
+        for content_block in response.content:
+            if hasattr(content_block, "text"):
+                strategy_text += content_block.text
+
+        if not strategy_text.strip():
+            raise ValueError("Empty strategy generated")
+
+        logger.bind(
+            user_id=current_user.user_id,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            description_length=len(request.description)
+        ).info("Generated trading strategy from description")
+
+        return GenerateStrategyResponse(
+            success=True,
+            user_prompt=strategy_text.strip()
+        )
+
+    except Exception as e:
+        logger.error(f"Strategy generation error: {e}")
+        return GenerateStrategyResponse(
+            success=False,
+            user_prompt="",
+            error=str(e)
+        )
+
+
+# ============================================================================
 # Performance Analysis Endpoint
 # ============================================================================
 

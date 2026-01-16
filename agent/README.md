@@ -1,13 +1,13 @@
 # Autonomous Trading Agent
 
-**Status**: Phase 4 Complete - Production Ready with Session Persistence + Watchdog
-**Last Updated**: 2025-12-27
+**Status**: Phase 5 Complete - Rei Integration for Persistent Learning
+**Last Updated**: 2026-01-16
 
 ---
 
 ## 🎯 Overview
 
-The ggbots autonomous trading agent enables 24/7 AI-powered trading with full control over strategy execution, position management, and self-directed timing. Built on Claude Agent SDK with 12 specialized MCP tools and **conversation persistence** across crashes and restarts.
+The ggbots autonomous trading agent enables 24/7 AI-powered trading with full control over strategy execution, position management, and self-directed timing. Built on Claude Agent SDK with 15 specialized MCP tools, **conversation persistence** across crashes/restarts, and optional **Rei integration** for persistent learning.
 
 **Architecture**:
 - **Strategy Configuration**: Via Strategy Advisor API (`/api/v2/assistant/chat`)
@@ -29,8 +29,9 @@ agent/
 ├── README.md              # This file - usage guide
 ├── __init__.py           # Package initialization
 ├── run_agent.py          # Main agent runner (CLI entry point)
-├── mcp_server.py         # 12 MCP tool definitions
+├── mcp_server.py         # 15 MCP tool definitions (including 3 Rei tools)
 ├── service_client.py     # HTTP client for ggbot API
+├── session_buffer.py     # Thread-safe buffer for Rei market data
 ├── config_manager.py     # Config CRUD (stub, not currently used)
 ├── chat.py               # CLI chat interface for testing
 └── test_mcp_tools.py     # Tool testing script
@@ -80,7 +81,7 @@ Agent executes 24/7 with self-directed timing using `wait_for` tool.
 
 ---
 
-## 🛠️ MCP Tools (12 Total)
+## 🛠️ MCP Tools (15 Total)
 
 ### **Market Data Tools**
 
@@ -324,6 +325,77 @@ Save strategy and exit strategy definition mode.
 
 ---
 
+### **Rei Integration Tools** (Persistent Learning)
+
+> **Requires**: `rei_enabled: true` in config + `REI_01_UNIT_SECRET` env var
+
+#### 13. `query_market_data_for_rei`
+Comprehensive data collection for Rei analysis.
+
+**Parameters**:
+- `symbol` (optional): Trading pair, default "BTC"
+- `timeframe` (optional): Data timeframe, default "4h"
+
+**Behavior**:
+1. Fetches 21 technical indicators via API
+2. Fetches 11 market intelligence sources via API
+3. Stores full JSON (~15-20KB) in session buffer
+4. Returns summary to Claude (not full data)
+
+**Why Session Buffer**: Claude doesn't pay token cost for carrying large JSON between tool calls.
+
+#### 14. `consult_rei_for_decision`
+Get trading decision from Rei's reasoning engine.
+
+**Parameters**:
+- `current_positions` (required): Description of open positions or "none"
+- `account_balance` (required): Current USD balance
+
+**Returns**:
+```
+🧠 Rei Trading Decision
+
+Symbol: BTC
+Action: ENTER_LONG | ENTER_SHORT | EXIT | WAIT
+Confidence: 68.0%
+Take Profit: $97,500.00
+Stop Loss: $93,200.00
+
+Reasoning: [Rei's analysis]
+Key Signals: RSI oversold, ADX strong trend, funding neutral
+Warnings: whale distribution activity
+
+✅ Confidence threshold met
+```
+
+**Rei's Calibrated Confidence**:
+- Unlike LLM confidence (poorly calibrated), Rei's confidence is deterministic and trustworthy
+- 60%+ recommended for trade execution
+- Don't override or cap Rei's confidence scores
+
+#### 15. `report_trade_outcome_to_rei`
+Send closed trade results for Rei learning.
+
+**Parameters**:
+- `symbol` (required): Trading pair
+- `side` (required): "long" | "short"
+- `entry_price` (required): Entry price
+- `exit_price` (required): Exit price
+- `pnl_usd` (required): P&L in USD
+- `pnl_pct` (required): P&L percentage
+- `duration_hours` (required): Trade duration
+- `close_reason` (required): "take_profit" | "stop_loss" | "manual" | "liquidation"
+- `conditions_at_entry` (required): Market conditions at entry
+
+**Purpose**: Rei strengthens/weakens patterns based on outcome. Winning trades reinforce patterns, losing trades weaken them.
+
+**Critical Rules**:
+- Send RAW FACTS only, never Rei's previous output
+- Call after EVERY closed trade (wins and losses)
+- Rei learns better from more data points
+
+---
+
 ## 🎭 Agent Architecture
 
 ### **Strategy Configuration (via Strategy Advisor API)**
@@ -429,8 +501,7 @@ CREATE TABLE agent_sessions (
 
 ```bash
 # Agent Model
-AGENT_MODEL=claude-opus-4-5-20251101  # Production: Opus 4.5 (best reasoning)
-# AGENT_MODEL=claude-sonnet-4-5-20250929  # Alternative: Sonnet 4.5 (faster, cheaper)
+AGENT_MODEL=claude-sonnet-4-5-20250929  # Production: Sonnet 4.5
 
 # Redis for message queues
 REDIS_URL=redis://localhost:6379
@@ -439,6 +510,9 @@ REDIS_PORT=6379
 
 # API Authentication
 SUPABASE_SERVICE_KEY=your-service-key-here  # For agent → API auth
+
+# Rei Integration (optional)
+REI_01_UNIT_SECRET=your-rei-unit-secret    # From Rei portal, enables persistent learning
 
 # Trading Modes
 # (Set in bot config, not .env)
@@ -453,6 +527,8 @@ SUPABASE_SERVICE_KEY=your-service-key-here  # For agent → API auth
   "trading_mode": "paper",  // or "aster" or "live" (symphony)
 
   "config_data": {
+    "rei_enabled": true,  // Enable Rei integration (optional)
+
     "agent_strategy": {
       "content": "Trade BTC conservatively. Entry: RSI < 30...",
       "autonomously_editable": false,
@@ -918,6 +994,13 @@ python agent/run_agent.py --config-id=<symphony-config> --mode=autonomous
 1. **Single Agent Per Bot**: Multi-agent support planned for future phases
 2. **Symphony Integration**: Pending API fixes (balance endpoint) - see Symphony section for details
 3. **Session Longevity**: Unknown if sessions expire after extended periods (needs testing)
+4. **Rei Data Coverage**: 21/21 technical indicators, 8/11 market intel (missing: eth_funding_rate, btc_tvl, whale_activity)
+
+**Added in 2026-01-16**:
+- ✅ **Rei Integration**: Persistent learning via Reilabs Rei Core - Claude orchestrates, Rei reasons
+- ✅ **3 New Tools**: query_market_data_for_rei, consult_rei_for_decision, report_trade_outcome_to_rei
+- ✅ **Session Buffer**: Thread-safe buffer for passing large market data between tools
+- ✅ **Conditional System Prompt**: Rei-specific execution loop when rei_enabled=true
 
 **Fixed in 2025-12-27**:
 - ✅ **Agent Freeze Bug**: Agents would freeze if they ended a turn without calling `wait_for()`. System prompt now enforces this rule.

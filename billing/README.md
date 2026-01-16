@@ -348,9 +348,68 @@ python -m billing.stripe_meter_reporter
 
 ---
 
+## Frontend Integration
+
+### UserProfile Dropdown (`frontend/.../UserProfile.tsx`)
+
+Adaptive display based on billing model:
+
+```typescript
+// Credit pack users (credits > 0)
+🪙 Credits    $50.00
+   Used       -$12.34
+   Balance    $37.66  // amber if < $5
+
+// Metered users (credits = 0)
+🪙 This week  $12.34
+```
+
+**API**: `getUsageSummary()` → `GET /api/v2/usage/me`
+
+### ActivationBar Daily Cost (`frontend/.../ActivationBar.tsx`)
+
+Shows average daily LLM cost per bot:
+
+```typescript
+// Day 1 of month
+🪙 $0.89 today
+
+// Day 2+
+🪙 ~$0.35/day  // period_usage / days_elapsed
+```
+
+**API**: `getConfigUsage(configId)` → `GET /api/v2/usage/config/{id}`
+
+**Refresh**: Every 5 minutes via `setInterval`
+
+### API Client Methods (`frontend/lib/api.ts`)
+
+```typescript
+// User-level summary
+apiClient.getUsageSummary(): Promise<{
+  period: string
+  usage_usd: number
+  credits_usd: number | null
+  net_balance_usd: number | null
+  cached: boolean
+}>
+
+// Per-bot usage
+apiClient.getConfigUsage(configId): Promise<{
+  config_id: string
+  config_name: string
+  period: string
+  period_usage_usd: number
+  today_usage_usd: number
+}>
+```
+
+---
+
 ## Related Documentation
 
 - `DOCS/completed/METERED_BILLING_IMPLEMENTATION.md` - Original billing setup
 - `DOCS/completed/CREDIT_PACKS.md` - Credit packs implementation
 - `DOCS/completed/USAGE_BILLING_TRACKING.md` - Usage tracking planning doc
 - `core/monitoring/README.md` - Account monitor architecture
+- `frontend/README.md` - Frontend usage display implementation

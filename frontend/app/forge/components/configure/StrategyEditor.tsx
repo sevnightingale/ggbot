@@ -2,10 +2,8 @@
 
 import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
-import { Crown, Zap, Activity, Sparkles } from 'lucide-react'
-import { usePermissions } from '@/lib/permissions'
+import { Zap, Activity, Sparkles } from 'lucide-react'
 import { ConfigData, apiClient } from '@/lib/api'
-import { UpgradeModal } from '@/components/UpgradeModal'
 
 interface LLMModel {
   model_id: string
@@ -64,11 +62,7 @@ export function StrategyEditor({
   onUpdate,
   className = ''
 }: StrategyEditorProps) {
-  const { canAccess } = usePermissions()
   const currentConfigType = configData?.config_type || 'scheduled_trading'
-
-  // Check premium access once to avoid repeated permission checks
-  const hasPremiumAccess = canAccess('premium_llms')
 
   // Local state for form fields - syncs with configData prop
   const [currentStrategy, setCurrentStrategy] = useState(configData?.decision?.user_prompt || '')
@@ -86,9 +80,6 @@ export function StrategyEditor({
   // State for LLM models
   const [llmModels, setLLMModels] = useState<LLMModel[]>([])
   const [modelsLoading, setModelsLoading] = useState(true)
-
-  // State for upgrade modal
-  const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
 
   // Ref for textarea auto-resize
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -167,12 +158,6 @@ export function StrategyEditor({
 
   // Handle frequency selection
   const handleFrequencyChange = (freq: string) => {
-    // Check permissions for high-frequency options
-    if ((freq === '5m' || freq === '15m') && !hasPremiumAccess) {
-      setUpgradeModalOpen(true)
-      return
-    }
-
     setAnalysisFrequency(freq)
     onUpdate?.({
       decision: {
@@ -186,11 +171,6 @@ export function StrategyEditor({
 
   // Handle model selection
   const handleModelChange = (modelId: string) => {
-    if (!hasPremiumAccess) {
-      setUpgradeModalOpen(true)
-      return
-    }
-
     setLlmModel(modelId)
     onUpdate?.({
       llm_config: {
@@ -274,118 +254,97 @@ export function StrategyEditor({
             <div className="p-4 text-center text-[var(--text-muted)]">Loading models...</div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-3">
-              {/* All OpenRouter Models */}
-              {!hasPremiumAccess ? (
-                <button
-                  onClick={() => setUpgradeModalOpen(true)}
-                  className="p-4 rounded-xl border text-left transition-all bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-muted)] opacity-60 hover:opacity-80"
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <div className="font-medium flex items-center gap-2">
-                      7 AI Models
-                      <Crown className="h-3 w-3" />
-                    </div>
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)]">
-                    Grok, Claude, Gemini, DeepSeek, GPT, Kimi, Qwen
-                  </div>
-                </button>
-              ) : (
-                llmModels.map((model) => {
-                  const logoPath = MODEL_LOGOS[model.model_id]
-                  return (
-                    <button
-                      key={model.model_id}
-                      onClick={() => handleModelChange(model.model_id)}
-                      className={`p-4 rounded-xl border text-left transition-all ${
-                        llmModel === model.model_id
-                          ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
-                          : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        {logoPath && (
-                          <div
-                            className="flex items-center justify-center rounded-full flex-shrink-0"
-                            style={{
-                              backgroundColor: MODEL_COLORS[model.model_id] || '#333',
-                              width: '32px',
-                              height: '32px',
-                              padding: '5px'
-                            }}
-                          >
-                            <Image
-                              src={logoPath}
-                              alt={`${model.display_name} logo`}
-                              width={22}
-                              height={22}
-                              className="object-contain"
-                            />
-                          </div>
-                        )}
-                        <div className="flex-1 min-w-0">
-                          <div className="font-semibold text-base capitalize flex items-center gap-2">
-                            {model.model_id}
-                            <Crown className="h-3 w-3 text-amber-500 flex-shrink-0" />
-                          </div>
-                          <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                            {model.context_display || 'N/A'}
-                          </div>
+              {llmModels.map((model) => {
+                const logoPath = MODEL_LOGOS[model.model_id]
+                return (
+                  <button
+                    key={model.model_id}
+                    onClick={() => handleModelChange(model.model_id)}
+                    className={`p-4 rounded-xl border text-left transition-all ${
+                      llmModel === model.model_id
+                        ? 'bg-[var(--agent-decision)]/20 border-[var(--agent-decision)] text-[var(--text-primary)]'
+                        : 'bg-[var(--bg-primary)] border-[var(--border)] text-[var(--text-secondary)] hover:bg-[var(--bg-tertiary)]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      {logoPath && (
+                        <div
+                          className="flex items-center justify-center rounded-full flex-shrink-0"
+                          style={{
+                            backgroundColor: MODEL_COLORS[model.model_id] || '#333',
+                            width: '32px',
+                            height: '32px',
+                            padding: '5px'
+                          }}
+                        >
+                          <Image
+                            src={logoPath}
+                            alt={`${model.display_name} logo`}
+                            width={22}
+                            height={22}
+                            className="object-contain"
+                          />
+                        </div>
+                      )}
+                      <div className="flex-1 min-w-0">
+                        <div className="font-semibold text-base capitalize">
+                          {model.model_id}
+                        </div>
+                        <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                          {model.context_display || 'N/A'}
                         </div>
                       </div>
-                    </button>
-                  )
-                })
-              )}
+                    </div>
+                  </button>
+                )
+              })}
             </div>
           )}
 
           {/* Reasoning Tier Selector - Below model selection */}
-          {hasPremiumAccess && (
-            <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <div className="text-sm font-medium text-[var(--text-primary)]">
-                    Reasoning Level
-                  </div>
-                  <div className="text-xs text-[var(--text-muted)] mt-0.5">
-                    Controls quality, speed, and cost
-                  </div>
+          <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <div className="text-sm font-medium text-[var(--text-primary)]">
+                  Reasoning Level
+                </div>
+                <div className="text-xs text-[var(--text-muted)] mt-0.5">
+                  Controls quality, speed, and cost
                 </div>
               </div>
-              <div className="grid grid-cols-3 gap-3">
-                {[
-                  { tier: 'economy' as const, label: 'Economy', desc: 'Fast & cheap', icon: Zap },
-                  { tier: 'standard' as const, label: 'Standard', desc: 'Balanced', icon: Activity },
-                  { tier: 'premium' as const, label: 'Premium', desc: 'Best quality', icon: Sparkles }
-                ].map(({ tier, label, desc, icon: Icon }) => (
-                  <button
-                    key={tier}
-                    onClick={() => handleReasoningTierChange(tier)}
-                    className={`p-4 rounded-xl border-2 text-center transition-all ${
-                      reasoningTier === tier
-                        ? 'bg-[var(--accent)]/10 border-[var(--accent)] shadow-sm'
-                        : 'bg-[var(--bg-secondary)] border-[var(--border)] hover:border-[var(--accent)]/50 hover:bg-[var(--bg-tertiary)]'
-                    }`}
-                  >
-                    <div className="flex justify-center mb-2">
-                      <Icon className={`h-6 w-6 ${
-                        reasoningTier === tier ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
-                      }`} />
-                    </div>
-                    <div className={`text-sm font-semibold mb-1 ${
-                      reasoningTier === tier ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'
-                    }`}>
-                      {label}
-                    </div>
-                    <div className="text-xs text-[var(--text-muted)]">
-                      {desc}
-                    </div>
-                  </button>
-                ))}
-              </div>
             </div>
-          )}
+            <div className="grid grid-cols-3 gap-3">
+              {[
+                { tier: 'economy' as const, label: 'Economy', desc: 'Fast & cheap', icon: Zap },
+                { tier: 'standard' as const, label: 'Standard', desc: 'Balanced', icon: Activity },
+                { tier: 'premium' as const, label: 'Premium', desc: 'Best quality', icon: Sparkles }
+              ].map(({ tier, label, desc, icon: Icon }) => (
+                <button
+                  key={tier}
+                  onClick={() => handleReasoningTierChange(tier)}
+                  className={`p-4 rounded-xl border-2 text-center transition-all ${
+                    reasoningTier === tier
+                      ? 'bg-[var(--accent)]/10 border-[var(--accent)] shadow-sm'
+                      : 'bg-[var(--bg-secondary)] border-[var(--border)] hover:border-[var(--accent)]/50 hover:bg-[var(--bg-tertiary)]'
+                  }`}
+                >
+                  <div className="flex justify-center mb-2">
+                    <Icon className={`h-6 w-6 ${
+                      reasoningTier === tier ? 'text-[var(--accent)]' : 'text-[var(--text-muted)]'
+                    }`} />
+                  </div>
+                  <div className={`text-sm font-semibold mb-1 ${
+                    reasoningTier === tier ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'
+                  }`}>
+                    {label}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    {desc}
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
 
           {/* Current Selection Display */}
           <div className="p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
@@ -410,39 +369,22 @@ export function StrategyEditor({
           </p>
 
           <div className="grid grid-cols-3 lg:grid-cols-7 gap-2">
-            {['5m', '15m', '30m', '1h', '4h', '1d', '1w'].map((freq) => {
-              const isPremium = freq === '5m' || freq === '15m'
-              const hasAccess = !isPremium || hasPremiumAccess
-              const isLocked = isPremium && !hasAccess
-
-              return (
-                <button
-                  key={freq}
-                  onClick={() => handleFrequencyChange(freq)}
-                  className={`px-3 py-2 text-sm rounded-lg border transition-all relative ${
-                    analysisFrequency === freq
-                      ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] border-[var(--accent)] hover:bg-[var(--accent-hover)]'
-                      : isLocked
-                        ? 'bg-[var(--bg-primary)] text-[var(--text-muted)] border-[var(--border)] opacity-60 hover:opacity-80'
-                        : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
-                  }`}
-                >
-                  <div className="flex items-center justify-center gap-1">
-                    <span>{freq}</span>
-                    {isLocked && <Crown className="h-3 w-3" />}
-                  </div>
-                </button>
-              )
-            })}
+            {['5m', '15m', '30m', '1h', '4h', '1d', '1w'].map((freq) => (
+              <button
+                key={freq}
+                onClick={() => handleFrequencyChange(freq)}
+                className={`px-3 py-2 text-sm rounded-lg border transition-all ${
+                  analysisFrequency === freq
+                    ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816] border-[var(--accent)] hover:bg-[var(--accent-hover)]'
+                    : 'bg-[var(--bg-primary)] text-[var(--text-secondary)] border-[var(--border)] hover:bg-[var(--bg-tertiary)]'
+                }`}
+              >
+                {freq}
+              </button>
+            ))}
           </div>
         </div>
       )}
-
-      {/* Upgrade Modal */}
-      <UpgradeModal
-        open={upgradeModalOpen}
-        onOpenChange={setUpgradeModalOpen}
-      />
     </div>
   )
 }

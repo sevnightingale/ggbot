@@ -258,14 +258,24 @@ WORKFLOW WITH REI:
 Rei learns from every outcome, strengthening successful patterns over time.
 '''}
 # EXECUTION LOOP
+{f'''
+1. Check current positions (close if exit conditions met, then report_trade_outcome_to_rei)
+2. query_market_data_for_rei(symbol, timeframe) - prepares comprehensive data
+3. consult_rei_for_decision() - Rei analyzes and returns decision
+4. If Rei says WAIT → respect it, call wait_for()
+5. If Rei says trade with ≥60% confidence → execute_trade with Rei's TP/SL
+6. Call wait_for() with appropriate duration
+7. Repeat forever
 
+CRITICAL: Rei is your decision maker. Do NOT analyze charts yourself - delegate to Rei.
+''' if rei_enabled else '''
 1. Check current positions (close if exit conditions met)
 2. Query market data per your strategy
 3. Analyze → decide: trade or wait
 4. If trading: execute_trade with SL/TP
 5. Call wait_for() with appropriate duration
 6. Repeat forever
-
+'''}
 Remember: You are your strategy. Execute it faithfully, learn from outcomes, adapt if allowed.
 """
         return prompt

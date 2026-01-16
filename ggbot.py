@@ -354,33 +354,52 @@ class GGBotOrchestrator:
 
             # Permission check: Verify user can still activate/run bots
             user_profile = await user_service.get_profile(user_id)
+            is_first_run_allowed = False
+
             if not user_profile.can_activate_bots:
-                self._log.warning(
-                    f"Blocking bot execution for config {config_id} - "
-                    f"user {user_id} lost activation permission (tier: {user_profile.subscription_tier.value})"
-                )
-                # Auto-deactivate bot if user lost permission
-                await self.config_service.set_bot_state(config_id, user_id, "inactive")
-                raise HTTPException(
-                    status_code=403,
-                    detail="Bot activation requires an active subscription. Please upgrade to continue."
-                )
+                # Check if this is their free first run
+                if not config.first_run_used:
+                    self._log.info(
+                        f"Allowing free first run for config {config_id} - "
+                        f"user {user_id} is on {user_profile.subscription_tier.value} tier"
+                    )
+                    is_first_run_allowed = True
+                else:
+                    self._log.warning(
+                        f"Blocking bot execution for config {config_id} - "
+                        f"user {user_id} lost activation permission (tier: {user_profile.subscription_tier.value}), "
+                        f"first run already used"
+                    )
+                    # Auto-deactivate bot if user lost permission
+                    await self.config_service.set_bot_state(config_id, user_id, "inactive")
+                    raise HTTPException(
+                        status_code=403,
+                        detail="Your free test run has been used. Subscribe to run your bot again."
+                    )
 
             self._log.info(f"🔍 DEBUG: config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
 
+            # Execute the appropriate cycle
             if config.config_type == "signal_validation":
                 if signal_data:
-                    return await self._run_signal_validation_cycle(
+                    result = await self._run_signal_validation_cycle(
                         config, signal_data, override_symbol
                     )
                 else:
                     latest_signal = await self._fetch_latest_ggshot_signal()
                     signal_dict = self._signal_data_to_dict(latest_signal)
-                    return await self._run_signal_validation_cycle(
+                    result = await self._run_signal_validation_cycle(
                         config, signal_dict, override_symbol
                     )
             else:
-                return await self._run_autonomous_trading_cycle(config)
+                result = await self._run_autonomous_trading_cycle(config)
+
+            # Mark first run as used after successful execution (for free tier users)
+            if is_first_run_allowed and result.status != "error":
+                await self.config_service.mark_first_run_used(config_id)
+                self._log.info(f"Marked first run used for config {config_id}")
+
+            return result
             
         except Exception as e:
             end_time = datetime.now(timezone.utc)

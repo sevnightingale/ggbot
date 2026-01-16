@@ -1328,10 +1328,11 @@ async def query_market_data_for_rei(args: Dict[str, Any]) -> Dict[str, Any]:
         ]
 
         # All market intelligence data points
+        # NOTE: Category names must match catalog_mapping.py exactly
         all_intel_sources = {
             "derivatives_leverage": ["btc_funding_rate", "eth_funding_rate"],
             "macro_economics": ["vix", "dxy", "cpi", "nfp"],
-            "on_chain_analytics": ["btc_tvl", "whale_activity"],
+            "onchain_analytics": ["btc_tvl", "whale_activity"],  # Fixed: was "on_chain_analytics"
             "sentiment_social": ["twitter_sentiment"],
             "news_regulatory": ["crypto_news"],
             "trading_signals": ["ggshot"]
@@ -1346,9 +1347,26 @@ async def query_market_data_for_rei(args: Dict[str, Any]) -> Dict[str, Any]:
             timeframe=timeframe
         )
 
+        # Debug: Log what we got back
+        logger.info(f"query_market_data_for_rei: API result type={type(result)}, content={str(result)[:500]}")
+
+        # Handle case where result might be a string (error) or None
+        if not isinstance(result, dict):
+            logger.error(f"Unexpected result type from API: {type(result)} - {str(result)[:200]}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"❌ API returned unexpected type: {type(result).__name__}. Check API logs."
+                }]
+            }
+
         # Extract data from API response
-        technicals = result.get('data', {}).get('technicals', {})
+        # API returns nested structure: {'data': {'technicals': {'status': 'success', 'result': {'indicators': {...}}}}}
+        technicals_response = result.get('data', {}).get('technicals', {})
+        technicals = technicals_response.get('result', {}).get('indicators', {}) if isinstance(technicals_response, dict) else {}
+
         market_intel = result.get('data', {}).get('market_intelligence', {})
+        # market_intel is already flat dict of categories (no nested 'result' key)
 
         collected_data = {
             "symbol": symbol,
@@ -1377,14 +1395,19 @@ async def query_market_data_for_rei(args: Dict[str, Any]) -> Dict[str, Any]:
             summary_parts.append("Technical: No data")
 
         # Summarize intelligence
-        if market_intel:
+        if market_intel and isinstance(market_intel, dict):
             intel_summaries = []
             for category, points in market_intel.items():
                 if isinstance(points, dict):
                     for point_name, point_data in points.items():
                         if isinstance(point_data, dict):
-                            signal = point_data.get("signal", point_data.get("interpretation", {}).get("signal", ""))
-                            if signal:
+                            # Safely extract signal from either top level or nested interpretation
+                            signal = point_data.get("signal", "")
+                            if not signal:
+                                interpretation = point_data.get("interpretation", {})
+                                if isinstance(interpretation, dict):
+                                    signal = interpretation.get("signal", "")
+                            if signal and isinstance(signal, str):
                                 intel_summaries.append(f"{point_name}={signal}")
             if intel_summaries:
                 summary_parts.append(f"Intelligence: {', '.join(intel_summaries[:5])}")

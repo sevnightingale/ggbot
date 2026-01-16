@@ -383,30 +383,12 @@ function ForgeApp() {
           setSelectedConfigId(configs[0].config_id)
           setLoadError(null)
         } else {
-          // Create default bot
-          console.log('🔨 No bots found, creating default bot')
-          const newBot = await createDefaultBot()
-
-          // Verify the bot was actually created by fetching it back
-          try {
-            const verifyBot = await apiClient.getConfig(newBot.config_id)
-            console.log('✅ Bot creation verified:', verifyBot.config_id)
-            setAllBots([newBot])
-            setSelectedConfigId(newBot.config_id)
-            setLoadError(null)
-          } catch (verifyError) {
-            console.error('❌ Bot creation verification failed:', verifyError)
-            // Try to refresh the list in case there's a timing issue
-            const refreshedConfigs = await apiClient.listConfigs()
-            if (refreshedConfigs.length > 0) {
-              setAllBots(refreshedConfigs)
-              setSelectedConfigId(refreshedConfigs[0].config_id)
-              setLoadError(null)
-            } else {
-              console.error('❌ No bots found after creation attempt')
-              setLoadError('Failed to create default bot. Please refresh the page.')
-            }
-          }
+          // No bots - open the bot creation modal for onboarding
+          console.log('🎯 No bots found, opening bot creation modal for onboarding')
+          setAllBots([])
+          setSelectedConfigId(null)
+          setBotCreationModalOpen(true)
+          setLoadError(null)
         }
 
         // Fetch available data sources for configuration
@@ -869,7 +851,8 @@ function ForgeApp() {
     botType: 'scheduled_trading' | 'signal_validation' | 'agent' = 'scheduled_trading',
     tradingMode: 'paper' | 'symphony' | 'aster' = 'paper',
     symphonyAgentId?: string,
-    botName?: string
+    botName?: string,
+    configData?: Record<string, unknown>  // Full config from new typeform modal
   ) => {
     setIsCreatingNew(true)
 
@@ -886,11 +869,22 @@ function ForgeApp() {
         return `${typeNames[botType]} ${botCount}${modeLabel}`
       })()
 
-      // Create new bot with specified type and trading mode
-      const newBot = await createDefaultBot(botType, tradingMode, symphonyAgentId)
+      let newBot;
+      if (configData) {
+        // New typeform flow: create bot with full config directly
+        newBot = await apiClient.createConfig(finalBotName, configData as Partial<ConfigData>, {
+          config_type: botType,
+          trading_mode: tradingMode,
+          symphony_agent_id: symphonyAgentId
+        })
+      } else {
+        // Legacy flow: use createDefaultBot
+        newBot = await createDefaultBot(botType, tradingMode, symphonyAgentId)
+        // Update name for legacy flow
+        newBot = await apiClient.updateConfig(newBot.config_id, {}, finalBotName)
+      }
 
-      // Update name
-      const updatedBot = await apiClient.updateConfig(newBot.config_id, {}, finalBotName)
+      const updatedBot = newBot
 
       // Verify bot was created successfully by fetching it back
       try {
@@ -900,6 +894,21 @@ function ForgeApp() {
         // Add to local state and select it
         setAllBots(prev => [...prev, verifyBot])
         setSelectedConfigId(verifyBot.config_id)
+
+        // Close the modal
+        setBotCreationModalOpen(false)
+
+        // Trigger first run automatically (this uses the free first run for new users)
+        if (configData) {
+          console.log('🚀 Triggering first run for new bot:', verifyBot.config_id)
+          try {
+            await apiClient.triggerBotManually(verifyBot.config_id)
+            console.log('✅ First run triggered successfully')
+          } catch (runError) {
+            // Don't fail creation if first run fails - user can retry manually
+            console.warn('⚠️ First run failed (non-blocking):', runError)
+          }
+        }
       } catch (verifyError) {
         console.error('❌ New bot verification failed, refreshing bot list:', verifyError)
         // If verification fails, refresh from server to ensure we have latest data
@@ -910,6 +919,7 @@ function ForgeApp() {
         const createdBot = refreshedBots.find(bot => bot.config_id === updatedBot.config_id)
         if (createdBot) {
           setSelectedConfigId(createdBot.config_id)
+          setBotCreationModalOpen(false)
         } else {
           setSelectedConfigId(refreshedBots.length > 0 ? refreshedBots[0].config_id : null)
         }
@@ -1347,9 +1357,16 @@ function ForgeApp() {
       {/* Bot Creation Modal */}
       <BotCreationModal
         open={botCreationModalOpen}
-        onOpenChange={setBotCreationModalOpen}
+        onOpenChange={(open) => {
+          // Don't allow closing if user has no bots
+          if (!open && allBots.length === 0) {
+            return
+          }
+          setBotCreationModalOpen(open)
+        }}
         onConfirm={handleCreateNewBot}
         existingBotCount={allBots.length}
+        forceOpen={allBots.length === 0}
       />
     </div>
   )
