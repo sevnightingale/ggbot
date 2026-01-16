@@ -727,7 +727,7 @@ export function BotCreationModal({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
+      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0" hideCloseButton>
         {/* Header with close button (hidden if forceOpen) */}
         <div className="p-6 pb-0">
           <div className="flex items-center justify-between mb-2">
