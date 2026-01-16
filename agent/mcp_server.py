@@ -1281,17 +1281,516 @@ async def save_strategy_and_exit(args: Dict[str, Any]) -> Dict[str, Any]:
 
 
 # ============================================================================
+# TOOL 13: QUERY MARKET DATA FOR REI
+# ============================================================================
+
+@tool(
+    "query_market_data_for_rei",
+    """Fetch comprehensive market data and prepare it for Rei consultation.
+
+This tool fetches ALL available market data (32 data points) and stores it for the
+consult_rei_for_decision tool. Use this BEFORE consulting Rei.
+
+DATA FETCHED:
+- 21 Technical Indicators: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
+- 11 Market Intelligence: btc_funding_rate, eth_funding_rate, vix, dxy, cpi, nfp, btc_tvl, whale_activity, twitter_sentiment, crypto_news, ggshot
+
+Returns a SUMMARY for you to see. Full data is stored in session buffer for Rei.
+
+Params: symbol (required, e.g. "BTC" or "BTC/USDT"), timeframe (optional, default "4h")""",
+    {"symbol": str, "timeframe": str}
+)
+async def query_market_data_for_rei(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Fetch all market data and store in session buffer for Rei consultation.
+
+    This is a preparation step before calling consult_rei_for_decision.
+    The full data (~15-20KB) goes to the buffer, Claude receives a summary.
+
+    Uses HTTP API calls (same pattern as query_market_data) to work in agent venv.
+    """
+    try:
+        from agent.session_buffer import get_session_buffer
+
+        symbol = args["symbol"]
+        timeframe = args.get("timeframe", "4h")
+        config_id = agent_context.config_id
+        user_id = agent_context.user_id
+
+        logger.info(f"query_market_data_for_rei: Fetching data for {symbol} ({timeframe})")
+
+        # All technical indicators
+        all_indicators = [
+            "rsi", "macd", "stochastic", "williams_r", "cci", "mfi",
+            "adx", "psar", "aroon", "atr", "bbands", "obv",
+            "sma", "ema", "roc", "vwap", "trix", "vortex",
+            "bbwidth", "keltner", "donchian"
+        ]
+
+        # All market intelligence data points
+        all_intel_sources = {
+            "derivatives_leverage": ["btc_funding_rate", "eth_funding_rate"],
+            "macro_economics": ["vix", "dxy", "cpi", "nfp"],
+            "on_chain_analytics": ["btc_tvl", "whale_activity"],
+            "sentiment_social": ["twitter_sentiment"],
+            "news_regulatory": ["crypto_news"],
+            "trading_signals": ["ggshot"]
+        }
+
+        # Use HTTP API client (same pattern as query_market_data)
+        result = await agent_context.api_client.query_market_data(
+            config_id=config_id,
+            symbol=symbol,
+            indicators=all_indicators,
+            data_sources=all_intel_sources,
+            timeframe=timeframe
+        )
+
+        # Extract data from API response
+        technicals = result.get('data', {}).get('technicals', {})
+        market_intel = result.get('data', {}).get('market_intelligence', {})
+
+        collected_data = {
+            "symbol": symbol,
+            "timeframe": timeframe,
+            "timestamp": datetime.utcnow().isoformat(),
+            "technical_indicators": technicals,
+            "market_intelligence": market_intel
+        }
+
+        # Build summary
+        summary_parts = []
+
+        # Summarize technicals
+        if technicals:
+            key_summaries = []
+            for ind_name in ["rsi", "macd", "adx"]:
+                ind_data = technicals.get(ind_name, {})
+                if isinstance(ind_data, dict):
+                    current = ind_data.get("current", {})
+                    if isinstance(current, dict):
+                        value = current.get("value", current.get("adx", "N/A"))
+                        if isinstance(value, (int, float)):
+                            key_summaries.append(f"{ind_name.upper()}={value:.1f}")
+            summary_parts.append(f"Technical ({len(technicals)} indicators): {', '.join(key_summaries)}")
+        else:
+            summary_parts.append("Technical: No data")
+
+        # Summarize intelligence
+        if market_intel:
+            intel_summaries = []
+            for category, points in market_intel.items():
+                if isinstance(points, dict):
+                    for point_name, point_data in points.items():
+                        if isinstance(point_data, dict):
+                            signal = point_data.get("signal", point_data.get("interpretation", {}).get("signal", ""))
+                            if signal:
+                                intel_summaries.append(f"{point_name}={signal}")
+            if intel_summaries:
+                summary_parts.append(f"Intelligence: {', '.join(intel_summaries[:5])}")
+        else:
+            summary_parts.append("Intelligence: No data")
+
+        # Store in session buffer
+        buffer = get_session_buffer()
+        buffer.store(
+            session_key=config_id,
+            data=collected_data,
+            symbol=symbol,
+            metadata={
+                "indicator_count": len(technicals),
+                "intel_categories": len(market_intel)
+            }
+        )
+
+        # Log activity
+        log_activity_safe(
+            config_id=config_id,
+            user_id=user_id,
+            activity_type='market_query',
+            activity_source='agent_tool',
+            summary=f"Prepared data for Rei: {symbol}",
+            details={
+                'symbol': symbol,
+                'timeframe': timeframe,
+                'indicator_count': len(technicals),
+                'intel_categories': list(market_intel.keys()) if market_intel else []
+            },
+            related_symbol=symbol,
+            importance=5
+        )
+
+        response_text = f"""📊 Market Data Ready for Rei Consultation
+
+Symbol: {symbol}
+Timeframe: {timeframe}
+
+{chr(10).join(summary_parts)}
+
+Data stored in session buffer. Call consult_rei_for_decision() to get Rei's trading decision."""
+
+        return {
+            "content": [{
+                "type": "text",
+                "text": response_text
+            }]
+        }
+
+    except Exception as e:
+        logger.error(f"query_market_data_for_rei failed: {e}")
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"❌ Failed to prepare market data for Rei: {str(e)}"
+            }]
+        }
+
+
+# ============================================================================
+# TOOL 14: CONSULT REI FOR DECISION
+# ============================================================================
+
+@tool(
+    "consult_rei_for_decision",
+    """Consult Rei (learning AI) for a trading decision using prepared market data.
+
+IMPORTANT: Call query_market_data_for_rei FIRST to prepare the data.
+
+Rei analyzes all 32 data points and returns a structured decision with:
+- action: enter_long, enter_short, exit, wait
+- confidence: 0.0-1.0 (Rei's calibrated confidence)
+- reasoning: explanation of key factors
+- key_signals: list of important signals
+- warnings: any concerns
+
+Rei learns from every outcome you report, improving over time.
+
+Params: current_positions (required - describe open positions or "none"), account_balance (required - current USD balance)""",
+    {"current_positions": str, "account_balance": float}
+)
+async def consult_rei_for_decision(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Send market data to Rei and get a trading decision.
+
+    Reads from session buffer (populated by query_market_data_for_rei),
+    builds a self-contained message for Rei API, and returns the decision.
+    """
+    try:
+        import os
+        from agent.session_buffer import get_session_buffer
+        from core.services.rei_service import ReiService, ReiServiceError
+
+        current_positions = args["current_positions"]
+        account_balance = args["account_balance"]
+        config_id = agent_context.config_id
+
+        # Get data from session buffer
+        buffer = get_session_buffer()
+        market_data = buffer.retrieve(config_id, clear=True)
+
+        if not market_data:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": "❌ No market data in buffer. Call query_market_data_for_rei first."
+                }]
+            }
+
+        # Check for Rei credentials
+        rei_secret = os.getenv("REI_01_UNIT_SECRET")
+        if not rei_secret:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": "❌ Rei not configured. Set REI_01_UNIT_SECRET environment variable."
+                }]
+            }
+
+        # Build self-contained message for Rei (API has NO session context)
+        rei_message = {
+            "task": "trading_decision",
+            "symbol": market_data.get("symbol"),
+            "timeframe": market_data.get("timeframe"),
+            "current_positions": current_positions,
+            "account_balance_usd": account_balance,
+            "market_data": {
+                "technical_indicators": market_data.get("technical_indicators", {}),
+                "market_intelligence": market_data.get("market_intelligence", {})
+            },
+            "question": "Based on this market data, what trading action should I take? Provide your decision as JSON."
+        }
+
+        logger.info(f"Consulting Rei for {market_data.get('symbol')} decision...")
+
+        # Call Rei API
+        try:
+            rei = ReiService(agent_secret_key=rei_secret)
+
+            response = await rei.chat_completion(
+                messages=[{
+                    "role": "user",
+                    "content": json.dumps(rei_message, indent=2)
+                }],
+                response_format={"type": "json_object"},
+                temperature=0.45,
+                max_tokens=2000
+            )
+
+            await rei.close()
+
+            # Parse Rei's response
+            try:
+                decision = json.loads(response.content)
+            except json.JSONDecodeError:
+                # If not valid JSON, wrap the response
+                decision = {
+                    "action": "wait",
+                    "confidence": 0.0,
+                    "reasoning": response.content,
+                    "key_signals": [],
+                    "warnings": ["Response was not valid JSON"]
+                }
+
+            # Extract decision fields
+            action = decision.get("action", "wait")
+            confidence = decision.get("confidence", 0.0)
+            reasoning = decision.get("reasoning", "No reasoning provided")
+            key_signals = decision.get("key_signals", [])
+            warnings = decision.get("warnings", [])
+            take_profit = decision.get("take_profit")
+            stop_loss = decision.get("stop_loss")
+
+            # Log activity
+            log_activity_safe(
+                config_id=config_id,
+                user_id=agent_context.user_id,
+                activity_type='rei_decision',
+                activity_source='agent_tool',
+                summary=f"Rei: {action.upper()} ({confidence:.0%} confidence)",
+                details={
+                    'action': action,
+                    'confidence': confidence,
+                    'reasoning': reasoning,
+                    'key_signals': key_signals,
+                    'warnings': warnings,
+                    'symbol': market_data.get("symbol"),
+                    'take_profit': take_profit,
+                    'stop_loss': stop_loss
+                },
+                related_symbol=market_data.get("symbol"),
+                importance=8
+            )
+
+            # Format TP/SL lines if present
+            tp_sl_text = ""
+            if take_profit is not None or stop_loss is not None:
+                tp_sl_text = "\n"
+                if take_profit is not None:
+                    tp_sl_text += f"Take Profit: ${take_profit:,.2f}\n"
+                if stop_loss is not None:
+                    tp_sl_text += f"Stop Loss: ${stop_loss:,.2f}\n"
+
+            # Format response for Claude
+            response_text = f"""🧠 Rei Trading Decision
+
+Symbol: {market_data.get('symbol')}
+Action: {action.upper()}
+Confidence: {confidence:.1%}
+{tp_sl_text}
+Reasoning: {reasoning}
+
+Key Signals: {', '.join(key_signals) if key_signals else 'None specified'}
+Warnings: {', '.join(warnings) if warnings else 'None'}
+
+{"⚠️ Low confidence - consider waiting" if confidence < 0.55 else "✅ Confidence threshold met" if confidence >= 0.60 else "⚡ Marginal confidence - proceed with caution"}"""
+
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": response_text
+                }]
+            }
+
+        except ReiServiceError as e:
+            logger.error(f"Rei API error: {e}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"❌ Rei API error: {str(e)}\n\nFallback: Use your own judgment based on the market data summary."
+                }]
+            }
+
+    except Exception as e:
+        logger.error(f"consult_rei_for_decision failed: {e}")
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"❌ Failed to consult Rei: {str(e)}"
+            }]
+        }
+
+
+# ============================================================================
+# TOOL 15: REPORT TRADE OUTCOME TO REI
+# ============================================================================
+
+@tool(
+    "report_trade_outcome_to_rei",
+    """Report a closed trade outcome to Rei for learning.
+
+CRITICAL: Call this after every trade closes. This is how Rei learns and improves.
+
+Send RAW FACTS only - do not include Rei's previous reasoning or predictions.
+Rei uses this feedback to strengthen patterns that work and weaken patterns that don't.
+
+Params:
+- symbol (required): e.g. "BTC/USDT"
+- side (required): "long" or "short"
+- entry_price (required): price at entry
+- exit_price (required): price at exit
+- pnl_usd (required): profit/loss in USD
+- pnl_percent (required): profit/loss percentage
+- duration_hours (required): how long the trade was open
+- close_reason (required): "take_profit", "stop_loss", "manual", or "liquidation"
+- conditions_at_entry (required): brief description of market conditions when entered""",
+    {"symbol": str, "side": str, "entry_price": float, "exit_price": float, "pnl_usd": float, "pnl_percent": float, "duration_hours": float, "close_reason": str, "conditions_at_entry": str}
+)
+async def report_trade_outcome_to_rei(args: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Report trade outcome to Rei for learning.
+
+    Sends raw facts about the trade without Rei's previous output.
+    This is critical for Rei's pattern evolution.
+    """
+    try:
+        import os
+        from core.services.rei_service import ReiService, ReiServiceError
+
+        symbol = args["symbol"]
+        side = args["side"]
+        entry_price = args["entry_price"]
+        exit_price = args["exit_price"]
+        pnl_usd = args["pnl_usd"]
+        pnl_percent = args["pnl_percent"]
+        duration_hours = args["duration_hours"]
+        close_reason = args["close_reason"]
+        conditions_at_entry = args["conditions_at_entry"]
+
+        config_id = agent_context.config_id
+
+        # Check for Rei credentials
+        rei_secret = os.getenv("REI_01_UNIT_SECRET")
+        if not rei_secret:
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": "❌ Rei not configured. Set REI_01_UNIT_SECRET environment variable."
+                }]
+            }
+
+        # Build feedback message (RAW FACTS ONLY - no previous Rei output)
+        outcome = "WIN" if pnl_usd > 0 else "LOSS" if pnl_usd < 0 else "BREAKEVEN"
+
+        feedback_message = f"""TRADE OUTCOME REPORT
+
+Symbol: {symbol}
+Side: {side.upper()}
+Result: {outcome}
+
+Entry Price: ${entry_price:,.2f}
+Exit Price: ${exit_price:,.2f}
+P&L: ${pnl_usd:+,.2f} ({pnl_percent:+.2f}%)
+
+Duration: {duration_hours:.1f} hours
+Close Reason: {close_reason}
+
+Market Conditions at Entry:
+{conditions_at_entry}
+
+Learn from this outcome. If this was a winning trade, strengthen the patterns that led to this entry. If this was a losing trade, weaken those patterns or identify what was missed."""
+
+        logger.info(f"Reporting trade outcome to Rei: {symbol} {side} {outcome}")
+
+        try:
+            rei = ReiService(agent_secret_key=rei_secret)
+
+            response = await rei.chat_completion(
+                messages=[{
+                    "role": "user",
+                    "content": feedback_message
+                }],
+                temperature=0.3,  # Lower temperature for learning
+                max_tokens=500
+            )
+
+            await rei.close()
+
+            # Log activity
+            log_activity_safe(
+                config_id=config_id,
+                user_id=agent_context.user_id,
+                activity_type='rei_learning',
+                activity_source='agent_tool',
+                summary=f"Reported {outcome} to Rei: {symbol} {side}",
+                details={
+                    'symbol': symbol,
+                    'side': side,
+                    'outcome': outcome,
+                    'pnl_usd': pnl_usd,
+                    'pnl_percent': pnl_percent,
+                    'close_reason': close_reason
+                },
+                related_symbol=symbol,
+                importance=7
+            )
+
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"""✅ Trade outcome reported to Rei
+
+Symbol: {symbol}
+Side: {side.upper()}
+Result: {outcome} (${pnl_usd:+,.2f})
+
+Rei's acknowledgment:
+{response.content[:500]}{'...' if len(response.content) > 500 else ''}
+
+Rei will use this feedback to improve future decisions."""
+                }]
+            }
+
+        except ReiServiceError as e:
+            logger.error(f"Rei API error reporting outcome: {e}")
+            return {
+                "content": [{
+                    "type": "text",
+                    "text": f"⚠️ Could not report to Rei: {str(e)}\n\nThe trade outcome was not recorded for learning."
+                }]
+            }
+
+    except Exception as e:
+        logger.error(f"report_trade_outcome_to_rei failed: {e}")
+        return {
+            "content": [{
+                "type": "text",
+                "text": f"❌ Failed to report trade outcome: {str(e)}"
+            }]
+        }
+
+
+# ============================================================================
 # MCP SERVER CREATION
 # ============================================================================
 
 def create_mcp_server():
     """
-    Create MCP server with 12 tools for autonomous trading agent.
+    Create MCP server with 15 tools for autonomous trading agent.
 
     Returns:
         MCP server instance to be used with Claude Agent SDK
     """
-    logger.info("Creating MCP server with 12 trading tools")
+    logger.info("Creating MCP server with 15 trading tools (including Rei integration)")
 
     # LOG: All tool definitions
     logger.debug("📚 MCP TOOLS BEING REGISTERED:")
@@ -1307,6 +1806,9 @@ def create_mcp_server():
     logger.debug("   10. record_trade_observation - Record trade learnings")
     logger.debug("   11. query_trade_observations - Query past observations")
     logger.debug("   12. save_strategy_and_exit - Save strategy and exit")
+    logger.debug("   13. query_market_data_for_rei - Fetch all data and prepare for Rei")
+    logger.debug("   14. consult_rei_for_decision - Get trading decision from Rei")
+    logger.debug("   15. report_trade_outcome_to_rei - Report trade results for Rei learning")
 
     # Create server with all tools
     server = create_sdk_mcp_server(
@@ -1324,11 +1826,15 @@ def create_mcp_server():
             wait_for,
             record_trade_observation,
             query_trade_observations,
-            save_strategy_and_exit
+            save_strategy_and_exit,
+            # Rei integration tools
+            query_market_data_for_rei,
+            consult_rei_for_decision,
+            report_trade_outcome_to_rei
         ]
     )
 
-    logger.info("MCP server created successfully with 12 tools")
+    logger.info("MCP server created successfully with 15 tools")
     return server
 
 

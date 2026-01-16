@@ -31,7 +31,11 @@ export function UserProfile({}: UserProfileProps) {
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [addCreditsOpen, setAddCreditsOpen] = useState(false)
-  const [creditBalance, setCreditBalance] = useState<number | null>(null)
+  const [usageSummary, setUsageSummary] = useState<{
+    usage_usd: number
+    credits_usd: number | null
+    net_balance_usd: number | null
+  } | null>(null)
   const router = useRouter()
   const supabase = createClient()
   const { userProfile } = usePermissions()
@@ -64,21 +68,25 @@ export function UserProfile({}: UserProfileProps) {
     getUserData()
   }, [supabase.auth])
 
-  // Fetch credit balance (only for usage_based users)
+  // Fetch usage summary (only for usage_based users)
   useEffect(() => {
-    const fetchCreditBalance = async () => {
+    const fetchUsageSummary = async () => {
       if (userProfile?.subscription_tier === 'usage_based') {
         try {
-          const { available_usd } = await apiClient.getCreditBalance()
-          setCreditBalance(available_usd)
+          const summary = await apiClient.getUsageSummary()
+          setUsageSummary({
+            usage_usd: summary.usage_usd,
+            credits_usd: summary.credits_usd,
+            net_balance_usd: summary.net_balance_usd
+          })
         } catch (err) {
-          console.error('Failed to fetch credit balance:', err)
-          setCreditBalance(null)
+          console.error('Failed to fetch usage summary:', err)
+          setUsageSummary(null)
         }
       }
     }
 
-    fetchCreditBalance()
+    fetchUsageSummary()
   }, [userProfile?.subscription_tier])
 
   // Logout handler
@@ -189,11 +197,40 @@ export function UserProfile({}: UserProfileProps) {
                 )}
               </div>
 
-              {/* Credit Balance (usage_based only) */}
-              {isUsageBased && creditBalance !== null && (
-                <div className="mt-2 flex items-center gap-1 text-xs text-[var(--text-secondary)]">
-                  <Coins className="h-3 w-3" />
-                  <span>Credits: ${creditBalance.toFixed(2)}</span>
+              {/* Usage & Credit Info (usage_based only) */}
+              {isUsageBased && usageSummary && (
+                <div className="mt-2 space-y-1 text-xs">
+                  {usageSummary.credits_usd && usageSummary.credits_usd > 0 ? (
+                    // Credit pack user - show full breakdown
+                    <>
+                      <div className="flex items-center justify-between text-[var(--text-secondary)]">
+                        <span className="flex items-center gap-1">
+                          <Coins className="h-3 w-3" />
+                          Credits
+                        </span>
+                        <span>${usageSummary.credits_usd.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[var(--text-muted)]">
+                        <span className="pl-4">Used</span>
+                        <span>-${usageSummary.usage_usd.toFixed(2)}</span>
+                      </div>
+                      <div className="flex items-center justify-between text-[var(--text-primary)] font-medium border-t border-[var(--border)] pt-1 mt-1">
+                        <span className="pl-4">Balance</span>
+                        <span className={usageSummary.net_balance_usd && usageSummary.net_balance_usd < 5 ? 'text-amber-500' : ''}>
+                          ${usageSummary.net_balance_usd?.toFixed(2) ?? '0.00'}
+                        </span>
+                      </div>
+                    </>
+                  ) : (
+                    // Metered user - show just usage
+                    <div className="flex items-center justify-between text-[var(--text-secondary)]">
+                      <span className="flex items-center gap-1">
+                        <Coins className="h-3 w-3" />
+                        This week
+                      </span>
+                      <span>${usageSummary.usage_usd.toFixed(2)}</span>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -259,7 +296,7 @@ export function UserProfile({}: UserProfileProps) {
       <AddCreditsModal
         open={addCreditsOpen}
         onOpenChange={setAddCreditsOpen}
-        currentBalance={creditBalance ?? undefined}
+        currentBalance={usageSummary?.net_balance_usd ?? undefined}
       />
     </div>
   )

@@ -1,0 +1,3919 @@
+{
+  "test_run": "2026-01-15T22:24:52.580495",
+  "test_symbol": "BTC/USDT",
+  "test_timeframe": "4h",
+  "sections": {
+    "technical_indicators": {
+      "test_type": "technical_indicators",
+      "symbol": "BTC/USDT",
+      "timeframe": "4h",
+      "candles_requested": 200,
+      "timestamp": "2026-01-15T22:24:53.610316",
+      "indicators": {
+        "rsi": {
+          "status": "OK",
+          "data": {
+            "indicator": "RSI",
+            "period": 14,
+            "current": {
+              "value": 57.89,
+              "timestamp": "2026-01-15T22:24:53.657507+00:00"
+            },
+            "context": {
+              "trend": {
+                "direction": "sideways",
+                "strength": 0.1,
+                "velocity": -3.367,
+                "acceleration": -9.48
+              },
+              "ma5": 65.4,
+              "ma10": 69.37,
+              "volatility": 10.881
+            },
+            "levels": {
+              "overbought": {
+                "level": 70,
+                "status": "far_below",
+                "periods_in_zone": 0,
+                "time_percentage": 12.5
+              },
+              "oversold": {
+                "level": 30,
+                "status": "far_above",
+                "periods_in_zone": 0,
+                "time_percentage": 0.0
+              },
+              "neutral": {
+                "level": 50,
+                "status": "above",
+                "distance": 7.89
+              },
+              "key_levels": [
+                30,
+                50,
+                70
+              ],
+              "recent_crossovers": [
+                {
+                  "level": 70,
+                  "direction": "down",
+                  "periods_ago": 5,
+                  "strength": 4.707033224133724
+                },
+                {
+                  "level": 70,
+                  "direction": "up",
+                  "periods_ago": 8,
+                  "strength": 5.568455870817232
+                },
+                {
+                  "level": 70,
+                  "direction": "down",
+                  "periods_ago": 9,
+                  "strength": 2.20413019777412
+                }
+              ]
+            },
+            "extremes": {
+              "recent_high": {
+                "value": 78.24,
+                "periods_ago": "10",
+                "significance": 1.0
+              },
+              "recent_low": {
+                "value": 51.7,
+                "periods_ago": "18",
+                "significance": 0.7496734793326866
+              }
+            },
+            "patterns": {},
+            "evidence": {
+              "data_quality": {
+                "total_periods": 136,
+                "valid_data_percentage": 90.7,
+                "recent_volatility": 5.625
+              },
+              "calculation_notes": "RSI analysis based on 136 valid data points"
+            },
+            "summary": "RSI at 57.9 (recent high: 78.2 10p ago)"
+          }
+        },
+        "macd": {
+          "status": "OK",
+          "data": {
+            "indicator": "MACD",
+            "current": {
+              "macd": 1296.7039,
+              "signal": 1262.7971,
+              "histogram": 33.9068,
+              "timestamp": "2026-01-15T22:24:53.674731+00:00"
+            },
+            "trend": {
+              "direction": "bullish",
+              "strength": 0.064,
+              "momentum": "decreasing",
+              "acceleration": -131.4233
+            },
+            "patterns": {
+              "crossovers": {
+                "recent_crossovers": [],
+                "latest_crossover": null
+              },
+              "divergence": null
+            },
+            "levels": {
+              "zero_line": {
+                "current_position": "above",
+                "distance_from_zero": 1296.7039,
+                "time_above_zero_pct": 64.1,
+                "time_below_zero_pct": 35.9
+              },
+              "histogram": {
+                "momentum_direction": "decreasing",
+                "acceleration": -131.4233,
+                "zero_crossings_recent": 0,
+                "histogram_strength": 33.906793847924064
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "original_periods": {
+                  "macd": 150,
+                  "signal": 150,
+                  "histogram": 150,
+                  "prices": 150
+                },
+                "aligned_periods": 117,
+                "valid_data_percentage": 78.0
+              },
+              "calculation_notes": "MACD analysis based on 117 aligned data points"
+            },
+            "summary": "MACD rising trend with increasing momentum"
+          }
+        },
+        "stochastic": {
+          "status": "OK",
+          "data": {
+            "indicator": "Stochastic",
+            "period": 14,
+            "current": {
+              "k_percent": 73.17,
+              "d_percent": 76.54,
+              "spread": -3.37,
+              "timestamp": "2026-01-15T22:24:53.681675+00:00"
+            },
+            "context": {
+              "trend": {
+                "k_direction": "falling",
+                "momentum": "bearish_momentum",
+                "velocity": -1.79,
+                "acceleration": 0.01
+              },
+              "spread_momentum": -4.44,
+              "volatility": 22.885
+            },
+            "levels": {
+              "overbought": {
+                "level": 80,
+                "status": "below",
+                "streak_length": 0,
+                "time_percentage": 20.3,
+                "exit_analysis": {
+                  "recent_exits": [
+                    {
+                      "periods_ago": 4,
+                      "exit_level": 79.40371608525597,
+                      "strength": 0.029814195737201742
+                    }
+                  ],
+                  "latest_exit": {
+                    "periods_ago": 4,
+                    "exit_level": 79.40371608525597,
+                    "strength": 0.029814195737201742
+                  }
+                }
+              },
+              "oversold": {
+                "level": 20,
+                "status": "above",
+                "streak_length": 0,
+                "time_percentage": 7.5,
+                "exit_analysis": {
+                  "recent_exits": [],
+                  "latest_exit": null
+                }
+              },
+              "neutral": {
+                "level": 50,
+                "bias": "bullish",
+                "distance_from_50": 23.17
+              },
+              "key_levels": [
+                20,
+                50,
+                80
+              ],
+              "recent_crossovers": [
+                {
+                  "type": "bearish_crossover",
+                  "periods_ago": 1,
+                  "strength": 3.37,
+                  "location": "neutral"
+                },
+                {
+                  "type": "bullish_crossover",
+                  "periods_ago": 2,
+                  "strength": 1.08,
+                  "location": "neutral"
+                },
+                {
+                  "type": "bearish_crossover",
+                  "periods_ago": 5,
+                  "strength": 3.82,
+                  "location": "overbought"
+                },
+                {
+                  "type": "bullish_crossover",
+                  "periods_ago": 8,
+                  "strength": 0.6,
+                  "location": "overbought"
+                },
+                {
+                  "type": "bearish_crossover",
+                  "periods_ago": 11,
+                  "strength": 1.92,
+                  "location": "overbought"
+                }
+              ]
+            },
+            "extremes": {
+              "recent_high": {
+                "value": 94.3,
+                "periods_ago": "11",
+                "significance": 1.0
+              },
+              "recent_low": {
+                "value": 51.19,
+                "periods_ago": "19",
+                "significance": 1.0
+              }
+            },
+            "patterns": {
+              "squeeze": {
+                "type": "low_volatility_squeeze",
+                "current_volatility": 6.187,
+                "baseline_volatility": 22.885,
+                "description": "Stochastic showing reduced volatility - potential breakout setup"
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "aligned_periods": 133,
+                "period_used": 14,
+                "had_prices": true,
+                "valid_data_percentage": 97.1
+              },
+              "calculation_notes": "Stochastic analysis based on 133 aligned K/D periods"
+            },
+            "summary": "Stochastic %K: 73.2, %D: 76.5. Bearish Crossover 1p ago"
+          }
+        },
+        "williams_r": {
+          "status": "OK",
+          "data": {
+            "indicator": "Williams_R",
+            "length": 14,
+            "current": {
+              "value": -39.25,
+              "timestamp": "2026-01-15T22:24:53.691613+00:00"
+            },
+            "context": {
+              "trend": {
+                "direction": "sideways",
+                "strength": 0.063,
+                "velocity": -8.678,
+                "acceleration": 1.687
+              },
+              "momentum": {
+                "interpretation": "strong_downward_momentum",
+                "recent_range": 34.64,
+                "volatility": 25.57
+              },
+              "volatility": 25.572
+            },
+            "levels": {
+              "overbought": {
+                "level": -20,
+                "status": "below",
+                "streak_length": 0,
+                "time_percentage": 20.4,
+                "exit_analysis": {
+                  "recent_exits": [
+                    {
+                      "periods_ago": 1,
+                      "exit_level": -39.25,
+                      "strength": 0.9623000612689256
+                    },
+                    {
+                      "periods_ago": 3,
+                      "exit_level": -21.89,
+                      "strength": 0.0945382670021269
+                    },
+                    {
+                      "periods_ago": 5,
+                      "exit_level": -28.18,
+                      "strength": 0.40906561190845936
+                    }
+                  ],
+                  "latest_exit": {
+                    "periods_ago": 1,
+                    "exit_level": -39.25,
+                    "strength": 0.9623000612689256
+                  }
+                }
+              },
+              "oversold": {
+                "level": -80,
+                "status": "above",
+                "streak_length": 0,
+                "time_percentage": 10.9,
+                "exit_analysis": {
+                  "recent_exits": [],
+                  "latest_exit": null
+                }
+              },
+              "neutral": {
+                "level": -50,
+                "bias": "bullish",
+                "distance_from_50": 10.75
+              },
+              "key_levels": [
+                -20,
+                -50,
+                -80
+              ],
+              "recent_crossovers": [
+                {
+                  "level": -20,
+                  "direction": "down",
+                  "periods_ago": 1,
+                  "strength": 19.246001225378514
+                },
+                {
+                  "level": -20,
+                  "direction": "up",
+                  "periods_ago": 2,
+                  "strength": 0.6505911798827597
+                },
+                {
+                  "level": -20,
+                  "direction": "down",
+                  "periods_ago": 3,
+                  "strength": 1.8907653400425382
+                },
+                {
+                  "level": -20,
+                  "direction": "up",
+                  "periods_ago": 4,
+                  "strength": 0.31558707471181435
+                },
+                {
+                  "level": -20,
+                  "direction": "down",
+                  "periods_ago": 5,
+                  "strength": 8.181312238169188
+                }
+              ]
+            },
+            "extremes": {
+              "recent_high": {
+                "value": -0.0,
+                "periods_ago": "13",
+                "significance": 1.0
+              },
+              "recent_low": {
+                "value": -51.17,
+                "periods_ago": "18",
+                "significance": 0.8961334523000796
+              }
+            },
+            "patterns": {
+              "failure_swing": {
+                "type": "bullish_failure_swing",
+                "description": "Double bottom above oversold level",
+                "low_comparison": {
+                  "previous_low": -28.18,
+                  "latest_low": -21.89,
+                  "improvement": 6.29
+                }
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "aligned_periods": 137,
+                "had_prices": true,
+                "period_used": 14,
+                "windows_used": {
+                  "velocity": 2,
+                  "acceleration": 4,
+                  "position_rank": 14,
+                  "divergence": 14
+                }
+              },
+              "calculation_notes": "Williams %R analysis based on 137 periods with length=14"
+            },
+            "summary": "Williams %R at -39.2, strong downward momentum"
+          }
+        },
+        "cci": {
+          "status": "OK",
+          "data": {
+            "indicator": "CCI",
+            "current": {
+              "value": 50.23,
+              "timestamp": "2026-01-15T22:24:53.702163+00:00"
+            },
+            "context": {
+              "length": 20,
+              "momentum": {
+                "velocity": -12.51,
+                "acceleration": -33.28,
+                "volatility": 102.67,
+                "recent_range": 117.21,
+                "trend_direction": "falling",
+                "trend_strength": 0.626,
+                "momentum_interpretation": "strong_falling_acceleration"
+              },
+              "zero_line": {
+                "current_position": "above",
+                "distance_from_zero": 50.23,
+                "time_above_zero_pct": 64.9,
+                "time_below_zero_pct": 35.1,
+                "zero_crossings": 15
+              }
+            },
+            "levels": {
+              "current_zone": "neutral",
+              "overbought": {
+                "level": 100,
+                "status": "below",
+                "streak_length": 0,
+                "time_percentage": 33.6,
+                "exit_analysis": {
+                  "recent_exits": [
+                    {
+                      "periods_ago": 5,
+                      "exit_level": 91.66108370563559,
+                      "strength": 8.33891629436441
+                    }
+                  ],
+                  "latest_exit": {
+                    "periods_ago": 5,
+                    "exit_level": 91.66108370563559,
+                    "strength": 8.33891629436441
+                  }
+                },
+                "extreme_reading": "False"
+              },
+              "oversold": {
+                "level": -100,
+                "status": "above",
+                "streak_length": 0,
+                "time_percentage": 5.3,
+                "exit_analysis": {
+                  "recent_exits": [],
+                  "latest_exit": null
+                },
+                "extreme_reading": "False"
+              },
+              "neutral_bias": "bullish"
+            },
+            "patterns": {
+              "hook": {
+                "type": "falling_hook_pattern",
+                "hook_strength": 107.7,
+                "max_level": 158.0,
+                "current_level": 50.2,
+                "description": "CCI hooked down from 158.0 overbought level"
+              }
+            },
+            "position_rank": {
+              "percentile": 0.0,
+              "interpretation": "extremely_low"
+            },
+            "divergence": null,
+            "evidence": {
+              "data_quality": {
+                "total_periods": 131,
+                "valid_data_percentage": 87.3,
+                "recent_volatility": 40.552
+              },
+              "calculation_notes": "CCI analysis based on 131 valid data points with period 20"
+            },
+            "summary": "CCI at 50.2, strong falling acceleration"
+          }
+        },
+        "mfi": {
+          "status": "OK",
+          "data": {
+            "indicator": "MFI",
+            "current": {
+              "value": 66.26,
+              "timestamp": "2026-01-15T22:24:53.713442+00:00"
+            },
+            "context": {
+              "length": 14,
+              "position_rank": {
+                "percentile": 0.0,
+                "interpretation": "extremely_low"
+              }
+            },
+            "levels": {
+              "zones": {
+                "current_zone": "neutral",
+                "overbought": {
+                  "level": 80,
+                  "status": "below",
+                  "streak_length": 0,
+                  "time_percentage": 5.8,
+                  "exit_analysis": {
+                    "recent_exits": [
+                      {
+                        "periods_ago": 2,
+                        "exit_level": 75.77308018666214,
+                        "strength": 0.211
+                      }
+                    ],
+                    "latest_exit": {
+                      "periods_ago": 2,
+                      "exit_level": 75.77308018666214,
+                      "strength": 0.211
+                    }
+                  },
+                  "extreme_reading": "False"
+                },
+                "oversold": {
+                  "level": 20,
+                  "status": "above",
+                  "streak_length": 0,
+                  "time_percentage": 0.0,
+                  "exit_analysis": {
+                    "recent_exits": [],
+                    "latest_exit": null
+                  },
+                  "extreme_reading": "False"
+                },
+                "neutral_bias": "rising"
+              },
+              "money_flow": {
+                "pressure": "buying",
+                "pressure_strength": 0.325,
+                "consistency": 0.5,
+                "volume_confirmation": "strong",
+                "cycle_analysis": {
+                  "cycle_detected": false
+                },
+                "flow_quality": "low_quality_flow"
+              }
+            },
+            "patterns": {
+              "momentum": {
+                "velocity": -9.04,
+                "acceleration": -7.7,
+                "volatility": 14.46,
+                "recent_range": 18.08,
+                "momentum_strength": 0.904,
+                "momentum_interpretation": "strong_money_outflow_acceleration"
+              },
+              "formations": {},
+              "divergence": null
+            },
+            "evidence": {
+              "data_quality": {
+                "original_periods": {
+                  "mfi": 150,
+                  "prices": 150
+                },
+                "core_analysis_periods": 137,
+                "divergence_aligned_periods": 137,
+                "had_prices": true
+              },
+              "calculation_notes": "MFI analysis based on 137 core periods, divergence on 137 aligned periods"
+            },
+            "summary": "MFI at 66.3 (neutral, falling money flow), buying pressure"
+          }
+        },
+        "adx": {
+          "status": "OK",
+          "data": {
+            "indicator": "ADX",
+            "current": {
+              "adx": 38.04,
+              "plus_di": 29.15,
+              "minus_di": 16.08,
+              "timestamp": "2026-01-15T22:24:53.724138+00:00"
+            },
+            "context": {
+              "trend_strength": "strong",
+              "strength_value": 38.04,
+              "description": "Strong trending market",
+              "trend_evolution": "stable",
+              "directional_bias": "bullish",
+              "directional_strength": 13.07
+            },
+            "levels": {
+              "current_strength": "strong",
+              "weak_threshold": 20,
+              "strong_threshold": 25,
+              "very_strong_threshold": 40,
+              "extreme_threshold": 60
+            },
+            "trend_strength": {
+              "strength_percentage": 38.0,
+              "strong_trend_percentage": 37.4,
+              "weak_trend_percentage": 51.2,
+              "consistency": 0.586
+            },
+            "directional": {
+              "current_bias": "bullish",
+              "directional_strength": 13.07,
+              "plus_di_momentum": -2.43,
+              "minus_di_momentum": 0.93,
+              "crossovers": {
+                "recent_crossovers": [],
+                "latest_crossover": null
+              },
+              "spread_analysis": {
+                "current_spread": 13.07,
+                "average_spread": 5.79,
+                "spread_volatility": 13.21,
+                "max_bullish_spread": 36.11,
+                "max_bearish_spread": -13.77,
+                "spread_interpretation": "extreme_directional_bias"
+              },
+              "dominance": {
+                "bullish_dominance_pct": 55.9,
+                "bearish_dominance_pct": 44.1,
+                "dominant_direction": "bullish"
+              }
+            },
+            "momentum": {
+              "velocity": -0.1,
+              "acceleration": -2.94,
+              "slope_interpretation": "trend_strength_stable",
+              "momentum_quality": "low_quality_momentum"
+            },
+            "patterns": {
+              "di_patterns": {
+                "type": "convergence",
+                "current_spread": 13.07,
+                "description": "Directional indicators converging, trend weakening"
+              }
+            },
+            "position_rank": {
+              "percentile": 80.0,
+              "interpretation": "high"
+            },
+            "summary": "ADX 38.0 - Strong trending market with bullish bias (13.1)"
+          }
+        },
+        "psar": {
+          "status": "OK",
+          "data": {
+            "indicator": "Parabolic_SAR",
+            "current": {
+              "psar_value": 97924.49,
+              "price": 95516.01,
+              "distance": -2408.48,
+              "distance_percentage": -2.522,
+              "timestamp": "2026-01-15T22:24:53.756238+00:00"
+            },
+            "context": {
+              "trend": {
+                "current_direction": "bearish",
+                "trend_periods": 1,
+                "trend_strength": 1.0,
+                "trend_consistency": 0.9,
+                "strength_interpretation": "very_strong"
+              },
+              "distance": {
+                "current_absolute": -2408.48,
+                "current_relative_pct": -2.522,
+                "average_distance": 142.2676,
+                "max_distance": 4823.5684,
+                "min_distance": -3026.4066,
+                "distance_volatility": 2004.4589,
+                "distance_interpretation": "wide_distance"
+              },
+              "acceleration": {
+                "velocity": 1127.621578,
+                "acceleration": 911.846828,
+                "rate_of_change_5p": 4.185,
+                "acceleration_interpretation": "accelerating_upward"
+              },
+              "length": 14,
+              "calculation_periods": 149
+            },
+            "levels": {
+              "current_stop_level": 97924.49,
+              "stop_distance_pct": 2.522,
+              "trend_direction": "unknown"
+            },
+            "patterns": {
+              "signal_analysis": {
+                "recent_reversals": [
+                  {
+                    "type": "sar_reversal_bearish",
+                    "periods_ago": 1,
+                    "price_at_reversal": 95516.01,
+                    "psar_at_reversal": 97924.49,
+                    "strength": 0.498
+                  }
+                ],
+                "latest_reversal": {
+                  "type": "sar_reversal_bearish",
+                  "periods_ago": 1,
+                  "price_at_reversal": 95516.01,
+                  "psar_at_reversal": 97924.49,
+                  "strength": 0.498
+                },
+                "reversal_frequency": {
+                  "total_reversals": 13,
+                  "periods_per_reversal": 11.5,
+                  "reversal_rate": "medium"
+                }
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "aligned_periods": 149,
+                "had_high_low_data": true,
+                "calculation_periods": 14
+              },
+              "stop_loss": {
+                "current_stop_level": 97924.49,
+                "stop_distance": 2408.48,
+                "stop_distance_pct": 2.522,
+                "stop_type": "trailing_stop",
+                "performance": {
+                  "effectiveness_rate": 0.463,
+                  "total_tests": 95,
+                  "successful_stops": 44
+                },
+                "recommendation": "wide_stop"
+              },
+              "calculation_notes": "Parabolic SAR analysis based on 149 aligned periods"
+            },
+            "summary": "PSAR 97924.4900 - bearish trend for 1 periods, 2.52% from price. Recent reversal 1p ago"
+          }
+        },
+        "aroon": {
+          "status": "OK",
+          "data": {
+            "indicator": "Aroon",
+            "current": {
+              "aroon_up": 64.29,
+              "aroon_down": 7.14,
+              "oscillator": 57.14,
+              "timestamp": "2026-01-15T22:24:53.790680+00:00"
+            },
+            "context": {
+              "trend": {
+                "current_trend": "uptrend",
+                "trend_strength": 0.571,
+                "trend_consistency": 1.0,
+                "trend_duration": 16,
+                "separation": 57.14,
+                "trend_quality": "fair"
+              },
+              "strength": {
+                "aroon_up_strength": "strong",
+                "aroon_down_strength": "very_weak",
+                "combined_strength": "strong",
+                "up_momentum": -7.14,
+                "down_momentum": 2.38,
+                "up_evolution": "falling",
+                "down_evolution": "rising",
+                "dominant_indicator": "aroon_up"
+              },
+              "parallel_movement": {
+                "correlation": 0.0,
+                "movement_type": "independent_movement",
+                "interpretation": "Indicators moving independently"
+              }
+            },
+            "levels": {
+              "oscillator": {
+                "current_value": 57.14,
+                "zone": "strong_bullish",
+                "velocity": -9.52,
+                "acceleration": -10.71,
+                "zero_crossings": 12,
+                "time_above_zero_pct": 56.6,
+                "time_below_zero_pct": 41.2,
+                "oscillator_interpretation": "strong_bullish_slowing"
+              },
+              "crossovers": {
+                "recent_crossovers": [],
+                "latest_crossover": null,
+                "crossover_frequency": "low"
+              }
+            },
+            "patterns": {},
+            "divergence": null,
+            "evidence": {
+              "clarity": 0.571,
+              "consistency": 1.0,
+              "data_quality": 0.68
+            },
+            "summary": "Aroon Up: 64.3, Down: 7.1 - uptrend for 16 periods (strong bullish)"
+          }
+        },
+        "atr": {
+          "status": "OK",
+          "data": {
+            "indicator": "ATR",
+            "current": {
+              "value": 1191.74146,
+              "timestamp": "2026-01-15T22:24:53.798392+00:00"
+            },
+            "context": {
+              "trend": {
+                "direction": "rising",
+                "velocity": 30.882065,
+                "acceleration": -13.811681,
+                "strength": 0.216,
+                "consistency": 0.5,
+                "interpretation": "volatility_stable"
+              },
+              "relative": {
+                "comparisons": {
+                  "5p_avg": 5.86,
+                  "10p_avg": 9.18,
+                  "20p_avg": 19.07,
+                  "50p_avg": 23.08
+                },
+                "regime": "elevated_volatility",
+                "regime_ratio": 1.231
+              },
+              "breakout": {
+                "squeeze_detected": false,
+                "squeeze_periods": 0,
+                "expansion_potential": 0.0,
+                "recent_volatility_change_pct": 6.26,
+                "breakout_setup": false
+              }
+            },
+            "levels": {
+              "volatility": {
+                "current_level": "extremely_high",
+                "percentile_rank": 99.3,
+                "relative_to_mean": 34.53,
+                "relative_to_price_pct": 1.248,
+                "statistical": {
+                  "mean": 885.823233,
+                  "std": 142.944596,
+                  "max": 1191.74146,
+                  "min": 599.357616
+                }
+              },
+              "cycles": {
+                "cycle_detected": true,
+                "avg_expansion_cycle": 111.0,
+                "avg_contraction_cycle": 57.5,
+                "recent_peaks": 2,
+                "recent_troughs": 3,
+                "cycle_position": "post_trough_expansion"
+              },
+              "stop_loss": {
+                "current_price": 95516.01,
+                "stop_levels": {
+                  "1.0x_atr": {
+                    "long_stop": 94324.26854,
+                    "short_stop": 96707.75146,
+                    "distance": 1191.74146,
+                    "distance_pct": 1.248
+                  },
+                  "1.5x_atr": {
+                    "long_stop": 93728.397811,
+                    "short_stop": 97303.622189,
+                    "distance": 1787.612189,
+                    "distance_pct": 1.872
+                  },
+                  "2.0x_atr": {
+                    "long_stop": 93132.527081,
+                    "short_stop": 97899.492919,
+                    "distance": 2383.482919,
+                    "distance_pct": 2.495
+                  },
+                  "2.5x_atr": {
+                    "long_stop": 92536.656351,
+                    "short_stop": 98495.363649,
+                    "distance": 2979.353649,
+                    "distance_pct": 3.119
+                  },
+                  "3.0x_atr": {
+                    "long_stop": 91940.785621,
+                    "short_stop": 99091.234379,
+                    "distance": 3575.224379,
+                    "distance_pct": 3.743
+                  }
+                },
+                "recommended_multiplier": 2.5,
+                "recommended_stop": {
+                  "long_stop": 92536.656351,
+                  "short_stop": 98495.363649,
+                  "distance": 2979.353649,
+                  "distance_pct": 3.119
+                }
+              }
+            },
+            "evidence": {
+              "clarity": 1.0,
+              "consistency": 0.216,
+              "data_quality": 0.68
+            },
+            "summary": "ATR 1191.741460 - extremely high volatility (99th percentile)"
+          }
+        },
+        "bbands": {
+          "status": "OK",
+          "data": {
+            "indicator": "Bollinger_Bands",
+            "parameters": {
+              "length": 20,
+              "std": 2.0
+            },
+            "current": {
+              "lower": 90459.2197,
+              "middle": 94590.7305,
+              "upper": 98722.2413,
+              "bandwidth": 8.7356,
+              "percent_b": 0.612
+            },
+            "analysis": {
+              "position": "upper_half",
+              "squeeze": "False",
+              "width": "normal"
+            },
+            "values": {
+              "lower": [
+                86356.2863233785,
+                86321.0745904088,
+                86367.9088514924,
+                86591.01624402116,
+                86817.86739077941,
+                86729.91952498864,
+                86747.79551388243,
+                86719.79152816781,
+                86666.90847365693,
+                86647.65211522365,
+                86639.9446889052,
+                86625.76408197418,
+                86630.10780565544,
+                86644.5002191343,
+                86736.04634309898,
+                86780.03055780054,
+                86873.64878101273,
+                86887.34467033995,
+                86891.62189424693,
+                86893.08962222046,
+                86893.03676255188,
+                86893.18155081717,
+                86908.38560935738,
+                86534.43945695192,
+                86488.16430845638,
+                86467.22671171871,
+                86447.0895788116,
+                86403.77529417451,
+                86417.74062082336,
+                86404.8501166619,
+                86418.92408618948,
+                86445.83661454248,
+                86440.56975268615,
+                86487.68330833365,
+                86530.5631243575,
+                86577.40586042854,
+                86597.26875604015,
+                86618.64622286867,
+                86639.09365386871,
+                86602.22106117469,
+                86583.05463729773,
+                86618.87829479441,
+                86588.03127847827,
+                86777.456482473,
+                86927.96497228472,
+                86968.79101888252,
+                86974.21182351072,
+                87034.93437707471,
+                87154.22248075303,
+                87193.50214842873,
+                87258.78840469052,
+                87217.8763769804,
+                87128.85644095161,
+                87053.79522530606,
+                87063.98732581775,
+                87075.83219329757,
+                87071.28848397336,
+                87043.95739116012,
+                87090.89025238277,
+                87183.56740628574,
+                87281.13945725626,
+                87434.51354860057,
+                87692.13049633431,
+                87933.0902078036,
+                88195.7703283835,
+                88238.08532406348,
+                88336.75601490756,
+                88392.62992201347,
+                88419.91404196175,
+                88377.86134942624,
+                88507.77006498413,
+                88626.78157619295,
+                88811.36250122971,
+                88943.78079494124,
+                89276.29492671552,
+                89615.01260728818,
+                89960.01725993087,
+                90338.01263870187,
+                90641.35753139977,
+                90774.91850451907,
+                90741.71895326504,
+                90718.96432830425,
+                90724.4760933269,
+                90652.31356459227,
+                90450.85204315405,
+                90075.99926234476,
+                89869.75771722333,
+                89694.68743553212,
+                89600.56355688022,
+                89593.01823755118,
+                89514.12909175274,
+                89426.44067385502,
+                89415.79639449458,
+                89410.73096317338,
+                89489.79190503909,
+                89428.22268828364,
+                89666.1771232023,
+                89791.4195945764,
+                90042.0247347217,
+                90170.25893940372,
+                90165.64000303911,
+                90174.36707487084,
+                90217.33003130168,
+                90216.13567636353,
+                90233.3177331773,
+                90312.18989560493,
+                90308.91045725062,
+                90164.25235707182,
+                90138.44509099361,
+                90129.15797397574,
+                90073.96642375144,
+                90043.60540606047,
+                90040.54692650179,
+                90111.42994854374,
+                90091.36798584035,
+                90090.04537207194,
+                90096.42943413845,
+                89863.91367040768,
+                89592.12069449619,
+                89214.40171628943,
+                88996.7320606712,
+                88969.07510835509,
+                89063.33552028779,
+                88958.05605499774,
+                88888.92718780466,
+                89014.61464224607,
+                89256.06146686744,
+                89386.03705269696,
+                89637.35737725375,
+                90101.45679400688,
+                90459.21967125722
+              ],
+              "middle": [
+                87999.438,
+                87936.704,
+                87896.7625,
+                87807.05,
+                87681.9675,
+                87721.5895,
+                87714.0875,
+                87732.2585,
+                87710.4095,
+                87692.6685,
+                87688.974,
+                87677.04149999999,
+                87679.70449999999,
+                87686.692,
+                87718.67799999999,
+                87736.9505,
+                87778.3015,
+                87786.999,
+                87790.06899999999,
+                87792.2105,
+                87792.1445,
+                87792.20999999999,
+                87771.28199999999,
+                87869.9005,
+                87989.52249999999,
+                87925.662,
+                87886.7055,
+                87828.34599999999,
+                87833.312,
+                87827.17050000001,
+                87833.83499999999,
+                87853.31850000001,
+                87927.173,
+                87964.682,
+                88011.394,
+                88055.5765,
+                88092.382,
+                88155.95749999999,
+                88167.1135,
+                88150.0435,
+                88140.641,
+                88156.9045,
+                88140.863,
+                88035.91750000001,
+                87956.641,
+                87997.8155,
+                88055.1865,
+                88134.4075,
+                88215.43149999999,
+                88321.62899999999,
+                88417.392,
+                88517.059,
+                88565.998,
+                88670.751,
+                88725.333,
+                88790.318,
+                88858.1275,
+                88913.74,
+                89047.44200000001,
+                89232.1885,
+                89426.3775,
+                89599.0765,
+                89784.2295,
+                89939.901,
+                90114.7785,
+                90339.132,
+                90523.2115,
+                90732.39199999999,
+                90987.398,
+                91227.42050000001,
+                91449.5005,
+                91643.101,
+                91806.0985,
+                91982.0375,
+                92185.6305,
+                92303.2185,
+                92492.1515,
+                92626.75450000001,
+                92739.31049999999,
+                92781.832,
+                92772.73000000001,
+                92767.03349999999,
+                92768.4945,
+                92752.261,
+                92703.1755,
+                92570.603,
+                92483.65000000001,
+                92373.80750000001,
+                92230.92050000001,
+                92076.762,
+                91920.86850000001,
+                91755.562,
+                91651.63149999999,
+                91476.239,
+                91325.8535,
+                91251.93549999999,
+                91098.462,
+                90993.8635,
+                90883.19450000001,
+                90810.16100000001,
+                90767.89800000002,
+                90745.26950000001,
+                90712.601,
+                90709.6805,
+                90726.06899999999,
+                90749.2705,
+                90760.8745,
+                90804.41,
+                90819.815,
+                90789.8515,
+                90836.0095,
+                90905.91750000001,
+                90911.90400000001,
+                90965.742,
+                91030.77799999999,
+                91099.508,
+                91168.688,
+                91304.9945,
+                91483.049,
+                91722.42199999999,
+                91983.2365,
+                92206.81649999999,
+                92410.92650000002,
+                92711.4055,
+                93030.98700000001,
+                93344.036,
+                93592.6085,
+                93833.7265,
+                94092.376,
+                94398.18000000001,
+                94590.7305
+              ],
+              "upper": [
+                89642.58967662149,
+                89552.3334095912,
+                89425.6161485076,
+                89023.08375597885,
+                88546.06760922058,
+                88713.25947501136,
+                88680.37948611756,
+                88744.72547183218,
+                88753.91052634305,
+                88737.68488477635,
+                88738.0033110948,
+                88728.3189180258,
+                88729.30119434455,
+                88728.8837808657,
+                88701.309656901,
+                88693.87044219948,
+                88682.95421898727,
+                88686.65332966004,
+                88688.51610575305,
+                88691.33137777954,
+                88691.2522374481,
+                88691.23844918281,
+                88634.1783906426,
+                89205.36154304809,
+                89490.8806915436,
+                89384.09728828128,
+                89326.32142118839,
+                89252.91670582547,
+                89248.88337917665,
+                89249.49088333812,
+                89248.7459138105,
+                89260.80038545754,
+                89413.77624731384,
+                89441.68069166635,
+                89492.2248756425,
+                89533.74713957145,
+                89587.49524395984,
+                89693.2687771313,
+                89695.1333461313,
+                89697.86593882531,
+                89698.22736270228,
+                89694.9307052056,
+                89693.69472152172,
+                89294.37851752702,
+                88985.31702771528,
+                89026.83998111747,
+                89136.16117648927,
+                89233.8806229253,
+                89276.64051924695,
+                89449.75585157124,
+                89575.99559530949,
+                89816.24162301958,
+                90003.1395590484,
+                90287.70677469394,
+                90386.67867418224,
+                90504.80380670243,
+                90644.96651602664,
+                90783.52260883989,
+                91003.99374761725,
+                91280.80959371426,
+                91571.61554274375,
+                91763.63945139942,
+                91876.32850366569,
+                91946.7117921964,
+                92033.7866716165,
+                92440.17867593652,
+                92709.66698509245,
+                93072.15407798652,
+                93554.88195803826,
+                94076.97965057378,
+                94391.23093501586,
+                94659.42042380704,
+                94800.83449877027,
+                95020.29420505877,
+                95094.96607328448,
+                94991.42439271182,
+                95024.28574006914,
+                94915.49636129815,
+                94837.26346860021,
+                94788.74549548092,
+                94803.74104673498,
+                94815.10267169573,
+                94812.5129066731,
+                94852.20843540772,
+                94955.49895684594,
+                95065.20673765524,
+                95097.54228277669,
+                95052.9275644679,
+                94861.27744311979,
+                94560.50576244883,
+                94327.60790824729,
+                94084.683326145,
+                93887.4666055054,
+                93541.74703682662,
+                93161.9150949609,
+                93075.64831171634,
+                92530.7468767977,
+                92196.30740542362,
+                91724.36426527833,
+                91450.0630605963,
+                91370.15599696092,
+                91316.17192512918,
+                91207.87196869831,
+                91203.22532363648,
+                91218.82026682267,
+                91186.35110439507,
+                91212.83854274939,
+                91444.56764292819,
+                91501.18490900639,
+                91450.54502602427,
+                91598.05257624856,
+                91768.22959393956,
+                91783.26107349823,
+                91820.05405145626,
+                91970.18801415963,
+                92108.97062792807,
+                92240.94656586154,
+                92746.07532959232,
+                93373.97730550381,
+                94230.44228371055,
+                94969.7409393288,
+                95444.55789164489,
+                95758.51747971225,
+                96464.75494500225,
+                97173.04681219536,
+                97673.45735775391,
+                97929.15553313257,
+                98281.41594730304,
+                98547.39462274626,
+                98694.90320599313,
+                98722.24132874279
+              ],
+              "bandwidth": [
+                3.7344594783014227,
+                3.6745280095810773,
+                3.478748488620622,
+                2.769786152658234,
+                1.9709870429643,
+                2.260948486373157,
+                2.203276608486776,
+                2.3080836835681873,
+                2.3794234510854944,
+                2.383360895845807,
+                2.3926139473243166,
+                2.39806772683089,
+                2.3941611124945177,
+                2.377080847948288,
+                2.2404160192678892,
+                2.181338505033796,
+                2.0612217450739174,
+                2.049629990563963,
+                2.0468080637983346,
+                2.0482930607597356,
+                2.048264665520524,
+                2.0480825102428124,
+                1.9662385486009126,
+                3.039632537305724,
+                3.412584018838398,
+                3.317428052532108,
+                3.2760721044171883,
+                3.2439884631904095,
+                3.223313221244911,
+                3.2389074479818567,
+                3.2217901309000396,
+                3.204163279176592,
+                3.381442156257765,
+                3.3581629765144774,
+                3.365089014821185,
+                3.3573583827969316,
+                3.3944211974194185,
+                3.487708195175164,
+                3.466190023633466,
+                3.5117905275346,
+                3.5343204792492426,
+                3.4892926740765753,
+                3.5235228443854125,
+                2.858971777120415,
+                2.3390525513935416,
+                2.3387500593522756,
+                2.4552209119204513,
+                2.4949918065207255,
+                2.4059487126058263,
+                2.5545879629807513,
+                2.6207594888333356,
+                2.9354401009179205,
+                3.2453573414221464,
+                3.6471006650071995,
+                3.7449184308662886,
+                3.8618755858097784,
+                4.021779585725892,
+                4.205835023563033,
+                4.3944030365683915,
+                4.591663901001958,
+                4.797774667197596,
+                4.831663530370028,
+                4.660281689371044,
+                4.462559486687441,
+                4.259030990386334,
+                4.651465271852563,
+                4.830706840515588,
+                5.157501144655208,
+                5.643603431847241,
+                6.247154934242097,
+                6.4335626087227595,
+                6.582752855137547,
+                6.524045891723153,
+                6.606195704370579,
+                6.31190687204657,
+                5.824728403618601,
+                5.47534941939184,
+                4.941859128397167,
+                4.524409244125706,
+                4.326091546631515,
+                4.378465626127361,
+                4.41551075726861,
+                4.406708156017562,
+                4.528078157378233,
+                4.859215328273074,
+                5.389624042214009,
+                5.652658135306467,
+                5.800605468098497,
+                5.703850571717503,
+                5.394941586779133,
+                5.236546276207724,
+                5.0767959464843955,
+                4.878985936012298,
+                4.515944379450539,
+                4.020902131423071,
+                3.99709398320949,
+                3.144476526503153,
+                2.6429120803813624,
+                1.8511007891086366,
+                1.4093181942410318,
+                1.327028630674926,
+                1.2582527514101884,
+                1.09195627341413,
+                1.0881855628109625,
+                1.0862396492075164,
+                0.9632707833063461,
+                0.9959446628059689,
+                1.4099703812362967,
+                1.5004873308900468,
+                1.4554347542340913,
+                1.6778435786494188,
+                1.897152831529465,
+                1.91692624433038,
+                1.8783160180373433,
+                2.0639393286513332,
+                2.2161758061922,
+                2.3522518298421553,
+                3.156630888559595,
+                4.133942465131022,
+                5.468717962355074,
+                6.493584163737916,
+                7.0227809928670535,
+                7.245011183200785,
+                8.096845096372217,
+                8.904688525330492,
+                9.276267758025632,
+                9.266857933834729,
+                9.479937786128616,
+                9.469457169933204,
+                9.103402641858406,
+                8.735551162157028
+              ],
+              "percent_b": [
+                0.4507507425203813,
+                0.3708664259504985,
+                0.65518408202878,
+                0.641496894435707,
+                0.2357380845536899,
+                1.0663580265133688,
+                0.8915289120011125,
+                0.8956482148500128,
+                0.2256353920385365,
+                0.40869114456954614,
+                0.3477573521436428,
+                0.42256016480133646,
+                0.43309596878651474,
+                0.39890920084546694,
+                0.414806327058496,
+                0.41244800499461287,
+                0.5545560179769835,
+                0.4738849697873641,
+                0.4670436914867979,
+                0.5506269525321384,
+                0.5245384941993984,
+                0.34902591222405827,
+                0.6051273373996288,
+                1.3437720859517646,
+                1.0422381911161414,
+                0.37726503778515713,
+                0.43224390716693406,
+                0.337805172424833,
+                0.2894200148540852,
+                0.34245093255706055,
+                0.3830368057913248,
+                0.5179652400938545,
+                0.8663307617442821,
+                0.5885166660862116,
+                0.6600776995530656,
+                0.6344443900317315,
+                0.6741466748768843,
+                0.7782658635005032,
+                0.4302549961835735,
+                0.30353253553373705,
+                0.34192818716462875,
+                0.39893393917874,
+                0.33611134646927293,
+                0.49551932882983835,
+                0.5367166133771797,
+                0.6911200885973345,
+                0.862567929225571,
+                0.871197113863171,
+                0.8025692810525212,
+                1.0235763151788577,
+                0.931863841978103,
+                1.0311689733011438,
+                0.9972133715715168,
+                1.0103630618197958,
+                0.7563575459451812,
+                0.7806736562757223,
+                0.8109352577466405,
+                0.8235750493878982,
+                0.9039167381912743,
+                0.9892538464410621,
+                0.990766632430898,
+                0.8929022944101332,
+                0.8706111654570151,
+                0.7985256519097766,
+                0.8686673983279846,
+                1.1042435965560422,
+                0.9567709046945325,
+                1.0132718455858816,
+                1.0784519102252825,
+                1.0397290137635198,
+                0.9096584566877577,
+                0.852439297910383,
+                0.7419214081967492,
+                0.8057612770024408,
+                0.7514937626029771,
+                0.46303882441840444,
+                0.7479762881697982,
+                0.5413055537623519,
+                0.5333228394755917,
+                0.3269427153775921,
+                0.1497384880581446,
+                0.1140356190482094,
+                0.156477041641291,
+                0.03835487324387332,
+                0.021570604468600842,
+                0.030219376203804788,
+                0.17441657576801142,
+                0.2319273743923652,
+                0.2850233781087822,
+                0.32757239032670643,
+                0.2550568840232996,
+                0.22254515351091905,
+                0.39373959223782345,
+                0.22304900789499027,
+                0.3135755625304676,
+                0.32842816698451616,
+                0.3533943886432179,
+                0.3877271950973523,
+                0.3707487424205824,
+                0.35652413759309654,
+                0.28149065572548726,
+                0.48969219652785106,
+                0.49817170789884857,
+                0.5459021124628146,
+                0.6519235059154924,
+                0.4331124517857295,
+                0.7796411617861294,
+                1.283955335914494,
+                0.9316854855373998,
+                0.37218620029750665,
+                1.0439262725678253,
+                1.053948220553991,
+                0.7205157975347362,
+                0.7593712679369209,
+                0.9849969588705898,
+                0.946391958982075,
+                0.9166028738050551,
+                1.244231501784262,
+                1.2255142862936186,
+                1.2359545742067126,
+                1.1257739735421335,
+                0.9630208434399965,
+                0.855787716366227,
+                1.0399396671414347,
+                1.0113920599995656,
+                0.9166542941747399,
+                0.7758521332434108,
+                0.8144052134413148,
+                0.7793146573274995,
+                0.7721678693123301,
+                0.6119783462217805
+              ]
+            },
+            "timestamp": "2026-01-15 16:00:00+00:00"
+          }
+        },
+        "obv": {
+          "status": "OK",
+          "data": {
+            "indicator": "OBV",
+            "current": {
+              "value": 39554.88,
+              "timestamp": "2026-01-15T22:24:53.802495+00:00"
+            },
+            "context": {
+              "length": 14,
+              "relative": {
+                "position_percentile": 83.7,
+                "position": "near_high",
+                "max_obv": 49292.39,
+                "min_obv": -10576.79
+              }
+            },
+            "levels": {
+              "trend": {
+                "short_term": "bearish",
+                "medium_term": "bearish",
+                "long_term": "bullish",
+                "consensus": "bearish",
+                "velocity": -1321.89,
+                "strength": 0.946,
+                "consistency": 0.556
+              },
+              "accumulation": {
+                "timeframe_analysis": {
+                  "5p": {
+                    "score": "strong_distribution",
+                    "change_pct": -8.74
+                  },
+                  "10p": {
+                    "score": "strong_accumulation",
+                    "change_pct": 3.18
+                  },
+                  "20p": {
+                    "score": "strong_accumulation",
+                    "change_pct": 135.26
+                  }
+                },
+                "overall_phase": "accumulation_phase",
+                "phase_strength": "strong"
+              }
+            },
+            "patterns": {
+              "momentum": {
+                "velocity": -1525.35,
+                "acceleration": 1449.52,
+                "momentum_type": "decelerating_bearish",
+                "roc_5p": -14.32,
+                "roc_10p": -4.02
+              },
+              "formations": {},
+              "divergence": null,
+              "flow": {
+                "recent_flow": "distribution",
+                "flow_efficiency": 0.186054,
+                "avg_up_volume": 2221.27,
+                "avg_down_volume": 2233.79,
+                "volume_bias": "down_days",
+                "volume_ratio": 0.99
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "original_periods": {
+                  "obv": 150,
+                  "prices": 150,
+                  "volumes": 150
+                },
+                "cleaned_periods": 150,
+                "had_prices": true,
+                "had_volumes": true
+              },
+              "calculation_notes": "OBV analysis based on 150 periods with length 14"
+            },
+            "summary": "OBV 39555 - bearish trend (strong, 0.95), accumulation detected"
+          }
+        },
+        "sma": {
+          "status": "OK",
+          "data": {
+            "indicator": "SMA",
+            "current": {
+              "sma_value": 94590.7305,
+              "price": 95516.01,
+              "price_distance": 925.2795,
+              "price_distance_pct": 0.978,
+              "timestamp": "2026-01-15T22:24:53.810641+00:00"
+            },
+            "context": {
+              "trend": {
+                "short_term": "bullish",
+                "medium_term": "bullish",
+                "long_term": "bullish",
+                "consensus": "bullish",
+                "strength": 1.0,
+                "consistency": 1.0,
+                "slope": 249.3389
+              },
+              "slope": {
+                "short_term_slope": 252.334667,
+                "medium_term_slope": 249.3389,
+                "long_term_slope": 260.7494,
+                "acceleration": -67.138,
+                "direction": "upward",
+                "alignment": "aligned"
+              },
+              "quality": {
+                "smoothness": 0.978,
+                "responsiveness": 0.106,
+                "trend_clarity": 0.815,
+                "overall_quality": 0.897
+              },
+              "length": 20,
+              "smoothing_factor": 0.0952
+            },
+            "levels": {
+              "price_relationship": {
+                "position": "above",
+                "distance": 925.2795,
+                "distance_pct": 0.978,
+                "above_sma_pct": 59.5,
+                "below_sma_pct": 40.5,
+                "position_changes": "21",
+                "position_stability": 0.838
+              },
+              "support_resistance": {
+                "total_touches": 44,
+                "successful_bounces": 20,
+                "success_rate": 0.455,
+                "recent_touches": [
+                  {
+                    "index": 105,
+                    "periods_ago": 25,
+                    "price": 90690.8,
+                    "sma_value": 90749.2705
+                  },
+                  {
+                    "index": 106,
+                    "periods_ago": 24,
+                    "price": 91013.65,
+                    "sma_value": 90760.8745
+                  },
+                  {
+                    "index": 109,
+                    "periods_ago": 21,
+                    "price": 90620.96,
+                    "sma_value": 90789.8515
+                  },
+                  {
+                    "index": 112,
+                    "periods_ago": 18,
+                    "price": 91296.2,
+                    "sma_value": 90911.90400000001
+                  },
+                  {
+                    "index": 113,
+                    "periods_ago": 17,
+                    "price": 91408.91,
+                    "sma_value": 90965.742
+                  }
+                ],
+                "recent_bounces": [
+                  {
+                    "type": "support_bounce",
+                    "index": 100,
+                    "periods_ago": 30,
+                    "strength": 0.002528045504819119
+                  },
+                  {
+                    "type": "resistance_bounce",
+                    "index": 104,
+                    "periods_ago": 26,
+                    "strength": 0.0020356356737035322
+                  },
+                  {
+                    "type": "support_bounce",
+                    "index": 106,
+                    "periods_ago": 24,
+                    "strength": 0.008729130190910938
+                  }
+                ],
+                "effectiveness": "medium"
+              },
+              "current_level": 94590.7305,
+              "trend_direction": "bullish"
+            },
+            "patterns": {
+              "crossovers": {
+                "recent_crossovers": [],
+                "latest_crossover": null,
+                "crossover_frequency": 0.0
+              },
+              "trend_alignment": "aligned",
+              "slope_direction": "upward"
+            },
+            "evidence": {
+              "data_quality": {
+                "original_periods": 131,
+                "aligned_periods": 131,
+                "valid_data_percentage": 100.0,
+                "had_prices": true,
+                "calculation_periods": 20
+              },
+              "calculation_notes": "SMA analysis based on 131 periods with length=20"
+            },
+            "summary": "SMA 94590.7305 - bullish trend (strong), price above (+1.0%)"
+          }
+        },
+        "ema": {
+          "status": "OK",
+          "data": {
+            "indicator": "EMA",
+            "current": {
+              "ema_value": 94897.5406,
+              "price": 95516.01,
+              "price_distance": 618.4694,
+              "price_distance_pct": 0.652,
+              "timestamp": "2026-01-15T22:24:53.817473+00:00"
+            },
+            "context": {
+              "length": 20,
+              "responsiveness": {
+                "avg_change": 95.350938,
+                "max_change": 375.90526,
+                "relative_volatility": 0.022225,
+                "direction_changes": 19,
+                "change_frequency": 0.146,
+                "responsiveness_score": 0.184,
+                "responsiveness_rating": "low"
+              },
+              "signal_quality": {
+                "signal_quality": "low_frequency_high_reliability",
+                "noise_level": "low",
+                "recommended_use": "Reliable for position trading, slower signals"
+              }
+            },
+            "levels": {
+              "trend": {
+                "short_term": "rising",
+                "medium_term": "rising",
+                "long_term": "rising",
+                "consensus": "rising",
+                "strength": 0.522,
+                "consistency": 1.0,
+                "slope": 156.919185,
+                "acceleration": -210.181327
+              },
+              "price_relationship": {
+                "position": "above",
+                "distance": 618.4694,
+                "distance_pct": 0.652,
+                "above_ema_pct": 58.8,
+                "below_ema_pct": 41.2,
+                "avg_distance": 499.0086,
+                "avg_distance_pct": 0.554
+              },
+              "support_resistance": {
+                "total_touches": 26,
+                "successful_bounces": 13,
+                "success_rate": 0.5,
+                "recent_touches": [
+                  {
+                    "index": 104,
+                    "periods_ago": 26,
+                    "price": 90875.79,
+                    "ema_value": 90879.47197169745
+                  },
+                  {
+                    "index": 105,
+                    "periods_ago": 25,
+                    "price": 90690.8,
+                    "ema_value": 90861.50321248817
+                  },
+                  {
+                    "index": 106,
+                    "periods_ago": 24,
+                    "price": 91013.65,
+                    "ema_value": 90875.99338272738
+                  },
+                  {
+                    "index": 112,
+                    "periods_ago": 18,
+                    "price": 91296.2,
+                    "ema_value": 91132.21442375434
+                  },
+                  {
+                    "index": 113,
+                    "periods_ago": 17,
+                    "price": 91408.91,
+                    "ema_value": 91158.56638339678
+                  }
+                ],
+                "recent_bounces": [
+                  {
+                    "type": "support_bounce",
+                    "index": 102,
+                    "periods_ago": 28,
+                    "strength": 0.0004872628713740851
+                  },
+                  {
+                    "type": "support_bounce",
+                    "index": 103,
+                    "periods_ago": 27,
+                    "strength": 0.0013310562868222272
+                  },
+                  {
+                    "type": "support_bounce",
+                    "index": 106,
+                    "periods_ago": 24,
+                    "strength": 0.008729130190910938
+                  }
+                ],
+                "effectiveness": "medium"
+              }
+            },
+            "patterns": {
+              "crossovers": {
+                "recent_crossovers": [],
+                "latest_crossover": null,
+                "crossover_frequency": 0.0
+              },
+              "ema_sma_comparison": {}
+            },
+            "evidence": {
+              "data_quality": {
+                "original_ema_periods": 150,
+                "aligned_periods": 131,
+                "valid_data_percentage": 87.3,
+                "had_prices": true,
+                "had_sma": false,
+                "has_price_data": true,
+                "has_sma_comparison": false
+              },
+              "calculation_notes": "EMA analysis based on 131 aligned data points with period 20"
+            },
+            "summary": "EMA 94897.5406 - rising trend (strength: 0.52), low responsiveness, price +0.7%"
+          }
+        },
+        "roc": {
+          "status": "OK",
+          "data": {
+            "indicator": "ROC",
+            "current": {
+              "value": -0.214,
+              "value_pct": "-0.21%",
+              "timestamp": "2026-01-15T22:24:53.825450+00:00"
+            },
+            "context": {
+              "momentum": {
+                "direction": "negative",
+                "strength": 0.21414320934207895,
+                "strength_level": "very_weak",
+                "evolution": "decelerating",
+                "persistence": 0.2
+              },
+              "trend": {
+                "direction": "falling",
+                "slope": -1.206,
+                "strength": 0.603,
+                "consistency": 0.554
+              },
+              "velocity": {
+                "velocity": -1.206,
+                "acceleration": -1.118,
+                "interpretation": "decelerating_momentum"
+              },
+              "length": 10,
+              "calculation_periods": 140
+            },
+            "levels": {
+              "zero_line": {
+                "position": "below_zero",
+                "above_zero_pct": 58.6,
+                "below_zero_pct": 41.4,
+                "total_crossings": 28,
+                "recent_crosses": [
+                  {
+                    "type": "bearish_zero_cross",
+                    "periods_ago": 1,
+                    "value": -0.214
+                  }
+                ],
+                "crossing_frequency": 0.2
+              },
+              "extremes": {
+                "condition": "neutral",
+                "overbought_threshold": 3.41,
+                "oversold_threshold": -2.18,
+                "extreme_overbought_threshold": 7.61,
+                "extreme_oversold_threshold": -6.38,
+                "overbought_time_pct": 7.1,
+                "oversold_time_pct": 5.7,
+                "current_streak": 0
+              }
+            },
+            "patterns": {
+              "divergence": null
+            },
+            "evidence": {
+              "data_quality": {
+                "original_periods": 140,
+                "clean_periods": 140,
+                "valid_data_percentage": 100.0,
+                "had_prices": true,
+                "calculation_periods": 10
+              },
+              "calculation_notes": "ROC analysis based on 140 periods with length=10"
+            },
+            "summary": "ROC -0.21% - very_weak negative momentum"
+          }
+        },
+        "vwap": {
+          "status": "OK",
+          "data": {
+            "indicator": "VWAP",
+            "length": 14,
+            "current": {
+              "vwap_value": 96262.6514,
+              "price": 95516.01,
+              "price_distance": -746.6414,
+              "price_distance_pct": -0.776,
+              "timestamp": "2026-01-15T22:24:53.841729+00:00"
+            },
+            "context": {
+              "trend": {
+                "direction": "sideways",
+                "strength": 0.038,
+                "velocity": -100.699896,
+                "smoothness": 0.973
+              },
+              "fair_value": {
+                "assessment": "slightly_undervalued",
+                "distance_pct": -0.776,
+                "reversion_tendency": "low"
+              },
+              "anchored": {
+                "direction_consistency": 0.57,
+                "momentum": -100.699896,
+                "reset_detected": "False",
+                "behavior_quality": "choppy"
+              },
+              "volume_profile": {
+                "above_vwap_volume_pct": 58.1,
+                "below_vwap_volume_pct": 41.9,
+                "near_vwap_volume_pct": 58.1,
+                "avg_volume_above": 2312.96,
+                "avg_volume_below": 2123.14,
+                "volume_bias": "above_vwap",
+                "institutional_activity": "high"
+              },
+              "volatility": 507.421
+            },
+            "levels": {
+              "price_position": {
+                "current": "below",
+                "bias": "bearish",
+                "above_vwap_pct": 56.0,
+                "below_vwap_pct": 44.0,
+                "position_changes": 55
+              },
+              "deviation_bands": {
+                "current_position": "below_1std",
+                "std_devs_from_vwap": -1.47,
+                "upper_1std": 96770.0724,
+                "lower_1std": 95755.2304,
+                "upper_2std": 97277.4934,
+                "lower_2std": 95247.8093
+              },
+              "key_levels": [
+                96262.651388186
+              ],
+              "recent_crossovers": [
+                {
+                  "level": 0,
+                  "direction": "down",
+                  "periods_ago": 1,
+                  "strength": 746.6413881860062
+                },
+                {
+                  "level": 0,
+                  "direction": "up",
+                  "periods_ago": 4,
+                  "strength": 294.7481660574267
+                },
+                {
+                  "level": 0,
+                  "direction": "down",
+                  "periods_ago": 5,
+                  "strength": 268.9333333333052
+                },
+                {
+                  "level": 0,
+                  "direction": "up",
+                  "periods_ago": 8,
+                  "strength": 1091.0663469000428
+                }
+              ]
+            },
+            "extremes": {
+              "recent_high": {
+                "value": 96464.0512,
+                "periods_ago": "2",
+                "significance": 0.09800935740622765
+              },
+              "recent_low": {
+                "value": 91332.55,
+                "periods_ago": "17",
+                "significance": 1.0
+              }
+            },
+            "patterns": {
+              "convergence_divergence": {
+                "type": "converging_from_vwap",
+                "velocity": -431.835104,
+                "description": "Price converging to VWAP"
+              },
+              "volume_clustering": {
+                "type": "high_institutional_activity",
+                "near_vwap_pct": 58.1,
+                "description": "High volume clustering near VWAP - institutional activity"
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "aligned_periods": 150,
+                "had_volumes": true,
+                "volume_profile_available": true,
+                "support_resistance_touches": 81
+              },
+              "calculation_notes": "VWAP analysis based on 150 aligned price/VWAP periods"
+            },
+            "summary": "VWAP 96262.6514, price below (-0.8%) - slightly undervalued"
+          }
+        },
+        "trix": {
+          "status": "OK",
+          "data": {
+            "indicator": "TRIX",
+            "length": 14,
+            "current": {
+              "trix": 0.217278,
+              "signal": 95516.01,
+              "histogram": -95515.792722,
+              "timestamp": "2026-01-15T22:24:53.862804+00:00"
+            },
+            "context": {
+              "trend": {
+                "direction": "rising",
+                "strength": 0.137,
+                "velocity": 0.003983,
+                "acceleration": -0.013231
+              },
+              "momentum": {
+                "direction": "bullish",
+                "strength_level": "very_strong",
+                "persistence": 1.0
+              },
+              "volatility": 0.075655
+            },
+            "levels": {
+              "zero_line": {
+                "position": "above_zero",
+                "above_zero_pct": 58.8,
+                "below_zero_pct": 39.7,
+                "recent_crossings": []
+              },
+              "signal_line": {
+                "recent_crossovers": [],
+                "latest_crossover": null,
+                "crossover_frequency": 0.0
+              },
+              "key_levels": [
+                0
+              ],
+              "recent_crossovers": []
+            },
+            "extremes": {
+              "recent_high": {
+                "value": 0.217278,
+                "periods_ago": "0",
+                "significance": 0.0
+              },
+              "recent_low": {
+                "value": -0.014272,
+                "periods_ago": "19",
+                "significance": 1.0
+              }
+            },
+            "patterns": {},
+            "evidence": {
+              "data_quality": {
+                "aligned_periods": 136,
+                "had_signal": true,
+                "had_prices": false,
+                "windows_used": {
+                  "velocity": 2,
+                  "acceleration": 4,
+                  "turning_points": 14,
+                  "divergence": 14
+                }
+              },
+              "calculation_notes": "TRIX analysis based on 136 aligned periods with length=14"
+            },
+            "summary": "TRIX 0.217278 - very_strong bullish momentum, histogram -95515.792722 (above zero)"
+          }
+        },
+        "vortex": {
+          "status": "OK",
+          "data": {
+            "indicator": "Vortex",
+            "length": 14,
+            "current": {
+              "vi_plus": 1.1687,
+              "vi_minus": 0.7418,
+              "spread": 0.4269,
+              "dominant": "VI+",
+              "timestamp": "2026-01-15T22:24:53.872692+00:00"
+            },
+            "context": {
+              "trend": {
+                "direction": "sideways",
+                "strength": 0.09,
+                "velocity": -0.081972,
+                "acceleration": -0.036121
+              },
+              "dominance": {
+                "current": "VI_plus",
+                "strength": 0.4269,
+                "persistence": 1.0
+              },
+              "volatility": 0.2843
+            },
+            "levels": {
+              "one_line": {
+                "vi_plus_vs_one": "above",
+                "vi_minus_vs_one": "below",
+                "plus_above_one_pct": 67.6,
+                "minus_above_one_pct": 39.7,
+                "recent_crosses": {
+                  "plus_crosses": [],
+                  "minus_crosses": []
+                }
+              },
+              "vi_crossovers": [],
+              "key_levels": [
+                1.0
+              ],
+              "key_level_crosses": []
+            },
+            "extremes": {
+              "vi_plus_extremes": {
+                "recent_high": {
+                  "value": 1.3716,
+                  "periods_ago": "6",
+                  "significance": 1.0
+                },
+                "recent_low": {
+                  "value": 1.036,
+                  "periods_ago": "18",
+                  "significance": 1.0
+                }
+              },
+              "vi_minus_extremes": {
+                "recent_high": {
+                  "value": 0.9297,
+                  "periods_ago": "17",
+                  "significance": 1.0
+                },
+                "recent_low": {
+                  "value": 0.6288,
+                  "periods_ago": "6",
+                  "significance": 1.0
+                }
+              }
+            },
+            "patterns": {
+              "parallel_movement": {
+                "type": "parallel_movement",
+                "correlation": -0.873,
+                "direction": "opposite",
+                "description": "VI+ and VI- moving in opposite direction"
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "aligned_periods": 136,
+                "period_used": 14,
+                "had_prices": true,
+                "windows_used": {
+                  "velocity": 2,
+                  "persistence": 5,
+                  "crossover_scan": 14,
+                  "divergence": 14
+                }
+              },
+              "calculation_notes": "Vortex analysis based on 136 aligned VI+/VI- periods"
+            },
+            "summary": "Vortex VI+ 1.169, VI- 0.742 - VI plus dominant (+0.427)"
+          }
+        },
+        "bbwidth": {
+          "status": "OK",
+          "data": {
+            "indicator": "Bollinger_Width",
+            "current": {
+              "width": 8.74,
+              "timestamp": "2026-01-15T22:24:53.885914+00:00"
+            },
+            "context": {
+              "trend": {
+                "direction": "contracting",
+                "velocity": -0.248,
+                "acceleration": -0.957,
+                "strength": 0.125
+              },
+              "expansion": {
+                "cycle_position": "unclear",
+                "cycle_stage": "unclear",
+                "expansion_peaks": 0,
+                "contraction_troughs": 1,
+                "avg_expansion_height": 8.74,
+                "max_expansion": 8.74,
+                "recent_peak": null,
+                "recent_trough": {
+                  "index": 22,
+                  "value": 1.9662385486009126,
+                  "periods_ago": 108
+                }
+              },
+              "breakout": {
+                "potential": "low",
+                "potential_score": 0.2,
+                "recent_change": -0.734,
+                "change_direction": "contracting",
+                "setup_quality": "poor_setup"
+              }
+            },
+            "levels": {
+              "volatility": {
+                "level": "extremely_high",
+                "percentile_rank": 94.7,
+                "relative_to_mean": 127.23,
+                "statistics": {
+                  "mean": 3.84,
+                  "std": 1.98,
+                  "max": 9.48,
+                  "min": 0.96
+                }
+              },
+              "squeeze": {
+                "is_squeeze": false,
+                "squeeze_periods": 0,
+                "squeeze_threshold": 1.88,
+                "squeeze_intensity": 0.0,
+                "squeeze_frequency": 0.137,
+                "squeeze_quality": "weak"
+              },
+              "cycles": {
+                "avg_cycle_length": 18.0,
+                "total_cycles": 1,
+                "expanding_time_pct": 41.2,
+                "contracting_time_pct": 58.8
+              }
+            },
+            "evidence": {
+              "clarity": 1.0,
+              "consistency": 0.125,
+              "data_quality": 0.655
+            },
+            "summary": "BB Width 8.74% - extremely high volatility (95th percentile)"
+          }
+        },
+        "keltner": {
+          "status": "OK",
+          "data": {
+            "indicator": "Keltner_Channels",
+            "current": {
+              "price": 95516.01,
+              "upper_channel": 97402.5045,
+              "middle_channel": 94897.5406,
+              "lower_channel": 92392.5767,
+              "channel_width": 5.28,
+              "price_position_pct": 62.3,
+              "timestamp": "2026-01-15T22:24:53.889861+00:00"
+            },
+            "context": {
+              "length": 20,
+              "trend": {
+                "middle_trend": "rising",
+                "middle_slope": 178.235345,
+                "price_vs_middle": "above",
+                "trend_strength": 0.89
+              },
+              "squeeze": {
+                "is_squeeze": "False",
+                "squeeze_periods": 0,
+                "squeeze_threshold": 3.6,
+                "current_width": 5.28,
+                "squeeze_intensity": 0.0
+              }
+            },
+            "levels": {
+              "position": {
+                "position": "upper_channel",
+                "position_pct": 62.3,
+                "distance_from_middle": 618.4694,
+                "distance_from_middle_pct": 0.652,
+                "history": {
+                  "above_upper_pct": 13.7,
+                  "below_lower_pct": 0.0,
+                  "upper_half_pct": 45.0,
+                  "lower_half_pct": 41.2,
+                  "avg_position": 64.4,
+                  "position_volatility": 29.1
+                }
+              },
+              "support_resistance": {
+                "upper": {
+                  "touches": 6,
+                  "bounces": 2,
+                  "success_rate": 0.333,
+                  "recent_touches": [
+                    {
+                      "index": 127,
+                      "periods_ago": 3,
+                      "price": 96630.48
+                    },
+                    {
+                      "index": 128,
+                      "periods_ago": 2,
+                      "price": 96581.08
+                    },
+                    {
+                      "index": 129,
+                      "periods_ago": 1,
+                      "price": 96737.04
+                    }
+                  ],
+                  "recent_bounces": [
+                    {
+                      "type": "support_bounce",
+                      "periods_ago": 8,
+                      "strength": 0.020798795353960262
+                    },
+                    {
+                      "type": "resistance_bounce",
+                      "periods_ago": 3,
+                      "strength": 0.0005112258575140492
+                    }
+                  ]
+                },
+                "middle": {
+                  "touches": 16,
+                  "bounces": 10,
+                  "success_rate": 0.625,
+                  "recent_touches": [
+                    {
+                      "index": 109,
+                      "periods_ago": 21,
+                      "price": 90620.96
+                    },
+                    {
+                      "index": 112,
+                      "periods_ago": 18,
+                      "price": 91296.2
+                    },
+                    {
+                      "index": 113,
+                      "periods_ago": 17,
+                      "price": 91408.91
+                    }
+                  ],
+                  "recent_bounces": [
+                    {
+                      "type": "support_bounce",
+                      "periods_ago": 18,
+                      "strength": 0.001234553026303465
+                    },
+                    {
+                      "type": "support_bounce",
+                      "periods_ago": 17,
+                      "strength": 0.005831926012464173
+                    }
+                  ]
+                },
+                "lower": {
+                  "touches": 0,
+                  "bounces": 0,
+                  "success_rate": 0,
+                  "recent_touches": [],
+                  "recent_bounces": []
+                }
+              }
+            },
+            "patterns": {
+              "breakouts": {
+                "recent_breakouts": [
+                  {
+                    "type": "upward_breakout",
+                    "periods_ago": 8,
+                    "price": 96764.57,
+                    "channel_level": 95589.2764,
+                    "strength": 0.012295245637306159
+                  },
+                  {
+                    "type": "upward_breakout",
+                    "periods_ago": 14,
+                    "price": 93449.99,
+                    "channel_level": 93378.3842,
+                    "strength": 0.0007668349321824066
+                  }
+                ],
+                "latest_breakout": {
+                  "type": "upward_breakout",
+                  "periods_ago": 8,
+                  "price": 96764.57,
+                  "channel_level": 95589.2764,
+                  "strength": 0.012295245637306159
+                },
+                "breakout_frequency": 0.10526315789473684
+              },
+              "width_analysis": {
+                "current_width": 5.28,
+                "width_level": "wide",
+                "percentile": 95.0,
+                "trend": "expanding",
+                "velocity": 0.15,
+                "statistics": {
+                  "mean": 3.96,
+                  "std": 0.72,
+                  "max": 5.32,
+                  "min": 2.55
+                }
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "original_periods": {
+                  "prices": 150,
+                  "upper": 150,
+                  "middle": 150,
+                  "lower": 150
+                },
+                "aligned_periods": 131,
+                "valid_data_percentage": 87.3
+              },
+              "calculation_notes": "Keltner analysis based on 131 aligned data points with period 20"
+            },
+            "summary": "Keltner: Price 95516.0100 (upper channel, 62.3%), Width 5.28%"
+          }
+        },
+        "donchian": {
+          "status": "OK",
+          "data": {
+            "indicator": "Donchian_Channels",
+            "current": {
+              "price": 95516.01,
+              "upper_channel": 97924.49,
+              "middle_channel": 94431.345,
+              "lower_channel": 90938.2,
+              "channel_width": 6986.29,
+              "price_position_pct": 65.5,
+              "timestamp": "2026-01-15T22:24:53.899887+00:00"
+            },
+            "context": {
+              "length": 20,
+              "trend": {
+                "strength": "moderate_upward",
+                "position_pct": 65.5,
+                "channel_utilization": 0.354,
+                "utilization_rating": "low"
+              },
+              "consolidation": {
+                "is_consolidation": "False",
+                "consolidation_periods": 0,
+                "width_threshold": 3452.9617,
+                "price_range": 0,
+                "price_range_pct": 0,
+                "breakout_potential": "low"
+              }
+            },
+            "levels": {
+              "position": {
+                "position": "upper_third",
+                "position_pct": 65.5,
+                "distance_to_upper": 2408.48,
+                "distance_to_lower": 4577.81,
+                "distance_to_middle": 1084.665
+              },
+              "support_resistance": {
+                "upper": {
+                  "touches": 1,
+                  "bounces": 1,
+                  "breaks": 0,
+                  "bounce_rate": 1.0
+                },
+                "middle": {
+                  "touches": 5,
+                  "bounces": 3,
+                  "breaks": 0,
+                  "bounce_rate": 0.6
+                },
+                "lower": {
+                  "touches": 0,
+                  "bounces": 0,
+                  "breaks": 0,
+                  "bounce_rate": 0
+                }
+              }
+            },
+            "patterns": {
+              "breakouts": {
+                "recent_breakouts": [],
+                "latest_breakout": null,
+                "latest_upper_breakout": null,
+                "latest_lower_breakout": null,
+                "breakout_frequency": 0.0
+              },
+              "turtle_patterns": {
+                "primary_period": {
+                  "at_upper_channel": "False",
+                  "at_lower_channel": "False",
+                  "lookback_periods": 20
+                },
+                "extended_period": {
+                  "at_extended_high": "False",
+                  "at_extended_low": "False",
+                  "lookback_periods": 40
+                },
+                "recent_extremes": {
+                  "at_recent_low": "True",
+                  "at_recent_high": "False",
+                  "lookback_periods": 5
+                }
+              },
+              "width_analysis": {
+                "current_width": 6986.29,
+                "width_level": "very_wide",
+                "percentile": 82.5,
+                "width_velocity": -269.92,
+                "trend": "contracting",
+                "statistics": {
+                  "mean": 4072.5302,
+                  "max": 7796.05,
+                  "min": 2387.89
+                }
+              }
+            },
+            "evidence": {
+              "data_quality": {
+                "total_periods": 131,
+                "valid_data_percentage": 87.3,
+                "width_corrections": 0
+              },
+              "calculation_notes": "Donchian analysis based on 131 aligned data points with period 20"
+            },
+            "summary": "Donchian: Price 95516.0100 (65.5%), Width 6986.2900"
+          }
+        }
+      },
+      "summary": {
+        "total": 21,
+        "success": 21,
+        "errors": 0,
+        "error_list": []
+      },
+      "ohlcv_summary": {
+        "latest_price": 95516.01,
+        "price_change_24h": 4.0387386213768455,
+        "volume_24h": 82813.44685000001,
+        "date_range": {
+          "start": "2025-12-22T00:00:00+00:00",
+          "end": "2026-01-15T16:00:00+00:00"
+        }
+      },
+      "candles_received": 150
+    },
+    "market_intelligence": {
+      "test_type": "market_intelligence",
+      "symbol": "BTC/USDT",
+      "timestamp": "2026-01-15T22:24:53.905275",
+      "data_points": {
+        "trading_signals.ggshot": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 2.468109130859375,
+          "from_cache": true,
+          "data": {
+            "signals": {
+              "1h": {
+                "direction": "SHORT",
+                "entry_zone": {
+                  "low": 105718.8,
+                  "mid": 108485.35,
+                  "high": 111251.9
+                },
+                "stop_loss": 113123.3,
+                "take_profit": 103940.5,
+                "targets": [
+                  {
+                    "price": 103940.5,
+                    "number": 1
+                  },
+                  {
+                    "price": 102162.2,
+                    "number": 2
+                  },
+                  {
+                    "price": 100383.9,
+                    "number": 3
+                  },
+                  {
+                    "price": 95049.0,
+                    "number": 4
+                  }
+                ],
+                "confidence": null,
+                "strategy_accuracy": null,
+                "trend_line": 111251.9,
+                "timestamp": "2025-11-03T16:00:18+00:00"
+              },
+              "30m": {
+                "direction": "LONG",
+                "entry_zone": {
+                  "low": 112127.5,
+                  "mid": 109957.55,
+                  "high": 107787.6
+                },
+                "stop_loss": 107033.1,
+                "take_profit": 112912.4,
+                "targets": [
+                  {
+                    "price": 112912.4,
+                    "number": 1
+                  },
+                  {
+                    "price": 113697.3,
+                    "number": 2
+                  },
+                  {
+                    "price": 114482.2,
+                    "number": 3
+                  },
+                  {
+                    "price": 116836.9,
+                    "number": 4
+                  }
+                ],
+                "confidence": null,
+                "strategy_accuracy": null,
+                "trend_line": 107787.6,
+                "timestamp": "2025-10-21T15:02:31+00:00"
+              },
+              "4h": {
+                "direction": "SHORT",
+                "entry_zone": {
+                  "low": 108220.5,
+                  "mid": 112617.55,
+                  "high": 117014.6
+                },
+                "stop_loss": 123043.0,
+                "take_profit": 102645.1,
+                "targets": [
+                  {
+                    "price": 102645.1,
+                    "number": 1
+                  },
+                  {
+                    "price": 97069.8,
+                    "number": 2
+                  },
+                  {
+                    "price": 91494.4,
+                    "number": 3
+                  },
+                  {
+                    "price": 74768.4,
+                    "number": 4
+                  }
+                ],
+                "confidence": null,
+                "strategy_accuracy": null,
+                "trend_line": 117014.6,
+                "timestamp": "2025-10-16T18:00:14+00:00"
+              },
+              "5m": {
+                "direction": "LONG",
+                "entry_zone": {
+                  "low": 104211.1,
+                  "mid": 103002.1,
+                  "high": 101793.1
+                },
+                "stop_loss": 101589.5,
+                "take_profit": 104419.5,
+                "targets": [
+                  {
+                    "price": 104419.5,
+                    "number": 1
+                  },
+                  {
+                    "price": 104627.9,
+                    "number": 2
+                  },
+                  {
+                    "price": 104836.4,
+                    "number": 3
+                  },
+                  {
+                    "price": 105461.6,
+                    "number": 4
+                  }
+                ],
+                "confidence": null,
+                "strategy_accuracy": null,
+                "trend_line": 101793.1,
+                "timestamp": "2025-11-05T18:40:09+00:00"
+              }
+            },
+            "metadata": {
+              "symbol": "BTC/USDT",
+              "timeframes_found": [
+                "1h",
+                "30m",
+                "4h",
+                "5m"
+              ],
+              "latest_signal_age": "71 days ago",
+              "query_timestamp": "2026-01-15T22:21:34.891131+00:00"
+            }
+          }
+        },
+        "derivatives_leverage.btc_funding_rate": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.19478797912597656,
+          "from_cache": true,
+          "data": {
+            "symbol": "BTC/USDT",
+            "funding_rate": 8.136e-05,
+            "funding_rate_pct": 0.008136,
+            "next_funding_time": "2026-01-16T00:00:00+00:00",
+            "interpretation": {
+              "level": "neutral",
+              "risk": "minimal",
+              "interpretation": "Balanced positioning (0.008%)",
+              "trading_implication": "Neutral funding - no leverage warning signals",
+              "color": "green"
+            },
+            "fetched_at": "2026-01-15T21:45:30.591245+00:00",
+            "mark_price": 95530.4,
+            "index_price": 95558.68978261
+          }
+        },
+        "derivatives_leverage.eth_funding_rate": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.17881393432617188,
+          "from_cache": true,
+          "data": {
+            "symbol": "ETH/USDT",
+            "funding_rate": 8.14e-06,
+            "funding_rate_pct": 0.000814,
+            "next_funding_time": "2026-01-16T00:00:00+00:00",
+            "interpretation": {
+              "level": "neutral",
+              "risk": "minimal",
+              "interpretation": "Balanced positioning (0.001%)",
+              "trading_implication": "Neutral funding - no leverage warning signals",
+              "color": "green"
+            },
+            "fetched_at": "2026-01-15T22:21:34.982093+00:00",
+            "mark_price": 3301.27,
+            "index_price": 3302.18348837
+          }
+        },
+        "macro_economics.vix": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.476837158203125,
+          "from_cache": true,
+          "data": {
+            "value": 15.55,
+            "timestamp": "2026-01-15T14:39:31-05:00",
+            "interpretation": "Moderate volatility regime signals neutral conditions for crypto traders, neither strongly risk-on nor risk-off.",
+            "signal": "neutral",
+            "risk_regime": "moderate",
+            "_meta": {
+              "query_type": "vix_index",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T20:01:08.120044",
+              "tool_calls": [
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.cboe.com/us/indices/dashboard/vix/\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://finance.yahoo.com/quote/%5EVIX\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bloomberg.com/quote/VIX:IND\"}"
+                },
+                {
+                  "tool": "web_search_with_snippets",
+                  "args": "{\"query\":\"current VIX value CBOE\"}"
+                }
+              ],
+              "tool_calls_count": 4,
+              "citations": [
+                "https://www.cboe.com/us/indices/dashboard/vix/",
+                "https://www.tradingview.com/symbols/CBOE-VIX",
+                "https://www.cboe.com/tradable-products/vix",
+                "https://fred.stlouisfed.org/series/VIXCLS",
+                "https://www.cboe.com/us/indices/dashboard/vix",
+                "https://finance.yahoo.com/quote/%5EVIX",
+                "https://www.barchart.com/stocks/quotes/$VIX",
+                "https://www.cboe.com/us/indices/dashboard/VIX-VIX1Y-VIX3M-VIX6M-VIX9D",
+                "https://www.investing.com/indices/volatility-s-p-500",
+                "https://www.tradingview.com/symbols/TVC-VIX",
+                "https://www.cnbc.com/quotes/.VIX",
+                "https://www.bloomberg.com/quote/VIX:IND"
+              ],
+              "citations_count": 12,
+              "reasoning_tokens": 1612,
+              "total_tokens": 7967,
+              "estimated_cost": 0.0013670000000000002,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "web_search_with_snippets",
+                "browse_page"
+              ]
+            }
+          }
+        },
+        "macro_economics.dxy": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.22101402282714844,
+          "from_cache": true,
+          "data": {
+            "value": 99.33,
+            "timestamp": "2026-01-15T19:00:00Z",
+            "change_24h": 0.24,
+            "interpretation": "DXY up mildly +0.24% today, holding below 100 after rebound from recent lows; limited pressure on risk assets like crypto.",
+            "signal": "neutral",
+            "crypto_impact": "Dollar strength inversely correlates with crypto; current subdued levels and small gain pose minimal bearish threat.",
+            "_meta": {
+              "query_type": "dxy_index",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T19:32:06.982241",
+              "tool_calls": [
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"current DXY US Dollar Index value live\",\"num_results\":20}"
+                },
+                {
+                  "tool": "web_search_with_snippets",
+                  "args": "{\"query\":\"current DXY US Dollar Index value live\"}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"DXY\\\" site:investing.com\"}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"US Dollar Index\\\" site:tradingview.com\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.investing.com/indices/usdollar\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.tradingview.com/symbols/TVC-DXY\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.cnbc.com/quotes/.DXY\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bloomberg.com/quote/DXY:CUR\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://tradingeconomics.com/dxy:cur\"}"
+                }
+              ],
+              "tool_calls_count": 9,
+              "citations": [
+                "https://www.tradingview.com/symbols/FX-USDOLLAR",
+                "https://tradingeconomics.com/united-states/currency",
+                "https://www.marketwatch.com/investing/index/dxy?gaa_at=eafs&gaa_n=AWEtsqc5NIxWDivHqDTB6PNyi0yZkGKN-9zNRXWBziiF5CFhbnXMKN410fXO&gaa_sig=r3k0shhpCgCZaRDpqsFdICj-y_Bt27Tm2BGdLqu-THE6PATcddbKSyrwg2WlXhmXEVpGgJKt1_9Ttgdb0IIFJg%3D%3D&gaa_ts=69694418",
+                "https://tradingeconomics.com/dxy:cur",
+                "https://www.investing.com/indices/usdollar-news/48",
+                "https://www.barrons.com/market-data/indexes/dxy?gaa_at=eafs&gaa_n=AWEtsqd6I-MtpKuYrxDc-SIGVCPS0MOPnSO0wLPyO3GBioOC2d685oeWTI2U&gaa_sig=5DbpVO9bMg2kPVGJ0c0VN6I94zKSbR4y5wLnf1uO94k9L_aUXEixGfFCt7oA6MEO516L5aqWMdiaSZS6gEdPSQ%3D%3D&gaa_ts=69694418",
+                "https://www.tradingview.com/symbols/TVC-DXY/news",
+                "https://www.tradingview.com/symbols/ICEUS-DX1!",
+                "https://www.tradingview.com/symbols/TVC-DXY",
+                "https://www.tradingview.com/symbols/TVC-DXY/technicals",
+                "https://www.bloomberg.com/quote/DXY:CUR",
+                "https://www.barchart.com/stocks/quotes/$DXY/interactive-chart",
+                "https://www.investing.com/indices/usdollar-candlestick",
+                "https://finance.yahoo.com/quote/DX-Y.NYB",
+                "https://www.tradingview.com/symbols/PEPPERSTONE-USDX",
+                "https://www.tradingview.com/symbols/VANTAGE-USDX",
+                "https://www.investing.com/indices/usdollar-news",
+                "https://www.barchart.com/stocks/quotes/$DXY",
+                "https://www.cnbc.com/quotes/.DXY",
+                "https://www.tradingview.com/markets/currencies/indices-all",
+                "https://www.investing.com/indices/usdollar-historical-data",
+                "https://www.investing.com/indices/usdollar-technical",
+                "https://www.investing.com/currencies/us-dollar-index",
+                "https://es.investing.com/currencies/us-dollar-index",
+                "https://www.investing.com/indices/usdollar-news/85",
+                "https://www.investing.com/indices/usdollar",
+                "https://www.tradingview.com/symbols/EASYMARKETS-USXUSD/ideas?video=yes",
+                "https://www.tradingview.com/symbols/INDEX-DXY",
+                "https://www.investing.com/indices/usdollar-chart"
+              ],
+              "citations_count": 29,
+              "reasoning_tokens": 2619,
+              "total_tokens": 19456,
+              "estimated_cost": 0.0035675000000000004,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "web_search_with_snippets",
+                "browse_page",
+                "web_search"
+              ]
+            }
+          }
+        },
+        "macro_economics.cpi": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.20623207092285156,
+          "from_cache": true,
+          "data": {
+            "value": 2.7,
+            "release_date": "2026-01-13",
+            "previous_value": 2.7,
+            "interpretation": "CPI holds steady at 2.7% YoY, within 2-3% target range; neutral for Fed policy and crypto markets",
+            "signal": "neutral",
+            "fed_implications": "Fed likely to maintain current rates, no immediate cuts or hikes expected",
+            "_meta": {
+              "query_type": "cpi_inflation",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T16:01:04.783395",
+              "tool_calls": [
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"latest US CPI inflation BLS release\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"US CPI December 2025 BLS\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"Consumer Price Index\\\" site:bls.gov latest\",\"num_results\":5}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"US CPI January 2026 BLS\",\"num_results\":5}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bls.gov/news.release/cpi.nr0.htm\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bls.gov/cpi\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bls.gov/news.release/archives/cpi_01132026.htm\"}"
+                }
+              ],
+              "tool_calls_count": 7,
+              "citations": [
+                "https://www.usatoday.com/story/money/2026/01/13/annual-inflation-cpi-december-report/88133586007",
+                "https://democrats-budget.house.gov/news/press-releases/boyle-statement-december-cpi-inflation-release",
+                "https://www.usinflationcalculator.com/inflation/consumer-price-index-release-schedule",
+                "https://www.bls.gov/news.release/pdf/cpi.pdf",
+                "https://www.clevelandfed.org/indicators-and-data/inflation-nowcasting",
+                "https://www.bls.gov/schedule/news_release/current_year.asp",
+                "https://www.chase.com/personal/investments/learning-and-insights/article/cpi-report-december-2025",
+                "https://www.bls.gov/cpi/latest-numbers.htm",
+                "https://www.cbsnews.com/news/cpi-report-today-inflation-december-2025-tariffs",
+                "https://www.bls.gov/news.release/cpi.nr0.htm",
+                "https://www.bls.gov/news.release/archives/cpi_01132026.htm",
+                "https://www.cnn.com/2026/01/13/economy/us-cpi-consumer-prices-inflation-december",
+                "https://www.bls.gov/cpi",
+                "https://www.bls.gov/cpi/notices/2025/publication-changes-2026.htm",
+                "https://www.bls.gov/schedule/news_release/cpi.htm",
+                "https://www.bls.gov/news.release/cpi.htm",
+                "https://fred.stlouisfed.org/series/CPIAUCSL"
+              ],
+              "citations_count": 17,
+              "reasoning_tokens": 1220,
+              "total_tokens": 10690,
+              "estimated_cost": 0.0020448999999999997,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "browse_page",
+                "web_search"
+              ]
+            }
+          }
+        },
+        "macro_economics.nfp": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.21886825561523438,
+          "from_cache": true,
+          "data": {
+            "value": 50,
+            "release_date": "2026-01-09",
+            "previous_value": 56,
+            "unemployment_rate": 4.4,
+            "interpretation": "Weak job growth of 50k signals cooling labor market, likely dovish Fed pivot, bullish for crypto",
+            "signal": "bullish",
+            "economic_health": "weak",
+            "_meta": {
+              "query_type": "nfp_jobs",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T16:01:31.433260",
+              "tool_calls": [
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"latest US Nonfarm Payrolls NFP BLS site:bls.gov\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"Employment Situation\\\" BLS December 2025 OR January 2026\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"most recent Nonfarm Payrolls report release date BLS\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"US NFP jobs report January 2026 BLS\",\"num_results\":10}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bls.gov/news.release/empsit.nr0.htm\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bls.gov/news.release/pdf/empsit.pdf\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bls.gov/\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://www.bls.gov/news.release/empsit.t17.htm\"}"
+                }
+              ],
+              "tool_calls_count": 8,
+              "citations": [
+                "https://www.bls.gov/news.release/empsit.toc.htm",
+                "https://fred.stlouisfed.org/series/PAYEMS",
+                "https://www.bls.gov/charts/state-employment-and-unemployment/change-in-nonfarm-employment-by-state-map.htm",
+                "https://www.bls.gov/regions/mid-atlantic/data/xg-tables/ro3fx9584.htm",
+                "https://www.bls.gov/bls/2025-lapse-revised-release-dates.htm",
+                "https://www.bls.gov/",
+                "https://www.ihire.com/resourcecenter/employer/pages/the-december-2025-jobs-report-november-2025-jolts",
+                "https://www.bls.gov/schedule/news_release/current_year.asp",
+                "https://www.investing.com/economic-calendar/nonfarm-payrolls-227",
+                "https://www.bls.gov/news.release/pdf/empsit.pdf",
+                "https://equalsmoney.com/economic-calendar/events/us-employment-data",
+                "https://www.staffingindustry.com/research/research-reports/americas/january-2026-us-jobs-report",
+                "https://www.bls.gov/news.release/empsit.t17.htm",
+                "https://www.bls.gov/schedule/news_release/empsit.htm",
+                "https://www.forex.com/en/news-and-analysis/nfp-preview-is-there-actual-upside-potential-in-jobs",
+                "https://www.bls.gov/news.release/empsit.htm",
+                "https://www.bls.gov/ces",
+                "https://www.bls.gov/news.release/empsit.b.htm",
+                "https://www.dol.gov/newsroom/releases/osec/osec20260109",
+                "https://www.cnbc.com/2026/01/09/jobs-report-december-2025.html",
+                "https://www.americanprogress.org/article/december-jobs-day-closes-a-year-of-a-stalling-labor-market",
+                "https://kalshi.com/markets/kxpayrolls/jobs-numbers/kxpayrolls-26jan",
+                "https://tradingeconomics.com/united-states/non-farm-payrolls",
+                "https://www.hr-brew.com/stories/2026/01/09/labor-market-ends-year-weak",
+                "https://www.nj.gov/labor/lwdhome/press/2026/20260106_njtotalemployment.shtml",
+                "https://www.cpijobs.com/2026/01/12/january-2026-jobs-report",
+                "https://dbia.org/blog/u-s-job-growth-slows-at-the-end-of-2025-with-revisions-pointing-to-reduced-momentum",
+                "https://www.bls.gov/news.release/empsit.nr0.htm"
+              ],
+              "citations_count": 28,
+              "reasoning_tokens": 1243,
+              "total_tokens": 14604,
+              "estimated_cost": 0.0028609000000000004,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "browse_page",
+                "web_search"
+              ]
+            }
+          }
+        },
+        "onchain_analytics.btc_tvl": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.22912025451660156,
+          "from_cache": true,
+          "data": {
+            "tvl_usd": 7480000000,
+            "timestamp": "2026-01-15T12:00:00Z",
+            "change_24h_pct": 1.3,
+            "change_7d_pct": null,
+            "interpretation": "Bitcoin DeFi TVL stands at $7.48B, up 1.3% in 24h, led by restaking protocols like Babylon ($5.92B) and Lombard ($1.05B) showing positive 7d changes around 6%. Rising TVL signals increased BTC locking and reduced sell pressure.",
+            "signal": "bullish",
+            "trend": "increasing",
+            "_meta": {
+              "query_type": "btc_tvl",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T22:22:14.614279",
+              "tool_calls": [
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"Bitcoin TVL DefiLlama site:defillama.com\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"BTC TVL\\\" OR \\\"Bitcoin TVL\\\" DefiLlama\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"current Bitcoin DeFi TVL DefiLlama Dune\",\"num_results\":10}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"Total Value Locked\\\" Bitcoin DeFi\",\"num_results\":10}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://defillama.com/chain/Bitcoin\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://defillama.com/chains/bitcoin\"}"
+                },
+                {
+                  "tool": "browse_page",
+                  "args": "{\"url\": \"https://defillama.com/chain/bitcoin\"}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"Bitcoin DeFi TVL Dune Analytics dashboard\"}"
+                }
+              ],
+              "tool_calls_count": 8,
+              "citations": [
+                "https://defillama.com/chain/bitcoincash",
+                "https://coincub.com/best-crypto-analysis-tools",
+                "https://defillama.com/protocol/the-tokenized-bitcoin",
+                "https://dune.com/mackirfing/defi-dashboard-overview-a-real-time",
+                "https://www.21shares.com/en-us/insights/dune-dashboards",
+                "https://blog.0xpivot.com/sector-analysis-bitcoin-defi-part-1-a0a93baf707c",
+                "https://www.addressable.io/blog/crypt-tools-2025",
+                "https://thedefiant.io/news/defi/merlin-chain-s-surging-growth-pushes-bitcoin-s-defi-tvl-past-usd2b",
+                "https://defillama.com/bridged/bitcoin",
+                "https://defillama.com/protocol/wbtc",
+                "https://medium.com/@Ignas_defi_research/2022-state-of-defi-price-performance-tvl-trading-volume-development-activity-and-more-ad928813a070",
+                "https://www.nansen.ai/post/top-crypto-analytics-platforms-2025",
+                "https://www.nansen.ai/post/top-crypto-analytics-platforms-2025-guide",
+                "https://tokenterminal.com/explorer/metrics/tvl",
+                "https://defillama.com/chain/bitcoin",
+                "https://defillama.com/protocol/fiamma",
+                "https://defillama.com/protocol/unit",
+                "https://www.dune.com/zackmendel/defi-tvldefillama",
+                "https://algorand.co/blog/the-surprising-irrelevance-of-total-value-locked-tvl-on-cryptocurrency-returns",
+                "https://www.theblock.co/data/decentralized-finance/total-value-locked-tvl",
+                "https://defillama.com/protocol/binance-bitcoin",
+                "https://defiprime.com/defi-analytics",
+                "https://defillama.com/chains/bitcoin",
+                "https://defillama.com/chain/Bitcoin?tvl=true",
+                "https://x.com/CryptoRank_io/status/1851307512836112395",
+                "https://www.tradingview.com/symbols/BTC_TVL",
+                "https://www.dune.com/lombard_protocol/lombard",
+                "https://www.binance.com/en/square/post/15531547925569",
+                "https://defillama.com/",
+                "https://focusonbusiness.eu/en/news/total-value-locked-in-defi-soars-137-yoy-to-a-staggering-129-billion/6554",
+                "https://medium.com/@BizthonOfficial/dune-onchain-analytics-using-sql-0ec143835331",
+                "https://thedefiant.io/news/defi/makerdao-tops-tvl-charts",
+                "https://www.reddit.com/r/CryptoCurrency/comments/sd5qig/why_tvl_total_value_locked_is_important",
+                "https://www.binance.com/en/academy/glossary/total-value-locked-tvl",
+                "https://defillama.com/protocol/portal",
+                "https://web.ourcryptotalk.com/blog/top-10-dune-analytics-dashboards-for-navigating-web3-in-2025",
+                "https://medium.com/@orderlynetwork/what-are-bitcoin-layer-2-solutions-the-innovative-layer-with-broader-implications-for-defi-13a080ab33c1",
+                "https://www.dune.com/balancer/tvl",
+                "https://www.myetherwallet.com/blog/what-is-tvl-total-value-locked",
+                "https://www.tradingview.com/markets/cryptocurrencies/prices-highest-total-value-locked",
+                "https://www.dlnews.com/articles/llama-u/exploring-blockchains-with-defillama",
+                "https://defillama.com/chain/Bitcoin",
+                "https://dune.com/",
+                "https://defillama.com/dexs",
+                "https://defillama.com/chains"
+              ],
+              "citations_count": 45,
+              "reasoning_tokens": 2209,
+              "total_tokens": 15925,
+              "estimated_cost": 0.0029403,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "web_search",
+                "browse_page"
+              ]
+            }
+          }
+        },
+        "onchain_analytics.whale_activity": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.8335113525390625,
+          "from_cache": true,
+          "data": {
+            "symbol": "BTC/USDT",
+            "large_transfers_count": 25,
+            "exchange_inflows_usd": 1086560000,
+            "exchange_outflows_usd": 464030000,
+            "net_flow_usd": -622530000,
+            "interpretation": "In the last 24 hours, there were significant whale inflows to exchanges, particularly Coinbase Institutional, totaling over $1.08B USD (e.g., 1,733 BTC $165M, 1,957 BTC $189M). Outflows from exchanges to unknown wallets totaled $464M USD (e.g., multiple ~536 BTC batches from Coinbase ~$51M each, 999 BTC from Bitstamp $97M). Net inflow indicates distribution pattern with whales depositing large amounts potentially for selling. Short-term holders also sent substantial BTC to exchanges.",
+            "signal": "bearish",
+            "confidence": "high",
+            "_meta": {
+              "query_type": "whale_activity",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T22:23:20.018483",
+              "tool_calls": [
+                {
+                  "tool": "x_keyword_search",
+                  "args": "{\"query\":\"from:whale_alert (BTC OR Bitcoin OR \u20bf) since:2026-01-14\",\"limit\":50,\"mode\":\"Latest\"}"
+                },
+                {
+                  "tool": "x_keyword_search",
+                  "args": "{\"query\":\"(from:lookonchain OR from:spotonchain OR from:WhaleAlert) (BTC OR Bitcoin OR whale) since:2026-01-14\",\"limit\":30,\"mode\":\"Latest\"}"
+                },
+                {
+                  "tool": "x_semantic_search",
+                  "args": "{\"query\":\"large Bitcoin whale transfers to or from exchanges last 24 hours\",\"limit\":20,\"from_date\":\"2026-01-14\"}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"Bitcoin BTC whale large transactions transfers exchanges last 24 hours site:whale-alert.io OR site:dune.com OR site:glassnode.com OR site:cryptoquant.com\",\"num_results\":20}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"BTC\\\" \\\"whale\\\" \\\"transfer\\\" OR \\\"moved\\\" after:2026-01-14\",\"num_results\":20}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"current BTC USD price January 15 2026\"}"
+                }
+              ],
+              "tool_calls_count": 6,
+              "citations": [
+                "https://u.today/bitcoin-btc-price-analysis-for-january-15",
+                "https://x.com/i/status/2011454085522743539",
+                "https://x.com/i/status/2011812448882282533",
+                "https://coinswitch.co/switch/market-analysis/daily-whale-buying-transactions-report-15-january-2026",
+                "https://cryptoquant.com/insights/quicktake",
+                "https://cryptoquant.com/insights/quicktake/6898e4894e3d6a2c0d864715-Bitcoin-Bullish-as-Whale-Sized-USDT-Transfers-Disappear-From-TRON-Network",
+                "https://cryptoquant.com/asset/btc/chart/flow-indicator/exchange-whale-ratio",
+                "https://x.com/i/status/2011458254946316658",
+                "https://x.com/i/status/2011810601228534028",
+                "https://x.com/i/status/2011851642287554849",
+                "https://www.coindesk.com/price/bitcoin",
+                "https://x.com/i/status/2011838577047441546",
+                "https://x.com/i/status/2011447332701614156",
+                "https://x.com/i/status/2011837947943751787",
+                "https://x.com/i/status/2011345338364227828",
+                "https://bingx.com/en/news/post/binance-whale-btc-deposits-ease-in-january-ytd-inflows-total-btc",
+                "https://x.com/i/status/2011761087130010033",
+                "https://x.com/i/status/2011735579416019102",
+                "https://x.com/i/status/2011449996105637988",
+                "https://x.com/i/status/2011338473555575018",
+                "https://x.com/i/status/2011470590574571615",
+                "https://cryptoquant.com/insights/research",
+                "https://www.ainvest.com/news/bitcoin-whale-accumulation-structural-signal-2026-rallies-2601",
+                "https://x.com/i/status/2011605691736469724",
+                "https://x.com/i/status/2011808196395221131",
+                "https://x.com/i/status/2011243610147353056",
+                "https://x.com/i/status/2011856759288221756",
+                "https://bitflyer.com/en-us/bitcoin-chart",
+                "https://x.com/i/status/2011838225992552888",
+                "https://x.com/i/status/2011433197956178118",
+                "https://x.com/i/status/2011859842055491922",
+                "https://x.com/i/status/2011339288894464356",
+                "https://x.com/i/status/2011644103038300495",
+                "https://x.com/i/status/2011391498924032087",
+                "https://x.com/i/status/1998973903436394743",
+                "https://x.com/i/status/2011480341467255249",
+                "https://x.com/i/status/2011853424795467964",
+                "https://whale-alert.io/",
+                "https://x.com/i/status/2011921540653220245",
+                "https://x.com/i/status/2011342447302115553",
+                "https://x.com/i/status/2011467445916107153",
+                "https://x.com/i/status/2011869572962341037",
+                "https://x.com/i/status/2011830409928081625",
+                "https://x.com/i/status/2011905745772843072",
+                "https://cryptoquant.com/asset/btc/summary",
+                "https://x.com/i/status/2011300485903630829",
+                "https://twelvedata.com/markets/499377/crypto/coinbase-pro/btc-usd/historical-data",
+                "https://www.weex.com/news/detail/a-whale-has-closed-a-5x-hype-long-position-losing-approximately-718-million-311173",
+                "https://x.com/i/status/2011620010263757060",
+                "https://cryptopotato.com/bitcoin-enters-very-bullish-zone-as-large-holders-stack-btc",
+                "https://coinmarketcap.com/currencies/bitcoin/historical-data",
+                "https://x.com/i/status/2011696134033416224",
+                "https://x.com/i/status/2011832391468277924",
+                "https://x.com/Bitcoin/status/2011745737369940300",
+                "https://www.binance.com/en/square/post/01-14-2026-bitcoin-og-whales-show-decreased-activity-amid-market-changes-35069155468402",
+                "https://x.com/i/status/2011508223891652720",
+                "https://www.investing.com/crypto/bitcoin/historical-data",
+                "https://x.com/i/status/2011745176041947358",
+                "https://www.reddit.com/r/Bitcoin/comments/1qcybv3/old_miner_whale_moved_tons_of_btc_to_exchanges",
+                "https://x.com/i/status/2011812152827322520",
+                "https://cryptoquant.com/asset/btc",
+                "https://cryptoquant.com/asset/btc/chart/exchange-flows/exchange-netflow-total",
+                "https://x.com/i/status/2011344527127429627",
+                "https://x.com/i/status/2011815822990127418",
+                "https://tradingeconomics.com/btcusd:cur",
+                "https://x.com/i/status/2011445487753212047",
+                "https://x.com/i/status/2011507877031113209",
+                "https://x.com/i/status/2011834718250033268",
+                "https://x.com/i/status/2011744897183736276",
+                "https://cryptoquant.com/asset/btc/chart/exchange-flows",
+                "https://x.com/i/status/2011770545335943570",
+                "https://x.com/i/status/2011832952045342910",
+                "https://x.com/i/status/2011832668984340767",
+                "https://x.com/i/status/2011492514617049302",
+                "https://insights.glassnode.com/content/the-ultimate-guide-to-bitcoin-whales-2",
+                "https://x.com/i/status/2011843610262532307",
+                "https://www.cryptopolitan.com/bitcoin-sentiment-turns-bearish-btc-recovers",
+                "https://x.com/i/status/2011247682464202843",
+                "https://seekingalpha.com/article/4860170-whale-digital-asset-view-bitcoin-cycle-position-2026",
+                "https://earnpark.com/en/posts/whale-sell-off-sends-bitcoin-lowe",
+                "https://x.com/i/status/2011883100251291839",
+                "https://x.com/i/status/2011501187170734182",
+                "https://charts.bitbo.io/price",
+                "https://x.com/i/status/2011401195001196696"
+              ],
+              "citations_count": 84,
+              "reasoning_tokens": 4365,
+              "total_tokens": 30688,
+              "estimated_cost": 0.0054323,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "web_search",
+                "x_keyword_search",
+                "x_semantic_search"
+              ]
+            }
+          }
+        },
+        "sentiment_social.twitter_sentiment": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.23794174194335938,
+          "from_cache": true,
+          "data": {
+            "symbol": "BTC/USDT",
+            "sentiment_score": -0.08,
+            "sample_size": 150,
+            "bullish_ratio": 0.28,
+            "bearish_ratio": 0.31,
+            "neutral_ratio": 0.41,
+            "key_themes": [
+              "short signals",
+              "price consolidation around 95k",
+              "short squeeze potential",
+              "trading profits mixed",
+              "crash warnings vs support holds"
+            ],
+            "influencer_sentiment": "mixed",
+            "interpretation": "Mixed sentiment driven by numerous short signals from bots during pullback from 97k to 95k, offset by bullish profits, support holds, and whale accumulation narratives from engaged accounts.",
+            "signal": "neutral",
+            "confidence": "medium",
+            "_meta": {
+              "query_type": "twitter_sentiment",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T19:31:26.149139",
+              "tool_calls": [
+                {
+                  "tool": "x_keyword_search",
+                  "args": "{\"query\":\"\\\"BTC/USDT\\\" OR BTCUSDT OR \\\"BTC USDT\\\" since:2026-01-14\",\"limit\":100,\"mode\":\"Latest\"}"
+                },
+                {
+                  "tool": "x_keyword_search",
+                  "args": "{\"query\":\"\\\"BTC/USDT\\\" OR BTCUSDT OR \\\"BTC USDT\\\" since:2026-01-14\",\"limit\":50,\"mode\":\"Top\"}"
+                },
+                {
+                  "tool": "x_semantic_search",
+                  "args": "{\"query\":\"BTC/USDT price sentiment discussion\",\"limit\":50,\"from_date\":\"2026-01-14\"}"
+                },
+                {
+                  "tool": "code_execution",
+                  "args": "{\"code\":\"bull_words = ['bull', 'bullish', 'long', 'buy', 'moon', 'pump', 'breakout', 'up', 'profit', 'target high', 'higher', 'rise', 'rally', 'accumulate', 'support', 'hold', 'bounce', 'buying', 'green']\\nbear_words = ['bear', 'bearish', 'short', 'sell', 'dump', 'crash', 'breakdown', 'down', 'drop', 'fall', 'reject', 'red', 'crash', 'short signal']\\n\\ntexts = [\\n\\\"\ud83d\udcc9 BTCUSDT [15m] SHORT \uc2dc\uadf8\ub110!  \uac00\uaca9: 95474.6 \uc810\uc218: 5 (\uac15\ub3c4) \uc8fc\uc694\uadfc\uac70: SMA20\ud558\ud68c, \uc5ed\ubc30\uc5f4, Stoch\ubc14\ub2e5, CCI\uc57d\uc138, \uc77c\ubaa9\uc5ed\uc804 RSI: 35.6 | MFI: 38.9\\\",\\n\\\"#BTCUSDT  80 bin dolar dayken alt coinler ayn\u0131yd\u0131 95 bin dolar oldu yine ayn\u0131 aww\\\",\\n\\\"$BTC/USDT +10% PROFIT TP1 hit \u2705\\\",\\n\\\"$BTCUSDT +105% profits \ud83d\udcb5\ud83d\ude80 SHORT BTC/USDT Market Price Leverage: 10X TP: 94000 SL: 97,600\\\",\\n\\\"\ud83d\udd34 Bearish BTC Symbol: BTC/USDT Timeframe: 4h Price: 95722.01\\\",\\n\\\"BTCUSDT ve BNBUSDT Kripto taraf\u0131nda bir k\u0131p\u0131rdanmalar var. Yerimizi alal\u0131m ufaktan.\\\",\\n\\\"\ud83d\udea8 $BTC BIG CRASH Expected After Jan 19, 2026! Current Price: $95,912\\\",\\n\\\"Btc 94470 kaybetmezse yukar\u0131 devam eder diye d\u00fc\u015f\u00fcn\u00fcyorum. Buras\u0131 kaybedilirse 89-84-74500\\\",\\n\\\"I forgot about this BTCUSDT Called this trade live on my Yt 16RR\\\",\\n\\\"BTC/USDT SHORT SHORT SHORT OPEN MARKET PRICE \ud835\udde7\ud835\uddd4\ud835\uddde\ud835\uddd8 \ud835\udde3\ud835\udde5\ud835\udde2\ud835\uddd9\ud835\udddc\ud835\udde7 89,700\\\",\\n\\\"Allahtan $Btc d\u00fc\u015fmedi. Bir de Btc y\u0131k\u0131l\u0131rsa burdan ferman\u0131m\u0131z yaz\u0131l\u0131r heral.\\\",\\n\\\"[BTCUSDT, 1h] Breakout (Down) from Bollinger Band\\\",\\n\\\"#BTCUSDT Update: Catch that move early! A short to $94,511 is in play\\\",\\n\\\"$BTCUSDT SHORT RR : 2 LEVERAGE : 50x ENTRY : 96,331.5 TAKE PROFITS 1\ufe0f\u20e3 95,351.6\\\",\\n\\\"BTC/USDT SHORT SHORT SHORT OPEN MARKET PRICE \ud835\udde7\ud835\uddd4\ud835\uddde\ud835\uddd8 \ud835\udde3\ud835\udde5\ud835\udde2\ud835\uddd9\ud835\udddc\ud835\udde7 89,700\\\",\\n\\\"Im Short #btcusdt\\\",\\n\\\"long the dip 101k on the charts ! #BTCUSDT\\\",\\n\\\"#Bitcoin has a Falling Wedge chart pattern on the 1h chart. Overall: Bullish. Price Target: $98,635.\\\",\\n\\\"Bitcoin 97.100$ seviyesinin \u00fczerine \u00e7\u0131karsa, 1 milyar dolar\u0131n \u00fczerinde SHORT pozisyon #Liq olacak.\\\",\\n\\\"#BTCUSDT rising channel. Diren\u00e7 \u00fcst\u00fc kal\u0131c\u0131l\u0131k sa\u011flanmas\u0131 halinde y\u00fckseli\u015fin devam\u0131 beklenebilir.\\\",\\n\\\"looks like we might head higher soon - #bitcoin retested the trendline again, and seems that this might be a confirmed support now. Next targets $99k, $101k, $108k.\\\",\\n\\\"$BTC +7% Profit,So Far\u2705 +108K Soon\ud83d\udcc8\u270d\ufe0f #BTC #BTCUSDT #Bitcoin\\\",\\n\\\"$BTC is Rejecting 3rd Time From Top Looks Like Dump is Coming\\\",\\n\\\"BTC / USDT Update \ud83d\udcc8 We finally broke out of the 2-month consolidation box. But caution is needed before getting too bullish.\\\",\\n\\\"$BTC/USDT gave a strong break of the resistance area with a good closing in Daily candle.\\\",\\n\\\"$BTC / USDT ( UPDATE ) Bitcoin reclaims 96000$ following a bounce sub 85000$.\\\",\\n\\\"BTC dominance and USDT dominance are meeting at the same trend line again.\\\",\\n\\\"$BTC finally reached the green zone \u2705 first rejection and then retesting the latest breakout area around $89k.\\\",\\n\\\"$BTC/usdt WEEKLY Bears and 4 year cyclers aren't gonna like this chart \ud83e\udd23\ud83e\udd23\\\"\\n]\\n\\ndef analyze_sentiment(text):\\n    text_lower = text.lower()\\n    bull_count = sum(1 for word in bull_words if word in text_lower)\\n    bear_count = sum(1 for word in bear_words if word in text_lower)\\n    total = bull_count + bear_count\\n    if total == 0:\\n        return 0, 'neutral'\\n    score = (bull_count - bear_count) / total\\n    if score > 0.2:\\n        label = 'bullish'\\n    elif score < -0.2:\\n        label = 'bearish'\\n    else:\\n        label = 'neutral'\\n    return score, label\\n\\nresults = []\\nbull = 0\\nbear = 0\\nneutral = 0\\ntotal_score = 0\\n\\nfor text in texts:\\n    score, label = analyze_sentiment(text)\\n    results.append((text[:50] + '...', score, label))\\n    total_score += score\\n    if label == 'bullish':\\n        bull += 1\\n    elif label == 'bearish':\\n        bear += 1\\n    else:\\n        neutral += 1\\n\\navg_score = total_score / len(texts)\\nbull_ratio = bull / len(texts)\\nbear_ratio = bear / len(texts)\\nneutral_ratio = neutral / len(texts)\\n\\nprint(f\\\"Average score: {avg_score}\\\")\\nprint(f\\\"Bullish: {bull_ratio}, Bearish: {bear_ratio}, Neutral: {neutral_ratio}\\\")\\nprint(\\\"Classifications:\\\")\\nfor r in results:\\n    print(r)\\n\"}"
+                }
+              ],
+              "tool_calls_count": 4,
+              "citations": [
+                "https://x.com/i/status/2011869641791148161",
+                "https://x.com/i/status/2011845605677539750",
+                "https://x.com/i/status/2011863436242628761",
+                "https://x.com/i/status/2011861659166380197",
+                "https://x.com/i/status/2011845598664593779",
+                "https://x.com/i/status/2011843713006203173",
+                "https://x.com/i/status/2011874472526270789",
+                "https://x.com/i/status/2011238806020899104",
+                "https://x.com/i/status/2011318972780863832",
+                "https://x.com/i/status/2011873595547345016",
+                "https://x.com/i/status/2011853393208422685",
+                "https://x.com/i/status/2011718041621447141",
+                "https://x.com/i/status/2011664674262339589",
+                "https://x.com/i/status/2011868493592084846",
+                "https://x.com/i/status/2011750793767252441",
+                "https://x.com/i/status/2011718029496008833",
+                "https://x.com/i/status/2011429866261151987",
+                "https://x.com/i/status/2011496968049078558",
+                "https://x.com/i/status/2011881945391931854",
+                "https://x.com/i/status/2011859471723626979",
+                "https://x.com/i/status/2003347037128130779",
+                "https://x.com/i/status/2011332865968259491",
+                "https://x.com/i/status/2011324563657998608",
+                "https://x.com/i/status/2011867222998937667",
+                "https://x.com/i/status/2011845851141062959",
+                "https://x.com/i/status/2011737823146287166",
+                "https://x.com/i/status/2011858981116133584",
+                "https://x.com/i/status/2011761295121358851",
+                "https://x.com/i/status/2011402711540129876",
+                "https://x.com/i/status/2011882141123297693",
+                "https://x.com/i/status/2011367338608873827",
+                "https://x.com/i/status/2011859822442906065",
+                "https://x.com/i/status/2011786163141447700",
+                "https://x.com/i/status/2011302714190581862",
+                "https://x.com/i/status/2011878772900053112",
+                "https://x.com/i/status/2011227354803421297",
+                "https://x.com/i/status/2011877329350385902",
+                "https://x.com/i/status/2011302062416609318",
+                "https://x.com/i/status/2011666091987386689",
+                "https://x.com/i/status/2006993324243300558",
+                "https://x.com/i/status/2011434510098059405",
+                "https://x.com/i/status/2011442333355594032",
+                "https://x.com/i/status/2011642875193561180",
+                "https://x.com/i/status/2011866254706164145",
+                "https://x.com/i/status/2011853151473742245",
+                "https://x.com/i/status/2011857738469712199",
+                "https://x.com/i/status/2011287180639977805",
+                "https://x.com/i/status/2011857318045237253",
+                "https://x.com/i/status/2011849302377627982",
+                "https://x.com/i/status/2011877027843096976",
+                "https://x.com/i/status/2011696214153347434",
+                "https://x.com/i/status/2011871084870844695",
+                "https://x.com/i/status/2011320206191141061",
+                "https://x.com/i/status/2011840222565450231",
+                "https://x.com/i/status/2009649551792337227",
+                "https://x.com/i/status/2011454966821773661",
+                "https://x.com/i/status/2011877226430808420",
+                "https://x.com/i/status/2011335820616376507",
+                "https://x.com/i/status/2011863049347436843",
+                "https://x.com/i/status/2011872267496837472",
+                "https://x.com/i/status/2011718020524360133",
+                "https://x.com/i/status/2011864319806283790",
+                "https://x.com/i/status/2011877867223990362",
+                "https://x.com/i/status/2011857057734148430",
+                "https://x.com/i/status/2011691703111991509",
+                "https://x.com/i/status/2011484501726421258",
+                "https://x.com/i/status/2011821173856731602",
+                "https://x.com/i/status/2011843731322728784",
+                "https://x.com/i/status/2011393062988029987",
+                "https://x.com/i/status/2011489159643537678",
+                "https://x.com/i/status/2011854151332888814",
+                "https://x.com/i/status/2011863092309999665",
+                "https://x.com/i/status/2011863295955726777",
+                "https://x.com/i/status/2011843705917829451",
+                "https://x.com/i/status/2011313477345034583",
+                "https://x.com/i/status/2011523624751284237",
+                "https://x.com/i/status/2011883219600490997",
+                "https://x.com/i/status/2011878560336605676",
+                "https://x.com/i/status/2011877546854662312",
+                "https://x.com/i/status/2011853267915985228",
+                "https://x.com/i/status/2011708794812973145",
+                "https://x.com/i/status/2011827046314320217",
+                "https://x.com/i/status/2011845604721283437",
+                "https://x.com/i/status/2011845592192786749",
+                "https://x.com/i/status/2011876042810839282",
+                "https://x.com/i/status/2011872687887642869",
+                "https://x.com/i/status/2011866149324284338",
+                "https://x.com/i/status/2011395935348072737",
+                "https://x.com/i/status/2011855591602602280",
+                "https://x.com/i/status/2011305401850204392",
+                "https://x.com/i/status/2011880230609436853",
+                "https://x.com/i/status/2011375900399722550",
+                "https://x.com/i/status/2011394702634049977",
+                "https://x.com/i/status/2010492164468269310",
+                "https://x.com/i/status/2011112989605441825",
+                "https://x.com/i/status/2011588399850012938",
+                "https://x.com/i/status/2011856101629735372",
+                "https://x.com/i/status/2011674658723283235",
+                "https://x.com/i/status/2011437680471781602",
+                "https://x.com/i/status/2011853531142123882",
+                "https://x.com/i/status/2011876416120352825",
+                "https://x.com/i/status/2011846613862662535",
+                "https://x.com/i/status/2011445732310405393",
+                "https://x.com/i/status/2011314748709871736",
+                "https://x.com/i/status/2011861239639552028",
+                "https://x.com/i/status/2004111519831961852",
+                "https://x.com/i/status/2011333583625990241",
+                "https://x.com/i/status/2011296639378735276",
+                "https://x.com/i/status/2011881082254455107",
+                "https://x.com/i/status/2011587294709628952",
+                "https://x.com/i/status/2011474784782049419",
+                "https://x.com/i/status/1992565998072029257",
+                "https://x.com/i/status/2011351285988261929",
+                "https://x.com/i/status/1986837646082195582",
+                "https://x.com/i/status/2011345104213328373",
+                "https://x.com/i/status/2011381884195127591",
+                "https://x.com/i/status/2011455686635360419",
+                "https://x.com/i/status/2011699933372678601",
+                "https://x.com/i/status/2011411520064766008",
+                "https://x.com/i/status/2011230280875720913",
+                "https://x.com/i/status/2011362392085823805",
+                "https://x.com/i/status/2011843739455521070",
+                "https://x.com/i/status/2011861382312968450",
+                "https://x.com/i/status/2011819197559349632",
+                "https://x.com/i/status/2011826454024073677",
+                "https://x.com/i/status/2011412484595310613",
+                "https://x.com/i/status/1994203309448589739",
+                "https://x.com/i/status/2011335386023481476",
+                "https://x.com/i/status/2011321485672268267",
+                "https://x.com/i/status/2011838425830158412",
+                "https://x.com/i/status/2011304413521199473",
+                "https://x.com/i/status/2011843698649100689",
+                "https://x.com/i/status/2011263657414627418",
+                "https://x.com/i/status/2011873642045718901",
+                "https://x.com/i/status/2011844207917613367",
+                "https://x.com/i/status/2011228652789452927",
+                "https://x.com/i/status/2011321291647955245",
+                "https://x.com/i/status/2011774114160140575",
+                "https://x.com/i/status/2011880381411443091",
+                "https://x.com/i/status/2011294785404092726",
+                "https://x.com/i/status/2011314812794650675",
+                "https://x.com/i/status/2011882843140674029",
+                "https://x.com/i/status/2001248688438665270",
+                "https://x.com/i/status/2011396220250718305",
+                "https://x.com/i/status/2011865028748525835",
+                "https://x.com/i/status/2011362829673365993",
+                "https://x.com/i/status/2011864021578760451",
+                "https://x.com/i/status/2011771472675520901",
+                "https://x.com/i/status/2011878588270948627",
+                "https://x.com/i/status/2011577109446357239",
+                "https://x.com/i/status/2011689612419248239",
+                "https://x.com/i/status/2011852882191204438",
+                "https://x.com/i/status/2011755101271310363",
+                "https://x.com/i/status/2011810713744949508",
+                "https://x.com/i/status/2011087413884698849",
+                "https://x.com/i/status/2011299471767015683",
+                "https://x.com/i/status/2011844363278594248",
+                "https://x.com/i/status/2011879817059451341",
+                "https://x.com/i/status/2011847281600053579",
+                "https://x.com/i/status/2011309031709950401",
+                "https://x.com/i/status/2011343810781995178",
+                "https://x.com/i/status/2011347460808187907",
+                "https://x.com/i/status/2011873770642825400",
+                "https://x.com/i/status/2011338836953960760",
+                "https://x.com/i/status/2011868787818004893",
+                "https://x.com/i/status/2011727635450114513",
+                "https://x.com/i/status/2011310776733385155",
+                "https://x.com/i/status/2011495920555475262",
+                "https://x.com/i/status/2011349682539413795",
+                "https://x.com/i/status/2011256668785344576",
+                "https://x.com/i/status/2011400328462123386",
+                "https://x.com/i/status/2011838332645568557",
+                "https://x.com/i/status/2006613895759437920",
+                "https://x.com/i/status/2011411294147223848",
+                "https://x.com/i/status/2011703014969786850",
+                "https://x.com/i/status/2011498553806323869",
+                "https://x.com/i/status/2011883400580460781",
+                "https://x.com/i/status/2007607977021452466",
+                "https://x.com/i/status/2011872768523141159",
+                "https://x.com/i/status/2011333158722290067",
+                "https://x.com/i/status/2011867764915322891",
+                "https://x.com/i/status/2011856653893976547",
+                "https://x.com/i/status/2011333198421074284",
+                "https://x.com/i/status/2011411064236486890",
+                "https://x.com/i/status/2011520570937262274",
+                "https://x.com/i/status/2011457960535642295",
+                "https://x.com/i/status/2011361423213973979",
+                "https://x.com/i/status/2011860942859186225",
+                "https://x.com/i/status/2011846182708908068",
+                "https://x.com/i/status/2011882055689519494",
+                "https://x.com/i/status/2011788649667657973",
+                "https://x.com/i/status/2011875027998658754",
+                "https://x.com/i/status/2011282588691001597",
+                "https://x.com/i/status/2011457969691709448",
+                "https://x.com/i/status/2011883592696385773",
+                "https://x.com/i/status/2011860939914821942"
+              ],
+              "citations_count": 196,
+              "reasoning_tokens": 2835,
+              "total_tokens": 120745,
+              "estimated_cost": 0.0240587,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "x_semantic_search",
+                "x_keyword_search",
+                "code_execution"
+              ]
+            }
+          }
+        },
+        "news_regulatory.crypto_news": {
+          "status": "OK",
+          "source": "cache",
+          "latency_ms": 0.20647048950195312,
+          "from_cache": true,
+          "data": {
+            "symbol": "BTC/USDT",
+            "headlines": [
+              {
+                "title": "BTC Tapped New 2026 Highs Above $97K with Bullish Derivatives and On-Chain Signals",
+                "source": "X (@Defi_Edward)",
+                "url": "https://x.com/Defi_Edward/status/2011772134763221174",
+                "published": "2026-01-15T12:07:08Z",
+                "sentiment": "bullish",
+                "importance": "high",
+                "category": "market"
+              },
+              {
+                "title": "Data: BTC Breaks Through $97,000 Trading at $97,009.70 Up 2.10%",
+                "source": "X (@Telbloggram)",
+                "url": "https://x.com/Telbloggram/status/2011768026933445098",
+                "published": "2026-01-15T11:50:49Z",
+                "sentiment": "bullish",
+                "importance": "high",
+                "category": "market"
+              },
+              {
+                "title": "BTC Squeezing into Stacked Liquidations with Short-Side Risk Above $97K",
+                "source": "X (@IT_Tech_PL)",
+                "url": "https://x.com/IT_Tech_PL/status/2011710170779554087",
+                "published": "2026-01-15T08:00:55Z",
+                "sentiment": "neutral",
+                "importance": "high",
+                "category": "market"
+              },
+              {
+                "title": "Bitcoin USDT Price Sitting on Key Trend Line Support That Has Held Multiple Times",
+                "source": "X (@CryptooELITES)",
+                "url": "https://x.com/CryptooELITES/status/2011727635450114513",
+                "published": "2026-01-15T09:10:19Z",
+                "sentiment": "neutral",
+                "importance": "medium",
+                "category": "market"
+              },
+              {
+                "title": "BTC Rejects from Upper Supply Zone, Sellers in Control Below Key Range",
+                "source": "X (@DeadSeaTrader)",
+                "url": "https://x.com/DeadSeaTrader/status/2011828560604848613",
+                "published": "2026-01-15T15:51:21Z",
+                "sentiment": "bearish",
+                "importance": "medium",
+                "category": "market"
+              }
+            ],
+            "overall_sentiment": "mixed",
+            "high_importance_count": 3,
+            "interpretation": "BTC/USDT hit new 2026 highs above $97k amid bullish technicals and short squeeze potential, but now consolidating with rejection risks and support tests around $95k-$96k.",
+            "signal": "neutral",
+            "_meta": {
+              "query_type": "crypto_news",
+              "symbol": "BTC/USDT",
+              "timestamp": "2026-01-15T21:01:20.380362",
+              "tool_calls": [
+                {
+                  "tool": "x_keyword_search",
+                  "args": "{\"query\":\"(BTC OR $BTC OR Bitcoin) (USDT OR \\\"USDT\\\" OR Tether OR price OR pump OR dump) since:2026-01-15_06:00:00_UTC (news OR breaking OR alert) min_faves:5 filter:links -filter:replies\",\"limit\":30,\"mode\":\"Latest\"}"
+                },
+                {
+                  "tool": "x_semantic_search",
+                  "args": "{\"query\":\"breaking news BTC USDT price movement market update\",\"limit\":20,\"from_date\":\"2026-01-15\",\"min_score_threshold\":0.2}"
+                },
+                {
+                  "tool": "x_keyword_search",
+                  "args": "{\"query\":\"(BTC OR Bitcoin OR $BTC) USDT (breaking OR news OR update OR \\\"price action\\\") since:2026-01-15_06:00:00_UTC from:coindesk OR from:cointelegraph OR from:WhaleAlert OR from:cz_binance OR from:BitcoinMagazine min_faves:10\",\"limit\":10,\"mode\":\"Latest\"}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"\\\"BTC/USDT\\\" OR \\\"Bitcoin USDT\\\" breaking news OR update last 6 hours site:coindesk.com OR site:cointelegraph.com OR site:theblock.co OR site:decrypt.co OR site:cryptoslate.com OR site:news.bitcoin.com\",\"num_results\":15}"
+                },
+                {
+                  "tool": "web_search",
+                  "args": "{\"query\":\"BTC USDT latest news past 6 hours\",\"num_results\":20}"
+                },
+                {
+                  "tool": "web_search_with_snippets",
+                  "args": "{\"query\":\"BTC/USDT breaking news last 6 hours\"}"
+                }
+              ],
+              "tool_calls_count": 6,
+              "citations": [
+                "https://x.com/i/status/2011768026933445098",
+                "https://www.barchart.com/crypto/quotes/%5EBTCUSDT/news",
+                "https://www.coindesk.com/price/btc/markets?city=Miami&country=US&countryRegion=FL&currencyCode=USD&currencyName=United+States+dollar&currencySymbol=%24&locale=en&oficialCountryName=United+States+of+America&page=6&region=iad1&rw_allowed=false&rw_limit=3&rw_plan=3-plan&rw_remaining=3&rw_state=enabled&subregion=North+America&viewport=mobile",
+                "https://x.com/i/status/2011708794812973145",
+                "https://x.com/i/status/2011828560604848613",
+                "https://x.com/i/status/2011622888055714174",
+                "https://cryptoslate.com/news/page/1330?fbclid=IwAR1JGPZXNIGsV0kPimWSEb8vl4HDkZ8jX0Di0nocvh4DWO1JEdrk0T-ErqI%252Ccryptoslate_com%252Fnews%252Fpage%252F%257Bnum%257D%253Ffbclid%252Ccryptoslate_com%252C0_016755877%255C%255C%255C%2527",
+                "https://www.coindesk.com/tag/price-drop",
+                "https://www.coindesk.com/tag/pull-back",
+                "https://www.tradingview.com/symbols/BTCUSDT/news",
+                "https://x.com/i/status/2011811679760166967",
+                "https://www.tradingview.com/symbols/BTCUSD",
+                "https://x.com/i/status/2011780342034940065",
+                "https://www.coindesk.com/business/2025/09/06/bitcoin-and-stablecoins-dominate-as-india-u-s-top-2025-crypto-adoption-index",
+                "https://x.com/i/status/2011736364770107629",
+                "https://www.cryptocompare.com/coins/btc/overview",
+                "https://www.investing.com/crypto/bitcoin/btc-usdt",
+                "https://finance.yahoo.com/quote/USDT-BTC",
+                "https://www.coindesk.com/price/btc/markets?country=US&currencyCode=USD&currencyName=United+States+dollar&currencySymbol=%24&locale=en&oficialCountryName=United+States+of+America&page=1&region=cle1&rw_allowed=false&rw_limit=3&rw_plan=3-plan&rw_remaining=3&rw_state=enabled&subregion=North+America&viewport=mobile",
+                "https://x.com/i/status/2011703014969786850",
+                "https://x.com/i/status/2011782903248699750",
+                "https://www.coingecko.com/en/coins/bitcoin",
+                "https://www.barchart.com/crypto/quotes/%5EBTCUSDT",
+                "https://x.com/i/status/2011710170779554087",
+                "https://www.cryptometer.io/data/binance/btc/usdt",
+                "https://coinmarketcap.com/currencies/bitcoin",
+                "https://x.com/i/status/2011772134763221174",
+                "https://www.newsnow.com/us/Business/Cryptocurrencies/Bitcoin",
+                "https://x.com/i/status/2011840222565450231",
+                "https://x.com/i/status/2011875027998658754",
+                "https://www.tradingview.com/symbols/BTCUSDT",
+                "https://www.binance.com/en/square/hashtag/btcusdt.",
+                "https://x.com/i/status/2011618346656018704",
+                "https://x.com/i/status/2011738007850901826",
+                "https://www.tradingview.com/symbols/BTCUSDT.P/ideas?sort=recent&video=yes",
+                "https://www.coindesk.com/tag/the-defiant",
+                "https://x.com/i/status/2011803865663131808",
+                "https://x.com/i/status/2011802932958621739",
+                "https://finance.yahoo.com/quote/BTC-USD",
+                "https://x.com/i/status/2011885372158923006",
+                "https://www.google.com/finance/quote/BTC-USDT?hl=en",
+                "https://www.coindesk.com/markets/2026/01/07/rumble-shares-jump-5-after-launching-crypto-wallet-with-tether",
+                "https://x.com/i/status/2011674658723283235",
+                "https://x.com/i/status/2011888701304160297",
+                "https://x.com/i/status/2011727635450114513",
+                "https://www.coindesk.com/tag/export",
+                "https://x.com/i/status/2011861480560361682",
+                "https://www.coindesk.com/tag/grid-news"
+              ],
+              "citations_count": 48,
+              "reasoning_tokens": 3276,
+              "total_tokens": 22224,
+              "estimated_cost": 0.0041121000000000005,
+              "model": "grok-4-1-fast",
+              "tools_used": [
+                "x_semantic_search",
+                "web_search_with_snippets",
+                "x_keyword_search",
+                "web_search"
+              ]
+            }
+          }
+        }
+      },
+      "summary": {
+        "total": 11,
+        "success": 11,
+        "errors": 0,
+        "error_list": []
+      }
+    }
+  },
+  "overall_summary": {
+    "total_data_points": 32,
+    "successful": 32,
+    "errors": 0,
+    "success_rate": "100.0%"
+  }
+}

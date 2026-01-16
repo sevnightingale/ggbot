@@ -641,6 +641,43 @@ export class ApiClient {
     return await response.json()
   }
 
+  // Usage Summary (for UserProfile display)
+  async getUsageSummary(): Promise<{
+    period: string
+    usage_usd: number
+    credits_usd: number | null
+    net_balance_usd: number | null
+    updated_at: string
+    cached: boolean
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/usage/me`)
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to get usage summary')
+    }
+
+    return await response.json()
+  }
+
+  // Per-Bot Usage (for ActivationBar display)
+  async getConfigUsage(configId: string): Promise<{
+    config_id: string
+    config_name: string
+    period: string
+    period_usage_usd: number
+    today_usage_usd: number
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/usage/config/${configId}`)
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to get config usage')
+    }
+
+    return await response.json()
+  }
+
   // Purchase Credits via Stripe
   async purchaseCredits(amountCents: number): Promise<{ checkout_url: string }> {
     const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/credits/purchase`, {

@@ -1,8 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
-import { Clock, Play, PauseCircle, Zap, Crown, Trophy, CheckCircle } from 'lucide-react'
-import { BotConfiguration } from '@/lib/api'
+import React, { useState, useEffect } from 'react'
+import { Clock, Play, PauseCircle, Zap, Crown, Trophy, CheckCircle, Coins } from 'lucide-react'
+import { BotConfiguration, apiClient } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
@@ -73,6 +73,52 @@ export function ActivationBar({
   const isRegisteredForArena = selectedBot.is_public_performance === true
   const isPaperTrading = selectedBot.trading_mode === 'paper' || !selectedBot.trading_mode
 
+  // Fetch config usage for cost display
+  const [configUsage, setConfigUsage] = useState<{
+    period_usage_usd: number
+    today_usage_usd: number
+  } | null>(null)
+
+  useEffect(() => {
+    const fetchConfigUsage = async () => {
+      try {
+        const usage = await apiClient.getConfigUsage(selectedBot.config_id)
+        setConfigUsage({
+          period_usage_usd: usage.period_usage_usd,
+          today_usage_usd: usage.today_usage_usd
+        })
+      } catch (err) {
+        // Non-critical - just don't show usage if it fails
+        console.debug('Could not fetch config usage:', err)
+      }
+    }
+
+    fetchConfigUsage()
+    // Refresh every 5 minutes while component is mounted
+    const interval = setInterval(fetchConfigUsage, 5 * 60 * 1000)
+    return () => clearInterval(interval)
+  }, [selectedBot.config_id])
+
+  // Calculate average daily cost
+  const getAvgDailyCost = (): string | null => {
+    if (!configUsage) return null
+
+    const dayOfMonth = new Date().getDate()
+
+    if (dayOfMonth === 1) {
+      // First day of month - just show today's usage
+      return configUsage.today_usage_usd > 0
+        ? `$${configUsage.today_usage_usd.toFixed(2)} today`
+        : null
+    } else {
+      // Day 2+: show average
+      const avgDaily = configUsage.period_usage_usd / dayOfMonth
+      return avgDaily > 0.001
+        ? `~$${avgDaily.toFixed(2)}/day`
+        : null
+    }
+  }
+
   const handleActivate = () => {
     if (!canAccess('bot_activation')) {
       setUpgradeModalOpen(true)
@@ -130,13 +176,21 @@ export function ActivationBar({
 
           {/* Right: Controls */}
           <div className="flex items-center justify-center lg:justify-end gap-3 flex-wrap">
-            {/* Countdown */}
-            {countdown && !isSignalDriven && (
-              <div className="flex items-center gap-1 text-xs text-[var(--text-muted)]">
-                <Clock className="h-4 w-4" />
-                <span>{countdown}</span>
-              </div>
-            )}
+            {/* Countdown & Cost */}
+            <div className="flex items-center gap-3 text-xs text-[var(--text-muted)]">
+              {countdown && !isSignalDriven && (
+                <div className="flex items-center gap-1">
+                  <Clock className="h-4 w-4" />
+                  <span>{countdown}</span>
+                </div>
+              )}
+              {getAvgDailyCost() && (
+                <div className="flex items-center gap-1" title="Average daily LLM cost for this bot">
+                  <Coins className="h-3.5 w-3.5" />
+                  <span>{getAvgDailyCost()}</span>
+                </div>
+              )}
+            </div>
 
             {/* Action Buttons */}
             <div className="flex items-center gap-2">

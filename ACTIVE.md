@@ -1,59 +1,59 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-13 11:26:10 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-15 22:08:24 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 279
+- **Total Users**: 288
 - **Pro Users (ggbase)**: 0 (0 active subscriptions)
-- **Free Users**: 271
-- **Users with Bots**: 272 (97.5%)
+- **Free Users**: 277
+- **Users with Bots**: 281 (97.6%)
 
 ### Bot Statistics
-- **Total Bots**: 410
-- **Active Bots**: 8 (2.0%)
-  - Paper: 8
+- **Total Bots**: 420
+- **Active Bots**: 11 (2.6%)
+  - Paper: 11
   - Symphony (Live): 0
   - Aster (DEX): 0
-- **Inactive Bots**: 402
+- **Inactive Bots**: 409
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,700
-  - Wins: 1,746
-  - Losses: 3,954
-  - Platform Win Rate: 30.63%
-  - Total P&L: $-15,873.78
+- **Total Trades (All Time)**: 5,727
+  - Wins: 1,763
+  - Losses: 3,964
+  - Platform Win Rate: 30.78%
+  - Total P&L: $-16,749.47
 - **Recent Activity**:
-  - Last 24 hours: 6 trades
-  - Last 7 days: 174 trades
-  - Last 30 days: 528 trades
+  - Last 24 hours: 11 trades
+  - Last 7 days: 109 trades
+  - Last 30 days: 557 trades
 
 ### Open Positions
-- **Open Positions**: 5
+- **Open Positions**: 7
 - **Unique Symbols**: 1
-- **Total Exposure**: $67,689.56
-- **Unrealized P&L**: $32.01
+- **Total Exposure**: $123,891.83
+- **Unrealized P&L**: $412.78
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,932.83
+- **Average Balance**: $9,932.35
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $11,382.11
+- **Highest Balance**: $11,062.74
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 8 bots
+- **BTC/USDT**: 11 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 95 decisions (avg confidence: 44.0%)
-- **enter**: 39 decisions (avg confidence: 71.3%)
-- **exit**: 7 decisions (avg confidence: 62.0%)
+- **wait**: 410 decisions (avg confidence: 31.7%)
+- **enter**: 11 decisions (avg confidence: 61.8%)
+- **exit**: 7 decisions (avg confidence: 65.0%)
 
 ### System Health
-- **Decisions (last hour)**: 7
+- **Decisions (last hour)**: 17
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -62,21 +62,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 19MB | 6d 0h | 1 |
-| error-alerts | 🟢 online | 0.1% | 22MB | 6d 0h | 1 |
-| market-data-ws | 🟢 online | 2.1% | 22MB | 6d 0h | 1 |
-| ggbot | 🟢 online | 4.1% | 388MB | 3h 9m | 21 |
-| account-monitor | 🟢 online | 0.3% | 163MB | 14h 4m | 14 |
+| signal-listener | 🟢 online | 0% | 20MB | 2d 8h | 2 |
+| error-alerts | 🟢 online | 0% | 22MB | 2d 8h | 2 |
+| market-data-ws | 🟢 online | 1.3% | 144MB | 2d 8h | 2 |
+| ggbot | 🟢 online | 2.1% | 639MB | 1d 18h | 23 |
+| account-monitor | 🟢 online | 0.3% | 92MB | 2d 8h | 15 |
 
 ### VM Resources
 
-- **Disk**: 42G / 78G (55%)
-- **Memory**: 1.7Gi / 3.8Gi
-- **CPU Load**: 0.64 / 0.30 / 0.22 (1m/5m/15m)
+- **Disk**: 43G / 78G (56%)
+- **Memory**: 2.2Gi / 3.8Gi
+- **CPU Load**: 0.12 / 0.16 / 0.15 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 21.18M)
+- **Redis**: 🟢 connected (Memory: 21.37M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -375,8 +375,20 @@ df -h
 - `POST /stripe-webhook` - Handle subscription events (HMAC verified)
 - `POST /create-portal-session` - Stripe billing portal for self-service management
 - `GET /me` - User profile with subscription status
-- `GET /billing/usage` - Current unreported usage with model breakdown
-- `GET /billing/usage/breakdown` - Per-bot and daily usage breakdown
+- `GET /billing/usage` - Current unreported usage with model breakdown (deprecated, use /usage/me)
+- `GET /billing/usage/breakdown` - Per-bot and daily usage breakdown (deprecated, use /usage/breakdown)
+
+**Real-Time Usage API** (`/api/v2/usage/`) - NEW:
+- `GET /usage/me` - User usage summary (Redis-cached, includes credits + net balance)
+- `GET /usage/config/{config_id}` - Per-bot usage (instant from Redis)
+- `GET /usage/breakdown` - All bots usage breakdown (sorted by cost)
+- `GET /usage/history/{config_id}?days=30` - Daily usage history (90-day max)
+
+**Credit Packs**:
+- `POST /credits/purchase` - Create Stripe Checkout for credit pack
+- `POST /credits/crypto-checkout` - Create NOWPayments invoice for crypto payment
+- `GET /credits/balance` - Get Stripe credit balance
+- `POST /webhooks/nowpayments` - IPN callback for crypto payments (HMAC verified, idempotent)
 
 **Metered Billing System** (Production Live):
 - Daily meter reporting via APScheduler (midnight UTC)
@@ -385,6 +397,8 @@ df -h
 - All LLM calls tracked with tokens and costs in `activities` table
 - 70% markup applied: `platform_cost_usd = provider_cost_usd × 1.70`
 - Weekly/monthly invoicing with real-time Stripe Billing Meters aggregation
+- Real-time Redis counters updated on every LLM call (usage visibility)
+- Usage Monitor in account-monitor service (credit watchdog, auto-pause on depletion)
 
 **Frontend Components**:
 - `<UpgradeModal>` - Pricing modal with usage-based and PRO plans
@@ -414,7 +428,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-13 11:26:11 UTC
+**Last Updated**: 2026-01-15 22:08:25 UTC
 
 ---
 
@@ -1261,7 +1275,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-13 11:26:11 UTC
+**Last Updated**: 2026-01-15 22:08:25 UTC
 
 ---
 

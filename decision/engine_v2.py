@@ -7,6 +7,8 @@ validation modes with context-aware position management.
 """
 
 import asyncio
+import os
+import redis
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
@@ -874,6 +876,23 @@ Take Profit: {take_profit_text}
                 output_tokens=output_tokens,
                 platform_cost=f"${platform_cost:.4f}"
             ).info("LLM activity logged with token tracking")
+
+            # Update Redis usage counters for real-time billing visibility
+            try:
+                redis_client = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379'))
+                period = datetime.utcnow().strftime("%Y-%m")
+                day = datetime.utcnow().strftime("%Y-%m-%d")
+
+                # Atomic increments - fast and non-blocking
+                pipe = redis_client.pipeline()
+                pipe.incrbyfloat(f"usage:user:{self.user_id}:{period}", float(platform_cost))
+                pipe.incrbyfloat(f"usage:config:{self.config_id}:{period}", float(platform_cost))
+                pipe.incrbyfloat(f"usage:config:{self.config_id}:{day}", float(platform_cost))
+                pipe.expire(f"usage:config:{self.config_id}:{day}", 90 * 24 * 3600)  # 90 day TTL
+                pipe.execute()
+            except Exception as redis_err:
+                # Non-fatal - activities table is source of truth
+                logger.warning(f"Failed to update Redis usage counters: {redis_err}")
 
         except Exception as e:
             # Non-blocking - don't fail the decision if activity logging fails

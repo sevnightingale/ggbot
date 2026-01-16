@@ -95,7 +95,7 @@ def get_stripe_customer_id(user_id: str) -> str:
 
 def report_to_stripe(user_id: str, stripe_customer_id: str, total_cost: Decimal) -> bool:
     """
-    Report usage to Stripe Meter API.
+    Report usage to Stripe Meter API with idempotency.
 
     Args:
         user_id: Internal user UUID (for logging)
@@ -110,20 +110,27 @@ def report_to_stripe(user_id: str, stripe_customer_id: str, total_cost: Decimal)
         # We'll send as string to preserve precision
         value = str(total_cost)
 
-        # Create meter event
+        # Create idempotency identifier to prevent double billing
+        # Format: user:date:cost_hash - unique per user per day per amount
+        report_date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+        identifier = f"{user_id}:{report_date}:{hash(value)}"
+
+        # Create meter event with idempotency
         event = stripe.billing.MeterEvent.create(
             event_name=STRIPE_EVENT_NAME,
             payload={
                 "stripe_customer_id": stripe_customer_id,
                 "value": value,
-            }
+            },
+            identifier=identifier  # Stripe deduplicates based on this
         )
 
         logger.bind(
             user_id=user_id,
             stripe_customer_id=stripe_customer_id,
             cost=value,
-            event_id=event.identifier
+            event_id=event.identifier,
+            idempotency_key=identifier
         ).info(f"Reported ${value} to Stripe meter")
 
         return True

@@ -186,6 +186,7 @@ class TradingAgent:
         """Build system prompt with strategy context."""
         strategy_content = self.config.get("config_data", {}).get("agent_strategy", {}).get("content", "No strategy defined")
         autonomously_editable = self.config.get("config_data", {}).get("agent_strategy", {}).get("autonomously_editable", False)
+        rei_enabled = self.config.get("config_data", {}).get("rei_enabled", False)
 
         prompt = f"""You are an autonomous trading agent running 24/7. Your strategy defines who you are and how you trade.
 
@@ -228,7 +229,34 @@ Your tools are self-documenting. Key ones:
 - **record_trade_observation**: Log learnings after closing trades
 - **query_trade_observations**: Search your past learnings
 - **update_strategy**: Update your strategy content (if allowed)
+{"" if not rei_enabled else '''
+# REI INTEGRATION (Enhanced Reasoning)
 
+You have access to Rei, a learning AI that improves from experience. Use these tools for enhanced decision-making:
+
+- **query_market_data_for_rei**: Prepare comprehensive market data for Rei analysis
+  - Fetches 21 technical indicators + 11 market intelligence sources
+  - Must be called BEFORE consult_rei_for_decision
+  - Returns a summary while storing full data for Rei
+
+- **consult_rei_for_decision**: Get Rei's trading decision
+  - Call AFTER query_market_data_for_rei
+  - Returns: action, confidence, reasoning, key_signals, warnings, take_profit, stop_loss
+  - Rei's confidence is calibrated (trust it as-is, don't override)
+
+- **report_trade_outcome_to_rei**: Report closed trades for Rei learning
+  - Call after closing any trade
+  - Include entry/exit prices, P&L, close_reason, conditions_at_entry
+  - This teaches Rei which patterns work
+
+WORKFLOW WITH REI:
+1. query_market_data_for_rei(symbol, timeframe)
+2. consult_rei_for_decision(positions, balance)
+3. Execute trade using Rei's recommendation (or wait if advised)
+4. When trade closes → report_trade_outcome_to_rei()
+
+Rei learns from every outcome, strengthening successful patterns over time.
+'''}
 # EXECUTION LOOP
 
 1. Check current positions (close if exit conditions met)
@@ -265,7 +293,7 @@ Remember: You are your strategy. Execute it faithfully, learn from outcomes, ada
                 try:
                     # list_tools() is async and needs request context, so we can't call it here
                     # Instead, just log that 12 tools are registered (we know from debug logs above)
-                    logger.info("✅ MCP Server initialized with 12 tools:")
+                    logger.info("✅ MCP Server initialized with 15 tools:")
                     logger.info("   1. query_market_data - Market data across 7 categories with 32+ data points")
                     logger.info("   2. get_current_price - Real-time WebSocket price lookup")
                     logger.info("   3. execute_trade - Execute trades with required SL/TP")
@@ -278,6 +306,9 @@ Remember: You are your strategy. Execute it faithfully, learn from outcomes, ada
                     logger.info("  10. record_trade_observation - Post-trade reflection")
                     logger.info("  11. query_trade_observations - Search past learnings")
                     logger.info("  12. save_strategy_and_exit - Save strategy and exit")
+                    logger.info("  13. query_market_data_for_rei - Prepare data for Rei (Rei integration)")
+                    logger.info("  14. consult_rei_for_decision - Get Rei trading decision (Rei integration)")
+                    logger.info("  15. report_trade_outcome_to_rei - Report outcomes for Rei learning")
                     logger.info("\n  All tools will be available to agent via MCP protocol.")
                 except Exception as e:
                     logger.warning(f"Could not introspect MCP tools: {e}")
@@ -308,16 +339,21 @@ Remember: You are your strategy. Execute it faithfully, learn from outcomes, ada
                 "mcp_servers": {"trading": mcp_server},
                 "allowed_tools": [
                     "mcp__trading__query_market_data",
-                    "mcp__trading__get_current_price",  # NEW: Lightweight price check
+                    "mcp__trading__get_current_price",
                     "mcp__trading__execute_trade",
                     "mcp__trading__get_positions",
                     "mcp__trading__get_account_status",
                     "mcp__trading__close_position",
+                    "mcp__trading__cancel_order",
                     "mcp__trading__update_strategy",
                     "mcp__trading__wait_for",
                     "mcp__trading__record_trade_observation",
                     "mcp__trading__query_trade_observations",
-                    "mcp__trading__save_strategy_and_exit"
+                    "mcp__trading__save_strategy_and_exit",
+                    # Rei integration tools
+                    "mcp__trading__query_market_data_for_rei",
+                    "mcp__trading__consult_rei_for_decision",
+                    "mcp__trading__report_trade_outcome_to_rei"
                 ],
                 "disallowed_tools": [
                     "Task", "Bash", "Read", "Write", "Edit", "Glob", "Grep",

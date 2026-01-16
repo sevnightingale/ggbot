@@ -17,6 +17,7 @@ from core.common.db import get_db_connection
 from core.common.logger import logger as base_logger
 from core.domain.account_snapshot import AccountSnapshot
 from core.monitoring.adapters import PaperAccountAdapter, SymphonyAccountAdapter, AsterAccountAdapter
+from core.monitoring.usage_monitor import UsageMonitor
 
 # Create monitoring logger
 logger = base_logger.bind(service="universal_account_monitor")
@@ -36,7 +37,7 @@ class UniversalAccountMonitor:
     - Efficient adapter pattern
     """
 
-    def __init__(self):
+    def __init__(self, usage_monitor: Optional[UsageMonitor] = None):
         self.running = False
         self.cycle_count = 0
         self.last_snapshots: Dict[str, AccountSnapshot] = {}  # config_id -> last snapshot
@@ -48,6 +49,9 @@ class UniversalAccountMonitor:
             'symphony': SymphonyAccountAdapter(),
             'aster': AsterAccountAdapter()
         }
+
+        # Usage monitoring for billing/credit enforcement
+        self.usage_monitor = usage_monitor
 
         # Configuration
         self.monitor_interval = 5  # Check every 5 seconds
@@ -109,6 +113,20 @@ class UniversalAccountMonitor:
                 # Check for stale agents every 5 minutes (60 cycles at 5s each)
                 if self.cycle_count % 60 == 0:
                     await self._check_stale_agents()
+
+                # Usage monitoring: check credits every 60 seconds (12 cycles)
+                if self.usage_monitor and self.cycle_count % 12 == 0:
+                    try:
+                        await self.usage_monitor.check_all_active_users()
+                    except Exception as e:
+                        logger.error(f"❌ Usage check error: {e}")
+
+                # Cache usage summaries every 5 minutes (60 cycles)
+                if self.usage_monitor and self.cycle_count % 60 == 0:
+                    try:
+                        await self.usage_monitor.cache_usage_summaries()
+                    except Exception as e:
+                        logger.error(f"❌ Usage cache error: {e}")
 
                 self.cycle_count += 1
 
@@ -396,7 +414,12 @@ class UniversalAccountMonitor:
 
 async def main():
     """Main entry point for the monitoring service."""
-    monitor = UniversalAccountMonitor()
+    # Initialize usage monitor for billing/credit enforcement
+    usage_monitor = UsageMonitor()
+    logger.info("💰 Usage monitoring enabled")
+
+    # Create main monitor with usage monitoring
+    monitor = UniversalAccountMonitor(usage_monitor=usage_monitor)
 
     try:
         await monitor.start()

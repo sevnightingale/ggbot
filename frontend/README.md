@@ -50,10 +50,10 @@ Legacy/Archive (Moved to /archive/):
 │   ├── BotRail.tsx         # Multi-bot sidebar with management
 │   ├── TabNavigation.tsx   # Monitor/Configure tab switching
 │   ├── MobileNav.tsx       # Mobile responsive navigation
-│   └── UserProfile.tsx     # Profile dropdown with subscription status
+│   └── UserProfile.tsx     # Profile dropdown with subscription status + usage display
 │
 ├── monitor/                 # Real-time operational dashboard
-│   ├── ActivationBar.tsx   # Bot status/control with agent pipeline visualization
+│   ├── ActivationBar.tsx   # Bot status/control with daily cost display
 │   └── PositionsTable.tsx  # Live trading positions with real-time P&L
 │
 ├── configure/               # Bot configuration system (auto-save)
@@ -447,6 +447,101 @@ apiClient.createPortalSession() // For subscription management
 
 ---
 
+## 💰 Usage & Billing Display (2026-01-16)
+
+### **UserProfile Dropdown**
+
+Adaptive display based on billing model:
+
+```typescript
+// Credit pack users (credits > 0): Full breakdown
+🪙 Credits    $50.00
+   Used       -$12.34
+   ─────────────────
+   Balance    $37.66  // amber if < $5
+
+// Metered users (credits = 0): Simple usage
+🪙 This week  $12.34
+```
+
+**Implementation** (`UserProfile.tsx`):
+```typescript
+// Fetch usage summary on mount
+const [usageSummary, setUsageSummary] = useState<{
+  usage_usd: number
+  credits_usd: number | null
+  net_balance_usd: number | null
+} | null>(null)
+
+useEffect(() => {
+  if (userProfile?.subscription_tier === 'usage_based') {
+    const summary = await apiClient.getUsageSummary()
+    setUsageSummary(summary)
+  }
+}, [userProfile?.subscription_tier])
+
+// Adaptive display
+{usageSummary.credits_usd > 0 ? (
+  // Credit pack user - show full breakdown
+) : (
+  // Metered user - show just weekly usage
+)}
+```
+
+### **ActivationBar Daily Cost**
+
+Shows average daily LLM cost per bot:
+
+```typescript
+// Day 1 of month:
+🪙 $0.89 today
+
+// Day 2+:
+🪙 ~$0.35/day  // period_usage / days_elapsed
+```
+
+**Implementation** (`ActivationBar.tsx`):
+```typescript
+// Fetch on mount + 5-minute refresh
+useEffect(() => {
+  const fetchConfigUsage = async () => {
+    const usage = await apiClient.getConfigUsage(selectedBot.config_id)
+    setConfigUsage(usage)
+  }
+  fetchConfigUsage()
+  const interval = setInterval(fetchConfigUsage, 5 * 60 * 1000)
+  return () => clearInterval(interval)
+}, [selectedBot.config_id])
+
+// Calculate average
+const dayOfMonth = new Date().getDate()
+const avgDaily = configUsage.period_usage_usd / dayOfMonth
+```
+
+### **API Methods** (`lib/api.ts`)
+
+```typescript
+// User-level usage summary (for UserProfile)
+getUsageSummary(): Promise<{
+  period: string           // "2026-01"
+  usage_usd: number        // Total usage this period
+  credits_usd: number | null  // Credit balance (null if metered)
+  net_balance_usd: number | null  // credits - usage
+  cached: boolean          // True if from 5-min cache
+}>
+
+// Per-bot usage (for ActivationBar)
+getConfigUsage(configId: string): Promise<{
+  config_id: string
+  config_name: string
+  period: string           // "2026-01"
+  period_usage_usd: number // Total this month
+  today_usage_usd: number  // Just today
+}>
+```
+
+---
+
 ## 💻 Development & Deployment
 
 ### **Environment Setup**
@@ -684,6 +779,8 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 - [x] Subscription status display in UserProfile
 - [x] Permission gates triggering upgrade flow
 - [x] Metered billing system (pay-per-decision)
+- [x] Real-time usage display in UserProfile (credit pack & metered billing)
+- [x] Per-bot daily cost in ActivationBar
 
 ### **Integration & Deployment**
 - [x] V2 backend API integration with real-time data

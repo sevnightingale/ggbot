@@ -1,7 +1,8 @@
 # Rei Agent Integration - Persistent Learning Trading Agent
 
-**Status**: PLANNING - Awaiting beta access
+**Status**: IN PROGRESS - Beta access obtained, implementation started
 **Created**: 2026-01-13
+**Updated**: 2026-01-15
 **TODO Section**: Rei Agent Integration
 
 ---
@@ -49,239 +50,272 @@ Rei Architecture:
 | **Inference-time learning** | Every interaction shapes future reasoning |
 | **Persistent memory** | Hypergraph of concepts survives across sessions |
 | **Numerical precision** | Float64 preserved, not tokenized |
-| **Confidence calibration** | Explicit uncertainty bounds |
+| **Confidence calibration** | Explicit uncertainty bounds (actually calibrated, unlike LLMs) |
 | **Primordials** | Permanent memory anchors for core strategy rules |
 | **Pattern evolution** | Successful patterns strengthen, failures weaken |
 
 ---
 
-## Architecture: Claude + Rei Hybrid
+## Critical Rei API Behaviors (From Docs Review)
+
+These behaviors are essential for correct integration:
+
+### 1. API Has NO Session Context
+Each API call must be **self-contained**. Rei does not remember previous API calls.
+```python
+# ❌ WRONG - Don't simulate conversation
+{"messages": [
+    {"role": "assistant", "content": "[previous Rei response]"},
+    {"role": "user", "content": "Continue from there"}
+]}
+
+# ✅ CORRECT - Self-contained request
+{"messages": [
+    {"role": "user", "content": "[ALL data + context + question in one message]"}
+]}
+```
+
+### 2. Never Feed LLM Outputs Back
+The articulation layer (LLM) flattens Core's reasoning into text. Feeding that back causes:
+- **Dimensionality loss**: 5-concept edge → sentence (can't reconstruct)
+- **Artifact injection**: Stylistic words create spurious nodes
+- **Compound degradation**: Each cycle amplifies noise
+
+For trade outcomes, send **raw facts only**, not Rei's previous reasoning.
+
+### 3. Rei Confidence Is Calibrated
+Unlike LLM confidence (poorly calibrated, based on token probabilities), Rei's confidence:
+- Comes from uncertainty-aware reasoning in the Core
+- Is deterministic and traceable
+- Should be **trusted as-is** - don't cap or override it
+
+### 4. Primordials Are Irrevocable
+"Remember this" creates permanent memory that cannot be removed.
+- Test patterns in regular interaction first
+- Only use for genuinely permanent rules
+- Conflicting primordials both remain active (causes issues)
+
+### 5. Specialized Units Perform Better
+A well-crafted behavior prompt outperforms a generic unit that "learns over time."
+
+---
+
+## Architecture: Session Buffer Pattern
+
+The session buffer solves the problem of passing large market data between Claude tool calls without Claude paying the token cost for carrying JSON.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│  CLAUDE AGENT (Orchestrator)                                    │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Autonomous Loop                                          │  │
-│  │  • Wake up on schedule                                    │  │
-│  │  • Gather market data (existing MCP tools)                │  │
-│  │  • Consult Rei for decision ←──────────┐                 │  │
-│  │  • Execute trades (existing MCP tools)  │                 │  │
-│  │  • Report outcomes to Rei ──────────────┘                 │  │
-│  │  • Decide when to check again                             │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                              ↕                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  MCP Tools (existing)          MCP Tools (NEW)            │  │
-│  │  • query_market_data           • ask_rei_decision         │  │
-│  │  • execute_trade               • report_trade_outcome     │  │
-│  │  • get_positions                                          │  │
-│  │  • get_account                                            │  │
-│  └──────────────────────────────────────────────────────────┘  │
+│  Claude Agent calls: query_market_data(symbol)                  │
+│  ├─ Fetches 21 technical indicators (via ExtractionEngineV2)    │
+│  ├─ Fetches 11 market intel points (via MarketIntelligence)     │
+│  ├─ Stores FULL JSON in session buffer (~15-20KB)               │
+│  └─ Returns summary to Claude: "Data ready. RSI=57.9, ADX=38.0" │
 └─────────────────────────────────────────────────────────────────┘
-                              ↕
+                              │
+                              ▼
 ┌─────────────────────────────────────────────────────────────────┐
-│  REI UNIT (The Brain)                                           │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Core Reasoning Engine                                    │  │
-│  │  • Receives market context from Claude                    │  │
-│  │  • Reasons through concept space                          │  │
-│  │  • Returns: action, confidence, reasoning                 │  │
-│  │  • LEARNS from every outcome Claude reports               │  │
-│  │  • Builds persistent trading intuition                    │  │
-│  └──────────────────────────────────────────────────────────┘  │
-│                              ↓                                  │
-│  ┌──────────────────────────────────────────────────────────┐  │
-│  │  Persistent Memory                                        │  │
-│  │  • Primordials (core strategy rules)                      │  │
-│  │  • Learned patterns (RSI+volume → good entry)             │  │
-│  │  • Confidence calibration (when to trust signals)         │  │
-│  └──────────────────────────────────────────────────────────┘  │
+│  Claude Agent calls: consult_rei_for_decision()                 │
+│  ├─ Reads FULL data from session buffer                         │
+│  ├─ Builds self-contained message with:                         │
+│  │   - All 32 data points (technical + market intel)            │
+│  │   - Current positions                                        │
+│  │   - Account state                                            │
+│  │   - The decision question                                    │
+│  ├─ Sends to Rei API (single user message)                      │
+│  ├─ Parses JSON response: {action, confidence, reasoning, ...}  │
+│  └─ Clears session buffer                                       │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│  Claude Agent calls: report_trade_outcome(...)                  │
+│  (When trade closes - for Rei learning)                         │
+│  ├─ Sends RAW FACTS only:                                       │
+│  │   "BTC long closed: +142 USD (+2.8%), RSI was 31 at entry,   │
+│  │    funding 0.02%, duration 8h, close_reason: take_profit"    │
+│  └─ Rei Core strengthens/weakens patterns based on outcome      │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
-### Why Hybrid Over Pure Rei?
+### Why Session Buffer?
 
-| Aspect | Pure Rei Agent | Claude + Rei Hybrid |
-|--------|----------------|---------------------|
-| Implementation | Rebuild agent runner | Add 2 MCP tools |
-| Existing infra | Rewrite needed | Keep everything |
-| Session resumption | Need to rebuild | Already works |
-| Tool ecosystem | Rei's beta tools | Our proven 12 tools |
-| Autonomous timing | Need to implement | Claude handles it |
-| Rollback | Hard | Just disable tools |
+| Approach | Pros | Cons |
+|----------|------|------|
+| Claude carries full JSON | Simple | 15-20KB per turn, expensive |
+| Session buffer | Claude sees summary only | Requires buffer management |
+| Rei fetches data itself | Single tool call | Rei's crypto MCPs are "error-prone" |
+
+**Decision**: Session buffer. Our extraction pipeline is proven (32/32 data points validated). Rei's built-in MCPs are beta and unreliable.
+
+---
+
+## Validated Data Structure
+
+Data quality test (`tests/test_data_quality.py`) validated all 32 data points:
+
+### Technical Indicators (21) - via ExtractionEngineV2
+```
+rsi, macd, stochastic, williams_r, cci, mfi, adx, psar, aroon,
+atr, bbands, obv, sma, ema, roc, vwap, trix, vortex, bbwidth,
+keltner, donchian
+```
+
+Each indicator outputs structured JSON with:
+- `current`: Raw numerical values (Float64 preserved)
+- `context`: Trend, moving averages, volatility
+- `levels`: Overbought/oversold thresholds
+- `patterns`: Detected patterns (divergence, crossovers)
+- `summary`: Human-readable interpretation
+
+### Market Intelligence (11) - via MarketIntelligence Gateway
+```
+ggshot, btc_funding_rate, eth_funding_rate, vix, dxy, cpi, nfp,
+btc_tvl, whale_activity, twitter_sentiment, crypto_news
+```
+
+Each outputs structured JSON with:
+- Raw values (funding_rate_pct, current_value, etc.)
+- Signal interpretation (bullish/bearish/neutral)
+- Analysis context from Grok
+
+**Total payload to Rei**: ~15-20KB per decision call
+
+---
+
+## Unit Configuration
+
+### Recommended Settings
+
+| Setting | Value | Rationale |
+|---------|-------|-----------|
+| **Temperature** | 0.45-0.55 | Lower = more consistent reasoning |
+| **Max Tokens** | 2000 | Enough for structured JSON response |
+| **Response Format** | `json` | We need structured output |
+| **Model** | `google/gemini-2.5-flash` | Currently only available option |
+
+### Behavior Prompt (Finalized)
+
+```
+You are a trading decision engine that synthesizes market data across multiple domains to generate trading decisions.
+
+## Input Format
+You receive structured market data containing:
+- Technical indicators (RSI, MACD, ADX, Bollinger Bands, etc.) across timeframes
+- Sentiment signals (social media, funding rates)
+- Positioning data (open interest, whale activity)
+- Current price and recent price action
+
+## Output Format (JSON)
+{
+  "action": "enter_long" | "enter_short" | "exit" | "wait",
+  "confidence": 0.0 to 1.0,
+  "reasoning": "Brief explanation of key factors",
+  "key_signals": ["signal1", "signal2"],
+  "warnings": ["any concerns"]
+}
+
+## Decision Principles
+
+**Confluence matters**: When 3+ independent data sources point the same direction, that's signal. Single indicators are noise.
+
+**Calibrate confidence honestly**:
+- 0.75+ = Strong alignment across domains, clear structure
+- 0.60-0.75 = Majority alignment, some neutral domains
+- 0.55-0.60 = Technical edge with limited confirmation
+- Below 0.55 = Pass
+
+**Learn from outcomes**: You will receive feedback on trade results. Use this to calibrate which patterns actually predict success versus which merely correlate.
+
+**Uncertainty is valuable**: When signals conflict, saying "wait" with reasoning is better than forcing a decision.
+```
+
+### Primordial Strategy
+
+**DO NOT use primordials for:**
+- Bot-specific strategies (use behavior prompt instead)
+- Preferences that may change
+- Confidence caps or overrides
+
+**ONLY use primordials for:**
+- Invariant technical constraints (if any)
+- Security/risk policies that must never change
+
+For initial deployment: **No primordials**. Let the behavior prompt and learning handle everything. Primordials can be added later for truly permanent rules after observing what works.
 
 ---
 
 ## Implementation Plan
 
-### Phase 0: Access & Setup (~1 day)
-**Blocker**: Need Rei beta access
+### Phase 0: Access & Setup ✅ COMPLETE
+- [x] Obtain Rei beta access
+- [x] Create account
+- [x] Review full documentation (REI_DOCS.md)
+- [x] Understand API behavior and best practices
 
-- [ ] Request beta access via Discord/Telegram
-- [ ] Create test Unit in Rei Factory
-- [ ] Get Agent Secret Key
-- [ ] Test basic API connectivity
-- [ ] Understand pricing/rate limits
+### Phase 1: Rei Service Client ✅ COMPLETE
+**File**: `core/services/rei_service.py`
 
-### Phase 1: Rei Service Client (~2-3 hours)
+- [x] Create ReiService class with async HTTP client
+- [x] Implement chat_completion with retry/backoff
+- [x] Implement get_agent for status checks
+- [x] Add proper error handling (auth, rate limit, server errors)
+- [x] Add `REI_01_UNIT_SECRET` to .env (done by user)
+- [x] Test with simple query ✅ All 5 tests passed!
 
-Create `core/services/rei_service.py`:
+### Phase 2: Session Buffer ✅ COMPLETE
+**File**: `agent/session_buffer.py` (already existed)
 
-```python
-class ReiService:
-    """Client for Rei Core API."""
+Session buffer was already implemented with:
+- [x] Thread-safe storage with TTL (5 min default)
+- [x] store/retrieve/clear methods
+- [x] Auto-cleanup for stale sessions
+- [x] Global singleton via `get_session_buffer()`
 
-    BASE_URL = "https://api.reilabs.org"
+### Phase 3: MCP Tools ✅ COMPLETE
+**File**: `agent/mcp_server.py` (added to existing file)
 
-    def __init__(self, agent_secret_key: str):
-        self.agent_secret_key = agent_secret_key
+**Tool 13: query_market_data_for_rei**
+- [x] Fetches 21 technical indicators + 11 market intel
+- [x] Stores full data in session buffer
+- [x] Returns summary to Claude
 
-    async def chat_completion(self, messages: list[dict]) -> dict:
-        """Send messages to Rei Unit and get response."""
-        ...
+**Tool 14: consult_rei_for_decision**
+- [x] Reads from session buffer
+- [x] Builds self-contained Rei message
+- [x] Sends to Rei API with JSON response format
+- [x] Parses and returns decision
 
-    async def get_agent(self) -> dict:
-        """Get agent details and status."""
-        ...
-```
+**Tool 15: report_trade_outcome_to_rei**
+- [x] Sends raw trade facts to Rei
+- [x] No previous Rei output included
+- [x] Returns acknowledgment
 
-- [ ] Create `core/services/rei_service.py`
-- [ ] Implement chat_completion with retry/backoff
-- [ ] Implement response parsing
-- [ ] Add to `.env.example`: `REI_AGENT_SECRET_KEY`
-- [ ] Test with simple query
-
-### Phase 2: MCP Tools (~3-4 hours)
-
-Create `agent/mcp_tools/rei_tools.py`:
-
-**Tool 1: ask_rei_decision**
-```python
-@mcp_tool
-async def ask_rei_decision(
-    market_summary: str,
-    current_positions: str,
-    account_state: str,
-    recent_context: str = ""
-) -> dict:
-    """
-    Consult Rei for a trading decision.
-
-    Returns:
-        action: "enter_long" | "enter_short" | "exit" | "wait"
-        confidence: 0.0-1.0
-        reasoning: str
-        position_size_suggestion: float
-        stop_loss_pct: float
-        take_profit_pct: float
-    """
-```
-
-**Tool 2: report_trade_outcome**
-```python
-@mcp_tool
-async def report_trade_outcome(
-    trade_id: str,
-    entry_price: float,
-    exit_price: float,
-    side: str,
-    pnl_usd: float,
-    pnl_pct: float,
-    duration_hours: float,
-    close_reason: str,
-    market_conditions_at_entry: str
-) -> dict:
-    """
-    Report closed trade to Rei for learning.
-
-    Returns:
-        acknowledged: bool
-        patterns_noted: list[str]
-    """
-```
-
-- [ ] Create `agent/mcp_tools/rei_tools.py`
-- [ ] Implement `ask_rei_decision` tool
-- [ ] Implement `report_trade_outcome` tool
-- [ ] Add response parsing with fallbacks
-- [ ] Register tools in MCP server
-
-### Phase 3: Configuration (~1-2 hours)
-
-Update config models to support Rei:
+### Phase 4: Configuration ✅ COMPLETE
+**File**: `core/config/schemas.py`
 
 ```python
-# core/config/models.py
-class AgentStrategy(BaseModel):
+class AgentConfigData(BaseModel):
     # ... existing fields ...
-    rei_enabled: bool = False
-    rei_unit_id: Optional[str] = None
-    # rei_unit_secret stored in Supabase vault
+    rei_enabled: bool = False  # Enable Rei Core for enhanced reasoning
 ```
 
-- [ ] Add `rei_enabled` to AgentStrategy
-- [ ] Add `rei_unit_id` to AgentStrategy
-- [ ] Create vault storage for Rei secrets (like Symphony)
-- [ ] Add API endpoint to store Rei credentials
+- [x] Add rei_enabled flag to AgentConfigData
+- Note: API key stored in .env as `REI_01_API_KEY` (not per-bot vault)
 - [ ] Update `/api/v2/me` with Rei connection status
 
-### Phase 4: Agent System Prompt (~1-2 hours)
+### Phase 5: Agent System Prompt ✅ COMPLETE
+**File**: `agent/run_agent.py` (_build_system_prompt method)
 
-Update agent system prompt to use Rei for decisions:
-
-```markdown
-## Decision Making
-
-You have access to Rei, your learning-capable trading brain.
-
-**For ALL trading decisions**, use `ask_rei_decision` tool.
-Do NOT make entry/exit decisions yourself - Rei has learned
-from your past trades and has better pattern recognition.
-
-**After every closed trade**, use `report_trade_outcome` tool.
-This is critical - it's how Rei learns and improves.
-
-You are the executor. Rei is the strategist.
-```
-
-- [ ] Update `agent/prompts/system.md` with Rei instructions
-- [ ] Add conditional prompt section (only when rei_enabled)
-- [ ] Define Rei decision output format
-- [ ] Add examples of Claude + Rei interaction
-
-### Phase 5: Unit Initialization (~2-3 hours)
-
-When creating a Rei-enabled agent, set up primordials:
-
-```python
-async def initialize_rei_unit(config: BotConfig):
-    """Establish core strategy rules as primordials."""
-
-    primordials = [
-        "Remember this: Never enter positions against the 4H trend",
-        "Remember this: RSI below 30 is oversold, above 70 is overbought",
-        f"Remember this: My risk tolerance is {config.trading.max_margin_percent}%",
-        f"Remember this: I use {config.trading.leverage}x leverage",
-    ]
-
-    # Add user's strategy context as primordials
-    if config.agent_strategy.user_strategy_context:
-        primordials.append(
-            f"Remember this: {config.agent_strategy.user_strategy_context}"
-        )
-```
-
-- [ ] Design primordial initialization flow
-- [ ] Extract strategy rules from config
-- [ ] Create initialization endpoint/function
-- [ ] Test primordial persistence
+- [x] Add conditional Rei section (only when rei_enabled)
+- [x] Document when to use each Rei tool
+- [x] Document workflow: query_market_data → consult_rei → execute → report_outcome
 
 ### Phase 6: Testing & Validation (~1 week)
-
-- [ ] Create test agent with Rei enabled
+- [x] Create test script for Rei integration (tests/test_rei_integration.py)
+- [ ] Create test bot with Rei enabled
 - [ ] Run in paper trading for 50+ trades
 - [ ] Compare vs identical Claude-only agent
-- [ ] Measure: win rate, confidence calibration, decision quality
 - [ ] Monitor: API costs, latency, error rates
 - [ ] Document learnings
 
@@ -294,35 +328,44 @@ async def initialize_rei_unit(config: BotConfig):
    Claude: *scheduled wake or market event*
 
 2. GATHER DATA
-   Claude → query_market_data(BTC/USDT, [1h, 4h])
+   Claude → query_market_data_for_rei(BTC/USDT)
+   Tool:   *fetches 32 data points, stores in buffer*
+   Return: "Data ready: RSI=57.9, ADX=38.0 (strong trend),
+            funding=0.008% (neutral), whale_activity=bearish"
+
+3. GET CONTEXT
    Claude → get_positions()
    Claude → get_account()
 
-3. CONSULT REI
-   Claude → ask_rei_decision(
-       market_summary="BTC $94,500, RSI(1h)=31, funding=0.02%...",
-       current_positions="None",
-       account_state="Balance: $9,850"
-   )
+4. CONSULT REI
+   Claude → consult_rei_for_decision()
+   Tool:   *reads buffer, builds self-contained message*
+   Rei:    *navigates hypergraph concept space*
+           *returns: {action: "enter_long", confidence: 0.68, ...}*
+   Return: "Rei decision: LONG with 68% confidence.
+            Key signals: oversold RSI, strong trend, neutral funding.
+            Warnings: whale distribution activity"
 
-   Rei: *navigates concept space*
-        *recalls: "RSI~30 + low funding worked 2/3 times"*
-        *returns: enter_long, confidence=0.68*
-
-4. EXECUTE
+5. EXECUTE
    Claude → execute_trade(side=long, ...)
 
-5. ... time passes, trade closes ...
+6. ... time passes, trade closes ...
 
-6. FEEDBACK LOOP
+7. FEEDBACK LOOP
    Claude → report_trade_outcome(
-       pnl=+$142, pnl_pct=+2.8%,
-       conditions_at_entry="RSI=31, funding=0.02%"
+       symbol="BTC/USDT",
+       side="long",
+       entry_price=94500,
+       exit_price=96000,
+       pnl_usd=142,
+       pnl_pct=2.8,
+       duration_hours=8,
+       close_reason="take_profit",
+       conditions_at_entry="RSI=31, ADX=38, funding=0.008%"
    )
+   Rei:    *strengthens pathway: oversold + strong trend → good long*
 
-   Rei: *strengthens pathway: oversold + low funding → good long*
-
-7. REPEAT
+8. REPEAT
 ```
 
 ---
@@ -331,7 +374,8 @@ async def initialize_rei_unit(config: BotConfig):
 
 ### Primordials Are Permanent
 - Rei's "remember this" creates irrevocable memories
-- **Mitigation**: Be conservative, test patterns in regular interaction first
+- **Mitigation**: Don't use primordials initially
+- **Mitigation**: Test patterns in regular interaction first
 - **Mitigation**: Only create primordials for truly invariant rules
 
 ### Beta Product Stability
@@ -345,14 +389,15 @@ async def initialize_rei_unit(config: BotConfig):
 - **Mitigation**: Keep Claude-only path as fallback
 
 ### Cost Uncertainty
-- Rei pricing not publicly documented
-- **Action**: Clarify during beta access request
-- **Mitigation**: Monitor usage, set alerts
+- Rei pricing not publicly documented (beta is free?)
+- **Action**: Monitor usage during beta
+- **Mitigation**: Set alerts for unusual usage
 
 ### Learning Wrong Patterns
 - Unit could reinforce bad patterns from unlucky trades
 - **Mitigation**: Large sample size before trusting learned patterns
 - **Mitigation**: A/B test against control bot
+- **Mitigation**: Rei's natural decay should fade irrelevant patterns
 
 ---
 
@@ -361,21 +406,68 @@ async def initialize_rei_unit(config: BotConfig):
 | Metric | Current (Claude-only) | Target (Claude + Rei) |
 |--------|----------------------|----------------------|
 | Win rate | ~30% (platform avg) | >40% after learning period |
-| Confidence calibration | Poor (70% conf ≠ 70% wins) | <10% gap |
+| Confidence calibration | Poor (70% conf ≠ 70% wins) | <10% gap (Rei is calibrated) |
 | Adaptation speed | Manual prompt updates | Automatic via feedback |
 | Decision latency | 10-30s | <40s (acceptable overhead) |
 | Learning evidence | None | Visible pattern evolution |
 
 ---
 
-## Open Questions
+## Open Questions (Partially Resolved)
 
-1. **Pricing**: What does Rei API cost per request?
-2. **Rate limits**: Any throttling on chat completions?
-3. **Unit limits**: Max units per account?
-4. **Model selection**: Which LLM does Rei use for articulation?
-5. **Data retention**: How long does Core retain learned patterns?
-6. **Multi-Unit**: Can units share learnings or are they isolated?
+| Question | Status | Answer |
+|----------|--------|--------|
+| Pricing | Unknown | Beta appears free, monitor usage |
+| Rate limits | Unknown | Not documented, implement backoff |
+| Unit limits | ✅ Resolved | 15 units per account |
+| Model selection | ✅ Resolved | google/gemini-2.5-flash only |
+| Data retention | Unknown | Patterns persist indefinitely |
+| Multi-Unit | ✅ Resolved | Units are isolated (sharing coming "in future") |
+
+---
+
+## API Reference
+
+### Base URL
+```
+https://api.reilabs.org
+```
+
+### Authentication
+```
+Authorization: Bearer {agent_secret_key}
+```
+
+### Chat Completion
+```
+POST /v1/chat/completions
+
+{
+  "messages": [{"role": "user", "content": "..."}],
+  "temperature": 0.45,
+  "max_tokens": 2000,
+  "response_format": {"type": "json_object"}
+}
+```
+
+### Get Agent
+```
+GET /v1/agents
+```
+
+---
+
+## File Changes Summary
+
+| File | Change | Status |
+|------|--------|--------|
+| `core/services/rei_service.py` | NEW - Rei API client | ✅ Created |
+| `agent/session_buffer.py` | EXISTING - Market data buffer | ✅ Already existed |
+| `agent/mcp_server.py` | ADD 3 Rei tools (Tools 13-15) | ✅ Created |
+| `core/config/schemas.py` | ADD rei_enabled to AgentConfigData | ✅ Created |
+| `agent/run_agent.py` | UPDATE _build_system_prompt with Rei section | ✅ Created |
+| `.env` | ADD REI_01_UNIT_SECRET | ✅ Done by user |
+| `tests/test_rei_integration.py` | NEW - Integration tests | ✅ Created (5/5 pass) |
 
 ---
 
@@ -387,20 +479,8 @@ async def initialize_rei_unit(config: BotConfig):
 - **SDK (Python)**: `pip install reicore_sdk`
 - **SDK (JS)**: `npm install reicore-sdk`
 - **API Base**: https://api.reilabs.org
+- **Local Docs**: `/home/sev/ggbot/DOCS/REI_DOCS.md`
 
 ---
 
-## File Changes Summary
-
-| File | Change |
-|------|--------|
-| `core/services/rei_service.py` | NEW - Rei API client |
-| `agent/mcp_tools/rei_tools.py` | NEW - ask_rei_decision, report_trade_outcome |
-| `core/config/models.py` | ADD rei_enabled, rei_unit_id to AgentStrategy |
-| `agent/prompts/system.md` | UPDATE with Rei instructions |
-| `ggbot.py` | ADD Rei credential storage endpoint |
-| `.env.example` | ADD REI_AGENT_SECRET_KEY |
-
----
-
-**Next Step**: Obtain Rei beta access, then proceed with Phase 1.
+**Next Step**: Complete Phase 1 (test ReiService), then Phase 2 (SessionBuffer).

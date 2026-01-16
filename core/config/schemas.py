@@ -227,6 +227,9 @@ class AgentConfigData(BaseModel):
     telegram_integration: Optional[TelegramIntegrationConfig] = None
     agent_strategy: Optional[AgentStrategy] = None  # Can be None initially
 
+    # Rei integration (inference-time learning)
+    rei_enabled: bool = False  # Enable Rei Core for enhanced reasoning
+
     @field_validator('trading')
     def validate_trading(cls, v):
         """Ensure agent has valid trading config."""

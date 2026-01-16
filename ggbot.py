@@ -300,6 +300,7 @@ from api.snapshots import router as snapshots_router
 from api.assistant import router as assistant_router
 from api.admin import router as admin_router
 from api.public import router as public_router
+from api.usage import router as usage_router
 app.include_router(paper_trading_router)
 app.include_router(agent_router)
 app.include_router(activities_router)
@@ -307,6 +308,7 @@ app.include_router(snapshots_router)
 app.include_router(assistant_router)
 app.include_router(admin_router)
 app.include_router(public_router)
+app.include_router(usage_router)
 
 
 class GGBotOrchestrator:
@@ -4702,8 +4704,23 @@ async def nowpayments_webhook(request: Request):
         logger.info(f"NOWPayments webhook: status={payment_status}, ignoring")
         return {"status": "ignored", "reason": f"status is {payment_status}"}
 
-    # Extract user_id and amount from order_id (format: "credits_{user_id}_{amount_cents}")
+    # Extract order_id for idempotency check
     order_id = body_dict.get("order_id", "")
+
+    # Idempotency check - prevent duplicate credit grants on webhook retry
+    import redis
+    redis_client = redis.from_url(os.environ.get('REDIS_URL', 'redis://localhost:6379'))
+    processed_key = f"nowpayments:processed:{order_id}"
+
+    existing = redis_client.get(processed_key)
+    if existing:
+        logger.info(f"NOWPayments order {order_id} already processed (status={existing.decode()}), ignoring duplicate")
+        return {"status": "duplicate", "order_id": order_id}
+
+    # Mark as processing (24h TTL to handle retries)
+    redis_client.setex(processed_key, 86400, "processing")
+
+    # Extract user_id and amount from order_id (format: "credits_{user_id}_{amount_cents}")
     if not order_id.startswith("credits_"):
         logger.error(f"Invalid order_id format: {order_id}")
         raise HTTPException(400, "Invalid order_id")
@@ -4792,6 +4809,9 @@ async def nowpayments_webhook(request: Request):
         logger.bind(user_id=user_id).info(
             f"Crypto credit grant created: ${amount_cents / 100:.2f}"
         )
+
+        # Mark as completed (30-day TTL for audit trail)
+        redis_client.setex(processed_key, 86400 * 30, "completed")
 
     except stripe.error.StripeError as e:
         logger.error(f"Failed to create credit grant: {e}")

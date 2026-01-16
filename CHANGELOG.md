@@ -6,6 +6,63 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-16 - Frontend Usage Display
+
+**Continuation of**: [DOCS/completed/USAGE_BILLING_TRACKING.md](DOCS/completed/USAGE_BILLING_TRACKING.md)
+
+**API Client Methods** (`frontend/lib/api.ts:644-679`):
+- `getUsageSummary()` - Fetches `/api/v2/usage/me` for UserProfile display
+- `getConfigUsage()` - Fetches `/api/v2/usage/config/{id}` for per-bot costs
+
+**UserProfile Usage Display** (`frontend/.../UserProfile.tsx:34-38, 71-90, 200-235`):
+- Adaptive display based on billing model
+- Credit pack users: Shows Credits / Used / Balance breakdown
+- Metered users: Shows "This week: $X.XX" (weekly billing cycle)
+- Low balance warning (amber text when balance < $5)
+
+**ActivationBar Daily Cost** (`frontend/.../ActivationBar.tsx:76-120, 179-193`):
+- Fetches per-bot usage on mount + 5-minute refresh interval
+- Day 1 of month: Shows "$X.XX today"
+- Day 2+: Shows "~$X.XX/day" average (period_usage / days_elapsed)
+- Displayed next to countdown timer with Coins icon
+
+---
+
+## 2026-01-15 - Real-Time Usage Tracking & Billing Hardening
+
+**Planning Doc**: [DOCS/completed/USAGE_BILLING_TRACKING.md](DOCS/completed/USAGE_BILLING_TRACKING.md)
+
+**Redis Usage Counters** (`decision/engine_v2.py:880-895`):
+- Added real-time Redis INCRBYFLOAT on every LLM call
+- Keys: `usage:user:{id}:{YYYY-MM}`, `usage:config:{id}:{YYYY-MM}`, `usage:config:{id}:{YYYY-MM-DD}`
+- Daily keys have 90-day TTL for historical queries
+- Non-blocking: Redis failures don't break billing (activities table is source of truth)
+
+**Usage Monitor** (`core/monitoring/usage_monitor.py`):
+- New UsageMonitor class integrated into account-monitor PM2 service
+- Checks credit balances every 60s for users with active bots
+- Auto-pauses bots when credits depleted (updates DB + Redis pub/sub)
+- Caches usage summaries every 5min for fast API reads
+- Low balance warning at <20% remaining or <$5
+
+**Usage API Endpoints** (`api/usage.py`, `ggbot.py:303,311`):
+- `GET /api/v2/usage/me` - User summary (cached or live)
+- `GET /api/v2/usage/config/{config_id}` - Per-bot usage
+- `GET /api/v2/usage/breakdown` - All bots breakdown
+- `GET /api/v2/usage/history/{config_id}` - Daily history (90 days)
+
+**Idempotency Fixes**:
+- Stripe meter reporter (`billing/stripe_meter_reporter.py:113-125`): Added `identifier` param
+- NOWPayments webhook (`ggbot.py:4710-4721`): Redis-based order deduplication
+
+**Scripts**:
+- `scripts/backfill_usage_counters.py` - One-time Redis backfill from activities table
+
+**Documentation**:
+- `billing/README.md` - Comprehensive billing module documentation
+
+---
+
 ## 2026-01-13 - Frontend Snappiness Phase 1
 
 **Optimistic Updates** (`frontend/app/forge/page.tsx`):
