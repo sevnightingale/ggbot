@@ -2,7 +2,8 @@
 
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
-import { useEffect, useCallback, useRef, type ReactNode } from 'react'
+import { createPortal } from 'react-dom'
+import { useEffect, useCallback, useRef, useState, type ReactNode } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Size Variants (Responsive)
@@ -75,6 +76,12 @@ export function Modal({
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null)
   const previousActiveElement = useRef<HTMLElement | null>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Portal mount (needed for SSR - document not available on server)
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Focus trap
   useFocusTrap(modalRef, open)
@@ -122,7 +129,11 @@ export function Modal({
     }
   }, [open, handleKeyDown])
 
-  return (
+  // Don't render on server, wait for client mount
+  if (!mounted) return null
+
+  // Render via portal to escape parent container constraints
+  return createPortal(
     <AnimatePresence>
       {open && (
         <>
@@ -160,7 +171,8 @@ export function Modal({
           </motion.div>
         </>
       )}
-    </AnimatePresence>
+    </AnimatePresence>,
+    document.body
   )
 }
 
