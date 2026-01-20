@@ -335,6 +335,36 @@ const useDeleteBot = () => useMutation({
 
 ---
 
+## 🎨 **Unified Modal System**
+
+**Status**: 🔵 PLANNED
+**Planning Doc**: [DOCS/todo/UNIFIED_MODAL_SYSTEM.md](DOCS/todo/UNIFIED_MODAL_SYSTEM.md)
+**Complexity**: Medium (~6-8 hours)
+
+**Problem**: 8 modals with inconsistent implementations - 3 different systems (Radix, custom, Framer Motion), varying backdrops, borders, sizing, and broken `dark:` prefixes in SettingsModal.
+
+**Solution**: Unified `Modal` component with Framer Motion animations, responsive widths, full-screen mobile, consistent VIBE.md styling.
+
+### **Key Changes**
+- Framer Motion animations (from activity-modal)
+- Responsive sizing: `sm`→`md`→`lg`→`xl`→`full`
+- Full-screen on mobile (<640px)
+- Remove gold border from activity-modal
+- Fix `dark:` prefix issues (use CSS variables)
+
+### **Files to Migrate**
+- [ ] Create `components/ui/modal.tsx`
+- [ ] `AddCreditsModal.tsx` → `sm`
+- [ ] `UpgradeModal.tsx` → `sm`
+- [ ] `ArenaRegistrationModal.tsx` → `sm`
+- [ ] `SettingsModal.tsx` → `lg` + fix theme
+- [ ] `RiskAcknowledgmentModal.tsx` → `lg`
+- [ ] `BotCreationModal.tsx` → `xl`
+- [ ] `TradeHistoryModal.tsx` → `full`
+- [ ] `activity-modal.tsx` → `md` (keep nav features)
+
+---
+
 ## 📊 **Strategy Advisor Analysis** [STRATEGY_ADVISOR_ANALYSIS.md]
 
 **Status**: 🟢 COMPLETE
