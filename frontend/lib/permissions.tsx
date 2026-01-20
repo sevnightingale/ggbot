@@ -5,7 +5,7 @@ import { apiClient } from '@/lib/api'
 
 interface UserProfile {
   user_id: string
-  subscription_tier: 'free' | 'usage_based' | 'pro'
+  subscription_tier: 'free' | 'ggbase' | 'usage_based' | 'pro'  // ggbase = prepaid (credit pack users)
   subscription_status: 'active' | 'cancelled' | 'past_due'
   can_use_premium_features: boolean
   requires_own_llm_keys: boolean

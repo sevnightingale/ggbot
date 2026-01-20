@@ -9,11 +9,13 @@ validation modes with context-aware position management.
 import asyncio
 import os
 import redis
+import stripe
 from datetime import datetime, timezone
 from typing import Dict, Any, Optional, List
 from decimal import Decimal
 
 from core.common.logger import logger
+from core.services.user_service import user_service
 from core.services.config_service import config_service
 from core.common.db import get_db_connection, DecimalEncoder
 from core.services.llm_key_service import LLMKeyService
@@ -51,6 +53,11 @@ class ConfigurationError(DecisionError):
 
 class LLMError(DecisionError):
     """Exception for LLM API related errors."""
+    pass
+
+
+class InsufficientCreditsError(DecisionError):
+    """Exception raised when prepaid user has insufficient credits for LLM call."""
     pass
 
 
@@ -150,7 +157,95 @@ class DecisionEngineV2:
         except Exception as e:
             logger.bind(config_id=self.config_id, user_id=self.user_id).error(f"Failed to initialize LLM provider: {e}")
             raise ConfigurationError(f"Failed to initialize LLM provider: {e}")
-    
+
+    async def _check_prepaid_credits(self) -> bool:
+        """
+        Hard credit check for prepaid users BEFORE any LLM call.
+
+        Prepaid users MUST have credits available. If not, we raise an exception
+        immediately rather than making the LLM call and billing for overage.
+
+        Returns:
+            True if OK to proceed (not prepaid, or prepaid with credits)
+
+        Raises:
+            InsufficientCreditsError: If prepaid user has no credits remaining
+        """
+        if not self.user_id:
+            return True  # No user context, allow (shouldn't happen in practice)
+
+        # Get user profile to check tier
+        profile = await user_service.get_profile(self.user_id)
+        if not profile or not profile.requires_credit_check:
+            return True  # Not prepaid tier, no hard check needed
+
+        # Initialize stripe
+        stripe.api_key = os.getenv('STRIPE_SECRET_KEY')
+
+        # Get Stripe customer ID
+        customer_id = profile.stripe_customer_id
+        if not customer_id:
+            # Prepaid user with no Stripe customer = something wrong
+            logger.bind(user_id=self.user_id).warning(
+                "Prepaid user has no Stripe customer ID - blocking LLM call"
+            )
+            raise InsufficientCreditsError("No payment method configured for prepaid account")
+
+        try:
+            # Get credits from Stripe Credit Balance
+            credits = Decimal("0")
+            summary = stripe.billing.CreditBalanceSummary.retrieve(
+                customer=customer_id,
+                filter={'type': 'applicability_scope', 'applicability_scope': {'price_type': 'metered'}}
+            )
+            if summary.balances and len(summary.balances) > 0:
+                balance = summary.balances[0]
+                if hasattr(balance, 'available_balance') and balance.available_balance:
+                    # Stripe returns cents, convert to dollars
+                    credits = Decimal(str(balance.available_balance.monetary.value / 100))
+
+            # Get current period usage from Redis
+            period = datetime.utcnow().strftime("%Y-%m")
+            redis_client = redis.from_url(
+                os.getenv('REDIS_URL', 'redis://localhost:6379'),
+                decode_responses=True
+            )
+            usage_key = f"usage:user:{self.user_id}:{period}"
+            usage_raw = redis_client.get(usage_key)
+            usage = Decimal(usage_raw) if usage_raw else Decimal("0")
+
+            net_balance = credits - usage
+
+            if net_balance <= 0:
+                logger.bind(
+                    user_id=self.user_id,
+                    credits=float(credits),
+                    usage=float(usage),
+                    net_balance=float(net_balance)
+                ).warning("⛔ Prepaid credits exhausted - blocking LLM call")
+                raise InsufficientCreditsError(
+                    f"Prepaid credits exhausted. Credits: ${credits:.2f}, Usage: ${usage:.2f}"
+                )
+
+            logger.bind(
+                user_id=self.user_id,
+                credits=float(credits),
+                usage=float(usage),
+                net_balance=float(net_balance)
+            ).debug("✅ Prepaid credit check passed")
+
+            return True
+
+        except InsufficientCreditsError:
+            raise  # Re-raise our custom exception
+        except stripe.error.StripeError as e:
+            logger.bind(user_id=self.user_id).error(f"Stripe error during credit check: {e}")
+            # Fail open? Or fail closed? For prepaid, fail closed is safer
+            raise InsufficientCreditsError(f"Unable to verify credit balance: {e}")
+        except Exception as e:
+            logger.bind(user_id=self.user_id).error(f"Unexpected error during credit check: {e}")
+            raise InsufficientCreditsError(f"Credit verification failed: {e}")
+
     async def make_decision(self, symbol: Optional[str] = None,
                           signal_data: Optional[Dict] = None,
                           ggshot_signals: Optional[Dict] = None,
@@ -175,6 +270,9 @@ class DecisionEngineV2:
 
         if not self.config:
             await self.initialize()
+
+        # Hard credit check for prepaid users BEFORE any LLM call
+        await self._check_prepaid_credits()
 
         try:
             # Route based on config type and signal data presence
@@ -839,6 +937,15 @@ Take Profit: {take_profit_text}
             confidence = decision_data.get('confidence', 0.5)
             summary = f"Analyzed {symbol}: {action.upper()} (confidence: {confidence:.0%})"
 
+            # Check if user is prepaid tier - prepaid users don't get meter-reported
+            # (they pay upfront, not billed for overage)
+            is_prepaid = False
+            try:
+                profile = await user_service.get_profile(self.user_id)
+                is_prepaid = profile.is_prepaid_tier if profile else False
+            except Exception:
+                pass  # Default to non-prepaid if check fails
+
             # Log activity with token tracking (standalone - no decision_id)
             log_llm_activity_safe(
                 config_id=self.config_id,
@@ -865,7 +972,8 @@ Take Profit: {take_profit_text}
                 thinking_mode=thinking_mode,
                 reasoning_tokens=reasoning_tokens,
                 related_symbol=symbol,
-                importance=7  # Decision activities are important
+                importance=7,  # Decision activities are important
+                stripe_reported=is_prepaid  # Prepaid users: already "reported" (no Stripe reporting)
             )
 
             logger.bind(

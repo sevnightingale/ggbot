@@ -7,6 +7,7 @@ Funding rates indicate long/short leverage positioning in the market.
 
 from datetime import datetime, timezone
 from typing import Dict, Any
+import aiohttp
 
 from market_intelligence.adapters.base import DataAdapter
 from market_intelligence.types import QueryParams, AdapterResponse, AdapterError
@@ -27,6 +28,9 @@ class BinanceFundingAdapter(DataAdapter):
 
     # Binance Futures API endpoint
     FUTURES_API_BASE = "https://fapi.binance.com"
+
+    # Longer timeout - Binance API is fast but event loop can be blocked during bot execution
+    REQUEST_TIMEOUT = 60  # seconds (default is 30)
 
     # Funding rate interpretation thresholds
     THRESHOLDS = {
@@ -132,16 +136,16 @@ class BinanceFundingAdapter(DataAdapter):
             url = f"{self.FUTURES_API_BASE}/fapi/v1/premiumIndex"
             query_params = {'symbol': binance_symbol}
 
-            # Fetch from Binance Futures API
-            client = await self.get_http_client()
-            async with client.get(url, params=query_params) as response:
-                if response.status != 200:
-                    error_text = await response.text()
-                    raise AdapterError(
-                        f"Binance API returned {response.status}: {error_text}"
-                    )
-
-                data = await response.json()
+            # Fetch from Binance Futures API with extended timeout
+            timeout = aiohttp.ClientTimeout(total=self.REQUEST_TIMEOUT)
+            async with aiohttp.ClientSession(timeout=timeout) as session:
+                async with session.get(url, params=query_params) as response:
+                    if response.status != 200:
+                        error_text = await response.text()
+                        raise AdapterError(
+                            f"Binance API returned {response.status}: {error_text}"
+                        )
+                    data = await response.json()
 
             # Extract funding rate data
             # Binance response: {"symbol": "BTCUSDT", "markPrice": "...", "lastFundingRate": "0.00010000", ...}

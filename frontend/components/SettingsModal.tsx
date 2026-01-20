@@ -1,13 +1,13 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { Crown, Link2, CheckCircle2, Settings, Loader2, AlertCircle } from 'lucide-react'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalTitle,
+} from '@/components/ui/modal'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
 import { apiClient } from '@/lib/api'
@@ -362,17 +362,17 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-          <DialogHeader>
-            <div className="flex items-center gap-2 mb-1">
-              <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
-                <Settings className="h-5 w-5 text-[var(--text-primary)]" />
-              </div>
-              <DialogTitle className="text-2xl">Settings</DialogTitle>
+      <Modal open={open} onOpenChange={onOpenChange} size="lg">
+        <ModalHeader onClose={() => onOpenChange(false)}>
+          <div className="flex items-center gap-2">
+            <div className="rounded-full bg-[var(--bg-tertiary)] p-2">
+              <Settings className="h-5 w-5 text-[var(--text-primary)]" />
             </div>
-          </DialogHeader>
+            <ModalTitle className="text-2xl">Settings</ModalTitle>
+          </div>
+        </ModalHeader>
 
+        <ModalBody>
           <div className="space-y-6">
             {/* Subscription Section */}
             <section>
@@ -474,15 +474,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         </a>
                         {' '}under My Agents
                       </p>
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      <p className="text-xs text-amber-500 mt-1">
                         💡 Used for future balance display features. Not required for trading.
                       </p>
                     </div>
 
                     {error && (
-                      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
-                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-red-700 dark:text-red-300">{error}</p>
+                      <div className="bg-[var(--ember)]/10 border border-[var(--ember)]/30 rounded-lg p-3 flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-[var(--ember)] flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-[var(--ember)]">{error}</p>
                       </div>
                     )}
 
@@ -503,20 +503,20 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   </div>
                 </div>
               ) : (
-                <div className="border border-[var(--border)] rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
+                <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--signal)]/10">
                   <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-[var(--signal)] mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="font-medium text-green-900 dark:text-green-100 mb-1">
+                      <p className="font-medium text-[var(--text-primary)] mb-1">
                         Symphony Connected
                       </p>
-                      <p className="text-sm text-green-700 dark:text-green-300">
+                      <p className="text-sm text-[var(--text-secondary)]">
                         Smart Account: {storedSmartAccount.slice(0, 6)}...{storedSmartAccount.slice(-4)}
                       </p>
                     </div>
                     <button
                       onClick={handleDisconnect}
-                      className="text-sm text-red-600 dark:text-red-400 hover:underline font-medium"
+                      className="text-sm text-[var(--ember)] hover:underline font-medium"
                     >
                       Disconnect
                     </button>
@@ -587,15 +587,15 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         placeholder="0x... or 64 hex characters"
                         className="w-full px-3 py-2 border border-[var(--border)] rounded-lg bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-tertiary)] focus:outline-none focus:ring-2 focus:ring-purple-500/50 font-mono text-sm"
                       />
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                      <p className="text-xs text-amber-500 mt-1">
                         🔒 Stored securely in encrypted vault. Never shared.
                       </p>
                     </div>
 
                     {asterError && (
-                      <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start gap-2">
-                        <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
-                        <p className="text-sm text-red-700 dark:text-red-300">{asterError}</p>
+                      <div className="bg-[var(--ember)]/10 border border-[var(--ember)]/30 rounded-lg p-3 flex items-start gap-2">
+                        <AlertCircle className="h-4 w-4 text-[var(--ember)] flex-shrink-0 mt-0.5" />
+                        <p className="text-sm text-[var(--ember)]">{asterError}</p>
                       </div>
                     )}
 
@@ -616,23 +616,23 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                   </div>
                 </div>
               ) : (
-                <div className="border border-[var(--border)] rounded-lg p-4 bg-green-50 dark:bg-green-950/20">
+                <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--signal)]/10">
                   <div className="flex items-start gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <CheckCircle2 className="h-5 w-5 text-[var(--signal)] mt-0.5 flex-shrink-0" />
                     <div className="flex-1">
-                      <p className="font-medium text-green-900 dark:text-green-100 mb-1">
+                      <p className="font-medium text-[var(--text-primary)] mb-1">
                         AsterDEX Connected
                       </p>
-                      <p className="text-sm text-green-700 dark:text-green-300 mb-1">
+                      <p className="text-sm text-[var(--text-secondary)] mb-1">
                         User Wallet: {storedAsterUserWallet.slice(0, 6)}...{storedAsterUserWallet.slice(-4)}
                       </p>
-                      <p className="text-sm text-green-700 dark:text-green-300">
+                      <p className="text-sm text-[var(--text-secondary)]">
                         Aster Wallet: {storedAsterWallet.slice(0, 6)}...{storedAsterWallet.slice(-4)}
                       </p>
                     </div>
                     <button
                       onClick={handleAsterDisconnect}
-                      className="text-sm text-red-600 dark:text-red-400 hover:underline font-medium"
+                      className="text-sm text-[var(--ember)] hover:underline font-medium"
                     >
                       Disconnect
                     </button>
@@ -641,8 +641,8 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
               )}
             </section>
           </div>
-        </DialogContent>
-      </Dialog>
+        </ModalBody>
+      </Modal>
 
       {/* Upgrade Modal */}
       <UpgradeModal open={upgradeModalOpen} onOpenChange={setUpgradeModalOpen} />

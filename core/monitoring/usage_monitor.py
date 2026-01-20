@@ -20,6 +20,7 @@ from dataclasses import dataclass
 
 from core.common.db import get_db_connection
 from core.common.logger import logger as base_logger
+from core.services.user_service import user_service
 
 # Create usage monitor logger
 logger = base_logger.bind(service="usage_monitor")
@@ -116,20 +117,40 @@ class UsageMonitor:
 
     async def _check_user_credits(self, user_id: str) -> str:
         """
-        Check single user's credit status.
+        Check single user's credit status with tier-specific handling.
+
+        - PREPAID users: Hard block on depletion (pause bots immediately)
+        - USAGE_BASED users: Soft warning only (they'll be billed for overage)
 
         Returns: 'ok', 'warned', 'paused'
         """
         balance = await self.get_balance_status(user_id)
 
-        if balance.is_depleted:
-            await self._pause_all_user_bots(user_id, reason="credits_depleted")
-            await self._notify_user(user_id, "credits_depleted", balance)
-            return "paused"
+        # Get user profile to check tier
+        profile = await user_service.get_profile(user_id)
+        is_prepaid = profile.is_prepaid_tier if profile else False
 
-        if balance.is_low:
-            await self._notify_user(user_id, "credits_low", balance)
-            return "warned"
+        if is_prepaid:
+            # PREPAID: Hard block - pause bots when credits depleted
+            # This is backup - decision engine should catch this before LLM calls
+            if balance.is_depleted:
+                await self._pause_all_user_bots(user_id, reason="prepaid_credits_exhausted")
+                await self._notify_user(user_id, "prepaid_depleted", balance)
+                return "paused"
+
+            if balance.is_low:
+                await self._notify_user(user_id, "prepaid_low", balance)
+                return "warned"
+        else:
+            # USAGE_BASED: Soft handling - just warn, they'll be billed
+            if balance.is_depleted:
+                # Don't pause - usage_based users get billed for overage
+                await self._notify_user(user_id, "credits_depleted", balance)
+                return "warned"
+
+            if balance.is_low:
+                await self._notify_user(user_id, "credits_low", balance)
+                return "warned"
 
         return "ok"
 
@@ -201,6 +222,21 @@ class UsageMonitor:
             logger.error(f"Failed to get Stripe customer ID for {user_id}: {e}")
             return None
 
+    def _get_user_email(self, user_id: str) -> Optional[str]:
+        """Get user's email address from auth.users table."""
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    cur.execute(
+                        "SELECT email FROM auth.users WHERE id = %s",
+                        (user_id,)
+                    )
+                    result = cur.fetchone()
+                    return result[0] if result else None
+        except Exception as e:
+            logger.error(f"Failed to get email for user {user_id}: {e}")
+            return None
+
     async def _get_users_with_active_bots(self) -> List[str]:
         """Get list of user IDs with active bots."""
         try:
@@ -221,9 +257,11 @@ class UsageMonitor:
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
+                    # Note: 'paused' is not a valid state - constraint only allows 'active'/'inactive'
+                    # Setting to 'inactive' stops the scheduler and achieves the same effect
                     cur.execute("""
                         UPDATE configurations
-                        SET state = 'paused', updated_at = NOW()
+                        SET state = 'inactive', updated_at = NOW()
                         WHERE user_id = %s AND state = 'active'
                         RETURNING config_id, config_name
                     """, (user_id,))
@@ -247,7 +285,7 @@ class UsageMonitor:
 
     async def _notify_user(self, user_id: str, notification_type: str, balance: BalanceStatus):
         """
-        Send notification to user.
+        Send notification to user via email.
 
         Rate-limited to avoid spam - won't re-notify within cooldown period.
         """
@@ -260,21 +298,128 @@ class UsageMonitor:
 
         self.warned_users[user_id] = now
 
-        # Log the notification (TODO: Implement email via Resend)
-        if notification_type == "credits_depleted":
+        # Log the notification
+        if notification_type in ["credits_depleted", "prepaid_depleted"]:
             logger.warning(
                 f"💸 CREDITS DEPLETED for {user_id}: "
                 f"credits=${balance.credits_available:.2f}, usage=${balance.period_usage:.2f}"
             )
-        elif notification_type == "credits_low":
+        elif notification_type in ["credits_low", "prepaid_low"]:
             logger.info(
                 f"⚠️ LOW CREDITS for {user_id}: "
                 f"credits=${balance.credits_available:.2f}, usage=${balance.period_usage:.2f}, "
                 f"remaining=${balance.net_balance:.2f}"
             )
 
-        # TODO: Send email notification via Resend
-        # await send_credit_notification_email(user_id, notification_type, balance)
+        # Send email notification via Resend
+        user_email = self._get_user_email(user_id)
+        if not user_email:
+            logger.warning(f"Cannot send notification - no email found for user {user_id}")
+            return
+
+        try:
+            from core.services.resend_service import resend_service
+
+            if notification_type == "prepaid_depleted":
+                # Prepaid users: Bots paused, no further charges
+                title = "Your Prepaid Credits Are Exhausted - Bots Paused"
+                message = f"""
+                <p>Your prepaid credit balance has been fully used.</p>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Credits Purchased:</strong> ${balance.credits_available:.2f}</p>
+                    <p style="margin: 5px 0;"><strong>Usage:</strong> ${balance.period_usage:.2f}</p>
+                    <p style="margin: 5px 0; color: #dc3545;"><strong>Remaining:</strong> $0.00</p>
+                </div>
+
+                <p><strong>Your bots have been paused.</strong></p>
+                <p>As a prepaid user, you won't be charged anything more. Purchase additional credits to reactivate your bots.</p>
+                """
+                resend_service.send_notification(
+                    user_email=user_email,
+                    title=title,
+                    message=message,
+                    action_text="Buy More Credits",
+                    action_url="https://app.ggbots.ai/forge",
+                    notification_type="error"
+                )
+                logger.info(f"📧 Sent prepaid depleted email to {user_email}")
+
+            elif notification_type == "prepaid_low":
+                # Prepaid users: Low balance warning
+                title = "Low Prepaid Credit Balance"
+                message = f"""
+                <p>Your prepaid credit balance is running low.</p>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Credits Purchased:</strong> ${balance.credits_available:.2f}</p>
+                    <p style="margin: 5px 0;"><strong>Usage:</strong> ${balance.period_usage:.2f}</p>
+                    <p style="margin: 5px 0; color: #ffc107;"><strong>Remaining:</strong> ${balance.net_balance:.2f}</p>
+                </div>
+
+                <p>When your credits run out, your bots will be paused. As a prepaid user, you'll never be charged beyond what you've purchased.</p>
+                <p>Consider adding more credits to ensure uninterrupted bot operation.</p>
+                """
+                resend_service.send_notification(
+                    user_email=user_email,
+                    title=title,
+                    message=message,
+                    action_text="Buy More Credits",
+                    action_url="https://app.ggbots.ai/forge",
+                    notification_type="warning"
+                )
+                logger.info(f"📧 Sent prepaid low credits warning email to {user_email}")
+
+            elif notification_type == "credits_depleted":
+                # Usage-based users: Warning only (they'll be billed)
+                title = "Your ggbots Credits Are Depleted"
+                message = f"""
+                <p>Your ggbots credit balance has been exhausted.</p>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Credits Purchased:</strong> ${balance.credits_available:.2f}</p>
+                    <p style="margin: 5px 0;"><strong>Usage This Month:</strong> ${balance.period_usage:.2f}</p>
+                    <p style="margin: 5px 0; color: #dc3545;"><strong>Balance:</strong> ${balance.net_balance:.2f}</p>
+                </div>
+
+                <p>Your bots will continue running. Any usage beyond your credits will be billed to your payment method.</p>
+                <p>Add more credits to reduce your upcoming bill.</p>
+                """
+                resend_service.send_notification(
+                    user_email=user_email,
+                    title=title,
+                    message=message,
+                    action_text="Add Credits",
+                    action_url="https://app.ggbots.ai/forge",
+                    notification_type="warning"
+                )
+                logger.info(f"📧 Sent credits depleted email to {user_email}")
+
+            elif notification_type == "credits_low":
+                title = "Low Credit Balance Warning"
+                message = f"""
+                <p>Your ggbots credit balance is running low.</p>
+
+                <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                    <p style="margin: 5px 0;"><strong>Credits Purchased:</strong> ${balance.credits_available:.2f}</p>
+                    <p style="margin: 5px 0;"><strong>Usage This Month:</strong> ${balance.period_usage:.2f}</p>
+                    <p style="margin: 5px 0; color: #ffc107;"><strong>Remaining:</strong> ${balance.net_balance:.2f}</p>
+                </div>
+
+                <p>Consider adding more credits to ensure uninterrupted bot operation.</p>
+                """
+                resend_service.send_notification(
+                    user_email=user_email,
+                    title=title,
+                    message=message,
+                    action_text="Add Credits",
+                    action_url="https://app.ggbots.ai/forge",
+                    notification_type="warning"
+                )
+                logger.info(f"📧 Sent low credits warning email to {user_email}")
+
+        except Exception as e:
+            logger.error(f"Failed to send credit notification email to {user_email}: {e}")
 
     async def cache_usage_summaries(self):
         """

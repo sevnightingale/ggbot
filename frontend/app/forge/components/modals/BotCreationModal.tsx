@@ -1,12 +1,9 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import Image from 'next/image'
 import { Bot, Rocket, Loader2, AlertCircle, Zap, ChevronRight, ChevronLeft, Sparkles, X } from 'lucide-react'
-import {
-  Dialog,
-  DialogContent,
-} from '@/components/ui/dialog'
+import { Modal, ModalBody, ModalFooter } from '@/components/ui/modal'
 import { SymbolSelector } from '@/components/SymbolSelector'
 import { apiClient } from '@/lib/api'
 import { getArchetypeConfig, getArchetypeSummaries } from '@/lib/archetypes'
@@ -726,46 +723,46 @@ export function BotCreationModal({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0" hideCloseButton>
-        {/* Header with close button (hidden if forceOpen) */}
-        <div className="p-6 pb-0">
-          <div className="flex items-center justify-between mb-2">
-            <h1 className="text-sm font-medium text-[var(--text-muted)]">Create New Bot</h1>
-            {forceOpen ? (
-              <div
-                className="p-1 rounded text-[var(--text-muted)] cursor-not-allowed opacity-50"
-                title="Create your first bot to continue"
-              >
-                <X className="h-4 w-4" />
-              </div>
-            ) : (
-              <button
-                onClick={() => onOpenChange(false)}
-                className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            )}
-          </div>
-
-          <ProgressBar />
-        </div>
-
-        {/* Step Content */}
-        <div className="px-6 py-4 min-h-[400px]">
-          {renderStep()}
-
-          {/* Error display */}
-          {error && (
-            <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
-              {error}
+    <Modal open={open} onOpenChange={handleOpenChange} size="xl" preventClose={forceOpen}>
+      {/* Custom Header with progress bar */}
+      <div className="p-4 sm:p-6 pb-0 flex-shrink-0">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="text-sm font-medium text-[var(--text-muted)]">Create New Bot</h1>
+          {forceOpen ? (
+            <div
+              className="p-1 rounded text-[var(--text-muted)] cursor-not-allowed opacity-50"
+              title="Create your first bot to continue"
+            >
+              <X className="h-4 w-4" />
             </div>
+          ) : (
+            <button
+              onClick={() => onOpenChange(false)}
+              className="p-1 rounded hover:bg-[var(--bg-tertiary)] text-[var(--text-muted)]"
+            >
+              <X className="h-4 w-4" />
+            </button>
           )}
         </div>
 
-        {/* Navigation */}
-        <div className="p-6 pt-0 flex justify-between items-center border-t border-[var(--border)]">
+        <ProgressBar />
+      </div>
+
+      {/* Step Content */}
+      <ModalBody className="min-h-[400px]">
+        {renderStep()}
+
+        {/* Error display */}
+        {error && (
+          <div className="mt-4 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-500 text-sm">
+            {error}
+          </div>
+        )}
+      </ModalBody>
+
+      {/* Navigation */}
+      <ModalFooter>
+        <div className="flex justify-between items-center w-full">
           <button
             onClick={handleBack}
             disabled={currentStep === 1}
@@ -816,7 +813,7 @@ export function BotCreationModal({
             </button>
           )}
         </div>
-      </DialogContent>
-    </Dialog>
+      </ModalFooter>
+    </Modal>
   )
 }

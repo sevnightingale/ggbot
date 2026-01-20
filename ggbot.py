@@ -4375,20 +4375,43 @@ async def handle_checkout_completed(session):
             f"Subscription activated: tier={subscription_tier}, plan={plan}, Customer: {customer_id}, Subscription: {subscription_id}"
         )
     elif is_credit_purchase:
-        # Payment mode (existing subscriber) - just update customer_id if needed
+        # Payment mode (no subscription) - credit pack purchase
+        # For free tier users, upgrade them to prepaid tier (stored as 'ggbase')
+        # For existing paid users, keep their tier (credits just add to balance)
         with get_db_connection() as conn:
             with conn.cursor() as cur:
+                # First, get current tier
                 cur.execute("""
-                    UPDATE user_profiles
-                    SET stripe_customer_id = %s,
-                        updated_at = NOW()
-                    WHERE user_id = %s AND stripe_customer_id IS NULL
-                """, (customer_id, user_id))
-                conn.commit()
+                    SELECT subscription_tier FROM user_profiles WHERE user_id = %s
+                """, (user_id,))
+                result = cur.fetchone()
+                current_tier = result[0] if result else 'free'
 
-        logger.bind(user_id=user_id).info(
-            f"Credit purchase completed (existing subscriber): Customer: {customer_id}"
-        )
+                if current_tier == 'free':
+                    # Upgrade free users to prepaid tier (ggbase)
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET subscription_tier = 'ggbase',
+                            subscription_status = 'active',
+                            stripe_customer_id = %s,
+                            updated_at = NOW()
+                        WHERE user_id = %s
+                    """, (customer_id, user_id))
+                    logger.bind(user_id=user_id).info(
+                        f"Upgraded to prepaid tier: Customer: {customer_id}"
+                    )
+                else:
+                    # Existing paid user - just ensure customer_id is set
+                    cur.execute("""
+                        UPDATE user_profiles
+                        SET stripe_customer_id = %s,
+                            updated_at = NOW()
+                        WHERE user_id = %s AND stripe_customer_id IS NULL
+                    """, (customer_id, user_id))
+                    logger.bind(user_id=user_id).info(
+                        f"Credit purchase completed (existing {current_tier} subscriber): Customer: {customer_id}"
+                    )
+                conn.commit()
 
 
 async def handle_subscription_updated(subscription):
@@ -4550,8 +4573,9 @@ async def purchase_credits(
 ):
     """Create Stripe Checkout session for credit purchase.
 
-    If user is free tier: Creates subscription + credit purchase in one checkout.
-    If user already has subscription: Creates one-time payment for credits.
+    All credit purchases use payment mode (no subscription).
+    - Free tier users → become prepaid (ggbase) tier
+    - Existing paid users → credits add to their balance
     """
     amount_cents = request.amount_cents
 
@@ -4568,10 +4592,7 @@ async def purchase_credits(
             current_user.email
         )
 
-        # Check if user needs subscription
-        needs_subscription = not has_usage_based_subscription(str(current_user.user_id))
-
-        # Credit purchase line item (one-time)
+        # Credit purchase line item (one-time payment)
         credit_line_item = {
             'price_data': {
                 'currency': 'usd',
@@ -4584,51 +4605,23 @@ async def purchase_credits(
             'quantity': 1
         }
 
-        if needs_subscription:
-            # Free user: Create subscription + one-time credit purchase
-            # Stripe Checkout supports mixing subscription and one-time items
-            usage_price_id = os.environ.get('STRIPE_PRICE_ID_USAGE')
-            if not usage_price_id:
-                raise HTTPException(500, "Usage price not configured")
-
-            session = stripe.checkout.Session.create(
-                customer=customer_id,
-                mode='subscription',
-                line_items=[
-                    {'price': usage_price_id},  # $0 metered subscription
-                    credit_line_item  # One-time credit purchase
-                ],
-                success_url=f"{os.environ['FRONTEND_URL']}/credits/success?session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{os.environ['FRONTEND_URL']}/forge",
-                subscription_data={
-                    'metadata': {
-                        'user_id': str(current_user.user_id),
-                        'plan': 'usage'
-                    }
-                },
-                metadata={
-                    'user_id': str(current_user.user_id),
-                    'type': 'credit_purchase',
-                    'amount_cents': str(amount_cents)
-                }
-            )
-        else:
-            # Existing subscriber: Just one-time payment for credits
-            session = stripe.checkout.Session.create(
-                customer=customer_id,
-                mode='payment',
-                line_items=[credit_line_item],
-                success_url=f"{os.environ['FRONTEND_URL']}/credits/success?session_id={{CHECKOUT_SESSION_ID}}",
-                cancel_url=f"{os.environ['FRONTEND_URL']}/forge",
-                metadata={
-                    'user_id': str(current_user.user_id),
-                    'type': 'credit_purchase',
-                    'amount_cents': str(amount_cents)
-                }
-            )
+        # All credit purchases use payment mode (prepaid model)
+        # No metered subscription - webhook will set tier appropriately
+        session = stripe.checkout.Session.create(
+            customer=customer_id,
+            mode='payment',
+            line_items=[credit_line_item],
+            success_url=f"{os.environ['FRONTEND_URL']}/credits/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{os.environ['FRONTEND_URL']}/forge",
+            metadata={
+                'user_id': str(current_user.user_id),
+                'type': 'credit_purchase',
+                'amount_cents': str(amount_cents)
+            }
+        )
 
         logger.bind(user_id=str(current_user.user_id)).info(
-            f"Created credit purchase checkout: ${amount_cents/100:.2f}, needs_subscription={needs_subscription}"
+            f"Created credit purchase checkout: ${amount_cents/100:.2f}"
         )
 
         return {'checkout_url': session.url}
@@ -4787,39 +4780,43 @@ async def nowpayments_webhook(request: Request):
     # Get or create Stripe customer
     customer_id = await get_or_create_stripe_customer(user_id, email)
 
-    # Ensure user has usage_based subscription (required for credit grants)
-    if not has_usage_based_subscription(user_id):
-        # Create subscription programmatically
-        usage_price_id = os.environ.get('STRIPE_PRICE_ID_USAGE')
-        if usage_price_id:
-            try:
-                subscription = stripe.Subscription.create(
-                    customer=customer_id,
-                    items=[{'price': usage_price_id}],
-                    metadata={'user_id': user_id, 'plan': 'usage'}
-                )
+    # Check user's current tier to decide how to handle the credit purchase
+    with get_db_connection() as conn:
+        with conn.cursor() as cur:
+            cur.execute("""
+                SELECT subscription_tier FROM user_profiles WHERE user_id = %s
+            """, (user_id,))
+            tier_result = cur.fetchone()
+            current_tier = tier_result[0] if tier_result else 'free'
 
-                # Update user profile
-                with get_db_connection() as conn:
-                    with conn.cursor() as cur:
-                        cur.execute("""
-                            UPDATE user_profiles
-                            SET subscription_tier = 'usage_based',
-                                subscription_status = 'active',
-                                stripe_customer_id = %s,
-                                stripe_subscription_id = %s,
-                                subscription_expires_at = NULL,
-                                updated_at = NOW()
-                            WHERE user_id = %s
-                        """, (customer_id, subscription.id, user_id))
-                        conn.commit()
+    if current_tier == 'free':
+        # Free tier user buying credits via crypto → upgrade to prepaid (ggbase)
+        # NO metered subscription - they pay upfront only
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    UPDATE user_profiles
+                    SET subscription_tier = 'ggbase',
+                        subscription_status = 'active',
+                        stripe_customer_id = %s,
+                        updated_at = NOW()
+                    WHERE user_id = %s
+                """, (customer_id, user_id))
+                conn.commit()
 
-                logger.bind(user_id=user_id).info(
-                    f"Created subscription via crypto payment: {subscription.id}"
-                )
-            except stripe.error.StripeError as e:
-                logger.error(f"Failed to create subscription: {e}")
-                raise HTTPException(500, "Failed to create subscription")
+        logger.bind(user_id=user_id).info(
+            f"Upgraded to prepaid tier via crypto: Customer: {customer_id}"
+        )
+    elif current_tier == 'ggbase':
+        # Already prepaid - just add more credits (no tier change needed)
+        logger.bind(user_id=user_id).info(
+            f"Adding credits to existing prepaid account via crypto"
+        )
+    else:
+        # Already on usage_based or pro tier - credits will apply as discounts
+        logger.bind(user_id=user_id).info(
+            f"Adding credits to existing {current_tier} account via crypto"
+        )
 
     # Create Stripe Credit Grant
     try:

@@ -290,7 +290,8 @@ def log_llm_activity(
     reasoning_tokens: Optional[int] = None,
     decision_id: Optional[str] = None,
     related_symbol: Optional[str] = None,
-    importance: int = 5
+    importance: int = 5,
+    stripe_reported: bool = False
 ) -> str:
     """
     Log LLM activity WITH token tracking for metered billing.
@@ -315,6 +316,7 @@ def log_llm_activity(
         decision_id: Optional decision linking (deprecated)
         related_symbol: Optional symbol context
         importance: User-facing importance (1-10), default 5
+        stripe_reported: Set True for prepaid users (no meter reporting needed)
 
     Returns:
         activity_id: UUID of created activity
@@ -367,7 +369,7 @@ def log_llm_activity(
                     config_id, user_id, 'llm_thought', activity_source, summary,
                     json.dumps(details), decision_id, related_symbol, importance,
                     provider, model, thinking_mode, input_tokens, output_tokens,
-                    reasoning_tokens, provider_cost_usd, platform_cost_usd, False,
+                    reasoning_tokens, provider_cost_usd, platform_cost_usd, stripe_reported,
                     account_balance, account_pnl
                 ))
                 activity_id = cur.fetchone()[0]
@@ -448,7 +450,8 @@ def log_llm_activity_safe(
     reasoning_tokens: Optional[int] = None,
     decision_id: Optional[str] = None,
     related_symbol: Optional[str] = None,
-    importance: int = 5
+    importance: int = 5,
+    stripe_reported: bool = False
 ) -> Optional[str]:
     """
     Safe wrapper for log_llm_activity that catches exceptions.
@@ -479,7 +482,8 @@ def log_llm_activity_safe(
             reasoning_tokens=reasoning_tokens,
             decision_id=decision_id,
             related_symbol=related_symbol,
-            importance=importance
+            importance=importance,
+            stripe_reported=stripe_reported
         )
     except Exception as e:
         from core.common.logger import logger

@@ -78,6 +78,35 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
+## 💳 ~~**HIGH PRIORITY - Prepaid Tier Implementation**~~ ✅ COMPLETED
+
+**Status**: ✅ IMPLEMENTED (2026-01-20)
+**Planning Doc**: [DOCS/todo/PREPAID_TIER.md](DOCS/todo/PREPAID_TIER.md)
+
+**Solution**: Separate `prepaid` tier (using existing `ggbase` enum value):
+- NO Stripe metered subscription
+- Hard-block LLM calls when credits exhausted (before call, not after)
+- No invoices at end of billing period
+
+**Completed Phases**:
+- [x] **Phase 1**: Update `SubscriptionTier` enum + `can_activate_bots` permission
+- [x] **Phase 2**: Add pre-LLM credit check in `decision/engine_v2.py`
+- [x] **Phase 3**: Skip meter reporting for prepaid users in `stripe_meter_reporter.py`
+- [x] **Phase 4**: Update usage monitor for prepaid-specific handling
+- [x] **Phase 5**: Update checkout webhook to set prepaid tier
+- [x] **Phase 6**: Frontend updates (permissions type)
+
+**Files Modified**:
+- `core/domain/user_profile.py` - Added PREPAID tier, `is_prepaid_tier`, `requires_credit_check`
+- `decision/engine_v2.py` - Pre-LLM credit check, `stripe_reported=True` for prepaid
+- `core/common/activity_logger.py` - Added `stripe_reported` parameter
+- `billing/stripe_meter_reporter.py` - Exclude prepaid users from meter reporting
+- `core/monitoring/usage_monitor.py` - Separate prepaid vs usage_based handling
+- `ggbot.py` - Checkout webhook sets prepaid tier for credit purchases
+- `frontend/lib/permissions.tsx` - Added 'ggbase' to tier type
+
+---
+
 ## 🚨 **CRITICAL - CVE-2025-66478 Secret Rotation**
 
 **Status**: 🔴 URGENT - Application was vulnerable for ~11 hours (Dec 4-5, 2025)

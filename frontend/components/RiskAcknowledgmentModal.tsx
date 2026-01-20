@@ -1,7 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { AlertTriangle, X } from 'lucide-react'
+import { AlertTriangle } from 'lucide-react'
+import {
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalTitle,
+} from '@/components/ui/modal'
 
 interface RiskAcknowledgmentModalProps {
   isOpen: boolean
@@ -20,8 +27,6 @@ export function RiskAcknowledgmentModal({
 }: RiskAcknowledgmentModalProps) {
   const [acknowledged, setAcknowledged] = useState(false)
 
-  if (!isOpen) return null
-
   const isLiveTrading = tradingMode === 'symphony' || tradingMode === 'aster'
   const platformName = tradingMode === 'symphony' ? 'Symphony.io' : 'AsterDEX'
 
@@ -38,34 +43,24 @@ export function RiskAcknowledgmentModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
-      <div className="relative w-full max-w-2xl mx-4 bg-[var(--bg-secondary)] border border-[var(--border)] rounded-lg shadow-2xl">
-        {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b border-[var(--border)]">
-          <div className="flex items-center gap-3">
-            <AlertTriangle className="w-6 h-6 text-yellow-500" />
-            <h2 className="text-xl font-bold text-[var(--text-primary)]">
-              {isLiveTrading ? 'Live Trading Risk Acknowledgment' : 'Bot Activation'}
-            </h2>
-          </div>
-          <button
-            onClick={handleClose}
-            className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            <X className="w-5 h-5" />
-          </button>
-        </div>
+    <Modal open={isOpen} onOpenChange={(open) => !open && handleClose()} size="lg">
+      <ModalHeader onClose={handleClose}>
+        <ModalTitle className="flex items-center gap-3">
+          <AlertTriangle className="w-6 h-6 text-yellow-500" />
+          {isLiveTrading ? 'Live Trading Risk Acknowledgment' : 'Bot Activation'}
+        </ModalTitle>
+      </ModalHeader>
 
-        {/* Content */}
-        <div className="p-6 space-y-4 max-h-[60vh] overflow-y-auto">
+      <ModalBody>
+        <div className="space-y-4">
           <p className="text-[var(--text-primary)] font-semibold">
             You are about to activate &quot;{botName}&quot; {isLiveTrading && `in ${platformName} live trading mode`}.
           </p>
 
           {isLiveTrading && (
             <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-lg p-4">
-              <p className="text-yellow-200 font-semibold mb-2">⚠️ This bot will trade with real funds</p>
-              <p className="text-yellow-200/80 text-sm">
+              <p className="text-yellow-500 font-semibold mb-2">⚠️ This bot will trade with real funds</p>
+              <p className="text-yellow-500/80 text-sm">
                 All trades executed by this bot will use your actual {platformName} account balance.
               </p>
             </div>
@@ -126,28 +121,27 @@ export function RiskAcknowledgmentModal({
             </span>
           </label>
         </div>
+      </ModalBody>
 
-        {/* Footer */}
-        <div className="flex items-center justify-end gap-3 p-6 border-t border-[var(--border)]">
-          <button
-            onClick={handleClose}
-            className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleAccept}
-            disabled={!acknowledged}
-            className={`px-6 py-2 text-sm font-medium rounded-lg transition-all ${
-              acknowledged
-                ? 'bg-[var(--accent)] text-white hover:opacity-90'
-                : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-50'
-            }`}
-          >
-            Activate Bot
-          </button>
-        </div>
-      </div>
-    </div>
+      <ModalFooter>
+        <button
+          onClick={handleClose}
+          className="px-4 py-2 text-sm font-medium text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleAccept}
+          disabled={!acknowledged}
+          className={`px-6 py-2 text-sm font-medium rounded-lg transition-all ${
+            acknowledged
+              ? 'bg-[var(--accent)] text-white hover:opacity-90'
+              : 'bg-[var(--bg-tertiary)] text-[var(--text-secondary)] cursor-not-allowed opacity-50'
+          }`}
+        >
+          Activate Bot
+        </button>
+      </ModalFooter>
+    </Modal>
   )
 }

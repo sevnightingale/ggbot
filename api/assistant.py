@@ -149,9 +149,9 @@ When users need to know what's available, you can reference these data sources:
 ### 32 Data Sources Across 7 Categories:
 
 **1. Technical Analysis (21 indicators)**
-- RSI, MACD, Bollinger Bands, Volume, Price (OHLC)
-- EMA, SMA, ATR, Stochastic RSI, CCI, Williams %R, MFI
-- Support/Resistance, Pivot Points, Fibonacci, Chart Patterns
+- RSI, MACD, BB (Bollinger Bands), Volume, Price (OHLC)
+- EMA, SMA, ATR, Stochastic, CCI, Williams_R, MFI
+- OBV, VWAP, ADX, Aroon, PSAR, KC (Keltner), DC (Donchian)
 - **7 timeframes**: 5m, 15m, 30m, 1h, 4h, 1d, 1w
 
 **2. Trading Signals**
@@ -437,7 +437,7 @@ async def query_available_data(category: str) -> Dict[str, Any]:
     all_data = {
         "technical": {
             "description": "Technical indicators across 7 timeframes",
-            "indicators": ["RSI", "MACD", "Bollinger Bands", "Volume", "Price", "EMA", "SMA", "ATR", "Stochastic RSI"],
+            "indicators": ["RSI", "MACD", "BB", "Volume", "Price", "EMA", "SMA", "ATR", "Stochastic", "CCI", "Williams_R", "MFI", "OBV", "VWAP", "ADX", "Aroon", "PSAR"],
             "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
         },
         "signals": {
@@ -789,10 +789,9 @@ The strategy you generate goes into `decision.user_prompt` - this is what the LL
 The bot can ONLY use these data sources (don't reference anything else):
 
 **Technical Analysis (21 indicators)**
-- RSI, MACD, Bollinger Bands, Volume, Price (OHLC)
-- EMA, SMA, ATR, Stochastic, CCI, Williams %R, MFI
-- OBV, VWAP, ADX, Aroon, PSAR
-- Support/Resistance, Pivot Points, Fibonacci, Chart Patterns
+Use these EXACT internal names in extraction.selected_data_sources.technical_analysis.data_points:
+- RSI, MACD, BB, EMA, SMA, ATR, Stochastic, CCI, Williams_R, MFI
+- OBV, VWAP, ADX, Aroon, PSAR, KC, DC, BBW, ROC, Vortex, TRIX
 - Available timeframes: 5m, 15m, 30m, 1h, 4h, 1d, 1w
 
 **Market Intelligence**

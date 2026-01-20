@@ -15,7 +15,8 @@ import uuid
 class SubscriptionTier(Enum):
     """Available subscription tiers for the business model."""
     FREE = "free"                # Free tier: Can browse, cannot activate bots
-    USAGE_BASED = "usage_based"  # Usage tier: Pay per LLM call, no base fee
+    PREPAID = "ggbase"           # Prepaid tier: Credit pack users, hard-block on depletion
+    USAGE_BASED = "usage_based"  # Usage tier: Pay per LLM call, metered billing
     PRO = "pro"                  # Premium tier: $29/month + usage + agent access
 
 
@@ -74,6 +75,21 @@ class UserProfile:
         return self.subscription_tier == SubscriptionTier.PRO
 
     @property
+    def is_prepaid_tier(self) -> bool:
+        """Check if user is on prepaid (credit pack) tier."""
+        return self.subscription_tier == SubscriptionTier.PREPAID
+
+    @property
+    def requires_credit_check(self) -> bool:
+        """
+        Check if user requires hard credit balance check before LLM calls.
+
+        Prepaid users MUST have credits available before any LLM call.
+        Usage-based users are billed for overage, so no hard check needed.
+        """
+        return self.subscription_tier == SubscriptionTier.PREPAID
+
+    @property
     def has_active_subscription(self) -> bool:
         """Check if user has active subscription."""
         return (
@@ -102,10 +118,14 @@ class UserProfile:
         MASTER PERMISSION: Check if user can activate/run bots.
 
         This is the single source of truth for all paid features.
-        True for USAGE_BASED and PRO tiers with active subscriptions.
+        True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
         """
         return (
-            self.subscription_tier in [SubscriptionTier.USAGE_BASED, SubscriptionTier.PRO] and
+            self.subscription_tier in [
+                SubscriptionTier.PREPAID,
+                SubscriptionTier.USAGE_BASED,
+                SubscriptionTier.PRO
+            ] and
             self.has_active_subscription and
             not self.subscription_expired
         )
