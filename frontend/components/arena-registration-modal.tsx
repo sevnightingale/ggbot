@@ -2,13 +2,13 @@
 
 import { useState } from 'react'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogDescription,
-  DialogFooter,
-} from '@/components/ui/dialog'
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  ModalTitle,
+  ModalDescription,
+} from '@/components/ui/modal'
 import { Trophy, Calendar, DollarSign, Zap, AlertCircle, CheckCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 
@@ -76,8 +76,8 @@ export function ArenaRegistrationModal({
   // Success state UI
   if (success) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-md">
+      <Modal open={isOpen} onOpenChange={onClose} size="sm">
+        <ModalBody>
           <div className="flex flex-col items-center justify-center py-8">
             <div className="rounded-full bg-green-500/20 p-4 mb-4">
               <CheckCircle className="h-12 w-12 text-green-500" />
@@ -92,25 +92,25 @@ export function ArenaRegistrationModal({
               Competition starts January 21st
             </p>
           </div>
-        </DialogContent>
-      </Dialog>
+        </ModalBody>
+      </Modal>
     )
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-md">
-        <DialogHeader>
-          <DialogTitle className="flex items-center gap-2">
-            <Trophy className="h-5 w-5 text-[var(--accent)]" />
-            Enter the ggArena
-          </DialogTitle>
-          <DialogDescription>
-            Register &quot;{configName}&quot; for Season 1 competition
-          </DialogDescription>
-        </DialogHeader>
+    <Modal open={isOpen} onOpenChange={onClose} size="sm">
+      <ModalHeader onClose={onClose}>
+        <ModalTitle className="flex items-center gap-2">
+          <Trophy className="h-5 w-5 text-[var(--accent)]" />
+          Enter the ggArena
+        </ModalTitle>
+        <ModalDescription>
+          Register &quot;{configName}&quot; for Season 1 competition
+        </ModalDescription>
+      </ModalHeader>
 
-        <div className="space-y-4 py-4">
+      <ModalBody>
+        <div className="space-y-4">
           {/* Competition Details */}
           <div className="space-y-3">
             <div className="flex items-center gap-3 text-[var(--text-primary)]">
@@ -144,23 +144,23 @@ export function ArenaRegistrationModal({
             </div>
           )}
         </div>
+      </ModalBody>
 
-        <DialogFooter className="gap-2 sm:gap-0">
-          <button
-            onClick={onClose}
-            className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={handleRegister}
-            disabled={loading}
-            className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] font-medium hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
-          >
-            {loading ? 'Registering...' : 'Enter Arena'}
-          </button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+      <ModalFooter>
+        <button
+          onClick={onClose}
+          className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+        >
+          Cancel
+        </button>
+        <button
+          onClick={handleRegister}
+          disabled={loading}
+          className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] font-medium hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors"
+        >
+          {loading ? 'Registering...' : 'Enter Arena'}
+        </button>
+      </ModalFooter>
+    </Modal>
   )
 }

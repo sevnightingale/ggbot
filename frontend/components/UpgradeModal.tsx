@@ -1,13 +1,14 @@
 'use client'
 
-import React, { useState, useMemo } from 'react'
+import { useState, useMemo } from 'react'
 import { Loader2, Check, Bot, ChevronLeft } from 'lucide-react'
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog'
+  Modal,
+  ModalHeader,
+  ModalBody,
+  ModalTitle,
+  ModalDescription,
+} from '@/components/ui/modal'
 import { apiClient, BotConfiguration } from '@/lib/api'
 import { CreditPicker } from '@/components/CreditPicker'
 
@@ -117,40 +118,37 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="max-w-sm p-0 gap-0 overflow-hidden">
-        {/* Header */}
-        <div className="p-6 pb-4">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold flex items-center gap-2">
-              {paymentMode !== 'choose' && (
-                <button
-                  onClick={() => setPaymentMode('choose')}
-                  className="p-1 -ml-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
-                >
-                  <ChevronLeft size={20} className="text-[var(--text-secondary)]" />
-                </button>
-              )}
-              <Bot size={20} className="text-[var(--accent)]" />
-              {paymentMode === 'prepay' ? 'Prepay Credits' : `Activate ${botName}`}
-            </DialogTitle>
-          </DialogHeader>
-          <p className="text-sm text-[var(--text-secondary)] mt-2">
-            {paymentMode === 'prepay'
-              ? 'Buy credits upfront. Use until empty, never expires.'
-              : 'Your bot will analyze markets and trade 24/7 while you sleep.'
-            }
-          </p>
-        </div>
+    <Modal open={open} onOpenChange={handleOpenChange} size="sm">
+      <ModalHeader onClose={() => handleOpenChange(false)}>
+        <ModalTitle className="flex items-center gap-2">
+          {paymentMode !== 'choose' && (
+            <button
+              onClick={() => setPaymentMode('choose')}
+              className="p-1 -ml-1 rounded hover:bg-[var(--bg-tertiary)] transition-colors"
+            >
+              <ChevronLeft size={20} className="text-[var(--text-secondary)]" />
+            </button>
+          )}
+          <Bot size={20} className="text-[var(--accent)]" />
+          {paymentMode === 'prepay' ? 'Prepay Credits' : `Activate ${botName}`}
+        </ModalTitle>
+        <ModalDescription>
+          {paymentMode === 'prepay'
+            ? 'Buy credits upfront. Use until empty, never expires.'
+            : 'Your bot will analyze markets and trade 24/7 while you sleep.'
+          }
+        </ModalDescription>
+      </ModalHeader>
 
+      <ModalBody className="p-0">
         {/* Choose Payment Mode */}
         {paymentMode === 'choose' && (
           <>
-            <div className="px-6 pb-4 space-y-3">
+            <div className="px-4 sm:px-6 pb-4 space-y-3">
               {/* Pay as you go option */}
               <button
                 onClick={() => setPaymentMode('usage')}
-                className="w-full p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
+                className="w-full p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
               >
                 <div className="font-medium text-[var(--text-primary)]">Pay as you go</div>
                 <div className="text-sm text-[var(--text-secondary)] mt-1">
@@ -164,7 +162,7 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
               {/* Prepay credits option */}
               <button
                 onClick={() => setPaymentMode('prepay')}
-                className="w-full p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
+                className="w-full p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] hover:border-[var(--accent)] transition-all text-left"
               >
                 <div className="font-medium text-[var(--text-primary)]">Prepay credits</div>
                 <div className="text-sm text-[var(--text-secondary)] mt-1">
@@ -177,7 +175,7 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
             </div>
 
             {/* Trust Points */}
-            <div className="px-6 pb-6 space-y-2">
+            <div className="px-4 sm:px-6 pb-6 space-y-2">
               <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                 <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
                 <span>Pay only for AI decisions</span>
@@ -194,8 +192,8 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
         {paymentMode === 'usage' && (
           <>
             {/* Estimate Card */}
-            <div className="px-6 pb-4">
-              <div className="p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+            <div className="px-4 sm:px-6 pb-4">
+              <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
                 <div className="text-center">
                   <div className="text-sm text-[var(--text-secondary)] mb-1">
                     Estimated cost
@@ -212,7 +210,7 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
             </div>
 
             {/* Trust Points */}
-            <div className="px-6 pb-6 space-y-2">
+            <div className="px-4 sm:px-6 pb-4 space-y-2">
               <div className="flex items-center gap-2 text-sm text-[var(--text-secondary)]">
                 <Check size={16} className="text-[var(--profit-color)] flex-shrink-0" />
                 <span>Pay only for AI decisions</span>
@@ -229,13 +227,13 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
 
             {/* Error Message */}
             {error && (
-              <div className="mx-6 mb-4 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
+              <div className="mx-4 sm:mx-6 mb-4 p-3 bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30 rounded-lg">
                 <p className="text-sm text-[var(--loss-color)]">{error}</p>
               </div>
             )}
 
             {/* CTA */}
-            <div className="p-6 pt-0">
+            <div className="px-4 sm:px-6 pb-6">
               <button
                 onClick={handleUpgrade}
                 disabled={loading}
@@ -259,11 +257,11 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
 
         {/* Prepay credits flow */}
         {paymentMode === 'prepay' && (
-          <div className="px-6 pb-6">
+          <div className="px-4 sm:px-6 pb-6">
             <CreditPicker />
           </div>
         )}
-      </DialogContent>
-    </Dialog>
+      </ModalBody>
+    </Modal>
   )
 }
