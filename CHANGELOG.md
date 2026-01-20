@@ -6,6 +6,53 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-20 - Onboarding Revamp & Free Test Runs
+
+**Planning Doc**: [DOCS/completed/ONBOARDING_REVAMP.md](DOCS/completed/ONBOARDING_REVAMP.md)
+
+**Problem**: Poor new user experience - auto-created "Default ggbot" with bad RSI strategy, no guidance.
+
+**BotCreationModal Typeform Redesign** (`frontend/.../BotCreationModal.tsx`):
+- 5-step typeform-style flow: Name → Mode → Symbol/Timeframe → Strategy → Model
+- 3 archetype templates: Contrarian (mean-reversion), Compass (macro), Arbiter (confluence)
+- Description-based strategy generation via Claude Haiku
+- Progress bar with arrow navigation, step indicators
+- Auto-opens for users with 0 bots, non-closable until first bot created
+
+**Archetype System** (`frontend/lib/archetypes.ts`):
+- Full trading strategies with Identity, Entry/Exit Conditions, Confidence Thresholds
+- Each archetype includes extraction config (indicators, timeframes, market intelligence)
+- `getArchetypeConfig()`, `getArchetypeSummaries()` helpers
+
+**Strategy Generation Endpoint** (`api/assistant.py:776-920`):
+- `POST /api/v2/assistant/generate-strategy` - One-shot LLM call
+- Platform-aware prompt with 21 technical indicators + market intelligence sources
+- Outputs structured strategy matching archetype format
+
+**Free Test Runs System**:
+- `first_run_used` boolean - Creation auto-run (free, doesn't count)
+- `free_runs_remaining` integer (default 3) - Manual "Run Once" clicks per bot
+- Backend permission bypass in orchestrate (`ggbot.py:355-386`)
+- `decrement_free_runs()` method (`core/services/config_service.py:746-786`)
+- SSE includes both fields (`core/sse/dashboard_data.py:87,193-194`)
+
+**Run Once Button UI** (`frontend/.../ActivationBar.tsx:143-244`):
+- Shows "(3 free)" → "(2 free)" → "(1 free)" for non-subscribers
+- Grays out with tooltip when exhausted
+- Optimistic local state update (`frontend/app/forge/page.tsx:785-793`)
+
+**Legacy Permission Gating Removed** (`frontend/.../StrategyEditor.tsx`):
+- All AI models available to everyone (Grok, Claude, Gemini, DeepSeek, GPT, Kimi, Qwen)
+- All analysis frequencies available (5m, 15m, 30m, 1h, 4h, 1d, 1w)
+- Reasoning Tier selector (Economy/Standard/Premium) visible to all
+- Removed Crown icons, UpgradeModal from model selection
+
+**Dialog Component Enhancement** (`frontend/components/ui/dialog.tsx:23-52`):
+- Added `hideCloseButton?: boolean` prop to DialogContent
+- Used by BotCreationModal to show only custom X button with tooltip
+
+---
+
 ## 2026-01-16 - Rei Agent Integration
 
 **Planning Doc**: [DOCS/completed/REI_AGENT_INTEGRATION.md](DOCS/completed/REI_AGENT_INTEGRATION.md)

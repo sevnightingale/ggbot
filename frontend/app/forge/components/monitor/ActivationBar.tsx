@@ -140,8 +140,12 @@ export function ActivationBar({
     onStart()
   }
 
+  // Check if user can run: either has premium access OR has free runs remaining
+  const freeRunsRemaining = selectedBot.free_runs_remaining ?? 0
+  const canRunOnce = canAccess('bot_activation') || freeRunsRemaining > 0
+
   const handleManualTrigger = () => {
-    if (!canAccess('bot_activation')) {
+    if (!canRunOnce) {
       setUpgradeModalOpen(true)
       return
     }
@@ -216,15 +220,27 @@ export function ActivationBar({
 
               <button
                 onClick={handleManualTrigger}
-                disabled={isManualTriggering || isStarting || isStopping}
-                className="inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={isManualTriggering || isStarting || isStopping || !canRunOnce}
+                className={`inline-flex items-center gap-2 rounded-xl border border-[var(--border)] px-3 py-1.5 text-sm text-[var(--text-primary)] disabled:cursor-not-allowed ${
+                  !canRunOnce
+                    ? 'opacity-50'
+                    : 'hover:bg-[var(--bg-tertiary)] disabled:opacity-50'
+                }`}
+                title={!canRunOnce ? 'No free test runs remaining. Subscribe to run your bot.' : undefined}
               >
-                {!canAccess('bot_activation') ? (
+                {!canAccess('bot_activation') && freeRunsRemaining === 0 ? (
                   <Crown className="h-4 w-4" />
                 ) : (
                   <Zap className="h-4 w-4" />
                 )}
-                {isManualTriggering ? 'Triggering...' : 'Run once'}
+                {isManualTriggering ? 'Triggering...' : (
+                  <>
+                    Run once
+                    {!canAccess('bot_activation') && freeRunsRemaining > 0 && (
+                      <span className="text-xs text-[var(--text-muted)]">({freeRunsRemaining} free)</span>
+                    )}
+                  </>
+                )}
               </button>
 
               <button

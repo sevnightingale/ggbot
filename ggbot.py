@@ -354,27 +354,35 @@ class GGBotOrchestrator:
 
             # Permission check: Verify user can still activate/run bots
             user_profile = await user_service.get_profile(user_id)
-            is_first_run_allowed = False
+            is_first_run_allowed = False  # Creation auto-run (free, doesn't count)
+            is_free_manual_run = False    # Manual "Run Once" using free runs
 
             if not user_profile.can_activate_bots:
-                # Check if this is their free first run
+                # Check if this is their free first run (creation auto-run)
                 if not config.first_run_used:
                     self._log.info(
                         f"Allowing free first run for config {config_id} - "
                         f"user {user_id} is on {user_profile.subscription_tier.value} tier"
                     )
                     is_first_run_allowed = True
+                # Check if they have free manual runs remaining
+                elif config.free_runs_remaining > 0:
+                    self._log.info(
+                        f"Allowing free manual run for config {config_id} - "
+                        f"{config.free_runs_remaining} free runs remaining"
+                    )
+                    is_free_manual_run = True
                 else:
                     self._log.warning(
                         f"Blocking bot execution for config {config_id} - "
                         f"user {user_id} lost activation permission (tier: {user_profile.subscription_tier.value}), "
-                        f"first run already used"
+                        f"no free runs remaining"
                     )
                     # Auto-deactivate bot if user lost permission
                     await self.config_service.set_bot_state(config_id, user_id, "inactive")
                     raise HTTPException(
                         status_code=403,
-                        detail="Your free test run has been used. Subscribe to run your bot again."
+                        detail="No free test runs remaining. Subscribe to run your bot again."
                     )
 
             self._log.info(f"🔍 DEBUG: config.config_type = '{config.config_type}', signal_data present = {signal_data is not None}")
@@ -394,10 +402,16 @@ class GGBotOrchestrator:
             else:
                 result = await self._run_autonomous_trading_cycle(config)
 
-            # Mark first run as used after successful execution (for free tier users)
-            if is_first_run_allowed and result.status != "error":
-                await self.config_service.mark_first_run_used(config_id)
-                self._log.info(f"Marked first run used for config {config_id}")
+            # Handle free run tracking after successful execution
+            if result.status != "error":
+                if is_first_run_allowed:
+                    # Mark creation auto-run as used
+                    await self.config_service.mark_first_run_used(config_id)
+                    self._log.info(f"Marked first run used for config {config_id}")
+                elif is_free_manual_run:
+                    # Decrement free manual runs
+                    remaining = await self.config_service.decrement_free_runs(config_id)
+                    self._log.info(f"Decremented free runs for config {config_id}, {remaining} remaining")
 
             return result
             

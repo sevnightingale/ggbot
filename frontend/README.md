@@ -83,13 +83,17 @@ Legacy/Archive (Moved to /archive/):
 └── ValidationMessage.tsx   # Error/warning message component with icons
 
 /components/ui/              # shadcn UI components
-├── dialog.tsx              # Radix UI Dialog wrapper for modals
+├── dialog.tsx              # Radix UI Dialog wrapper (supports hideCloseButton prop)
 ├── button.tsx              # Button component with variants
 ├── card.tsx                # Card layout component
 ├── badge.tsx               # Badge/pill component
 └── input.tsx               # Input field component
 
+/forge/components/modals/    # Bot management modals
+├── BotCreationModal.tsx    # 5-step typeform-style onboarding (Name→Mode→Symbol→Strategy→Model)
+
 /lib/                        # Core utilities
+├── archetypes.ts           # Trading archetype templates (Contrarian, Compass, Arbiter)
 ├── permissions.tsx         # Permission context with subscription checks
 ├── permission-gate.tsx     # Component for gating premium features
 ├── useTradeValidation.ts   # Trading settings validation hook

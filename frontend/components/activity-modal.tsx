@@ -34,17 +34,6 @@ interface ActivityModalProps {
   onNavigate: (index: number) => void
 }
 
-// Theme colors (matching tv-timeline)
-const VIBE = {
-  obsidian: '#0B0B0C',
-  carbon: '#141416',
-  ivory: '#EDEBE7',
-  hair: 'rgba(237,235,231,0.16)',
-  brass: '#C1A87D',
-  signal: '#3CA6E0',
-  ember: '#D74A1F',
-}
-
 // Formatting helpers
 const formatPrice = (price: number | null | undefined): string => {
   if (price == null) return '—'
@@ -62,38 +51,38 @@ const formatPnL = (value: number | null | undefined): string => {
   return `-$${Math.abs(value).toFixed(2)}`
 }
 
-// Get activity type info
+// Get activity type info - uses CSS variables
 function getActivityTypeInfo(activity: Activity): { label: string; icon: string; color: string } {
   const isLong = activity.data?.details?.side === 'long'
 
   switch (activity.type) {
     case 'trade_entry':
       return isLong
-        ? { label: 'Long Entry', icon: '↑', color: '#16a34a' }
-        : { label: 'Short Entry', icon: '↓', color: '#dc2626' }
+        ? { label: 'Long Entry', icon: '↑', color: 'var(--profit-color)' }
+        : { label: 'Short Entry', icon: '↓', color: 'var(--loss-color)' }
     case 'trade_exit':
       const pnl = Number(activity.data?.details?.pnl || 0)
       return pnl >= 0
-        ? { label: 'Position Closed', icon: '✓', color: '#16a34a' }
-        : { label: 'Position Closed', icon: '✗', color: '#dc2626' }
+        ? { label: 'Position Closed', icon: '✓', color: 'var(--profit-color)' }
+        : { label: 'Position Closed', icon: '✗', color: 'var(--loss-color)' }
     case 'market_query':
-      return { label: 'Market Query', icon: '📊', color: VIBE.signal }
+      return { label: 'Market Query', icon: '📊', color: 'var(--signal)' }
     case 'llm_thought':
-      return { label: 'Decision Analysis', icon: '🧠', color: VIBE.brass }
+      return { label: 'Decision Analysis', icon: '🧠', color: 'var(--accent)' }
     case 'agent_wait':
-      return { label: 'Agent Waiting', icon: '⏸', color: VIBE.ivory }
+      return { label: 'Agent Waiting', icon: '⏸', color: 'var(--text-primary)' }
     case 'price_check':
-      return { label: 'Price Check', icon: '💱', color: VIBE.signal }
+      return { label: 'Price Check', icon: '💱', color: 'var(--signal)' }
     case 'observation_recorded':
-      return { label: 'Observation', icon: '📝', color: VIBE.brass }
+      return { label: 'Observation', icon: '📝', color: 'var(--accent)' }
     case 'strategy_updated':
-      return { label: 'Strategy Update', icon: '⚙️', color: VIBE.signal }
+      return { label: 'Strategy Update', icon: '⚙️', color: 'var(--signal)' }
     case 'signal_received':
-      return { label: 'Signal Received', icon: '📡', color: VIBE.signal }
+      return { label: 'Signal Received', icon: '📡', color: 'var(--signal)' }
     case 'bot_created':
-      return { label: 'Bot Created', icon: '🤖', color: '#16a34a' }
+      return { label: 'Bot Created', icon: '🤖', color: 'var(--profit-color)' }
     default:
-      return { label: activity.type, icon: '●', color: VIBE.brass }
+      return { label: activity.type, icon: '●', color: 'var(--accent)' }
   }
 }
 
@@ -106,11 +95,14 @@ function TradeEntryContent({ activity }: { activity: Activity }) {
   return (
     <div className="space-y-4">
       {/* Symbol and Side hero */}
-      <div className="text-center p-3 rounded-lg" style={{ backgroundColor: isLong ? 'rgba(22, 163, 74, 0.15)' : 'rgba(220, 38, 38, 0.15)' }}>
-        <div className="text-2xl font-bold" style={{ color: isLong ? '#16a34a' : '#dc2626' }}>
+      <div
+        className="text-center p-3 rounded-lg"
+        style={{ backgroundColor: isLong ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)' }}
+      >
+        <div className="text-2xl font-bold" style={{ color: isLong ? 'var(--profit-color)' : 'var(--loss-color)' }}>
           {isLong ? '↑ LONG' : '↓ SHORT'}
         </div>
-        <div className="text-sm mt-1" style={{ color: VIBE.signal }}>{String(symbol)}</div>
+        <div className="text-sm mt-1 text-[var(--signal)]">{String(symbol)}</div>
       </div>
 
       {/* Main trade info card */}
@@ -125,45 +117,42 @@ function TradeEntryContent({ activity }: { activity: Activity }) {
 
       {/* Confidence bar */}
       {details.confidence != null && (
-        <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(237,235,231,0.05)' }}>
-          <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+        <div className="p-3 rounded-lg bg-[var(--bg-tertiary)]">
+          <div className="text-xs uppercase tracking-wider mb-2 text-[var(--text-secondary)]">
             Confidence
           </div>
           <div className="flex items-center gap-3">
-            <div className="flex-1 bg-black bg-opacity-30 rounded-full h-2 overflow-hidden">
+            <div className="flex-1 bg-black/30 rounded-full h-2 overflow-hidden">
               <div
-                className="h-full rounded-full transition-all"
-                style={{
-                  width: `${(Number(details.confidence) || 0) * 100}%`,
-                  backgroundColor: VIBE.signal
-                }}
+                className="h-full rounded-full transition-all bg-[var(--signal)]"
+                style={{ width: `${(Number(details.confidence) || 0) * 100}%` }}
               />
             </div>
-            <span className="text-sm font-semibold" style={{ color: VIBE.signal }}>
+            <span className="text-sm font-semibold text-[var(--signal)]">
               {formatPercent(Number(details.confidence))}
             </span>
           </div>
         </div>
       )}
 
-      {/* Risk levels - check both naming conventions */}
+      {/* Risk levels */}
       <div className="grid grid-cols-2 gap-3">
         {(details.stop_loss != null || details.stop_loss_price != null) && (
-          <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)' }}>
-            <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.ember }}>
+          <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(239, 68, 68, 0.1)' }}>
+            <div className="text-xs uppercase tracking-wider mb-1 text-[var(--ember)]">
               Stop Loss
             </div>
-            <div className="font-mono" style={{ color: VIBE.ember }}>
+            <div className="font-mono text-[var(--ember)]">
               {formatPrice(Number(details.stop_loss || details.stop_loss_price))}
             </div>
           </div>
         )}
         {(details.take_profit != null || details.take_profit_price != null) && (
           <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(60, 166, 224, 0.1)' }}>
-            <div className="text-xs uppercase tracking-wider mb-1" style={{ color: VIBE.signal }}>
+            <div className="text-xs uppercase tracking-wider mb-1 text-[var(--signal)]">
               Take Profit
             </div>
-            <div className="font-mono" style={{ color: VIBE.signal }}>
+            <div className="font-mono text-[var(--signal)]">
               {formatPrice(Number(details.take_profit || details.take_profit_price))}
             </div>
           </div>
@@ -172,7 +161,7 @@ function TradeEntryContent({ activity }: { activity: Activity }) {
 
       {/* Liquidation price if available */}
       {details.liquidation_price != null && (
-        <div className="text-sm text-center" style={{ color: VIBE.ember }}>
+        <div className="text-sm text-center text-[var(--ember)]">
           Liquidation: {formatPrice(Number(details.liquidation_price))}
         </div>
       )}
@@ -199,21 +188,24 @@ function TradeExitContent({ activity }: { activity: Activity }) {
     <div className="space-y-4">
       {/* Symbol and result header */}
       <div className="text-center">
-        <div className="text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
+        <div className="text-sm text-[var(--text-secondary)]">
           {isLong ? 'LONG' : 'SHORT'} {String(symbol)}
         </div>
       </div>
 
       {/* P&L Hero */}
-      <div className="p-4 rounded-lg text-center" style={{ backgroundColor: isProfit ? 'rgba(22, 163, 74, 0.15)' : 'rgba(220, 38, 38, 0.15)' }}>
-        <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+      <div
+        className="p-4 rounded-lg text-center"
+        style={{ backgroundColor: isProfit ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.15)' }}
+      >
+        <div className="text-xs uppercase tracking-wider mb-1 text-[var(--text-secondary)]">
           Realized P&L
         </div>
-        <div className="text-3xl font-bold" style={{ color: isProfit ? '#16a34a' : '#dc2626' }}>
+        <div className="text-3xl font-bold" style={{ color: isProfit ? 'var(--profit-color)' : 'var(--loss-color)' }}>
           {formatPnL(pnl)}
         </div>
         {details.pnl_pct != null && (
-          <div className="text-sm mt-1" style={{ color: isProfit ? '#16a34a' : '#dc2626' }}>
+          <div className="text-sm mt-1" style={{ color: isProfit ? 'var(--profit-color)' : 'var(--loss-color)' }}>
             ({Number(details.pnl_pct).toFixed(2)}%)
           </div>
         )}
@@ -234,10 +226,7 @@ function TradeExitContent({ activity }: { activity: Activity }) {
       {/* Duration and close reason */}
       <div className="grid grid-cols-2 gap-3">
         {details.duration_seconds != null && (
-          <InfoCard
-            label="Duration"
-            value={formatDuration(Number(details.duration_seconds))}
-          />
+          <InfoCard label="Duration" value={formatDuration(Number(details.duration_seconds))} />
         )}
         {details.close_reason != null && (
           <InfoCard label="Close Reason" value={String(details.close_reason).replace(/_/g, ' ')} />
@@ -246,7 +235,7 @@ function TradeExitContent({ activity }: { activity: Activity }) {
 
       {/* Fees */}
       {details.total_fees != null && (
-        <div className="text-sm text-center" style={{ color: 'rgba(237,235,231,0.5)' }}>
+        <div className="text-sm text-center text-[var(--text-muted)]">
           Fees: -${Number(details.total_fees).toFixed(2)}
         </div>
       )}
@@ -260,7 +249,7 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
   const action = String(details.action || 'wait').toUpperCase()
   const confidence = Number(details.confidence || 0)
 
-  // Try to parse structured sections from thought (using [\s\S] instead of . for cross-browser compat)
+  // Try to parse structured sections from thought
   const keySignal = thought.match(/KEY[_\s]?SIGNAL:?\s*([\s\S]+?)(?=SUPPORTING|RISK|SUMMARY|$)/i)?.[1]?.trim()
   const supporting = thought.match(/SUPPORTING:?\s*([\s\S]+?)(?=RISK|SUMMARY|$)/i)?.[1]?.trim()
   const risk = thought.match(/RISK:?\s*([\s\S]+?)(?=SUMMARY|$)/i)?.[1]?.trim()
@@ -272,28 +261,31 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
     <div className="space-y-4">
       {/* Action and Confidence */}
       <div className="flex items-center gap-4">
-        <div className="px-4 py-2 rounded-lg font-bold" style={{
-          backgroundColor: action === 'LONG' ? 'rgba(22, 163, 74, 0.2)' :
-                          action === 'SHORT' ? 'rgba(220, 38, 38, 0.2)' :
-                          'rgba(237,235,231,0.1)',
-          color: action === 'LONG' ? '#16a34a' :
-                 action === 'SHORT' ? '#dc2626' :
-                 VIBE.ivory
-        }}>
+        <div
+          className="px-4 py-2 rounded-lg font-bold"
+          style={{
+            backgroundColor: action === 'LONG' ? 'rgba(16, 185, 129, 0.2)' :
+                            action === 'SHORT' ? 'rgba(239, 68, 68, 0.2)' :
+                            'var(--bg-tertiary)',
+            color: action === 'LONG' ? 'var(--profit-color)' :
+                   action === 'SHORT' ? 'var(--loss-color)' :
+                   'var(--text-primary)'
+          }}
+        >
           {action}
         </div>
         <div className="flex-1">
-          <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+          <div className="text-xs uppercase tracking-wider mb-1 text-[var(--text-secondary)]">
             Confidence
           </div>
           <div className="flex items-center gap-2">
-            <div className="flex-1 bg-black bg-opacity-30 rounded-full h-2 overflow-hidden">
+            <div className="flex-1 bg-black/30 rounded-full h-2 overflow-hidden">
               <div
-                className="h-full rounded-full"
-                style={{ width: `${confidence * 100}%`, backgroundColor: VIBE.brass }}
+                className="h-full rounded-full bg-[var(--accent)]"
+                style={{ width: `${confidence * 100}%` }}
               />
             </div>
-            <span className="text-sm font-semibold">{formatPercent(confidence)}</span>
+            <span className="text-sm font-semibold text-[var(--text-primary)]">{formatPercent(confidence)}</span>
           </div>
         </div>
       </div>
@@ -302,24 +294,24 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
       {isStructured ? (
         <div className="space-y-3">
           {keySignal != null && (
-            <ReasoningSection title="Key Signal" content={keySignal} color={VIBE.signal} />
+            <ReasoningSection title="Key Signal" content={keySignal} colorVar="--signal" />
           )}
           {supporting != null && (
-            <ReasoningSection title="Supporting" content={supporting} color={VIBE.brass} />
+            <ReasoningSection title="Supporting" content={supporting} colorVar="--accent" />
           )}
           {risk != null && (
-            <ReasoningSection title="Risk" content={risk} color={VIBE.ember} />
+            <ReasoningSection title="Risk" content={risk} colorVar="--ember" />
           )}
           {summary != null && (
-            <ReasoningSection title="Summary" content={summary} color={VIBE.ivory} />
+            <ReasoningSection title="Summary" content={summary} colorVar="--text-primary" />
           )}
         </div>
       ) : (
-        <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(237,235,231,0.05)' }}>
-          <div className="text-xs uppercase tracking-wider mb-2" style={{ color: 'rgba(237,235,231,0.6)' }}>
+        <div className="p-3 rounded-lg bg-[var(--bg-tertiary)]">
+          <div className="text-xs uppercase tracking-wider mb-2 text-[var(--text-secondary)]">
             Reasoning
           </div>
-          <div className="prose prose-invert prose-sm max-w-none text-sm" style={{ color: VIBE.ivory }}>
+          <div className="prose prose-sm max-w-none text-sm text-[var(--text-primary)]">
             <ReactMarkdown>{thought}</ReactMarkdown>
           </div>
         </div>
@@ -327,7 +319,7 @@ function LLMThoughtContent({ activity }: { activity: Activity }) {
 
       {/* Symbol if present */}
       {details.symbol != null && (
-        <div className="text-center text-sm" style={{ color: VIBE.signal }}>
+        <div className="text-center text-sm text-[var(--signal)]">
           {String(details.symbol)}
         </div>
       )}
@@ -345,7 +337,7 @@ function MarketQueryContent({ activity }: { activity: Activity }) {
       {/* Query summary */}
       <div className="grid grid-cols-2 gap-3">
         {details.current_price != null && (
-          <InfoCard label="Price at Query" value={formatPrice(Number(details.current_price))} color={VIBE.signal} />
+          <InfoCard label="Price at Query" value={formatPrice(Number(details.current_price))} valueColor="var(--signal)" />
         )}
         {details.query_mode != null && (
           <InfoCard label="Mode" value={String(details.query_mode).replace(/_/g, ' ')} />
@@ -360,7 +352,7 @@ function MarketQueryContent({ activity }: { activity: Activity }) {
 
       {/* Data age */}
       {details.data_age_seconds != null && (
-        <div className="text-sm text-center" style={{ color: 'rgba(237,235,231,0.5)' }}>
+        <div className="text-sm text-center text-[var(--text-muted)]">
           Data age: {Number(details.data_age_seconds).toFixed(1)}s
         </div>
       )}
@@ -368,16 +360,16 @@ function MarketQueryContent({ activity }: { activity: Activity }) {
       {/* Collapsible data sections */}
       {Object.keys(formattedData).length > 0 && (
         <div className="space-y-2">
-          <div className="text-xs uppercase tracking-wider" style={{ color: 'rgba(237,235,231,0.6)' }}>
+          <div className="text-xs uppercase tracking-wider text-[var(--text-secondary)]">
             Data Sent to LLM
           </div>
           {Object.entries(formattedData).map(([key, value]) => (
-            <details key={key} className="rounded-lg border" style={{ borderColor: VIBE.hair }}>
-              <summary className="cursor-pointer px-3 py-2 text-sm font-medium" style={{ color: VIBE.brass }}>
+            <details key={key} className="rounded-lg border border-[var(--border)]">
+              <summary className="cursor-pointer px-3 py-2 text-sm font-medium text-[var(--accent)]">
                 {key.replace(/_/g, ' ').toUpperCase()}
               </summary>
               <div className="px-3 pb-3 overflow-y-auto">
-                <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: 'rgba(237,235,231,0.8)' }}>
+                <pre className="text-xs font-mono whitespace-pre-wrap text-[var(--text-primary)]">
                   {String(value)}
                 </pre>
               </div>
@@ -396,19 +388,19 @@ function GenericActivityContent({ activity }: { activity: Activity }) {
     <div className="space-y-4">
       {/* Summary */}
       {activity.data.summary != null && (
-        <div className="prose prose-invert prose-sm max-w-none" style={{ color: VIBE.ivory }}>
+        <div className="prose prose-sm max-w-none text-[var(--text-primary)]">
           <ReactMarkdown>{String(activity.data.summary)}</ReactMarkdown>
         </div>
       )}
 
       {/* Raw details if any */}
       {Object.keys(details).length > 0 && (
-        <details className="rounded-lg border" style={{ borderColor: VIBE.hair }}>
-          <summary className="cursor-pointer px-3 py-2 text-sm" style={{ color: 'rgba(237,235,231,0.6)' }}>
+        <details className="rounded-lg border border-[var(--border)]">
+          <summary className="cursor-pointer px-3 py-2 text-sm text-[var(--text-secondary)]">
             View Details
           </summary>
           <div className="px-3 pb-3">
-            <pre className="text-xs font-mono whitespace-pre-wrap" style={{ color: 'rgba(237,235,231,0.6)' }}>
+            <pre className="text-xs font-mono whitespace-pre-wrap text-[var(--text-secondary)]">
               {JSON.stringify(details, null, 2)}
             </pre>
           </div>
@@ -419,29 +411,45 @@ function GenericActivityContent({ activity }: { activity: Activity }) {
 }
 
 // Helper components
-function InfoCard({ label, value, color }: { label: string; value: string; color?: string }) {
+function InfoCard({ label, value, valueColor }: { label: string; value: string; valueColor?: string }) {
   return (
-    <div className="p-3 rounded-lg" style={{ backgroundColor: 'rgba(237,235,231,0.05)' }}>
-      <div className="text-xs uppercase tracking-wider mb-1" style={{ color: 'rgba(237,235,231,0.6)' }}>
+    <div className="p-3 rounded-lg bg-[var(--bg-tertiary)]">
+      <div className="text-xs uppercase tracking-wider mb-1 text-[var(--text-secondary)]">
         {label}
       </div>
-      <div className="font-semibold" style={{ color: color || VIBE.ivory }}>
+      <div className="font-semibold" style={{ color: valueColor || 'var(--text-primary)' }}>
         {value}
       </div>
     </div>
   )
 }
 
-function ReasoningSection({ title, content, color }: { title: string; content: string; color: string }) {
+function ReasoningSection({ title, content, colorVar }: { title: string; content: string; colorVar: string }) {
   return (
-    <div className="p-3 rounded-lg" style={{ backgroundColor: `${color}15` }}>
-      <div className="text-xs uppercase tracking-wider mb-1 font-semibold" style={{ color }}>
+    <div className="p-3 rounded-lg" style={{ backgroundColor: `color-mix(in srgb, var(${colorVar}) 15%, transparent)` }}>
+      <div className="text-xs uppercase tracking-wider mb-1 font-semibold" style={{ color: `var(${colorVar})` }}>
         {title}
       </div>
-      <div className="text-sm" style={{ color: VIBE.ivory }}>
+      <div className="text-sm text-[var(--text-primary)]">
         {content}
       </div>
     </div>
+  )
+}
+
+// Raw output section component - shows full activity object as JSON
+function RawOutputSection({ activity }: { activity: Activity }) {
+  return (
+    <details className="mt-4 rounded-lg border border-[var(--border)]">
+      <summary className="cursor-pointer px-3 py-2 text-xs uppercase tracking-wider text-[var(--text-secondary)]">
+        Raw Output
+      </summary>
+      <div className="px-3 pb-3 max-h-64 overflow-y-auto">
+        <pre className="text-xs font-mono whitespace-pre-wrap text-[var(--text-secondary)]">
+          {JSON.stringify(activity, null, 2)}
+        </pre>
+      </div>
+    </details>
   )
 }
 
@@ -555,7 +563,7 @@ export default function ActivityModal({
             className="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm"
           />
 
-          {/* Centering wrapper - uses flexbox so transform can be used by Framer Motion */}
+          {/* Centering wrapper */}
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4 pointer-events-none">
             {/* Modal */}
             <motion.div
@@ -563,10 +571,8 @@ export default function ActivityModal({
               animate={{ opacity: 1, scale: 1, x: swipeDirection === 'left' ? -10 : swipeDirection === 'right' ? 10 : 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
               transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-              className="flex flex-col rounded-xl border-2 overflow-hidden pointer-events-auto"
+              className="flex flex-col rounded-xl border-2 border-[var(--accent)] bg-[var(--bg-secondary)] overflow-hidden pointer-events-auto"
               style={{
-                backgroundColor: VIBE.carbon,
-                borderColor: VIBE.brass,
                 width: 'min(calc(100vw - 32px), 500px)',
                 maxHeight: 'min(calc(100vh - 64px), 700px)',
               }}
@@ -574,84 +580,85 @@ export default function ActivityModal({
               onTouchMove={handleTouchMove}
               onTouchEnd={handleTouchEnd}
             >
-            {/* Header with navigation */}
-            <div className="flex items-center justify-between px-4 py-3 border-b" style={{ borderColor: VIBE.hair }}>
-              {/* Prev button */}
-              <button
-                onClick={() => canGoPrev && onNavigate(currentIndex - 1)}
-                disabled={!canGoPrev}
-                className="p-2 rounded-lg transition-colors"
-                style={{
-                  opacity: canGoPrev ? 1 : 0.3,
-                  cursor: canGoPrev ? 'pointer' : 'not-allowed'
-                }}
-              >
-                <ChevronLeft size={20} style={{ color: VIBE.brass }} />
-              </button>
+              {/* Header with navigation */}
+              <div className="flex items-center justify-between px-4 py-3 border-b border-[var(--border)]">
+                {/* Prev button */}
+                <button
+                  onClick={() => canGoPrev && onNavigate(currentIndex - 1)}
+                  disabled={!canGoPrev}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{
+                    opacity: canGoPrev ? 1 : 0.3,
+                    cursor: canGoPrev ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  <ChevronLeft size={20} className="text-[var(--accent)]" />
+                </button>
 
-              {/* Timestamp and counter */}
-              <div className="text-center flex-1">
-                <div className="text-sm font-medium" style={{ color: VIBE.ivory }}>
-                  {new Date(activity.timestamp).toLocaleString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit'
-                  })}
+                {/* Timestamp and counter */}
+                <div className="text-center flex-1">
+                  <div className="text-sm font-medium text-[var(--text-primary)]">
+                    {new Date(activity.timestamp).toLocaleString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      hour: 'numeric',
+                      minute: '2-digit'
+                    })}
+                  </div>
+                  <div className="text-xs text-[var(--text-muted)]">
+                    {currentIndex + 1} of {activities.length}
+                  </div>
                 </div>
-                <div className="text-xs" style={{ color: 'rgba(237,235,231,0.5)' }}>
-                  {currentIndex + 1} of {activities.length}
-                </div>
+
+                {/* Next button */}
+                <button
+                  onClick={() => canGoNext && onNavigate(currentIndex + 1)}
+                  disabled={!canGoNext}
+                  className="p-2 rounded-lg transition-colors"
+                  style={{
+                    opacity: canGoNext ? 1 : 0.3,
+                    cursor: canGoNext ? 'pointer' : 'not-allowed'
+                  }}
+                >
+                  <ChevronRight size={20} className="text-[var(--accent)]" />
+                </button>
+
+                {/* Close button */}
+                <button
+                  onClick={onClose}
+                  className="p-2 rounded-lg transition-colors hover:bg-[var(--bg-tertiary)] ml-2"
+                >
+                  <X size={20} className="text-[var(--text-primary)]" />
+                </button>
               </div>
 
-              {/* Next button */}
-              <button
-                onClick={() => canGoNext && onNavigate(currentIndex + 1)}
-                disabled={!canGoNext}
-                className="p-2 rounded-lg transition-colors"
-                style={{
-                  opacity: canGoNext ? 1 : 0.3,
-                  cursor: canGoNext ? 'pointer' : 'not-allowed'
-                }}
-              >
-                <ChevronRight size={20} style={{ color: VIBE.brass }} />
-              </button>
-
-              {/* Close button */}
-              <button
-                onClick={onClose}
-                className="p-2 rounded-lg transition-colors hover:bg-white/10 ml-2"
-              >
-                <X size={20} style={{ color: VIBE.ivory }} />
-              </button>
-            </div>
-
-            {/* Activity type badge */}
-            <div className="px-4 pt-4">
-              <div
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold"
-                style={{ backgroundColor: `${typeInfo.color}20`, color: typeInfo.color }}
-              >
-                <span>{typeInfo.icon}</span>
-                <span>{typeInfo.label}</span>
+              {/* Activity type badge */}
+              <div className="px-4 pt-4">
+                <div
+                  className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-semibold"
+                  style={{ backgroundColor: `color-mix(in srgb, ${typeInfo.color} 20%, transparent)`, color: typeInfo.color }}
+                >
+                  <span>{typeInfo.icon}</span>
+                  <span>{typeInfo.label}</span>
+                </div>
+                {activity.data.symbol && (
+                  <span className="ml-3 text-sm font-mono text-[var(--signal)]">
+                    {activity.data.symbol}
+                  </span>
+                )}
               </div>
-              {activity.data.symbol && (
-                <span className="ml-3 text-sm font-mono" style={{ color: VIBE.signal }}>
-                  {activity.data.symbol}
-                </span>
-              )}
-            </div>
 
-            {/* Content - scrollable */}
-            <div className="flex-1 overflow-y-auto px-4 py-4">
-              {renderContent()}
-            </div>
+              {/* Content - scrollable */}
+              <div className="flex-1 overflow-y-auto px-4 py-4">
+                {renderContent()}
+                <RawOutputSection activity={activity} />
+              </div>
 
-            {/* Footer hint */}
-            <div className="px-4 py-2 text-center text-xs border-t" style={{ borderColor: VIBE.hair, color: 'rgba(237,235,231,0.4)' }}>
-              <span className="hidden md:inline">Use ← → arrows to navigate • Esc to close</span>
-              <span className="md:hidden">Swipe left/right to navigate • Tap outside to close</span>
-            </div>
+              {/* Footer hint */}
+              <div className="px-4 py-2 text-center text-xs border-t border-[var(--border)] text-[var(--text-muted)]">
+                <span className="hidden md:inline">Use ← → arrows to navigate • Esc to close</span>
+                <span className="md:hidden">Swipe left/right to navigate • Tap outside to close</span>
+              </div>
             </motion.div>
           </div>
         </>

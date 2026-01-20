@@ -955,9 +955,11 @@ async def wait_for(args: Dict[str, Any]) -> Dict[str, Any]:
         return {
             "content": [{
                 "type": "text",
-                "text": f"⏳ Waited {duration_minutes} minutes.\n"
-                        f"Next check: {next_check.strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
-                        f"Reason: {reason}"
+                "text": f"⏳ Waited {duration_minutes} minutes. Time: {datetime.now(timezone.utc).strftime('%Y-%m-%d %H:%M:%S')} UTC\n"
+                        f"Reason: {reason}\n\n"
+                        f"**CONTINUE YOUR LOOP NOW** - Call get_positions() to check position status, "
+                        f"then query_market_data_for_rei() if you need fresh analysis. "
+                        f"Do NOT just acknowledge this message - CALL A TOOL."
             }]
         }
 

@@ -84,6 +84,7 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
     WITH bot_configs AS (
         SELECT c.config_id, c.user_id, c.config_name, c.config_type, c.state, c.config_data,
                c.trading_mode, c.symphony_agent_id, c.profile_image_url,
+               c.first_run_used, c.free_runs_remaining,
                c.created_at, c.updated_at
         FROM configurations c
         WHERE c.user_id = %s AND c.state != 'archived'
@@ -189,6 +190,8 @@ def _get_dashboard_data_from_db(user_id: str) -> Dict[str, Any]:
                 'trading_mode', bc.trading_mode,
                 'symphony_agent_id', bc.symphony_agent_id,
                 'profile_image_url', bc.profile_image_url,
+                'first_run_used', COALESCE(bc.first_run_used, false),
+                'free_runs_remaining', COALESCE(bc.free_runs_remaining, 3),
                 'config_data', json_build_object(
                     'schema_version', bc.config_data->>'schema_version',
                     'config_type', bc.config_data->>'config_type',

@@ -69,69 +69,12 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 ### **Phase 4: Future (Post-Launch)**
 
 - [ ] Inline arena bot creation modal (components exist, just need flow)
-- [x] Full onboarding flow reassessment → See Onboarding Revamp section below
+- [x] Full onboarding flow reassessment → COMPLETE (see CHANGELOG 2026-01-20)
 
 ### **Open Questions**
 1. Late registrations after Jan 21 - allow with fresh $10k?
 2. Should Sev's 7 prototype bots compete in Season 1?
 3. Multiple bots per user - allowed?
-
----
-
-## 🎯 **HIGH PRIORITY - Onboarding Revamp** [ONBOARDING_REVAMP.md]
-
-**Status**: 🔵 PLANNING
-**Planning Doc**: [DOCS/todo/ONBOARDING_REVAMP.md](DOCS/todo/ONBOARDING_REVAMP.md)
-**Complexity**: Medium (~2-3 days)
-**Priority**: High - First impression for new users
-
-**Problem**: Current new user experience is poor - auto-created "Default ggbot" with bad RSI strategy, no guidance, no investment in the bot.
-
-**Solution**: Transform BotCreationModal into Typeform-style guided experience:
-- One step at a time with arrow navigation
-- Description-based strategy generation via LLM
-- 3 archetype templates (Contrarian, Compass, Arbiter)
-- First run free for new bots
-- Non-closable modal for users with 0 bots
-
-### **Phase 1: Backend** (~3-4 hours)
-
-- [ ] Add `first_run_used` column to configurations table
-- [ ] Create `POST /api/v2/assistant/generate-strategy` endpoint
-- [ ] Modify orchestrate endpoint for first-run permission bypass
-- [ ] Test endpoint with various descriptions
-
-### **Phase 2: Frontend - Modal Structure** (~4-5 hours)
-
-- [ ] Refactor BotCreationModal to 5-step structure
-- [ ] Step 1: Bot name (pre-filled "ggbot N")
-- [ ] Step 2: Trading mode (Paper/Symphony/Aster)
-- [ ] Step 3: Symbol & timeframe selection
-- [ ] Step 4: Strategy description + archetype buttons
-- [ ] Step 5: AI model & reasoning tier selection
-- [ ] Progress bar and navigation arrows
-
-### **Phase 3: Frontend - Integration** (~3-4 hours)
-
-- [ ] Create `archetypes.ts` with Contrarian/Compass/Arbiter configs
-- [ ] Implement archetype click → apply config, skip to final step
-- [ ] Add strategy generation API call for custom descriptions
-- [ ] Reuse model selector from StrategyEditor (remove permission gating)
-- [ ] Handle loading states during generation
-
-### **Phase 4: Frontend - New User Flow** (~2-3 hours)
-
-- [ ] Auto-open modal for users with 0 bots
-- [ ] Hide X button with tooltip "Create your first bot to continue"
-- [ ] Trigger first run automatically on creation
-- [ ] Show success alert ("Bot created!")
-- [ ] Test complete flow end-to-end
-
-### **Phase 5: Cleanup** (~1-2 hours)
-
-- [ ] Remove `canAccess('premium_llms')` from StrategyEditor (legacy)
-- [ ] Clean up any unused permission checks
-- [ ] Update related documentation
 
 ---
 

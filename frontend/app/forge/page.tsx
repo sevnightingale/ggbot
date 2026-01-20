@@ -782,7 +782,15 @@ function ForgeApp() {
       const result = await apiClient.triggerBotManually(selectedBot.config_id)
       console.log('✅ Manual trigger result:', result)
 
-      // Manual execution started - status will be tracked via SSE updates
+      // Optimistically decrement free_runs_remaining for instant UI feedback
+      // (SSE will sync the actual value within 5 seconds)
+      if (selectedBot.first_run_used && (selectedBot.free_runs_remaining ?? 0) > 0) {
+        setAllBots(prev => prev.map(bot =>
+          bot.config_id === selectedBot.config_id
+            ? { ...bot, free_runs_remaining: Math.max(0, (bot.free_runs_remaining ?? 0) - 1) }
+            : bot
+        ))
+      }
 
     } catch (error) {
       console.error('❌ Failed to trigger bot manually:', error)

@@ -1,59 +1,60 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-16 08:57:19 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-19 18:59:06 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 289
+- **Total Users**: 294
 - **Pro Users (ggbase)**: 0 (0 active subscriptions)
-- **Free Users**: 277
-- **Users with Bots**: 282 (97.6%)
+- **Free Users**: 282
+- **Users with Bots**: 287 (97.6%)
 
 ### Bot Statistics
-- **Total Bots**: 422
-- **Active Bots**: 13 (3.1%)
-  - Paper: 13
+- **Total Bots**: 434
+- **Active Bots**: 14 (3.2%)
+  - Paper: 14
   - Symphony (Live): 0
   - Aster (DEX): 0
-- **Inactive Bots**: 409
+- **Inactive Bots**: 420
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,730
-  - Wins: 1,766
-  - Losses: 3,964
-  - Platform Win Rate: 30.82%
-  - Total P&L: $-16,231.81
+- **Total Trades (All Time)**: 5,774
+  - Wins: 1,785
+  - Losses: 3,989
+  - Platform Win Rate: 30.91%
+  - Total P&L: $-16,704.43
 - **Recent Activity**:
-  - Last 24 hours: 9 trades
-  - Last 7 days: 101 trades
-  - Last 30 days: 559 trades
+  - Last 24 hours: 21 trades
+  - Last 7 days: 78 trades
+  - Last 30 days: 557 trades
 
 ### Open Positions
-- **Open Positions**: 6
+- **Open Positions**: 5
 - **Unique Symbols**: 1
-- **Total Exposure**: $108,356.49
-- **Unrealized P&L**: $-56.97
+- **Total Exposure**: $81,518.01
+- **Unrealized P&L**: $20.66
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,933.90
+- **Average Balance**: $9,934.64
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $11,062.74
+- **Highest Balance**: $11,958.38
 
 ### Top Trading Symbols (Active Bots)
 
 - **BTC/USDT**: 13 bots
+- **DOGE/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 452 decisions (avg confidence: 35.7%)
-- **enter**: 9 decisions (avg confidence: 59.4%)
-- **exit**: 7 decisions (avg confidence: 67.1%)
+- **wait**: 939 decisions (avg confidence: 31.1%)
+- **enter**: 20 decisions (avg confidence: 69.7%)
+- **exit**: 19 decisions (avg confidence: 70.2%)
 
 ### System Health
-- **Decisions (last hour)**: 25
+- **Decisions (last hour)**: 42
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -62,22 +63,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0.2% | 16MB | 4h 0m | 3 |
-| error-alerts | 🟢 online | 0% | 22MB | 4h 0m | 3 |
-| market-data-ws | 🟢 online | 1.2% | 19MB | 4h 0m | 3 |
-| ggbot | 🟢 online | 2.5% | 482MB | 4h 0m | 24 |
-| account-monitor | 🟢 online | 0.3% | 128MB | 3h 46m | 17 |
-| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 69MB | 23s | 7 |
+| signal-listener | 🟢 online | 0% | 16MB | 3d 14h | 3 |
+| error-alerts | 🟢 online | 0% | 21MB | 3d 14h | 3 |
+| market-data-ws | 🟢 online | 1.3% | 26MB | 3d 14h | 3 |
+| ggbot | 🟢 online | 1% | 429MB | 3d 5h | 26 |
+| account-monitor | 🟢 online | 0.5% | 28MB | 3d 13h | 17 |
+| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 68MB | 2h 28m | 0 |
 
 ### VM Resources
 
 - **Disk**: 44G / 78G (57%)
-- **Memory**: 2.3Gi / 3.8Gi
-- **CPU Load**: 1.55 / 0.96 / 0.72 (1m/5m/15m)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 0.77 / 0.41 / 0.25 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 17.70M)
+- **Redis**: 🟢 connected (Memory: 21.54M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -429,7 +430,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-16 08:57:20 UTC
+**Last Updated**: 2026-01-19 18:59:07 UTC
 
 ---
 
@@ -564,7 +565,7 @@ df -h
 | `created_at` | timestamp with time zone | ✓ | now() |
 | `updated_at` | timestamp with time zone | ✓ | now() |
 
-### `configurations` (13 columns)
+### `configurations` (14 columns)
 
 **Primary Key**: `config_id`
 
@@ -588,6 +589,7 @@ df -h
 | `is_public_performance` | boolean | ✓ | false |
 | `profile_image_url` | text | ✓ |  |
 | `description` | text | ✓ |  |
+| `first_run_used` | boolean | ✓ | false |
 
 ### `data_points` (11 columns)
 
@@ -1276,7 +1278,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-16 08:57:20 UTC
+**Last Updated**: 2026-01-19 18:59:07 UTC
 
 ---
 

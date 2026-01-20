@@ -37,6 +37,7 @@ class BotConfigV2:
         profile_image_url: Optional[str] = None,
         is_public_performance: bool = False,
         first_run_used: bool = False,
+        free_runs_remaining: int = 3,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -58,6 +59,7 @@ class BotConfigV2:
         self.profile_image_url = profile_image_url
         self.is_public_performance = is_public_performance
         self.first_run_used = first_run_used
+        self.free_runs_remaining = free_runs_remaining
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -74,6 +76,7 @@ class BotConfigV2:
             "profile_image_url": self.profile_image_url,
             "is_public_performance": self.is_public_performance,
             "first_run_used": self.first_run_used,
+            "free_runs_remaining": self.free_runs_remaining,
             "config_data": {
                 "schema_version": self.schema_version,
                 "selected_pair": self.selected_pair,
@@ -129,6 +132,7 @@ class BotConfigV2:
             profile_image_url=data.get("profile_image_url"),
             is_public_performance=data.get("is_public_performance", False),
             first_run_used=data.get("first_run_used", False),
+            free_runs_remaining=data.get("free_runs_remaining", 3),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -283,7 +287,7 @@ class ConfigService:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state, first_run_used
+                        SELECT config_name, config_data, created_at, updated_at, config_type, trading_mode, symphony_agent_id, profile_image_url, state, first_run_used, free_runs_remaining
                         FROM configurations
                         WHERE config_id = %s AND user_id = %s
                     """, (config_id, user_id))
@@ -300,6 +304,7 @@ class ConfigService:
                     profile_image_url = result[7]
                     state = result[8] or "inactive"
                     first_run_used = result[9] if result[9] is not None else False
+                    free_runs_remaining = result[10] if result[10] is not None else 3
                     
                     # Handle nested config_data structure
                     if "config_data" in config_data:
@@ -323,6 +328,7 @@ class ConfigService:
                             "profile_image_url": profile_image_url,
                             "state": state,
                             "first_run_used": first_run_used,
+                            "free_runs_remaining": free_runs_remaining,
                             "created_at": result[2].isoformat() if result[2] else None,
                             "updated_at": result[3].isoformat() if result[3] else None
                         }
@@ -341,6 +347,7 @@ class ConfigService:
                         flattened_config["profile_image_url"] = profile_image_url
                         flattened_config["state"] = state
                         flattened_config["first_run_used"] = first_run_used
+                        flattened_config["free_runs_remaining"] = free_runs_remaining
                         if "created_at" not in flattened_config and result[2]:
                             flattened_config["created_at"] = result[2].isoformat()
                         if "updated_at" not in flattened_config and result[3]:
@@ -369,14 +376,14 @@ class ConfigService:
                 with conn.cursor() as cur:
                     cur.execute("""
                         SELECT config_id, config_name, config_data, created_at, updated_at, state, config_type,
-                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used
+                               trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining
                         FROM configurations
                         WHERE user_id = %s
                         ORDER BY created_at DESC
                     """, (user_id,))
 
                     for row in cur.fetchall():
-                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used = row
+                        config_id, config_name, config_data, created_at, updated_at, state, db_config_type, trading_mode, symphony_agent_id, profile_image_url, is_public_performance, first_run_used, free_runs_remaining = row
 
                         if isinstance(config_data, str):
                             config_data = json.loads(config_data)
@@ -404,6 +411,7 @@ class ConfigService:
                                 "profile_image_url": profile_image_url,
                                 "is_public_performance": is_public_performance or False,
                                 "first_run_used": first_run_used if first_run_used is not None else False,
+                                "free_runs_remaining": free_runs_remaining if free_runs_remaining is not None else 3,
                                 "created_at": created_at.isoformat() if created_at else None,
                                 "updated_at": updated_at.isoformat() if updated_at else None
                             }
@@ -421,6 +429,7 @@ class ConfigService:
                             flattened_config["profile_image_url"] = profile_image_url
                             flattened_config["is_public_performance"] = is_public_performance or False
                             flattened_config["first_run_used"] = first_run_used if first_run_used is not None else False
+                            flattened_config["free_runs_remaining"] = free_runs_remaining if free_runs_remaining is not None else 3
                             if created_at:
                                 flattened_config["created_at"] = created_at.isoformat()
                             if updated_at:
@@ -733,6 +742,48 @@ class ConfigService:
         except Exception as e:
             self._log.error(f"Failed to mark first run used for {config_id}: {e}")
             return False
+
+    async def decrement_free_runs(
+        self,
+        config_id: str
+    ) -> int:
+        """
+        Decrement the free runs remaining for a bot configuration.
+
+        Called after a successful manual "Run Once" execution.
+        Returns the new count of remaining free runs.
+
+        Args:
+            config_id: Configuration ID
+
+        Returns:
+            Number of free runs remaining after decrement, or -1 on error
+        """
+        try:
+            with get_db_connection() as conn:
+                with conn.cursor() as cur:
+                    # Decrement and return new value (don't go below 0)
+                    cur.execute("""
+                        UPDATE configurations
+                        SET free_runs_remaining = GREATEST(free_runs_remaining - 1, 0),
+                            updated_at = CURRENT_TIMESTAMP
+                        WHERE config_id = %s
+                        RETURNING free_runs_remaining
+                    """, (config_id,))
+
+                    result = cur.fetchone()
+                    if result:
+                        conn.commit()
+                        remaining = result[0]
+                        self._log.info(f"Decremented free runs for config {config_id}, {remaining} remaining")
+                        return remaining
+                    else:
+                        self._log.warning(f"No config found to decrement free runs: {config_id}")
+                        return -1
+
+        except Exception as e:
+            self._log.error(f"Failed to decrement free runs for {config_id}: {e}")
+            return -1
 
 
 # Convenience instance
