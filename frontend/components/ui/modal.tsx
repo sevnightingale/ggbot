@@ -148,27 +148,29 @@ export function Modal({
             aria-hidden="true"
           />
 
-          {/* Modal */}
-          <motion.div
-            ref={modalRef}
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            role="dialog"
-            aria-modal="true"
-            tabIndex={-1}
-            className={`
-              fixed inset-0 z-50 flex flex-col
-              bg-[var(--bg-secondary)]
-              sm:inset-auto sm:left-1/2 sm:top-1/2
-              sm:-translate-x-1/2 sm:-translate-y-1/2
-              sm:rounded-xl sm:border sm:border-[var(--border)]
-              sm:max-h-[85vh] w-full ${SIZES[size]}
-            `}
-          >
-            {children}
-          </motion.div>
+          {/* Modal Container - centers the modal on desktop */}
+          <div className="fixed inset-0 z-50 flex items-center justify-center sm:p-4 pointer-events-none">
+            {/* Modal */}
+            <motion.div
+              ref={modalRef}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+              role="dialog"
+              aria-modal="true"
+              tabIndex={-1}
+              className={`
+                pointer-events-auto flex flex-col
+                bg-[var(--bg-secondary)]
+                w-full h-full
+                sm:h-auto sm:max-h-[85vh] sm:rounded-xl sm:border sm:border-[var(--border)]
+                ${SIZES[size]}
+              `}
+            >
+              {children}
+            </motion.div>
+          </div>
         </>
       )}
     </AnimatePresence>,
