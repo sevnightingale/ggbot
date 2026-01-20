@@ -3,7 +3,7 @@
 import { motion, AnimatePresence } from 'framer-motion'
 import { X } from 'lucide-react'
 import { createPortal } from 'react-dom'
-import { useEffect, useCallback, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useRef, useState, type ReactNode } from 'react'
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Size Variants (Responsive)
@@ -86,48 +86,68 @@ export function Modal({
   // Focus trap
   useFocusTrap(modalRef, open)
 
-  // Escape key handler
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    if (e.key === 'Escape' && !preventClose) {
-      onOpenChange(false)
-    }
+  // Store callbacks in refs to avoid re-running effects when they change
+  const onOpenChangeRef = useRef(onOpenChange)
+  const preventCloseRef = useRef(preventClose)
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange
+    preventCloseRef.current = preventClose
   }, [onOpenChange, preventClose])
 
-  // Focus management + body scroll lock
+  // Escape key handler - uses refs so effect doesn't re-run on callback changes
   useEffect(() => {
-    if (open) {
-      // Store the element that had focus before modal opened
-      previousActiveElement.current = document.activeElement as HTMLElement
+    if (!open) return
 
-      // Lock body scroll
-      document.body.style.overflow = 'hidden'
-      document.addEventListener('keydown', handleKeyDown)
-
-      // Focus the modal (or first focusable element) after animation
-      setTimeout(() => {
-        if (modalRef.current) {
-          const firstFocusable = modalRef.current.querySelector<HTMLElement>(
-            'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
-          )
-          if (firstFocusable) {
-            firstFocusable.focus()
-          } else {
-            modalRef.current.focus()
-          }
-        }
-      }, 50)
-    }
-
-    return () => {
-      document.body.style.overflow = ''
-      document.removeEventListener('keydown', handleKeyDown)
-
-      // Restore focus to previous element
-      if (!open && previousActiveElement.current) {
-        previousActiveElement.current.focus()
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === 'Escape' && !preventCloseRef.current) {
+        onOpenChangeRef.current(false)
       }
     }
-  }, [open, handleKeyDown])
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [open])
+
+  // Body scroll lock - only depends on open state
+  useEffect(() => {
+    if (open) {
+      document.body.style.overflow = 'hidden'
+    }
+    return () => {
+      document.body.style.overflow = ''
+    }
+  }, [open])
+
+  // Focus management - only runs once when modal opens
+  useEffect(() => {
+    if (!open) {
+      // Restore focus to previous element when modal closes
+      if (previousActiveElement.current) {
+        previousActiveElement.current.focus()
+        previousActiveElement.current = null
+      }
+      return
+    }
+
+    // Store the element that had focus before modal opened
+    previousActiveElement.current = document.activeElement as HTMLElement
+
+    // Focus the modal (or first focusable element) after animation
+    const timeoutId = setTimeout(() => {
+      if (modalRef.current) {
+        const firstFocusable = modalRef.current.querySelector<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        )
+        if (firstFocusable) {
+          firstFocusable.focus()
+        } else {
+          modalRef.current.focus()
+        }
+      }
+    }, 50)
+
+    return () => clearTimeout(timeoutId)
+  }, [open])
 
   // Don't render on server, wait for client mount
   if (!mounted) return null
