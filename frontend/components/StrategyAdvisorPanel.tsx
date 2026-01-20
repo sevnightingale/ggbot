@@ -501,7 +501,7 @@ export function StrategyAdvisorPanel({
                     <button
                       onClick={handleCreateStrategy}
                       disabled={loading || analysisLoading}
-                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors"
                     >
                       <Wand2 className="w-4 h-4 text-[var(--accent)]" />
                       <span>Create Strategy</span>
@@ -512,7 +512,7 @@ export function StrategyAdvisorPanel({
                       <button
                         onClick={fetchAnalysis}
                         disabled={loading || analysisLoading}
-                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] transition-colors"
+                        className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors"
                       >
                         <BarChart3 className="w-4 h-4 text-[var(--accent)]" />
                         <span>Analyze Performance</span>
@@ -545,7 +545,7 @@ export function StrategyAdvisorPanel({
                 <div
                   className={`max-w-[80%] rounded-lg px-4 py-2 ${
                     msg.role === 'user'
-                      ? 'bg-[var(--accent)] text-[#edebe7] dark:text-[#1a1816]'
+                      ? 'bg-[var(--accent)] text-[#0b0b0c]'
                       : 'bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border)]'
                   }`}
                 >
@@ -607,7 +607,7 @@ export function StrategyAdvisorPanel({
           <Button
             onClick={sendMessage}
             disabled={loading || !input.trim()}
-            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#edebe7] dark:text-[#1a1816] font-medium px-6"
+            className="bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[#0b0b0c] font-medium px-6"
           >
             Send
           </Button>
