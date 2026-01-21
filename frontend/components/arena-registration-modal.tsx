@@ -9,7 +9,7 @@ import {
   ModalTitle,
   ModalDescription,
 } from '@/components/ui/modal'
-import { Trophy, Calendar, DollarSign, Zap, AlertCircle, CheckCircle } from 'lucide-react'
+import { Trophy, Calendar, DollarSign, Zap, AlertCircle, CheckCircle, Play } from 'lucide-react'
 import { createClient } from '@/lib/supabase'
 
 interface ArenaRegistrationModalProps {
@@ -18,6 +18,9 @@ interface ArenaRegistrationModalProps {
   configId: string
   configName: string
   onSuccess: () => void
+  isBotActive: boolean
+  onActivateBot: () => void
+  isActivating?: boolean
 }
 
 export function ArenaRegistrationModal({
@@ -25,7 +28,10 @@ export function ArenaRegistrationModal({
   onClose,
   configId,
   configName,
-  onSuccess
+  onSuccess,
+  isBotActive,
+  onActivateBot,
+  isActivating = false
 }: ArenaRegistrationModalProps) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -107,6 +113,58 @@ export function ArenaRegistrationModal({
             )}
           </div>
         </ModalBody>
+      </Modal>
+    )
+  }
+
+  // Bot not active - show activation prompt
+  if (!isBotActive) {
+    return (
+      <Modal open={isOpen} onOpenChange={onClose} size="sm">
+        <ModalHeader onClose={onClose}>
+          <ModalTitle className="flex items-center gap-2">
+            <Play className="h-5 w-5 text-[var(--accent)]" />
+            Activate Your Bot First
+          </ModalTitle>
+          <ModalDescription>
+            Your bot needs to be running to enter the Arena
+          </ModalDescription>
+        </ModalHeader>
+
+        <ModalBody>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-[var(--bg-tertiary)] p-4">
+              <p className="text-sm text-[var(--text-secondary)]">
+                <strong className="text-[var(--text-primary)]">&quot;{configName}&quot;</strong> is currently inactive.
+                Activate it first, then you can register for the ggArena competition.
+              </p>
+            </div>
+
+            <div className="text-center text-sm text-[var(--text-muted)]">
+              Once activated, your bot will start making trading decisions automatically.
+            </div>
+          </div>
+        </ModalBody>
+
+        <ModalFooter>
+          <button
+            onClick={onClose}
+            className="px-4 py-2 text-sm text-[var(--text-secondary)] hover:text-[var(--text-primary)] transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={() => {
+              onActivateBot()
+              onClose()
+            }}
+            disabled={isActivating}
+            className="px-4 py-2 rounded-lg bg-[var(--accent)] text-[var(--bg-primary)] font-medium hover:bg-[var(--accent-hover)] disabled:opacity-50 transition-colors flex items-center gap-2"
+          >
+            <Play className="h-4 w-4" />
+            {isActivating ? 'Activating...' : 'Activate Bot'}
+          </button>
+        </ModalFooter>
       </Modal>
     )
   }

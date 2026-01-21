@@ -326,6 +326,9 @@ export function ActivationBar({
           // Trigger a refresh - the SSE will pick up the change
           window.location.reload()
         }}
+        isBotActive={isActive}
+        onActivateBot={onStart}
+        isActivating={isStarting}
       />
     </>
   )
