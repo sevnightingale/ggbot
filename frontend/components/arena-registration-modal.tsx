@@ -30,6 +30,10 @@ export function ArenaRegistrationModal({
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [accountWasReset, setAccountWasReset] = useState(false)
+
+  // Check if competition has started (Jan 21 12:00 UTC)
+  const competitionStarted = Date.now() >= new Date('2026-01-21T12:00:00Z').getTime()
 
   const handleRegister = async () => {
     setLoading(true)
@@ -57,6 +61,9 @@ export function ArenaRegistrationModal({
         throw new Error(data.detail || 'Registration failed')
       }
 
+      const data = await response.json()
+      setAccountWasReset(data.account_reset === true)
+
       // Show success state
       setSuccess(true)
       onSuccess()
@@ -65,7 +72,8 @@ export function ArenaRegistrationModal({
       setTimeout(() => {
         onClose()
         setSuccess(false)
-      }, 2000)
+        setAccountWasReset(false)
+      }, 2500)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -88,9 +96,15 @@ export function ArenaRegistrationModal({
             <p className="text-[var(--text-secondary)] text-center">
               &quot;{configName}&quot; is registered for ggArena Season 1
             </p>
-            <p className="text-sm text-[var(--text-muted)] mt-2">
-              Competition starts January 21st
-            </p>
+            {accountWasReset ? (
+              <p className="text-sm text-green-500 mt-2 font-medium">
+                Account reset to $10,000 — Good luck!
+              </p>
+            ) : (
+              <p className="text-sm text-[var(--text-muted)] mt-2">
+                Competition starts January 21st
+              </p>
+            )}
           </div>
         </ModalBody>
       </Modal>
@@ -132,8 +146,17 @@ export function ArenaRegistrationModal({
             <div className="flex gap-2">
               <AlertCircle className="h-4 w-4 text-[var(--accent)] flex-shrink-0 mt-0.5" />
               <p className="text-[var(--text-secondary)]">
-                <strong className="text-[var(--text-primary)]">Note:</strong> Your paper trading
-                account will be reset to $10,000 on January 21st when the competition begins.
+                {competitionStarted ? (
+                  <>
+                    <strong className="text-[var(--text-primary)]">Note:</strong> The competition is live!
+                    Your paper trading account will be reset to $10,000 immediately upon registration.
+                  </>
+                ) : (
+                  <>
+                    <strong className="text-[var(--text-primary)]">Note:</strong> Your paper trading
+                    account will be reset to $10,000 on January 21st when the competition begins.
+                  </>
+                )}
               </p>
             </div>
           </div>

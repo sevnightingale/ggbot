@@ -3926,14 +3926,39 @@ async def register_for_arena(
                 """, (config_id, current_user.user_id))
                 conn.commit()
 
-        logger.info(f"Bot registered for Arena: config_id={config_id}, user_id={current_user.user_id}")
+        # 5. If competition has started, reset account to $10k immediately
+        from datetime import datetime, timezone
+        competition_start = datetime(2026, 1, 21, 12, 0, 0, tzinfo=timezone.utc)
+        account_reset = False
 
-        return {
-            "status": "success",
-            "config_id": config_id,
-            "message": "Your bot is registered for ggArena Season 1! Account will be reset to $10,000 on January 21st.",
-            "competition_start": "2026-01-21T12:00:00Z"
-        }
+        if datetime.now(timezone.utc) >= competition_start:
+            try:
+                from trading.paper.supabase_service import SupabasePaperTradingService
+                paper_trading = SupabasePaperTradingService()
+                reset_result = await paper_trading.reset_account(config_id, current_user.user_id)
+                account_reset = reset_result.get('status') == 'success'
+                logger.info(f"Late arena entry - account reset: config_id={config_id}, success={account_reset}")
+            except Exception as e:
+                logger.error(f"Failed to reset account for late arena entry: {e}")
+
+        logger.info(f"Bot registered for Arena: config_id={config_id}, user_id={current_user.user_id}, account_reset={account_reset}")
+
+        if account_reset:
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "message": "You're in! Your account has been reset to $10,000. Good luck!",
+                "competition_start": "2026-01-21T12:00:00Z",
+                "account_reset": True
+            }
+        else:
+            return {
+                "status": "success",
+                "config_id": config_id,
+                "message": "Your bot is registered for ggArena Season 1! Account will be reset to $10,000 on January 21st.",
+                "competition_start": "2026-01-21T12:00:00Z",
+                "account_reset": False
+            }
 
     except HTTPException:
         raise
