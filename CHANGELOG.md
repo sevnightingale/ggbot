@@ -6,6 +6,111 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-21 - ggArena Season 1 Launch
+
+**Planning Doc**: [DOCS/completed/GGARENA_SEASON1_LAUNCH.md](DOCS/completed/GGARENA_SEASON1_LAUNCH.md)
+
+**Launch Execution** (12:00 UTC):
+- Ran `scripts/arena_reset.py --execute` → 14 bots reset to $10k, 5 positions closed
+- Added `arena_registered_at` timestamp column to configurations table
+- Backfilled 12 existing arena registrations
+
+**Arena Page Polish** (`frontend/app/arena/page.tsx`):
+- Hardcoded chart to 504 hours (21 days) for competition duration
+- Removed time range dropdown selector
+- Season badge shows "Season One · 🔴 LIVE" with pulsing red dot when competition active
+- Countdown timer hidden when live (replaced by LIVE badge)
+- Reordered sections: Hero → Chart → Leaderboard → How It Works → Footer
+
+**Backend: Competition Start Filter** (`api/public.py:18-71`):
+- `COMPETITION_START = datetime(2026, 1, 21, 12, 0, 0, tzinfo=timezone.utc)`
+- Arena performance API now filters data from competition start, not rolling window
+- Chart shows only post-reset data
+
+**Late Registration Support** (`ggbot.py:3929-3961`):
+- Registration endpoint now resets account to $10k if competition already started
+- Returns `account_reset: true` flag in response
+- Frontend modal shows immediate reset confirmation
+
+**Bug Fixes**:
+- `frontend/app/forge/page.tsx`: Skip API calls for temp IDs (optimistic placeholders during duplication)
+- `market_intelligence/adapters/derivatives/binance_funding.py`: Increased timeout 30s → 60s
+
+---
+
+## 2026-01-21 - Unified Modal System
+
+**Planning Doc**: [DOCS/completed/UNIFIED_MODAL_SYSTEM.md](DOCS/completed/UNIFIED_MODAL_SYSTEM.md)
+
+**Problem**: 8 modals using 3 different systems (Radix Dialog, custom, Framer Motion). Inconsistent backdrops (`/50` to `/80`), borders (`rounded-lg` to `rounded-2xl`), sizing (no responsive scaling), broken `dark:` prefixes in SettingsModal.
+
+**Solution**: Unified `Modal` component with Framer Motion, responsive sizing, full-screen mobile, CSS variables.
+
+**New Component** (`frontend/components/ui/modal.tsx`):
+- `Modal`, `ModalHeader`, `ModalBody`, `ModalFooter`, `ModalTitle`, `ModalDescription`
+- Size variants: `sm`, `md`, `lg`, `xl`, `full` with responsive breakpoints
+- Focus trap, focus restoration, ARIA attributes for accessibility
+- Portal rendering (escapes parent containers), scroll lock
+- `preventClose` prop for forced modals (onboarding)
+
+**Migrated Modals**:
+- `AddCreditsModal.tsx` → `size="sm"`, simplified structure
+- `UpgradeModal.tsx` → `size="sm"`, multi-view with back navigation
+- `ArenaRegistrationModal.tsx` → `size="sm"`, success state handling
+- `BotCreationModal.tsx` → `size="xl"`, `preventClose={forceOpen}`
+- `SettingsModal.tsx` → `size="lg"`, fixed all `dark:` prefixes to CSS variables
+- `RiskAcknowledgmentModal.tsx` → `size="lg"`, converted from custom implementation
+
+**activity-modal.tsx**: Minimal changes (kept custom navigation features):
+- Removed gold border (`border-2 border-[var(--accent)]` → `border border-[var(--border)]`)
+- Standardized z-index (`z-40` → `z-50`)
+- Preserved: touch swipe, chevron navigation, counter display, arrow key navigation
+
+**Skipped**: `TradeHistoryModal.tsx` (no UI trigger currently)
+
+---
+
+## 2026-01-21 - Prepaid Tier Implementation
+
+**Planning Doc**: [DOCS/completed/PREPAID_TIER.md](DOCS/completed/PREPAID_TIER.md)
+
+**Problem**: Credit pack buyers on `usage_based` tier with metered billing → confusion. Users expect prepaid behavior (bot stops when empty), actual behavior was metered billing with credits as discounts (potential overage charges).
+
+**Solution**: Separate `prepaid` tier using existing `ggbase` enum value (0 users, no migration needed).
+
+**Domain Model** (`core/domain/user_profile.py`):
+- `PREPAID = "ggbase"` enum value, `is_prepaid_tier`, `requires_credit_check` properties
+- `can_activate_bots` now includes PREPAID tier
+
+**Pre-LLM Credit Check** (`decision/engine_v2.py:161-247`):
+- `InsufficientCreditsError` exception blocks LLM calls when credits exhausted
+- `_check_prepaid_credits()` called before every decision
+- Fail-closed: Stripe API errors block rather than allow
+
+**Activity Logging** (`core/common/activity_logger.py:277-295`):
+- `stripe_reported` parameter added to `log_llm_activity()`
+- Prepaid users: `stripe_reported=True` immediately (never enters meter queue)
+
+**Meter Reporter** (`billing/stripe_meter_reporter.py:33-65`):
+- JOIN filter excludes `ggbase` tier from unreported usage query
+- Defense in depth: even if activity logged incorrectly, won't be metered
+
+**Usage Monitor** (`core/monitoring/usage_monitor.py:118-155`):
+- Tier-specific handling: PREPAID=hard block, USAGE_BASED=soft warn
+- Prepaid-specific email notifications (no overage messaging)
+
+**Checkout Flows** (`ggbot.py:4377-4414, 4569-4627, 4822-4849`):
+- Stripe credit purchase: payment mode only (no subscription)
+- Crypto credit purchase: sets `ggbase` tier for free users
+- Webhook: free→prepaid on credit purchase, existing paid users keep tier
+
+**Frontend** (`frontend/lib/permissions.tsx:8`):
+- Added `ggbase` to `subscription_tier` type union
+
+**Migration**: 6 existing credit pack users migrated from `usage_based` to `ggbase`, Stripe subscriptions cancelled.
+
+---
+
 ## 2026-01-20 - Onboarding Revamp & Free Test Runs
 
 **Planning Doc**: [DOCS/completed/ONBOARDING_REVAMP.md](DOCS/completed/ONBOARDING_REVAMP.md)

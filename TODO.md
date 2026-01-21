@@ -4,106 +4,21 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 
 ---
 
-## 🏆 **CRITICAL - ggArena Season 1 Launch**
+## 🏆 **ggArena Season 1** - 🟢 LIVE
 
-**Status**: 🔴 URGENT - Launch tweet Jan 8, Season 1 starts Jan 21
-**Planning Doc**: [DOCS/todo/GGARENA_SEASON1_LAUNCH.md](DOCS/todo/GGARENA_SEASON1_LAUNCH.md)
+**Status**: Competition running Jan 21 12:00 UTC → Feb 11 12:00 UTC
+**Planning Doc**: [DOCS/completed/GGARENA_SEASON1_LAUNCH.md](DOCS/completed/GGARENA_SEASON1_LAUNCH.md)
 
 **Competition Details**:
 - **Dates**: Jan 21 12:00 UTC → Feb 11 12:00 UTC (21 days)
 - **Prize Pool**: $2,500 in USX on Scroll
 - **Top 3**: Also get funded live trading on Symphony
-- **Winning Criteria**: Highest equity after 21 days
-- **Eligibility**: Active bots with usage-based subscription
+- **14 bots competing**, all reset to $10k at launch
 
-### **Phase 1: Tonight (Jan 7) - Launch Prep** ✅ COMPLETE
-
-**Arena Page Updates**:
-- [x] Update hero copy: Season 1 framing, $2,500 prize pool, dates
-- [x] Add countdown timer component (to Jan 21 12:00 UTC)
-- [x] Reframe prototype bots as "Training Ground" / examples
-- [x] Update hardcoded dates (Dec 18 - Jan 8) → (Jan 21 - Feb 11)
-- [ ] Add "Registered Competitors" section (for future registrations)
-
-**Registration Mechanism**:
-- [x] Create `POST /api/v2/bot/{config_id}/arena/register` endpoint
-- [x] Validate: user owns bot, bot active, user subscribed
-- [x] Set `is_public_performance = true` on registration
-- [x] Create registration confirmation modal (frontend)
-- [x] Add "Enter Arena" button to bot config page
-
-**Navigation & Branding**:
-- [x] Add ggArena link to navbar
-- [x] Add banner message about Season 1 (Jan 21st)
-- [x] Update logo everywhere
-- [x] Update favicon
-
-### **Phase 2: Critical Polish (Tonight/Tomorrow)** ✅ COMPLETE
-
-- [x] Fix duplicate and reset buttons (missing config_type, UI not refreshing)
-- [x] Fix "Setting up your ggbot" message (shows when no bots exist, misleading)
-- [x] Remove "free" labels from bot creation modal (usage-based now)
-- [x] Fix theme/light mode issues (strategy advisor buttons, image upload icon)
-- [x] Remove floating question mark helper icon
-- [x] Add socials to header + landing footer (Twitter/X, Telegram)
-- [x] Arena page performance fix (countdown timer isolated, removed heavy ArenaTimeline)
-- [x] Arena page UX overhaul (How It Works, Leaderboard, prize breakdown, varied CTAs)
-- [x] Arena CTAs link to app.ggbots.ai (direct to app, not landing)
-
-### **Phase 3: Before Jan 21**
-
-**Infrastructure**:
-- [x] Create `scripts/arena_reset.py` - bulk reset all registered bots to $10k
-- [x] Test reset script (tested on The Technician, verified dry-run on all 7 bots)
-- [ ] Add `arena_registered_at` timestamp column (optional)
-
-**Communications**:
-- [x] Draft launch email for ggbots v2 + ggArena announcement
-- [x] Draft Telegram post for same
-- [x] Post launch tweet + video (Jan 8)
-
-**Polish**:
-- [x] Fix Google auth showing Supabase project ID
+**Remaining Work**:
 - [ ] Update x-bot to different account
-
-### **Phase 4: Future (Post-Launch)**
-
-- [ ] Inline arena bot creation modal (components exist, just need flow)
-- [x] Full onboarding flow reassessment → COMPLETE (see CHANGELOG 2026-01-20)
-
-### **Open Questions**
-1. Late registrations after Jan 21 - allow with fresh $10k?
-2. Should Sev's 7 prototype bots compete in Season 1?
-3. Multiple bots per user - allowed?
-
----
-
-## 💳 ~~**HIGH PRIORITY - Prepaid Tier Implementation**~~ ✅ COMPLETED
-
-**Status**: ✅ IMPLEMENTED (2026-01-20)
-**Planning Doc**: [DOCS/todo/PREPAID_TIER.md](DOCS/todo/PREPAID_TIER.md)
-
-**Solution**: Separate `prepaid` tier (using existing `ggbase` enum value):
-- NO Stripe metered subscription
-- Hard-block LLM calls when credits exhausted (before call, not after)
-- No invoices at end of billing period
-
-**Completed Phases**:
-- [x] **Phase 1**: Update `SubscriptionTier` enum + `can_activate_bots` permission
-- [x] **Phase 2**: Add pre-LLM credit check in `decision/engine_v2.py`
-- [x] **Phase 3**: Skip meter reporting for prepaid users in `stripe_meter_reporter.py`
-- [x] **Phase 4**: Update usage monitor for prepaid-specific handling
-- [x] **Phase 5**: Update checkout webhook to set prepaid tier
-- [x] **Phase 6**: Frontend updates (permissions type)
-
-**Files Modified**:
-- `core/domain/user_profile.py` - Added PREPAID tier, `is_prepaid_tier`, `requires_credit_check`
-- `decision/engine_v2.py` - Pre-LLM credit check, `stripe_reported=True` for prepaid
-- `core/common/activity_logger.py` - Added `stripe_reported` parameter
-- `billing/stripe_meter_reporter.py` - Exclude prepaid users from meter reporting
-- `core/monitoring/usage_monitor.py` - Separate prepaid vs usage_based handling
-- `ggbot.py` - Checkout webhook sets prepaid tier for credit purchases
-- `frontend/lib/permissions.tsx` - Added 'ggbase' to tier type
+- [ ] Inline arena bot creation modal (optional, future)
+- [ ] Add "Registered Competitors" section (optional, future)
 
 ---
 
@@ -361,36 +276,6 @@ const useDeleteBot = () => useMutation({
 - [x] Updated all 3 prompts with structured REASONING format (KEY_SIGNAL, SUPPORTING, RISK, SUMMARY)
 - [x] Frontend parses structured sections with graceful fallback to raw text
 - [x] No backend parser changes needed (frontend-only parsing)
-
----
-
-## 🎨 **Unified Modal System**
-
-**Status**: 🔵 PLANNED
-**Planning Doc**: [DOCS/todo/UNIFIED_MODAL_SYSTEM.md](DOCS/todo/UNIFIED_MODAL_SYSTEM.md)
-**Complexity**: Medium (~6-8 hours)
-
-**Problem**: 8 modals with inconsistent implementations - 3 different systems (Radix, custom, Framer Motion), varying backdrops, borders, sizing, and broken `dark:` prefixes in SettingsModal.
-
-**Solution**: Unified `Modal` component with Framer Motion animations, responsive widths, full-screen mobile, consistent VIBE.md styling.
-
-### **Key Changes**
-- Framer Motion animations (from activity-modal)
-- Responsive sizing: `sm`→`md`→`lg`→`xl`→`full`
-- Full-screen on mobile (<640px)
-- Remove gold border from activity-modal
-- Fix `dark:` prefix issues (use CSS variables)
-
-### **Files to Migrate**
-- [ ] Create `components/ui/modal.tsx`
-- [ ] `AddCreditsModal.tsx` → `sm`
-- [ ] `UpgradeModal.tsx` → `sm`
-- [ ] `ArenaRegistrationModal.tsx` → `sm`
-- [ ] `SettingsModal.tsx` → `lg` + fix theme
-- [ ] `RiskAcknowledgmentModal.tsx` → `lg`
-- [ ] `BotCreationModal.tsx` → `xl`
-- [ ] `TradeHistoryModal.tsx` → `full`
-- [ ] `activity-modal.tsx` → `md` (keep nav features)
 
 ---
 
