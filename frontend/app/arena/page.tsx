@@ -5,9 +5,10 @@ import { RefreshCw, Bot, TrendingUp, TrendingDown, Circle, Zap, ChevronDown } fr
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
 
-// Isolated countdown component - only this re-renders every second, not the whole page
+// Isolated countdown/live component - only this re-renders every second, not the whole page
 function CountdownTimer({ targetTime }: { targetTime: number }) {
   const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0, seconds: 0 })
+  const [isLive, setIsLive] = useState(false)
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -19,6 +20,7 @@ function CountdownTimer({ targetTime }: { targetTime: number }) {
       const now = Date.now()
       const diff = targetTime - now
       if (diff > 0) {
+        setIsLive(false)
         setTimeLeft({
           days: Math.floor(diff / (1000 * 60 * 60 * 24)),
           hours: Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60)),
@@ -26,14 +28,30 @@ function CountdownTimer({ targetTime }: { targetTime: number }) {
           seconds: Math.floor((diff % (1000 * 60)) / 1000)
         })
       } else {
+        setIsLive(true)
         setTimeLeft({ days: 0, hours: 0, minutes: 0, seconds: 0 })
       }
     }, 1000)
     return () => clearInterval(timer)
   }, [targetTime])
 
-  if (!mounted || (timeLeft.days + timeLeft.hours + timeLeft.minutes + timeLeft.seconds === 0)) {
+  if (!mounted) {
     return null
+  }
+
+  // Show LIVE indicator once competition has started
+  if (isLive) {
+    return (
+      <div className="flex justify-center mb-8">
+        <div className="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-red-500/10 border border-red-500/50">
+          <span className="relative flex h-3 w-3">
+            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
+          </span>
+          <span className="text-xl font-bold text-red-500 uppercase tracking-wider">Live</span>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -171,9 +189,11 @@ function ArenaContent() {
   const [data, setData] = useState<ArenaData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [hours, setHours] = useState(504)
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
+
+  // Fixed to 21 days (504 hours) for the competition
+  const hours = 504
 
   // Competition start time for countdown (static, no state needed here)
   const competitionStartTime = new Date('2026-01-21T12:00:00Z').getTime()
@@ -201,6 +221,7 @@ function ArenaContent() {
 
     try {
       // Use relative URL to go through Next.js rewrites (avoids CORS issues)
+      // Fixed to 504 hours (21 days) for the competition duration
       const response = await fetch(`/api/v2/public/arena/performance?hours=${hours}`)
 
       if (!response.ok) {
@@ -215,7 +236,7 @@ function ArenaContent() {
     } finally {
       setLoading(false)
     }
-  }, [hours])
+  }, [])
 
   useEffect(() => {
     fetchData()
@@ -440,24 +461,13 @@ function ArenaContent() {
                 <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
                 <h3 className="font-display text-xl text-[var(--text-primary)]">Performance Over Time</h3>
               </div>
-              <div className="flex items-center gap-2">
-                <select
-                  value={hours}
-                  onChange={(e) => setHours(Number(e.target.value))}
-                  className="px-3 py-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[var(--text-primary)] text-sm font-mono transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[var(--accent)] focus:border-[var(--accent)] hover:border-[var(--accent)]"
-                >
-                  <option value={168}>7 days</option>
-                  <option value={336}>14 days</option>
-                  <option value={504}>21 days</option>
-                </select>
-                <button
-                  onClick={fetchData}
-                  disabled={loading}
-                  className="p-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] transition-all duration-200 hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
-                >
-                  <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
-                </button>
-              </div>
+              <button
+                onClick={fetchData}
+                disabled={loading}
+                className="p-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] transition-all duration-200 hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
+              >
+                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+              </button>
             </div>
             <ResponsiveContainer width="100%" height={400}>
               <LineChart data={chartData}>
