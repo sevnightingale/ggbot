@@ -3913,13 +3913,15 @@ async def register_for_arena(
                 detail="Arena registration requires an active subscription."
             )
 
-        # 4. Set is_public_performance = true
+        # 4. Set is_public_performance = true and record registration time
         from core.common.db import get_db_connection
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE configurations
-                    SET is_public_performance = true, updated_at = CURRENT_TIMESTAMP
+                    SET is_public_performance = true,
+                        arena_registered_at = CURRENT_TIMESTAMP,
+                        updated_at = CURRENT_TIMESTAMP
                     WHERE config_id = %s AND user_id = %s
                 """, (config_id, current_user.user_id))
                 conn.commit()
