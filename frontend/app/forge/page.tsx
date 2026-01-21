@@ -617,7 +617,8 @@ function ForgeApp() {
 
   // Fetch latest activity for selected bot (for status display when idle)
   useEffect(() => {
-    if (!selectedConfigId || !user) {
+    // Skip temp IDs (optimistic placeholders during bot creation/duplication)
+    if (!selectedConfigId || !user || selectedConfigId.startsWith('temp-')) {
       setLatestActivity(null)
       return
     }
@@ -840,7 +841,8 @@ function ForgeApp() {
   // Config update callback for AI Assistant and child components
   const handleConfigUpdate = async () => {
     // Reload the selected bot's config after AI or auto-save updates
-    if (selectedConfigId) {
+    // Skip temp IDs (optimistic placeholders)
+    if (selectedConfigId && !selectedConfigId.startsWith('temp-')) {
       try {
         const updatedBot = await apiClient.getConfig(selectedConfigId)
         setAllBots(prev => prev.map(bot =>
