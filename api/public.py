@@ -15,6 +15,10 @@ from core.common.logger import logger
 router = APIRouter(prefix="/api/v2/public", tags=["public"])
 
 
+# Season 1 competition start time - all chart data starts from here
+COMPETITION_START = datetime(2026, 1, 21, 12, 0, 0, tzinfo=timezone.utc)
+
+
 @router.get("/arena/performance")
 async def get_arena_performance(
     hours: int = Query(default=504, ge=1, le=720)  # Default 21 days (504 hours), max 30 days
@@ -28,8 +32,11 @@ async def get_arena_performance(
     Formula: total_equity = current_balance + unrealized_pnl
     (Source: AccountMetricsCalculator.calculate_total_equity)
 
+    Note: Data always starts from COMPETITION_START (Jan 21 12:00 UTC) regardless
+    of the hours parameter, to ensure fair comparison from competition start.
+
     Args:
-        hours: Time window in hours (default 504 = 21 days for competition)
+        hours: Time window in hours (ignored for Season 1 - uses competition start)
 
     Returns:
         {
@@ -60,7 +67,8 @@ async def get_arena_performance(
             ]
         }
     """
-    cutoff_time = datetime.now(timezone.utc) - timedelta(hours=hours)
+    # Always use competition start time - ignore hours param during Season 1
+    cutoff_time = COMPETITION_START
 
     with get_db_connection() as conn:
         with conn.cursor() as cur:
