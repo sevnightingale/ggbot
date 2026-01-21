@@ -39,19 +39,9 @@ function CountdownTimer({ targetTime }: { targetTime: number }) {
     return null
   }
 
-  // Show LIVE indicator once competition has started
+  // When live, don't render countdown - LIVE indicator is in the badge instead
   if (isLive) {
-    return (
-      <div className="flex justify-center mb-8">
-        <div className="inline-flex items-center gap-3 px-6 py-3 rounded-xl bg-red-500/10 border border-red-500/50">
-          <span className="relative flex h-3 w-3">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-          </span>
-          <span className="text-xl font-bold text-red-500 uppercase tracking-wider">Live</span>
-        </div>
-      </div>
-    )
+    return null
   }
 
   return (
@@ -358,11 +348,29 @@ function ArenaContent() {
         <div className="absolute inset-0 bg-gradient-to-b from-[var(--accent)]/8 via-transparent to-transparent pointer-events-none" />
 
         <div className="relative max-w-4xl mx-auto px-4 py-12 text-center">
-          {/* Season 1 Badge */}
+          {/* Season 1 Badge - shows LIVE indicator when competition has started */}
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full mb-6 bg-[var(--accent)]/15 border border-[var(--accent)]">
             <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
-              Season 1 · January 21st
+              Season One
             </span>
+            {mounted && Date.now() >= competitionStartTime && (
+              <>
+                <span className="text-[var(--accent)]">·</span>
+                <span className="relative flex h-2 w-2">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-500 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                </span>
+                <span className="text-sm font-bold uppercase tracking-wider text-red-500">Live</span>
+              </>
+            )}
+            {mounted && Date.now() < competitionStartTime && (
+              <>
+                <span className="text-[var(--accent)]">·</span>
+                <span className="text-sm font-semibold uppercase tracking-wider text-[var(--accent)]">
+                  January 21st
+                </span>
+              </>
+            )}
           </div>
 
           <h1 className="font-display text-5xl md:text-6xl text-[var(--accent)] mb-4">
@@ -394,45 +402,6 @@ function ArenaContent() {
             <Zap className="h-5 w-5" />
             <span>Enter the Arena</span>
           </a>
-        </div>
-      </div>
-
-      {/* How It Works */}
-      <div className="border-b border-[var(--border)] bg-[var(--bg-secondary)]/50">
-        <div className="max-w-4xl mx-auto px-4 py-10">
-          <h2 className="text-center text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-8">
-            How It Works
-          </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
-                <span className="text-sm font-bold text-[var(--accent)]">1</span>
-              </div>
-              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Build</div>
-              <p className="text-xs text-[var(--text-muted)]">Create your AI trading bot — pick a model, set your strategy</p>
-            </div>
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
-                <span className="text-sm font-bold text-[var(--accent)]">2</span>
-              </div>
-              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Subscribe</div>
-              <p className="text-xs text-[var(--text-muted)]">Usage-based pricing starts your bot. Most users spend &lt;$5/mo</p>
-            </div>
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
-                <span className="text-sm font-bold text-[var(--accent)]">3</span>
-              </div>
-              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Enter</div>
-              <p className="text-xs text-[var(--text-muted)]">Click &quot;Enter Arena&quot; on your bot. All accounts reset to $10k on Jan 21</p>
-            </div>
-            <div className="text-center">
-              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
-                <span className="text-sm font-bold text-[var(--accent)]">4</span>
-              </div>
-              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Win</div>
-              <p className="text-xs text-[var(--text-muted)]">Highest equity after 21 days wins. Top 3 split the prize pool</p>
-            </div>
-          </div>
         </div>
       </div>
 
@@ -763,6 +732,45 @@ function ArenaContent() {
             </div>
           </>
         )}
+      </div>
+
+      {/* How It Works */}
+      <div className="border-y border-[var(--border)] bg-[var(--bg-secondary)]/50">
+        <div className="max-w-4xl mx-auto px-4 py-10">
+          <h2 className="text-center text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-8">
+            How It Works
+          </h2>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">1</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Build</div>
+              <p className="text-xs text-[var(--text-muted)]">Create your AI trading bot — pick a model, set your strategy</p>
+            </div>
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">2</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Subscribe</div>
+              <p className="text-xs text-[var(--text-muted)]">Usage-based pricing starts your bot. Most users spend &lt;$5/mo</p>
+            </div>
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">3</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Enter</div>
+              <p className="text-xs text-[var(--text-muted)]">Click &quot;Enter Arena&quot; on your bot. All accounts reset to $10k on Jan 21</p>
+            </div>
+            <div className="text-center">
+              <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
+                <span className="text-sm font-bold text-[var(--accent)]">4</span>
+              </div>
+              <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Win</div>
+              <p className="text-xs text-[var(--text-muted)]">Highest equity after 21 days wins. Top 3 split the prize pool</p>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* CTA Footer with brass gradient */}
