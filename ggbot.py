@@ -2067,40 +2067,56 @@ async def test_signal_publishing(
 ) -> Dict[str, Any]:
     """Test signal publishing functionality with mock data."""
     try:
-        from signals.publishing_service import publish_signal_to_telegram
-        
-        # Mock signal data for testing
-        mock_signal_data = {
-            'symbol': 'BTC/USDT',
-            'direction': 'LONG',
-            'source': 'manual_trigger',
-            'raw_message': 'Test signal for Telegram publishing functionality'
-        }
-        
-        # Mock decision result
-        mock_decision_result = {
-            'action': 'VALIDATE',
-            'confidence': 0.85,
-            'reasoning': 'This is a test signal to validate the Telegram publishing functionality. The signal shows strong technical indicators with RSI oversold conditions and bullish MACD crossover.'
-        }
-        
-        # Attempt to publish the test signal
-        success = await publish_signal_to_telegram(
-            config_id=config_id,
-            user_id=current_user.user_id,
-            signal_data=mock_signal_data,
-            decision_result=mock_decision_result
+        from signals.publishing_service import SignalPublishingService, AccessControlService
+
+        # Check permissions first and give specific error
+        access_control = AccessControlService()
+        can_publish = await access_control.can_publish_signals(current_user.user_id)
+        if not can_publish:
+            raise HTTPException(
+                status_code=403,
+                detail="Telegram publishing requires an active subscription. Upgrade at ggbots.ai/pricing"
+            )
+
+        # Check telegram config exists
+        telegram_config = await access_control.get_user_telegram_config(config_id)
+        if not telegram_config:
+            raise HTTPException(
+                status_code=400,
+                detail="Telegram publishing not configured. Enable it and enter your channel ID first."
+            )
+
+        # Create service and test message
+        service = SignalPublishingService()
+
+        # Send a simple test message directly
+        test_message = (
+            "🧪 ggbots Test Message\n\n"
+            "Your Telegram publishing is configured correctly!\n\n"
+            "Your bot's trading signals will appear here.\n\n"
+            "🌐 https://ggbots.ai"
         )
-        
+
+        success = await service.telegram_bot.send_message(
+            chat_id=telegram_config.chat_id,
+            text=test_message
+        )
+
+        if not success:
+            raise HTTPException(
+                status_code=400,
+                detail="Failed to send message. Make sure @ggFilter_Bot is admin in your channel/group with 'Post Messages' permission."
+            )
+
         return {
-            "status": "success" if success else "failed",
-            "message": "Test signal published successfully" if success else "Failed to publish test signal",
-            "signal_data": mock_signal_data,
-            "decision_result": mock_decision_result,
-            "config_id": config_id,
-            "user_id": current_user.user_id
+            "status": "success",
+            "message": "Test message sent successfully!",
+            "chat_id": telegram_config.chat_id,
+            "config_id": config_id
         }
-        
+
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Signal publishing test failed: {e}")
         import traceback

@@ -42,28 +42,30 @@ class AccessControlService:
         self.logger = logger.bind(component='access_control')
     
     async def can_publish_signals(self, user_id: str) -> bool:
-        """Check if user can publish signals (ggBase tier only)."""
+        """Check if user can publish signals (any paid tier with active subscription)."""
         try:
             with get_db_connection() as conn:
                 with conn.cursor() as cur:
                     cur.execute("""
-                        SELECT subscription_tier, subscription_status, paid_data_points
-                        FROM user_profiles 
+                        SELECT subscription_tier, subscription_status
+                        FROM user_profiles
                         WHERE user_id = %s
                     """, (user_id,))
-                    
+
                     result = cur.fetchone()
                     if not result:
                         return False
-                    
-                    tier, status, paid_points = result
-                    
-                    # Must be ggbase tier with active subscription
+
+                    tier, status = result
+
+                    # Match frontend permission: can_activate_bots logic
+                    # Paid tiers (usage_based, ggbase, pro) with active status can publish
+                    paid_tiers = ('usage_based', 'ggbase', 'pro')
                     return (
-                        tier == 'ggbase' and
+                        tier in paid_tiers and
                         status == 'active'
                     )
-                    
+
         except Exception as e:
             self.logger.error(f"Failed to check signal publishing access for {user_id}: {e}")
             return False
