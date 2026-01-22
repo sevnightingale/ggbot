@@ -82,8 +82,11 @@ Legacy/Archive (Moved to /archive/):
 ├── AddCreditsModal.tsx     # Modal wrapper for CreditPicker (for existing subscribers)
 └── ValidationMessage.tsx   # Error/warning message component with icons
 
-/components/ui/              # shadcn UI components
-├── dialog.tsx              # Radix UI Dialog wrapper (supports hideCloseButton prop)
+/components/ui/              # UI components
+├── modal.tsx               # Unified modal system - Framer Motion animations, responsive sizes (sm/md/lg/xl/full),
+│                           #   focus trap, portal rendering, full-screen mobile. Exports: Modal, ModalHeader,
+│                           #   ModalBody, ModalFooter, ModalTitle, ModalDescription. Use for ALL modals.
+├── dialog.tsx              # Radix UI Dialog wrapper (DEPRECATED - use modal.tsx instead)
 ├── button.tsx              # Button component with variants
 ├── card.tsx                # Card layout component
 ├── badge.tsx               # Badge/pill component

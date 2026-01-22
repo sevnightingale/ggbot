@@ -608,12 +608,34 @@ class TechnicalIndicators:
         """
         results = {}
 
-        # Indicator name aliases for common abbreviations
+        # Indicator name aliases for common abbreviations and display names
+        # This handles cases where display names are accidentally used in configs
         aliases = {
+            # Standard abbreviations
             "kc": "keltner",
             "dc": "donchian",
             "bb": "bbands",
-            "bbw": "bbwidth"
+            "bbw": "bbwidth",
+            # Display name variants (spaces → underscores, common typos)
+            "bollinger bands": "bbands",
+            "bollinger_bands": "bbands",
+            "bollinger band width": "bbwidth",
+            "bollinger_band_width": "bbwidth",
+            "williams %r": "williams_r",
+            "williams%r": "williams_r",
+            "williams r": "williams_r",
+            "donchian channels": "donchian",
+            "donchian_channels": "donchian",
+            "parabolic sar": "psar",
+            "parabolic_sar": "psar",
+            "keltner channels": "keltner",
+            "keltner_channels": "keltner",
+            "stochastic oscillator": "stochastic",
+            "stochastic_oscillator": "stochastic",
+            "aroon indicator": "aroon",
+            "aroon_indicator": "aroon",
+            "vortex indicator": "vortex",
+            "vortex_indicator": "vortex",
         }
 
         for indicator in indicators:

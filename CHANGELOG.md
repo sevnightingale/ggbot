@@ -6,6 +6,34 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-22 - Rei Integration Hardening
+
+**Related Doc**: [DOCS/completed/REI_AGENT_INTEGRATION.md](DOCS/completed/REI_AGENT_INTEGRATION.md)
+
+**Problem**: Claude (Opus 4.5) was overriding Rei's EXIT signals with independent analysis. One incident: Rei said EXIT at +$144 profit, Claude held → position closed at -$246 loss. ~$400 swing from override.
+
+**Model Change** (`.env`):
+- Switched from `claude-opus-4-5-20251101` to `claude-haiku-4-5-20250929`
+- Haiku follows instructions more faithfully, less "I have a better idea" behavior
+
+**System Prompt Hardening** (`agent/run_agent.py:232-299`):
+- Added explicit rules: "You are a robot. Rei says X, you do X."
+- Forbidden phrases: "My Assessment", "despite Rei", "however, I think"
+- EXIT has NO threshold - when Rei says out, agent exits immediately
+- ENTER requires ≥50% confidence (wait for conviction)
+
+**Confidence-Based Position Sizing**:
+- Size = confidence × max_position (e.g., 70% confidence = 70% of max size)
+- Higher conviction = larger bet, lower conviction = smaller bet
+
+**Rei Timeout Fix** (`agent/mcp_server.py:1553`):
+- Increased timeout 60s → 180s for large market data payload (~15-20KB)
+- Was causing connection errors during consult_rei_for_decision
+
+**Documentation**: Updated `agent/README.md` with decision logic table, thresholds, sizing formula.
+
+---
+
 ## 2026-01-22 - Telegram Publishing (Platform Bot)
 
 **Planning Doc**: [DOCS/completed/TELEGRAM_PUBLISHING.md](DOCS/completed/TELEGRAM_PUBLISHING.md)

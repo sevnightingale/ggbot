@@ -1,60 +1,62 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-20 21:06:17 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-22 04:17:53 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 296
-- **Pro Users (ggbase)**: 0 (0 active subscriptions)
-- **Free Users**: 283
-- **Users with Bots**: 289 (97.6%)
+- **Total Users**: 300
+- **Pro Users (ggbase)**: 10 (10 active subscriptions)
+- **Free Users**: 281
+- **Users with Bots**: 293 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 437
-- **Active Bots**: 13 (3.0%)
-  - Paper: 12
+- **Total Bots**: 446
+- **Active Bots**: 22 (4.9%)
+  - Paper: 21
   - Symphony (Live): 1
   - Aster (DEX): 0
 - **Inactive Bots**: 424
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,794
-  - Wins: 1,787
-  - Losses: 4,007
-  - Platform Win Rate: 30.84%
-  - Total P&L: $-18,630.54
+- **Total Trades (All Time)**: 5,458
+  - Wins: 1,634
+  - Losses: 3,824
+  - Platform Win Rate: 29.94%
+  - Total P&L: $-17,322.86
 - **Recent Activity**:
-  - Last 24 hours: 23 trades
-  - Last 7 days: 91 trades
-  - Last 30 days: 541 trades
+  - Last 24 hours: 29 trades
+  - Last 7 days: 102 trades
+  - Last 30 days: 530 trades
 
 ### Open Positions
 - **Open Positions**: 9
-- **Unique Symbols**: 1
-- **Total Exposure**: $148,259.63
-- **Unrealized P&L**: $-537.27
+- **Unique Symbols**: 2
+- **Total Exposure**: $89,478.51
+- **Unrealized P&L**: $800.78
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,930.67
+- **Average Balance**: $9,935.24
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $11,958.38
+- **Highest Balance**: $10,431.75
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 12 bots
-- **DOGE/USDT**: 1 bots
+- **BTC/USDT**: 18 bots
+- **SOL/USDT**: 2 bots
+- **ETH/USDT**: 1 bots
+- **RENDER/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 988 decisions (avg confidence: 33.8%)
-- **enter**: 24 decisions (avg confidence: 64.9%)
-- **exit**: 11 decisions (avg confidence: 66.3%)
+- **wait**: 985 decisions (avg confidence: 41.8%)
+- **enter**: 29 decisions (avg confidence: 64.8%)
+- **exit**: 19 decisions (avg confidence: 69.3%)
 
 ### System Health
-- **Decisions (last hour)**: 38
+- **Decisions (last hour)**: 35
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -63,22 +65,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| signal-listener | 🟢 online | 0% | 64MB | 1h 18m | 4 |
-| error-alerts | 🟢 online | 0% | 34MB | 1h 18m | 4 |
-| market-data-ws | 🟢 online | 1.5% | 172MB | 1h 18m | 4 |
-| ggbot | 🟢 online | 0.2% | 391MB | 1h 18m | 29 |
-| account-monitor | 🟢 online | 0.5% | 152MB | 38m | 20 |
-| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 70MB | 1h 18m | 2 |
+| error-alerts | 🟢 online | 0% | 20MB | 16h 14m | 5 |
+| market-data-ws | 🟢 online | 1% | 21MB | 16h 14m | 5 |
+| ggbot | 🟢 online | 1.3% | 290MB | 13m | 39 |
+| account-monitor | 🟢 online | 1.1% | 133MB | 16h 14m | 21 |
+| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 70MB | 1h 42m | 9 |
+| telegram-bot | 🟢 online | 0% | 23MB | 3h 23m | 0 |
 
 ### VM Resources
 
 - **Disk**: 45G / 78G (58%)
-- **Memory**: 2.8Gi / 3.8Gi
-- **CPU Load**: 1.36 / 0.79 / 0.57 (1m/5m/15m)
+- **Memory**: 2.6Gi / 3.8Gi
+- **CPU Load**: 1.81 / 0.58 / 0.30 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 18.28M)
+- **Redis**: 🟢 connected (Memory: 18.76M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -430,7 +432,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-20 21:06:19 UTC
+**Last Updated**: 2026-01-22 04:17:54 UTC
 
 ---
 
@@ -565,7 +567,7 @@ df -h
 | `created_at` | timestamp with time zone | ✓ | now() |
 | `updated_at` | timestamp with time zone | ✓ | now() |
 
-### `configurations` (15 columns)
+### `configurations` (16 columns)
 
 **Primary Key**: `config_id`
 
@@ -591,6 +593,7 @@ df -h
 | `description` | text | ✓ |  |
 | `first_run_used` | boolean | ✓ | false |
 | `free_runs_remaining` | integer | ✓ | 3 |
+| `arena_registered_at` | timestamp with time zone | ✓ |  |
 
 ### `data_points` (11 columns)
 
@@ -1021,12 +1024,17 @@ df -h
 **Business Logic (@property methods)**:
 - `is_free_tier` - Check if user is on free tier.
 - `is_pro_tier` - Check if user has pro subscription.
+- `is_prepaid_tier` - Check if user is on prepaid (credit pack) tier.
+- `requires_credit_check` - Check if user requires hard credit balance check before LLM calls.
+
+Prepaid users MUST have credits available before any LLM call.
+Usage-based users are billed for overage, so no hard check needed.
 - `has_active_subscription` - Check if user has active subscription.
 - `subscription_expired` - Check if subscription has expired.
 - `can_activate_bots` - MASTER PERMISSION: Check if user can activate/run bots.
 
 This is the single source of truth for all paid features.
-True for USAGE_BASED and PRO tiers with active subscriptions.
+True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 - `can_use_agents` - Check if user can create and use agents (PRO tier only).
 - `is_premium_user` - DEPRECATED: Use can_activate_bots instead.
 - `can_use_premium_features` - DEPRECATED: Use can_activate_bots instead.
@@ -1279,7 +1287,7 @@ True for USAGE_BASED and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-20 21:06:19 UTC
+**Last Updated**: 2026-01-22 04:17:54 UTC
 
 ---
 

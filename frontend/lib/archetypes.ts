@@ -16,8 +16,26 @@ export interface ArchetypeConfig {
         data_points: string[]
         timeframes: string[]
       }
-      market_intelligence?: {
+      // Market intelligence categories (proper structure matching backend)
+      macro_economics?: {
         data_points: string[]
+        timeframes: string[]
+      }
+      sentiment_social?: {
+        data_points: string[]
+        timeframes: string[]
+      }
+      derivatives_leverage?: {
+        data_points: string[]
+        timeframes: string[]
+      }
+      onchain_analytics?: {
+        data_points: string[]
+        timeframes: string[]
+      }
+      news_regulatory?: {
+        data_points: string[]
+        timeframes: string[]
       }
     }
   }
@@ -35,11 +53,16 @@ export const ARCHETYPES: Record<string, ArchetypeConfig> = {
     extraction: {
       selected_data_sources: {
         technical_analysis: {
-          data_points: ['RSI', 'Stochastic', 'CCI', 'Bollinger Bands', 'EMA', 'ATR', 'MACD', 'OBV', 'ADX', 'Aroon', 'VWAP'],
+          data_points: ['RSI', 'Stochastic', 'CCI', 'BB', 'EMA', 'ATR', 'MACD', 'OBV', 'ADX', 'Aroon', 'VWAP'],
           timeframes: ['1h']
         },
-        market_intelligence: {
-          data_points: ['twitter_sentiment', 'btc_funding_rate', 'eth_funding_rate']
+        sentiment_social: {
+          data_points: ['twitter_sentiment'],
+          timeframes: ['1h']
+        },
+        derivatives_leverage: {
+          data_points: ['btc_funding_rate', 'eth_funding_rate'],
+          timeframes: ['1h']
         }
       }
     },
@@ -162,11 +185,20 @@ The crowd overdoes it. You're there for the correction.`
     extraction: {
       selected_data_sources: {
         technical_analysis: {
-          data_points: ['EMA', 'SMA', 'ADX', 'Aroon', 'MACD', 'RSI', 'Bollinger Bands', 'OBV', 'ATR'],
+          data_points: ['EMA', 'SMA', 'ADX', 'Aroon', 'MACD', 'RSI', 'BB', 'OBV', 'ATR'],
           timeframes: ['1d']
         },
-        market_intelligence: {
-          data_points: ['VIX', 'DXY', 'btc_funding_rate', 'eth_funding_rate', 'twitter_sentiment']
+        macro_economics: {
+          data_points: ['vix', 'dxy'],
+          timeframes: ['1d']
+        },
+        sentiment_social: {
+          data_points: ['twitter_sentiment'],
+          timeframes: ['1d']
+        },
+        derivatives_leverage: {
+          data_points: ['btc_funding_rate', 'eth_funding_rate'],
+          timeframes: ['1d']
         }
       }
     },
@@ -289,11 +321,16 @@ The macro compass points the way. You follow it.`
     extraction: {
       selected_data_sources: {
         technical_analysis: {
-          data_points: ['ADX', 'Aroon', 'EMA', 'SMA', 'PSAR', 'MACD', 'RSI', 'Stochastic', 'CCI', 'Bollinger Bands', 'ATR', 'OBV', 'VWAP'],
+          data_points: ['ADX', 'Aroon', 'EMA', 'SMA', 'PSAR', 'MACD', 'RSI', 'Stochastic', 'CCI', 'BB', 'ATR', 'OBV', 'VWAP'],
           timeframes: ['4h']
         },
-        market_intelligence: {
-          data_points: ['twitter_sentiment', 'btc_funding_rate', 'eth_funding_rate']
+        sentiment_social: {
+          data_points: ['twitter_sentiment'],
+          timeframes: ['4h']
+        },
+        derivatives_leverage: {
+          data_points: ['btc_funding_rate', 'eth_funding_rate'],
+          timeframes: ['4h']
         }
       }
     },

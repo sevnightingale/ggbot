@@ -1549,7 +1549,8 @@ async def consult_rei_for_decision(args: Dict[str, Any]) -> Dict[str, Any]:
 
         # Call Rei API
         try:
-            rei = ReiService(agent_secret_key=rei_secret)
+            # Use longer timeout (180s) for large market data payload (~15-20KB)
+            rei = ReiService(agent_secret_key=rei_secret, timeout=180.0)
 
             response = await rei.chat_completion(
                 messages=[{

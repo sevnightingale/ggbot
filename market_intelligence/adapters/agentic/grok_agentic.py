@@ -332,6 +332,9 @@ Return ONLY the JSON object, no markdown formatting.""",
 
         # Query-specific timeouts (in seconds)
         # NFP queries require extended time due to complex government data source searches
+        # Note: Grok response times are highly variable (28s-100s observed) due to
+        # X API latency, web search variability, and server load. Timeouts should
+        # provide sufficient margin for this variance.
         query_timeouts = {
             'nfp_jobs': 300.0,  # 5 minutes - complex BLS.gov/Bloomberg/Reuters searches
             'cpi_inflation': 180.0,  # 3 minutes - government data
@@ -340,7 +343,7 @@ Return ONLY the JSON object, no markdown formatting.""",
             'btc_tvl': 180.0,  # 3 minutes - DeFi protocol aggregation
             'whale_activity': 180.0,  # 3 minutes - blockchain analysis
             'twitter_sentiment': 180.0,  # 3 minutes - X search + sentiment analysis + code execution
-            'crypto_news': 120.0,  # 2 minutes - news aggregation
+            'crypto_news': 180.0,  # 3 minutes - news aggregation (uses both web + X search)
         }
         timeout = query_timeouts.get(query_type, 180.0)  # Default 3 minutes
 

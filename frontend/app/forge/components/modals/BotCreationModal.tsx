@@ -299,10 +299,11 @@ export function BotCreationModal({
         }
 
         // Build default extraction config based on timeframe
+        // NOTE: Use backend names (BB not 'Bollinger Bands', etc.)
         extractionConfig = {
           selected_data_sources: {
             technical_analysis: {
-              data_points: ['RSI', 'MACD', 'Bollinger Bands', 'EMA', 'SMA', 'ATR', 'OBV', 'Stochastic'],
+              data_points: ['RSI', 'MACD', 'BB', 'EMA', 'SMA', 'ATR', 'OBV', 'Stochastic'],
               timeframes: [timeframe]
             }
           }

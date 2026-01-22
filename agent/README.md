@@ -1,13 +1,18 @@
 # Autonomous Trading Agent
 
-**Status**: Phase 5 Complete - Rei Integration for Persistent Learning
-**Last Updated**: 2026-01-16
+**Status**: Phase 6 - Rei Integration Hardened (Haiku + Smart Thresholds)
+**Last Updated**: 2026-01-22
 
 ---
 
 ## 🎯 Overview
 
 The ggbots autonomous trading agent enables 24/7 AI-powered trading with full control over strategy execution, position management, and self-directed timing. Built on Claude Agent SDK with 15 specialized MCP tools, **conversation persistence** across crashes/restarts, and optional **Rei integration** for persistent learning.
+
+**Rei Integration Architecture** (when `rei_enabled: true`):
+- **Rei** = Brain (reasoning, learning, pattern recognition, calibrated confidence)
+- **Claude Haiku** = Executor (data gathering, tool coordination, trade execution)
+- Claude does NOT override Rei's decisions - it executes them faithfully
 
 **Architecture**:
 - **Strategy Configuration**: Via Strategy Advisor API (`/api/v2/assistant/chat`)
@@ -370,8 +375,18 @@ Warnings: whale distribution activity
 
 **Rei's Calibrated Confidence**:
 - Unlike LLM confidence (poorly calibrated), Rei's confidence is deterministic and trustworthy
-- 60%+ recommended for trade execution
+- Used for position sizing: `size = confidence × max_position`
 - Don't override or cap Rei's confidence scores
+
+**Decision Logic**:
+| Rei's Action | Threshold | What Happens |
+|--------------|-----------|--------------|
+| **WAIT** | None | Wait and check later |
+| **ENTER_LONG/SHORT** | ≥50% | Execute with confidence-based sizing |
+| **ENTER_LONG/SHORT** | <50% | Treat as WAIT (setup not ready) |
+| **EXIT** | **None** | Exit immediately (no hesitation) |
+
+**Why EXIT has no threshold**: When Rei says exit, the agent exits. Period. Hesitating on exit signals (like "but confidence is only 45%") led to significant losses in testing. The entry threshold exists because waiting for higher conviction often yields better entry prices.
 
 #### 15. `report_trade_outcome_to_rei`
 Send closed trade results for Rei learning.
@@ -501,7 +516,8 @@ CREATE TABLE agent_sessions (
 
 ```bash
 # Agent Model
-AGENT_MODEL=claude-sonnet-4-5-20250929  # Production: Sonnet 4.5
+AGENT_MODEL=claude-haiku-4-5-20250929  # Haiku 4.5 for Rei agents (follows instructions faithfully)
+# Alternative: claude-sonnet-4-5-20250929 for non-Rei agents needing more reasoning
 
 # Redis for message queues
 REDIS_URL=redis://localhost:6379
@@ -996,6 +1012,13 @@ python agent/run_agent.py --config-id=<symphony-config> --mode=autonomous
 3. **Session Longevity**: Unknown if sessions expire after extended periods (needs testing)
 4. **Rei Data Coverage**: 21/21 technical indicators, 8/11 market intel (missing: eth_funding_rate, btc_tvl, whale_activity)
 
+**Updated in 2026-01-22**:
+- ✅ **Model Change**: Switched from Opus 4.5 to Haiku 4.5 (`claude-haiku-4-5-20250929`) - Haiku follows Rei's decisions more faithfully without adding independent analysis
+- ✅ **Hardened Rei Prompt**: Explicit rules forbidding Claude from overriding Rei's decisions
+- ✅ **Smart Thresholds**: 50% entry threshold (wait for conviction), NO exit threshold (when Rei says out, get out)
+- ✅ **Confidence-Based Sizing**: Position size scales with Rei's confidence (70% confidence = 70% of max position)
+- ✅ **Rei Timeout Fix**: Increased timeout from 60s to 180s for large market data payloads (~15-20KB)
+
 **Added in 2026-01-16**:
 - ✅ **Rei Integration**: Persistent learning via Reilabs Rei Core - Claude orchestrates, Rei reasons
 - ✅ **3 New Tools**: query_market_data_for_rei, consult_rei_for_decision, report_trade_outcome_to_rei
@@ -1005,7 +1028,6 @@ python agent/run_agent.py --config-id=<symphony-config> --mode=autonomous
 **Fixed in 2025-12-27**:
 - ✅ **Agent Freeze Bug**: Agents would freeze if they ended a turn without calling `wait_for()`. System prompt now enforces this rule.
 - ✅ **Agent Watchdog**: Auto-restart for stale agents (>24h inactive) via account-monitor service
-- ✅ **Model Upgrade**: Switched to Opus 4.5 (`claude-opus-4-5-20251101`) for better reasoning
 - ✅ **System Prompt Cleanup**: Removed deprecated strategy_definition mode, streamlined prompts
 - ✅ **Observation Tool Logging**: Better error handling and logging for `record_trade_observation` and `query_trade_observations`
 

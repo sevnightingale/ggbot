@@ -335,7 +335,7 @@ class UsageMonitor:
                 <p><strong>Your bots have been paused.</strong></p>
                 <p>As a prepaid user, you won't be charged anything more. Purchase additional credits to reactivate your bots.</p>
                 """
-                resend_service.send_notification(
+                resend_service.send_generic_notification(
                     user_email=user_email,
                     title=title,
                     message=message,
@@ -360,7 +360,7 @@ class UsageMonitor:
                 <p>When your credits run out, your bots will be paused. As a prepaid user, you'll never be charged beyond what you've purchased.</p>
                 <p>Consider adding more credits to ensure uninterrupted bot operation.</p>
                 """
-                resend_service.send_notification(
+                resend_service.send_generic_notification(
                     user_email=user_email,
                     title=title,
                     message=message,
@@ -385,7 +385,7 @@ class UsageMonitor:
                 <p>Your bots will continue running. Any usage beyond your credits will be billed to your payment method.</p>
                 <p>Add more credits to reduce your upcoming bill.</p>
                 """
-                resend_service.send_notification(
+                resend_service.send_generic_notification(
                     user_email=user_email,
                     title=title,
                     message=message,
@@ -408,7 +408,7 @@ class UsageMonitor:
 
                 <p>Consider adding more credits to ensure uninterrupted bot operation.</p>
                 """
-                resend_service.send_notification(
+                resend_service.send_generic_notification(
                     user_email=user_email,
                     title=title,
                     message=message,
