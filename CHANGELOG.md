@@ -6,6 +6,38 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-22 - Telegram Publishing (Platform Bot)
+
+**Planning Doc**: [DOCS/completed/TELEGRAM_PUBLISHING.md](DOCS/completed/TELEGRAM_PUBLISHING.md)
+
+**Bot Command Handler** (`signals/telegram_bot_handler.py`):
+- New PM2 service `telegram-bot` - long polling for Telegram commands
+- `/start` - welcome message with setup instructions
+- `/chatid` - returns group ID for configuration
+- `/help` - command reference
+
+**Publishing Service** (`signals/publishing_service.py`):
+- Fixed tier check: all paid tiers (usage_based, ggbase, pro) not just ggbase
+- Entry notifications: bot name, action (📈 LONG / 📉 SHORT), confidence, reasoning
+- Exit notifications: P&L display (✅ +$X / ❌ -$X), duration, close reason icons
+- `publish_exit_to_telegram()` - new function for trade exits
+
+**Orchestrator Integration** (`ggbot.py:744-820`):
+- `_should_publish_signal()` - only publishes on trade entries (long/short), not waits
+- `_trigger_signal_publishing()` - enriches with bot_name, symbol, config_type
+
+**Trade Exit Hooks**:
+- `trading/paper/supabase_service.py:624-649` - paper trade exits
+- `trading/live/symphony_service.py:532-560` - Symphony live exits
+- Skips `account_reset` reason to avoid spam
+
+**Frontend** (`TradeSettings.tsx`, `permissions.tsx`):
+- Updated instructions: "channel" → "group" (groups support /chatid)
+- Fixed permission gate: `telegram_publishing` case added
+- Fixed API URL: relative → absolute backend URL
+
+---
+
 ## 2026-01-21 - ggArena Season 1 Launch
 
 **Planning Doc**: [DOCS/completed/GGARENA_SEASON1_LAUNCH.md](DOCS/completed/GGARENA_SEASON1_LAUNCH.md)
