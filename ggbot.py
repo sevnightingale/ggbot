@@ -749,6 +749,11 @@ class GGBotOrchestrator:
         if not publisher_config.get('enabled', False):
             return False
 
+        # Only publish on trade entries (long/short), not waits
+        action = decision_result.get('action', 'wait').lower()
+        if action not in ['long', 'short', 'enter', 'buy', 'sell']:
+            return False
+
         try:
             from core.common.db import get_db_connection
             with get_db_connection() as conn:
@@ -766,8 +771,10 @@ class GGBotOrchestrator:
 
                     tier, status = result
 
-                    if tier != 'ggbase' or status != 'active':
-                        self._log.info(f"User {config.user_id} requires ggbase subscription for signal publishing")
+                    # Match publishing_service logic: allow all paid tiers
+                    paid_tiers = ('usage_based', 'ggbase', 'pro')
+                    if tier not in paid_tiers or status != 'active':
+                        self._log.info(f"User {config.user_id} requires paid subscription for signal publishing")
                         return False
 
         except Exception as e:
@@ -782,19 +789,27 @@ class GGBotOrchestrator:
         signal_data: Dict,
         decision_result: Dict
     ) -> None:
-        """Trigger signal publishing to user's Telegram channel."""
+        """Trigger signal publishing to user's Telegram group."""
         try:
             from signals.publishing_service import publish_signal_to_telegram
-            
+
+            # Enrich signal_data with bot context for scheduled_trading bots
+            enriched_signal_data = {
+                **signal_data,
+                'bot_name': config.config_name,
+                'symbol': config.selected_pair,
+                'config_type': config.config_type
+            }
+
             success = await publish_signal_to_telegram(
                 config_id=config.config_id,
                 user_id=config.user_id,
-                signal_data=signal_data,
+                signal_data=enriched_signal_data,
                 decision_result=decision_result
             )
-            
+
             if success:
-                self._log.info(f"Successfully published signal for config {config.config_id}")
+                self._log.info(f"📡 Published signal to Telegram for {config.config_name}")
             else:
                 self._log.warning(f"Failed to publish signal for config {config.config_id}")
                 

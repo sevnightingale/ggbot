@@ -275,7 +275,7 @@ export function TradeSettings({
               </div>
             </div>
             <div className="text-sm text-[var(--text-muted)] mb-4">
-              Telegram signal publishing is available with a paid subscription. Upgrade to automatically publish your bot&apos;s trading decisions to your Telegram channel.
+              Telegram signal publishing is available with a paid subscription. Upgrade to automatically publish your bot&apos;s trading decisions to a Telegram group.
             </div>
             <button
               onClick={() => window.open('/pricing', '_blank')}
@@ -290,7 +290,7 @@ export function TradeSettings({
             <div className="flex items-center justify-between p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
               <div>
                 <div className="font-medium text-[var(--text-primary)]">Publish Signals</div>
-                <div className="text-sm text-[var(--text-muted)]">Send trading decisions to Telegram channel</div>
+                <div className="text-sm text-[var(--text-muted)]">Send trading decisions to a Telegram group</div>
               </div>
               <button
                 onClick={() => updateConfig({
@@ -313,7 +313,7 @@ export function TradeSettings({
               </button>
             </div>
 
-          {/* Channel Settings (when enabled) */}
+          {/* Group Settings (when enabled) */}
           {publisher.enabled && (
             <div className="space-y-4">
               {/* Setup Instructions */}
@@ -322,7 +322,7 @@ export function TradeSettings({
                 <ol className="text-sm text-[var(--text-muted)] space-y-2">
                   <li className="flex items-start gap-2">
                     <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">1</span>
-                    <span>Add <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">@ggFilter_Bot</code> bot to your Telegram channel</span>
+                    <span>Create a Telegram group and add <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">@ggFilter_Bot</code></span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">2</span>
@@ -330,19 +330,19 @@ export function TradeSettings({
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">3</span>
-                    <span>Send <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">/chatid</code> in the channel to get your Channel ID</span>
+                    <span>Send <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">/chatid</code> in the group to get your Group ID</span>
                   </li>
                   <li className="flex items-start gap-2">
                     <span className="flex-shrink-0 w-5 h-5 bg-[var(--agent-decision)] text-white text-xs rounded-full flex items-center justify-center font-medium">4</span>
-                    <span>Copy the Channel ID below</span>
+                    <span>Paste the Group ID below</span>
                   </li>
                 </ol>
               </div>
 
-              {/* Channel ID Input */}
+              {/* Group ID Input */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                  Channel ID
+                  Group ID
                 </label>
                 <input
                   type="text"
@@ -353,11 +353,11 @@ export function TradeSettings({
                       publisher: { ...publisher, filter_channel: e.target.value }
                     }
                   })}
-                  placeholder="-1001234567890 or @YourChannel"
+                  placeholder="-5180461557"
                   className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
                 />
                 <div className="text-xs text-[var(--text-muted)] mt-1">
-                  Get this by sending /chatid in your channel after adding our bot
+                  Get this by sending /chatid in your group after adding the bot
                 </div>
               </div>
 
@@ -391,7 +391,7 @@ export function TradeSettings({
                     Send Test Message
                   </button>
                   <div className="text-xs text-[var(--text-muted)] mt-1">
-                    Verify that our bot can send messages to your channel
+                    Verify that the bot can send messages to your group
                   </div>
                 </div>
               )}

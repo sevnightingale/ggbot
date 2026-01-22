@@ -245,40 +245,60 @@ class SignalPublishingService:
         decision_result: Dict,
         channel_config: TelegramChannel
     ) -> str:
-        """Format validated signal with standardized ggbots format."""
+        """Format signal with ggbots branding."""
 
         # Extract data for formatting
         action = decision_result.get('action', 'UNKNOWN').upper()
         confidence = decision_result.get('confidence', 0.0)
         reasoning = decision_result.get('reasoning', 'No reasoning provided')
 
-        # Get symbol from signal_data (handle both dict and object formats)
-        if hasattr(signal_data, 'symbol'):
-            symbol = signal_data.symbol
+        # Get bot name and symbol from signal_data
+        bot_name = signal_data.get('bot_name', 'ggbot')
+        symbol = signal_data.get('symbol', 'UNKNOWN')
+        config_type = signal_data.get('config_type', 'scheduled_trading')
+
+        # Format action with emoji
+        if action in ['LONG', 'BUY', 'ENTER']:
+            action_display = "📈 LONG"
+        elif action in ['SHORT', 'SELL']:
+            action_display = "📉 SHORT"
         else:
-            symbol = signal_data.get('symbol', 'UNKNOWN')
+            action_display = f"🔥 {action}"
 
-        # Check if signal meets user's confidence threshold
-        threshold_met = confidence >= channel_config.confidence_threshold
-        approval_status = "APPROVED" if threshold_met else "REJECTED"
+        # Different format for signal_validation vs scheduled_trading
+        if config_type == 'signal_validation':
+            # Signal validation: show approval status
+            threshold_met = confidence >= channel_config.confidence_threshold
+            approval_status = "✅ APPROVED" if threshold_met else "❌ REJECTED"
 
-        # Standardized ggbots message format
-        message_parts = [
-            f"Signal: {approval_status}",
-            f"🔥 {action} {symbol}",
-            f"Confidence: {confidence:.1%} (threshold: {channel_config.confidence_threshold:.1%})",
-            "",
-            f"Reasoning: {reasoning}"
-        ]
-
-        # Add original signal context if available and not manual trigger
-        raw_message = getattr(signal_data, 'raw_message', '') or signal_data.get('raw_message', '')
-        if raw_message and raw_message.strip() and raw_message != "Manual trigger initiated by user":
-            message_parts.extend([
+            message_parts = [
+                f"Signal: {approval_status}",
+                f"{action_display} {symbol}",
+                f"Confidence: {confidence:.0%}",
                 "",
-                "Original Signal:",
-                raw_message
-            ])
+                f"Reasoning: {reasoning}"
+            ]
+
+            # Add original signal context if available
+            raw_message = signal_data.get('raw_message', '')
+            if raw_message and raw_message.strip():
+                message_parts.extend([
+                    "",
+                    "Original Signal:",
+                    raw_message
+                ])
+        else:
+            # Scheduled trading: show bot name prominently
+            message_parts = [
+                f"🤖 {bot_name}",
+                "",
+                f"{action_display} {symbol}",
+                f"Confidence: {confidence:.0%}",
+                "",
+                f"Reasoning: {reasoning}",
+                "",
+                "🌐 ggbots.ai"
+            ]
 
         return "\n".join(message_parts)
 
