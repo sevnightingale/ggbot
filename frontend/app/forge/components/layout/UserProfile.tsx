@@ -191,6 +191,10 @@ export function UserProfile({}: UserProfileProps) {
                     <Crown className="h-3 w-3" />
                     {getTierName()}
                   </div>
+                ) : isGgbase ? (
+                  <div className="inline-flex items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
+                    {getTierName()}
+                  </div>
                 ) : isUsageBased ? (
                   <div className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-medium text-emerald-500">
                     {getTierName()}
@@ -252,7 +256,7 @@ export function UserProfile({}: UserProfileProps) {
               />
               {hasPaidTier ? (
                 <>
-                  {isUsageBased && (
+                  {(isUsageBased || isGgbase) && (
                     <MenuButton
                       icon={Plus}
                       label="Add Credits"

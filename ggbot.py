@@ -4434,32 +4434,45 @@ async def handle_checkout_completed(session):
         )
     elif is_credit_purchase:
         # Payment mode (no subscription) - credit pack purchase
-        # For free tier users, upgrade them to prepaid tier (stored as 'ggbase')
-        # For existing paid users, keep their tier (credits just add to balance)
+        # For free/expired users, upgrade them to prepaid tier (stored as 'ggbase')
+        # For existing active paid users, keep their tier (credits just add to balance)
         with get_db_connection() as conn:
             with conn.cursor() as cur:
-                # First, get current tier
+                # Get current tier and check if subscription is expired
                 cur.execute("""
-                    SELECT subscription_tier FROM user_profiles WHERE user_id = %s
+                    SELECT subscription_tier, subscription_status, subscription_expires_at
+                    FROM user_profiles WHERE user_id = %s
                 """, (user_id,))
                 result = cur.fetchone()
                 current_tier = result[0] if result else 'free'
+                current_status = result[1] if result else None
+                expires_at = result[2] if result else None
 
-                if current_tier == 'free':
-                    # Upgrade free users to prepaid tier (ggbase)
+                # Check if subscription is expired
+                from datetime import datetime, timezone
+                is_expired = (
+                    expires_at is not None and
+                    expires_at <= datetime.now(timezone.utc)
+                )
+
+                # Upgrade to prepaid if free tier OR has expired subscription
+                if current_tier == 'free' or is_expired:
+                    # Upgrade to prepaid tier (ggbase)
+                    # Clear subscription_expires_at since prepaid doesn't expire (credits do)
                     cur.execute("""
                         UPDATE user_profiles
                         SET subscription_tier = 'ggbase',
                             subscription_status = 'active',
+                            subscription_expires_at = NULL,
                             stripe_customer_id = %s,
                             updated_at = NOW()
                         WHERE user_id = %s
                     """, (customer_id, user_id))
                     logger.bind(user_id=user_id).info(
-                        f"Upgraded to prepaid tier: Customer: {customer_id}"
+                        f"Upgraded to prepaid tier (was {current_tier}, expired={is_expired}): Customer: {customer_id}"
                     )
                 else:
-                    # Existing paid user - just ensure customer_id is set
+                    # Existing active paid user - just ensure customer_id is set
                     cur.execute("""
                         UPDATE user_profiles
                         SET stripe_customer_id = %s,
@@ -4838,24 +4851,35 @@ async def nowpayments_webhook(request: Request):
     # Get or create Stripe customer
     customer_id = await get_or_create_stripe_customer(user_id, email)
 
-    # Check user's current tier to decide how to handle the credit purchase
+    # Check user's current tier and expiration to decide how to handle the credit purchase
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             cur.execute("""
-                SELECT subscription_tier FROM user_profiles WHERE user_id = %s
+                SELECT subscription_tier, subscription_expires_at
+                FROM user_profiles WHERE user_id = %s
             """, (user_id,))
             tier_result = cur.fetchone()
             current_tier = tier_result[0] if tier_result else 'free'
+            expires_at = tier_result[1] if tier_result else None
 
-    if current_tier == 'free':
-        # Free tier user buying credits via crypto → upgrade to prepaid (ggbase)
+    # Check if subscription is expired
+    from datetime import datetime, timezone
+    is_expired = (
+        expires_at is not None and
+        expires_at <= datetime.now(timezone.utc)
+    )
+
+    if current_tier == 'free' or is_expired:
+        # Free tier or expired user buying credits via crypto → upgrade to prepaid (ggbase)
         # NO metered subscription - they pay upfront only
+        # Clear subscription_expires_at since prepaid doesn't expire (credits do)
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE user_profiles
                     SET subscription_tier = 'ggbase',
                         subscription_status = 'active',
+                        subscription_expires_at = NULL,
                         stripe_customer_id = %s,
                         updated_at = NOW()
                     WHERE user_id = %s
@@ -4863,7 +4887,7 @@ async def nowpayments_webhook(request: Request):
                 conn.commit()
 
         logger.bind(user_id=user_id).info(
-            f"Upgraded to prepaid tier via crypto: Customer: {customer_id}"
+            f"Upgraded to prepaid tier via crypto (was {current_tier}, expired={is_expired}): Customer: {customer_id}"
         )
     elif current_tier == 'ggbase':
         # Already prepaid - just add more credits (no tier change needed)
@@ -4871,7 +4895,7 @@ async def nowpayments_webhook(request: Request):
             f"Adding credits to existing prepaid account via crypto"
         )
     else:
-        # Already on usage_based or pro tier - credits will apply as discounts
+        # Already on active usage_based or pro tier - credits will apply as discounts
         logger.bind(user_id=user_id).info(
             f"Adding credits to existing {current_tier} account via crypto"
         )
