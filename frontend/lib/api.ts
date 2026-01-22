@@ -442,7 +442,7 @@ export class ApiClient {
   // User Profile Management
   async getUserProfile(): Promise<UserProfile> {
     console.log('🔍 API Call: getUserProfile to', `${this.baseUrl}/api/v2/user/profile`)
-    
+
     try {
       const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/user/profile`)
       console.log('📡 Response status:', response.status, response.statusText)
@@ -455,7 +455,7 @@ export class ApiClient {
 
       const result = await response.json()
       console.log('✅ User profile loaded:', result)
-      return result.profile
+      return result  // API now returns profile directly, not wrapped
     } catch (err) {
       console.error('💥 Network error:', err)
       throw err

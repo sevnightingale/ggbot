@@ -2231,24 +2231,36 @@ async def search_symbols(query: str) -> Dict[str, Any]:
 async def get_user_profile(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
-    """Get current user profile."""
+    """Get current user profile with credit info for prepaid tier."""
     profile = await current_user.load_profile()
 
+    # Get credit balance for paid users (needed for prepaid activation check)
+    credit_balance_usd = None
+    if profile.has_stripe_integration:
+        credit_balance_usd = get_user_credit_balance(str(current_user.user_id))
+
+    # Compute effective "can start bot right now" permission
+    # For prepaid users: need credits > 0
+    # For usage_based/pro: always allowed (they get billed)
+    has_available_credits = True
+    if profile.is_prepaid_tier:
+        has_available_credits = credit_balance_usd is not None and credit_balance_usd > 0
+
     return {
-        "status": "success",
-        "profile": {
-            "user_id": profile.user_id,
-            "subscription_tier": profile.subscription_tier.value,
-            "subscription_status": profile.subscription_status.value,
-            "can_use_premium_features": profile.can_use_premium_features,
-            "requires_own_llm_keys": profile.requires_own_llm_keys,
-            "can_publish_telegram_signals": profile.can_publish_telegram_signals,
-            "can_use_signal_validation": profile.can_use_signal_validation,
-            "can_use_live_trading": profile.can_use_live_trading,
-            "can_activate_bots": profile.can_activate_bots,
-            "can_use_agents": profile.can_use_agents,
-            "paid_data_points": profile.paid_data_points
-        }
+        "user_id": profile.user_id,
+        "subscription_tier": profile.subscription_tier.value,
+        "subscription_status": profile.subscription_status.value,
+        "can_use_premium_features": profile.can_use_premium_features,
+        "requires_own_llm_keys": profile.requires_own_llm_keys,
+        "can_publish_telegram_signals": profile.can_publish_telegram_signals,
+        "can_use_signal_validation": profile.can_use_signal_validation,
+        "can_use_live_trading": profile.can_use_live_trading,
+        "can_activate_bots": profile.can_activate_bots,
+        "can_use_agents": profile.can_use_agents,
+        "paid_data_points": profile.paid_data_points,
+        # Credit-related fields for prepaid tier handling
+        "credit_balance_usd": credit_balance_usd,
+        "has_available_credits": has_available_credits
     }
 
 
