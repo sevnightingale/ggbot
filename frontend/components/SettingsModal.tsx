@@ -21,13 +21,13 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
   const { userProfile } = usePermissions()
   const isPro = userProfile?.subscription_tier === 'pro'
   const isUsageBased = userProfile?.subscription_tier === 'usage_based'
-  const isGgbase = userProfile?.subscription_tier === 'ggbase'  // Prepaid (credit pack) users
-  const hasPaidTier = isPro || isUsageBased || isGgbase
+  const isPrepaid = userProfile?.subscription_tier === 'prepaid'
+  const hasPaidTier = isPro || isUsageBased || isPrepaid
 
   // Get tier display name
   const getTierName = () => {
     if (isPro) return 'Pro Plan'
-    if (isGgbase) return 'Prepaid'
+    if (isPrepaid) return 'Prepaid'
     if (isUsageBased) return 'Usage-Based'
     return 'Free Plan'
   }
@@ -389,7 +389,7 @@ export function SettingsModal({ open, onOpenChange }: SettingsModalProps) {
                         <Crown className="h-3 w-3" />
                         {getTierName()}
                       </span>
-                    ) : isGgbase ? (
+                    ) : isPrepaid ? (
                       <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/20 px-2 py-1 text-xs font-medium text-orange-400">
                         {getTierName()}
                       </span>

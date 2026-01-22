@@ -34,7 +34,7 @@ def get_unreported_usage() -> List[Tuple[str, Decimal, int]]:
     """
     Query activities table for unreported LLM usage.
 
-    Excludes prepaid (ggbase) tier users - they pay upfront and should never
+    Excludes prepaid tier users - they pay upfront and should never
     be reported to Stripe meters. This is defense in depth; prepaid activities
     should already have stripe_reported=TRUE at creation time.
 
@@ -54,7 +54,7 @@ def get_unreported_usage() -> List[Tuple[str, Decimal, int]]:
                     WHERE a.stripe_reported = FALSE
                       AND a.platform_cost_usd IS NOT NULL
                       AND a.platform_cost_usd > 0
-                      AND up.subscription_tier != 'ggbase'  -- Exclude prepaid users
+                      AND up.subscription_tier != 'prepaid'  -- Exclude prepaid users
                     GROUP BY a.user_id
                     ORDER BY total_cost DESC
                 """)

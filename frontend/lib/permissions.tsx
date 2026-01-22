@@ -5,7 +5,7 @@ import { apiClient } from '@/lib/api'
 
 interface UserProfile {
   user_id: string
-  subscription_tier: 'free' | 'ggbase' | 'usage_based' | 'pro'  // ggbase = prepaid (credit pack users)
+  subscription_tier: 'free' | 'prepaid' | 'usage_based' | 'pro'
   subscription_status: 'active' | 'cancelled' | 'past_due'
   can_use_premium_features: boolean
   requires_own_llm_keys: boolean
@@ -15,6 +15,9 @@ interface UserProfile {
   can_activate_bots: boolean
   can_use_agents: boolean
   paid_data_points: string[]
+  // Credit-related fields
+  credit_balance_usd: number | null  // Current credit balance (null if no Stripe integration)
+  has_available_credits: boolean     // True if can start bot (non-prepaid OR prepaid with credits > 0)
 }
 
 interface PermissionContextType {
@@ -79,7 +82,9 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
           can_use_live_trading: false,
           can_activate_bots: false,
           can_use_agents: false,
-          paid_data_points: []
+          paid_data_points: [],
+          credit_balance_usd: null,
+          has_available_credits: false
         })
       } finally {
         setLoading(false)
@@ -95,14 +100,17 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
 
     // SIMPLIFIED PERMISSION MODEL
     // Only 3 features are gated:
-    // 1. bot_activation - requires paid subscription
+    // 1. bot_activation - requires paid subscription + credits (for prepaid)
     // 2. agents - requires PRO tier
     // 3. ggshot - requires special data point access
     // Everything else is available to all users (configure, view, etc.)
 
     switch (feature) {
       case 'bot_activation':
-        return userProfile.can_activate_bots
+        // Must have subscription AND available credits (for prepaid users)
+        // has_available_credits is true for usage_based/pro (they get billed)
+        // has_available_credits is false for prepaid users with 0 credits
+        return userProfile.can_activate_bots && userProfile.has_available_credits
 
       case 'agents':
         return userProfile.can_use_agents

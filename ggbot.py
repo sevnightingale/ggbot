@@ -772,7 +772,7 @@ class GGBotOrchestrator:
                     tier, status = result
 
                     # Match publishing_service logic: allow all paid tiers
-                    paid_tiers = ('usage_based', 'ggbase', 'pro')
+                    paid_tiers = ('usage_based', 'prepaid', 'pro')
                     if tier not in paid_tiers or status != 'active':
                         self._log.info(f"User {config.user_id} requires paid subscription for signal publishing")
                         return False
@@ -3753,7 +3753,31 @@ async def start_bot(
         config = await config_service.get_config(config_id, current_user.user_id)
         if not config:
             raise HTTPException(status_code=404, detail="Configuration not found")
-        
+
+        # =====================================================================
+        # PERMISSION CHECK: Verify user can activate bots
+        # =====================================================================
+        user_profile = await user_service.get_profile(current_user.user_id)
+        if not user_profile.can_activate_bots:
+            raise HTTPException(
+                status_code=403,
+                detail="Subscription required to activate bots. Please subscribe to start your bot."
+            )
+
+        # For prepaid users, also check they have available credits
+        if user_profile.is_prepaid_tier:
+            credit_balance = get_user_credit_balance(str(current_user.user_id))
+            if credit_balance <= 0:
+                logger.warning(
+                    f"Blocking bot start for prepaid user {current_user.user_id} - "
+                    f"no credits available (balance: ${credit_balance:.2f})"
+                )
+                raise HTTPException(
+                    status_code=402,  # Payment Required
+                    detail="Insufficient credits. Please add credits to activate your bot."
+                )
+        # =====================================================================
+
         # Check if already active
         current_state = await config_service.get_bot_state(config_id, current_user.user_id)
         if current_state == 'active':
@@ -4336,8 +4360,24 @@ async def get_current_user_profile(
     """Get current user's profile with subscription info."""
     profile = await current_user.load_profile()
 
+    # Get credit balance for paid users (needed for prepaid activation check)
+    credit_balance_usd = None
+    if profile.has_stripe_integration:
+        credit_balance_usd = get_user_credit_balance(str(current_user.user_id))
+
+    # Compute effective "can start bot right now" permission
+    # For prepaid users: need credits > 0
+    # For usage_based/pro: always allowed (they get billed)
+    has_available_credits = True
+    if profile.is_prepaid_tier:
+        has_available_credits = credit_balance_usd is not None and credit_balance_usd > 0
+
     # Debug logging
-    logger.info(f"🔍 /me endpoint - user: {current_user.user_id}, tier: {profile.subscription_tier.value}, can_activate: {profile.can_activate_bots}, can_agents: {profile.can_use_agents}")
+    logger.info(
+        f"🔍 /me endpoint - user: {current_user.user_id}, tier: {profile.subscription_tier.value}, "
+        f"can_activate: {profile.can_activate_bots}, credits: ${credit_balance_usd or 0:.2f}, "
+        f"has_credits: {has_available_credits}"
+    )
 
     return {
         "user_id": current_user.user_id,
@@ -4353,7 +4393,10 @@ async def get_current_user_profile(
         "requires_own_llm_keys": profile.requires_own_llm_keys,
         "paid_data_points": profile.paid_data_points,
         "has_stripe_integration": profile.has_stripe_integration,
-        "subscription_expires_at": profile.subscription_expires_at.isoformat() if profile.subscription_expires_at else None
+        "subscription_expires_at": profile.subscription_expires_at.isoformat() if profile.subscription_expires_at else None,
+        # Credit-related fields for prepaid tier handling
+        "credit_balance_usd": credit_balance_usd,
+        "has_available_credits": has_available_credits
     }
 
 
@@ -4434,7 +4477,7 @@ async def handle_checkout_completed(session):
         )
     elif is_credit_purchase:
         # Payment mode (no subscription) - credit pack purchase
-        # For free/expired users, upgrade them to prepaid tier (stored as 'ggbase')
+        # For free/expired users, upgrade them to prepaid tier
         # For existing active paid users, keep their tier (credits just add to balance)
         with get_db_connection() as conn:
             with conn.cursor() as cur:
@@ -4457,11 +4500,11 @@ async def handle_checkout_completed(session):
 
                 # Upgrade to prepaid if free tier OR has expired subscription
                 if current_tier == 'free' or is_expired:
-                    # Upgrade to prepaid tier (ggbase)
+                    # Upgrade to prepaid tier
                     # Clear subscription_expires_at since prepaid doesn't expire (credits do)
                     cur.execute("""
                         UPDATE user_profiles
-                        SET subscription_tier = 'ggbase',
+                        SET subscription_tier = 'prepaid',
                             subscription_status = 'active',
                             subscription_expires_at = NULL,
                             stripe_customer_id = %s,
@@ -4599,6 +4642,37 @@ def has_usage_based_subscription(user_id: str) -> bool:
     return tier == 'usage_based' and status == 'active'
 
 
+def get_user_credit_balance(user_id: str) -> float:
+    """
+    Get user's available credit balance from Stripe.
+
+    Returns the net balance (credits - usage) in USD.
+    Used for permission checks before bot activation.
+    """
+    customer_id = get_stripe_customer_id(user_id)
+    if not customer_id:
+        return 0.0
+
+    try:
+        summary = stripe.billing.CreditBalanceSummary.retrieve(
+            customer=customer_id,
+            filter={
+                'type': 'applicability_scope',
+                'applicability_scope': {'price_type': 'metered'}
+            }
+        )
+
+        if summary.balances and len(summary.balances) > 0:
+            balance = summary.balances[0]
+            available = balance.available_balance.monetary.value / 100 if balance.available_balance else 0
+            return available
+        return 0.0
+
+    except stripe.error.StripeError as e:
+        logger.error(f"Stripe error checking credit balance for {user_id}: {e}")
+        return 0.0  # Fail closed - assume no credits if we can't check
+
+
 @app.get("/api/v2/credits/balance")
 async def get_credit_balance(current_user: AuthenticatedUser = Depends(get_current_user_v2)):
     """Get user's credit balance from Stripe Credit Grants."""
@@ -4645,7 +4719,7 @@ async def purchase_credits(
     """Create Stripe Checkout session for credit purchase.
 
     All credit purchases use payment mode (no subscription).
-    - Free tier users → become prepaid (ggbase) tier
+    - Free tier users → become prepaid tier
     - Existing paid users → credits add to their balance
     """
     amount_cents = request.amount_cents
@@ -4870,14 +4944,14 @@ async def nowpayments_webhook(request: Request):
     )
 
     if current_tier == 'free' or is_expired:
-        # Free tier or expired user buying credits via crypto → upgrade to prepaid (ggbase)
+        # Free tier or expired user buying credits via crypto → upgrade to prepaid
         # NO metered subscription - they pay upfront only
         # Clear subscription_expires_at since prepaid doesn't expire (credits do)
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
                     UPDATE user_profiles
-                    SET subscription_tier = 'ggbase',
+                    SET subscription_tier = 'prepaid',
                         subscription_status = 'active',
                         subscription_expires_at = NULL,
                         stripe_customer_id = %s,
@@ -4889,7 +4963,7 @@ async def nowpayments_webhook(request: Request):
         logger.bind(user_id=user_id).info(
             f"Upgraded to prepaid tier via crypto (was {current_tier}, expired={is_expired}): Customer: {customer_id}"
         )
-    elif current_tier == 'ggbase':
+    elif current_tier == 'prepaid':
         # Already prepaid - just add more credits (no tier change needed)
         logger.bind(user_id=user_id).info(
             f"Adding credits to existing prepaid account via crypto"

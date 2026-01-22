@@ -1,62 +1,62 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-22 04:17:53 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-22 19:24:02 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
 - **Total Users**: 300
-- **Pro Users (ggbase)**: 10 (10 active subscriptions)
-- **Free Users**: 281
+- **Pro Users (ggbase)**: 11 (11 active subscriptions)
+- **Free Users**: 280
 - **Users with Bots**: 293 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 446
-- **Active Bots**: 22 (4.9%)
-  - Paper: 21
+- **Total Bots**: 445
+- **Active Bots**: 21 (4.7%)
+  - Paper: 20
   - Symphony (Live): 1
   - Aster (DEX): 0
 - **Inactive Bots**: 424
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,458
-  - Wins: 1,634
-  - Losses: 3,824
-  - Platform Win Rate: 29.94%
-  - Total P&L: $-17,322.86
+- **Total Trades (All Time)**: 5,466
+  - Wins: 1,636
+  - Losses: 3,830
+  - Platform Win Rate: 29.93%
+  - Total P&L: $-17,533.79
 - **Recent Activity**:
-  - Last 24 hours: 29 trades
-  - Last 7 days: 102 trades
-  - Last 30 days: 530 trades
+  - Last 24 hours: 20 trades
+  - Last 7 days: 109 trades
+  - Last 30 days: 527 trades
 
 ### Open Positions
-- **Open Positions**: 9
+- **Open Positions**: 12
 - **Unique Symbols**: 2
-- **Total Exposure**: $89,478.51
-- **Unrealized P&L**: $800.78
+- **Total Exposure**: $139,632.67
+- **Unrealized P&L**: $901.82
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,935.24
+- **Average Balance**: $9,934.62
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,431.75
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 18 bots
+- **BTC/USDT**: 17 bots
 - **SOL/USDT**: 2 bots
 - **ETH/USDT**: 1 bots
 - **RENDER/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 985 decisions (avg confidence: 41.8%)
-- **enter**: 29 decisions (avg confidence: 64.8%)
-- **exit**: 19 decisions (avg confidence: 69.3%)
+- **wait**: 632 decisions (avg confidence: 38.7%)
+- **enter**: 21 decisions (avg confidence: 63.3%)
+- **exit**: 19 decisions (avg confidence: 69.4%)
 
 ### System Health
-- **Decisions (last hour)**: 35
+- **Decisions (last hour)**: 21
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -65,22 +65,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 20MB | 16h 14m | 5 |
-| market-data-ws | 🟢 online | 1% | 21MB | 16h 14m | 5 |
-| ggbot | 🟢 online | 1.3% | 290MB | 13m | 39 |
-| account-monitor | 🟢 online | 1.1% | 133MB | 16h 14m | 21 |
-| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 70MB | 1h 42m | 9 |
-| telegram-bot | 🟢 online | 0% | 23MB | 3h 23m | 0 |
+| error-alerts | 🟢 online | 0% | 22MB | 1d 7h | 5 |
+| market-data-ws | 🟢 online | 4.3% | 20MB | 1d 7h | 5 |
+| ggbot | 🟢 online | 1.7% | 409MB | 15h 19m | 39 |
+| account-monitor | 🟢 online | 0% | 260MB | 1d 7h | 21 |
+| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 35MB | 16h 49m | 9 |
+| telegram-bot | 🟢 online | 0% | 38MB | 18h 29m | 0 |
 
 ### VM Resources
 
 - **Disk**: 45G / 78G (58%)
-- **Memory**: 2.6Gi / 3.8Gi
-- **CPU Load**: 1.81 / 0.58 / 0.30 (1m/5m/15m)
+- **Memory**: 2.7Gi / 3.8Gi
+- **CPU Load**: 0.72 / 0.48 / 0.35 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 18.76M)
+- **Redis**: 🟢 connected (Memory: 22.67M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -432,7 +432,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-22 04:17:54 UTC
+**Last Updated**: 2026-01-22 19:24:04 UTC
 
 ---
 
@@ -1287,7 +1287,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-22 04:17:54 UTC
+**Last Updated**: 2026-01-22 19:24:04 UTC
 
 ---
 

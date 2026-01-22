@@ -29,9 +29,9 @@ def get_platform_stats():
             cur.execute("""
                 SELECT
                     COUNT(*) as total_users,
-                    COUNT(CASE WHEN subscription_tier = 'ggbase' THEN 1 END) as pro_users,
+                    COUNT(CASE WHEN subscription_tier = 'prepaid' THEN 1 END) as prepaid_users,
                     COUNT(CASE WHEN subscription_tier = 'free' OR subscription_tier IS NULL THEN 1 END) as free_users,
-                    COUNT(CASE WHEN subscription_expires_at IS NULL AND subscription_tier = 'ggbase' THEN 1 END) as active_subscribers
+                    COUNT(CASE WHEN subscription_expires_at IS NULL AND subscription_tier = 'prepaid' THEN 1 END) as active_subscribers
                 FROM user_profiles
             """)
             user_data = cur.fetchone()
@@ -199,7 +199,7 @@ def print_status_report(stats):
     print("\n📊 USER STATISTICS")
     print("-" * 80)
     print(f"Total Users: {stats['total_users']}")
-    print(f"  Pro Users (ggbase): {stats['pro_users']} ({stats['active_subscribers']} active subscriptions)")
+    print(f"  Prepaid Users: {stats['pro_users']} ({stats['active_subscribers']} active subscriptions)")
     print(f"  Free Users: {stats['free_users']}")
     print(f"Users with Bots: {stats['users_with_bots']} ({stats['users_with_bots']/stats['total_users']*100:.1f}%)")
 
@@ -961,7 +961,7 @@ def update_active_md(stats):
         "",
         "### Users & Subscriptions",
         f"- **Total Users**: {stats['total_users']}",
-        f"- **Pro Users (ggbase)**: {stats['pro_users']} ({stats['active_subscribers']} active subscriptions)",
+        f"- **Prepaid Users**: {stats['pro_users']} ({stats['active_subscribers']} active subscriptions)",
         f"- **Free Users**: {stats['free_users']}",
         f"- **Users with Bots**: {stats['users_with_bots']} ({stats['users_with_bots']/stats['total_users']*100:.1f}%)",
         "",

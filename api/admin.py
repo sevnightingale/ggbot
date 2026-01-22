@@ -75,12 +75,12 @@ async def get_platform_stats(
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             # User statistics
-            # Tiers: free, ggbase (prepaid/credit packs), usage_based, pro
+            # Tiers: free, prepaid (credit packs), usage_based, pro
             cur.execute("""
                 SELECT
                     COUNT(*) as total_users,
                     COUNT(CASE WHEN subscription_tier = 'pro' THEN 1 END) as pro_users,
-                    COUNT(CASE WHEN subscription_tier = 'ggbase' THEN 1 END) as prepaid_users,
+                    COUNT(CASE WHEN subscription_tier = 'prepaid' THEN 1 END) as prepaid_users,
                     COUNT(CASE WHEN subscription_tier = 'usage_based' THEN 1 END) as usage_based_users,
                     COUNT(CASE WHEN subscription_tier = 'free' OR subscription_tier IS NULL THEN 1 END) as free_users,
                     COUNT(CASE WHEN subscription_status = 'active' AND subscription_tier NOT IN ('free') AND subscription_tier IS NOT NULL THEN 1 END) as active_subscribers
@@ -90,7 +90,7 @@ async def get_platform_stats(
             stats['users'] = {
                 'total': user_data[0],
                 'pro': user_data[1],
-                'prepaid': user_data[2],  # Credit pack users (ggbase tier)
+                'prepaid': user_data[2],
                 'usage_based': user_data[3],
                 'free': user_data[4],
                 'active_subscribers': user_data[5]
@@ -664,7 +664,7 @@ async def update_user(
     params = []
 
     if update.subscription_tier is not None:
-        valid_tiers = ['free', 'usage_based', 'ggbase', 'pro']
+        valid_tiers = ['free', 'usage_based', 'prepaid', 'pro']
         if update.subscription_tier not in valid_tiers:
             raise HTTPException(status_code=400, detail=f"Invalid tier. Must be one of: {valid_tiers}")
         updates.append("subscription_tier = %s")

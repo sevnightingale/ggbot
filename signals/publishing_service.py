@@ -59,8 +59,8 @@ class AccessControlService:
                     tier, status = result
 
                     # Match frontend permission: can_activate_bots logic
-                    # Paid tiers (usage_based, ggbase, pro) with active status can publish
-                    paid_tiers = ('usage_based', 'ggbase', 'pro')
+                    # Paid tiers (usage_based, prepaid, pro) with active status can publish
+                    paid_tiers = ('usage_based', 'prepaid', 'pro')
                     return (
                         tier in paid_tiers and
                         status == 'active'

@@ -68,12 +68,12 @@ export function UserProfile({}: UserProfileProps) {
     getUserData()
   }, [supabase.auth])
 
-  // Fetch usage summary for paid users (usage_based and ggbase/prepaid)
+  // Fetch usage summary for paid users (usage_based and prepaid)
   useEffect(() => {
     const fetchUsageSummary = async () => {
       const tier = userProfile?.subscription_tier
-      // Fetch for both usage_based (metered) and ggbase (prepaid) users
-      if (tier === 'usage_based' || tier === 'ggbase') {
+      // Fetch for both usage_based (metered) and prepaid users
+      if (tier === 'usage_based' || tier === 'prepaid') {
         try {
           const summary = await apiClient.getUsageSummary()
           setUsageSummary({
@@ -116,14 +116,14 @@ export function UserProfile({}: UserProfileProps) {
   const hasPaidTier = userProfile?.can_activate_bots || false
   const isPro = userProfile?.subscription_tier === 'pro'
   const isUsageBased = userProfile?.subscription_tier === 'usage_based'
-  const isGgbase = userProfile?.subscription_tier === 'ggbase'  // Prepaid (credit pack) users
-  const showCredits = isUsageBased || isGgbase  // Both tiers can have credits
+  const isPrepaid = userProfile?.subscription_tier === 'prepaid'
+  const showCredits = isUsageBased || isPrepaid  // Both tiers can have credits
 
   // Get tier display name
   const getTierName = () => {
     if (isPro) return 'Pro Plan'
     if (isUsageBased) return 'Usage-Based'
-    if (isGgbase) return 'Prepaid'
+    if (isPrepaid) return 'Prepaid'
     return 'Free Plan'
   }
 
@@ -191,7 +191,7 @@ export function UserProfile({}: UserProfileProps) {
                     <Crown className="h-3 w-3" />
                     {getTierName()}
                   </div>
-                ) : isGgbase ? (
+                ) : isPrepaid ? (
                   <div className="inline-flex items-center gap-1 rounded-full bg-orange-500/20 px-2 py-0.5 text-xs font-medium text-orange-400">
                     {getTierName()}
                   </div>
@@ -206,7 +206,7 @@ export function UserProfile({}: UserProfileProps) {
                 )}
               </div>
 
-              {/* Usage & Credit Info (usage_based and ggbase/prepaid users) */}
+              {/* Usage & Credit Info (usage_based and prepaid users) */}
               {showCredits && usageSummary && (
                 <div className="mt-2 space-y-1 text-xs">
                   {usageSummary.credits_usd && usageSummary.credits_usd > 0 ? (
@@ -256,7 +256,7 @@ export function UserProfile({}: UserProfileProps) {
               />
               {hasPaidTier ? (
                 <>
-                  {(isUsageBased || isGgbase) && (
+                  {(isUsageBased || isPrepaid) && (
                     <MenuButton
                       icon={Plus}
                       label="Add Credits"

@@ -15,7 +15,7 @@ import uuid
 class SubscriptionTier(Enum):
     """Available subscription tiers for the business model."""
     FREE = "free"                # Free tier: Can browse, cannot activate bots
-    PREPAID = "ggbase"           # Prepaid tier: Credit pack users, hard-block on depletion
+    PREPAID = "prepaid"          # Prepaid tier: Credit pack users, hard-block on depletion
     USAGE_BASED = "usage_based"  # Usage tier: Pay per LLM call, metered billing
     PRO = "pro"                  # Premium tier: $29/month + usage + agent access
 

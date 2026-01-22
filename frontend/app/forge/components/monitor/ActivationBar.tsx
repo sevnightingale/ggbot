@@ -5,6 +5,7 @@ import { Clock, Play, PauseCircle, Zap, Crown, Trophy, CheckCircle, Coins } from
 import { BotConfiguration, apiClient } from '@/lib/api'
 import { usePermissions } from '@/lib/permissions'
 import { UpgradeModal } from '@/components/UpgradeModal'
+import { AddCreditsModal } from '@/components/AddCreditsModal'
 import { RiskAcknowledgmentModal } from '@/components/RiskAcknowledgmentModal'
 import { BotImageUpload } from '@/components/BotImageUpload'
 import { ArenaRegistrationModal } from '@/components/arena-registration-modal'
@@ -64,10 +65,16 @@ export function ActivationBar({
 }: ActivationBarProps) {
   const isActive = selectedBot.state === 'active'
   const isSignalDriven = selectedBot.config_data.decision?.analysis_frequency === 'signal_driven'
-  const { canAccess } = usePermissions()
+  const { canAccess, userProfile } = usePermissions()
   const [upgradeModalOpen, setUpgradeModalOpen] = useState(false)
+  const [addCreditsOpen, setAddCreditsOpen] = useState(false)
   const [riskModalOpen, setRiskModalOpen] = useState(false)
   const [arenaModalOpen, setArenaModalOpen] = useState(false)
+
+  // Check if user is prepaid tier with no credits
+  const isPrepaidNoCredits = userProfile?.subscription_tier === 'prepaid' &&
+                             userProfile?.can_activate_bots &&
+                             !userProfile?.has_available_credits
 
   const isLiveTrading = selectedBot.trading_mode === 'symphony' || selectedBot.trading_mode === 'aster'
   const isRegisteredForArena = selectedBot.is_public_performance === true
@@ -121,7 +128,13 @@ export function ActivationBar({
 
   const handleActivate = () => {
     if (!canAccess('bot_activation')) {
-      setUpgradeModalOpen(true)
+      // Prepaid users with no credits → show Add Credits modal
+      // Free users → show Subscribe/Upgrade modal
+      if (isPrepaidNoCredits) {
+        setAddCreditsOpen(true)
+      } else {
+        setUpgradeModalOpen(true)
+      }
       return
     }
 
@@ -146,7 +159,13 @@ export function ActivationBar({
 
   const handleManualTrigger = () => {
     if (!canRunOnce) {
-      setUpgradeModalOpen(true)
+      // Prepaid users with no credits → show Add Credits modal
+      // Free users → show Subscribe/Upgrade modal
+      if (isPrepaidNoCredits) {
+        setAddCreditsOpen(true)
+      } else {
+        setUpgradeModalOpen(true)
+      }
       return
     }
     onManualTrigger()
@@ -305,6 +324,13 @@ export function ActivationBar({
         open={upgradeModalOpen}
         onOpenChange={setUpgradeModalOpen}
         botConfig={selectedBot}
+      />
+
+      {/* Add Credits Modal - for prepaid users with no credits */}
+      <AddCreditsModal
+        open={addCreditsOpen}
+        onOpenChange={setAddCreditsOpen}
+        currentBalance={userProfile?.credit_balance_usd ?? undefined}
       />
 
       {/* Risk Acknowledgment Modal */}

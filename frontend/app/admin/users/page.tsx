@@ -96,7 +96,7 @@ export default function UsersPage() {
     switch (tier) {
       case 'pro':
         return <span className="px-2 py-0.5 bg-purple-500/20 text-purple-400 rounded text-xs">Pro</span>
-      case 'ggbase':
+      case 'prepaid':
         return <span className="px-2 py-0.5 bg-amber-500/20 text-amber-400 rounded text-xs">Prepaid</span>
       case 'usage_based':
         return <span className="px-2 py-0.5 bg-blue-500/20 text-blue-400 rounded text-xs">Usage</span>
