@@ -4365,53 +4365,6 @@ async def create_portal_session(
         raise HTTPException(500, f"Error accessing billing portal: {str(e)}")
 
 
-@app.get("/api/v2/me")
-async def get_current_user_profile(
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
-):
-    """Get current user's profile with subscription info."""
-    profile = await current_user.load_profile()
-
-    # Get credit balance for paid users (needed for prepaid activation check)
-    credit_balance_usd = None
-    if profile.has_stripe_integration:
-        credit_balance_usd = get_user_credit_balance(str(current_user.user_id))
-
-    # Compute effective "can start bot right now" permission
-    # For prepaid users: need credits > 0
-    # For usage_based/pro: always allowed (they get billed)
-    has_available_credits = True
-    if profile.is_prepaid_tier:
-        has_available_credits = credit_balance_usd is not None and credit_balance_usd > 0
-
-    # Debug logging
-    logger.info(
-        f"🔍 /me endpoint - user: {current_user.user_id}, tier: {profile.subscription_tier.value}, "
-        f"can_activate: {profile.can_activate_bots}, credits: ${credit_balance_usd or 0:.2f}, "
-        f"has_credits: {has_available_credits}"
-    )
-
-    return {
-        "user_id": current_user.user_id,
-        "email": current_user.email,
-        "subscription_tier": profile.subscription_tier.value,
-        "subscription_status": profile.subscription_status.value,
-        "can_use_premium_features": profile.can_use_premium_features,
-        "can_publish_telegram_signals": profile.can_publish_telegram_signals,
-        "can_use_signal_validation": profile.can_use_signal_validation,
-        "can_use_live_trading": profile.can_use_live_trading,
-        "can_activate_bots": profile.can_activate_bots,
-        "can_use_agents": profile.can_use_agents,
-        "requires_own_llm_keys": profile.requires_own_llm_keys,
-        "paid_data_points": profile.paid_data_points,
-        "has_stripe_integration": profile.has_stripe_integration,
-        "subscription_expires_at": profile.subscription_expires_at.isoformat() if profile.subscription_expires_at else None,
-        # Credit-related fields for prepaid tier handling
-        "credit_balance_usd": credit_balance_usd,
-        "has_available_credits": has_available_credits
-    }
-
-
 # =============================================================================
 # WEBHOOK HANDLERS
 # =============================================================================
