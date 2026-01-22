@@ -68,10 +68,12 @@ export function UserProfile({}: UserProfileProps) {
     getUserData()
   }, [supabase.auth])
 
-  // Fetch usage summary (only for usage_based users)
+  // Fetch usage summary for paid users (usage_based and ggbase/prepaid)
   useEffect(() => {
     const fetchUsageSummary = async () => {
-      if (userProfile?.subscription_tier === 'usage_based') {
+      const tier = userProfile?.subscription_tier
+      // Fetch for both usage_based (metered) and ggbase (prepaid) users
+      if (tier === 'usage_based' || tier === 'ggbase') {
         try {
           const summary = await apiClient.getUsageSummary()
           setUsageSummary({
@@ -110,15 +112,18 @@ export function UserProfile({}: UserProfileProps) {
     }
   }
 
-  // Check if user has paid subscription (usage_based or pro)
+  // Check if user has paid subscription
   const hasPaidTier = userProfile?.can_activate_bots || false
   const isPro = userProfile?.subscription_tier === 'pro'
   const isUsageBased = userProfile?.subscription_tier === 'usage_based'
+  const isGgbase = userProfile?.subscription_tier === 'ggbase'  // Prepaid (credit pack) users
+  const showCredits = isUsageBased || isGgbase  // Both tiers can have credits
 
   // Get tier display name
   const getTierName = () => {
     if (isPro) return 'Pro Plan'
     if (isUsageBased) return 'Usage-Based'
+    if (isGgbase) return 'Prepaid'
     return 'Free Plan'
   }
 
@@ -197,8 +202,8 @@ export function UserProfile({}: UserProfileProps) {
                 )}
               </div>
 
-              {/* Usage & Credit Info (usage_based only) */}
-              {isUsageBased && usageSummary && (
+              {/* Usage & Credit Info (usage_based and ggbase/prepaid users) */}
+              {showCredits && usageSummary && (
                 <div className="mt-2 space-y-1 text-xs">
                   {usageSummary.credits_usd && usageSummary.credits_usd > 0 ? (
                     // Credit pack user - show full breakdown

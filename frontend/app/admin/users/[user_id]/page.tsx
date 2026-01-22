@@ -322,6 +322,7 @@ export default function UserDetailPage() {
               className="w-full px-3 py-2 bg-charcoal-800 border border-charcoal-700 rounded-lg text-white focus:outline-none focus:border-charcoal-500"
             >
               <option value="free">Free</option>
+              <option value="ggbase">Prepaid (Credit Packs)</option>
               <option value="usage_based">Usage Based</option>
               <option value="pro">Pro</option>
             </select>

@@ -51,11 +51,11 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
   const [error, setError] = useState<string | null>(null)
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('choose')
 
-  // Calculate estimate based on bot config
+  // Calculate estimate based on bot config (weekly, to match billing)
   const estimate = useMemo(() => {
     if (!botConfig) {
-      // Fallback for generic modal (no specific bot)
-      return { low: 5, high: 15, hasConfig: false }
+      // Fallback for generic modal (no specific bot) - weekly estimate
+      return { low: 1, high: 4, hasConfig: false }
     }
 
     // Get model from config
@@ -78,8 +78,8 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
     const frequency = botConfig.config_data.decision?.analysis_frequency || '1h'
     const decisionsPerDay = FREQUENCY_TO_DECISIONS[frequency] || 24
 
-    // Calculate monthly cost
-    const baseCost = decisionsPerDay * 30 * costPerDecision
+    // Calculate weekly cost (billing is weekly)
+    const baseCost = decisionsPerDay * 7 * costPerDecision
 
     // Add ±30% range for variance (market activity, actual decisions made)
     const low = Math.max(1, Math.round(baseCost * 0.7))
@@ -152,10 +152,10 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
               >
                 <div className="font-medium text-[var(--text-primary)]">Pay as you go</div>
                 <div className="text-sm text-[var(--text-secondary)] mt-1">
-                  Billed monthly for actual usage
+                  Billed weekly for actual usage
                 </div>
                 <div className="text-xs text-[var(--text-tertiary)] mt-2">
-                  ~${estimate.low}-{estimate.high}/mo typical
+                  ~${estimate.low}-{estimate.high}/week typical
                 </div>
               </button>
 
@@ -196,11 +196,11 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
               <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
                 <div className="text-center">
                   <div className="text-sm text-[var(--text-secondary)] mb-1">
-                    Estimated cost
+                    Estimated weekly cost
                   </div>
                   <div className="text-3xl font-bold text-[var(--text-primary)]">
                     ~${estimate.low}-{estimate.high}
-                    <span className="text-base font-normal text-[var(--text-tertiary)]">/mo</span>
+                    <span className="text-base font-normal text-[var(--text-tertiary)]">/week</span>
                   </div>
                   <div className="text-xs text-[var(--text-tertiary)] mt-1">
                     {estimate.hasConfig ? 'Based on your configuration' : 'Typical range for most bots'}

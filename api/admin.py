@@ -75,22 +75,25 @@ async def get_platform_stats(
     with get_db_connection() as conn:
         with conn.cursor() as cur:
             # User statistics
+            # Tiers: free, ggbase (prepaid/credit packs), usage_based, pro
             cur.execute("""
                 SELECT
                     COUNT(*) as total_users,
-                    COUNT(CASE WHEN subscription_tier = 'ggbase' THEN 1 END) as pro_users,
+                    COUNT(CASE WHEN subscription_tier = 'pro' THEN 1 END) as pro_users,
+                    COUNT(CASE WHEN subscription_tier = 'ggbase' THEN 1 END) as prepaid_users,
                     COUNT(CASE WHEN subscription_tier = 'usage_based' THEN 1 END) as usage_based_users,
                     COUNT(CASE WHEN subscription_tier = 'free' OR subscription_tier IS NULL THEN 1 END) as free_users,
-                    COUNT(CASE WHEN subscription_status = 'active' AND subscription_tier != 'free' THEN 1 END) as active_subscribers
+                    COUNT(CASE WHEN subscription_status = 'active' AND subscription_tier NOT IN ('free') AND subscription_tier IS NOT NULL THEN 1 END) as active_subscribers
                 FROM user_profiles
             """)
             user_data = cur.fetchone()
             stats['users'] = {
                 'total': user_data[0],
                 'pro': user_data[1],
-                'usage_based': user_data[2],
-                'free': user_data[3],
-                'active_subscribers': user_data[4]
+                'prepaid': user_data[2],  # Credit pack users (ggbase tier)
+                'usage_based': user_data[3],
+                'free': user_data[4],
+                'active_subscribers': user_data[5]
             }
 
             # Bot statistics

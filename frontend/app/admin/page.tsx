@@ -9,6 +9,7 @@ interface PlatformStats {
   users: {
     total: number
     pro: number
+    prepaid: number  // ggbase tier - credit pack users
     usage_based: number
     free: number
     active_subscribers: number
