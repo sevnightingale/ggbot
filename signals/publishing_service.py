@@ -341,5 +341,108 @@ async def publish_signal_to_telegram(
         return False
 
 
+async def publish_exit_to_telegram(
+    config_id: str,
+    user_id: str,
+    exit_data: Dict
+) -> bool:
+    """Publish trade exit notification to telegram.
+
+    Args:
+        config_id: Bot configuration ID
+        user_id: User ID
+        exit_data: Dict with keys:
+            - bot_name: Name of the bot
+            - symbol: Trading symbol (e.g., BTC/USDT)
+            - side: 'long' or 'short'
+            - entry_price: Entry price
+            - exit_price: Exit price
+            - pnl: P&L in USD
+            - pnl_pct: P&L percentage
+            - close_reason: Why position closed
+            - duration_seconds: How long position was open
+    """
+    try:
+        service = SignalPublishingService()
+        access_control = AccessControlService()
+
+        # Check permissions
+        if not await access_control.can_publish_signals(user_id):
+            return False
+
+        # Get telegram config
+        telegram_config = await access_control.get_user_telegram_config(config_id)
+        if not telegram_config:
+            return False
+
+        # Format exit message
+        message = _format_exit_message(exit_data)
+
+        # Send message
+        success = await service.telegram_bot.send_message(
+            chat_id=telegram_config.chat_id,
+            text=message
+        )
+
+        if success:
+            logger.info(f"📡 Published exit notification for {exit_data.get('bot_name', config_id)}")
+
+        return success
+
+    except Exception as e:
+        logger.error(f"Failed to publish exit to telegram: {e}")
+        return False
+
+
+def _format_exit_message(exit_data: Dict) -> str:
+    """Format trade exit notification message."""
+    bot_name = exit_data.get('bot_name', 'ggbot')
+    symbol = exit_data.get('symbol', 'UNKNOWN')
+    side = exit_data.get('side', 'long').upper()
+    pnl = exit_data.get('pnl', 0)
+    pnl_pct = exit_data.get('pnl_pct', 0)
+    close_reason = exit_data.get('close_reason', 'unknown')
+    duration_seconds = exit_data.get('duration_seconds', 0)
+
+    # Format P&L with color indicator
+    if pnl >= 0:
+        pnl_display = f"✅ +${pnl:.2f} (+{pnl_pct:.1f}%)"
+    else:
+        pnl_display = f"❌ ${pnl:.2f} ({pnl_pct:.1f}%)"
+
+    # Format duration
+    if duration_seconds < 3600:
+        duration_display = f"{int(duration_seconds / 60)}m"
+    elif duration_seconds < 86400:
+        duration_display = f"{duration_seconds / 3600:.1f}h"
+    else:
+        duration_display = f"{duration_seconds / 86400:.1f}d"
+
+    # Format close reason nicely
+    reason_display = {
+        'take_profit': '🎯 Take Profit',
+        'stop_loss': '🛑 Stop Loss',
+        'trailing_stop': '📉 Trailing Stop',
+        'position_management': '🤖 AI Exit',
+        'manual': '👤 Manual Close',
+        'account_reset': '🔄 Account Reset',
+        'liquidation': '💀 Liquidation'
+    }.get(close_reason, close_reason.replace('_', ' ').title())
+
+    message_parts = [
+        f"🤖 {bot_name}",
+        "",
+        f"CLOSED {side} {symbol}",
+        "",
+        pnl_display,
+        f"Duration: {duration_display}",
+        f"Reason: {reason_display}",
+        "",
+        "🌐 ggbots.ai"
+    ]
+
+    return "\n".join(message_parts)
+
+
 # NOTE: PM2 service main() removed - this module now only provides utility functions
 # Telegram publishing is handled directly by the orchestrator (ggbot.py)

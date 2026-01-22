@@ -528,6 +528,37 @@ class SymphonyLiveTradingService:
                 )
 
             self._log.info(f"Symphony position closed successfully: batch_id={batch_id}")
+
+            # Publish exit notification to Telegram
+            if position_details and reason != 'account_reset':
+                try:
+                    from signals.publishing_service import publish_exit_to_telegram
+
+                    # Get bot name from config
+                    with get_db_connection() as conn:
+                        with conn.cursor() as cur:
+                            cur.execute("SELECT config_name FROM configurations WHERE config_id = %s", (config_id,))
+                            result = cur.fetchone()
+                            bot_name = result[0] if result else 'ggbot'
+
+                    await publish_exit_to_telegram(
+                        config_id=str(config_id),
+                        user_id=str(user_id),
+                        exit_data={
+                            'bot_name': bot_name,
+                            'symbol': symbol,
+                            'side': side,
+                            'entry_price': float(entry_price),
+                            'exit_price': float(exit_price),
+                            'pnl': float(pnl),
+                            'pnl_pct': pnl_pct,
+                            'close_reason': reason,
+                            'duration_seconds': duration_seconds or 0
+                        }
+                    )
+                except Exception as e:
+                    self._log.warning(f"Failed to publish exit to Telegram: {e}")
+
             return {
                 "status": "success",
                 "batch_id": batch_id,

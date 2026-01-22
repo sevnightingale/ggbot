@@ -620,7 +620,34 @@ class SupabasePaperTradingService:
             )
 
             logger.info(f"Paper position closed: {trade_id} - {reason} @ ${close_price:.2f} (P&L: ${net_pnl:.2f})")
-            
+
+            # Publish exit notification to Telegram (skip for account_reset)
+            if reason != 'account_reset':
+                try:
+                    from signals.publishing_service import publish_exit_to_telegram
+
+                    # Get bot name from config
+                    config_response = self.supabase.table('configurations').select('config_name').eq('config_id', str(trade['config_id'])).execute()
+                    bot_name = config_response.data[0]['config_name'] if config_response.data else 'ggbot'
+
+                    await publish_exit_to_telegram(
+                        config_id=str(trade['config_id']),
+                        user_id=str(trade['user_id']),
+                        exit_data={
+                            'bot_name': bot_name,
+                            'symbol': trade['symbol'],
+                            'side': side,
+                            'entry_price': entry_price,
+                            'exit_price': close_price,
+                            'pnl': net_pnl,
+                            'pnl_pct': pnl_pct,
+                            'close_reason': reason,
+                            'duration_seconds': duration_seconds
+                        }
+                    )
+                except Exception as e:
+                    logger.warning(f"Failed to publish exit to Telegram: {e}")
+
             return {
                 "status": "closed",
                 "trade_id": trade_id,
