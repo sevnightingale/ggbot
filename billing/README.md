@@ -100,7 +100,13 @@ STRIPE_WEBHOOK_SECRET=whsec_xxx       # Webhook signature verification
 
 **Meter ID**: `mtr_61TcMoxbXUvKBLQG741J9gH6H6LiHGyW`
 **Event Name**: `llm_tokens_usd`
-**Aggregation**: Sum of USD values per billing period
+**Aggregation**: Sum of cent values per billing period
+
+**Price Configuration** (updated 2026-01-22):
+- **Current Price**: `price_1SsU8VJ9gH6H6LiHvuJy6LxP` ($0.01 per cent)
+- **Legacy Price**: `price_1SSz0EJ9gH6H6LiH7SBooW80` ($1.00 per unit - ARCHIVED)
+
+**Why cents?** Stripe truncates meter values to integers. With $1/unit, a user with $0.72 usage would be billed $0 (floor(0.72) = 0 units). With $0.01/cent, they're correctly billed $0.72 (72 cents × $0.01).
 
 ### Daily Meter Reporting
 

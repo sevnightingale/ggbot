@@ -112,9 +112,11 @@ def report_to_stripe(user_id: str, stripe_customer_id: str, total_cost: Decimal)
         True if successful, False otherwise
     """
     try:
-        # Stripe expects integer cents or float dollars
-        # We'll send as string to preserve precision
-        value = str(total_cost)
+        # Convert dollars to cents for Stripe meter billing
+        # Price is $0.01 per unit, so $0.72 -> 72 cents -> 72 × $0.01 = $0.72 billed
+        # This fixes the truncation bug where <$1 usage was billed as $0
+        value_cents = int(total_cost * 100)
+        value = str(value_cents)
 
         # Create idempotency identifier to prevent double billing
         # Format: user:date:cost_hash - unique per user per day per amount
@@ -134,10 +136,11 @@ def report_to_stripe(user_id: str, stripe_customer_id: str, total_cost: Decimal)
         logger.bind(
             user_id=user_id,
             stripe_customer_id=stripe_customer_id,
-            cost=value,
+            cost_usd=str(total_cost),
+            cost_cents=value,
             event_id=event.identifier,
             idempotency_key=identifier
-        ).info(f"Reported ${value} to Stripe meter")
+        ).info(f"Reported {value_cents} cents (${total_cost}) to Stripe meter")
 
         return True
 

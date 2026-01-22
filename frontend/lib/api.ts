@@ -146,6 +146,9 @@ export interface UserProfile {
   can_activate_bots: boolean
   can_use_agents: boolean
   paid_data_points: string[]
+  // Credit-related fields
+  credit_balance_usd: number | null
+  has_available_credits: boolean
 }
 
 export class ApiClient {
