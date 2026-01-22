@@ -367,7 +367,8 @@ export function TradeSettings({
                   <button
                     onClick={async () => {
                       try {
-                        const response = await fetch(`/api/v2/test/signal-publishing/${configId}`, {
+                        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
+                        const response = await fetch(`${apiUrl}/api/v2/test/signal-publishing/${configId}`, {
                           method: 'POST',
                           headers: {
                             'Content-Type': 'application/json',

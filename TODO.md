@@ -256,6 +256,53 @@ const useDeleteBot = () => useMutation({
 
 ---
 
+## 📱 **Telegram Publishing - Platform Bot Implementation**
+
+**Status**: 🟡 READY TO IMPLEMENT
+**Planning Doc**: [DOCS/todo/TELEGRAM_PUBLISHING.md](DOCS/todo/TELEGRAM_PUBLISHING.md)
+**Complexity**: Medium (~6-8 hours)
+**Priority**: P2 - Feature completion
+
+**Problem**: Telegram publishing UI exists but feature is non-functional. Users can't get channel ID (no `/chatid` command), permission gate is broken, only signal_validation bots publish.
+
+**Solution**: Platform Bot Model - ggbots maintains `@ggFilter_Bot`, users add it to channels, we publish on their behalf.
+
+### **Implementation Phases**
+
+**Phase 1: Bot Command Handler** (~2-3 hours)
+- [ ] Create `signals/telegram_bot_handler.py` with `/start`, `/chatid`, `/help` commands
+- [ ] Add `telegram-bot` PM2 service to `ecosystem.config.js`
+- [ ] **USER ACTION**: Verify `@ggFilter_Bot` exists and token is valid
+- [ ] **USER ACTION**: Disable "Group Privacy" in BotFather settings
+
+**Phase 2: Frontend Permission Fix** (~30 min)
+- [ ] Add `telegram_publishing` case to `permissions.tsx` switch statement
+- [ ] Gate returns `userProfile.can_publish_telegram_signals`
+
+**Phase 3: Extend to Scheduled Trading Bots** (~2-3 hours)
+- [ ] Add `publish_trading_decision()` function to `publishing_service.py`
+- [ ] Hook into `_run_autonomous_trading_cycle()` in `ggbot.py`
+- [ ] Publish on successful trade entries (not waits)
+
+**Phase 4: Error Handling & UX** (~1 hour)
+- [ ] Return structured errors from publishing service
+- [ ] Update test endpoint with specific error messages
+- [ ] Frontend displays meaningful error (not generic alert)
+
+**Phase 5: Testing & Documentation** (~1 hour)
+- [ ] Manual test: `/chatid` in channel/group/private
+- [ ] Manual test: non-subscriber sees premium lock
+- [ ] Manual test: successful publish from scheduled_trading bot
+- [ ] Update frontend instructions if needed
+
+### **User Actions Required Before Implementation**
+1. Verify `@ggFilter_Bot` exists on Telegram
+2. Test bot token: `curl https://api.telegram.org/bot<TOKEN>/getMe`
+3. Check BotFather settings (Group Privacy should be OFF)
+4. Decide on message branding (logo, disclaimer, link to ggbots.ai)
+
+---
+
 ## 🎨 **Activity Modal Redesign** [ACTIVITY_MODAL_REDESIGN.md]
 
 **Status**: 🟢 COMPLETE

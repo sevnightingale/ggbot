@@ -110,9 +110,12 @@ export function PermissionProvider({ children }: PermissionProviderProps) {
       case 'ggshot':
         return userProfile.paid_data_points.includes('ggshot')
 
+      case 'telegram_publishing':
+        return userProfile.can_publish_telegram_signals
+
       default:
         // All other features available to everyone
-        // (LLM models, frequencies, telegram, signal validation, live trading, etc.)
+        // (LLM models, frequencies, signal validation, live trading, etc.)
         return true
     }
   }

@@ -145,6 +145,31 @@ module.exports = {
       max_restarts: 50,  // Increased from 20 for resilience
       restart_delay: 5000  // Increased to 5s for backoff
     },
+    // Telegram Bot Handler - Responds to /chatid and other commands
+    {
+      name: 'telegram-bot',
+      script: '/home/sev/ggbot/signals/telegram_bot_handler.py',
+      interpreter: '/home/sev/ggbot/.venv/bin/python',
+      cwd: '/home/sev/ggbot',
+      instances: 1,
+      exec_mode: 'fork',
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '100M',
+      env: {
+        NODE_ENV: 'production',
+        PYTHONPATH: '/home/sev/ggbot',
+        GG_FILTER_TOKEN: process.env.GG_FILTER_TOKEN,
+        DATABASE_URL: process.env.DATABASE_URL
+      },
+      error_file: 'logs/telegram-bot-error.log',
+      out_file: 'logs/telegram-bot-out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      min_uptime: '30s',
+      max_restarts: 20,
+      restart_delay: 4000
+    },
     // Universal Account Monitor - Unified monitoring for paper/symphony/aster
     {
       name: 'account-monitor',
