@@ -1,62 +1,62 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-22 19:24:02 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-23 05:13:33 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 300
-- **Pro Users (ggbase)**: 11 (11 active subscriptions)
+- **Total Users**: 301
+- **Prepaid Users**: 12 (12 active subscriptions)
 - **Free Users**: 280
-- **Users with Bots**: 293 (97.7%)
+- **Users with Bots**: 294 (97.7%)
 
 ### Bot Statistics
-- **Total Bots**: 445
-- **Active Bots**: 21 (4.7%)
-  - Paper: 20
+- **Total Bots**: 447
+- **Active Bots**: 24 (5.4%)
+  - Paper: 23
   - Symphony (Live): 1
   - Aster (DEX): 0
-- **Inactive Bots**: 424
+- **Inactive Bots**: 423
 - **Avg Bots per User**: 1.5
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,466
-  - Wins: 1,636
-  - Losses: 3,830
-  - Platform Win Rate: 29.93%
-  - Total P&L: $-17,533.79
+- **Total Trades (All Time)**: 5,475
+  - Wins: 1,639
+  - Losses: 3,836
+  - Platform Win Rate: 29.94%
+  - Total P&L: $-17,753.60
 - **Recent Activity**:
-  - Last 24 hours: 20 trades
-  - Last 7 days: 109 trades
-  - Last 30 days: 527 trades
+  - Last 24 hours: 18 trades
+  - Last 7 days: 113 trades
+  - Last 30 days: 521 trades
 
 ### Open Positions
-- **Open Positions**: 12
+- **Open Positions**: 10
 - **Unique Symbols**: 2
-- **Total Exposure**: $139,632.67
-- **Unrealized P&L**: $901.82
+- **Total Exposure**: $95,506.87
+- **Unrealized P&L**: $779.25
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,934.62
+- **Average Balance**: $9,934.42
 - **Lowest Balance**: $3,905.05
 - **Highest Balance**: $10,431.75
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 17 bots
-- **SOL/USDT**: 2 bots
+- **BTC/USDT**: 19 bots
+- **SOL/USDT**: 3 bots
 - **ETH/USDT**: 1 bots
 - **RENDER/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 632 decisions (avg confidence: 38.7%)
-- **enter**: 21 decisions (avg confidence: 63.3%)
-- **exit**: 19 decisions (avg confidence: 69.4%)
+- **wait**: 647 decisions (avg confidence: 38.6%)
+- **enter**: 17 decisions (avg confidence: 63.8%)
+- **exit**: 16 decisions (avg confidence: 67.4%)
 
 ### System Health
-- **Decisions (last hour)**: 21
+- **Decisions (last hour)**: 31
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -65,22 +65,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 22MB | 1d 7h | 5 |
-| market-data-ws | 🟢 online | 4.3% | 20MB | 1d 7h | 5 |
-| ggbot | 🟢 online | 1.7% | 409MB | 15h 19m | 39 |
-| account-monitor | 🟢 online | 0% | 260MB | 1d 7h | 21 |
-| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 35MB | 16h 49m | 9 |
-| telegram-bot | 🟢 online | 0% | 38MB | 18h 29m | 0 |
+| error-alerts | 🟢 online | 0% | 30MB | 6h 4m | 6 |
+| market-data-ws | 🟢 online | 1.7% | 16MB | 1d 17h | 5 |
+| ggbot | 🟢 online | 4.3% | 382MB | 6h 7m | 44 |
+| account-monitor | 🟢 online | 1.7% | 119MB | 6h 4m | 22 |
+| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 30MB | 1d 2h | 9 |
+| telegram-bot | 🟢 online | 0% | 33MB | 6h 4m | 1 |
 
 ### VM Resources
 
-- **Disk**: 45G / 78G (58%)
-- **Memory**: 2.7Gi / 3.8Gi
-- **CPU Load**: 0.72 / 0.48 / 0.35 (1m/5m/15m)
+- **Disk**: 46G / 78G (59%)
+- **Memory**: 2.6Gi / 3.8Gi
+- **CPU Load**: 0.52 / 0.61 / 0.58 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 22.67M)
+- **Redis**: 🟢 connected (Memory: 23.28M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -432,7 +432,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-22 19:24:04 UTC
+**Last Updated**: 2026-01-23 05:13:34 UTC
 
 ---
 
@@ -1287,7 +1287,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-22 19:24:04 UTC
+**Last Updated**: 2026-01-23 05:13:34 UTC
 
 ---
 

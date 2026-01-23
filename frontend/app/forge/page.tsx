@@ -20,6 +20,7 @@ import { ConfigureLayout } from './components/configure/ConfigureLayout'
 import { BotCreationModal } from './components/modals/BotCreationModal'
 import { Wrench, X } from 'lucide-react'
 import Link from 'next/link'
+import { OnboardingTour } from '@/components/OnboardingTour'
 
 interface Position {
   trade_id: string
@@ -94,6 +95,26 @@ function ForgeApp() {
   const [isBotSwitching, setIsBotSwitching] = useState(false)  // Show skeleton during bot switch
   const [botCreationModalOpen, setBotCreationModalOpen] = useState(false)
   const [showArenaBanner, setShowArenaBanner] = useState(true)
+  const [showOnboardingTour, setShowOnboardingTour] = useState(false)
+
+  // Onboarding tour steps - shown after first bot creation
+  const ONBOARDING_STEPS = [
+    {
+      target: '[data-tour="activity-timeline"]',
+      title: "Your Bot's Activity",
+      content: "This timeline shows every action your bot takes. Click the icons on the chart to see details about each trade and decision."
+    },
+    {
+      target: '[data-tour="configure-tab"]',
+      title: "Customize Your Bot",
+      content: "Click Configure to edit your bot's strategy, change which indicators it uses, and adjust trading settings."
+    },
+    {
+      target: '[data-tour="strategy-advisor"]',
+      title: "Strategy Advisor",
+      content: "Chat with the Strategy Advisor to understand your strategy, get suggestions, or analyze your bot's performance."
+    }
+  ]
 
   // Use ref to track selectedConfigId for SSE filtering without causing reconnections
   const selectedConfigIdRef = useRef(selectedConfigId)
@@ -901,12 +922,20 @@ function ForgeApp() {
         const verifyBot = await apiClient.getConfig(updatedBot.config_id)
         console.log('✅ New bot creation verified:', verifyBot.config_id, verifyBot.config_name)
 
+        // Check if this is the user's first bot (for onboarding tour)
+        const isFirstBot = allBots.length === 0
+
         // Add to local state and select it
         setAllBots(prev => [...prev, verifyBot])
         setSelectedConfigId(verifyBot.config_id)
 
         // Close the modal
         setBotCreationModalOpen(false)
+
+        // Trigger onboarding tour for first-time users after a short delay
+        if (isFirstBot) {
+          setTimeout(() => setShowOnboardingTour(true), 1500)
+        }
 
         // Trigger first run automatically (this uses the free first run for new users)
         if (configData) {
@@ -1308,11 +1337,13 @@ function ForgeApp() {
                   ) : (
                     <div className="space-y-3">
                       {/* Activity Timeline - Full Width */}
-                      <TVTimeline
-                        configId={selectedConfigId || ''}
-                        title={selectedBot.config_name}
-                        variant="embedded"
-                      />
+                      <div data-tour="activity-timeline">
+                        <TVTimeline
+                          configId={selectedConfigId || ''}
+                          title={selectedBot.config_name}
+                          variant="embedded"
+                        />
+                      </div>
 
                       {/* PositionsTable - Active trades (full width) */}
                       <PositionsTable
@@ -1377,6 +1408,14 @@ function ForgeApp() {
         onConfirm={handleCreateNewBot}
         existingBotCount={allBots.length}
         forceOpen={allBots.length === 0}
+      />
+
+      {/* Onboarding Tour - shown after first bot creation */}
+      <OnboardingTour
+        steps={ONBOARDING_STEPS}
+        storageKey="ggbots-onboarding-complete"
+        active={showOnboardingTour}
+        onComplete={() => setShowOnboardingTour(false)}
       />
     </div>
   )

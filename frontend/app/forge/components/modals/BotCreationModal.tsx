@@ -567,7 +567,10 @@ export function BotCreationModal({
                   setDescription(e.target.value)
                   setSelectedArchetype(null) // Clear archetype if typing
                 }}
-                placeholder="Example: A patient bot that waits for extreme fear or greed, then fades the crowd. Buy when RSI is oversold and everyone is panicking, sell when euphoria takes over..."
+                placeholder="Describe your trading style in plain English. Examples:
+• A patient bot that waits for RSI extremes
+• Follow the trend using moving averages
+• Buy when everyone is fearful, sell when greedy"
                 className="w-full px-4 py-4 h-32 border border-[var(--border)] rounded-xl bg-[var(--bg-primary)] text-[var(--text-primary)] placeholder:text-[var(--text-muted)] focus:outline-none focus:ring-2 focus:ring-[var(--accent)] resize-none"
               />
               <div className="flex justify-between mt-2">
@@ -580,10 +583,18 @@ export function BotCreationModal({
               </div>
             </div>
 
-            <div className="border-t border-[var(--border)] pt-6">
-              <p className="text-sm text-[var(--text-muted)] mb-4 text-center">
-                Or start with a proven archetype:
-              </p>
+            <div className="relative my-6">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-[var(--border)]"></div>
+              </div>
+              <div className="relative flex justify-center">
+                <span className="px-4 bg-[var(--bg-secondary)] text-sm text-[var(--text-muted)]">
+                  or choose a proven strategy
+                </span>
+              </div>
+            </div>
+
+            <div>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                 {ARCHETYPES.map((archetype) => (
                   <button

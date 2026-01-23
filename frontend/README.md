@@ -73,6 +73,8 @@ Legacy/Archive (Moved to /archive/):
 ├── tv-timeline.tsx         # AI consciousness timeline - bot's subjective awareness moments with equity chart
 ├── bottom-sheet.tsx        # Framer Motion slide-up drawer (centered on desktop) for activity details
 ├── StrategyAdvisorPanel.tsx # Inline AI chat for bot configuration (500px fixed, markdown rendering)
+│                           #   Buttons: "Explain Strategy" (understand), "Update Strategy" (iterate), "Analyze Performance" (after trades)
+├── OnboardingTour.tsx      # First-time user tutorial overlay - spotlight + tooltip, localStorage persistence, keyboard nav
 ├── SaveStatusIndicator.tsx # Global operation status (Saving/Saved/Error) with custom message support
 ├── BotImageUpload.tsx      # Bot profile image uploader - drag-drop, auto-resize to 1024×1024, Supabase Storage
 ├── HelpWidget.tsx          # Floating help widget with Telegram community invite
@@ -706,6 +708,63 @@ import { Bot, Settings, BarChart3 } from 'lucide-react'
 - **Specs**: 5MB max file size, supports JPG/PNG/WebP, JPEG output at 90% quality
 - **Integration**: `BotImageUpload` component with `profile_image_url` field on configurations table
 
+### **Onboarding System** (2026-01-23)
+
+#### **First-Time User Tour**
+Tutorial overlay that highlights key features after first bot creation:
+
+**Component**: `OnboardingTour.tsx`
+```typescript
+interface TourStep {
+  target: string   // CSS selector (e.g., '[data-tour="activity-timeline"]')
+  title: string    // Step heading
+  content: string  // Explanation text
+}
+```
+
+**Tour Steps**:
+1. **Activity Timeline** - Explains the equity chart and trade markers
+2. **Configure Tab** - Points to strategy customization
+3. **Strategy Advisor** - Introduces AI chat for strategy help
+
+**Features**:
+- Spotlight effect via CSS `boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)'`
+- Keyboard navigation: ←/→ arrows, Escape to skip
+- localStorage persistence (`ggbots-onboarding-complete`)
+- Automatic scroll-into-view for each step
+
+**Trigger**: 1.5s after first bot creation completes:
+```typescript
+// In page.tsx handleCreateNewBot()
+const isFirstBot = allBots.length === 0
+if (isFirstBot) {
+  setTimeout(() => setShowOnboardingTour(true), 1500)
+}
+```
+
+**Data Attributes**: Target elements use `data-tour` for selection:
+- `data-tour="activity-timeline"` - TVTimeline wrapper
+- `data-tour="configure-tab"` - Configure tab button
+- `data-tour="strategy-advisor"` - StrategyAdvisorPanel root
+
+#### **Strategy Advisor Buttons**
+Post-creation context-aware buttons in `StrategyAdvisorPanel.tsx`:
+
+| Button | Icon | When Shown | Action |
+|--------|------|------------|--------|
+| Explain Strategy | MessageCircle | Always | Sends prompt asking AI to explain current strategy |
+| Update Strategy | Wand2 | Always | Sends prompt to modify strategy |
+| Analyze Performance | BarChart3 | After trades | Fetches performance analysis report |
+
+**Empty State Text**: Changes based on trade history:
+- No trades: "What would you like to know about your bot?"
+- Has trades: "How can I help you improve your bot?"
+
+#### **Bot Creation Modal Improvements**
+- **Better Placeholder**: Description field shows bullet-point examples
+- **Visual Separator**: "or choose a proven strategy" divider between custom description and archetypes
+- **Frequency Hint**: Explains what analysis frequency means
+
 ### **Configuration System** (Unified Batched Save - 2025-12-04)
 - **Strategy Advisor**: Inline AI chat panel (500px fixed) with Claude Haiku, markdown rendering, real-time config updates
 - **Unified Batched Save**: All config changes batched over 5s, single API call, dirty field tracking prevents SSE overwrites
@@ -778,6 +837,8 @@ const leverageValidation = useFieldValidation(leverage, ValidationRules.leverage
 - [x] Professional design system with agent color scheme
 - [x] Trading settings validation with error/warning feedback
 - [x] Real-time input validation preventing invalid configurations
+- [x] First-time user onboarding tour with spotlight highlighting (2026-01-23)
+- [x] Context-aware Strategy Advisor buttons (Explain/Update/Analyze)
 
 ### **Monetization & Subscriptions**
 - [x] Stripe integration (checkout, webhooks, billing portal)

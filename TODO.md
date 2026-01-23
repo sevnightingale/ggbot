@@ -256,6 +256,50 @@ const useDeleteBot = () => useMutation({
 
 ---
 
+## 🔮 **Market Data Intelligence Update** [MARKET_DATA_INTELLIGENCE_UPDATE.md]
+
+**Status**: 🟡 IN PROGRESS
+**Planning Doc**: [DOCS/todo/MARKET_DATA_INTELLIGENCE_UPDATE.md](DOCS/todo/MARKET_DATA_INTELLIGENCE_UPDATE.md)
+**Complexity**: Low-Medium (~4-6 hours)
+**Priority**: Medium
+
+**Summary**: Clean up stale data sources, add new intelligence, explore Nansen API.
+
+### **Phase 1: ggShot Soft Disable** (~1 hour)
+
+**Problem**: ggShot signals are 90+ days stale, confusing bots that use them.
+
+- [ ] Disable `ggshot` data point in database (`enabled=false`)
+- [ ] Disable `trading_signals` data source in database (`enabled=false`)
+- [ ] Remove Signals tab from Configure layout (archive `SignalsConfiguration.tsx`)
+- [ ] Verify no console errors, graceful handling for existing configs
+
+### **Phase 2: Astrology Indicator** (~1-2 hours)
+
+**Add cosmic timing signals under `sentiment_social` category.**
+
+- [ ] Add `astro_timing` prompt template to `grok_agentic.py`
+- [ ] Add catalog mapping entry in `catalog_mapping.py`
+- [ ] Seed database with new data point
+- [ ] Test Grok query returns valid JSON (moon phase, aspects, signal)
+- [ ] Verify appears in frontend data source selector
+
+### **Phase 3: Nansen API Exploration** (~2-3 hours)
+
+**Leverage free credits to evaluate on-chain intelligence.**
+
+- [ ] Review Nansen API documentation
+- [ ] Identify valuable endpoints (smart money, whale tracking)
+- [ ] Test with free credits
+- [ ] Decision: implement adapter or defer?
+
+### **Phase 4: Documentation** (~30 min)
+
+- [ ] Update `market_intelligence/README.md` data point counts
+- [ ] Add CHANGELOG entry
+
+---
+
 ## 🎨 **Activity Modal Redesign** [ACTIVITY_MODAL_REDESIGN.md]
 
 **Status**: 🟢 COMPLETE

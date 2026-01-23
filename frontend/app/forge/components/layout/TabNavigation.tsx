@@ -29,6 +29,7 @@ export function TabNavigation({ activeTab, onTabChange, className = '' }: TabNav
                 : 'text-[var(--text-muted)] hover:bg-[var(--bg-secondary)] hover:text-[var(--text-primary)]'
             }`}
             title={tab.description}
+            {...(tab.key === 'configure' ? { 'data-tour': 'configure-tab' } : {})}
           >
             {tab.label}
           </button>

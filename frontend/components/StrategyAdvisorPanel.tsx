@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { Sparkles, BarChart3, Wand2, AlertTriangle, TrendingUp, Target, Loader2 } from 'lucide-react'
+import { Sparkles, BarChart3, Wand2, AlertTriangle, TrendingUp, Target, Loader2, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { apiClient } from '@/lib/api'
 import ReactMarkdown from 'react-markdown'
@@ -94,7 +94,8 @@ interface StrategyAdvisorPanelProps {
   className?: string
 }
 
-const CREATE_STRATEGY_PROMPT = "I'd like help creating a trading strategy for my bot. Can you guide me through the process?"
+const EXPLAIN_STRATEGY_PROMPT = "Please explain my current trading strategy in simple terms. What will my bot actually do? Walk me through the entry conditions, exit conditions, and how it makes decisions."
+const UPDATE_STRATEGY_PROMPT = "I'd like help modifying my trading strategy. Can you guide me through updating it?"
 
 /**
  * Inline Strategy Advisor chat panel
@@ -157,12 +158,21 @@ export function StrategyAdvisorPanel({
     checkClosedTrades()
   }, [configId])
 
-  const handleCreateStrategy = () => {
+  const handleExplainStrategy = () => {
     // Set the prompt and trigger send
-    setInput(CREATE_STRATEGY_PROMPT)
+    setInput(EXPLAIN_STRATEGY_PROMPT)
     // Use setTimeout to ensure state is updated before sending
     setTimeout(() => {
-      sendMessageWithContent(CREATE_STRATEGY_PROMPT)
+      sendMessageWithContent(EXPLAIN_STRATEGY_PROMPT)
+    }, 0)
+  }
+
+  const handleUpdateStrategy = () => {
+    // Set the prompt and trigger send
+    setInput(UPDATE_STRATEGY_PROMPT)
+    // Use setTimeout to ensure state is updated before sending
+    setTimeout(() => {
+      sendMessageWithContent(UPDATE_STRATEGY_PROMPT)
     }, 0)
   }
 
@@ -458,7 +468,7 @@ export function StrategyAdvisorPanel({
   }
 
   return (
-    <div className={`flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] ${className}`} style={{ height: '500px' }}>
+    <div data-tour="strategy-advisor" className={`flex flex-col rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] ${className}`} style={{ height: '500px' }}>
       {/* Header */}
       <div className="flex-shrink-0 px-4 py-3 border-b border-[var(--border)] flex items-center gap-2">
         <Sparkles className="w-5 h-5 text-[var(--accent)]" />
@@ -491,23 +501,33 @@ export function StrategyAdvisorPanel({
                 <p className="text-sm text-[var(--text-muted)] mb-4">
                   {hasClosedTrades
                     ? "How can I help you improve your bot?"
-                    : "Let's create a trading strategy for your bot."}
+                    : "What would you like to know about your bot?"}
                 </p>
 
                 {/* Action buttons - show based on bot state */}
                 {!checkingTrades && (
-                  <div className={`flex ${hasClosedTrades ? 'gap-3' : ''} justify-center mb-4`}>
-                    {/* Always show Create Strategy */}
+                  <div className="flex flex-wrap gap-2 justify-center mb-4">
+                    {/* Explain Strategy - always show */}
                     <button
-                      onClick={handleCreateStrategy}
+                      onClick={handleExplainStrategy}
+                      disabled={loading || analysisLoading}
+                      className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors"
+                    >
+                      <MessageCircle className="w-4 h-4 text-[var(--accent)]" />
+                      <span>Explain Strategy</span>
+                    </button>
+
+                    {/* Update Strategy (renamed from Create) */}
+                    <button
+                      onClick={handleUpdateStrategy}
                       disabled={loading || analysisLoading}
                       className="flex items-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg border border-[var(--border)] bg-[var(--bg-primary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] transition-colors"
                     >
                       <Wand2 className="w-4 h-4 text-[var(--accent)]" />
-                      <span>Create Strategy</span>
+                      <span>Update Strategy</span>
                     </button>
 
-                    {/* Only show Analyze Performance if bot has closed trades */}
+                    {/* Analyze Performance - only after trades */}
                     {hasClosedTrades && (
                       <button
                         onClick={fetchAnalysis}
