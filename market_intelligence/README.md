@@ -1,10 +1,10 @@
 # Market Data System - Complete Architecture
 
 **Status**: ✅ Production Deployed
-**Version**: Phase 1 Complete (32 data points live, cost-optimized)
+**Version**: Phase 1 Complete (33 data points live, cost-optimized)
 **Last Updated**: 2026-01-13
 
-The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **32 data points** across **7 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
+The **Market Data System** is ggbots' unified pipeline for acquiring, processing, and serving market intelligence to AI trading agents. It orchestrates **33 data points** across **6 categories**, from technical indicators to real-time sentiment, using a scalable catalog-driven architecture.
 
 ---
 
@@ -44,7 +44,7 @@ AI trading decisions need **contextual market intelligence** beyond price and vo
 **Intelligence Orchestrator** → Config-driven routing, parallel execution, permission system, agent support
 
 ### **Current Capabilities**
-- ✅ **32 data points** across 7 categories (all FREE tier except ggShot)
+- ✅ **33 data points** across 6 categories (all FREE tier)
 - ✅ **5 adapter types** handling diverse data sources (hybrid Grok + Perplexity)
 - ✅ **Parallel query execution** (~30s for all 8 sources, 5.3x speedup)
 - ✅ **Custom cache TTL** per data point (10min to 24hrs)
@@ -429,14 +429,16 @@ intel:funding_rate:{symbol:'BTC/USDT'}  TTL=3600s (1hr)
 | **On-Chain Analytics** (2 sources) |
 | | BTC TVL in DeFi | GrokAgentic | ~$0.025 | 6 hours | 🆓 |
 | | Whale Activity | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
-| **Sentiment & Social** (1 source) |
+| **Sentiment & Social** (3 sources) |
 | | Twitter/X Sentiment | GrokAgentic | ~$0.05 | 4 hours | 🆓 |
+| | Lunar Phase | GrokAgentic | ~$0.005 | 12 hours | 🆓 |
+| | Mercury Retrograde Status | GrokAgentic | ~$0.001 | 24 hours | 🆓 |
 | **News & Regulatory** (1 source) |
 | | Crypto News Headlines | GrokAgentic | ~$0.025 | 2 hours | 🆓 |
 
-**Total**: 32 data points (31 FREE, 1 Premium*)
+**Total**: 33 data points (all FREE tier)
 
-*ggShot requires third-party subscription
+*Note: ggShot (Premium) disabled 2026-01-23 due to stale signals. Astrology data points (lunar_phase, mercury_status) added same date.*
 
 ---
 
@@ -1168,6 +1170,6 @@ print(f"Fetched {sum(len(cat) for cat in result.values())} data points")
 
 ---
 
-**The Market Data System represents ggbots' complete data pipeline - from user configuration to AI-driven trading decisions, orchestrating 32 data points across 7 categories with production-proven performance, cost efficiency, and extensibility.** 🚀
+**The Market Data System represents ggbots' complete data pipeline - from user configuration to AI-driven trading decisions, orchestrating 33 data points across 6 categories with production-proven performance, cost efficiency, and extensibility.** 🚀
 
 **Phase 1 Status**: ✅ **PRODUCTION DEPLOYED** (2025-10-28, cost-optimized 2026-01-13)

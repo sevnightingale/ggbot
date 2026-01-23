@@ -97,7 +97,7 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
     },
 
     # ========================================================================
-    # SENTIMENT & SOCIAL (Grok-Powered - Premium)
+    # SENTIMENT & SOCIAL (Grok-Powered)
     # ========================================================================
     ('sentiment_social', 'twitter_sentiment'): {
         'data_type': 'grok_agentic',
@@ -106,6 +106,19 @@ CATALOG_MAPPING: Dict[Tuple[str, str], Dict[str, Any]] = {
             'symbol': '{symbol}'
         },
         'cache_ttl': 14400  # 4 hours - sentiment doesn't flip in minutes; $0.05/query (web+X)
+    },
+
+    # Astrology / Timing Signals (2026-01-23)
+    ('sentiment_social', 'lunar_phase'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'lunar_phase'},
+        'cache_ttl': 43200  # 12 hours - moon phase changes slowly
+    },
+
+    ('sentiment_social', 'mercury_status'): {
+        'data_type': 'grok_agentic',
+        'params_template': {'query_type': 'mercury_status'},
+        'cache_ttl': 86400  # 24 hours - retrograde status changes very slowly
     },
 
     # ========================================================================

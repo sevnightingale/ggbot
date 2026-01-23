@@ -88,10 +88,14 @@ async def set_agent_context(config_id: str, user_id: str, api_client: GGBotAPICl
 CATEGORIES (use exact names):
 - technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
 - macro_economics: vix, dxy, cpi, nfp
-- sentiment_social: twitter_sentiment (exact name "twitter_sentiment")
+- sentiment_social: twitter_sentiment, lunar_phase, mercury_status
 - derivatives_leverage: btc_funding_rate, eth_funding_rate
 - on_chain_analytics: btc_tvl, whale_activity
 - news_regulatory: crypto_news
+
+ASTROLOGY DATA POINTS:
+- lunar_phase: Current moon phase (New/Full Moon, waxing/waning), trading implications
+- mercury_status: Mercury retrograde status, other planetary retrogrades
 
 TIMEFRAMES (for technical_analysis):
 Technical indicators support 7 timeframes: "5m", "15m", "30m", "1h", "4h", "1d", "1w"
@@ -100,7 +104,7 @@ Default: "1h". Other categories use latest available data regardless of timefram
 EXAMPLES:
 {"symbol": "BTC", "categories": {"technical_analysis": ["RSI"]}}
 {"symbol": "BTC", "categories": {"technical_analysis": ["RSI", "MACD"]}, "timeframe": "15m"}
-{"symbol": "ETH", "categories": {"technical_analysis": ["Stochastic"], "sentiment_social": ["twitter_sentiment"]}, "timeframe": "4h"}
+{"symbol": "ETH", "categories": {"sentiment_social": ["twitter_sentiment", "lunar_phase"]}}
 
 Symbol formats: "BTC", "BTCUSDT", "BTC/USDT" all work. Indicators are case-insensitive.
 Params: symbol (required), categories (dict), timeframe (optional, default '1h')""",
@@ -118,7 +122,7 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
     Categories:
     - technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
     - macro_economics: vix, dxy, cpi, nfp
-    - sentiment_social: twitter_sentiment (use exact name "twitter_sentiment", NOT "twitter" or "sentiment")
+    - sentiment_social: twitter_sentiment, lunar_phase, mercury_status
     - derivatives_leverage: btc_funding_rate, eth_funding_rate
     - on_chain_analytics: btc_tvl, whale_activity
     - news_regulatory: crypto_news
@@ -130,16 +134,16 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
             "categories": {"technical_analysis": ["RSI"]}  # case-insensitive
         })
 
-        # Multiple data sources
+        # Multiple data sources including astrology
         query_market_data({
             "symbol": "BTC",
             "categories": {
                 "technical_analysis": ["RSI", "MACD"],
-                "sentiment_social": ["twitter_sentiment"]
+                "sentiment_social": ["twitter_sentiment", "lunar_phase"]
             }
         })
 
-    Note: Use exact data point names (twitter_sentiment, btc_funding_rate, etc.)
+    Note: Use exact data point names (twitter_sentiment, lunar_phase, mercury_status, etc.)
     """
     try:
         # LOG: Raw arguments from agent

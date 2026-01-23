@@ -716,22 +716,30 @@ Tutorial overlay that highlights key features after first bot creation:
 **Component**: `OnboardingTour.tsx`
 ```typescript
 interface TourStep {
-  target: string   // CSS selector (e.g., '[data-tour="activity-timeline"]')
-  title: string    // Step heading
-  content: string  // Explanation text
+  target: string      // CSS selector (e.g., '[data-tour="activity-timeline"]')
+  title: string       // Step heading
+  content: string     // Explanation text
+  onEnter?: () => void // Called when entering step (for navigation)
 }
 ```
 
-**Tour Steps**:
-1. **Activity Timeline** - Explains the equity chart and trade markers
-2. **Configure Tab** - Points to strategy customization
-3. **Strategy Advisor** - Introduces AI chat for strategy help
+**Tour Steps** (5-step flow with auto-navigation):
+| Step | Tab | Target | Title |
+|------|-----|--------|-------|
+| 1 | Monitor | Activity Timeline | "Your Bot's Activity" |
+| 2 | Monitor | Configure Tab | "Customize Your Bot" |
+| 3 | Configure | Strategy Advisor | "Strategy Advisor" |
+| 4 | Configure | Config Tabs | "Manual Configuration" |
+| 5 | Monitor | Activity Timeline | "You're All Set!" |
 
 **Features**:
-- Spotlight effect via CSS `boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)'`
+- Border highlight only (no darkening overlay) - brass border via CSS
+- Pointer-events pass-through (clicks reach page, only tooltip captures)
+- "Skip tutorial" link at bottom of each tooltip
 - Keyboard navigation: ←/→ arrows, Escape to skip
 - localStorage persistence (`ggbots-onboarding-complete`)
 - Automatic scroll-into-view for each step
+- `onEnter` callbacks enable tab switching between steps
 
 **Trigger**: 1.5s after first bot creation completes:
 ```typescript
@@ -743,9 +751,10 @@ if (isFirstBot) {
 ```
 
 **Data Attributes**: Target elements use `data-tour` for selection:
-- `data-tour="activity-timeline"` - TVTimeline wrapper
-- `data-tour="configure-tab"` - Configure tab button
-- `data-tour="strategy-advisor"` - StrategyAdvisorPanel root
+- `data-tour="activity-timeline"` - TVTimeline wrapper (Monitor tab)
+- `data-tour="configure-tab"` - Configure tab button (TabNavigation)
+- `data-tour="strategy-advisor"` - StrategyAdvisorPanel root (Configure tab)
+- `data-tour="config-tabs"` - ConfigTabs wrapper (Configure tab)
 
 #### **Strategy Advisor Buttons**
 Post-creation context-aware buttons in `StrategyAdvisorPanel.tsx`:

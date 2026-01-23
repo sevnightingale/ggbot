@@ -96,10 +96,14 @@ Query market data across 6 categories with 30+ data points.
 **Categories**:
 - `technical_analysis`: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
 - `macro_economics`: vix, dxy, cpi, nfp
-- `sentiment_social`: twitter_sentiment
+- `sentiment_social`: twitter_sentiment, lunar_phase, mercury_status
 - `derivatives_leverage`: btc_funding_rate, eth_funding_rate
 - `on_chain_analytics`: btc_tvl, whale_activity
 - `news_regulatory`: crypto_news
+
+**Astrology Data Points** (under sentiment_social):
+- `lunar_phase`: Current moon phase, waxing/waning status, days to next Full/New Moon
+- `mercury_status`: Mercury retrograde status, other planetary retrogrades
 
 **Example**:
 ```json
@@ -107,7 +111,7 @@ Query market data across 6 categories with 30+ data points.
   "symbol": "BTC",
   "categories": {
     "technical_analysis": ["RSI", "MACD"],
-    "sentiment_social": ["twitter_sentiment"]
+    "sentiment_social": ["twitter_sentiment", "lunar_phase"]
   },
   "timeframe": "1h"
 }

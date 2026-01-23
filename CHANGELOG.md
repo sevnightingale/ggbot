@@ -6,6 +6,57 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-23 - Market Data Intelligence Update
+
+**Planning Doc**: [DOCS/completed/MARKET_DATA_INTELLIGENCE_UPDATE.md](DOCS/completed/MARKET_DATA_INTELLIGENCE_UPDATE.md)
+
+**ggShot Soft Disable**:
+- Disabled `data_points.ggshot` and `data_sources.trading_signals` in database (`enabled=false`)
+- Removed Signals tab from frontend (`ConfigTabs.tsx`, `ConfigureLayout.tsx`)
+- Updated `orchestrator.py:_check_permission()` to validate `enabled` flag
+- Updated agent MCP tool docstrings to remove ggshot references
+- Reason: signals 90+ days stale, confusing bots
+
+**Astrology Indicators** (`market_intelligence/adapters/agentic/grok_agentic.py`):
+- Added `lunar_phase` prompt template (moon phase, waxing/waning, next Full/New Moon)
+- Added `mercury_status` prompt template (retrograde status, other retrogrades)
+- Added catalog mappings (`catalog_mapping.py`) with 12hr/24hr TTLs
+- Seeded database under `sentiment_social` category
+- Updated `agent/mcp_server.py` and `agent/README.md` with new data points
+- Cost: ~$0.005/lunar query, ~$0.001/mercury query
+
+---
+
+## 2026-01-23 - Onboarding Tour & Strategy Advisor UX
+
+**Frontend Onboarding Tour** (`components/OnboardingTour.tsx` - NEW):
+- 5-step tutorial overlay triggered after first bot creation
+- Auto-navigates between Monitor/Configure tabs to show key features
+- Border highlight only (no darkening overlay), pointer-events pass-through
+- "Skip tutorial" link, keyboard nav (←/→/Esc), localStorage persistence
+- Steps: Activity Timeline → Configure Tab → Strategy Advisor → Config Tabs → Wrap-up
+
+**Strategy Advisor Buttons** (`components/StrategyAdvisorPanel.tsx`):
+- Added "Explain Strategy" button (MessageCircle icon) - sends prompt for strategy explanation
+- Renamed "Create Strategy" → "Update Strategy" (Wand2 icon) - post-creation context
+- "Analyze Performance" only shows after bot has closed trades
+- Updated empty state text based on trade history
+
+**Tour Integration** (`app/forge/page.tsx`):
+- `ONBOARDING_STEPS` array with `onEnter` callbacks for tab navigation
+- Triggers 1.5s after first bot creation
+- `data-tour` attributes: activity-timeline, configure-tab, strategy-advisor, config-tabs
+
+**Bot Creation Modal** (`app/forge/components/modals/BotCreationModal.tsx`):
+- Improved description placeholder with bullet examples
+- Visual "or choose a proven strategy" separator between custom/archetypes
+
+**Supporting Changes**:
+- `TabNavigation.tsx` - Added `data-tour="configure-tab"` attribute
+- `ConfigureLayout.tsx` - Added `data-tour="config-tabs"` wrapper
+
+---
+
 ## 2026-01-22 - Rei Integration Hardening
 
 **Related Doc**: [DOCS/completed/REI_AGENT_INTEGRATION.md](DOCS/completed/REI_AGENT_INTEGRATION.md)

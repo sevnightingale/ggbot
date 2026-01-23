@@ -250,6 +250,64 @@ Interpretation:
 - Large magnitude (>$50M): High confidence signal
 
 Return ONLY the JSON object, no markdown formatting.""",
+
+        # ========================================================================
+        # ASTROLOGY / TIMING SIGNALS (2026-01-23)
+        # ========================================================================
+        'lunar_phase': """Get the current lunar phase and its trading implications.
+
+Tasks:
+1. Determine the current moon phase (New Moon, Waxing Crescent, First Quarter, Waxing Gibbous, Full Moon, Waning Gibbous, Third Quarter, Waning Crescent)
+2. Calculate days until the next major phase change (New Moon or Full Moon)
+3. Note any upcoming lunar events (eclipses, supermoons)
+
+Return a JSON object with this EXACT structure:
+{{
+    "phase": "<exact phase name>",
+    "phase_emoji": "<🌑|🌒|🌓|🌔|🌕|🌖|🌗|🌘>",
+    "illumination_pct": <number 0-100>,
+    "days_to_full_moon": <number or null if currently full>,
+    "days_to_new_moon": <number or null if currently new>,
+    "waxing": <true if growing, false if shrinking>,
+    "next_major_event": "<description of next New/Full Moon or eclipse>",
+    "next_event_date": "<ISO 8601 date>",
+    "trading_implication": "<brief note on traditional lunar trading patterns>"
+}}
+
+Context for trading_implication:
+- New Moon: Fresh starts, good for new positions
+- Waxing phases: Growth energy, bullish bias
+- Full Moon: Culmination, emotional peaks, potential reversals
+- Waning phases: Consolidation energy, cautious bias
+
+Return ONLY the JSON object, no markdown formatting.""",
+
+        'mercury_status': """Get the current Mercury retrograde status and its trading implications.
+
+Tasks:
+1. Check if Mercury is currently in retrograde
+2. Find the dates of the current or next retrograde period
+3. Note any other significant planetary retrogrades affecting markets (Venus, Mars)
+
+Return a JSON object with this EXACT structure:
+{{
+    "mercury_retrograde": <true|false>,
+    "current_status": "<direct|retrograde|stationing (about to turn)>",
+    "retrograde_period": {{
+        "start": "<ISO 8601 date or null>",
+        "end": "<ISO 8601 date or null>"
+    }},
+    "days_until_change": <number of days until Mercury changes direction>,
+    "other_retrogrades": ["<list of other planets currently retrograde>"],
+    "trading_implication": "<brief note on Mercury retrograde trading patterns>"
+}}
+
+Context for trading_implication:
+- Mercury Retrograde: Communication/tech issues, market reversals, choppy action, review positions rather than new entries
+- Mercury Direct: Clearer signals, good for new positions
+- Stationing periods (2-3 days before/after): Most volatile
+
+Return ONLY the JSON object, no markdown formatting.""",
     }
 
     def __init__(self):

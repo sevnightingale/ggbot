@@ -258,31 +258,13 @@ const useDeleteBot = () => useMutation({
 
 ## 🔮 **Market Data Intelligence Update** [MARKET_DATA_INTELLIGENCE_UPDATE.md]
 
-**Status**: 🟡 IN PROGRESS
-**Planning Doc**: [DOCS/todo/MARKET_DATA_INTELLIGENCE_UPDATE.md](DOCS/todo/MARKET_DATA_INTELLIGENCE_UPDATE.md)
-**Complexity**: Low-Medium (~4-6 hours)
-**Priority**: Medium
+**Status**: 🟢 PHASE 1-2 COMPLETE
+**Planning Doc**: [DOCS/completed/MARKET_DATA_INTELLIGENCE_UPDATE.md](DOCS/completed/MARKET_DATA_INTELLIGENCE_UPDATE.md)
 
-**Summary**: Clean up stale data sources, add new intelligence, explore Nansen API.
-
-### **Phase 1: ggShot Soft Disable** ✅ COMPLETE (2026-01-23)
-
-**Problem**: ggShot signals are 90+ days stale, confusing bots that use them.
-
-- [x] Disable `ggshot` data point in database (`enabled=false`)
-- [x] Disable `trading_signals` data source in database (`enabled=false`)
-- [x] Remove Signals tab from Configure layout (archive `SignalsConfiguration.tsx`)
-- [x] Verify no console errors, graceful handling for existing configs (build passes)
-
-### **Phase 2: Astrology Indicator** (~1-2 hours)
-
-**Add cosmic timing signals under `sentiment_social` category.**
-
-- [ ] Add `astro_timing` prompt template to `grok_agentic.py`
-- [ ] Add catalog mapping entry in `catalog_mapping.py`
-- [ ] Seed database with new data point
-- [ ] Test Grok query returns valid JSON (moon phase, aspects, signal)
-- [ ] Verify appears in frontend data source selector
+**Completed** (2026-01-23):
+- ✅ ggShot soft disable (database + frontend + orchestrator permission check)
+- ✅ Astrology indicators: `lunar_phase`, `mercury_status` under sentiment_social
+- ✅ Tested Grok queries (~$0.005 lunar, ~$0.001 mercury)
 
 ### **Phase 3: Nansen API Exploration** (~2-3 hours)
 
@@ -292,11 +274,6 @@ const useDeleteBot = () => useMutation({
 - [ ] Identify valuable endpoints (smart money, whale tracking)
 - [ ] Test with free credits
 - [ ] Decision: implement adapter or defer?
-
-### **Phase 4: Documentation** (~30 min)
-
-- [ ] Update `market_intelligence/README.md` data point counts
-- [ ] Add CHANGELOG entry
 
 ---
 
