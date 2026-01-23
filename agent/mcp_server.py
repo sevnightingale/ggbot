@@ -83,7 +83,7 @@ async def set_agent_context(config_id: str, user_id: str, api_client: GGBotAPICl
 
 @tool(
     "query_market_data",
-    """Query market data across 7 categories:
+    """Query market data across 6 categories:
 
 CATEGORIES (use exact names):
 - technical_analysis: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
@@ -92,27 +92,19 @@ CATEGORIES (use exact names):
 - derivatives_leverage: btc_funding_rate, eth_funding_rate
 - on_chain_analytics: btc_tvl, whale_activity
 - news_regulatory: crypto_news
-- trading_signals: ggshot (PREMIUM, exact name "ggshot")
 
 TIMEFRAMES (for technical_analysis):
 Technical indicators support 7 timeframes: "5m", "15m", "30m", "1h", "4h", "1d", "1w"
 Default: "1h". Other categories use latest available data regardless of timeframe.
 
-GGSHOT SCAN MODE (NEW - for dynamic symbol discovery):
-To find which symbols have recent ggshot signals, omit the symbol parameter:
-{"categories": {"trading_signals": ["ggshot"]}, "scan_days": 2}
-Returns list of symbols with signals from last N days (AsterDEX-compatible only).
-Use this to discover active trading opportunities, then query full history for those symbols.
-
 EXAMPLES:
 {"symbol": "BTC", "categories": {"technical_analysis": ["RSI"]}}
 {"symbol": "BTC", "categories": {"technical_analysis": ["RSI", "MACD"]}, "timeframe": "15m"}
 {"symbol": "ETH", "categories": {"technical_analysis": ["Stochastic"], "sentiment_social": ["twitter_sentiment"]}, "timeframe": "4h"}
-{"categories": {"trading_signals": ["ggshot"]}, "scan_days": 2}  # Scan mode - find active symbols
 
 Symbol formats: "BTC", "BTCUSDT", "BTC/USDT" all work. Indicators are case-insensitive.
-Params: symbol (optional for scan mode), categories (dict), timeframe (optional, default '1h'), scan_days (optional, for ggshot scan mode)""",
-    {"symbol": str, "categories": dict, "timeframe": str, "scan_days": int}
+Params: symbol (required), categories (dict), timeframe (optional, default '1h')""",
+    {"symbol": str, "categories": dict, "timeframe": str}
 )
 async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
     """
@@ -130,7 +122,6 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
     - derivatives_leverage: btc_funding_rate, eth_funding_rate
     - on_chain_analytics: btc_tvl, whale_activity
     - news_regulatory: crypto_news
-    - trading_signals: ggshot (PREMIUM - use exact name "ggshot", NOT "ggshot_signals")
 
     Examples:
         # Simple query - symbol formats are flexible
@@ -144,12 +135,11 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
             "symbol": "BTC",
             "categories": {
                 "technical_analysis": ["RSI", "MACD"],
-                "trading_signals": ["ggshot"],
                 "sentiment_social": ["twitter_sentiment"]
             }
         })
 
-    Note: Use exact data point names (ggshot, twitter_sentiment, btc_funding_rate)
+    Note: Use exact data point names (twitter_sentiment, btc_funding_rate, etc.)
     """
     try:
         # LOG: Raw arguments from agent
@@ -273,14 +263,14 @@ async def query_market_data(args: Dict[str, Any]) -> Dict[str, Any]:
             return {
                 "content": [{
                     "type": "text",
-                    "text": "❌ Symbol required for market data query. Use scan mode (omit symbol + request ggshot) to find active symbols first."
+                    "text": "❌ Symbol required for market data query. Provide a symbol like 'BTC' or 'ETH'."
                 }]
             }
 
         # Validate category names
         VALID_CATEGORIES = {
             "technical_analysis", "macro_economics", "sentiment_social",
-            "derivatives_leverage", "on_chain_analytics", "news_regulatory", "trading_signals"
+            "derivatives_leverage", "on_chain_analytics", "news_regulatory"
         }
 
         unknown_categories = set(categories.keys()) - VALID_CATEGORIES

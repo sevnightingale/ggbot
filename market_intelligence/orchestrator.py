@@ -287,12 +287,12 @@ async def _check_permission(
     Returns:
         True if user has access, False otherwise
     """
-    # Query database for data point's requires_premium flag
+    # Query database for data point's requires_premium AND enabled flags
     try:
         with get_db_connection() as conn:
             with conn.cursor() as cur:
                 cur.execute("""
-                    SELECT dp.requires_premium
+                    SELECT dp.requires_premium, dp.enabled, ds.enabled as source_enabled
                     FROM data_points dp
                     JOIN data_sources ds ON dp.source_id = ds.source_id
                     WHERE ds.name = %s AND dp.name = %s
@@ -303,7 +303,12 @@ async def _check_permission(
                     logger.warning(f"Data point not found: {source_name}.{point_name}")
                     return False
 
-                requires_premium = result[0]
+                requires_premium, point_enabled, source_enabled = result
+
+                # Check if data point or source is disabled
+                if not point_enabled or not source_enabled:
+                    logger.debug(f"Data point disabled: {source_name}.{point_name} (point_enabled={point_enabled}, source_enabled={source_enabled})")
+                    return False
 
                 # If free, allow access
                 if not requires_premium:

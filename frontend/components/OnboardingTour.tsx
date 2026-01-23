@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { X, ChevronRight, ChevronLeft } from 'lucide-react'
+import { ChevronRight, ChevronLeft } from 'lucide-react'
 
 interface TourStep {
   target: string  // CSS selector
@@ -119,15 +119,8 @@ export function OnboardingTour({ steps, storageKey, onComplete, active = true }:
     : targetRect.bottom + 12
 
   return (
-    <div className="fixed inset-0 z-[100]" aria-modal="true" role="dialog">
-      {/* Overlay with cutout - click to skip */}
-      <div
-        className="absolute inset-0 bg-black/60 transition-opacity"
-        onClick={handleSkip}
-        aria-label="Skip tour"
-      />
-
-      {/* Spotlight on target */}
+    <div className="fixed inset-0 z-[100] pointer-events-none" aria-modal="true" role="dialog">
+      {/* Highlight border on target - no darkening */}
       <div
         className="absolute border-2 border-[var(--accent)] rounded-lg pointer-events-none transition-all duration-300"
         style={{
@@ -135,28 +128,18 @@ export function OnboardingTour({ steps, storageKey, onComplete, active = true }:
           left: targetRect.left - 4,
           width: targetRect.width + 8,
           height: targetRect.height + 8,
-          boxShadow: '0 0 0 9999px rgba(0,0,0,0.6)'
         }}
       />
 
       {/* Tooltip */}
       <div
-        className="absolute bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-4 shadow-xl max-w-sm transition-all duration-300"
+        className="absolute bg-[var(--bg-secondary)] border border-[var(--border)] rounded-xl p-4 shadow-xl max-w-sm transition-all duration-300 pointer-events-auto"
         style={{
           top: tooltipTop,
           left: Math.max(16, Math.min(targetRect.left, typeof window !== 'undefined' ? window.innerWidth - 360 : 400)),
         }}
       >
-        {/* Close button */}
-        <button
-          onClick={handleSkip}
-          className="absolute top-2 right-2 p-1.5 rounded-lg hover:bg-[var(--bg-tertiary)] transition-colors"
-          aria-label="Close tour"
-        >
-          <X className="w-4 h-4 text-[var(--text-muted)]" />
-        </button>
-
-        <h3 className="font-semibold text-[var(--text-primary)] mb-2 pr-6">
+        <h3 className="font-semibold text-[var(--text-primary)] mb-2">
           {step.title}
         </h3>
         <p className="text-sm text-[var(--text-secondary)] mb-4 leading-relaxed">
@@ -194,6 +177,16 @@ export function OnboardingTour({ steps, storageKey, onComplete, active = true }:
               {currentStep < steps.length - 1 && <ChevronRight className="w-4 h-4" />}
             </button>
           </div>
+        </div>
+
+        {/* Skip tutorial link */}
+        <div className="mt-3 pt-3 border-t border-[var(--border)] text-center">
+          <button
+            onClick={handleSkip}
+            className="text-xs text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors"
+          >
+            Skip tutorial
+          </button>
         </div>
       </div>
     </div>

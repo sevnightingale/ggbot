@@ -107,15 +107,27 @@ function ForgeApp() {
       onEnter: () => setActiveTab('monitor')
     },
     {
+      target: '[data-tour="configure-tab"]',
+      title: "Customize Your Bot",
+      content: "Click Configure anytime to edit your bot's strategy, change indicators, or adjust trading settings.",
+      onEnter: () => setActiveTab('monitor')
+    },
+    {
       target: '[data-tour="strategy-advisor"]',
       title: "Strategy Advisor",
       content: "Chat with the Strategy Advisor to understand your strategy, get suggestions, or analyze your bot's performance.",
       onEnter: () => setActiveTab('configure')
     },
     {
+      target: '[data-tour="config-tabs"]',
+      title: "Manual Configuration",
+      content: "Use these tabs to manually adjust your market data sources, edit your strategy prompt, or fine-tune trade settings like leverage and position sizing.",
+      onEnter: () => setActiveTab('configure')
+    },
+    {
       target: '[data-tour="activity-timeline"]',
       title: "You're All Set!",
-      content: "Your bot is ready to trade. Watch its activity here, or click Configure anytime to adjust your strategy. Good luck!",
+      content: "Your bot is ready to trade. Watch its activity here, and come back to Configure anytime to refine your strategy. Good luck!",
       onEnter: () => setActiveTab('monitor')
     }
   ]

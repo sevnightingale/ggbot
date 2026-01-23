@@ -91,7 +91,7 @@ Agent executes 24/7 with self-directed timing using `wait_for` tool.
 ### **Market Data Tools**
 
 #### 1. `query_market_data`
-Query market data across 7 categories with 32+ data points.
+Query market data across 6 categories with 30+ data points.
 
 **Categories**:
 - `technical_analysis`: RSI, MACD, Stochastic, Williams_R, CCI, MFI, ADX, PSAR, Aroon, ATR, BB, OBV, SMA, EMA, ROC, VWAP, TRIX, Vortex, BBWidth, Keltner, Donchian
@@ -100,7 +100,6 @@ Query market data across 7 categories with 32+ data points.
 - `derivatives_leverage`: btc_funding_rate, eth_funding_rate
 - `on_chain_analytics`: btc_tvl, whale_activity
 - `news_regulatory`: crypto_news
-- `trading_signals`: ggshot (PREMIUM)
 
 **Example**:
 ```json
@@ -108,7 +107,7 @@ Query market data across 7 categories with 32+ data points.
   "symbol": "BTC",
   "categories": {
     "technical_analysis": ["RSI", "MACD"],
-    "trading_signals": ["ggshot"]
+    "sentiment_social": ["twitter_sentiment"]
   },
   "timeframe": "1h"
 }

@@ -207,11 +207,13 @@ export function ConfigureLayout({
         // Normal Mode: Show full configuration tabs
         <>
           {/* Configuration Tabs */}
-          <ConfigTabs
-            activeTab={activeConfigTab}
-            onTabChange={setActiveConfigTab}
-            className="mb-6"
-          />
+          <div data-tour="config-tabs">
+            <ConfigTabs
+              activeTab={activeConfigTab}
+              onTabChange={setActiveConfigTab}
+              className="mb-6"
+            />
+          </div>
 
           {/* Tab Content - All components receive onUpdateConfig directly */}
           <div className="min-h-[400px]">
