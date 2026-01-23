@@ -431,40 +431,99 @@ TOOL_UPDATE_FULL_CONFIG = {
 }
 
 
-async def query_available_data(category: str) -> Dict[str, Any]:
-    """Return list of available data sources."""
+async def get_available_data_points_from_db() -> Dict[str, Any]:
+    """
+    Query database for all enabled data sources and their data points.
+    Returns structured data for prompt building.
+    """
+    try:
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        ds.name as source_name,
+                        ds.display_name as source_display,
+                        array_agg(dp.name ORDER BY dp.sort_order) as data_points,
+                        array_agg(dp.display_name ORDER BY dp.sort_order) as display_names
+                    FROM data_sources ds
+                    JOIN data_points dp ON ds.source_id = dp.source_id
+                    WHERE ds.enabled = true AND dp.enabled = true
+                    GROUP BY ds.name, ds.display_name, ds.sort_order
+                    ORDER BY ds.sort_order
+                """)
 
-    all_data = {
-        "technical": {
-            "description": "Technical indicators across 7 timeframes",
-            "indicators": ["RSI", "MACD", "BB", "Volume", "Price", "EMA", "SMA", "ATR", "Stochastic", "CCI", "Williams_R", "MFI", "OBV", "VWAP", "ADX", "Aroon", "PSAR"],
-            "timeframes": ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
-        },
-        "signals": {
-            "description": "AI-filtered trading signals",
-            "sources": ["ggShot AI Signals"]
-        },
-        "on_chain": {
-            "description": "Blockchain analytics",
-            "sources": ["BTC TVL", "Whale Activity"]
-        },
-        "derivatives": {
-            "description": "Futures market data",
-            "sources": ["BTC Funding Rate", "ETH Funding Rate"]
-        },
-        "sentiment": {
-            "description": "Social sentiment analysis",
-            "sources": ["Twitter Sentiment"]
-        },
-        "news": {
-            "description": "Crypto news aggregation",
-            "sources": ["Crypto News Feed"]
-        },
-        "macro": {
-            "description": "Macroeconomic indicators",
-            "sources": ["VIX", "DXY", "CPI", "NFP"]
+                result = {}
+                for row in cur.fetchall():
+                    source_name, source_display, points, displays = row
+                    result[source_name] = {
+                        'display_name': source_display,
+                        'data_points': points,
+                        'display_names': displays
+                    }
+                return result
+    except Exception as e:
+        logger.error(f"Failed to fetch data points from database: {e}")
+        # Return hardcoded fallback if DB query fails
+        return {
+            'technical_analysis': {
+                'display_name': 'Technical Analysis',
+                'data_points': ['RSI', 'MACD', 'BB', 'EMA', 'SMA', 'ATR', 'Stochastic', 'ADX', 'Aroon'],
+                'display_names': ['RSI', 'MACD', 'Bollinger Bands', 'EMA', 'SMA', 'ATR', 'Stochastic', 'ADX', 'Aroon']
+            }
         }
+
+
+def build_data_points_prompt_section(available_data: Dict[str, Any]) -> str:
+    """Build the data points section of the prompt dynamically."""
+    sections = []
+
+    for source_name, source_data in available_data.items():
+        display_name = source_data['display_name']
+        points = source_data['data_points']
+
+        # Format based on category
+        if source_name == 'technical_analysis':
+            # Show count and list for technical indicators
+            points_str = ', '.join(points)
+            sections.append(f"**{display_name}** ({len(points)} indicators):\n{points_str}")
+            sections.append("Available timeframes: 5m, 15m, 30m, 1h, 4h, 1d, 1w")
+        else:
+            # Non-technical categories - simpler format
+            points_str = ', '.join(points)
+            sections.append(f"**{display_name}**: {points_str}")
+
+    return '\n\n'.join(sections)
+
+
+async def query_available_data(category: str) -> Dict[str, Any]:
+    """Return list of available data sources from database."""
+
+    # Get fresh data from database
+    available = await get_available_data_points_from_db()
+
+    # Map database names to API category names
+    category_mapping = {
+        'technical_analysis': 'technical',
+        'derivatives_leverage': 'derivatives',
+        'macro_economics': 'macro',
+        'sentiment_social': 'sentiment',
+        'onchain_analytics': 'on_chain',
+        'news_regulatory': 'news',
+        'trading_signals': 'signals'
     }
+
+    all_data = {}
+    for source_name, source_data in available.items():
+        key = category_mapping.get(source_name, source_name)
+        all_data[key] = {
+            "description": source_data['display_name'],
+        }
+        # Use 'indicators' for technical, 'sources' for others
+        if source_name == 'technical_analysis':
+            all_data[key]["indicators"] = source_data['data_points']
+            all_data[key]["timeframes"] = ["5m", "15m", "30m", "1h", "4h", "1d", "1w"]
+        else:
+            all_data[key]["sources"] = source_data['data_points']
 
     if category == "all":
         return all_data
@@ -773,6 +832,21 @@ class GenerateStrategyResponse(BaseModel):
     error: str | None = None
 
 
+class CreateConfigRequest(BaseModel):
+    """Request model for one-shot config creation."""
+    description: str
+    symbol: str = "BTC/USDT"
+    timeframe: str = "1h"
+
+
+class CreateConfigResponse(BaseModel):
+    """Response model for config creation."""
+    success: bool
+    user_prompt: str = ""
+    extraction: Dict[str, Any] = {}
+    error: str | None = None
+
+
 STRATEGY_GENERATION_PROMPT = """You are the Strategy Generator for ggbots.ai. Your job is to convert a user's description of their trading philosophy into a concrete, executable trading strategy that the bot's decision engine will use.
 
 ## How ggbots Work
@@ -886,6 +960,73 @@ Generate ONLY the strategy text (no JSON, no code blocks around the whole thing)
 Generate the strategy now based on the user's description."""
 
 
+CONFIG_CREATION_PROMPT_TEMPLATE = """You are the Config Creator for ggbots.ai. Your job is to convert a user's strategy description into a COMPLETE bot configuration including both the trading strategy AND the extraction config.
+
+## How ggbots Work
+
+The bot follows a 3-step pipeline:
+1. **Extraction**: Fetches market data based on selected indicators and timeframes
+2. **Decision**: An LLM reads your strategy + the extracted data, then decides: LONG, SHORT, CLOSE, or HOLD
+3. **Trading**: Executes the decision with position sizing and risk management
+
+You must create BOTH:
+- `user_prompt`: The trading strategy (markdown format)
+- `extraction`: The data sources config (JSON format)
+
+## Available Data Sources
+
+{data_points_section}
+
+## CRITICAL: Use EXACT Names
+
+The extraction config MUST use the exact internal names listed above. Examples:
+- ✅ "RSI" not "Relative Strength Index"
+- ✅ "BB" not "Bollinger Bands"
+- ✅ "btc_funding_rate" not "BTC Funding Rate"
+- ✅ "twitter_sentiment" not "Twitter Sentiment"
+
+## Output Format
+
+You MUST respond with valid JSON in this exact structure:
+
+```json
+{{
+  "user_prompt": "# Strategy Name\\n\\n**Timeframe**: 1h\\n**Style**: Description\\n\\n---\\n\\n## Identity\\n\\n[Bot personality]\\n\\n---\\n\\n## How You Read the Data\\n\\n**Primary indicators**:\\n[Key indicators]\\n\\n**Secondary indicators**:\\n[Confirmation]\\n\\n---\\n\\n## Entry Conditions\\n\\n**LONG when:**\\n- [Conditions]\\n\\n**SHORT when:**\\n- [Conditions]\\n\\n---\\n\\n## Exit Conditions\\n\\n**Take Profit:**\\n- [Targets]\\n\\n**Stop Loss:**\\n- [Stops]\\n\\n---\\n\\n## Confidence Thresholds\\n\\n- **0.70+ confidence**: [High confidence]\\n- **0.55-0.70 confidence**: [Medium]\\n- **Below 0.55**: Pass\\n\\n---\\n\\n## When You Pass\\n\\n- [Conditions to avoid]",
+  "extraction": {{
+    "selected_data_sources": {{
+      "technical_analysis": {{
+        "data_points": ["RSI", "MACD", "ADX", "EMA", "ATR"],
+        "timeframes": ["{timeframe}"]
+      }},
+      "sentiment_social": {{
+        "data_points": ["twitter_sentiment"],
+        "timeframes": ["{timeframe}"]
+      }}
+    }}
+  }}
+}}
+```
+
+## Guidelines
+
+1. **Match extraction to strategy**: If your strategy mentions ADX, include ADX in extraction
+2. **Use minimal indicators**: Only include what the strategy actually uses (5-12 technical indicators typical)
+3. **Include relevant categories**: If strategy mentions sentiment/macro/funding, add those categories
+4. **Be specific with values**: "RSI below 30" not "RSI oversold"
+5. **Include confidence levels**: Decision engine uses 0.0-1.0 confidence scores
+6. **Add stop/take profit logic**: Every strategy needs exit rules
+
+## Personality Translations
+
+- "Contrarian/fade the crowd" → RSI, Stochastic, BB extremes + twitter_sentiment
+- "Trend follower" → ADX, Aroon, EMA alignment + MACD momentum
+- "Patient/sniper" → Multiple confirmations, higher thresholds
+- "Macro-aware" → vix, dxy + longer timeframes
+- "Funding-aware" → btc_funding_rate, eth_funding_rate
+
+Create the complete config now. Respond ONLY with the JSON object, no other text."""
+
+
 @router.post("/assistant/generate-strategy", response_model=GenerateStrategyResponse)
 async def generate_strategy_from_description(
     request: GenerateStrategyRequest,
@@ -950,6 +1091,114 @@ Convert this into a complete, executable trading strategy following the format i
         return GenerateStrategyResponse(
             success=False,
             user_prompt="",
+            error=str(e)
+        )
+
+
+# ============================================================================
+# Config Creation Endpoint (One-Shot with Extraction)
+# ============================================================================
+
+@router.post("/assistant/create-config", response_model=CreateConfigResponse)
+async def create_bot_config(
+    request: CreateConfigRequest,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+):
+    """
+    One-shot config creation from user description.
+
+    Returns complete config including:
+    - user_prompt: Trading strategy (markdown)
+    - extraction: Data sources config
+
+    This endpoint dynamically queries the database for available data points
+    and uses AI to generate both the strategy AND matching extraction config.
+    """
+    try:
+        # Get available data points from database
+        available_data = await get_available_data_points_from_db()
+
+        # Build dynamic prompt section
+        data_points_section = build_data_points_prompt_section(available_data)
+
+        # Format the full prompt
+        system_prompt = CONFIG_CREATION_PROMPT_TEMPLATE.format(
+            data_points_section=data_points_section,
+            timeframe=request.timeframe
+        )
+
+        # Build user message
+        user_message = f"""Create a complete bot config for:
+
+**Description**: {request.description}
+**Symbol**: {request.symbol}
+**Timeframe**: {request.timeframe}
+
+Respond with the JSON config only."""
+
+        # Initialize Anthropic client
+        client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+
+        # Call Claude Haiku
+        response = client.messages.create(
+            model="claude-haiku-4-5-20251001",
+            max_tokens=4096,
+            system=system_prompt,
+            messages=[{"role": "user", "content": user_message}]
+        )
+
+        # Extract response text
+        response_text = ""
+        for content_block in response.content:
+            if hasattr(content_block, "text"):
+                response_text += content_block.text
+
+        # Parse JSON response
+        # Handle potential markdown code blocks
+        if "```json" in response_text:
+            response_text = response_text.split("```json")[1].split("```")[0]
+        elif "```" in response_text:
+            response_text = response_text.split("```")[1].split("```")[0]
+
+        config_data = json.loads(response_text.strip())
+
+        # Validate required fields
+        if "user_prompt" not in config_data:
+            raise ValueError("Missing user_prompt in response")
+        if "extraction" not in config_data:
+            raise ValueError("Missing extraction in response")
+
+        # Get indicator count for logging
+        indicators_count = len(
+            config_data.get('extraction', {})
+            .get('selected_data_sources', {})
+            .get('technical_analysis', {})
+            .get('data_points', [])
+        )
+
+        logger.bind(
+            user_id=current_user.user_id,
+            symbol=request.symbol,
+            timeframe=request.timeframe,
+            indicators_count=indicators_count
+        ).info("Created bot config from description")
+
+        return CreateConfigResponse(
+            success=True,
+            user_prompt=config_data["user_prompt"],
+            extraction=config_data["extraction"]
+        )
+
+    except json.JSONDecodeError as e:
+        logger.error(f"Failed to parse config JSON: {e}")
+        return CreateConfigResponse(
+            success=False,
+            error=f"Failed to parse AI response as JSON: {str(e)}"
+        )
+    except Exception as e:
+        logger.error(f"Config creation error: {e}")
+        return CreateConfigResponse(
+            success=False,
             error=str(e)
         )
 

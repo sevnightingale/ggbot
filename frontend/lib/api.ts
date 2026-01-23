@@ -439,6 +439,54 @@ export class ApiClient {
     }
   }
 
+  // Config Creation (one-shot with extraction config)
+  async createBotConfig(
+    description: string,
+    symbol: string = 'BTC/USDT',
+    timeframe: string = '1h'
+  ): Promise<{
+    success: boolean
+    user_prompt: string
+    extraction: {
+      selected_data_sources: {
+        technical_analysis?: { data_points: string[]; timeframes: string[] }
+        sentiment_social?: { data_points: string[]; timeframes: string[] }
+        derivatives_leverage?: { data_points: string[]; timeframes: string[] }
+        macro_economics?: { data_points: string[]; timeframes: string[] }
+        onchain_analytics?: { data_points: string[]; timeframes: string[] }
+        news_regulatory?: { data_points: string[]; timeframes: string[] }
+      }
+    }
+    error?: string
+  }> {
+    console.log('🔍 API Call: createBotConfig to', `${this.baseUrl}/api/v2/assistant/create-config`)
+
+    try {
+      const response = await this.authenticatedFetch(
+        `${this.baseUrl}/api/v2/assistant/create-config`,
+        {
+          method: 'POST',
+          body: JSON.stringify({ description, symbol, timeframe })
+        }
+      )
+      console.log('📡 Response status:', response.status, response.statusText)
+
+      if (!response.ok) {
+        const error = await response.text()
+        console.error('❌ API Error:', error)
+        return { success: false, user_prompt: '', extraction: { selected_data_sources: {} }, error }
+      }
+
+      const result = await response.json()
+      console.log('✅ Config created:', result.success, 'indicators:',
+        result.extraction?.selected_data_sources?.technical_analysis?.data_points?.length || 0)
+      return result
+    } catch (err) {
+      console.error('💥 Network error:', err)
+      return { success: false, user_prompt: '', extraction: { selected_data_sources: {} }, error: String(err) }
+    }
+  }
+
   // User Profile Management
   async getUserProfile(): Promise<UserProfile> {
     console.log('🔍 API Call: getUserProfile to', `${this.baseUrl}/api/v2/user/profile`)

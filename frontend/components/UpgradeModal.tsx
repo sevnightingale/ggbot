@@ -51,11 +51,33 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
   const [error, setError] = useState<string | null>(null)
   const [paymentMode, setPaymentMode] = useState<PaymentMode>('choose')
 
+  // Human-readable frequency labels
+  const FREQUENCY_LABELS: Record<string, string> = {
+    '5m': 'every 5 min',
+    '15m': 'every 15 min',
+    '30m': 'every 30 min',
+    '1h': 'every hour',
+    '4h': 'every 4 hours',
+    '1d': 'daily',
+    '1w': 'weekly',
+    'signal_driven': 'signal-driven'
+  }
+
   // Calculate estimate based on bot config (weekly, to match billing)
   const estimate = useMemo(() => {
     if (!botConfig) {
       // Fallback for generic modal (no specific bot) - weekly estimate
-      return { low: 1, high: 4, hasConfig: false }
+      return {
+        low: 1,
+        high: 4,
+        hasConfig: false,
+        model: 'default',
+        tier: 'standard' as const,
+        frequency: '1h',
+        frequencyLabel: 'every hour',
+        economyLow: 0,
+        economyHigh: 1
+      }
     }
 
     // Get model from config
@@ -73,19 +95,36 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
     }
 
     const costPerDecision = modelCosts[tier]
+    const economyCostPerDecision = modelCosts['economy']
 
     // Get frequency from config
     const frequency = botConfig.config_data.decision?.analysis_frequency || '1h'
     const decisionsPerDay = FREQUENCY_TO_DECISIONS[frequency] || 24
+    const decisionsPerWeek = decisionsPerDay * 7
 
     // Calculate weekly cost (billing is weekly)
-    const baseCost = decisionsPerDay * 7 * costPerDecision
+    const baseCost = decisionsPerWeek * costPerDecision
+    const economyBaseCost = decisionsPerWeek * economyCostPerDecision
 
     // Add ±30% range for variance (market activity, actual decisions made)
     const low = Math.max(1, Math.round(baseCost * 0.7))
     const high = Math.round(baseCost * 1.3)
 
-    return { low, high, hasConfig: true }
+    // Economy tier estimate (for the tip)
+    const economyLow = Math.max(0.1, Math.round(economyBaseCost * 0.7 * 10) / 10)
+    const economyHigh = Math.round(economyBaseCost * 1.3 * 10) / 10
+
+    return {
+      low,
+      high,
+      hasConfig: true,
+      model,
+      tier,
+      frequency,
+      frequencyLabel: FREQUENCY_LABELS[frequency] || frequency,
+      economyLow,
+      economyHigh
+    }
   }, [botConfig])
 
   const handleUpgrade = async () => {
@@ -144,6 +183,13 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
         {/* Choose Payment Mode */}
         {paymentMode === 'choose' && (
           <>
+            {/* Anchor: Most bots cost less than $1/week */}
+            <div className="px-4 sm:px-6 pb-3">
+              <div className="text-center text-sm text-[var(--text-secondary)]">
+                Most bots cost <span className="font-medium text-[var(--text-primary)]">less than $1/week</span>
+              </div>
+            </div>
+
             <div className="px-4 sm:px-6 pb-4 space-y-3">
               {/* Pay as you go option */}
               <button
@@ -155,7 +201,7 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
                   Billed weekly for actual usage
                 </div>
                 <div className="text-xs text-[var(--text-tertiary)] mt-2">
-                  ~${estimate.low}-{estimate.high}/week typical
+                  Your bot: ~${estimate.low}-{estimate.high}/week
                 </div>
               </button>
 
@@ -191,21 +237,45 @@ export function UpgradeModal({ open, onOpenChange, botConfig }: UpgradeModalProp
         {/* Usage-based flow */}
         {paymentMode === 'usage' && (
           <>
-            {/* Estimate Card */}
+            {/* Estimate Card with breakdown */}
             <div className="px-4 sm:px-6 pb-4">
               <div className="p-4 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)]">
-                <div className="text-center">
-                  <div className="text-sm text-[var(--text-secondary)] mb-1">
-                    Estimated weekly cost
-                  </div>
+                <div className="text-center mb-3">
                   <div className="text-3xl font-bold text-[var(--text-primary)]">
                     ~${estimate.low}-{estimate.high}
                     <span className="text-base font-normal text-[var(--text-tertiary)]">/week</span>
                   </div>
-                  <div className="text-xs text-[var(--text-tertiary)] mt-1">
-                    {estimate.hasConfig ? 'Based on your configuration' : 'Typical range for most bots'}
-                  </div>
                 </div>
+
+                {/* What's driving the cost */}
+                {estimate.hasConfig && (
+                  <div className="text-xs text-[var(--text-tertiary)] space-y-1 border-t border-[var(--border)] pt-3">
+                    <div className="flex justify-between">
+                      <span>Model</span>
+                      <span className="text-[var(--text-secondary)] capitalize">{estimate.model}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Reasoning</span>
+                      <span className="text-[var(--text-secondary)] capitalize">{estimate.tier}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Frequency</span>
+                      <span className="text-[var(--text-secondary)]">{estimate.frequencyLabel}</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Economy tier tip - only show if not already on economy */}
+                {estimate.hasConfig && estimate.tier !== 'economy' && (
+                  <div className="mt-3 pt-3 border-t border-[var(--border)]">
+                    <div className="flex items-start gap-2 text-xs">
+                      <span className="text-[var(--accent)]">💡</span>
+                      <span className="text-[var(--text-secondary)]">
+                        Switch to <span className="font-medium">economy</span> tier for ~${estimate.economyLow < 1 ? estimate.economyLow.toFixed(2) : estimate.economyLow}-{estimate.economyHigh < 1 ? estimate.economyHigh.toFixed(2) : estimate.economyHigh}/week
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 

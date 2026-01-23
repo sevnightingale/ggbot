@@ -286,27 +286,17 @@ export function BotCreationModal({
         extractionConfig = archetypeConfig.extraction
         finalTimeframe = archetypeConfig.defaultTimeframe
       } else {
-        // Generate strategy from description
+        // Generate complete config from description (strategy + extraction)
         setIsGenerating(true)
         try {
-          const result = await apiClient.generateStrategy(description, symbol, timeframe)
+          const result = await apiClient.createBotConfig(description, symbol, timeframe)
           if (!result.success || !result.user_prompt) {
-            throw new Error(result.error || 'Failed to generate strategy')
+            throw new Error(result.error || 'Failed to create bot config')
           }
           userPrompt = result.user_prompt
+          extractionConfig = result.extraction  // Use AI-generated extraction config
         } finally {
           setIsGenerating(false)
-        }
-
-        // Build default extraction config based on timeframe
-        // NOTE: Use backend names (BB not 'Bollinger Bands', etc.)
-        extractionConfig = {
-          selected_data_sources: {
-            technical_analysis: {
-              data_points: ['RSI', 'MACD', 'BB', 'EMA', 'SMA', 'ATR', 'OBV', 'Stochastic'],
-              timeframes: [timeframe]
-            }
-          }
         }
       }
 

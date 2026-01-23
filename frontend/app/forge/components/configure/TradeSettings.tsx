@@ -339,10 +339,35 @@ export function TradeSettings({
                 </ol>
               </div>
 
-              {/* Group ID Input */}
+              {/* Important Notes */}
+              <div className="p-4 rounded-2xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                <h4 className="font-medium text-[var(--text-primary)] mb-3">Where to receive signals?</h4>
+                <div className="space-y-3 text-sm text-[var(--text-muted)]">
+                  <div>
+                    <strong className="text-[var(--text-primary)]">Option A: Private Chat (just you)</strong>
+                    <ol className="mt-1 ml-4 space-y-1 list-decimal">
+                      <li>Message <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">@ggFilter_Bot</code> and send <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">/start</code></li>
+                      <li>Send <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">/chatid</code> to get your personal Chat ID</li>
+                    </ol>
+                  </div>
+                  <div>
+                    <strong className="text-[var(--text-primary)]">Option B: Group Chat (share with others)</strong>
+                    <ol className="mt-1 ml-4 space-y-1 list-decimal">
+                      <li>Add <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">@ggFilter_Bot</code> to your group</li>
+                      <li>Make the bot an admin with &quot;Post Messages&quot; permission</li>
+                      <li>Send <code className="px-1 py-0.5 bg-[var(--bg-tertiary)] rounded text-[var(--text-primary)]">/chatid</code> in the group</li>
+                    </ol>
+                  </div>
+                  <div className="pt-2 border-t border-[var(--border)] text-xs">
+                    <span className="text-amber-400">💡</span> Private IDs are positive (e.g., 1234567890), group IDs are negative (e.g., -1002208537638)
+                  </div>
+                </div>
+              </div>
+
+              {/* Chat ID Input */}
               <div>
                 <label className="block text-sm font-medium text-[var(--text-muted)] mb-2">
-                  Group ID
+                  Chat ID
                 </label>
                 <input
                   type="text"
@@ -350,14 +375,14 @@ export function TradeSettings({
                   onChange={(e) => updateConfig({
                     telegram_integration: {
                       ...telegramConfig,
-                      publisher: { ...publisher, filter_channel: e.target.value }
+                      publisher: { ...publisher, filter_channel: e.target.value.trim() }
                     }
                   })}
-                  placeholder="-5180461557"
-                  className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent"
+                  placeholder="-1002208537638"
+                  className="w-full p-3 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] text-[var(--text-primary)] focus:outline-none focus:ring-2 focus:ring-[var(--agent-decision)] focus:border-transparent font-mono"
                 />
                 <div className="text-xs text-[var(--text-muted)] mt-1">
-                  Get this by sending /chatid in your group after adding the bot
+                  Paste the exact ID from the /chatid command — no spaces or extra characters
                 </div>
               </div>
 
