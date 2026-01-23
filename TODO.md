@@ -265,14 +265,14 @@ const useDeleteBot = () => useMutation({
 
 **Summary**: Clean up stale data sources, add new intelligence, explore Nansen API.
 
-### **Phase 1: ggShot Soft Disable** (~1 hour)
+### **Phase 1: ggShot Soft Disable** ✅ COMPLETE (2026-01-23)
 
 **Problem**: ggShot signals are 90+ days stale, confusing bots that use them.
 
-- [ ] Disable `ggshot` data point in database (`enabled=false`)
-- [ ] Disable `trading_signals` data source in database (`enabled=false`)
-- [ ] Remove Signals tab from Configure layout (archive `SignalsConfiguration.tsx`)
-- [ ] Verify no console errors, graceful handling for existing configs
+- [x] Disable `ggshot` data point in database (`enabled=false`)
+- [x] Disable `trading_signals` data source in database (`enabled=false`)
+- [x] Remove Signals tab from Configure layout (archive `SignalsConfiguration.tsx`)
+- [x] Verify no console errors, graceful handling for existing configs (build passes)
 
 ### **Phase 2: Astrology Indicator** (~1-2 hours)
 

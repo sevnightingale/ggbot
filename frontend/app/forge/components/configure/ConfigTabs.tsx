@@ -1,9 +1,9 @@
 'use client'
 
 import React from 'react'
-import { BarChart3, Brain, Settings, Radio, LucideIcon } from 'lucide-react'
+import { BarChart3, Brain, Settings, LucideIcon } from 'lucide-react'
 
-export type ConfigTabType = 'market-data' | 'strategy' | 'trade-settings' | 'signals'
+export type ConfigTabType = 'market-data' | 'strategy' | 'trade-settings'
 
 interface ConfigTabsProps {
   activeTab?: ConfigTabType
@@ -20,7 +20,8 @@ export function ConfigTabs({
     { id: 'strategy' as ConfigTabType, label: 'Strategy', Icon: Brain },
     { id: 'market-data' as ConfigTabType, label: 'Market Data', Icon: BarChart3 },
     { id: 'trade-settings' as ConfigTabType, label: 'Trade Settings', Icon: Settings },
-    { id: 'signals' as ConfigTabType, label: 'Signals', Icon: Radio },
+    // Signals tab hidden - ggShot integration disabled (2026-01-23)
+    // To re-enable: add { id: 'signals', label: 'Signals', Icon: Radio }
   ]
 
   return (

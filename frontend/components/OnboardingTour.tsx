@@ -8,6 +8,7 @@ interface TourStep {
   title: string
   content: string
   placement?: 'top' | 'bottom' | 'left' | 'right'
+  onEnter?: () => void  // Called when entering this step (for navigation, etc.)
 }
 
 interface OnboardingTourProps {
@@ -34,25 +35,32 @@ export function OnboardingTour({ steps, storageKey, onComplete, active = true }:
     return undefined
   }, [storageKey, active])
 
-  // Update target element position
+  // Update target element position and call onEnter callback
   useEffect(() => {
     if (!isVisible || currentStep >= steps.length) return
 
+    const step = steps[currentStep]
+
+    // Call onEnter callback (e.g., for navigation)
+    step.onEnter?.()
+
     const updateTargetRect = () => {
-      const target = document.querySelector(steps[currentStep].target)
+      const target = document.querySelector(step.target)
       if (target) {
         setTargetRect(target.getBoundingClientRect())
         target.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
     }
 
-    updateTargetRect()
+    // Delay to allow React to re-render after onEnter (e.g., tab switch)
+    const initialTimer = setTimeout(updateTargetRect, 100)
 
     // Also update on scroll/resize
     window.addEventListener('scroll', updateTargetRect, true)
     window.addEventListener('resize', updateTargetRect)
 
     return () => {
+      clearTimeout(initialTimer)
       window.removeEventListener('scroll', updateTargetRect, true)
       window.removeEventListener('resize', updateTargetRect)
     }

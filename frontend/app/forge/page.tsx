@@ -98,21 +98,25 @@ function ForgeApp() {
   const [showOnboardingTour, setShowOnboardingTour] = useState(false)
 
   // Onboarding tour steps - shown after first bot creation
+  // Steps auto-navigate between tabs to show key features
   const ONBOARDING_STEPS = [
     {
       target: '[data-tour="activity-timeline"]',
       title: "Your Bot's Activity",
-      content: "This timeline shows every action your bot takes. Click the icons on the chart to see details about each trade and decision."
-    },
-    {
-      target: '[data-tour="configure-tab"]',
-      title: "Customize Your Bot",
-      content: "Click Configure to edit your bot's strategy, change which indicators it uses, and adjust trading settings."
+      content: "This timeline shows every action your bot takes. Click the icons on the chart to see details about each trade and decision.",
+      onEnter: () => setActiveTab('monitor')
     },
     {
       target: '[data-tour="strategy-advisor"]',
       title: "Strategy Advisor",
-      content: "Chat with the Strategy Advisor to understand your strategy, get suggestions, or analyze your bot's performance."
+      content: "Chat with the Strategy Advisor to understand your strategy, get suggestions, or analyze your bot's performance.",
+      onEnter: () => setActiveTab('configure')
+    },
+    {
+      target: '[data-tour="activity-timeline"]',
+      title: "You're All Set!",
+      content: "Your bot is ready to trade. Watch its activity here, or click Configure anytime to adjust your strategy. Good luck!",
+      onEnter: () => setActiveTab('monitor')
     }
   ]
 

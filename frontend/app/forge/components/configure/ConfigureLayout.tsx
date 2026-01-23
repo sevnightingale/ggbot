@@ -7,7 +7,8 @@ import { StrategyAdvisorPanel } from '@/components/StrategyAdvisorPanel'
 import { useSaveStatus } from '@/lib/contexts/SaveStatusContext'
 import { ConfigTabs, ConfigTabType } from './ConfigTabs'
 import { MarketDataSelector } from './MarketDataSelector'
-import { SignalsConfiguration } from './SignalsConfiguration'
+// SignalsConfiguration hidden - ggShot integration disabled (2026-01-23)
+// import { SignalsConfiguration } from './SignalsConfiguration'
 import { StrategyEditor } from './StrategyEditor'
 import { TradeSettings } from './TradeSettings'
 import { EmptyState } from '../shared/EmptyState'
@@ -229,15 +230,7 @@ export function ConfigureLayout({
               />
             )}
 
-            {activeConfigTab === 'signals' && (
-              <SignalsConfiguration
-                configId={selectedBot.config_id}
-                configName={editingTableFields?.config_name || selectedBot?.config_name}
-                configType={editingTableFields?.config_type || selectedBot?.config_type}
-                configData={configData}
-                onUpdate={onUpdateConfig}
-              />
-            )}
+            {/* Signals tab hidden - ggShot integration disabled (2026-01-23) */}
 
             {activeConfigTab === 'strategy' && (
               <StrategyEditor
