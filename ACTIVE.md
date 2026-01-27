@@ -1,62 +1,63 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-23 05:13:33 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-26 22:14:08 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 301
+- **Total Users**: 306
 - **Prepaid Users**: 12 (12 active subscriptions)
-- **Free Users**: 280
-- **Users with Bots**: 294 (97.7%)
+- **Free Users**: 285
+- **Users with Bots**: 297 (97.1%)
 
 ### Bot Statistics
-- **Total Bots**: 447
-- **Active Bots**: 24 (5.4%)
-  - Paper: 23
+- **Total Bots**: 461
+- **Active Bots**: 34 (7.4%)
+  - Paper: 33
   - Symphony (Live): 1
   - Aster (DEX): 0
-- **Inactive Bots**: 423
-- **Avg Bots per User**: 1.5
+- **Inactive Bots**: 427
+- **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,475
-  - Wins: 1,639
-  - Losses: 3,836
-  - Platform Win Rate: 29.94%
-  - Total P&L: $-17,753.60
+- **Total Trades (All Time)**: 5,565
+  - Wins: 1,675
+  - Losses: 3,890
+  - Platform Win Rate: 30.10%
+  - Total P&L: $-19,483.96
 - **Recent Activity**:
-  - Last 24 hours: 18 trades
-  - Last 7 days: 113 trades
-  - Last 30 days: 521 trades
+  - Last 24 hours: 22 trades
+  - Last 7 days: 172 trades
+  - Last 30 days: 346 trades
 
 ### Open Positions
-- **Open Positions**: 10
+- **Open Positions**: 12
 - **Unique Symbols**: 2
-- **Total Exposure**: $95,506.87
-- **Unrealized P&L**: $779.25
+- **Total Exposure**: $134,647.98
+- **Unrealized P&L**: $2,086.65
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,934.42
+- **Average Balance**: $9,932.65
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $10,431.75
+- **Highest Balance**: $10,539.64
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 19 bots
-- **SOL/USDT**: 3 bots
-- **ETH/USDT**: 1 bots
-- **RENDER/USDT**: 1 bots
+- **BTC/USDT**: 21 bots
+- **ETH/USDT**: 6 bots
+- **SOL/USDT**: 4 bots
+- **AAVE/USDT**: 1 bots
+- **LINK/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 647 decisions (avg confidence: 38.6%)
-- **enter**: 17 decisions (avg confidence: 63.8%)
-- **exit**: 16 decisions (avg confidence: 67.4%)
+- **wait**: 850 decisions (avg confidence: 42.9%)
+- **exit**: 24 decisions (avg confidence: 70.0%)
+- **enter**: 22 decisions (avg confidence: 67.1%)
 
 ### System Health
-- **Decisions (last hour)**: 31
+- **Decisions (last hour)**: 33
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -65,22 +66,22 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 30MB | 6h 4m | 6 |
-| market-data-ws | 🟢 online | 1.7% | 16MB | 1d 17h | 5 |
-| ggbot | 🟢 online | 4.3% | 382MB | 6h 7m | 44 |
-| account-monitor | 🟢 online | 1.7% | 119MB | 6h 4m | 22 |
-| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 30MB | 1d 2h | 9 |
-| telegram-bot | 🟢 online | 0% | 33MB | 6h 4m | 1 |
+| error-alerts | 🟢 online | 0% | 34MB | 16m | 8 |
+| market-data-ws | 🟢 online | 1.6% | 174MB | 16m | 7 |
+| ggbot | 🟢 online | 1% | 406MB | 16m | 46 |
+| account-monitor | 🟢 online | 1.6% | 151MB | 16m | 25 |
+| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 70MB | 16m | 12 |
+| telegram-bot | 🟢 online | 0% | 34MB | 16m | 3 |
 
 ### VM Resources
 
 - **Disk**: 46G / 78G (59%)
-- **Memory**: 2.6Gi / 3.8Gi
-- **CPU Load**: 0.52 / 0.61 / 0.58 (1m/5m/15m)
+- **Memory**: 2.5Gi / 3.8Gi
+- **CPU Load**: 0.50 / 0.24 / 0.23 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 23.28M)
+- **Redis**: 🟢 connected (Memory: 19.09M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -432,7 +433,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-23 05:13:34 UTC
+**Last Updated**: 2026-01-26 22:14:09 UTC
 
 ---
 
@@ -1287,7 +1288,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-23 05:13:34 UTC
+**Last Updated**: 2026-01-26 22:14:09 UTC
 
 ---
 

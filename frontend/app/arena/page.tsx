@@ -1,9 +1,10 @@
 'use client'
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import { RefreshCw, Bot, TrendingUp, TrendingDown, Circle, Zap, ChevronDown } from 'lucide-react'
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
 import { ThemeProvider } from '@/lib/theme'
+import { useArenaPerformance } from '@/lib/queries'
 
 // Isolated countdown/live component - only this re-renders every second, not the whole page
 function CountdownTimer({ targetTime }: { targetTime: number }) {
@@ -66,11 +67,6 @@ function CountdownTimer({ targetTime }: { targetTime: number }) {
   )
 }
 
-interface DataPoint {
-  timestamp: string
-  equity: number
-}
-
 interface DataSources {
   technical_analysis?: { data_points: string[]; timeframes: string[] }
   sentiment_social?: { data_points: string[]; timeframes: string[] }
@@ -78,36 +74,6 @@ interface DataSources {
   onchain_analytics?: { data_points: string[]; timeframes: string[] }
   macro_economics?: { data_points: string[]; timeframes: string[] }
   derivatives_leverage?: { data_points: string[]; timeframes: string[] }
-}
-
-interface BotData {
-  config_id: string
-  config_name: string
-  profile_image_url: string | null
-  description: string | null
-  data_points: DataPoint[]
-  current_equity: number
-  current_pnl: number
-  initial_balance: number
-  total_trades: number
-  win_rate: number
-  open_positions: number
-  current_balance: number
-  unrealized_pnl: number
-  // Config details
-  frequency: string | null
-  model: string | null
-  symbol: string | null
-  data_sources: DataSources | null
-  stop_loss: string | null
-  take_profit: string | null
-  max_margin: string | null
-}
-
-interface ArenaData {
-  bots: BotData[]
-  hours: number
-  competition_days: number
 }
 
 // Vibrant distinct colors for chart lines
@@ -176,14 +142,15 @@ function getAllIndicators(sources: DataSources | null): string[] {
 }
 
 function ArenaContent() {
-  const [data, setData] = useState<ArenaData | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
-  const [mounted, setMounted] = useState(false)
-
   // Fixed to 21 days (504 hours) for the competition
   const hours = 504
+
+  // React Query for arena data - handles loading, caching, refetching
+  const { data, isLoading: loading, error: queryError, refetch } = useArenaPerformance(hours)
+  const error = queryError?.message || null
+
+  const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
+  const [mounted, setMounted] = useState(false)
 
   // Competition start time for countdown (static, no state needed here)
   const competitionStartTime = new Date('2026-01-21T12:00:00Z').getTime()
@@ -204,33 +171,6 @@ function ArenaContent() {
       return next
     })
   }
-
-  const fetchData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-
-    try {
-      // Use relative URL to go through Next.js rewrites (avoids CORS issues)
-      // Fixed to 504 hours (21 days) for the competition duration
-      const response = await fetch(`/api/v2/public/arena/performance?hours=${hours}`)
-
-      if (!response.ok) {
-        const errData = await response.json()
-        throw new Error(errData.detail || 'Failed to fetch arena data')
-      }
-
-      const result = await response.json()
-      setData(result)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load data')
-    } finally {
-      setLoading(false)
-    }
-  }, [])
-
-  useEffect(() => {
-    fetchData()
-  }, [fetchData])
 
   const getChartData = () => {
     if (!data || data.bots.length === 0) return []
@@ -431,7 +371,7 @@ function ArenaContent() {
                 <h3 className="font-display text-xl text-[var(--text-primary)]">Performance Over Time</h3>
               </div>
               <button
-                onClick={fetchData}
+                onClick={() => refetch()}
                 disabled={loading}
                 className="p-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] transition-all duration-200 hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
               >

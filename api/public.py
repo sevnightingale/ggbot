@@ -5,6 +5,9 @@ Public-facing endpoints that require no authentication.
 Used for showcase features like the Arena competition page.
 """
 
+import os
+import json
+import redis
 from datetime import datetime, timezone, timedelta
 from typing import Dict, Any, Optional
 from fastapi import APIRouter, Query
@@ -17,6 +20,17 @@ router = APIRouter(prefix="/api/v2/public", tags=["public"])
 
 # Season 1 competition start time - all chart data starts from here
 COMPETITION_START = datetime(2026, 1, 21, 12, 0, 0, tzinfo=timezone.utc)
+
+# Redis cache for arena performance
+ARENA_CACHE_KEY = "arena:performance"
+ARENA_CACHE_TTL = 60  # 60 seconds
+
+def _get_redis_client():
+    """Get Redis client for caching."""
+    return redis.from_url(
+        os.getenv('REDIS_URL', 'redis://localhost:6379'),
+        decode_responses=True
+    )
 
 
 @router.get("/arena/performance")
@@ -67,6 +81,18 @@ async def get_arena_performance(
             ]
         }
     """
+    # Check Redis cache first
+    try:
+        redis_client = _get_redis_client()
+        cached = redis_client.get(ARENA_CACHE_KEY)
+        if cached:
+            logger.info("Arena performance: cache hit")
+            return json.loads(cached)
+    except Exception as e:
+        logger.warning(f"Arena cache read failed: {e}")
+        # Continue without cache
+
+    # Cache miss - query database
     # Always use competition start time - ignore hours param during Season 1
     cutoff_time = COMPETITION_START
 
@@ -177,14 +203,24 @@ async def get_arena_performance(
             bots_list = list(bots_data.values())
             bots_list.sort(key=lambda x: x["current_equity"], reverse=True)
 
-    logger.info(f"Arena performance query: {len(bots_list)} showcase bots, {hours}h window")
+    logger.info(f"Arena performance: cache miss, {len(bots_list)} showcase bots, {hours}h window")
 
-    return {
+    result = {
         "success": True,
         "hours": hours,
         "competition_days": hours // 24,
         "bots": bots_list
     }
+
+    # Cache result
+    try:
+        redis_client = _get_redis_client()
+        redis_client.setex(ARENA_CACHE_KEY, ARENA_CACHE_TTL, json.dumps(result))
+        logger.info(f"Arena performance: cached for {ARENA_CACHE_TTL}s")
+    except Exception as e:
+        logger.warning(f"Arena cache write failed: {e}")
+
+    return result
 
 
 @router.get("/arena/{config_id}/balance-series")

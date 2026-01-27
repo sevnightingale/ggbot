@@ -13,7 +13,7 @@ Active tasks and planned work. See CHANGELOG.md for completed features.
 - **Dates**: Jan 21 12:00 UTC → Feb 11 12:00 UTC (21 days)
 - **Prize Pool**: $2,500 in USX on Scroll
 - **Top 3**: Also get funded live trading on Symphony
-- **14 bots competing**, all reset to $10k at launch
+- **33 bots competing** (updated 2026-01-26), all reset to $10k at launch
 
 **Remaining Work**:
 - [ ] Update x-bot to different account
@@ -117,142 +117,139 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ---
 
-## 🎲 **USX Staking Modal - Bot Competition Betting**
+## 🎲 **USX Staking Modal - Arena Pledging** [CC-B]
 
-**Status**: 🔵 PLANNING
+**Status**: 🟡 IN PROGRESS (parallel with CC-A)
 **Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md)
-**Complexity**: Medium (~6-8 hours)
+**Coordination**: See `CONTEXT.md` for cross-session coordination
+**Complexity**: Medium (~5-6 hours)
+**Assigned**: CC-B (USX Session)
 
-**Summary**: Gamification feature allowing users to stake USX (Scroll stablecoin) on which bot they think will win competitions. Standard Scroll staking (USX→sUSX) + simple DB record of bot choice. Competition logic deferred.
+**Summary**: Gamification feature allowing users to pledge USX (Scroll stablecoin) on which bot they think will win competitions. Web3 code is **scoped to Arena page only** to avoid bloating rest of app.
+
+### **Architecture Decision**
+```
+Web3 providers (wagmi/rainbowkit) are LAZY-LOADED on Arena page only.
+- Forge page: 0KB Web3 overhead
+- Arena page: ~65KB loaded only when visiting /arena
+- React Query at root level (CC-A handles this)
+```
 
 ### **User Flow**
-1. Click "Stake on Bot" → Modal opens
-2. Connect wallet (RainbowKit)
-3. Select bot to back (dropdown)
-4. Enter USX amount
-5. Execute 2 txs: approve + deposit to sUSX vault
-6. Record stake in DB
-7. User earns base yield (worst case) + prize if bot wins (best case)
+1. Visit Arena page → Click "Pledge USX" on bot card
+2. Connect wallet (RainbowKit modal)
+3. Enter USX amount, see balance
+4. Execute 2 txs: approve + deposit to sUSX vault
+5. Record pledge in DB
+6. User earns sUSX yield (worst case) + prize share if bot wins (best case)
 
 ### **Implementation Phases**
 
 **Phase 1: Research & Setup** (~1 hour)
 - [ ] Find USX/sUSX contract addresses on Scroll mainnet (docs.usx.capital, Scrollscan)
 - [ ] Get WalletConnect Project ID (cloud.walletconnect.com)
-- [ ] Install deps: `wagmi`, `viem`, `@rainbow-me/rainbowkit`, `@tanstack/react-query`
-- [ ] Set up wagmi config with Scroll chain
+- [ ] Install deps (Arena scope): `wagmi`, `viem`, `@rainbow-me/rainbowkit`
+- [ ] Create `frontend/lib/wagmi-config.ts` with Scroll chain
 
-**Phase 2: Database & Backend** (~1 hour)
-- [ ] Create `usx_stakes` table (user_id, wallet_address, config_id, usx_amount, tx_hash)
-- [ ] Add `POST /api/v2/usx/stake` endpoint (record stake after on-chain tx)
-- [ ] Add `GET /api/v2/usx/stakes` endpoint (list user stakes)
+**Phase 2: Arena Page Architecture** (~1 hour)
+- [ ] Create `frontend/components/arena/ArenaWithStaking.tsx` (provider wrapper)
+- [ ] Update `frontend/app/arena/page.tsx` to lazy-load with `dynamic()`
+- [ ] Create `frontend/lib/contracts.ts` with USX/sUSX addresses + ABIs
+- [ ] Test wallet connection works on Arena page only
 
-**Phase 3: Frontend Web3 Integration** (~2-3 hours)
-- [ ] Wrap app in WagmiProvider + RainbowKitProvider + QueryClientProvider
-- [ ] Create contract constants (`lib/contracts.ts` with USX/sUSX addresses + ABIs)
-- [ ] Build StakingModal component with wallet connect, bot selector, amount input
-- [ ] Test wallet connection and balance reading
+**Phase 3: Database & Backend** (~1 hour)
+- [ ] Create `arena_pledges` table (user_id, wallet_address, config_id, usx_amount, tx_hash)
+- [ ] Add `POST /api/v2/arena/pledge` endpoint
+- [ ] Add `GET /api/v2/arena/pledges` endpoint
 
-**Phase 4: On-Chain Integration** (~2-3 hours)
-- [ ] Implement approve transaction (USX.approve → sUSX vault)
-- [ ] Implement deposit transaction (Vault.deposit → receive sUSX)
-- [ ] Add transaction waiting/success/error states
-- [ ] Test on Scroll mainnet with small amounts
+**Phase 4: PledgeModal Component** (~2-3 hours)
+- [ ] Build `frontend/components/arena/PledgeModal.tsx`
+- [ ] Bot selector dropdown (arena bots only)
+- [ ] Amount input with USX balance display
+- [ ] Implement approve + deposit transactions
+- [ ] Transaction progress overlay (Approving → Pledging → Done)
+- [ ] Success state with tx link
+- [ ] Theme RainbowKit to match brass palette
 
-**Phase 5: UI Integration** (~1 hour)
-- [ ] Add "Stake on Bot" trigger (location TBD)
-- [ ] Integrate modal with existing UI
-- [ ] End-to-end testing
+**Phase 5: Integration & Testing** (~1 hour)
+- [ ] Add "Pledge USX" button to Arena leaderboard bot cards
+- [ ] End-to-end test on Scroll mainnet with small amounts
+- [ ] Communicate 15-day unstaking cooldown in UI
 - [ ] Deploy to Vercel
+
+### **Key Files (CC-B owns these)**
+- `frontend/lib/wagmi-config.ts` (NEW)
+- `frontend/lib/contracts.ts` (NEW)
+- `frontend/components/arena/ArenaWithStaking.tsx` (NEW)
+- `frontend/components/arena/PledgeModal.tsx` (NEW)
+- `frontend/app/arena/page.tsx` (modify for lazy-load)
+- `api/public.py` or `ggbot.py` (pledge endpoints)
+- Database migration for `arena_pledges`
 
 ---
 
-## ⚡ **Frontend Snappiness - React Query & Optimistic Updates**
+## ⚡ **Frontend Performance - React Query & Arena Caching** [CC-A]
 
-**Status**: 🟡 PHASE 1 COMPLETE
-**Complexity**: Low-Medium (~1-2 days total)
-**Priority**: Medium - UX improvement, not blocking
+**Status**: 🟡 IN PROGRESS (parallel with CC-B)
+**Planning Doc**: [DOCS/todo/FRONTEND_PERFORMANCE_REACT_QUERY.md](DOCS/todo/FRONTEND_PERFORMANCE_REACT_QUERY.md)
+**Coordination**: See `CONTEXT.md` for cross-session coordination
+**Complexity**: Low-Medium (~3-4 hours)
+**Assigned**: CC-A (Snappiness Session)
 
-**Current State**:
-- ✅ SSE real-time updates (excellent)
-- ✅ Batched config saves with dirty tracking (excellent)
-- ✅ LoadingSkeleton component exists
-- ✅ Optimistic updates for delete/rename/duplicate/reset (2026-01-13)
-- ✅ Skeleton loading states (2026-01-13)
-- ✅ SaveStatusContext extended for custom operation feedback (2026-01-13)
-- ❌ No server state caching (React Query / SWR)
+**Problem**: Arena page and Forge page feel sluggish due to no caching, re-fetches on every visit, and heavy chart rendering.
 
-### **Phase 1: Quick Wins** ✅ COMPLETE (2026-01-13)
+**Solution**:
+1. Add React Query at root level (benefits all pages)
+2. Add Redis caching to Arena endpoint (instant loads)
+3. Convert Forge to use React Query hooks (Phase 3, after testing)
 
-See CHANGELOG.md entry for details.
+### **Phase 1: Foundation** (~1 hour) 🟡 IN PROGRESS
 
-### **Phase 2: React Query Integration** (~4-6 hours)
-
-**Setup**:
 - [ ] Install `@tanstack/react-query`
-- [ ] Create `frontend/lib/providers.tsx` with QueryClientProvider
-- [ ] Wrap app in provider (layout.tsx or page.tsx)
-- [ ] Configure staleTime, refetchOnWindowFocus
+- [ ] Create `frontend/lib/providers.tsx` (QueryClientProvider only)
+- [ ] Wrap app in providers (`frontend/app/layout.tsx`)
+- [ ] Verify app loads without errors
 
-**Convert Core Fetches**:
-- [ ] `useBots()` - Replace `listConfigs` useState with useQuery
-- [ ] `useBot(configId)` - Single bot fetch with caching
-- [ ] `useDataSources()` - Data sources (rarely changes, long staleTime)
-- [ ] `useUserProfile()` - User profile/permissions
+### **Phase 2: Arena Performance** (~1-2 hours)
 
-**Mutation Hooks with Optimistic Updates**:
-- [ ] `useDeleteBot()` - Optimistic remove + rollback
-- [ ] `useCreateBot()` - Optimistic add + rollback
-- [ ] `useUpdateBot()` - Optimistic update + rollback
+**Backend - Redis Caching**:
+- [ ] Add Redis cache to `/api/v2/public/arena/performance` (60s TTL)
+- [ ] Log cache hits/misses for monitoring
 
-**Files**:
-- `frontend/lib/queries.ts` (NEW)
+**Frontend - React Query Hook**:
+- [ ] Create `useArenaPerformance()` hook in `frontend/lib/queries.ts`
+- [ ] Update `frontend/app/arena/page.tsx` to use hook
+- [ ] Test: revisiting Arena within 30s should be instant
+
+### **Phase 3: Forge Page** (~2-3 hours, AFTER Phase 2 testing)
+
+**Only proceed after Phase 2 is tested and feels good.**
+
+- [ ] Create `useBots()` hook
+- [ ] Integrate SSE updates with React Query cache
+- [ ] Create `useDataSources()` hook (5min staleTime)
+- [ ] Create `useUserProfile()` hook
+- [ ] Remove old useState/useEffect patterns
+
+### **Key Files (CC-A owns these)**
 - `frontend/lib/providers.tsx` (NEW)
-- `frontend/app/forge/page.tsx`
+- `frontend/lib/queries.ts` (NEW)
+- `frontend/app/layout.tsx` (wrap with Providers)
+- `frontend/app/arena/page.tsx` (use hooks)
+- `api/public.py` (Redis caching)
 
-### **Phase 3: Advanced Patterns** (~2-3 hours, optional)
+### **Success Metrics**
 
-- [ ] Prefetch bot data on hover in BotRail
-- [ ] Background refetch on window focus
-- [ ] Infinite scroll for trade history (if needed)
-- [ ] React Query DevTools for debugging
+| Metric | Before | Target |
+|--------|--------|--------|
+| Arena page revisit | ~500ms | <100ms (cache) |
+| Bot switching | 200-500ms flash | Instant |
+| Arena API calls | 1 per visit | 1 per 60s max |
 
-### **Benefits**
-
-| Before | After |
-|--------|-------|
-| Re-fetch on every page visit | Cached for 30s, instant on return |
-| Delete waits 200-500ms for API | Instant removal, async confirmation |
-| Plain "Loading..." text | Skeleton shows page structure |
-| Manual loading/error states | Built-in with React Query |
-| No request deduplication | Auto-deduped concurrent requests |
-
-### **Implementation Notes**
-
-**SSE + React Query Coexistence**:
-```typescript
-// SSE pushes updates → invalidate React Query cache
-stream.addEventListener('dashboard', (event) => {
-  queryClient.setQueryData(['bots'], data.bots)  // Direct update
-  // OR
-  queryClient.invalidateQueries(['bots'])  // Trigger refetch
-})
-```
-
-**Optimistic Delete Pattern**:
-```typescript
-const useDeleteBot = () => useMutation({
-  mutationFn: (id) => apiClient.deleteConfig(id),
-  onMutate: async (id) => {
-    await queryClient.cancelQueries(['bots'])
-    const previous = queryClient.getQueryData(['bots'])
-    queryClient.setQueryData(['bots'], old => old.filter(b => b.config_id !== id))
-    return { previous }
-  },
-  onError: (err, id, ctx) => queryClient.setQueryData(['bots'], ctx.previous),
-  onSettled: () => queryClient.invalidateQueries(['bots']),
-})
-```
+### **Previously Completed** (Phase 1: Quick Wins - 2026-01-13)
+- ✅ Optimistic updates for delete/rename/duplicate/reset
+- ✅ Skeleton loading states
+- ✅ SaveStatusContext for custom operation feedback
 
 ---
 

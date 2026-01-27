@@ -1,6 +1,7 @@
 import type { Metadata } from "next"
 import { Bodoni_Moda, Space_Grotesk, IBM_Plex_Mono } from 'next/font/google'
 import { Analytics } from "@vercel/analytics/next"
+import { Providers } from "@/lib/providers"
 import "./globals.css"
 
 const bodoniModa = Bodoni_Moda({
@@ -35,9 +36,11 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${bodoniModa.variable} ${spaceGrotesk.variable} ${ibmPlexMono.variable}`}>
       <body className="font-sans antialiased">
-        <div className="min-h-screen bg-charcoal-900 text-bone-200">
-          {children}
-        </div>
+        <Providers>
+          <div className="min-h-screen bg-charcoal-900 text-bone-200">
+            {children}
+          </div>
+        </Providers>
         <Analytics />
       </body>
     </html>
