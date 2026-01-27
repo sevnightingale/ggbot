@@ -11,7 +11,8 @@ import { ThemeProvider } from '@/lib/theme'
 import { useArenaPerformance, ArenaBot } from '@/lib/queries'
 import { Sparkline } from '@/components/arena/Sparkline'
 import { Top3Chart } from '@/components/arena/Top3Chart'
-import { RefreshCw, Bot, TrendingUp, TrendingDown, Zap, ChevronDown } from 'lucide-react'
+import { RefreshCw, Bot, TrendingUp, TrendingDown, Zap, ChevronDown, Coins } from 'lucide-react'
+import { BetModal } from '@/components/arena/BetModal'
 
 // Separate QueryClient for Web3 (wagmi needs its own)
 const web3QueryClient = new QueryClient()
@@ -215,6 +216,7 @@ function ArenaContent() {
 
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
   const [mounted, setMounted] = useState(false)
+  const [betModalBot, setBetModalBot] = useState<{ bot: ArenaBot; rank: number } | null>(null)
 
   const competitionStartTime = new Date('2026-01-21T12:00:00Z').getTime()
 
@@ -622,6 +624,25 @@ function ArenaContent() {
                                 )}
                               </div>
                             )}
+
+                            {/* Bet CTA */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                setBetModalBot({ bot, rank: index + 1 })
+                              }}
+                              className="w-full flex items-center justify-center gap-3 p-4 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30 hover:bg-[var(--accent)]/20 hover:border-[var(--accent)] transition-all group"
+                            >
+                              <Coins className="h-5 w-5 text-[var(--accent)]" />
+                              <div className="text-left">
+                                <div className="font-semibold text-[var(--accent)] group-hover:text-[var(--accent)]">
+                                  Bet on This Bot
+                                </div>
+                                <div className="text-xs text-[var(--text-muted)]">
+                                  Earn yield + win a share of the prize pool
+                                </div>
+                              </div>
+                            </button>
                           </div>
                         </div>
                       )}
@@ -701,6 +722,16 @@ function ArenaContent() {
           </p>
         </div>
       </div>
+
+      {/* Bet Modal */}
+      {betModalBot && (
+        <BetModal
+          isOpen={!!betModalBot}
+          onClose={() => setBetModalBot(null)}
+          bot={betModalBot.bot}
+          currentRank={betModalBot.rank}
+        />
+      )}
     </div>
   )
 }
