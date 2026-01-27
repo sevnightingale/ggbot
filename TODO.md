@@ -152,15 +152,14 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 - ✅ Redis caching on Arena endpoint (60s TTL)
 - ✅ Arena page redesign: Top3Chart + Sparklines (eliminated Recharts spaghetti)
 - ✅ Bundle: 212KB → 168KB first load JS (44KB reduction)
+- ✅ Forge page hooks: `useDataSources()` (10min), `useBotList()`, `useLatestActivity()` (30s refetch)
+- ✅ Arena podium: refresh button feedback (`isFetching`), inline legend, taller chart
 
-### **Phase 3: Forge Page** (~2-3 hours, FUTURE)
+### **Future**
 
-**Not urgent - Arena performance issues resolved. Defer until needed.**
-
-- [ ] Create `useBots()` hook
-- [ ] Integrate SSE updates with React Query cache
-- [ ] Create `useDataSources()` hook (5min staleTime)
+- [ ] Integrate SSE updates with React Query cache (write SSE data into query cache)
 - [ ] Create `useUserProfile()` hook
+- [ ] Full mutation hooks for bot CRUD (replace manual optimistic updates)
 
 ---
 

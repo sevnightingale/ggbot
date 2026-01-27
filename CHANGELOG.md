@@ -6,6 +6,22 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-27 - Forge React Query + Arena Podium Fixes
+
+**Forge Page React Query** (`frontend/lib/queries.ts`, `frontend/app/forge/page.tsx`):
+- `useDataSources()` - 10min staleTime, replaces manual fetch-on-mount
+- `useBotList()` - Initial load with auto-retry + window focus refetch
+- `useLatestActivity(configId)` - 30s refetchInterval, replaces manual setInterval polling
+- `useConfigUsage()`, `useForgeQueryClient()` helpers for future SSE cache integration
+- Removed ~60 lines manual fetch/poll/retry boilerplate from page.tsx
+
+**Arena Podium Fixes** (`frontend/components/arena/Top3Chart.tsx`, `ArenaWithStaking.tsx`):
+- Refresh button uses `isFetching` (not `isLoading`) — spinner now animates on refetch
+- Top 3 legend inline on desktop (saves vertical space), stacked on mobile
+- Chart height: 200/280px → 220/300px for breathing room
+
+---
+
 ## 2026-01-27 - Frontend Performance & Arena Redesign
 
 **Planning Doc**: [DOCS/completed/FRONTEND_PERFORMANCE_REACT_QUERY.md](DOCS/completed/FRONTEND_PERFORMANCE_REACT_QUERY.md)
