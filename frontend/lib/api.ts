@@ -888,6 +888,62 @@ export class ApiClient {
 
     return await response.json()
   }
+
+  // =============================================================================
+  // Arena Pledges (USX Staking on Bot Competition)
+  // =============================================================================
+
+  async recordArenaPledge(data: {
+    wallet_address: string
+    config_id: string
+    usx_amount: string
+    susx_amount?: string
+    tx_hash: string
+  }): Promise<{
+    status: string
+    pledge_id?: string
+    bot_name?: string
+    usx_amount?: string
+    message: string
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/pledge`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data)
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to record pledge')
+    }
+
+    return await response.json()
+  }
+
+  async getArenaPledges(): Promise<{
+    status: string
+    pledges: Array<{
+      id: string
+      config_id: string
+      bot_name: string
+      profile_image_url: string | null
+      usx_amount: number
+      susx_amount: number | null
+      tx_hash: string
+      pledged_at: string | null
+      unstaked: boolean
+    }>
+    total_pledged: number
+  }> {
+    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/pledges`)
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.detail || 'Failed to get pledges')
+    }
+
+    return await response.json()
+  }
 }
 
 export const apiClient = new ApiClient()

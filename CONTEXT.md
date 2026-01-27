@@ -258,7 +258,10 @@ _Update this section as work progresses_
 - [x] **CC-B**: wagmi-config.ts + contracts.ts created
 - [x] **CC-B**: ArenaWithStaking wrapper created with RainbowKit theming
 - [x] **CC-B**: Arena page lazy-loads Web3 components (build passing)
-- [ ] **CC-B**: Backend endpoints (arena_pledges table + API)
+- [x] **CC-B**: arena_pledges table created in database
+- [x] **CC-B**: POST /api/v2/arena/pledge endpoint added
+- [x] **CC-B**: GET /api/v2/arena/pledges endpoint added
+- [x] **CC-B**: API client methods (recordArenaPledge, getArenaPledges)
 - [ ] **CC-B**: PledgeModal built
 - [ ] **Both**: Integration tested
 

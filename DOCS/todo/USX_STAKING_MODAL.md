@@ -1,8 +1,30 @@
 # USX Staking Modal - Bot Competition Betting
 
-**Status**: 🔵 PLANNING
+**Status**: 🟡 IN PROGRESS (Phases 1-3 complete, PledgeModal remaining)
 **Created**: 2025-12-14
+**Last Updated**: 2026-01-27
 **Complexity**: Medium (~6-8 hours)
+
+---
+
+## Progress Summary (2026-01-27)
+
+**Completed**:
+- ✅ Phase 1: Research & Setup (contract addresses, WalletConnect ID, deps)
+- ✅ Phase 2: Database & Backend (arena_pledges table, endpoints)
+- ✅ Phase 3: Frontend Web3 Integration (wagmi config, ArenaWithStaking wrapper)
+
+**Remaining**:
+- 🔲 Phase 4: On-Chain Integration (approve + deposit transactions)
+- 🔲 Phase 5: PledgeModal UI
+
+**Key Files Created**:
+- `frontend/lib/wagmi-config.ts` - Scroll chain + WalletConnect config
+- `frontend/lib/contracts.ts` - USX/sUSX addresses and ABIs
+- `frontend/components/arena/ArenaWithStaking.tsx` - Web3 provider wrapper
+- `ggbot.py:4083-4238` - Pledge endpoints
+
+**Architecture Decision**: Web3 is lazy-loaded on Arena page only (~65KB savings elsewhere).
 
 ---
 
@@ -403,45 +425,39 @@ recordUsxStake: async (data: {
 
 ## Implementation Phases
 
-### Phase 1: Research & Setup (~1 hour)
-- [ ] Find USX and sUSX contract addresses on Scroll mainnet
-  - Check docs.usx.capital
-  - Search Scrollscan for "USX" token
-  - Join USX Discord/Telegram if needed
-- [ ] Get WalletConnect Project ID (free at cloud.walletconnect.com)
-- [ ] Install dependencies: `wagmi`, `viem`, `@rainbow-me/rainbowkit`, `@tanstack/react-query`
-- [ ] Set up wagmi config with Scroll chain
+### Phase 1: Research & Setup ✅ COMPLETE
+- [x] Find USX and sUSX contract addresses on Scroll mainnet
+  - USX: `0x3b005fefc63ca7c8d25ee21fba3787229ba4cf03`
+  - sUSX: `0xcB14BcdF6cD483665D10dfD6f87d908996C7F922`
+- [x] Get WalletConnect Project ID (`66a0c85a2532de4ad0b841ff3b79cb5c`)
+- [x] Install dependencies: `wagmi`, `viem`, `@rainbow-me/rainbowkit`
+- [x] Set up wagmi config with Scroll chain (`frontend/lib/wagmi-config.ts`)
 
-### Phase 2: Database & Backend (~1 hour)
-- [ ] Create `usx_stakes` table migration
-- [ ] Add `/api/v2/usx/stake` endpoint (record stake)
-- [ ] Add `/api/v2/usx/stakes` endpoint (list user stakes)
-- [ ] Test endpoints with mock data
+### Phase 2: Database & Backend ✅ COMPLETE
+- [x] Create `arena_pledges` table (renamed from usx_stakes)
+- [x] Add `POST /api/v2/arena/pledge` endpoint
+- [x] Add `GET /api/v2/arena/pledges` endpoint
+- [x] API client methods in `frontend/lib/api.ts`
 
-### Phase 3: Frontend Web3 Integration (~2-3 hours)
-- [ ] Wrap app in WagmiProvider + RainbowKitProvider
-- [ ] Create contract constants file (`lib/contracts.ts`)
-- [ ] Build StakingModal component
-  - Wallet connection (RainbowKit)
-  - Bot selection dropdown
-  - Amount input with balance display
-  - Two-step transaction flow (approve + deposit)
-  - Success/error states
-- [ ] Test wallet connection and balance reading
+### Phase 3: Frontend Web3 Integration ✅ COMPLETE
+- [x] Lazy-load Web3 providers on Arena page only (`ArenaWithStaking.tsx`)
+- [x] Create contract constants file (`lib/contracts.ts`)
+- [x] RainbowKit themed with brass palette
+- [x] Build passing, bundle ~65KB scoped to Arena
 
-### Phase 4: On-Chain Integration (~2-3 hours)
+### Phase 4: On-Chain Integration (REMAINING)
 - [ ] Implement approve transaction (USX → sUSX vault)
 - [ ] Implement deposit transaction (receive sUSX)
 - [ ] Add transaction waiting states
-- [ ] Test full flow on Scroll testnet (if available)
 - [ ] Test full flow on Scroll mainnet with small amounts
 
-### Phase 5: UI Integration & Polish (~1 hour)
-- [ ] Add "Stake on Bot" button somewhere in UI (TBD where)
-- [ ] Integrate modal trigger
-- [ ] Add loading states and error handling
-- [ ] Test end-to-end user flow
-- [ ] Deploy to Vercel
+### Phase 5: PledgeModal UI (REMAINING)
+- [ ] Build `PledgeModal.tsx` component
+- [ ] Bot selection dropdown
+- [ ] Amount input with USX balance display
+- [ ] Transaction progress overlay
+- [ ] Add trigger button to Arena leaderboard
+- [ ] Communicate 15-day unstaking cooldown in UI
 
 ---
 

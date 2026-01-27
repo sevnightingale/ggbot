@@ -6,6 +6,60 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
+## 2026-01-27 - Frontend Performance & Arena Redesign
+
+**Planning Doc**: [DOCS/completed/FRONTEND_PERFORMANCE_REACT_QUERY.md](DOCS/completed/FRONTEND_PERFORMANCE_REACT_QUERY.md)
+
+**React Query Integration** (`frontend/lib/`):
+- `providers.tsx` - QueryClientProvider at root level (30s staleTime, 5min gcTime)
+- `queries.ts` - `useArenaPerformance()` hook with type-safe ArenaBot interface
+- `layout.tsx` - Wrapped app with Providers
+- Bundle overhead: ~12KB gzipped, benefits all pages
+
+**Backend Redis Caching** (`api/public.py`):
+- `/api/v2/public/arena/performance` - 60s TTL cache
+- Double-layer caching: Redis (60s) + React Query (30s) = instant revisits
+- Log cache hits/misses for monitoring
+
+**Arena Page Redesign** (`frontend/components/arena/`):
+- `Sparkline.tsx` - Pure SVG sparklines (~50 data points, no library)
+- `Top3Chart.tsx` - lightweight-charts podium chart (3 lines only, gold/silver/dark-brass)
+- Replaced 30-line Recharts spaghetti → eliminated "page unresponsive"
+- Responsive `BotEquityChart` - SVG viewBox scales to container width
+- Bundle: 212KB → 168KB first load JS (44KB reduction)
+
+**Mobile Improvements**:
+- Sparklines in leaderboard rows (desktop), expanded cards (mobile)
+- Three-column stats layout in expanded cards (Performance/Strategy/Risk)
+- Removed duplicate sparkline stacking issue
+
+---
+
+## 2026-01-27 - USX Staking Infrastructure (Arena Pledging)
+
+**Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md) (Phases 1-3 complete, PledgeModal pending)
+
+**Web3 Dependencies** (`frontend/package.json`):
+- Added wagmi, viem, @rainbow-me/rainbowkit for Scroll blockchain integration
+- Web3 code scoped to Arena page only (lazy-loaded, ~65KB savings for other pages)
+
+**Frontend Setup** (`frontend/lib/`, `frontend/components/arena/`):
+- `wagmi-config.ts` - Scroll chain config with WalletConnect Project ID
+- `contracts.ts` - USX (`0x3b00...cf03`) and sUSX (`0xcB14...F922`) addresses + ERC20/ERC4626 ABIs
+- `ArenaWithStaking.tsx` - Web3 provider wrapper with brass-themed RainbowKit
+- `arena/page.tsx` - Lazy-loads Web3 components via `dynamic()` with skeleton loading
+
+**Backend** (`ggbot.py:4083-4238`):
+- `arena_pledges` table - Records user pledges on arena bots (tx_hash unique constraint prevents duplicates)
+- `POST /api/v2/arena/pledge` - Record pledge after on-chain tx, validates bot is in Arena
+- `GET /api/v2/arena/pledges` - Returns user's pledges with bot names and amounts
+
+**API Client** (`frontend/lib/api.ts`):
+- `recordArenaPledge()` - Posts pledge data after on-chain transaction
+- `getArenaPledges()` - Fetches user's active pledges
+
+---
+
 ## 2026-01-23 - Market Data Intelligence Update
 
 **Planning Doc**: [DOCS/completed/MARKET_DATA_INTELLIGENCE_UPDATE.md](DOCS/completed/MARKET_DATA_INTELLIGENCE_UPDATE.md)

@@ -119,137 +119,58 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ## 🎲 **USX Staking Modal - Arena Pledging** [CC-B]
 
-**Status**: 🟡 IN PROGRESS (parallel with CC-A)
+**Status**: 🟡 IN PROGRESS - Phases 1-3 COMPLETE, PledgeModal remaining
 **Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md)
 **Coordination**: See `CONTEXT.md` for cross-session coordination
-**Complexity**: Medium (~5-6 hours)
 **Assigned**: CC-B (USX Session)
 
 **Summary**: Gamification feature allowing users to pledge USX (Scroll stablecoin) on which bot they think will win competitions. Web3 code is **scoped to Arena page only** to avoid bloating rest of app.
 
-### **Architecture Decision**
-```
-Web3 providers (wagmi/rainbowkit) are LAZY-LOADED on Arena page only.
-- Forge page: 0KB Web3 overhead
-- Arena page: ~65KB loaded only when visiting /arena
-- React Query at root level (CC-A handles this)
-```
+### **Completed (2026-01-27)**
+- [x] USX/sUSX contract addresses researched (docs.usx.capital)
+- [x] WalletConnect Project ID obtained
+- [x] wagmi, viem, @rainbow-me/rainbowkit installed
+- [x] `frontend/lib/wagmi-config.ts` - Scroll chain config
+- [x] `frontend/lib/contracts.ts` - USX/sUSX addresses + ABIs
+- [x] `frontend/components/arena/ArenaWithStaking.tsx` - Provider wrapper with brass-themed RainbowKit
+- [x] `frontend/app/arena/page.tsx` - Lazy-loads Web3 components with skeleton
+- [x] `arena_pledges` table created in database
+- [x] `POST /api/v2/arena/pledge` endpoint in ggbot.py
+- [x] `GET /api/v2/arena/pledges` endpoint in ggbot.py
+- [x] API client methods: `recordArenaPledge()`, `getArenaPledges()`
 
-### **User Flow**
-1. Visit Arena page → Click "Pledge USX" on bot card
-2. Connect wallet (RainbowKit modal)
-3. Enter USX amount, see balance
-4. Execute 2 txs: approve + deposit to sUSX vault
-5. Record pledge in DB
-6. User earns sUSX yield (worst case) + prize share if bot wins (best case)
-
-### **Implementation Phases**
-
-**Phase 1: Research & Setup** (~1 hour)
-- [ ] Find USX/sUSX contract addresses on Scroll mainnet (docs.usx.capital, Scrollscan)
-- [ ] Get WalletConnect Project ID (cloud.walletconnect.com)
-- [ ] Install deps (Arena scope): `wagmi`, `viem`, `@rainbow-me/rainbowkit`
-- [ ] Create `frontend/lib/wagmi-config.ts` with Scroll chain
-
-**Phase 2: Arena Page Architecture** (~1 hour)
-- [ ] Create `frontend/components/arena/ArenaWithStaking.tsx` (provider wrapper)
-- [ ] Update `frontend/app/arena/page.tsx` to lazy-load with `dynamic()`
-- [ ] Create `frontend/lib/contracts.ts` with USX/sUSX addresses + ABIs
-- [ ] Test wallet connection works on Arena page only
-
-**Phase 3: Database & Backend** (~1 hour)
-- [ ] Create `arena_pledges` table (user_id, wallet_address, config_id, usx_amount, tx_hash)
-- [ ] Add `POST /api/v2/arena/pledge` endpoint
-- [ ] Add `GET /api/v2/arena/pledges` endpoint
-
-**Phase 4: PledgeModal Component** (~2-3 hours)
+### **Remaining - PledgeModal (~2-3 hours)**
 - [ ] Build `frontend/components/arena/PledgeModal.tsx`
 - [ ] Bot selector dropdown (arena bots only)
 - [ ] Amount input with USX balance display
 - [ ] Implement approve + deposit transactions
 - [ ] Transaction progress overlay (Approving → Pledging → Done)
 - [ ] Success state with tx link
-- [ ] Theme RainbowKit to match brass palette
-
-**Phase 5: Integration & Testing** (~1 hour)
-- [ ] Add "Pledge USX" button to Arena leaderboard bot cards
-- [ ] End-to-end test on Scroll mainnet with small amounts
+- [ ] Add "Pledge" button trigger to Arena leaderboard
+- [ ] End-to-end test on Scroll mainnet
 - [ ] Communicate 15-day unstaking cooldown in UI
-- [ ] Deploy to Vercel
-
-### **Key Files (CC-B owns these)**
-- `frontend/lib/wagmi-config.ts` (NEW)
-- `frontend/lib/contracts.ts` (NEW)
-- `frontend/components/arena/ArenaWithStaking.tsx` (NEW)
-- `frontend/components/arena/PledgeModal.tsx` (NEW)
-- `frontend/app/arena/page.tsx` (modify for lazy-load)
-- `api/public.py` or `ggbot.py` (pledge endpoints)
-- Database migration for `arena_pledges`
 
 ---
 
-## ⚡ **Frontend Performance - React Query & Arena Caching** [CC-A]
+## ⚡ **Frontend Performance - React Query & Arena Redesign**
 
-**Status**: 🟡 IN PROGRESS (parallel with CC-B)
-**Planning Doc**: [DOCS/todo/FRONTEND_PERFORMANCE_REACT_QUERY.md](DOCS/todo/FRONTEND_PERFORMANCE_REACT_QUERY.md)
-**Coordination**: See `CONTEXT.md` for cross-session coordination
-**Complexity**: Low-Medium (~3-4 hours)
-**Assigned**: CC-A (Snappiness Session)
+**Status**: 🟢 PHASE 1-2 COMPLETE + Arena Redesign
+**Planning Doc**: [DOCS/completed/FRONTEND_PERFORMANCE_REACT_QUERY.md](DOCS/completed/FRONTEND_PERFORMANCE_REACT_QUERY.md)
 
-**Problem**: Arena page and Forge page feel sluggish due to no caching, re-fetches on every visit, and heavy chart rendering.
+**Completed** (2026-01-27):
+- ✅ React Query at root level (`providers.tsx`, `queries.ts`, `layout.tsx`)
+- ✅ Redis caching on Arena endpoint (60s TTL)
+- ✅ Arena page redesign: Top3Chart + Sparklines (eliminated Recharts spaghetti)
+- ✅ Bundle: 212KB → 168KB first load JS (44KB reduction)
 
-**Solution**:
-1. Add React Query at root level (benefits all pages)
-2. Add Redis caching to Arena endpoint (instant loads)
-3. Convert Forge to use React Query hooks (Phase 3, after testing)
+### **Phase 3: Forge Page** (~2-3 hours, FUTURE)
 
-### **Phase 1: Foundation** (~1 hour) 🟡 IN PROGRESS
-
-- [ ] Install `@tanstack/react-query`
-- [ ] Create `frontend/lib/providers.tsx` (QueryClientProvider only)
-- [ ] Wrap app in providers (`frontend/app/layout.tsx`)
-- [ ] Verify app loads without errors
-
-### **Phase 2: Arena Performance** (~1-2 hours)
-
-**Backend - Redis Caching**:
-- [ ] Add Redis cache to `/api/v2/public/arena/performance` (60s TTL)
-- [ ] Log cache hits/misses for monitoring
-
-**Frontend - React Query Hook**:
-- [ ] Create `useArenaPerformance()` hook in `frontend/lib/queries.ts`
-- [ ] Update `frontend/app/arena/page.tsx` to use hook
-- [ ] Test: revisiting Arena within 30s should be instant
-
-### **Phase 3: Forge Page** (~2-3 hours, AFTER Phase 2 testing)
-
-**Only proceed after Phase 2 is tested and feels good.**
+**Not urgent - Arena performance issues resolved. Defer until needed.**
 
 - [ ] Create `useBots()` hook
 - [ ] Integrate SSE updates with React Query cache
 - [ ] Create `useDataSources()` hook (5min staleTime)
 - [ ] Create `useUserProfile()` hook
-- [ ] Remove old useState/useEffect patterns
-
-### **Key Files (CC-A owns these)**
-- `frontend/lib/providers.tsx` (NEW)
-- `frontend/lib/queries.ts` (NEW)
-- `frontend/app/layout.tsx` (wrap with Providers)
-- `frontend/app/arena/page.tsx` (use hooks)
-- `api/public.py` (Redis caching)
-
-### **Success Metrics**
-
-| Metric | Before | Target |
-|--------|--------|--------|
-| Arena page revisit | ~500ms | <100ms (cache) |
-| Bot switching | 200-500ms flash | Instant |
-| Arena API calls | 1 per visit | 1 per 60s max |
-
-### **Previously Completed** (Phase 1: Quick Wins - 2026-01-13)
-- ✅ Optimistic updates for delete/rename/duplicate/reset
-- ✅ Skeleton loading states
-- ✅ SaveStatusContext for custom operation feedback
 
 ---
 
@@ -277,7 +198,7 @@ Web3 providers (wagmi/rainbowkit) are LAZY-LOADED on Arena page only.
 ## 🎨 **Activity Modal Redesign** [ACTIVITY_MODAL_REDESIGN.md]
 
 **Status**: 🟢 COMPLETE
-**Planning Doc**: [DOCS/todo/ACTIVITY_MODAL_REDESIGN.md](DOCS/todo/ACTIVITY_MODAL_REDESIGN.md)
+**Planning Doc**: [DOCS/completed/ACTIVITY_MODAL_REDESIGN.md](DOCS/completed/ACTIVITY_MODAL_REDESIGN.md)
 
 **Problem**: Bottom sheet for activity details was poor UX - unformatted text blobs, no navigation between activities, mobile-unfriendly.
 
@@ -300,7 +221,7 @@ Web3 providers (wagmi/rainbowkit) are LAZY-LOADED on Arena page only.
 ## 📊 **Strategy Advisor Analysis** [STRATEGY_ADVISOR_ANALYSIS.md]
 
 **Status**: 🟢 COMPLETE
-**Planning Doc**: [DOCS/todo/STRATEGY_ADVISOR_ANALYSIS.md](DOCS/todo/STRATEGY_ADVISOR_ANALYSIS.md)
+**Planning Doc**: [DOCS/completed/STRATEGY_ADVISOR_ANALYSIS.md](DOCS/completed/STRATEGY_ADVISOR_ANALYSIS.md)
 **Completed**: 2026-01-04
 
 **Problem**: Users had no automated way to understand why their bot wins or loses.
