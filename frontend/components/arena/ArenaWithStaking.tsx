@@ -211,7 +211,7 @@ function BotEquityChart({ bot }: { bot: ArenaBot }) {
 
 function ArenaContent() {
   const hours = 504 // 21 days for competition
-  const { data, isLoading: loading, error: queryError, refetch } = useArenaPerformance(hours)
+  const { data, isLoading: loading, isFetching, error: queryError, refetch } = useArenaPerformance(hours)
   const error = queryError?.message || null
 
   const [expandedCards, setExpandedCards] = useState<Set<string>>(new Set())
@@ -381,13 +381,13 @@ function ArenaContent() {
               </div>
               <button
                 onClick={() => refetch()}
-                disabled={loading}
+                disabled={isFetching}
                 className="p-2.5 bg-[var(--bg-primary)] border border-[var(--border)] rounded-xl text-[var(--text-muted)] transition-all duration-200 hover:text-[var(--accent)] hover:border-[var(--accent)] hover:bg-[var(--bg-tertiary)] disabled:opacity-50"
               >
-                <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+                <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               </button>
             </div>
-            <Top3Chart bots={rankedBots} />
+            <Top3Chart bots={rankedBots} inlineHeader />
           </div>
         )}
 

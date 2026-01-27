@@ -7,6 +7,8 @@ import { ArenaBot } from '@/lib/queries'
 interface Top3ChartProps {
   bots: ArenaBot[]
   className?: string
+  /** When true, legend displays inline (horizontal) on desktop instead of as a separate block */
+  inlineHeader?: boolean
 }
 
 // Podium colors - brass variants for ceremonial feel
@@ -21,7 +23,7 @@ const PODIUM_COLORS = {
  *
  * Clean, performant, interactive. Designed for the Arena podium.
  */
-export function Top3Chart({ bots, className = '' }: Top3ChartProps) {
+export function Top3Chart({ bots, className = '', inlineHeader = false }: Top3ChartProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
   const seriesRefs = useRef<ISeriesApi<'Line'>[]>([])
@@ -146,36 +148,51 @@ export function Top3Chart({ bots, className = '' }: Top3ChartProps) {
     )
   }
 
+  const legend = top3.map((bot, index) => {
+    const colors = [PODIUM_COLORS.gold, PODIUM_COLORS.silver, PODIUM_COLORS.bronze]
+    const medals = ['🥇', '🥈', '🥉']
+    const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
+    return (
+      <div key={bot.config_id} className="flex items-center gap-2">
+        <span className="text-lg leading-none">{medals[index]}</span>
+        <div
+          className="w-3 h-3 rounded-full flex-shrink-0"
+          style={{ backgroundColor: colors[index] }}
+        />
+        <span className="text-sm font-medium text-[var(--text-primary)] truncate">
+          {bot.config_name}
+        </span>
+        <span className={`text-sm font-mono flex-shrink-0 ${pnlPercent >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'}`}>
+          {pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(1)}%
+        </span>
+      </div>
+    )
+  })
+
   return (
     <div className={className}>
-      {/* Legend */}
-      <div className="flex items-center justify-center gap-6 mb-4">
-        {top3.map((bot, index) => {
-          const colors = [PODIUM_COLORS.gold, PODIUM_COLORS.silver, PODIUM_COLORS.bronze]
-          const medals = ['🥇', '🥈', '🥉']
-          const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
-          return (
-            <div key={bot.config_id} className="flex items-center gap-2">
-              <span className="text-lg">{medals[index]}</span>
-              <div
-                className="w-3 h-3 rounded-full"
-                style={{ backgroundColor: colors[index] }}
-              />
-              <span className="text-sm font-medium text-[var(--text-primary)]">
-                {bot.config_name}
-              </span>
-              <span className={`text-sm font-mono ${pnlPercent >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'}`}>
-                {pnlPercent >= 0 ? '+' : ''}{pnlPercent.toFixed(1)}%
-              </span>
-            </div>
-          )
-        })}
-      </div>
+      {/* Legend — inline on desktop when inlineHeader, stacked on mobile */}
+      {inlineHeader ? (
+        <>
+          {/* Desktop: horizontal row */}
+          <div className="hidden md:flex items-center gap-6 mb-2">
+            {legend}
+          </div>
+          {/* Mobile: stacked column */}
+          <div className="flex flex-col gap-2 mb-3 md:hidden">
+            {legend}
+          </div>
+        </>
+      ) : (
+        <div className="flex items-center justify-center gap-6 mb-4">
+          {legend}
+        </div>
+      )}
 
-      {/* Chart container */}
+      {/* Chart container — slightly taller for breathing room */}
       <div
         ref={containerRef}
-        className="w-full h-[200px] md:h-[280px]"
+        className="w-full h-[220px] md:h-[300px]"
       />
     </div>
   )
