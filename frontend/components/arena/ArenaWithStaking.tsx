@@ -508,10 +508,12 @@ function ArenaContent() {
                               </p>
                             )}
 
-                            <BotEquityChart bot={bot} />
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                              <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
+                            {/* Chart + Performance side by side on desktop, stacked on mobile */}
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                              <div className="md:col-span-3">
+                                <BotEquityChart bot={bot} />
+                              </div>
+                              <div className="md:col-span-2 rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
                                 <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
                                   Performance
                                 </div>
@@ -536,7 +538,10 @@ function ArenaContent() {
                                   </div>
                                 </div>
                               </div>
+                            </div>
 
+                            {/* Strategy + Risk side by side */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                               <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
                                 <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
                                   Strategy
