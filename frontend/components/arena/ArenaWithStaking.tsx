@@ -356,32 +356,8 @@ function ArenaContent() {
         </div>
       </div>
 
-      {/* Narrative Section — The Forge Story */}
-      <div className="border-b border-[var(--border)] bg-[var(--bg-secondary)]/30">
-        <div className="max-w-3xl mx-auto px-4 py-16 md:py-20 text-center space-y-6">
-          <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] tracking-tight leading-tight">
-            Forged in strategy. Tested by markets.
-          </h2>
-          <div className="space-y-4 text-base md:text-lg text-[var(--text-secondary)] leading-relaxed">
-            <p>
-              Every bot in this arena was built by hand — indicators chosen, prompts crafted,
-              risk parameters tuned. Each one reflects its creator&apos;s conviction about how
-              markets move.
-            </p>
-            <p>
-              Same starting capital. Same market. Different minds.
-              The leaderboard doesn&apos;t care who built you — only whether you&apos;re right.
-            </p>
-          </div>
-          {/* Ceremonial divider */}
-          <div className="pt-4">
-            <div className="w-16 h-px bg-[var(--accent)]/30 mx-auto" />
-          </div>
-        </div>
-      </div>
-
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-12">
+      <div className="max-w-7xl mx-auto px-4 py-10">
         {error && (
           <div className="mb-6 p-4 rounded-2xl border border-[var(--ember)] bg-[var(--ember)]/10">
             <p className="text-[var(--ember)] text-sm">{error}</p>
@@ -397,11 +373,11 @@ function ArenaContent() {
 
         {/* Top 3 Podium Chart */}
         {!loading && data && rankedBots.length >= 3 && (
-          <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 mb-10">
+          <>
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-                <h3 className="font-display text-2xl md:text-3xl text-[var(--text-primary)]">The Podium</h3>
+                <h3 className="font-display text-xl text-[var(--text-primary)]">The Podium</h3>
               </div>
               <button
                 onClick={() => refetch()}
@@ -411,19 +387,21 @@ function ArenaContent() {
                 <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
               </button>
             </div>
-            <Top3Chart bots={rankedBots} inlineHeader />
-          </div>
+            <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 mb-10">
+              <Top3Chart bots={rankedBots} inlineHeader />
+            </div>
+          </>
         )}
 
         {/* Leaderboard */}
         {!loading && data && rankedBots.length > 0 && (
           <>
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-                <h3 className="font-display text-2xl md:text-3xl text-[var(--text-primary)]">
+                <h3 className="font-display text-xl text-[var(--text-primary)]">
                   Leaderboard
-                  <span className="ml-3 text-sm font-normal text-[var(--text-muted)]">
+                  <span className="ml-2 text-sm font-normal text-[var(--text-muted)]">
                     {rankedBots.length} bots competing
                   </span>
                 </h3>
@@ -686,23 +664,23 @@ function ArenaContent() {
 
       {/* How It Works */}
       <div className="border-y border-[var(--border)] bg-[var(--bg-secondary)]/50">
-        <div className="max-w-4xl mx-auto px-4 py-14">
-          <h2 className="text-center font-mono text-xs uppercase tracking-widest text-[var(--text-muted)] mb-10">
+        <div className="max-w-4xl mx-auto px-4 py-10">
+          <h2 className="text-center text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-8">
             How It Works
           </h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             {[
-              { step: '1', title: 'Forge', desc: 'Build your bot — choose indicators, craft your strategy prompt, set risk parameters' },
-              { step: '2', title: 'Enter', desc: 'Register for the arena — all bots start with identical $10k paper accounts' },
-              { step: '3', title: 'Compete', desc: 'Your bot trades autonomously for 21 days against every other bot in the arena' },
-              { step: '4', title: 'Win', desc: 'Highest equity takes the prize pool — top 3 earn funded live trading' }
+              { step: '1', title: 'Build', desc: 'Create your AI trading bot' },
+              { step: '2', title: 'Subscribe', desc: 'Most users spend <$5/mo' },
+              { step: '3', title: 'Enter', desc: 'All accounts reset to $10k' },
+              { step: '4', title: 'Win', desc: 'Highest equity takes all' }
             ].map(item => (
               <div key={item.step} className="text-center">
                 <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
                   <span className="text-sm font-bold text-[var(--accent)]">{item.step}</span>
                 </div>
-                <div className="text-sm font-semibold text-[var(--text-primary)] mb-1">{item.title}</div>
-                <p className="text-xs text-[var(--text-muted)] leading-relaxed">{item.desc}</p>
+                <div className="text-sm font-medium text-[var(--text-primary)] mb-1">{item.title}</div>
+                <p className="text-xs text-[var(--text-muted)]">{item.desc}</p>
               </div>
             ))}
           </div>
@@ -740,11 +718,11 @@ function ArenaContent() {
 
         <div className="relative max-w-3xl mx-auto px-4 py-16 text-center">
           <h2 className="font-display text-3xl md:text-4xl text-[var(--text-primary)] mb-4">
-            Ready to Forge Yours?
+            Ready to Compete?
           </h2>
 
           <p className="text-lg text-[var(--text-secondary)] mb-6 max-w-md mx-auto">
-            Build your bot. Enter the arena. Let the market decide.
+            21 days. One winner. Real prizes.
           </p>
 
           <div className="flex justify-center gap-6 mb-10">
