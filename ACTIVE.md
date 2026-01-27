@@ -155,9 +155,9 @@
 - `GET /api/v2/public/arena/{config_id}/activities` - Public bot activity events
 - `GET /api/v2/public/arena/{config_id}/metadata` - Public bot metadata
 
-**Arena Pledging** (USX staking on bots, auth required)
-- `POST /api/v2/arena/pledge` - Record USX pledge after on-chain tx (validates bot is in Arena)
-- `GET /api/v2/arena/pledges` - List user's pledges with bot names and amounts
+**Arena Betting** (USX staking on bots, public — wallet = identity)
+- `POST /api/v2/arena/pledge` - Record USX bet after on-chain tx (no auth, validates wallet + tx_hash format)
+- `GET /api/v2/arena/pledges` - List user's bets with bot names and amounts (auth required)
 
 **AI Assistant** (Production)
 - `POST /api/v2/assistant/chat` - Universal AI assistant for bot configuration (Claude Haiku function calling)

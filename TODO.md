@@ -117,38 +117,28 @@ If issues detected: Stop new processes, restore `ggbot.py` monolith via PM2. Exp
 
 ---
 
-## 🎲 **USX Staking Modal - Arena Pledging** [CC-B]
+## 🎲 **USX Arena Betting** [CC-B]
 
-**Status**: 🟡 IN PROGRESS - Phases 1-3 COMPLETE, PledgeModal remaining
+**Status**: 🟡 IN PROGRESS - Core flow deployed, needs USX tokens for end-to-end test
 **Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md)
-**Coordination**: See `CONTEXT.md` for cross-session coordination
-**Assigned**: CC-B (USX Session)
 
-**Summary**: Gamification feature allowing users to pledge USX (Scroll stablecoin) on which bot they think will win competitions. Web3 code is **scoped to Arena page only** to avoid bloating rest of app.
+**Summary**: Users bet USX on which arena bot will win. Win = sUSX yield + prize share. Lose = sUSX yield only (no downside). Web3 scoped to Arena page only.
 
 ### **Completed (2026-01-27)**
-- [x] USX/sUSX contract addresses researched (docs.usx.capital)
-- [x] WalletConnect Project ID obtained
-- [x] wagmi, viem, @rainbow-me/rainbowkit installed
-- [x] `frontend/lib/wagmi-config.ts` - Scroll chain config
-- [x] `frontend/lib/contracts.ts` - USX/sUSX addresses + ABIs
-- [x] `frontend/components/arena/ArenaWithStaking.tsx` - Provider wrapper with brass-themed RainbowKit
-- [x] `frontend/app/arena/page.tsx` - Lazy-loads Web3 components with skeleton
-- [x] `arena_pledges` table created in database
-- [x] `POST /api/v2/arena/pledge` endpoint in ggbot.py
-- [x] `GET /api/v2/arena/pledges` endpoint in ggbot.py
-- [x] API client methods: `recordArenaPledge()`, `getArenaPledges()`
+- [x] Web3 infra: wagmi v2, viem v2, RainbowKit v2 on Scroll
+- [x] BetModal: wallet connect → amount → approve → deposit → record
+- [x] "Bet on This Bot" CTA in expanded bot cards
+- [x] Public pledge endpoint (wallet = identity, no auth)
+- [x] Dynamic USX decimals reading from contract
+- [x] Error handling: wallet rejection, on-chain failure, retry mechanism
+- [x] Side-by-side chart + stats layout in expanded cards
 
-### **Remaining - PledgeModal (~2-3 hours)**
-- [ ] Build `frontend/components/arena/PledgeModal.tsx`
-- [ ] Bot selector dropdown (arena bots only)
-- [ ] Amount input with USX balance display
-- [ ] Implement approve + deposit transactions
-- [ ] Transaction progress overlay (Approving → Pledging → Done)
-- [ ] Success state with tx link
-- [ ] Add "Pledge" button trigger to Arena leaderboard
-- [ ] End-to-end test on Scroll mainnet
-- [ ] Communicate 15-day unstaking cooldown in UI
+### **Remaining**
+- [ ] Acquire USX tokens for end-to-end test on Scroll mainnet
+- [ ] Verify full approve → deposit → record flow with real tokens
+- [ ] Display "Total Backed" per bot on leaderboard
+- [ ] Show "You bet X on this bot" badge for users with active bets
+- [ ] Prize distribution logic (after competition ends)
 
 ---
 

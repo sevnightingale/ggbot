@@ -13,18 +13,28 @@
 - ✅ Phase 1: Research & Setup (contract addresses, WalletConnect ID, deps)
 - ✅ Phase 2: Database & Backend (arena_pledges table, endpoints)
 - ✅ Phase 3: Frontend Web3 Integration (wagmi config, ArenaWithStaking wrapper)
+- ✅ Phase 4: On-Chain Integration (approve + deposit via BetModal)
+- ✅ Phase 5: BetModal UI (full flow, error handling, retry)
 
 **Remaining**:
-- 🔲 Phase 4: On-Chain Integration (approve + deposit transactions)
-- 🔲 Phase 5: PledgeModal UI
+- 🔲 End-to-end test with real USX tokens
+- 🔲 Display layer: "Total Backed" per bot, "You bet X" badges
+- 🔲 Prize distribution logic
 
-**Key Files Created**:
-- `frontend/lib/wagmi-config.ts` - Scroll chain + WalletConnect config
+**Key Files**:
+- `frontend/lib/wagmi-config.ts` - Scroll chain + WalletConnect (Vercel env var)
 - `frontend/lib/contracts.ts` - USX/sUSX addresses and ABIs
-- `frontend/components/arena/ArenaWithStaking.tsx` - Web3 provider wrapper
-- `ggbot.py:4083-4238` - Pledge endpoints
+- `frontend/components/arena/ArenaWithStaking.tsx` - Web3 provider wrapper + Arena content
+- `frontend/components/arena/BetModal.tsx` - Full betting modal with 6-step state machine
+- `ggbot.py` - Public pledge endpoints (wallet = identity, no auth)
+- `frontend/lib/api.ts` - `recordArenaPledge()` (regular fetch, no auth)
 
-**Architecture Decision**: Web3 is lazy-loaded on Arena page only (~65KB savings elsewhere).
+**Architecture Decisions**:
+- Web3 lazy-loaded on Arena page only (~65KB savings elsewhere)
+- wagmi v2 required (RainbowKit 2.x incompatible with wagmi v3)
+- Pledge endpoint is public — wallet address is identity, no ggbots login needed
+- `arena_pledges.user_id` nullable (public users may not have ggbots account)
+- USX decimals read from contract dynamically, not hardcoded
 
 ---
 

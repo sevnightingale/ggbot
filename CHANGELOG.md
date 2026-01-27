@@ -35,28 +35,37 @@ Complete history of features, fixes, and improvements. For current status see AC
 
 ---
 
-## 2026-01-27 - USX Staking Infrastructure (Arena Pledging)
+## 2026-01-27 - USX Arena Betting (Full Stack)
 
-**Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md) (Phases 1-3 complete, PledgeModal pending)
+**Planning Doc**: [DOCS/todo/USX_STAKING_MODAL.md](DOCS/todo/USX_STAKING_MODAL.md)
 
 **Web3 Dependencies** (`frontend/package.json`):
-- Added wagmi, viem, @rainbow-me/rainbowkit for Scroll blockchain integration
+- wagmi v2, viem v2, @rainbow-me/rainbowkit v2 (wagmi v3 incompatible with RainbowKit, downgraded)
 - Web3 code scoped to Arena page only (lazy-loaded, ~65KB savings for other pages)
 
-**Frontend Setup** (`frontend/lib/`, `frontend/components/arena/`):
-- `wagmi-config.ts` - Scroll chain config with WalletConnect Project ID
-- `contracts.ts` - USX (`0x3b00...cf03`) and sUSX (`0xcB14...F922`) addresses + ERC20/ERC4626 ABIs
-- `ArenaWithStaking.tsx` - Web3 provider wrapper with brass-themed RainbowKit
-- `arena/page.tsx` - Lazy-loads Web3 components via `dynamic()` with skeleton loading
+**BetModal** (`frontend/components/arena/BetModal.tsx`):
+- Full betting flow: wallet connect → amount input → approve → deposit → record
+- Reads USX decimals from contract (not hardcoded)
+- Refs (stepRef, parsedAmountRef, addressRef) prevent stale closures in useEffect chains
+- Error handling: wallet rejection, on-chain tx failure, separate error states per step
+- 6 granular steps: idle → approving → waitApproval → depositing → waitDeposit → recording → complete
+- Retry mechanism with wagmi reset(), "Try again" button on error
+- Shows sUSX preview, 15-day cooldown warning, Scrollscan tx link on success
 
-**Backend** (`ggbot.py:4083-4238`):
-- `arena_pledges` table - Records user pledges on arena bots (tx_hash unique constraint prevents duplicates)
-- `POST /api/v2/arena/pledge` - Record pledge after on-chain tx, validates bot is in Arena
-- `GET /api/v2/arena/pledges` - Returns user's pledges with bot names and amounts
+**Arena Card CTA** (`frontend/components/arena/ArenaWithStaking.tsx`):
+- "Bet on This Bot" button in expanded bot cards with Coins icon
+- Side-by-side equity chart (60%) + performance stats (40%) on desktop, stacked on mobile
+- Strategy + Risk Management in 2-col grid below
 
-**API Client** (`frontend/lib/api.ts`):
-- `recordArenaPledge()` - Posts pledge data after on-chain transaction
-- `getArenaPledges()` - Fetches user's active pledges
+**Backend** (`ggbot.py`):
+- `POST /api/v2/arena/pledge` - Now public (no auth), wallet_address = identity
+- Validates wallet address format (0x, 42 chars) and tx_hash format (0x, 66 chars)
+- `arena_pledges.user_id` now nullable (ALTER TABLE migration applied)
+
+**Frontend Setup** (`frontend/lib/`):
+- `wagmi-config.ts` - Scroll chain config with WalletConnect Project ID (Vercel env var)
+- `contracts.ts` - USX/sUSX addresses + ERC20/ERC4626 ABIs
+- `api.ts` - `recordArenaPledge()` uses regular fetch (no auth required)
 
 ---
 
