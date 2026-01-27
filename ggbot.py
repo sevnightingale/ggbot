@@ -4076,6 +4076,168 @@ async def unregister_from_arena(
         raise HTTPException(status_code=500, detail=f"Unregistration failed: {str(e)}")
 
 
+# =============================================================================
+# Arena USX Pledges (Staking on Bot Competition)
+# =============================================================================
+
+@app.post("/api/v2/arena/pledge")
+async def record_arena_pledge(
+    request: Request,
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Record a USX staking pledge on an arena bot.
+
+    Called after the user completes on-chain staking (USX → sUSX vault).
+    Records which bot they're backing for prize distribution.
+
+    Request body:
+    {
+        "wallet_address": "0x...",
+        "config_id": "uuid",
+        "usx_amount": "100.50",
+        "susx_amount": "95.25",  # optional
+        "tx_hash": "0x..."
+    }
+    """
+    try:
+        data = await request.json()
+
+        wallet_address = data.get('wallet_address')
+        config_id = data.get('config_id')
+        usx_amount = data.get('usx_amount')
+        susx_amount = data.get('susx_amount')  # Optional
+        tx_hash = data.get('tx_hash')
+
+        # Validate required fields
+        if not all([wallet_address, config_id, usx_amount, tx_hash]):
+            raise HTTPException(
+                status_code=400,
+                detail="Missing required fields: wallet_address, config_id, usx_amount, tx_hash"
+            )
+
+        # Validate config_id is a public arena bot
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT config_id, config_name
+                    FROM configurations
+                    WHERE config_id = %s AND is_public_performance = true
+                """, (config_id,))
+                bot = cur.fetchone()
+
+                if not bot:
+                    raise HTTPException(
+                        status_code=404,
+                        detail="Bot not found or not in Arena competition"
+                    )
+
+                bot_name = bot[1]
+
+                # Insert pledge record
+                cur.execute("""
+                    INSERT INTO arena_pledges
+                        (user_id, wallet_address, config_id, usx_amount, susx_amount, tx_hash)
+                    VALUES (%s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (tx_hash) DO NOTHING
+                    RETURNING id
+                """, (
+                    current_user.user_id,
+                    wallet_address,
+                    config_id,
+                    usx_amount,
+                    susx_amount,
+                    tx_hash
+                ))
+                result = cur.fetchone()
+                conn.commit()
+
+                if not result:
+                    # tx_hash already exists
+                    logger.warning(f"Duplicate pledge tx_hash: {tx_hash}")
+                    return {
+                        "status": "duplicate",
+                        "message": "This transaction has already been recorded"
+                    }
+
+                pledge_id = result[0]
+
+        logger.info(
+            f"Arena pledge recorded: user={current_user.user_id}, "
+            f"bot={config_id}, amount={usx_amount} USX, tx={tx_hash[:16]}..."
+        )
+
+        return {
+            "status": "success",
+            "pledge_id": str(pledge_id),
+            "bot_name": bot_name,
+            "usx_amount": usx_amount,
+            "message": f"You're backing {bot_name} with {usx_amount} USX!"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Failed to record arena pledge: {e}")
+        raise HTTPException(status_code=500, detail=f"Pledge recording failed: {str(e)}")
+
+
+@app.get("/api/v2/arena/pledges")
+async def get_user_pledges(
+    current_user: AuthenticatedUser = Depends(get_current_user_v2)
+) -> Dict[str, Any]:
+    """
+    Get all arena pledges for the current user.
+
+    Returns list of bots they've staked on with amounts.
+    """
+    try:
+        from core.common.db import get_db_connection
+        with get_db_connection() as conn:
+            with conn.cursor() as cur:
+                cur.execute("""
+                    SELECT
+                        p.id,
+                        p.config_id,
+                        c.config_name,
+                        c.profile_image_url,
+                        p.usx_amount,
+                        p.susx_amount,
+                        p.tx_hash,
+                        p.pledged_at,
+                        p.unstaked_at
+                    FROM arena_pledges p
+                    JOIN configurations c ON p.config_id = c.config_id
+                    WHERE p.user_id = %s
+                    ORDER BY p.pledged_at DESC
+                """, (current_user.user_id,))
+                pledges = cur.fetchall()
+
+        return {
+            "status": "success",
+            "pledges": [
+                {
+                    "id": str(row[0]),
+                    "config_id": str(row[1]),
+                    "bot_name": row[2],
+                    "profile_image_url": row[3],
+                    "usx_amount": float(row[4]),
+                    "susx_amount": float(row[5]) if row[5] else None,
+                    "tx_hash": row[6],
+                    "pledged_at": row[7].isoformat() if row[7] else None,
+                    "unstaked": row[8] is not None
+                }
+                for row in pledges
+            ],
+            "total_pledged": sum(float(row[4]) for row in pledges)
+        }
+
+    except Exception as e:
+        logger.error(f"Failed to get user pledges: {e}")
+        raise HTTPException(status_code=500, detail=f"Failed to fetch pledges: {str(e)}")
+
+
 @app.get("/api/v2/scheduler/status")
 async def get_scheduler_status(
     current_user: AuthenticatedUser = Depends(get_current_user_v2)

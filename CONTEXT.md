@@ -254,10 +254,12 @@ _Update this section as work progresses_
 - [x] **CC-A**: queries.ts hooks created (useArenaPerformance)
 - [x] **CC-A**: Arena Redis caching added (60s TTL)
 - [x] **CC-A**: Arena page converted to use React Query
-- [ ] **CC-B**: wagmi deps installed
-- [ ] **CC-B**: ArenaWithStaking wrapper created
+- [x] **CC-B**: wagmi deps installed (2026-01-27)
+- [x] **CC-B**: wagmi-config.ts + contracts.ts created
+- [x] **CC-B**: ArenaWithStaking wrapper created with RainbowKit theming
+- [x] **CC-B**: Arena page lazy-loads Web3 components (build passing)
+- [ ] **CC-B**: Backend endpoints (arena_pledges table + API)
 - [ ] **CC-B**: PledgeModal built
-- [ ] **CC-B**: Backend endpoints done
 - [ ] **Both**: Integration tested
 
 ---

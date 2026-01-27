@@ -12,8 +12,8 @@ interface Top3ChartProps {
 // Podium colors - brass variants for ceremonial feel
 const PODIUM_COLORS = {
   gold: '#c1a87d',    // Brass - 1st place
-  silver: '#a8a8a8',  // Silver - 2nd place
-  bronze: '#cd7f32',  // Bronze - 3rd place
+  silver: '#9a9a9a',  // Muted silver - 2nd place
+  bronze: '#a89168',  // Dark brass - 3rd place (from VIBE.md agent-trading)
 }
 
 /**
