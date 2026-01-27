@@ -1,10 +1,11 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { RefreshCw, Bot, TrendingUp, TrendingDown, Circle, Zap, ChevronDown } from 'lucide-react'
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts'
+import { RefreshCw, Bot, TrendingUp, TrendingDown, Zap, ChevronDown } from 'lucide-react'
 import { ThemeProvider } from '@/lib/theme'
-import { useArenaPerformance } from '@/lib/queries'
+import { useArenaPerformance, ArenaBot } from '@/lib/queries'
+import { Sparkline } from '@/components/arena/Sparkline'
+import { Top3Chart } from '@/components/arena/Top3Chart'
 
 // Isolated countdown/live component - only this re-renders every second, not the whole page
 function CountdownTimer({ targetTime }: { targetTime: number }) {
@@ -76,19 +77,8 @@ interface DataSources {
   derivatives_leverage?: { data_points: string[]; timeframes: string[] }
 }
 
-// Vibrant distinct colors for chart lines
-const BOT_COLORS = [
-  '#c1a87d', // brass (lead)
-  '#3ca6e0', // signal blue
-  '#10b981', // emerald
-  '#f59e0b', // amber
-  '#8b5cf6', // purple
-  '#ec4899', // pink
-  '#06b6d4', // cyan
-]
-
 // Helper to format frequency display
-function formatFrequency(freq: string | null): string {
+function formatFrequency(freq: string | null | undefined): string {
   if (!freq) return '—'
   const map: Record<string, string> = {
     '5m': '5 min',
@@ -104,7 +94,7 @@ function formatFrequency(freq: string | null): string {
 }
 
 // Helper to format model name
-function formatModel(model: string | null): string {
+function formatModel(model: string | null | undefined): string {
   if (!model) return '—'
   const map: Record<string, string> = {
     'grok': 'Grok',
@@ -117,28 +107,59 @@ function formatModel(model: string | null): string {
 }
 
 // Helper to get data source categories
-function getDataSourceCategories(sources: DataSources | null): string[] {
+function getDataSourceCategories(sources: DataSources | Record<string, unknown> | null): string[] {
   if (!sources) return []
   const categories: string[] = []
-  if (sources.technical_analysis) categories.push('Technical')
-  if (sources.sentiment_social) categories.push('Sentiment')
-  if (sources.news_regulatory) categories.push('News')
-  if (sources.onchain_analytics) categories.push('On-chain')
-  if (sources.macro_economics) categories.push('Macro')
-  if (sources.derivatives_leverage) categories.push('Derivatives')
+  const s = sources as DataSources
+  if (s.technical_analysis) categories.push('Technical')
+  if (s.sentiment_social) categories.push('Sentiment')
+  if (s.news_regulatory) categories.push('News')
+  if (s.onchain_analytics) categories.push('On-chain')
+  if (s.macro_economics) categories.push('Macro')
+  if (s.derivatives_leverage) categories.push('Derivatives')
   return categories
 }
 
 // Helper to get all indicators
-function getAllIndicators(sources: DataSources | null): string[] {
+function getAllIndicators(sources: DataSources | Record<string, unknown> | null): string[] {
   if (!sources) return []
   const indicators: string[] = []
   Object.values(sources).forEach(source => {
-    if (source?.data_points) {
+    if (source && typeof source === 'object' && 'data_points' in source && Array.isArray(source.data_points)) {
       indicators.push(...source.data_points)
     }
   })
   return [...new Set(indicators)] // Remove duplicates
+}
+
+// Individual Bot Sparkline Chart for expanded view
+function BotEquityChart({ bot }: { bot: ArenaBot }) {
+  const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
+  const isPositive = pnlPercent >= 0
+
+  return (
+    <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
+      <div className="flex items-center justify-between mb-3">
+        <span className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)]">
+          Equity Curve
+        </span>
+        <span className={`text-sm font-mono font-semibold ${isPositive ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'}`}>
+          {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
+        </span>
+      </div>
+      <Sparkline
+        data={bot.data_points}
+        width={400}
+        height={80}
+        strokeWidth={2}
+        className="w-full"
+      />
+      <div className="flex justify-between mt-2 text-xs text-[var(--text-muted)] font-mono">
+        <span>Jan 21</span>
+        <span>Now</span>
+      </div>
+    </div>
+  )
 }
 
 function ArenaContent() {
@@ -172,30 +193,6 @@ function ArenaContent() {
     })
   }
 
-  const getChartData = () => {
-    if (!data || data.bots.length === 0) return []
-
-    const timestampMap = new Map<number, Record<string, number>>()
-
-    data.bots.forEach((bot) => {
-      bot.data_points.forEach((point) => {
-        const timestamp = new Date(point.timestamp).getTime()
-        if (!timestampMap.has(timestamp)) {
-          timestampMap.set(timestamp, { timestamp })
-        }
-        const entry = timestampMap.get(timestamp)
-        if (entry) {
-          entry[bot.config_name] = point.equity
-        }
-      })
-    })
-
-    const chartData = Array.from(timestampMap.values())
-    chartData.sort((a, b) => a.timestamp - b.timestamp)
-
-    return chartData
-  }
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -205,22 +202,9 @@ function ArenaContent() {
     }).format(value)
   }
 
-  const formatTimestamp = (timestamp: number) => {
-    const date = new Date(timestamp)
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-  }
-
-  // Memoize expensive calculations to avoid re-computing on accordion toggle
-  const chartData = useMemo(() => getChartData(), [data])
-
   // Competition timeline - Season 1 dates (no hydration mismatch)
   const competitionStart = new Date('2026-01-21T12:00:00Z')
-  const competitionEnd = new Date('2026-02-11T12:00:00Z') // 21 days later
   const totalDays = 21
-
-  // Chart domain timestamps for fixed x-axis (static, safe for SSR)
-  const chartDomainStart = competitionStart.getTime()
-  const chartDomainEnd = competitionEnd.getTime()
 
   // Dynamic values - only calculate on client to avoid hydration mismatch
   const daysSinceStart = mounted
@@ -233,13 +217,6 @@ function ArenaContent() {
   const rankedBots = useMemo(() =>
     data ? [...data.bots].sort((a, b) => b.current_equity - a.current_equity) : []
   , [data])
-
-  // Get color for a bot by its original index
-  const getBotColor = (botName: string) => {
-    if (!data) return BOT_COLORS[0]
-    const index = data.bots.findIndex(b => b.config_name === botName)
-    return BOT_COLORS[index % BOT_COLORS.length]
-  }
 
   return (
     <div className="min-h-screen bg-[var(--bg-primary)]">
@@ -362,13 +339,13 @@ function ArenaContent() {
           </div>
         )}
 
-        {/* Chart Card - First */}
-        {!loading && data && chartData.length > 0 && (
+        {/* Top 3 Podium Chart */}
+        {!loading && data && rankedBots.length >= 3 && (
           <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] p-6 mb-8">
-            <div className="flex items-center justify-between mb-6">
+            <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-                <h3 className="font-display text-xl text-[var(--text-primary)]">Performance Over Time</h3>
+                <h3 className="font-display text-xl text-[var(--text-primary)]">The Podium</h3>
               </div>
               <button
                 onClick={() => refetch()}
@@ -378,55 +355,7 @@ function ArenaContent() {
                 <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
               </button>
             </div>
-            <ResponsiveContainer width="100%" height={400}>
-              <LineChart data={chartData}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#2a2a2d" />
-                <XAxis
-                  dataKey="timestamp"
-                  type="number"
-                  domain={[chartDomainStart, chartDomainEnd]}
-                  stroke="#8a8781"
-                  tickFormatter={formatTimestamp}
-                  tick={{ fill: '#8a8781', fontSize: 11 }}
-                  axisLine={{ stroke: '#2a2a2d' }}
-                  scale="time"
-                />
-                <YAxis
-                  stroke="#8a8781"
-                  tickFormatter={(value) => `$${(value / 1000).toFixed(0)}k`}
-                  tick={{ fill: '#8a8781', fontSize: 11 }}
-                  axisLine={{ stroke: '#2a2a2d' }}
-                  domain={['auto', 'auto']}
-                />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#141416',
-                    border: '1px solid #c1a87d',
-                    borderRadius: '12px',
-                    color: '#edebe7',
-                    fontSize: '12px',
-                    boxShadow: '0 8px 32px rgba(0,0,0,0.5)'
-                  }}
-                  labelFormatter={(value: number) => formatTimestamp(value)}
-                  formatter={(value: number) => [formatCurrency(value), '']}
-                />
-                <Legend
-                  wrapperStyle={{ fontSize: '12px', color: '#d6d3ce' }}
-                  iconType="circle"
-                />
-                {data.bots.map((bot, index) => (
-                  <Line
-                    key={bot.config_id}
-                    type="monotone"
-                    dataKey={bot.config_name}
-                    stroke={BOT_COLORS[index % BOT_COLORS.length]}
-                    strokeWidth={2}
-                    dot={false}
-                    connectNulls
-                  />
-                ))}
-              </LineChart>
-            </ResponsiveContainer>
+            <Top3Chart bots={rankedBots} />
           </div>
         )}
 
@@ -436,18 +365,19 @@ function ArenaContent() {
             <div className="flex items-center justify-between mb-6">
               <div className="flex items-center gap-3">
                 <div className="w-1 h-6 rounded-full bg-[var(--accent)]" />
-                <h3 className="font-display text-xl text-[var(--text-primary)]">Leaderboard</h3>
+                <h3 className="font-display text-xl text-[var(--text-primary)]">
+                  Leaderboard
+                  <span className="ml-2 text-sm font-normal text-[var(--text-muted)]">
+                    {rankedBots.length} bots competing
+                  </span>
+                </h3>
               </div>
-              <p className="text-xs text-[var(--text-muted)]">
-                Prototype bots — study their strategies for inspiration
-              </p>
             </div>
             <div className="rounded-2xl border border-[var(--border)] bg-[var(--bg-secondary)] overflow-hidden mb-8">
               <div className="divide-y divide-[var(--border)]">
                 {rankedBots.map((bot, index) => {
                   const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
                   const isPositive = pnlPercent >= 0
-                  const color = getBotColor(bot.config_name)
                   const isLeader = index === 0
                   const isExpanded = expandedCards.has(bot.config_id)
                   const categories = getDataSourceCategories(bot.data_sources)
@@ -465,78 +395,83 @@ function ArenaContent() {
                         className="px-4 py-4 cursor-pointer hover:bg-[var(--bg-tertiary)]"
                         onClick={() => toggleCard(bot.config_id)}
                       >
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3 md:gap-4">
                           {/* Rank with medal for top 3 */}
-                          <div className="w-10 text-center flex-shrink-0">
+                          <div className="w-8 md:w-10 text-center flex-shrink-0">
                             {index === 0 ? (
-                              <span className="text-2xl">🥇</span>
+                              <span className="text-xl md:text-2xl">🥇</span>
                             ) : index === 1 ? (
-                              <span className="text-2xl">🥈</span>
+                              <span className="text-xl md:text-2xl">🥈</span>
                             ) : index === 2 ? (
-                              <span className="text-2xl">🥉</span>
+                              <span className="text-xl md:text-2xl">🥉</span>
                             ) : (
-                              <span className="font-mono text-lg text-[var(--text-muted)]">{index + 1}</span>
+                              <span className="font-mono text-base md:text-lg text-[var(--text-muted)]">{index + 1}</span>
                             )}
                           </div>
 
-                          {/* Avatar with color border */}
-                          <div className="flex items-center gap-3 flex-shrink-0">
-                            <Circle className="h-3 w-3" style={{ color, fill: color }} />
+                          {/* Avatar */}
+                          <div className="flex-shrink-0">
                             {bot.profile_image_url ? (
                               <img
                                 src={bot.profile_image_url}
                                 alt={bot.config_name}
-                                className="w-12 h-12 rounded-full object-cover border-2"
-                                style={{ borderColor: color }}
+                                className="w-10 h-10 md:w-12 md:h-12 rounded-full object-cover border-2 border-[var(--border)]"
                               />
                             ) : (
-                              <div
-                                className="w-12 h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2"
-                                style={{ borderColor: color }}
-                              >
-                                <Bot className="h-6 w-6 text-[var(--text-muted)]" />
+                              <div className="w-10 h-10 md:w-12 md:h-12 rounded-full flex items-center justify-center bg-[var(--bg-primary)] border-2 border-[var(--border)]">
+                                <Bot className="h-5 w-5 md:h-6 md:w-6 text-[var(--text-muted)]" />
                               </div>
                             )}
                           </div>
 
                           {/* Name + Meta */}
                           <div className="flex-1 min-w-0">
-                            <div className={`text-base font-semibold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                            <div className={`text-sm md:text-base font-semibold truncate ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
                               {bot.config_name}
                             </div>
                             <div className="text-xs text-[var(--text-muted)] font-mono">
-                              {formatFrequency(bot.frequency)} · {bot.symbol || 'BTC/USDT'}
+                              {formatModel(bot.model)} · {formatFrequency(bot.frequency)}
                             </div>
                           </div>
 
+                          {/* Sparkline - hidden on mobile */}
+                          <div className="hidden md:block flex-shrink-0">
+                            <Sparkline
+                              data={bot.data_points}
+                              width={100}
+                              height={28}
+                              strokeWidth={1.5}
+                            />
+                          </div>
+
                           {/* Stats - hidden on mobile */}
-                          <div className="hidden md:flex items-center gap-8 flex-shrink-0">
-                            <div className="text-center">
-                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Trades</div>
+                          <div className="hidden lg:flex items-center gap-6 flex-shrink-0">
+                            <div className="text-center w-16">
+                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Trades</div>
                               <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</div>
                             </div>
-                            <div className="text-center">
-                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-1">Win Rate</div>
+                            <div className="text-center w-16">
+                              <div className="text-[10px] uppercase tracking-widest text-[var(--text-muted)] mb-0.5">Win Rate</div>
                               <div className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(0)}%</div>
                             </div>
                           </div>
 
                           {/* Equity + P&L */}
                           <div className="text-right flex-shrink-0">
-                            <div className={`text-lg font-mono font-bold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
+                            <div className={`text-base md:text-lg font-mono font-bold ${isLeader ? 'text-[var(--accent)]' : 'text-[var(--text-primary)]'}`}>
                               {formatCurrency(bot.current_equity)}
                             </div>
-                            <div className={`text-sm font-mono flex items-center justify-end gap-1 ${
-                              isPositive ? 'text-green-500' : 'text-red-500'
+                            <div className={`text-xs md:text-sm font-mono flex items-center justify-end gap-1 ${
+                              isPositive ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'
                             }`}>
-                              {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                              {isPositive ? <TrendingUp className="h-3 w-3 md:h-4 md:w-4" /> : <TrendingDown className="h-3 w-3 md:h-4 md:w-4" />}
                               {isPositive ? '+' : ''}{pnlPercent.toFixed(2)}%
                             </div>
                           </div>
 
                           {/* Expand toggle */}
                           <ChevronDown
-                            className={`h-5 w-5 text-[var(--text-muted)] transition-transform duration-200 flex-shrink-0 ${
+                            className={`h-4 w-4 md:h-5 md:w-5 text-[var(--text-muted)] transition-transform duration-200 flex-shrink-0 ${
                               isExpanded ? 'rotate-180' : ''
                             }`}
                           />
@@ -545,8 +480,19 @@ function ArenaContent() {
 
                       {/* Expanded Details */}
                       {isExpanded && (
-                        <div className="px-4 pb-5 pt-2">
-                          <div className="ml-14 space-y-5">
+                        <div className="px-4 pb-5 pt-2 bg-[var(--bg-tertiary)]/30">
+                          <div className="space-y-5">
+                            {/* Mobile: Show sparkline in expanded view */}
+                            <div className="md:hidden">
+                              <Sparkline
+                                data={bot.data_points}
+                                width={280}
+                                height={48}
+                                strokeWidth={2}
+                                className="w-full"
+                              />
+                            </div>
+
                             {/* Description */}
                             {bot.description && (
                               <p className="text-sm text-[var(--text-secondary)] leading-relaxed max-w-2xl">
@@ -554,14 +500,44 @@ function ArenaContent() {
                               </p>
                             )}
 
-                            {/* Two-column layout for Strategy + Risk */}
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            {/* Equity Chart - Full width for this bot */}
+                            <BotEquityChart bot={bot} />
+
+                            {/* Three-column layout for Performance + Strategy + Risk */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                              {/* Performance Stats */}
+                              <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
+                                <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
+                                  Performance
+                                </div>
+                                <div className="space-y-2">
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Total Trades</span>
+                                    <span className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.total_trades}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Win Rate</span>
+                                    <span className="text-sm font-mono font-semibold text-[var(--text-primary)]">{(bot.win_rate * 100).toFixed(1)}%</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Open Positions</span>
+                                    <span className="text-sm font-mono font-semibold text-[var(--text-primary)]">{bot.open_positions}</span>
+                                  </div>
+                                  <div className="flex justify-between items-center">
+                                    <span className="text-sm text-[var(--text-muted)]">Unrealized P&L</span>
+                                    <span className={`text-sm font-mono font-semibold ${bot.unrealized_pnl >= 0 ? 'text-[var(--profit-color)]' : 'text-[var(--loss-color)]'}`}>
+                                      {bot.unrealized_pnl >= 0 ? '+' : ''}{formatCurrency(bot.unrealized_pnl)}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+
                               {/* Strategy Configuration */}
-                              <div className="rounded-xl bg-[var(--bg-tertiary)]/50 p-4">
+                              <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
                                 <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
                                   Strategy
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                   <div className="flex justify-between items-center">
                                     <span className="text-sm text-[var(--text-muted)]">AI Model</span>
                                     <span className="text-sm font-medium text-[var(--text-primary)]">{formatModel(bot.model)}</span>
@@ -571,7 +547,7 @@ function ArenaContent() {
                                     <span className="text-sm font-mono font-medium text-[var(--text-primary)]">{bot.symbol || 'BTC/USDT'}</span>
                                   </div>
                                   <div className="flex justify-between items-center">
-                                    <span className="text-sm text-[var(--text-muted)]">Decision Frequency</span>
+                                    <span className="text-sm text-[var(--text-muted)]">Frequency</span>
                                     <span className="text-sm font-medium text-[var(--text-primary)]">{formatFrequency(bot.frequency)}</span>
                                   </div>
                                   {bot.max_margin && (
@@ -584,31 +560,21 @@ function ArenaContent() {
                               </div>
 
                               {/* Risk Management */}
-                              <div className="rounded-xl bg-[var(--bg-tertiary)]/50 p-4">
+                              <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
                                 <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
                                   Risk Management
                                 </div>
-                                <div className="space-y-3">
+                                <div className="space-y-2">
                                   <div className="flex justify-between items-center">
                                     <span className="text-sm text-[var(--text-muted)]">Stop Loss</span>
-                                    <span className={`text-sm font-mono font-medium ${bot.stop_loss ? 'text-red-400' : 'text-[var(--text-muted)]'}`}>
+                                    <span className={`text-sm font-mono font-medium ${bot.stop_loss ? 'text-[var(--loss-color)]' : 'text-[var(--text-muted)]'}`}>
                                       {bot.stop_loss ? `-${bot.stop_loss}%` : 'Not set'}
                                     </span>
                                   </div>
                                   <div className="flex justify-between items-center">
                                     <span className="text-sm text-[var(--text-muted)]">Take Profit</span>
-                                    <span className={`text-sm font-mono font-medium ${bot.take_profit ? 'text-green-400' : 'text-[var(--text-muted)]'}`}>
+                                    <span className={`text-sm font-mono font-medium ${bot.take_profit ? 'text-[var(--profit-color)]' : 'text-[var(--text-muted)]'}`}>
                                       {bot.take_profit ? `+${bot.take_profit}%` : 'Not set'}
-                                    </span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-[var(--text-muted)]">Open Positions</span>
-                                    <span className="text-sm font-mono font-medium text-[var(--text-primary)]">{bot.open_positions}</span>
-                                  </div>
-                                  <div className="flex justify-between items-center">
-                                    <span className="text-sm text-[var(--text-muted)]">Unrealized P&L</span>
-                                    <span className={`text-sm font-mono font-medium ${bot.unrealized_pnl >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                      {bot.unrealized_pnl >= 0 ? '+' : ''}{formatCurrency(bot.unrealized_pnl)}
                                     </span>
                                   </div>
                                 </div>
@@ -617,14 +583,13 @@ function ArenaContent() {
 
                             {/* Data Sources & Indicators */}
                             {(categories.length > 0 || indicators.length > 0) && (
-                              <div className="rounded-xl bg-[var(--bg-tertiary)]/50 p-4">
+                              <div className="rounded-xl bg-[var(--bg-primary)] border border-[var(--border)] p-4">
                                 <div className="text-xs font-semibold uppercase tracking-wider text-[var(--accent)] mb-3">
                                   Market Intelligence
                                 </div>
 
                                 {categories.length > 0 && (
                                   <div className="mb-3">
-                                    <div className="text-xs text-[var(--text-muted)] mb-2">Data Sources</div>
                                     <div className="flex flex-wrap gap-2">
                                       {categories.map(cat => (
                                         <span
@@ -639,25 +604,20 @@ function ArenaContent() {
                                 )}
 
                                 {indicators.length > 0 && (
-                                  <div>
-                                    <div className="text-xs text-[var(--text-muted)] mb-2">
-                                      Technical Indicators ({indicators.length})
-                                    </div>
-                                    <div className="flex flex-wrap gap-1.5">
-                                      {indicators.slice(0, 15).map(ind => (
-                                        <span
-                                          key={ind}
-                                          className="px-2 py-0.5 text-[11px] font-mono rounded bg-[var(--bg-primary)] text-[var(--text-secondary)] border border-[var(--border)]"
-                                        >
-                                          {ind}
-                                        </span>
-                                      ))}
-                                      {indicators.length > 15 && (
-                                        <span className="px-2 py-0.5 text-[11px] font-mono text-[var(--text-muted)]">
-                                          +{indicators.length - 15} more
-                                        </span>
-                                      )}
-                                    </div>
+                                  <div className="flex flex-wrap gap-1.5">
+                                    {indicators.slice(0, 12).map(ind => (
+                                      <span
+                                        key={ind}
+                                        className="px-2 py-0.5 text-[11px] font-mono rounded bg-[var(--bg-secondary)] text-[var(--text-secondary)] border border-[var(--border)]"
+                                      >
+                                        {ind}
+                                      </span>
+                                    ))}
+                                    {indicators.length > 12 && (
+                                      <span className="px-2 py-0.5 text-[11px] font-mono text-[var(--text-muted)]">
+                                        +{indicators.length - 12} more
+                                      </span>
+                                    )}
                                   </div>
                                 )}
                               </div>
@@ -680,34 +640,34 @@ function ArenaContent() {
           <h2 className="text-center text-sm font-semibold uppercase tracking-wider text-[var(--text-muted)] mb-8">
             How It Works
           </h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
             <div className="text-center">
               <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
                 <span className="text-sm font-bold text-[var(--accent)]">1</span>
               </div>
               <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Build</div>
-              <p className="text-xs text-[var(--text-muted)]">Create your AI trading bot — pick a model, set your strategy</p>
+              <p className="text-xs text-[var(--text-muted)]">Create your AI trading bot</p>
             </div>
             <div className="text-center">
               <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
                 <span className="text-sm font-bold text-[var(--accent)]">2</span>
               </div>
               <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Subscribe</div>
-              <p className="text-xs text-[var(--text-muted)]">Usage-based pricing starts your bot. Most users spend &lt;$5/mo</p>
+              <p className="text-xs text-[var(--text-muted)]">Most users spend &lt;$5/mo</p>
             </div>
             <div className="text-center">
               <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
                 <span className="text-sm font-bold text-[var(--accent)]">3</span>
               </div>
               <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Enter</div>
-              <p className="text-xs text-[var(--text-muted)]">Click &quot;Enter Arena&quot; on your bot. All accounts reset to $10k on Jan 21</p>
+              <p className="text-xs text-[var(--text-muted)]">All accounts reset to $10k</p>
             </div>
             <div className="text-center">
               <div className="w-10 h-10 rounded-full bg-[var(--accent)]/15 border border-[var(--accent)] flex items-center justify-center mx-auto mb-3">
                 <span className="text-sm font-bold text-[var(--accent)]">4</span>
               </div>
               <div className="text-sm font-medium text-[var(--text-primary)] mb-1">Win</div>
-              <p className="text-xs text-[var(--text-muted)]">Highest equity after 21 days wins. Top 3 split the prize pool</p>
+              <p className="text-xs text-[var(--text-muted)]">Highest equity takes all</p>
             </div>
           </div>
         </div>
@@ -757,7 +717,7 @@ function ArenaContent() {
           </a>
 
           <p className="mt-6 text-xs text-[var(--text-muted)]">
-            Competition starts January 21st, 12:00 UTC
+            Competition started January 21st · {rankedBots.length} bots competing
           </p>
         </div>
       </div>
