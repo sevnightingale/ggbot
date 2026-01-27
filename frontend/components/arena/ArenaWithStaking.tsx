@@ -694,7 +694,7 @@ function ArenaContent() {
           <div className="flex flex-wrap justify-center items-center gap-6 md:gap-8">
             {[
               { name: 'Scroll', url: 'https://scroll.io' },
-              { name: 'Symphony', url: 'https://symphony.finance' },
+              { name: 'Symphony', url: 'https://symphony.io' },
             ].map(partner => (
               <a
                 key={partner.name}
