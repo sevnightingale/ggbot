@@ -2,7 +2,8 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { createClient } from '@/lib/supabase'
-import { apiClient, BotConfiguration, ConfigData, DataSource } from '@/lib/api'
+import { apiClient, BotConfiguration, ConfigData } from '@/lib/api'
+import { useDataSources, useLatestActivity, useBotList } from '@/lib/queries'
 import { ThemeProvider } from '@/lib/theme'
 import { PermissionProvider, usePermissions } from '@/lib/permissions'
 import { SaveStatusProvider, useSaveStatus } from '@/lib/contexts/SaveStatusContext'
@@ -33,25 +34,6 @@ interface Position {
   status: string
   opened_at: string
   leverage: number
-}
-
-interface Activity {
-  id: string
-  timestamp: string
-  type: string
-  priority: number
-  data: {
-    summary?: string
-    details?: Record<string, unknown>
-    symbol?: string
-    importance?: number
-    trade_id?: string
-    trade_type?: string
-    confidence?: number
-    leverage?: number
-    entry_price?: number
-    stop_loss_price?: number
-  }
 }
 
 interface AccountData {
@@ -85,8 +67,11 @@ function ForgeApp() {
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null)
   const [positions, setPositions] = useState<Position[]>([])
   const [accounts, setAccounts] = useState<AccountData[]>([])  // Account data from SSE
-  const [latestActivity, setLatestActivity] = useState<Activity | null>(null)  // Latest activity for status display
-  const [dataSources, setDataSources] = useState<DataSource[]>([])
+
+  // React Query hooks — replace manual useEffect fetching with cached queries
+  const { data: dataSources = [] } = useDataSources(!!user)
+  const { data: latestActivity = null } = useLatestActivity(selectedConfigId)
+  const { data: initialBots } = useBotList(!!user)
   const [isStarting, setIsStarting] = useState(false)
   const [isStopping, setIsStopping] = useState(false)
   const [isManualTriggering, setIsManualTriggering] = useState(false)
@@ -403,49 +388,24 @@ function ForgeApp() {
     return newConfig
   }
 
-  // Load or create bot when user is ready
+  // Seed local bot state from React Query cache when initial data arrives
   useEffect(() => {
-    if (!user) return
+    if (!initialBots) return
 
-    const loadOrCreateBot = async () => {
+    if (initialBots.length > 0) {
+      setAllBots(initialBots)
+      // Only auto-select if nothing selected yet
+      setSelectedConfigId(prev => prev ?? initialBots[0].config_id)
       setLoadError(null)
-
-      try {
-        // Get user's existing bots using proper API client
-        const configs = await apiClient.listConfigs()
-
-        if (configs.length > 0) {
-          // Load all configs and select first one
-          setAllBots(configs)
-          setSelectedConfigId(configs[0].config_id)
-          setLoadError(null)
-        } else {
-          // No bots - open the bot creation modal for onboarding
-          console.log('🎯 No bots found, opening bot creation modal for onboarding')
-          setAllBots([])
-          setSelectedConfigId(null)
-          setBotCreationModalOpen(true)
-          setLoadError(null)
-        }
-
-        // Fetch available data sources for configuration
-        try {
-          const dataSourcesResponse = await apiClient.getDataSourcesWithPoints()
-          setDataSources(dataSourcesResponse)
-        } catch (dataSourceError) {
-          console.error('Failed to fetch data sources:', dataSourceError)
-          // Continue without data sources - MarketDataSelector will show empty state
-        }
-
-      } catch (error) {
-        console.error('❌ Failed to load/create bot:', error)
-        const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-        setLoadError(`Failed to load bots: ${errorMessage}`)
-      }
+    } else {
+      // No bots - open the bot creation modal for onboarding
+      console.log('🎯 No bots found, opening bot creation modal for onboarding')
+      setAllBots([])
+      setSelectedConfigId(null)
+      setBotCreationModalOpen(true)
+      setLoadError(null)
     }
-
-    loadOrCreateBot()
-  }, [user])
+  }, [initialBots])
 
   // Real-time SSE connection for status updates with auto-reconnect
   useEffect(() => {
@@ -652,75 +612,11 @@ function ForgeApp() {
     return () => clearInterval(interval)
   }, [nextRun, selectedBot])
 
-  // Fetch latest activity for selected bot (for status display when idle)
-  useEffect(() => {
-    // Skip temp IDs (optimistic placeholders during bot creation/duplication)
-    if (!selectedConfigId || !user || selectedConfigId.startsWith('temp-')) {
-      setLatestActivity(null)
-      return
-    }
+  // Latest activity is now fetched via useLatestActivity() React Query hook
+  // with 30s refetchInterval — no manual polling needed
 
-    const fetchLatestActivity = async () => {
-      try {
-        const token = await getAuthToken()
-        if (!token) return
-
-        const apiUrl = process.env.NEXT_PUBLIC_V2_API_URL || 'https://ggbots-api.nightingale.business'
-        const response = await fetch(`${apiUrl}/api/v2/activities/${selectedConfigId}?limit=1`, {
-          headers: { Authorization: `Bearer ${token}` }
-        })
-
-        if (response.ok) {
-          const data = await response.json()
-          if (data.activities && data.activities.length > 0) {
-            setLatestActivity(data.activities[0])
-          } else {
-            setLatestActivity(null)
-          }
-        }
-      } catch (error) {
-        console.error('Failed to fetch latest activity:', error)
-      }
-    }
-
-    fetchLatestActivity()
-    // Refresh every 30 seconds
-    const interval = setInterval(fetchLatestActivity, 30000)
-    return () => clearInterval(interval)
-  }, [selectedConfigId, user])
-
-  // Page visibility retry - retry failed loads when user returns to page
-  useEffect(() => {
-    const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
-        console.log('👁️ Page became visible')
-
-        // Retry loading if there was an error and no bots loaded
-        if (loadError || (user && allBots.length === 0)) {
-          console.log('🔄 Retrying failed load...')
-          setLoadError(null)
-
-          try {
-            const configs = await apiClient.listConfigs()
-            if (configs.length > 0) {
-              setAllBots(configs)
-              if (!selectedConfigId) {
-                setSelectedConfigId(configs[0].config_id)
-              }
-              setLoadError(null)
-            }
-          } catch (error) {
-            console.error('❌ Retry failed:', error)
-            const errorMessage = error instanceof Error ? error.message : 'Unknown error'
-            setLoadError(`Failed to load bots: ${errorMessage}`)
-          }
-        }
-      }
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
-    return () => document.removeEventListener('visibilitychange', handleVisibilityChange)
-  }, [loadError, user, allBots.length, selectedConfigId])
+  // Page visibility retry is now handled by React Query's built-in
+  // refetchOnWindowFocus and retry logic
 
   // NOTE: Config loading for editing is handled by the useEffect at line 164-184
   // which fires when activeTab === 'configure' && selectedBot changes.
