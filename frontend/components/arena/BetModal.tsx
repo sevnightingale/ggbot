@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useRef, useCallback } from 'react'
 import { X, Loader2, Check, AlertCircle, Wallet, TrendingUp } from 'lucide-react'
 import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
@@ -21,15 +21,29 @@ interface BetModalProps {
   currentRank: number
 }
 
-type TxStep = 'idle' | 'approving' | 'approved' | 'depositing' | 'recording' | 'complete' | 'error'
+type Step = 'idle' | 'approving' | 'waitApproval' | 'depositing' | 'waitDeposit' | 'recording' | 'complete' | 'error'
 
 export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
   const [amount, setAmount] = useState('')
-  const [txStep, setTxStep] = useState<TxStep>('idle')
+  const [step, setStep] = useState<Step>('idle')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
-  const [txHash, setTxHash] = useState<string | null>(null)
+
+  // Ref to track step without stale closures in effects
+  const stepRef = useRef<Step>('idle')
+  const updateStep = useCallback((newStep: Step) => {
+    stepRef.current = newStep
+    setStep(newStep)
+  }, [])
 
   const { address, isConnected } = useAccount()
+
+  // Read USX decimals dynamically (don't assume 18)
+  const { data: usxDecimals } = useReadContract({
+    address: SCROLL_CONTRACTS.USX_TOKEN,
+    abi: USX_ABI,
+    functionName: 'decimals',
+  })
+  const decimals = (usxDecimals as number) ?? 18
 
   // Read USX balance
   const { data: usxBalance, refetch: refetchBalance } = useReadContract({
@@ -49,8 +63,18 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
     query: { enabled: !!address }
   })
 
+  // Parse amount with correct decimals
+  const parsedAmount = amount && parseFloat(amount) > 0
+    ? parseUnits(amount, decimals)
+    : BigInt(0)
+
+  // Keep a ref so effects don't capture stale values
+  const parsedAmountRef = useRef(parsedAmount)
+  const addressRef = useRef(address)
+  useEffect(() => { parsedAmountRef.current = parsedAmount }, [parsedAmount])
+  useEffect(() => { addressRef.current = address }, [address])
+
   // Preview sUSX shares for deposit amount
-  const parsedAmount = amount ? parseUnits(amount, 18) : BigInt(0)
   const { data: previewShares } = useReadContract({
     address: SCROLL_CONTRACTS.SUSX_VAULT,
     abi: SUSX_VAULT_ABI,
@@ -59,126 +83,201 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
     query: { enabled: parsedAmount > BigInt(0) }
   })
 
-  // Write contracts
-  const { writeContract: writeApprove, data: approveHash } = useWriteContract()
-  const { writeContract: writeDeposit, data: depositHash } = useWriteContract()
+  // Write contract hooks (separate for approve and deposit)
+  const {
+    writeContract: doApprove,
+    data: approveHash,
+    error: approveError,
+    isPending: approvePending,
+    reset: resetApprove
+  } = useWriteContract()
 
-  // Wait for transactions
-  const { isSuccess: approveSuccess } = useWaitForTransactionReceipt({
-    hash: approveHash,
-  })
-  const { isSuccess: depositSuccess } = useWaitForTransactionReceipt({
-    hash: depositHash,
-  })
+  const {
+    writeContract: doDeposit,
+    data: depositHash,
+    error: depositError,
+    isPending: depositPending,
+    reset: resetDeposit
+  } = useWriteContract()
 
-  // Handle approve success
+  // Wait for transaction confirmations
+  const {
+    isSuccess: approveConfirmed,
+    error: approveTxError
+  } = useWaitForTransactionReceipt({ hash: approveHash })
+
+  const {
+    isSuccess: depositConfirmed,
+    error: depositTxError
+  } = useWaitForTransactionReceipt({ hash: depositHash })
+
+  // === Step transitions via effects ===
+
+  // Approve submitted to chain → waiting for confirmation
   useEffect(() => {
-    if (approveSuccess && txStep === 'approving') {
-      setTxStep('approved')
+    if (approveHash && stepRef.current === 'approving') {
+      updateStep('waitApproval')
+    }
+  }, [approveHash, updateStep])
+
+  // Approve confirmed → start deposit
+  useEffect(() => {
+    if (approveConfirmed && stepRef.current === 'waitApproval') {
+      updateStep('depositing')
       refetchAllowance()
-      // Auto-proceed to deposit
-      handleDeposit()
-    }
-  }, [approveSuccess])
-
-  // Handle deposit success
-  useEffect(() => {
-    if (depositSuccess && txStep === 'depositing') {
-      setTxHash(depositHash || null)
-      recordPledge()
-    }
-  }, [depositSuccess])
-
-  const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
-  const isPositive = pnlPercent >= 0
-  const formattedBalance = usxBalance ? formatUnits(usxBalance as bigint, 18) : '0'
-  const formattedShares = previewShares ? formatUnits(previewShares as bigint, 18) : '0'
-
-  const needsApproval = currentAllowance !== undefined && parsedAmount > BigInt(0)
-    && (currentAllowance as bigint) < parsedAmount
-
-  const handleApprove = async () => {
-    if (!address) return
-    setTxStep('approving')
-    setErrorMessage(null)
-    try {
-      writeApprove({
-        address: SCROLL_CONTRACTS.USX_TOKEN,
-        abi: USX_ABI,
-        functionName: 'approve',
-        args: [SCROLL_CONTRACTS.SUSX_VAULT, parsedAmount]
-      })
-    } catch (err) {
-      setTxStep('error')
-      setErrorMessage(err instanceof Error ? err.message : 'Approval failed')
-    }
-  }
-
-  const handleDeposit = async () => {
-    if (!address) return
-    setTxStep('depositing')
-    try {
-      writeDeposit({
+      doDeposit({
         address: SCROLL_CONTRACTS.SUSX_VAULT,
         abi: SUSX_VAULT_ABI,
         functionName: 'deposit',
-        args: [parsedAmount, address]
+        args: [parsedAmountRef.current, addressRef.current!]
       })
-    } catch (err) {
-      setTxStep('error')
-      setErrorMessage(err instanceof Error ? err.message : 'Deposit failed')
     }
-  }
+  }, [approveConfirmed, updateStep, refetchAllowance, doDeposit])
 
-  const recordPledge = async () => {
-    if (!address || !depositHash) return
-    setTxStep('recording')
-    try {
-      await apiClient.recordArenaPledge({
-        wallet_address: address,
+  // Deposit submitted to chain → waiting for confirmation
+  useEffect(() => {
+    if (depositHash && stepRef.current === 'depositing') {
+      updateStep('waitDeposit')
+    }
+  }, [depositHash, updateStep])
+
+  // Deposit confirmed → record pledge on backend
+  useEffect(() => {
+    if (depositConfirmed && stepRef.current === 'waitDeposit') {
+      updateStep('recording')
+      const formattedShares = previewShares
+        ? formatUnits(previewShares as bigint, decimals)
+        : undefined
+      apiClient.recordArenaPledge({
+        wallet_address: addressRef.current!,
         config_id: bot.config_id,
         usx_amount: amount,
         susx_amount: formattedShares,
-        tx_hash: depositHash
+        tx_hash: depositHash!
+      }).then(() => {
+        updateStep('complete')
+        refetchBalance()
+      }).catch((err) => {
+        // On-chain tx succeeded, just log backend failure
+        console.error('Failed to record pledge on backend:', err)
+        updateStep('complete')
+        refetchBalance()
       })
-      setTxStep('complete')
-      refetchBalance()
-    } catch (err) {
-      // Even if recording fails, the on-chain tx succeeded
-      console.error('Failed to record pledge:', err)
-      setTxStep('complete')
     }
-  }
+  }, [depositConfirmed, updateStep, depositHash, bot.config_id, amount, previewShares, decimals, refetchBalance])
 
-  const handleSubmit = () => {
-    if (needsApproval) {
-      handleApprove()
-    } else {
-      handleDeposit()
-    }
-  }
+  // === Error handling ===
 
-  const handleClose = () => {
-    if (txStep === 'approving' || txStep === 'depositing' || txStep === 'recording') {
-      return // Don't close during transaction
+  // Wallet rejected approve
+  useEffect(() => {
+    if (approveError && (stepRef.current === 'approving' || stepRef.current === 'idle')) {
+      updateStep('error')
+      setErrorMessage(approveError.message?.includes('User rejected')
+        ? 'Transaction rejected in wallet'
+        : approveError.message || 'Approval failed')
     }
-    setAmount('')
-    setTxStep('idle')
+  }, [approveError, updateStep])
+
+  // Approve tx failed on-chain
+  useEffect(() => {
+    if (approveTxError && stepRef.current === 'waitApproval') {
+      updateStep('error')
+      setErrorMessage('Approval transaction failed on-chain')
+    }
+  }, [approveTxError, updateStep])
+
+  // Wallet rejected deposit
+  useEffect(() => {
+    if (depositError && stepRef.current === 'depositing') {
+      updateStep('error')
+      setErrorMessage(depositError.message?.includes('User rejected')
+        ? 'Transaction rejected in wallet'
+        : depositError.message || 'Deposit failed')
+    }
+  }, [depositError, updateStep])
+
+  // Deposit tx failed on-chain
+  useEffect(() => {
+    if (depositTxError && stepRef.current === 'waitDeposit') {
+      updateStep('error')
+      setErrorMessage('Deposit transaction failed on-chain')
+    }
+  }, [depositTxError, updateStep])
+
+  // === Derived values ===
+
+  const pnlPercent = ((bot.current_equity - bot.initial_balance) / bot.initial_balance) * 100
+  const isPositive = pnlPercent >= 0
+  const formattedBalance = usxBalance ? formatUnits(usxBalance as bigint, decimals) : '0'
+  const formattedShares = previewShares ? formatUnits(previewShares as bigint, decimals) : '0'
+
+  const needsApproval = currentAllowance !== undefined
+    && parsedAmount > BigInt(0)
+    && (currentAllowance as bigint) < parsedAmount
+
+  // === Actions ===
+
+  const handleSubmit = useCallback(() => {
     setErrorMessage(null)
-    setTxHash(null)
-    onClose()
-  }
-
-  const setMaxAmount = () => {
-    if (usxBalance) {
-      setAmount(formatUnits(usxBalance as bigint, 18))
+    if (needsApproval) {
+      updateStep('approving')
+      doApprove({
+        address: SCROLL_CONTRACTS.USX_TOKEN,
+        abi: USX_ABI,
+        functionName: 'approve',
+        args: [SCROLL_CONTRACTS.SUSX_VAULT, parsedAmountRef.current]
+      })
+    } else {
+      updateStep('depositing')
+      doDeposit({
+        address: SCROLL_CONTRACTS.SUSX_VAULT,
+        abi: SUSX_VAULT_ABI,
+        functionName: 'deposit',
+        args: [parsedAmountRef.current, addressRef.current!]
+      })
     }
-  }
+  }, [needsApproval, updateStep, doApprove, doDeposit])
+
+  const handleRetry = useCallback(() => {
+    resetApprove()
+    resetDeposit()
+    updateStep('idle')
+    setErrorMessage(null)
+  }, [resetApprove, resetDeposit, updateStep])
+
+  const handleClose = useCallback(() => {
+    // Block close during active transactions
+    if (approvePending || depositPending) return
+    if (stepRef.current === 'waitApproval' || stepRef.current === 'waitDeposit' || stepRef.current === 'recording') return
+
+    setAmount('')
+    updateStep('idle')
+    setErrorMessage(null)
+    resetApprove()
+    resetDeposit()
+    onClose()
+  }, [approvePending, depositPending, updateStep, resetApprove, resetDeposit, onClose])
+
+  const setMaxAmount = useCallback(() => {
+    if (usxBalance) {
+      setAmount(formatUnits(usxBalance as bigint, decimals))
+    }
+  }, [usxBalance, decimals])
 
   if (!isOpen) return null
 
-  const isProcessing = txStep === 'approving' || txStep === 'depositing' || txStep === 'recording'
-  const canSubmit = isConnected && parsedAmount > BigInt(0) && !isProcessing && txStep !== 'complete'
+  const isProcessing = step === 'approving' || step === 'waitApproval'
+    || step === 'depositing' || step === 'waitDeposit' || step === 'recording'
+  const canSubmit = isConnected && parsedAmount > BigInt(0) && !isProcessing && step !== 'complete'
+
+  // Step display messages
+  const stepMessage: Record<string, string> = {
+    'approving': 'Confirm approval in your wallet...',
+    'waitApproval': 'Waiting for approval confirmation...',
+    'depositing': 'Confirm deposit in your wallet...',
+    'waitDeposit': 'Waiting for deposit confirmation...',
+    'recording': 'Recording your bet...',
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -245,8 +344,8 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
             </div>
           )}
 
-          {/* Amount Input (only show when connected) */}
-          {isConnected && txStep !== 'complete' && (
+          {/* Amount Input (only show when connected and not complete) */}
+          {isConnected && step !== 'complete' && (
             <>
               <div>
                 <label className="block text-sm font-medium text-[var(--text-secondary)] mb-2">
@@ -278,7 +377,7 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
               </div>
 
               {/* Preview */}
-              {parsedAmount > BigInt(0) && (
+              {parsedAmount > BigInt(0) && !isProcessing && (
                 <div className="p-3 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30">
                   <div className="flex justify-between text-sm">
                     <span className="text-[var(--text-secondary)]">You&apos;ll receive</span>
@@ -293,33 +392,40 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
               )}
 
               {/* Cooldown Warning */}
-              <div className="flex items-start gap-2 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
-                <AlertCircle className="h-4 w-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
-                <p className="text-xs text-[var(--text-muted)]">
-                  {SUSX_COOLDOWN_DAYS}-day cooldown to unstake after competition ends.
-                  Either way, your USX earns yield.
-                </p>
-              </div>
+              {!isProcessing && (
+                <div className="flex items-start gap-2 p-3 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
+                  <AlertCircle className="h-4 w-4 text-[var(--text-muted)] mt-0.5 flex-shrink-0" />
+                  <p className="text-xs text-[var(--text-muted)]">
+                    {SUSX_COOLDOWN_DAYS}-day cooldown to unstake after competition ends.
+                    Either way, your USX earns yield.
+                  </p>
+                </div>
+              )}
             </>
           )}
 
-          {/* Transaction Status */}
+          {/* Transaction Progress */}
           {isProcessing && (
             <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-[var(--bg-secondary)] border border-[var(--border)]">
               <Loader2 className="h-8 w-8 text-[var(--accent)] animate-spin" />
               <p className="text-sm font-medium text-[var(--text-primary)]">
-                {txStep === 'approving' && 'Approving USX...'}
-                {txStep === 'depositing' && 'Staking USX...'}
-                {txStep === 'recording' && 'Recording your bet...'}
+                {stepMessage[step] || 'Processing...'}
               </p>
-              <p className="text-xs text-[var(--text-muted)]">
-                Please confirm in your wallet
-              </p>
+              {(step === 'waitApproval' || step === 'waitDeposit') && (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Waiting for on-chain confirmation...
+                </p>
+              )}
+              {(step === 'approving' || step === 'depositing') && (
+                <p className="text-xs text-[var(--text-muted)]">
+                  Check your wallet for the transaction
+                </p>
+              )}
             </div>
           )}
 
           {/* Success State */}
-          {txStep === 'complete' && (
+          {step === 'complete' && (
             <div className="flex flex-col items-center gap-3 p-4 rounded-xl bg-[var(--profit-color)]/10 border border-[var(--profit-color)]/30">
               <div className="w-12 h-12 rounded-full bg-[var(--profit-color)]/20 flex items-center justify-center">
                 <Check className="h-6 w-6 text-[var(--profit-color)]" />
@@ -332,9 +438,9 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
                   {amount} USX staked · Earning yield now
                 </p>
               </div>
-              {txHash && (
+              {depositHash && (
                 <a
-                  href={`https://scrollscan.com/tx/${txHash}`}
+                  href={`https://scrollscan.com/tx/${depositHash}`}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-xs text-[var(--accent)] hover:underline"
@@ -346,16 +452,22 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
           )}
 
           {/* Error State */}
-          {txStep === 'error' && errorMessage && (
+          {step === 'error' && errorMessage && (
             <div className="p-3 rounded-xl bg-[var(--loss-color)]/10 border border-[var(--loss-color)]/30">
-              <p className="text-sm text-[var(--loss-color)]">{errorMessage}</p>
+              <p className="text-sm text-[var(--loss-color)] mb-2">{errorMessage}</p>
+              <button
+                onClick={handleRetry}
+                className="text-xs text-[var(--text-secondary)] hover:text-[var(--text-primary)] underline"
+              >
+                Try again
+              </button>
             </div>
           )}
         </div>
 
         {/* Footer */}
         <div className="p-5 border-t border-[var(--border)]">
-          {txStep === 'complete' ? (
+          {step === 'complete' ? (
             <button
               onClick={handleClose}
               className="w-full py-3 rounded-xl font-medium transition-colors bg-[var(--bg-secondary)] hover:bg-[var(--bg-tertiary)] text-[var(--text-primary)] border border-[var(--border)]"
@@ -369,9 +481,10 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
               className="w-full py-3 rounded-xl font-medium transition-colors bg-[var(--accent)] hover:bg-[var(--accent-hover)] text-[var(--bg-primary)] disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {!isConnected && 'Connect Wallet to Bet'}
-              {isConnected && needsApproval && 'Approve & Bet'}
-              {isConnected && !needsApproval && parsedAmount > BigInt(0) && 'Place Bet'}
-              {isConnected && parsedAmount === BigInt(0) && 'Enter Amount'}
+              {isConnected && step === 'error' && 'Try Again'}
+              {isConnected && step !== 'error' && needsApproval && parsedAmount > BigInt(0) && 'Approve & Bet'}
+              {isConnected && step !== 'error' && !needsApproval && parsedAmount > BigInt(0) && 'Place Bet'}
+              {isConnected && step !== 'error' && parsedAmount === BigInt(0) && 'Enter Amount'}
             </button>
           )}
         </div>

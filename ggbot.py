@@ -4083,11 +4083,11 @@ async def unregister_from_arena(
 @app.post("/api/v2/arena/pledge")
 async def record_arena_pledge(
     request: Request,
-    current_user: AuthenticatedUser = Depends(get_current_user_v2)
 ) -> Dict[str, Any]:
     """
-    Record a USX staking pledge on an arena bot.
+    Record a USX staking pledge on an arena bot (public endpoint).
 
+    No auth required — wallet_address is the identity.
     Called after the user completes on-chain staking (USX → sUSX vault).
     Records which bot they're backing for prize distribution.
 
@@ -4116,6 +4116,20 @@ async def record_arena_pledge(
                 detail="Missing required fields: wallet_address, config_id, usx_amount, tx_hash"
             )
 
+        # Basic wallet address validation
+        if not wallet_address.startswith('0x') or len(wallet_address) != 42:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid wallet address format"
+            )
+
+        # Basic tx_hash validation
+        if not tx_hash.startswith('0x') or len(tx_hash) != 66:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid transaction hash format"
+            )
+
         # Validate config_id is a public arena bot
         from core.common.db import get_db_connection
         with get_db_connection() as conn:
@@ -4135,15 +4149,14 @@ async def record_arena_pledge(
 
                 bot_name = bot[1]
 
-                # Insert pledge record
+                # Insert pledge record (user_id nullable for public endpoint)
                 cur.execute("""
                     INSERT INTO arena_pledges
-                        (user_id, wallet_address, config_id, usx_amount, susx_amount, tx_hash)
-                    VALUES (%s, %s, %s, %s, %s, %s)
+                        (wallet_address, config_id, usx_amount, susx_amount, tx_hash)
+                    VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (tx_hash) DO NOTHING
                     RETURNING id
                 """, (
-                    current_user.user_id,
                     wallet_address,
                     config_id,
                     usx_amount,
@@ -4164,7 +4177,7 @@ async def record_arena_pledge(
                 pledge_id = result[0]
 
         logger.info(
-            f"Arena pledge recorded: user={current_user.user_id}, "
+            f"Arena pledge recorded: wallet={wallet_address[:10]}..., "
             f"bot={config_id}, amount={usx_amount} USX, tx={tx_hash[:16]}..."
         )
 

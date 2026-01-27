@@ -906,7 +906,7 @@ export class ApiClient {
     usx_amount?: string
     message: string
   }> {
-    const response = await this.authenticatedFetch(`${this.baseUrl}/api/v2/arena/pledge`, {
+    const response = await fetch(`${this.baseUrl}/api/v2/arena/pledge`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(data)
