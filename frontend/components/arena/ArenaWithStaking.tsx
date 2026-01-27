@@ -685,6 +685,31 @@ function ArenaContent() {
         </div>
       </div>
 
+      {/* Partners */}
+      <div className="border-t border-[var(--border)] py-10">
+        <div className="text-center space-y-4">
+          <h3 className="font-mono text-xs uppercase tracking-widest text-[var(--text-muted)]">
+            Partners &amp; Sponsors
+          </h3>
+          <div className="flex flex-wrap justify-center items-center gap-6 md:gap-8">
+            {[
+              { name: 'Scroll', url: 'https://scroll.io' },
+              { name: 'Symphony', url: 'https://symphony.finance' },
+            ].map(partner => (
+              <a
+                key={partner.name}
+                href={partner.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-display text-xl text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-colors duration-300"
+              >
+                {partner.name}
+              </a>
+            ))}
+          </div>
+        </div>
+      </div>
+
       {/* CTA Footer */}
       <div className="relative border-t border-[var(--border)] overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-t from-[var(--accent)]/10 via-[var(--accent)]/5 to-transparent pointer-events-none" />
