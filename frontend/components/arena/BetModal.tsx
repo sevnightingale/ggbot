@@ -6,7 +6,7 @@ import { ConnectButton } from '@rainbow-me/rainbowkit'
 import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from 'wagmi'
 import { parseUnits, formatUnits } from 'viem'
 import { SCROLL_CONTRACTS, USX_ABI, SUSX_VAULT_ABI, SUSX_COOLDOWN_DAYS } from '@/lib/contracts'
-import { api } from '@/lib/api'
+import { apiClient } from '@/lib/api'
 
 interface BetModalProps {
   isOpen: boolean
@@ -134,7 +134,7 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
     if (!address || !depositHash) return
     setTxStep('recording')
     try {
-      await api.recordArenaPledge({
+      await apiClient.recordArenaPledge({
         wallet_address: address,
         config_id: bot.config_id,
         usx_amount: amount,
