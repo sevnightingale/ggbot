@@ -281,7 +281,7 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
               {parsedAmount > BigInt(0) && (
                 <div className="p-3 rounded-xl bg-[var(--accent)]/10 border border-[var(--accent)]/30">
                   <div className="flex justify-between text-sm">
-                    <span className="text-[var(--text-secondary)]">You'll receive</span>
+                    <span className="text-[var(--text-secondary)]">You&apos;ll receive</span>
                     <span className="font-mono font-medium text-[var(--accent)]">
                       ~{parseFloat(formattedShares).toFixed(4)} sUSX
                     </span>
@@ -326,7 +326,7 @@ export function BetModal({ isOpen, onClose, bot, currentRank }: BetModalProps) {
               </div>
               <div className="text-center">
                 <p className="font-medium text-[var(--text-primary)]">
-                  You're backing {bot.config_name}!
+                  You&apos;re backing {bot.config_name}!
                 </p>
                 <p className="text-sm text-[var(--text-muted)] mt-1">
                   {amount} USX staked · Earning yield now
