@@ -16,7 +16,7 @@ interface BetModalProps {
     config_name: string
     current_equity: number
     initial_balance: number
-    profile_image_url?: string
+    profile_image_url?: string | null
   }
   currentRank: number
 }
