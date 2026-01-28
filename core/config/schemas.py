@@ -157,6 +157,9 @@ class ScheduledTradingConfigData(BaseModel):
     llm_config: Optional[LLMConfig] = Field(default_factory=LLMConfig)
     telegram_integration: Optional[TelegramIntegrationConfig] = None
 
+    # Rei integration (inference-time learning decision engine)
+    rei_enabled: bool = False
+
     # Must NOT have agent_strategy
     agent_strategy: None = None
 

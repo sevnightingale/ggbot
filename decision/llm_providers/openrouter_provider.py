@@ -49,10 +49,10 @@ class OpenRouterProvider(LLMProvider):
         ('gpt', 'standard'): 'openai/gpt-5',
         ('gpt', 'premium'): 'openai/gpt-5-pro',
 
-        # Kimi (MoonshotAI)
+        # Kimi (MoonshotAI) - Updated 2026-01-27: standard/premium → K2.5
         ('kimi', 'economy'): 'moonshotai/kimi-k2',
-        ('kimi', 'standard'): 'moonshotai/kimi-k2-0905',
-        ('kimi', 'premium'): 'moonshotai/kimi-k2-thinking',
+        ('kimi', 'standard'): 'moonshotai/kimi-k2.5',
+        ('kimi', 'premium'): 'moonshotai/kimi-k2.5',
 
         # Qwen
         ('qwen', 'economy'): 'qwen/qwen-turbo',
@@ -67,7 +67,7 @@ class OpenRouterProvider(LLMProvider):
         'gemini': 'google/gemini-2.5-pro',
         'deepseek': 'deepseek/deepseek-v3.2',
         'gpt': 'openai/gpt-5',
-        'kimi': 'moonshotai/kimi-k2-0905',
+        'kimi': 'moonshotai/kimi-k2.5',
         'qwen': 'qwen/qwen-plus',
         'default': 'x-ai/grok-4-fast'
     }
@@ -96,8 +96,7 @@ class OpenRouterProvider(LLMProvider):
         'openai/gpt-5-pro',
         # Kimi
         'moonshotai/kimi-k2',
-        'moonshotai/kimi-k2-0905',
-        'moonshotai/kimi-k2-thinking',
+        'moonshotai/kimi-k2.5',
         # Qwen - does NOT support reasoning
     }
 
@@ -121,8 +120,7 @@ class OpenRouterProvider(LLMProvider):
         'anthropic/claude-opus-4.5',
         # Kimi
         'moonshotai/kimi-k2',
-        'moonshotai/kimi-k2-0905',
-        'moonshotai/kimi-k2-thinking',
+        'moonshotai/kimi-k2.5',
         # Qwen
         'qwen/qwen-turbo',
         'qwen/qwen-plus',

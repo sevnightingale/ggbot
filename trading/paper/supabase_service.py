@@ -648,6 +648,34 @@ class SupabasePaperTradingService:
                 except Exception as e:
                     logger.warning(f"Failed to publish exit to Telegram: {e}")
 
+            # Report trade outcome to Rei for learning (if rei_enabled)
+            if reason != 'account_reset':
+                try:
+                    config_id_str = str(trade['config_id'])
+                    config_response = self.supabase.table('configurations').select('config_data').eq('config_id', config_id_str).execute()
+                    if config_response.data:
+                        config_data = config_response.data[0].get('config_data', {})
+                        if isinstance(config_data, str):
+                            import json as _json
+                            config_data = _json.loads(config_data)
+                        rei_enabled = config_data.get('rei_enabled', False)
+                        if rei_enabled:
+                            from decision.rei_engine import report_trade_outcome_to_rei
+                            duration_hours = duration_seconds / 3600.0
+                            await report_trade_outcome_to_rei(
+                                config_id=config_id_str,
+                                symbol=trade['symbol'],
+                                side=side,
+                                entry_price=entry_price,
+                                exit_price=close_price,
+                                pnl_usd=float(net_pnl),
+                                pnl_percent=pnl_pct,
+                                duration_hours=duration_hours,
+                                close_reason=reason,
+                            )
+                except Exception as e:
+                    logger.warning(f"Failed to report trade outcome to Rei: {e}")
+
             return {
                 "status": "closed",
                 "trade_id": trade_id,

@@ -38,6 +38,7 @@ class BotConfigV2:
         is_public_performance: bool = False,
         first_run_used: bool = False,
         free_runs_remaining: int = 3,
+        rei_enabled: bool = False,
         created_at: Optional[datetime] = None,
         updated_at: Optional[datetime] = None
     ):
@@ -60,6 +61,7 @@ class BotConfigV2:
         self.is_public_performance = is_public_performance
         self.first_run_used = first_run_used
         self.free_runs_remaining = free_runs_remaining
+        self.rei_enabled = rei_enabled
         self.created_at = created_at or datetime.now()
         self.updated_at = updated_at or datetime.now()
     
@@ -133,6 +135,7 @@ class BotConfigV2:
             is_public_performance=data.get("is_public_performance", False),
             first_run_used=data.get("first_run_used", False),
             free_runs_remaining=data.get("free_runs_remaining", 3),
+            rei_enabled=data.get("rei_enabled", False),
             created_at=datetime.fromisoformat(data["created_at"]) if data.get("created_at") else None,
             updated_at=datetime.fromisoformat(data["updated_at"]) if data.get("updated_at") else None
         )
@@ -323,6 +326,7 @@ class ConfigService:
                             "llm_config": inner_config.get("llm_config", {"provider": "deepseek", "use_platform_keys": True, "use_own_key": False}),
                             "telegram_integration": inner_config.get("telegram_integration", {}),
                             "agent_strategy": inner_config.get("agent_strategy"),  # Include agent strategy
+                            "rei_enabled": inner_config.get("rei_enabled", False),
                             "trading_mode": trading_mode,
                             "symphony_agent_id": symphony_agent_id,
                             "profile_image_url": profile_image_url,

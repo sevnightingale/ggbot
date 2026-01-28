@@ -239,6 +239,7 @@ case 'live_trading':
 | Data extraction, indicators, preprocessors | `extraction/v2/README.md` |
 | Market intelligence, Grok sources | `market_intelligence/README.md` |
 | Decision engine, LLM prompts | `decision/README.md` |
+| Updating LLM models/tiers | `decision/llm_providers/MODEL_UPDATE.md` |
 | Agent behavior, MCP tools, strategy | `agent/README.md` |
 | Frontend components, SSE, bot rail | `frontend/README.md` |
 | Database schema questions | `ACTIVE.md` (Database Schema section) |

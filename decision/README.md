@@ -172,6 +172,58 @@ prompt = build_opportunity_analysis_prompt(
 - **New**: Users only configure `strategy` field, system handles all variable injection
 - **Benefit**: Eliminates prompt engineering complexity while maintaining customization
 
+## Rei Decision Engine (Experimental)
+
+### Overview
+`decision/rei_engine.py` provides an alternative decision path using Rei Core (reilabs.org) instead of OpenRouter LLMs. When `rei_enabled: true` is set in a bot's config_data, `_run_decision_v2()` routes to `ReiDecisionEngine` instead of `DecisionEngineV2`.
+
+### Architecture
+```
+Extraction (normal V2 pipeline)
+    ↓
+ReiDecisionEngine.make_decision()
+    ↓  Sends raw numerical data (Float64 precision)
+    ↓  {technical_indicators, market_intelligence, positions, balance}
+    ↓
+Rei API (api.reilabs.org/v1/chat/completions)
+    ↓  Returns JSON: {action, confidence, take_profit, stop_loss, reasoning}
+    ↓
+Trading (normal paper/symphony engine)
+    ↓
+[On trade close] → report_trade_outcome_to_rei() (feedback loop)
+```
+
+### Key Differences from LLM Path
+| Aspect | DecisionEngineV2 (LLM) | ReiDecisionEngine |
+|--------|------------------------|-------------------|
+| Provider | OpenRouter (GPT-5, Claude, etc.) | Rei Core API |
+| Data format | Prose prompt with formatted text | Raw JSON with Float64 numbers |
+| Learning | None (stateless per call) | Inference-time conceptual learning |
+| Feedback | None | Trade outcomes reported for pattern evolution |
+| Config used | `llm_config`, `decision` (strategy/prompts) | Neither (ignored for Rei bots) |
+| Cost tracking | OpenRouter usage → activities table | Rei API (separate, via REI_01_UNIT_SECRET) |
+
+### Config
+```sql
+-- Enable Rei on a bot
+UPDATE configurations
+SET config_data = config_data || '{"rei_enabled": true}'::jsonb
+WHERE config_id = 'your-config-id';
+```
+
+### Files
+- `decision/rei_engine.py` — ReiDecisionEngine + report_trade_outcome_to_rei()
+- `core/services/rei_service.py` — Rei API client (httpx async, retry, auth)
+- `core/config/schemas.py` — `rei_enabled` field on ScheduledTradingConfigData
+- `trading/paper/supabase_service.py` — Feedback hook on trade close
+
+### Environment
+```
+REI_01_UNIT_SECRET=your-rei-unit-secret-key
+```
+
+---
+
 ## Current Implementation Status
 
 ### Completed ✅

@@ -1,63 +1,63 @@
 # 🚀 ACTIVE - ggbots System Status
 
-**Last Updated**: 2026-01-26 22:14:08 UTC (Auto-updated by status_check.py)
+**Last Updated**: 2026-01-27 18:36:00 UTC (Auto-updated by status_check.py)
 **System Health**: 🟢 HEALTHY
 
 ## 📊 Live Platform Metrics
 
 ### Users & Subscriptions
-- **Total Users**: 306
-- **Prepaid Users**: 12 (12 active subscriptions)
-- **Free Users**: 285
-- **Users with Bots**: 297 (97.1%)
+- **Total Users**: 307
+- **Prepaid Users**: 13 (13 active subscriptions)
+- **Free Users**: 284
+- **Users with Bots**: 298 (97.1%)
 
 ### Bot Statistics
-- **Total Bots**: 461
-- **Active Bots**: 34 (7.4%)
-  - Paper: 33
+- **Total Bots**: 467
+- **Active Bots**: 30 (6.4%)
+  - Paper: 29
   - Symphony (Live): 1
   - Aster (DEX): 0
-- **Inactive Bots**: 427
+- **Inactive Bots**: 437
 - **Avg Bots per User**: 1.6
 
 ### Trading Activity
-- **Total Trades (All Time)**: 5,565
-  - Wins: 1,675
-  - Losses: 3,890
-  - Platform Win Rate: 30.10%
-  - Total P&L: $-19,483.96
+- **Total Trades (All Time)**: 5,581
+  - Wins: 1,684
+  - Losses: 3,897
+  - Platform Win Rate: 30.17%
+  - Total P&L: $-18,614.83
 - **Recent Activity**:
-  - Last 24 hours: 22 trades
-  - Last 7 days: 172 trades
-  - Last 30 days: 346 trades
+  - Last 24 hours: 29 trades
+  - Last 7 days: 178 trades
+  - Last 30 days: 361 trades
 
 ### Open Positions
-- **Open Positions**: 12
-- **Unique Symbols**: 2
-- **Total Exposure**: $134,647.98
-- **Unrealized P&L**: $2,086.65
+- **Open Positions**: 17
+- **Unique Symbols**: 4
+- **Total Exposure**: $187,800.74
+- **Unrealized P&L**: $719.69
 
 ### Account Balances (Paper Trading)
-- **Average Balance**: $9,932.65
+- **Average Balance**: $9,935.38
 - **Lowest Balance**: $3,905.05
-- **Highest Balance**: $10,539.64
+- **Highest Balance**: $10,472.05
 
 ### Top Trading Symbols (Active Bots)
 
-- **BTC/USDT**: 21 bots
-- **ETH/USDT**: 6 bots
-- **SOL/USDT**: 4 bots
-- **AAVE/USDT**: 1 bots
+- **BTC/USDT**: 19 bots
+- **SOL/USDT**: 5 bots
+- **ETH/USDT**: 4 bots
 - **LINK/USDT**: 1 bots
+- **RENDER/USDT**: 1 bots
 
 ### Decision Activity (24h)
 
-- **wait**: 850 decisions (avg confidence: 42.9%)
-- **exit**: 24 decisions (avg confidence: 70.0%)
-- **enter**: 22 decisions (avg confidence: 67.1%)
+- **wait**: 865 decisions (avg confidence: 39.4%)
+- **enter**: 29 decisions (avg confidence: 65.9%)
+- **exit**: 19 decisions (avg confidence: 70.9%)
 
 ### System Health
-- **Decisions (last hour)**: 33
+- **Decisions (last hour)**: 31
 - **Status**: 🟢 HEALTHY
 
 ## 🖥️ System Resources
@@ -66,22 +66,21 @@
 
 | Service | Status | CPU | Memory | Uptime | Restarts |
 |---------|--------|-----|--------|--------|----------|
-| error-alerts | 🟢 online | 0% | 34MB | 16m | 8 |
-| market-data-ws | 🟢 online | 1.6% | 174MB | 16m | 7 |
-| ggbot | 🟢 online | 1% | 406MB | 16m | 46 |
-| account-monitor | 🟢 online | 1.6% | 151MB | 16m | 25 |
-| agent-5b77d429-5da4-4d69-8aba-50d916e4b6b8 | 🟢 online | 0% | 70MB | 16m | 12 |
-| telegram-bot | 🟢 online | 0% | 34MB | 16m | 3 |
+| error-alerts | 🟢 online | 0% | 19MB | 20h 38m | 8 |
+| market-data-ws | 🟢 online | 1.3% | 13MB | 20h 38m | 7 |
+| ggbot | 🟢 online | 1.1% | 470MB | 51m | 50 |
+| account-monitor | 🟢 online | 1.6% | 217MB | 20h 38m | 25 |
+| telegram-bot | 🟢 online | 0% | 35MB | 20h 38m | 3 |
 
 ### VM Resources
 
-- **Disk**: 46G / 78G (59%)
-- **Memory**: 2.5Gi / 3.8Gi
-- **CPU Load**: 0.50 / 0.24 / 0.23 (1m/5m/15m)
+- **Disk**: 45G / 78G (58%)
+- **Memory**: 1.9Gi / 3.8Gi
+- **CPU Load**: 0.56 / 0.25 / 0.16 (1m/5m/15m)
 
 ### Infrastructure Services
 
-- **Redis**: 🟢 connected (Memory: 19.09M)
+- **Redis**: 🟢 connected (Memory: 21.03M)
 - **Supabase PostgreSQL**: 🟢 connected (Remote managed service)
 
 ---
@@ -294,6 +293,16 @@
 - **Live Trading**: Symphony.io integration (premium feature, ggBase required)
 - **AsterDEX Trading**: Decentralized futures (33 symbols, up to 20x leverage, competition-ready)
 
+### **Rei Decision Engine** (Experimental - 2026-01-27)
+- **Purpose**: Alternative decision engine using Rei Core (reilabs.org) instead of OpenRouter LLMs
+- **How it works**: Extraction runs normally → raw numerical data sent to Rei API (Float64 precision) → structured JSON decision returned → trading engine executes
+- **Key advantage**: Inference-time learning — Rei evolves reasoning patterns from trade outcomes without retraining. No LLM tokenization loss on numerical data.
+- **Feedback loop**: Trade outcomes (P&L, duration, close reason) automatically reported to Rei for learning
+- **Config**: Set `rei_enabled: true` in bot's `config_data` JSONB to route decisions through Rei
+- **Test bot**: "The Nightingale" (config_id: `4060437e-b39e-4c51-a2a9-b35cf698ed64`) — BTC/USDT paper trading
+- **Files**: `decision/rei_engine.py` (engine), `core/services/rei_service.py` (API client)
+- **Docs**: `DOCS/REI_DOCS.md` (Rei platform documentation)
+
 ---
 
 ## 🔌 Complete Port Reference
@@ -437,7 +446,7 @@ df -h
 
 **For architectural context and design decisions**, see [DOCS/DATABASE_CONTEXT.md](DOCS/DATABASE_CONTEXT.md).
 
-**Last Updated**: 2026-01-26 22:14:09 UTC
+**Last Updated**: 2026-01-27 18:36:01 UTC
 
 ---
 
@@ -551,6 +560,37 @@ df -h
 | `last_active_at` | timestamp without time zone | ✓ | now() |
 | `created_at` | timestamp without time zone | ✓ | now() |
 | `updated_at` | timestamp without time zone | ✓ | now() |
+
+### `arena_pledges` (12 columns)
+
+**Primary Key**: `id`
+
+**Foreign Keys**:
+- `config_id` → `configurations(config_id)`
+
+**Indexes**:
+- `arena_pledges_tx_hash_key` on (tx_hash)
+- `idx_arena_pledges_config` on (config_id)
+- `idx_arena_pledges_pledged_at` on (pledged_at)
+- `idx_arena_pledges_user` on (user_id)
+- `idx_arena_pledges_wallet` on (wallet_address)
+
+**Unique Constraints**: `tx_hash`
+
+| Column | Type | Nullable | Default |
+|--------|------|----------|---------|
+| `id` | uuid |  | gen_random_uuid() |
+| `user_id` | uuid | ✓ |  |
+| `wallet_address` | text |  |  |
+| `config_id` | uuid | ✓ |  |
+| `usx_amount` | numeric |  |  |
+| `susx_amount` | numeric | ✓ |  |
+| `tx_hash` | text |  |  |
+| `pledged_at` | timestamp with time zone | ✓ | now() |
+| `competition_id` | uuid | ✓ |  |
+| `prize_amount` | numeric | ✓ |  |
+| `claimed_at` | timestamp with time zone | ✓ |  |
+| `unstaked_at` | timestamp with time zone | ✓ |  |
 
 ### `bot_telegram_channels` (6 columns)
 
@@ -1292,7 +1332,7 @@ True for PREPAID, USAGE_BASED, and PRO tiers with active subscriptions.
 
 **Auto-generated** - Updated automatically by `scripts/status_check.py`
 
-**Last Updated**: 2026-01-26 22:14:09 UTC
+**Last Updated**: 2026-01-27 18:36:01 UTC
 
 ---
 

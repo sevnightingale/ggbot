@@ -1019,8 +1019,6 @@ class GGBotOrchestrator:
                     "confidence": 0.0
                 }
 
-            decision_engine = await self._get_decision_engine(config_id, config.user_id)
-
             if signal_data:
                 symbol = signal_data['symbol']
             else:
@@ -1033,16 +1031,46 @@ class GGBotOrchestrator:
             ggshot_signals = extraction_result.get('ggshot_signals', {})
             market_intelligence = extraction_result.get('market_intelligence', {})
 
+            # Route to Rei decision engine if enabled
+            if getattr(config, 'rei_enabled', False):
+                from decision.rei_engine import ReiDecisionEngine
+                rei_engine = ReiDecisionEngine(config_id, config.user_id)
+
+                # Get open positions and account balance for Rei context
+                open_positions = []
+                account_balance = None
+                try:
+                    from trading.paper.supabase_service import SupabasePaperTradingService
+                    paper_service = SupabasePaperTradingService()
+                    open_positions = await paper_service.get_open_positions(config_id)
+                    account_summary = await paper_service.get_account_summary(config_id)
+                    account_balance = account_summary.get('current_balance', 10000.0)
+                except Exception as e:
+                    self._log.warning(f"Could not fetch positions/balance for Rei context: {e}")
+
+                decision_result = await rei_engine.make_decision(
+                    symbol=symbol,
+                    extraction_result=extraction_result,
+                    open_positions=open_positions,
+                    account_balance=account_balance,
+                    market_intelligence=market_intelligence,
+                )
+                self._log.info(f"Rei Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
+                return decision_result
+
+            # Standard OpenRouter LLM decision engine
+            decision_engine = await self._get_decision_engine(config_id, config.user_id)
+
             decision_result = await decision_engine.make_decision(
                 symbol=symbol,
                 signal_data=signal_data,
                 ggshot_signals=ggshot_signals,
                 market_intelligence=market_intelligence
             )
-            
+
             self._log.info(f"V2 Decision completed: {decision_result.get('action')} with confidence {decision_result.get('confidence', 0)}")
             return decision_result
-            
+
         except Exception as e:
             self._log.error(f"V2 Decision failed: {e}")
             return {
