@@ -28,6 +28,11 @@ from typing import Dict, Any, List, Optional
 
 from core.common.logger import logger
 from core.services.rei_service import ReiService, ReiServiceError
+from extraction.v2.preprocessors.compact_config import (
+    get_timeframes_for_indicator,
+    REI_INDICATOR_TIMEFRAMES,
+)
+from extraction.v2.preprocessors import get_preprocessor
 
 
 class ReiDecisionEngine:
@@ -152,18 +157,11 @@ class ReiDecisionEngine:
         Sends raw numerical data — no prose, no LLM articulation.
         Rei preserves Float64 precision (unlike LLMs which tokenize numbers).
 
-        NOTE: Current payload may exceed Rei's ~30KB limit with all timeframes.
-        TODO: Restructure preprocessors to output compact format (Option B).
+        Uses compact format for indicators to stay under ~30KB payload limit.
+        Only includes timeframes configured in REI_INDICATOR_TIMEFRAMES per indicator.
         """
-        # Extract technical indicators from extraction result
-        # extraction_result has nested timeframe structure
-        technicals = {}
-        if 'timeframes' in extraction_result:
-            for tf_key, tf_data in extraction_result.get('timeframes', {}).items():
-                if isinstance(tf_data, dict) and 'indicators' in tf_data:
-                    technicals[tf_key] = self._sanitize_numeric_data(tf_data['indicators'])
-        elif 'indicators' in extraction_result:
-            technicals['default'] = self._sanitize_numeric_data(extraction_result['indicators'])
+        # Convert indicators to compact format (filters by configured timeframes)
+        compact_indicators = self._convert_to_compact_indicators(extraction_result)
 
         # Market intelligence — strip debug metadata (_meta, tool_calls, citations)
         intel = market_intelligence or extraction_result.get('market_intelligence', {})
@@ -180,15 +178,142 @@ class ReiDecisionEngine:
             "account_balance_usd": account_balance,
             "current_positions": positions_summary,
             "market_data": {
-                "technical_indicators": technicals,
+                "indicators": compact_indicators,
                 "market_intelligence": intel,
             },
             "instructions": (
                 "Analyze this market data and return a JSON trading decision. "
-                "Include action, confidence, reasoning, key_signals, warnings, "
-                "take_profit (price level), and stop_loss (price level)."
+                "Each indicator has: value (primary), value_secondary, value_tertiary, "
+                "velocity (rate of change), zone (state), trend, patterns (list of codes). "
+                "Return: action (long/short/wait/close), confidence (0-1), reasoning, "
+                "key_signals, warnings, take_profit (price), stop_loss (price)."
             ),
         }
+
+    def _convert_to_compact_indicators(
+        self,
+        extraction_result: Dict[str, Any],
+    ) -> List[Dict[str, Any]]:
+        """
+        Convert full indicator outputs to compact format for Rei.
+
+        Filters indicators by configured timeframes (REI_INDICATOR_TIMEFRAMES)
+        and converts each to compact format using preprocessor.to_compact().
+
+        Args:
+            extraction_result: Full extraction result with timeframes/indicators
+
+        Returns:
+            List of compact indicator dicts
+        """
+        compact_list = []
+
+        # extraction_result has nested timeframe structure
+        timeframes_data = extraction_result.get('timeframes', {})
+
+        if not timeframes_data and 'indicators' in extraction_result:
+            # Flat structure - single timeframe
+            timeframes_data = {'default': {'indicators': extraction_result['indicators']}}
+
+        for tf_key, tf_data in timeframes_data.items():
+            if not isinstance(tf_data, dict) or 'indicators' not in tf_data:
+                continue
+
+            indicators = tf_data.get('indicators', {})
+
+            for indicator_name, indicator_data in indicators.items():
+                if not isinstance(indicator_data, dict):
+                    continue
+
+                # Normalize indicator name
+                indicator_lower = indicator_name.lower()
+
+                # Check if this timeframe is configured for this indicator
+                configured_tfs = get_timeframes_for_indicator(indicator_lower)
+                if tf_key not in configured_tfs and tf_key != 'default':
+                    # Skip - this timeframe not configured for this indicator
+                    continue
+
+                # Try to get preprocessor for compact conversion
+                preprocessor = get_preprocessor(indicator_lower)
+
+                if preprocessor and hasattr(preprocessor, 'to_compact'):
+                    try:
+                        compact = preprocessor.to_compact(indicator_data, tf_key)
+                        compact_list.append(compact)
+                    except Exception as e:
+                        self._log.warning(
+                            f"Compact conversion failed for {indicator_name}/{tf_key}: {e}"
+                        )
+                        # Fallback: include sanitized original (but smaller)
+                        compact_list.append(self._fallback_compact(
+                            indicator_name, tf_key, indicator_data
+                        ))
+                else:
+                    # No compact converter - use fallback
+                    compact_list.append(self._fallback_compact(
+                        indicator_name, tf_key, indicator_data
+                    ))
+
+        self._log.debug(f"Converted {len(compact_list)} indicators to compact format")
+        return compact_list
+
+    def _fallback_compact(
+        self,
+        indicator_name: str,
+        timeframe: str,
+        indicator_data: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """
+        Fallback compact conversion for indicators without to_compact() method.
+
+        Extracts essential values into universal compact schema.
+        """
+        current = indicator_data.get('current', {})
+
+        # Try to find primary value
+        value = current.get('value')
+        if value is None:
+            # Try common field names
+            for key in ['macd', 'adx', 'k_percent', 'price', 'atr', 'percent_b']:
+                if key in current:
+                    value = current.get(key)
+                    break
+
+        # Try to find secondary/tertiary values
+        value_secondary = current.get('signal') or current.get('d_percent') or current.get('upper_band')
+        value_tertiary = current.get('histogram') or current.get('lower_band')
+
+        return {
+            "indicator": indicator_name.lower(),
+            "timeframe": timeframe,
+            "timestamp": current.get('timestamp'),
+            "value": self._safe_float(value),
+            "value_secondary": self._safe_float(value_secondary),
+            "value_tertiary": self._safe_float(value_tertiary),
+            "velocity": 0.0,
+            "rank": 0.0,
+            "zone": indicator_data.get('zone', {}).get('current_zone', 'unknown')
+                    if isinstance(indicator_data.get('zone'), dict)
+                    else 'unknown',
+            "zone_periods": 0,
+            "trend": indicator_data.get('trend', {}).get('direction', 'unknown')
+                     if isinstance(indicator_data.get('trend'), dict)
+                     else 'unknown',
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+            "patterns": [],
+            "analysis": indicator_data.get('summary', ''),
+        }
+
+    def _safe_float(self, value: Any) -> Optional[float]:
+        """Safely convert value to float, handling None and numpy types."""
+        if value is None:
+            return None
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return None
 
     def _strip_meta_fields(self, data: Any) -> Any:
         """

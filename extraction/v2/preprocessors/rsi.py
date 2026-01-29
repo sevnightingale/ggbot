@@ -290,5 +290,175 @@ class RSIPreprocessor(BasePreprocessor):
         # Add pattern info
         if "momentum" in patterns:
             summary += f". {patterns['momentum']['description']}"
-        
+
         return summary
+
+    # ==================================================================================
+    # COMPACT FORMAT CONVERSION
+    # ==================================================================================
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """
+        Convert full RSI output to universal compact format.
+
+        RSI-specific mapping:
+        - value: RSI value (0-100)
+        - zone: overbought/oversold/neutral
+        - patterns: divergence_bullish, divergence_bearish, momentum_strong_up, etc.
+
+        Args:
+            full_output: Full preprocess() output
+            timeframe: Timeframe string (e.g., "1h", "4h")
+
+        Returns:
+            Compact format dict
+        """
+        if "error" in full_output:
+            return {
+                "indicator": "rsi",
+                "timeframe": timeframe,
+                "timestamp": None,
+                "value": None,
+                "value_secondary": None,
+                "value_tertiary": None,
+                "velocity": 0.0,
+                "rank": 0.0,
+                "zone": "error",
+                "zone_periods": 0,
+                "trend": "unknown",
+                "crossover_type": None,
+                "crossover_periods_ago": None,
+                "patterns": [],
+                "analysis": full_output.get("error", "Unknown error")
+            }
+
+        current = full_output.get("current", {})
+        context = full_output.get("context", {})
+        trend_data = context.get("trend", {})
+        levels = full_output.get("levels", {})
+        patterns_data = full_output.get("patterns", {})
+
+        # Extract RSI value
+        rsi_value = current.get("value", 50.0)
+
+        # Determine zone
+        if rsi_value >= 70:
+            zone = "overbought"
+            zone_periods = levels.get("overbought", {}).get("periods_in_zone", 0)
+        elif rsi_value <= 30:
+            zone = "oversold"
+            zone_periods = levels.get("oversold", {}).get("periods_in_zone", 0)
+        else:
+            zone = "neutral"
+            zone_periods = 0
+
+        # Calculate rank (position in 0-100 range)
+        rank = rsi_value / 100.0  # RSI is already 0-100, normalize to 0-1
+
+        # Extract velocity
+        velocity = trend_data.get("velocity", 0.0)
+
+        # Convert patterns to codes
+        pattern_codes = self._extract_pattern_codes(patterns_data)
+
+        # Check for level crossovers (50-line, 70-line, 30-line)
+        crossover_type = None
+        crossover_periods_ago = None
+        recent_crossovers = levels.get("recent_crossovers", [])
+        if recent_crossovers:
+            latest = recent_crossovers[0]
+            level = latest.get("level")
+            direction = latest.get("direction")
+            if level == 50:
+                crossover_type = "bullish_50" if direction == "up" else "bearish_50"
+            elif level == 70:
+                crossover_type = "entering_overbought" if direction == "up" else "exiting_overbought"
+            elif level == 30:
+                crossover_type = "exiting_oversold" if direction == "up" else "entering_oversold"
+            crossover_periods_ago = latest.get("periods_ago")
+
+        # Ensure all numeric values are Python native types (not numpy)
+        def to_native(val):
+            if val is None:
+                return None
+            if isinstance(val, (np.integer, np.int64, np.int32)):
+                return int(val)
+            if isinstance(val, (np.floating, np.float64, np.float32)):
+                return float(val)
+            return val
+
+        return {
+            "indicator": "rsi",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+
+            "value": round(float(rsi_value), 2) if rsi_value is not None else None,
+            "value_secondary": None,  # RSI has no secondary value
+            "value_tertiary": None,   # RSI has no tertiary value
+
+            "velocity": round(float(velocity), 4) if velocity else 0.0,
+            "rank": round(float(rank), 3),
+
+            "zone": zone,
+            "zone_periods": to_native(zone_periods),
+            "trend": trend_data.get("direction", "sideways"),
+
+            "crossover_type": crossover_type,
+            "crossover_periods_ago": to_native(crossover_periods_ago),
+
+            "patterns": pattern_codes,
+
+            "analysis": full_output.get("summary", "")
+        }
+
+    def _extract_pattern_codes(self, patterns: dict) -> list:
+        """
+        Convert pattern objects to standardized code strings.
+
+        Pattern codes are designed to be:
+        - Human readable (not cryptic abbreviations)
+        - Consistent across all indicators
+        - Machine parseable
+
+        Args:
+            patterns: The patterns dict from full output
+
+        Returns:
+            List of pattern code strings
+        """
+        codes = []
+
+        # Divergence patterns
+        if "divergence" in patterns:
+            div = patterns["divergence"]
+            div_type = div.get("type", "").lower()
+            if "positive" in div_type or "bullish" in div_type:
+                codes.append("divergence_bullish")
+            elif "negative" in div_type or "bearish" in div_type:
+                codes.append("divergence_bearish")
+
+        # Momentum patterns
+        if "momentum" in patterns:
+            mom = patterns["momentum"]
+            mom_type = mom.get("type", "").lower()
+            if "rising" in mom_type or "bullish" in mom_type:
+                if mom.get("strength", 0) > 0.7:
+                    codes.append("momentum_strong_up")
+                else:
+                    codes.append("momentum_rising")
+            elif "falling" in mom_type or "bearish" in mom_type:
+                if mom.get("strength", 0) > 0.7:
+                    codes.append("momentum_strong_down")
+                else:
+                    codes.append("momentum_falling")
+
+        # Reversal patterns
+        if "reversal" in patterns:
+            rev = patterns["reversal"]
+            rev_type = rev.get("type", "").lower()
+            if "double_top" in rev_type:
+                codes.append("double_top")
+            elif "double_bottom" in rev_type:
+                codes.append("double_bottom")
+
+        return codes

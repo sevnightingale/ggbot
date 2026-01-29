@@ -380,7 +380,7 @@ class BasePreprocessor:
         if rank >= 90:
             return "extremely_high"
         elif rank >= 75:
-            return "high" 
+            return "high"
         elif rank >= 60:
             return "above_average"
         elif rank >= 40:
@@ -391,3 +391,65 @@ class BasePreprocessor:
             return "low"
         else:
             return "extremely_low"
+
+    # ==================================================================================
+    # COMPACT FORMAT CONVERSION (for Rei and optimized consumers)
+    # ==================================================================================
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """
+        Convert full preprocessor output to universal compact format.
+
+        This method should be overridden by each indicator preprocessor to provide
+        indicator-specific compact conversion. The base implementation provides
+        a generic fallback.
+
+        The compact format is designed to be:
+        - Small (~300-400 bytes per indicator-timeframe)
+        - Numerically precise (for Rei's Float64 preservation)
+        - Self-contained (no external context needed)
+        - Universal schema (same fields, optional values)
+
+        Args:
+            full_output: The full preprocessor output dict
+            timeframe: The timeframe string (e.g., "1h", "4h")
+
+        Returns:
+            Compact format dict with universal schema
+        """
+        # Generic fallback - subclasses should override with specific logic
+        indicator_name = full_output.get("indicator", "unknown").lower()
+        current = full_output.get("current", {})
+
+        # Try to extract primary value from common structures
+        value = current.get("value")
+        if value is None:
+            # Try other common field names
+            for key in ["macd", "adx", "k_percent", "price", "atr"]:
+                if key in current:
+                    value = current.get(key)
+                    break
+
+        return {
+            "indicator": indicator_name,
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+
+            "value": value,
+            "value_secondary": None,
+            "value_tertiary": None,
+
+            "velocity": 0.0,
+            "rank": 0.0,
+
+            "zone": "unknown",
+            "zone_periods": 0,
+            "trend": "unknown",
+
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+
+            "patterns": [],
+
+            "analysis": full_output.get("summary", "")
+        }
