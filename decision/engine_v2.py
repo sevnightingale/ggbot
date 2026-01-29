@@ -854,7 +854,7 @@ Take Profit: {take_profit_text}
                         'completed',
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
-                        prompt,
+                        None,  # prompt no longer stored (redundant with activities.market_query)
                         json.dumps(decision_data_json, cls=DecisionJSONEncoder),
                         datetime.now(timezone.utc).isoformat()
                     ))
@@ -1678,7 +1678,7 @@ Take Profit: {take_profit_text}
                         'completed',
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
-                        prompt,
+                        None,  # prompt no longer stored (redundant with activities.market_query)
                         json.dumps(decision_data_json, cls=DecisionJSONEncoder),
                         datetime.now(timezone.utc).isoformat()
                     ))
@@ -2083,7 +2083,7 @@ Confirmation Level: {confidence_level} - {confidence_desc}"""
                         'completed',
                         decision_data.get('confidence', 0.5),
                         decision_data.get('reasoning', llm_response),
-                        prompt,
+                        None,  # prompt no longer stored (redundant with activities.market_query)
                         json.dumps(decision_data_json, cls=DecisionJSONEncoder),
                         position_data.get('entry_decision_id'),  # Link to original entry decision
                         datetime.now(timezone.utc).isoformat()
