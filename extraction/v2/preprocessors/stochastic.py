@@ -406,7 +406,7 @@ class StochasticPreprocessor(BasePreprocessor):
                                zone_analysis: Dict, position_rank: float) -> str:
         """Generate human-readable Stochastic summary."""
         summary = f"Stochastic %K: {k_value:.1f}, %D: {d_value:.1f}"
-        
+
         # Add zone information
         zone = zone_analysis["current_zone"]
         if zone != "neutral":
@@ -415,13 +415,93 @@ class StochasticPreprocessor(BasePreprocessor):
                 summary += f" ({zone} for {streak} periods)"
             else:
                 summary += f" ({zone})"
-        
+
         # Add crossover information
         latest_cross = cross_analysis.get("latest_crossover")
         if latest_cross and latest_cross["periods_ago"] <= 5:
             summary += f". {latest_cross['type'].replace('_', ' ').title()} {latest_cross['periods_ago']}p ago"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full Stochastic output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "stochastic", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        context = full_output.get("context", {})
+        trend_data = context.get("trend", {})
+        levels = full_output.get("levels", {})
+        patterns_data = full_output.get("patterns", {})
+
+        k_val = to_native(current.get("k_percent"))
+        d_val = to_native(current.get("d_percent"))
+
+        # Zone determination
+        if k_val is not None:
+            if k_val >= 80: zone = "overbought"
+            elif k_val <= 20: zone = "oversold"
+            else: zone = "neutral"
+        else:
+            zone = "unknown"
+
+        # Zone periods
+        zone_periods = 0
+        if zone == "overbought":
+            zone_periods = to_native(levels.get("overbought", {}).get("streak_length", 0)) or 0
+        elif zone == "oversold":
+            zone_periods = to_native(levels.get("oversold", {}).get("streak_length", 0)) or 0
+
+        # Crossover extraction
+        recent_crossovers = levels.get("recent_crossovers", [])
+        crossover_type = None
+        crossover_periods_ago = None
+        if recent_crossovers:
+            latest = recent_crossovers[0]
+            cross_type = latest.get("type", "")
+            crossover_type = "crossover_bullish" if "bullish" in cross_type else "crossover_bearish"
+            crossover_periods_ago = to_native(latest.get("periods_ago"))
+
+        # Pattern extraction
+        pattern_codes = []
+        if "divergence" in patterns_data:
+            div = patterns_data["divergence"]
+            if "bullish" in div.get("type", ""): pattern_codes.append("divergence_bullish")
+            elif "bearish" in div.get("type", ""): pattern_codes.append("divergence_bearish")
+        if "momentum" in patterns_data:
+            mom = patterns_data["momentum"]
+            if "rising" in mom.get("type", ""): pattern_codes.append("momentum_rising")
+            elif "falling" in mom.get("type", ""): pattern_codes.append("momentum_falling")
+
+        return {
+            "indicator": "stochastic",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(float(k_val), 2) if k_val else None,
+            "value_secondary": round(float(d_val), 2) if d_val else None,
+            "value_tertiary": None,
+            "velocity": round(to_native(trend_data.get("velocity", 0)) or 0, 4),
+            "rank": round(float(k_val) / 100.0, 3) if k_val else 0.0,
+            "zone": zone,
+            "zone_periods": zone_periods,
+            "trend": trend_data.get("k_direction", "unknown"),
+            "crossover_type": crossover_type,
+            "crossover_periods_ago": crossover_periods_ago,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }
 
     def _calculate_stoch_confidence(self, k: pd.Series, d: pd.Series,
                                    cross_analysis: Dict, zone_analysis: Dict, period: int = 14) -> float:

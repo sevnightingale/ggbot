@@ -2,7 +2,7 @@
 
 Tracking `to_compact()` implementation for all 21 technical indicator preprocessors.
 
-**Goal**: Each preprocessor outputs a universal compact schema for Rei API payloads (~400 bytes vs ~2KB full output).
+**Status: COMPLETE** - All 21 indicators implemented and tested.
 
 **Reference**: See `decision/README.md` → "Rei Decision Engine" section for schema documentation.
 
@@ -10,52 +10,56 @@ Tracking `to_compact()` implementation for all 21 technical indicator preprocess
 
 ## Implementation Status
 
-### Completed ✅
+### All Complete ✅ (21/21)
 
-| Indicator | File | Status | Notes |
-|-----------|------|--------|-------|
-| RSI | `rsi.py` | ✅ Complete | Zone detection, pattern codes, crossovers |
+| Indicator | File | Status | Size | Notes |
+|-----------|------|--------|------|-------|
+| RSI | `rsi.py` | ✅ Complete | 401 bytes | Zone, patterns, crossovers |
+| MACD | `macd.py` | ✅ Complete | 406 bytes | 3 values: macd, signal, histogram |
+| Stochastic | `stochastic.py` | ✅ Complete | 388 bytes | 2 values: %K, %D |
+| Bollinger Bands | `bbands.py` | ✅ Complete | 421 bytes | %B, bandwidth, squeeze |
+| ADX | `adx.py` | ✅ Complete | 410 bytes | 3 values: adx, +DI, -DI |
+| ATR | `atr.py` | ✅ Complete | 381 bytes | Volatility classification |
+| EMA | `ema.py` | ✅ Complete | 397 bytes | Trend/price relationship |
+| SMA | `sma.py` | ✅ Complete | 379 bytes | Trend/price relationship |
+| CCI | `cci.py` | ✅ Complete | 340 bytes | Zone analysis |
+| MFI | `mfi.py` | ✅ Complete | 406 bytes | Zone analysis, patterns |
+| Williams %R | `williams_r.py` | ✅ Complete | 360 bytes | Zone analysis |
+| OBV | `obv.py` | ✅ Complete | 377 bytes | Volume trend |
+| VWAP | `vwap.py` | ✅ Complete | 378 bytes | Price vs VWAP |
+| PSAR | `psar.py` | ✅ Complete | 392 bytes | Trend direction |
+| ROC | `roc.py` | ✅ Complete | 366 bytes | Momentum rate |
+| Aroon | `aroon.py` | ✅ Complete | 380 bytes | Oscillator + up/down |
+| Vortex | `vortex.py` | ✅ Complete | 389 bytes | VI+, VI- |
+| Trix | `trix.py` | ✅ Complete | 415 bytes | Triple smoothed |
+| BBWidth | `bbwidth.py` | ✅ Complete | 389 bytes | Squeeze detection |
+| Donchian | `donchian.py` | ✅ Complete | 382 bytes | Breakout levels |
+| Keltner | `keltner.py` | ✅ Complete | 410 bytes | Channel position |
 
-### High Priority (Most Used) 🔴
+---
 
-| Indicator | File | Status | Notes |
-|-----------|------|--------|-------|
-| MACD | `macd.py` | ⬜ Pending | 3 values: macd, signal, histogram |
-| Stochastic | `stochastic.py` | ⬜ Pending | 2 values: %K, %D |
-| Bollinger Bands | `bbands.py` | ⬜ Pending | %B, bandwidth, squeeze detection |
-| ADX | `adx.py` | ⬜ Pending | 3 values: adx, +DI, -DI |
+## Validation Test
 
-### Medium Priority 🟡
+Run to validate all implementations:
+```bash
+python scripts/tests/test_compact_preprocessors.py
+```
 
-| Indicator | File | Status | Notes |
-|-----------|------|--------|-------|
-| ATR | `atr.py` | ⬜ Pending | Volatility classification |
-| EMA | `ema.py` | ⬜ Pending | Trend/price relationship |
-| SMA | `sma.py` | ⬜ Pending | Trend/price relationship |
-| CCI | `cci.py` | ⬜ Pending | Similar to RSI zones |
-| MFI | `mfi.py` | ⬜ Pending | Similar to RSI zones |
-| Williams %R | `williams_r.py` | ⬜ Pending | Similar to RSI zones |
+**Latest test results (2026-01-29):**
+```
+✅ Implemented:  21 (all indicators)
+⚠️  Fallback:     0 (none)
+❌ Failed:       0 (none)
 
-### Lower Priority 🟢
-
-| Indicator | File | Status | Notes |
-|-----------|------|--------|-------|
-| OBV | `obv.py` | ⬜ Pending | Volume trend |
-| VWAP | `vwap.py` | ⬜ Pending | Price vs VWAP |
-| PSAR | `psar.py` | ⬜ Pending | Trend direction, stops |
-| ROC | `roc.py` | ⬜ Pending | Momentum rate |
-| Aroon | `aroon.py` | ⬜ Pending | 2 values: up, down |
-| Vortex | `vortex.py` | ⬜ Pending | 2 values: VI+, VI- |
-| Trix | `trix.py` | ⬜ Pending | Triple smoothed momentum |
-| BBWidth | `bbwidth.py` | ⬜ Pending | Squeeze detection |
-| Donchian | `donchian.py` | ⬜ Pending | Channel breakouts |
-| Keltner | `keltner.py` | ⬜ Pending | Channel position |
+Estimated Rei payload: 50 indicator-timeframes × ~450 bytes = ~22.0KB
+Rei limit: 30KB → ✅ FITS
+```
 
 ---
 
 ## Universal Compact Schema
 
-Every `to_compact()` must return this structure:
+Every `to_compact()` returns this structure:
 
 ```python
 {
@@ -82,38 +86,6 @@ Every `to_compact()` must return this structure:
     "analysis": str                 # Summary text (from full output)
 }
 ```
-
----
-
-## Indicator-Specific Mapping
-
-### Momentum Oscillators (RSI-like)
-- **value**: indicator value
-- **zone**: "overbought"/"oversold"/"neutral"
-- **patterns**: divergence_*, momentum_*, double_top/bottom
-
-### Multi-Component (MACD, Stochastic)
-- **value**: primary line (MACD line, %K)
-- **value_secondary**: signal line (%D)
-- **value_tertiary**: histogram (MACD only)
-- **zone**: "bullish"/"bearish" based on line relationship
-- **crossover_type**: "bullish"/"bearish" crossover
-
-### Band Indicators (BB, Keltner, Donchian)
-- **value**: %B or position metric
-- **value_secondary**: bandwidth
-- **zone**: "above_upper"/"upper_half"/"lower_half"/"below_lower"
-- **patterns**: squeeze_*, walk_upper/lower
-
-### Trend Indicators (ADX, Aroon, Vortex)
-- **value**: primary (ADX, Aroon oscillator, VI+)
-- **value_secondary**: directional+ (Aroon Up, VI-)
-- **value_tertiary**: directional- (Aroon Down)
-- **zone**: "strong_trend"/"weak_trend"/"bullish"/"bearish"
-
-### Volume Indicators (OBV, VWAP)
-- **value**: indicator value
-- **zone**: "accumulation"/"distribution"/"neutral" (OBV) or "above"/"below" (VWAP)
 
 ---
 
@@ -154,79 +126,31 @@ Every `to_compact()` must return this structure:
 
 ---
 
-## Test Validation
-
-Run after each implementation:
-```bash
-python scripts/tests/test_compact_preprocessors.py
-```
-
-Test checks:
-1. All implemented preprocessors have `to_compact()` method
-2. Output matches universal schema
-3. All values are JSON-serializable (no numpy types)
-4. Size is under 600 bytes per indicator
-5. Pattern codes are from approved list
-
----
-
-## Implementation Template
-
-```python
-def to_compact(self, full_output: dict, timeframe: str) -> dict:
-    """Convert full output to universal compact format."""
-    import numpy as np
-
-    if "error" in full_output:
-        return {
-            "indicator": "indicator_name",
-            "timeframe": timeframe,
-            "timestamp": None,
-            "value": None, "value_secondary": None, "value_tertiary": None,
-            "velocity": 0.0, "rank": 0.0,
-            "zone": "error", "zone_periods": 0, "trend": "unknown",
-            "crossover_type": None, "crossover_periods_ago": None,
-            "patterns": [],
-            "analysis": full_output.get("error", "Unknown error")
-        }
-
-    # Helper for numpy conversion
-    def to_native(val):
-        if val is None: return None
-        if isinstance(val, (np.integer,)): return int(val)
-        if isinstance(val, (np.floating,)): return float(val)
-        return val
-
-    current = full_output.get("current", {})
-    # ... extract indicator-specific values ...
-
-    return {
-        "indicator": "indicator_name",
-        "timeframe": timeframe,
-        "timestamp": current.get("timestamp"),
-        "value": ...,
-        "value_secondary": ...,
-        "value_tertiary": ...,
-        "velocity": ...,
-        "rank": ...,
-        "zone": ...,
-        "zone_periods": to_native(...),
-        "trend": ...,
-        "crossover_type": ...,
-        "crossover_periods_ago": to_native(...),
-        "patterns": self._extract_pattern_codes(full_output.get("patterns", {})),
-        "analysis": full_output.get("summary", "")
-    }
-```
-
----
-
 ## Progress Log
 
 | Date | Indicator | Author | Notes |
 |------|-----------|--------|-------|
 | 2026-01-29 | RSI | Claude | Initial implementation with full pattern support |
+| 2026-01-29 | MACD | Claude | 3-value output with crossover detection |
+| 2026-01-29 | Stochastic | Claude | %K/%D with zone and crossover support |
+| 2026-01-29 | BBands | Claude | %B, bandwidth, squeeze patterns |
+| 2026-01-29 | ADX | Claude | ADX/+DI/-DI with trend strength zones |
+| 2026-01-29 | ATR | Claude | Volatility zones and squeeze detection |
+| 2026-01-29 | CCI | Claude | Zone analysis similar to RSI |
+| 2026-01-29 | MFI | Claude | Zone analysis with divergence patterns |
+| 2026-01-29 | EMA/SMA | Claude | Price relationship and trend consensus |
+| 2026-01-29 | Williams %R | Claude | Zone analysis with failure swings |
+| 2026-01-29 | OBV | Claude | Accumulation/distribution phases |
+| 2026-01-29 | VWAP | Claude | Price position vs VWAP |
+| 2026-01-29 | PSAR | Claude | Trend direction with reversals |
+| 2026-01-29 | ROC | Claude | Momentum rate with strength levels |
+| 2026-01-29 | Aroon | Claude | Oscillator with up/down components |
+| 2026-01-29 | Vortex | Claude | VI+/VI- with crossovers |
+| 2026-01-29 | Trix | Claude | Triple smoothed momentum |
+| 2026-01-29 | BBWidth | Claude | Squeeze detection |
+| 2026-01-29 | Donchian | Claude | Breakout detection |
+| 2026-01-29 | Keltner | Claude | Channel position |
 
 ---
 
-*Last updated: 2026-01-29*
+*Completed: 2026-01-29*

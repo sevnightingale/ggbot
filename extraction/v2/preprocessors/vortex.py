@@ -620,3 +620,36 @@ class VortexPreprocessor(BasePreprocessor):
             summary += f", {crossover_type.replace('_', ' ')} {periods_ago}p ago"
 
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full Vortex output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "vortex", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        dominance = full_output.get("dominance_analysis", {})
+        crossover = full_output.get("crossover_analysis", {})
+        vi_plus = to_native(current.get("vi_plus"))
+        vi_minus = to_native(current.get("vi_minus"))
+        dominant = dominance.get("current_dominant", "neutral")
+        zone = "bullish" if "bullish" in dominant else "bearish" if "bearish" in dominant else "neutral"
+        latest_cross = crossover.get("latest_crossover")
+        cross_type = None
+        cross_periods = None
+        if latest_cross:
+            cross_type = "crossover_bullish" if "bullish" in latest_cross.get("type", "") else "crossover_bearish"
+            cross_periods = to_native(latest_cross.get("periods_ago"))
+        return {"indicator": "vortex", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(vi_plus), 4) if vi_plus else None,
+                "value_secondary": round(float(vi_minus), 4) if vi_minus else None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.5, "zone": zone, "zone_periods": 0,
+                "trend": "bullish" if "bullish" in dominant else "bearish" if "bearish" in dominant else "neutral",
+                "crossover_type": cross_type, "crossover_periods_ago": cross_periods,
+                "patterns": [], "analysis": full_output.get("summary", "")}

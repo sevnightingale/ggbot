@@ -495,22 +495,72 @@ class SMAPreprocessor(BasePreprocessor):
         
         return round(np.mean(confidence_factors), 3)
     
-    def _generate_sma_summary(self, sma_value: float, price: Optional[float], 
+    def _generate_sma_summary(self, sma_value: float, price: Optional[float],
                              trend_analysis: Dict, price_relationship: Dict) -> str:
         """Generate human-readable SMA summary."""
         consensus = trend_analysis.get("consensus", "mixed")
         trend_strength = trend_analysis.get("strength", 0)
-        
+
         summary = f"SMA {sma_value:.4f} - {consensus} trend"
-        
+
         if trend_strength > 0.6:
             summary += f" (strong)"
-        
+
         if (price is not None) and price_relationship:
             position = price_relationship.get("position", "unknown")
             distance_pct = price_relationship.get("distance_pct", 0)
-            
+
             if position in ["above", "below"]:
                 summary += f", price {position} ({distance_pct:+.1f}%)"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full SMA output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "sma", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        trend_data = full_output.get("trend_analysis", {})
+        price_rel = full_output.get("price_relationship", {})
+
+        sma_val = to_native(current.get("value"))
+        price_distance = to_native(price_rel.get("distance_pct"))
+
+        # Zone based on price position relative to SMA
+        position = price_rel.get("position", "unknown")
+        zone = "above" if position == "above" else "below" if position == "below" else "neutral"
+
+        # Trend from analysis
+        consensus = trend_data.get("consensus", "mixed")
+        trend = "bullish" if consensus == "bullish" else "bearish" if consensus == "bearish" else "neutral"
+
+        return {
+            "indicator": "sma",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(sma_val, 4) if sma_val else None,
+            "value_secondary": round(price_distance, 2) if price_distance else None,
+            "value_tertiary": None,
+            "velocity": round(to_native(trend_data.get("momentum", 0)) or 0, 4),
+            "rank": 0.5,
+            "zone": zone,
+            "zone_periods": 0,
+            "trend": trend,
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+            "patterns": [],
+            "analysis": full_output.get("summary", "")
+        }

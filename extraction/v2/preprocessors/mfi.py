@@ -500,5 +500,75 @@ class MFIPreprocessor(BasePreprocessor):
         flow_quality = money_flow_analysis.get("flow_quality", "")
         if "high_quality" in flow_quality:
             summary += " - HIGH QUALITY FLOW"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full MFI output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "mfi", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        context = full_output.get("context", {})
+        trend_data = context.get("trend", {})
+        levels = full_output.get("levels", {})
+        patterns_data = full_output.get("patterns", {})
+
+        mfi_val = to_native(current.get("value"))
+
+        # Zone based on MFI level (80/20 standard)
+        if mfi_val is not None:
+            if mfi_val >= 80: zone = "overbought"
+            elif mfi_val <= 20: zone = "oversold"
+            else: zone = "neutral"
+        else:
+            zone = "unknown"
+
+        zone_periods = 0
+        if zone == "overbought":
+            zone_periods = to_native(levels.get("overbought", {}).get("streak_length", 0)) or 0
+        elif zone == "oversold":
+            zone_periods = to_native(levels.get("oversold", {}).get("streak_length", 0)) or 0
+
+        # Pattern extraction
+        pattern_codes = []
+        if "divergence" in patterns_data:
+            div = patterns_data.get("divergence")
+            if div and isinstance(div, dict):
+                if "positive" in div.get("type", ""): pattern_codes.append("divergence_bullish")
+                elif "negative" in div.get("type", ""): pattern_codes.append("divergence_bearish")
+        if "double_pattern" in patterns_data:
+            dp = patterns_data.get("double_pattern")
+            if dp and isinstance(dp, dict):
+                if "top" in dp.get("type", ""): pattern_codes.append("double_top")
+                elif "bottom" in dp.get("type", ""): pattern_codes.append("double_bottom")
+
+        return {
+            "indicator": "mfi",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(float(mfi_val), 2) if mfi_val else None,
+            "value_secondary": None,
+            "value_tertiary": None,
+            "velocity": round(to_native(trend_data.get("velocity", 0)) or 0, 4),
+            "rank": round(float(mfi_val) / 100.0, 3) if mfi_val else 0.5,
+            "zone": zone,
+            "zone_periods": zone_periods,
+            "trend": trend_data.get("direction", "unknown"),
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }

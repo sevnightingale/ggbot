@@ -329,12 +329,70 @@ class ATRPreprocessor(BasePreprocessor):
         """Generate human-readable ATR summary."""
         volatility_level = volatility_analysis["current_level"]
         percentile = volatility_analysis["percentile_rank"]
-        
+
         summary = f"ATR {current_atr:.6f} - {volatility_level.replace('_', ' ')} volatility ({percentile:.0f}th percentile)"
-        
+
         if trend_analysis:
             interpretation = trend_analysis.get("interpretation", "")
             if interpretation != "volatility_stable":
                 summary += f", {interpretation.replace('_', ' ')}"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full ATR output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "atr", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        volatility = full_output.get("volatility_analysis", {})
+        trend_data = full_output.get("trend_analysis", {})
+        squeeze = full_output.get("squeeze_analysis", {})
+
+        atr_val = to_native(current.get("atr"))
+        atr_pct = to_native(current.get("atr_percent"))
+
+        # Zone based on volatility level
+        level = volatility.get("current_level", "normal")
+        zone_map = {"very_high": "high_volatility", "high": "high_volatility",
+                    "above_normal": "normal", "normal": "normal",
+                    "below_normal": "low_volatility", "low": "low_volatility", "very_low": "low_volatility"}
+        zone = zone_map.get(level, "normal")
+
+        # Pattern extraction
+        pattern_codes = []
+        interpretation = trend_data.get("interpretation", "")
+        if "expanding" in interpretation: pattern_codes.append("volatility_expanding")
+        elif "contracting" in interpretation: pattern_codes.append("volatility_contracting")
+        if squeeze.get("squeeze_detected"): pattern_codes.append("squeeze_active")
+        if squeeze.get("breakout_setup"): pattern_codes.append("squeeze_firing")
+
+        return {
+            "indicator": "atr",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(atr_val, 6) if atr_val else None,
+            "value_secondary": round(atr_pct, 4) if atr_pct else None,
+            "value_tertiary": None,
+            "velocity": round(to_native(trend_data.get("change_rate", 0)) or 0, 4),
+            "rank": round(to_native(volatility.get("percentile_rank", 50)) / 100, 3),
+            "zone": zone,
+            "zone_periods": to_native(squeeze.get("squeeze_periods", 0)) or 0,
+            "trend": "expanding" if "expanding" in interpretation else "contracting" if "contracting" in interpretation else "stable",
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }

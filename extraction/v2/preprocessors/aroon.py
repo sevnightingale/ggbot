@@ -563,3 +563,33 @@ class AroonPreprocessor(BasePreprocessor):
             summary += f" ({osc_zone.replace('_', ' ')})"
         
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full Aroon output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "aroon", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        trend_data = full_output.get("trend_analysis", {})
+        osc = full_output.get("oscillator_analysis", {})
+        aroon_up = to_native(current.get("aroon_up"))
+        aroon_down = to_native(current.get("aroon_down"))
+        osc_val = to_native(osc.get("value"))
+        current_trend = trend_data.get("current_trend", "sideways")
+        zone = "bullish" if current_trend == "uptrend" else "bearish" if current_trend == "downtrend" else "neutral"
+        return {"indicator": "aroon", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(osc_val), 2) if osc_val else None,
+                "value_secondary": round(float(aroon_up), 2) if aroon_up else None,
+                "value_tertiary": round(float(aroon_down), 2) if aroon_down else None,
+                "velocity": 0.0, "rank": round((float(osc_val) + 100) / 200, 3) if osc_val else 0.5,
+                "zone": zone, "zone_periods": to_native(trend_data.get("trend_duration", 0)) or 0,
+                "trend": "bullish" if current_trend == "uptrend" else "bearish" if current_trend == "downtrend" else "neutral",
+                "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("summary", "")}

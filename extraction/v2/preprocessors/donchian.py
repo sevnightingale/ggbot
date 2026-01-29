@@ -484,3 +484,39 @@ class DonchianChannelsPreprocessor(BasePreprocessor):
             summary += f" - CONSOLIDATION ({consolidation_periods}p)"
         
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full Donchian output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "donchian", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        breakout = full_output.get("breakout_analysis", {})
+        position = full_output.get("position_analysis", {})
+        pos_pct = to_native(position.get("position_pct"))
+        latest_breakout = breakout.get("latest_breakout")
+        patterns = []
+        cross_type = None
+        cross_periods = None
+        if latest_breakout and latest_breakout.get("periods_ago", 99) <= 5:
+            btype = latest_breakout.get("type", "")
+            cross_type = "crossover_bullish" if "upper" in btype else "crossover_bearish" if "lower" in btype else None
+            cross_periods = to_native(latest_breakout.get("periods_ago"))
+            patterns.append("breakout" if cross_type else "")
+        patterns = [p for p in patterns if p]
+        zone = "upper" if pos_pct and pos_pct > 80 else "lower" if pos_pct and pos_pct < 20 else "middle"
+        return {"indicator": "donchian", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(pos_pct), 2) if pos_pct else None,
+                "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": round(float(pos_pct) / 100, 3) if pos_pct else 0.5,
+                "zone": zone, "zone_periods": 0,
+                "trend": "bullish" if pos_pct and pos_pct > 50 else "bearish" if pos_pct and pos_pct < 50 else "neutral",
+                "crossover_type": cross_type, "crossover_periods_ago": cross_periods,
+                "patterns": patterns, "analysis": full_output.get("summary", "")}

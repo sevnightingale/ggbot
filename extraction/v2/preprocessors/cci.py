@@ -400,12 +400,11 @@ class CCIPreprocessor(BasePreprocessor):
         return None
     
     # Signal generation and confidence scoring methods removed to comply with analysis-only philosophy
-    
+
     def _generate_cci_summary(self, cci_value: float, zone_analysis: Dict, momentum_analysis: Dict) -> str:
         """Generate human-readable CCI summary."""
         summary = f"CCI at {cci_value:.1f}"
-        
-        # Add zone information
+
         zone = zone_analysis["current_zone"]
         if zone != "neutral":
             streak = zone_analysis[zone]["streak_length"]
@@ -413,17 +412,83 @@ class CCIPreprocessor(BasePreprocessor):
                 summary += f" ({zone} for {streak} periods)"
             else:
                 summary += f" ({zone})"
-        
-        # Add extreme reading information
+
         if zone_analysis["overbought"]["extreme_reading"]:
             summary += " - EXTREME HIGH"
         elif zone_analysis["oversold"]["extreme_reading"]:
             summary += " - EXTREME LOW"
-        
-        # Add momentum information
+
         if "momentum_interpretation" in momentum_analysis:
             momentum = momentum_analysis["momentum_interpretation"]
             if "strong" in momentum:
                 summary += f", {momentum.replace('_', ' ')}"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full CCI output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "cci", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        context = full_output.get("context", {})
+        trend_data = context.get("trend", {})
+        levels = full_output.get("levels", {})
+        patterns_data = full_output.get("patterns", {})
+
+        cci_val = to_native(current.get("value"))
+
+        # Zone based on CCI level (100/-100 standard)
+        if cci_val is not None:
+            if cci_val >= 100: zone = "overbought"
+            elif cci_val <= -100: zone = "oversold"
+            else: zone = "neutral"
+        else:
+            zone = "unknown"
+
+        zone_periods = 0
+        if zone == "overbought":
+            zone_periods = to_native(levels.get("overbought", {}).get("streak_length", 0)) or 0
+        elif zone == "oversold":
+            zone_periods = to_native(levels.get("oversold", {}).get("streak_length", 0)) or 0
+
+        # Pattern extraction
+        pattern_codes = []
+        if "divergence" in patterns_data:
+            div = patterns_data["divergence"]
+            if "bullish" in div.get("type", ""): pattern_codes.append("divergence_bullish")
+            elif "bearish" in div.get("type", ""): pattern_codes.append("divergence_bearish")
+        if "momentum" in patterns_data:
+            mom = patterns_data["momentum"]
+            if "rising" in mom.get("type", ""): pattern_codes.append("momentum_rising")
+            elif "falling" in mom.get("type", ""): pattern_codes.append("momentum_falling")
+
+        return {
+            "indicator": "cci",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(float(cci_val), 2) if cci_val else None,
+            "value_secondary": None,
+            "value_tertiary": None,
+            "velocity": round(to_native(trend_data.get("velocity", 0)) or 0, 4),
+            "rank": round((float(cci_val) + 200) / 400, 3) if cci_val else 0.5,  # Normalize -200 to +200
+            "zone": zone,
+            "zone_periods": zone_periods,
+            "trend": trend_data.get("direction", "unknown"),
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }

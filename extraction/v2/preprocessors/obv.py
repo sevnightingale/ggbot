@@ -586,3 +586,36 @@ class OBVPreprocessor(BasePreprocessor):
                 summary += f", {phase} detected"
         
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full OBV output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "obv", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        trend_data = full_output.get("trend_analysis", {})
+        accum = full_output.get("accumulation_analysis", {})
+        obv_val = to_native(current.get("value"))
+        phase = accum.get("overall_phase", "neutral")
+        zone = "accumulation" if "accumulation" in phase else "distribution" if "distribution" in phase else "neutral"
+        consensus = trend_data.get("consensus", "mixed")
+        trend = "bullish" if consensus == "bullish" else "bearish" if consensus == "bearish" else "neutral"
+        patterns = []
+        if full_output.get("patterns", {}).get("divergence"):
+            div = full_output["patterns"]["divergence"]
+            if "positive" in div.get("type", ""): patterns.append("divergence_bullish")
+            elif "negative" in div.get("type", ""): patterns.append("divergence_bearish")
+        return {"indicator": "obv", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(obv_val), 2) if obv_val else None,
+                "value_secondary": None, "value_tertiary": None,
+                "velocity": round(to_native(trend_data.get("momentum", 0)) or 0, 4),
+                "rank": 0.5, "zone": zone, "zone_periods": 0, "trend": trend,
+                "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": patterns, "analysis": full_output.get("summary", "")}

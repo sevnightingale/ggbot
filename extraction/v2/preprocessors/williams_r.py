@@ -404,7 +404,6 @@ class WilliamsRPreprocessor(BasePreprocessor):
         """Generate human-readable Williams %R summary."""
         summary = f"Williams %R at {wr_value:.1f}"
 
-        # Add zone information
         zone = zone_analysis["current_zone"]
         if zone != "neutral":
             streak = zone_analysis[zone]["streak_length"]
@@ -413,10 +412,77 @@ class WilliamsRPreprocessor(BasePreprocessor):
             else:
                 summary += f" ({zone})"
 
-        # Add momentum information
         if "momentum_interpretation" in momentum_analysis:
             momentum = momentum_analysis["momentum_interpretation"]
             if "strong" in momentum:
                 summary += f", {momentum.replace('_', ' ')}"
 
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full Williams %R output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "williams_r", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        context = full_output.get("context", {})
+        trend_data = context.get("trend", {})
+        levels = full_output.get("levels", {})
+        patterns_data = full_output.get("patterns", {})
+
+        wr_val = to_native(current.get("value"))
+
+        # Zone based on Williams %R level (-20/-80 standard, inverted)
+        if wr_val is not None:
+            if wr_val >= -20: zone = "overbought"
+            elif wr_val <= -80: zone = "oversold"
+            else: zone = "neutral"
+        else:
+            zone = "unknown"
+
+        zone_periods = 0
+        if zone == "overbought":
+            zone_periods = to_native(levels.get("overbought", {}).get("streak_length", 0)) or 0
+        elif zone == "oversold":
+            zone_periods = to_native(levels.get("oversold", {}).get("streak_length", 0)) or 0
+
+        # Pattern extraction
+        pattern_codes = []
+        if "divergence" in patterns_data:
+            div = patterns_data["divergence"]
+            if "positive" in div.get("type", ""): pattern_codes.append("divergence_bullish")
+            elif "negative" in div.get("type", ""): pattern_codes.append("divergence_bearish")
+        if "failure_swing" in patterns_data:
+            fs = patterns_data["failure_swing"]
+            if "bullish" in fs.get("type", ""): pattern_codes.append("failure_swing")
+            elif "bearish" in fs.get("type", ""): pattern_codes.append("failure_swing")
+
+        return {
+            "indicator": "williams_r",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(float(wr_val), 2) if wr_val else None,
+            "value_secondary": None,
+            "value_tertiary": None,
+            "velocity": round(to_native(trend_data.get("velocity", 0)) or 0, 4),
+            "rank": round((float(wr_val) + 100) / 100, 3) if wr_val else 0.5,  # -100 to 0 → 0 to 1
+            "zone": zone,
+            "zone_periods": zone_periods,
+            "trend": trend_data.get("direction", "unknown"),
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }

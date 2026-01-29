@@ -574,3 +574,28 @@ class VWAPPreprocessor(BasePreprocessor):
         summary += f" - {fair_value.replace('_', ' ')}"
 
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full VWAP output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "vwap", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        price_rel = full_output.get("price_relationship", {})
+        vwap_val = to_native(current.get("vwap"))
+        distance = to_native(price_rel.get("distance_pct"))
+        position = price_rel.get("position", "at_level")
+        zone = "above" if position == "above" else "below" if position == "below" else "neutral"
+        return {"indicator": "vwap", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(vwap_val), 4) if vwap_val else None,
+                "value_secondary": round(float(distance), 2) if distance else None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.5, "zone": zone, "zone_periods": 0, "trend": zone,
+                "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("summary", "")}

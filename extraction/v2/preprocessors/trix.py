@@ -458,3 +458,36 @@ class TRIXPreprocessor(BasePreprocessor):
         summary += f" ({position.replace('_', ' ')})"
 
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full TRIX output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "trix", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        momentum = full_output.get("momentum_analysis", {})
+        zero_line = full_output.get("zero_line_analysis", {})
+        trix_val = to_native(current.get("trix"))
+        signal_val = to_native(current.get("signal"))
+        direction = momentum.get("direction", "neutral")
+        position = zero_line.get("position", "at_zero")
+        zone = "bullish" if position == "above_zero" else "bearish" if position == "below_zero" else "neutral"
+        patterns = []
+        if momentum.get("strength_level") == "strong":
+            patterns.append("momentum_strong_up" if direction == "bullish" else "momentum_strong_down" if direction == "bearish" else "")
+        patterns = [p for p in patterns if p]
+        return {"indicator": "trix", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(trix_val), 6) if trix_val else None,
+                "value_secondary": round(float(signal_val), 6) if signal_val else None, "value_tertiary": None,
+                "velocity": round(to_native(momentum.get("acceleration", 0)) or 0, 6),
+                "rank": 0.5, "zone": zone, "zone_periods": 0,
+                "trend": "rising" if direction == "bullish" else "falling" if direction == "bearish" else "neutral",
+                "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": patterns, "analysis": full_output.get("summary", "")}

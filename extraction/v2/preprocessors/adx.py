@@ -499,16 +499,95 @@ class ADXPreprocessor(BasePreprocessor):
                              trend_strength: Dict, directional_analysis: Dict) -> str:
         """Generate human-readable ADX summary."""
         summary = f"ADX {adx_value:.1f} - {trend_strength['description']}"
-        
+
         # Add directional information if available
         if plus_di is not None and minus_di is not None:
             bias = directional_analysis.get("current_bias", "neutral")
             strength = directional_analysis.get("directional_strength", 0)
             summary += f" with {bias} bias ({strength:.1f})"
-        
+
         # Add trend evolution
         evolution = trend_strength.get("trend_evolution", "stable")
         if evolution != "stable":
             summary += f", trend {evolution}"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full ADX output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "adx", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        trend_strength = full_output.get("trend_strength", {})
+        directional = full_output.get("directional_analysis", {})
+        momentum = full_output.get("momentum_analysis", {})
+        patterns_data = full_output.get("patterns", {})
+
+        adx_val = to_native(current.get("adx"))
+        plus_di = to_native(current.get("plus_di"))
+        minus_di = to_native(current.get("minus_di"))
+
+        # Zone based on ADX strength
+        if adx_val is not None:
+            if adx_val >= 40: zone = "very_strong_trend"
+            elif adx_val >= 25: zone = "strong_trend"
+            elif adx_val >= 20: zone = "weak_trend"
+            else: zone = "no_trend"
+        else:
+            zone = "unknown"
+
+        # Trend direction from directional bias
+        bias = directional.get("current_bias", "neutral")
+        trend = "bullish" if bias == "bullish" else "bearish" if bias == "bearish" else "neutral"
+
+        # Crossover extraction
+        crossovers = directional.get("crossovers", {})
+        latest_cross = crossovers.get("latest_crossover")
+        crossover_type = None
+        crossover_periods_ago = None
+        if latest_cross:
+            cross_type = latest_cross.get("type", "")
+            crossover_type = "crossover_bullish" if "bullish" in cross_type else "crossover_bearish"
+            crossover_periods_ago = to_native(latest_cross.get("periods_ago"))
+
+        # Pattern extraction
+        pattern_codes = []
+        if "turning_points" in patterns_data:
+            tp = patterns_data["turning_points"]
+            if tp.get("type") == "peak": pattern_codes.append("momentum_weakening")
+            elif tp.get("type") == "trough": pattern_codes.append("momentum_accelerating")
+        if "extreme_levels" in patterns_data:
+            el = patterns_data["extreme_levels"]
+            if el.get("type") == "extreme_high": pattern_codes.append("momentum_strong_up")
+            elif el.get("type") == "extreme_low": pattern_codes.append("squeeze_active")
+
+        return {
+            "indicator": "adx",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(adx_val, 2) if adx_val else None,
+            "value_secondary": round(plus_di, 2) if plus_di else None,
+            "value_tertiary": round(minus_di, 2) if minus_di else None,
+            "velocity": round(to_native(momentum.get("velocity", 0)) or 0, 4),
+            "rank": round(adx_val / 100.0, 3) if adx_val else 0.0,
+            "zone": zone,
+            "zone_periods": 0,
+            "trend": trend,
+            "crossover_type": crossover_type,
+            "crossover_periods_ago": crossover_periods_ago,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }

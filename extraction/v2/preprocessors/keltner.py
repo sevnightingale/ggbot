@@ -468,3 +468,32 @@ class KeltnerChannelsPreprocessor(BasePreprocessor):
             summary += f" - SQUEEZE ({squeeze_periods}p)"
         
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full Keltner output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "keltner", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        position = full_output.get("position_analysis", {})
+        squeeze = full_output.get("squeeze_analysis", {})
+        pos_pct = to_native(position.get("position_pct"))
+        pos_name = position.get("position", "middle")
+        zone = "above_upper" if "above" in pos_name else "below_lower" if "below" in pos_name else "neutral"
+        patterns = []
+        if squeeze.get("squeeze_detected"): patterns.append("squeeze_active")
+        return {"indicator": "keltner", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(pos_pct), 2) if pos_pct else None,
+                "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": round(float(pos_pct) / 100, 3) if pos_pct else 0.5,
+                "zone": zone, "zone_periods": 0,
+                "trend": "bullish" if pos_pct and pos_pct > 50 else "bearish" if pos_pct and pos_pct < 50 else "neutral",
+                "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": patterns, "analysis": full_output.get("summary", "")}

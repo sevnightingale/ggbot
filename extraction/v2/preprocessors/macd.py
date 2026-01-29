@@ -277,9 +277,82 @@ class MACDPreprocessor(BasePreprocessor):
         momentum = "increasing" if histogram > 0 else "decreasing"
 
         summary = f"MACD {trend} trend with {momentum} momentum"
-        
+
         if crossovers["latest_crossover"] and crossovers["latest_crossover"]["periods_ago"] <= 5:
             crossover = crossovers["latest_crossover"]
             summary += f". Recent {crossover['type']} {crossover['periods_ago']}p ago"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full MACD output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "macd", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        trend_data = full_output.get("trend", {})
+        patterns_data = full_output.get("patterns", {})
+        levels = full_output.get("levels", {})
+
+        macd_val = to_native(current.get("macd"))
+        signal_val = to_native(current.get("signal"))
+        histogram_val = to_native(current.get("histogram"))
+
+        # Zone based on MACD vs signal
+        if macd_val is not None and signal_val is not None:
+            zone = "bullish" if macd_val > signal_val else "bearish"
+        else:
+            zone = "unknown"
+
+        # Extract crossover
+        crossovers = patterns_data.get("crossovers", {})
+        latest_cross = crossovers.get("latest_crossover")
+        crossover_type = None
+        crossover_periods_ago = None
+        if latest_cross:
+            cross_type = latest_cross.get("type", "")
+            crossover_type = "crossover_bullish" if "bullish" in cross_type else "crossover_bearish"
+            crossover_periods_ago = to_native(latest_cross.get("periods_ago"))
+
+        # Extract patterns
+        pattern_codes = []
+        if patterns_data.get("divergence"):
+            div_type = patterns_data["divergence"].get("type", "")
+            if "positive" in div_type: pattern_codes.append("divergence_bullish")
+            elif "negative" in div_type: pattern_codes.append("divergence_bearish")
+
+        hist_analysis = levels.get("histogram", {})
+        if hist_analysis.get("momentum_direction") == "increasing":
+            pattern_codes.append("momentum_rising")
+        elif hist_analysis.get("momentum_direction") == "decreasing":
+            pattern_codes.append("momentum_falling")
+
+        return {
+            "indicator": "macd",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(macd_val, 4) if macd_val else None,
+            "value_secondary": round(signal_val, 4) if signal_val else None,
+            "value_tertiary": round(histogram_val, 4) if histogram_val else None,
+            "velocity": round(to_native(hist_analysis.get("acceleration", 0)) or 0, 4),
+            "rank": 0.0,
+            "zone": zone,
+            "zone_periods": 0,
+            "trend": trend_data.get("direction", "unknown"),
+            "crossover_type": crossover_type,
+            "crossover_periods_ago": crossover_periods_ago,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }

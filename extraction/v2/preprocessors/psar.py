@@ -552,3 +552,34 @@ class ParabolicSARPreprocessor(BasePreprocessor):
             summary += f". Recent reversal {latest_reversal['periods_ago']}p ago"
         
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full PSAR output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "psar", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        trend_data = full_output.get("trend_analysis", {})
+        signal = full_output.get("signal_analysis", {})
+        psar_val = to_native(current.get("psar"))
+        direction = trend_data.get("current_direction", "unknown")
+        zone = "bullish" if direction == "uptrend" else "bearish" if direction == "downtrend" else "neutral"
+        patterns = []
+        reversal = signal.get("latest_reversal")
+        if reversal and reversal.get("periods_ago", 99) <= 3:
+            patterns.append("crossover_bullish" if "up" in reversal.get("type", "") else "crossover_bearish")
+        return {"indicator": "psar", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(psar_val), 4) if psar_val else None,
+                "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.5, "zone": zone,
+                "zone_periods": to_native(trend_data.get("trend_periods", 0)) or 0,
+                "trend": "bullish" if direction == "uptrend" else "bearish" if direction == "downtrend" else "neutral",
+                "crossover_type": patterns[0] if patterns else None, "crossover_periods_ago": to_native(reversal.get("periods_ago")) if reversal else None,
+                "patterns": patterns, "analysis": full_output.get("summary", "")}

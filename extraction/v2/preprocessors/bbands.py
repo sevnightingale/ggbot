@@ -519,16 +519,95 @@ class BollingerBandsPreprocessor(BasePreprocessor):
         """Generate human-readable Bollinger Bands summary."""
         percent_b = position_analysis["percent_b"]
         position = position_analysis["position"]
-        
+
         # Guard against middle=0 division
         denom = middle if abs(middle) > 1e-12 else 1e-12
         bandwidth = (upper - lower) / denom * 100
-        
+
         summary = f"BB: Price {price:.4f}, %B {percent_b:.2f} ({position.replace('_', ' ')})"
         summary += f", BW {bandwidth:.2f}%"
-        
+
         if squeeze_analysis["is_squeeze"]:
             squeeze_periods = squeeze_analysis["squeeze_periods"]
             summary += f" - SQUEEZE ({squeeze_periods}p)"
-        
+
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full Bollinger Bands output to universal compact format."""
+        if "error" in full_output:
+            return {
+                "indicator": "bbands", "timeframe": timeframe, "timestamp": None,
+                "value": None, "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": [], "analysis": full_output.get("error", "")
+            }
+
+        def to_native(val):
+            if val is None: return None
+            if isinstance(val, (np.integer,)): return int(val)
+            if isinstance(val, (np.floating,)): return float(val)
+            return val
+
+        current = full_output.get("current", {})
+        context = full_output.get("context", {})
+        squeeze = full_output.get("squeeze", {})
+        trend_data = full_output.get("trend", {})
+        patterns_data = full_output.get("patterns", {})
+        volatility = full_output.get("volatility", {})
+
+        percent_b = to_native(current.get("percent_b"))
+        bandwidth = to_native(current.get("bandwidth"))
+
+        # Zone based on %B position
+        position = context.get("position", "unknown")
+        zone_map = {
+            "above_upper": "above_upper",
+            "near_upper": "upper_half",
+            "upper_half": "upper_half",
+            "lower_half": "lower_half",
+            "near_lower": "lower_half",
+            "below_lower": "below_lower"
+        }
+        zone = zone_map.get(position, "neutral")
+
+        # Trend from price vs middle
+        trend = trend_data.get("price_vs_middle", "unknown")
+        if trend == "above": trend = "bullish"
+        elif trend == "below": trend = "bearish"
+
+        # Pattern extraction
+        pattern_codes = []
+        if squeeze.get("is_squeeze"):
+            quality = squeeze.get("squeeze_quality", "")
+            if quality in ["excellent", "good"]:
+                pattern_codes.append("squeeze_active")
+        if volatility.get("regime") == "high_volatility":
+            pattern_codes.append("volatility_expanding")
+        elif volatility.get("regime") == "low_volatility":
+            pattern_codes.append("volatility_contracting")
+        if "walking_bands" in patterns_data:
+            wb = patterns_data["walking_bands"]
+            if "upper" in wb.get("type", ""):
+                pattern_codes.append("momentum_strong_up")
+            elif "lower" in wb.get("type", ""):
+                pattern_codes.append("momentum_strong_down")
+
+        return {
+            "indicator": "bbands",
+            "timeframe": timeframe,
+            "timestamp": current.get("timestamp"),
+            "value": round(percent_b, 3) if percent_b is not None else None,
+            "value_secondary": round(bandwidth, 2) if bandwidth is not None else None,
+            "value_tertiary": None,
+            "velocity": round(to_native(context.get("percent_b_change_5p", 0)) or 0, 4),
+            "rank": round(percent_b, 3) if percent_b is not None else 0.0,
+            "zone": zone,
+            "zone_periods": to_native(squeeze.get("squeeze_periods", 0)) or 0,
+            "trend": trend,
+            "crossover_type": None,
+            "crossover_periods_ago": None,
+            "patterns": pattern_codes,
+            "analysis": full_output.get("summary", "")
+        }

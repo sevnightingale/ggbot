@@ -277,3 +277,32 @@ class BollingerWidthPreprocessor(BasePreprocessor):
             summary += f" - {squeeze_quality.upper()} SQUEEZE ({squeeze_periods}p)"
         
         return summary
+
+    def to_compact(self, full_output: dict, timeframe: str) -> dict:
+        """Convert full BB Width output to universal compact format."""
+        if "error" in full_output:
+            return {"indicator": "bbwidth", "timeframe": timeframe, "timestamp": None,
+                    "value": None, "value_secondary": None, "value_tertiary": None,
+                    "velocity": 0.0, "rank": 0.0, "zone": "error", "zone_periods": 0,
+                    "trend": "unknown", "crossover_type": None, "crossover_periods_ago": None,
+                    "patterns": [], "analysis": full_output.get("error", "")}
+        def to_native(val):
+            if val is None: return None
+            if hasattr(val, 'item'): return val.item()
+            return val
+        current = full_output.get("current", {})
+        volatility = full_output.get("volatility_analysis", {})
+        squeeze = full_output.get("squeeze_analysis", {})
+        width_val = to_native(current.get("value"))
+        level = volatility.get("level", "average")
+        zone = "high_volatility" if level in ["very_high", "high"] else "low_volatility" if level in ["very_low", "low"] else "normal"
+        patterns = []
+        if squeeze.get("is_squeeze"): patterns.append("squeeze_active")
+        return {"indicator": "bbwidth", "timeframe": timeframe, "timestamp": current.get("timestamp"),
+                "value": round(float(width_val), 4) if width_val else None,
+                "value_secondary": None, "value_tertiary": None,
+                "velocity": 0.0, "rank": round(to_native(volatility.get("percentile_rank", 50)) / 100, 3),
+                "zone": zone, "zone_periods": to_native(squeeze.get("squeeze_periods", 0)) or 0,
+                "trend": "expanding" if level in ["high", "very_high"] else "contracting" if level in ["low", "very_low"] else "stable",
+                "crossover_type": None, "crossover_periods_ago": None,
+                "patterns": patterns, "analysis": full_output.get("summary", "")}
