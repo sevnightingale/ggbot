@@ -182,8 +182,9 @@ prompt = build_opportunity_analysis_prompt(
 Extraction (normal V2 pipeline)
     ↓
 ReiDecisionEngine.make_decision()
-    ↓  Sends raw numerical data (Float64 precision)
-    ↓  {technical_indicators, market_intelligence, positions, balance}
+    ↓  Converts indicators to compact format
+    ↓  Filters by configured timeframes per indicator
+    ↓  {compact_indicators, market_intelligence, positions, balance}
     ↓
 Rei API (api.reilabs.org/v1/chat/completions)
     ↓  Returns JSON: {action, confidence, take_profit, stop_loss, reasoning}
@@ -197,11 +198,156 @@ Trading (normal paper/symphony engine)
 | Aspect | DecisionEngineV2 (LLM) | ReiDecisionEngine |
 |--------|------------------------|-------------------|
 | Provider | OpenRouter (GPT-5, Claude, etc.) | Rei Core API |
-| Data format | Prose prompt with formatted text | Raw JSON with Float64 numbers |
+| Data format | Prose prompt with formatted text | Compact JSON with Float64 numbers |
+| Indicator format | Full preprocessor output (~2KB each) | Compact format (~400 bytes each) |
+| Timeframe filtering | All available timeframes | Configured per indicator type |
 | Learning | None (stateless per call) | Inference-time conceptual learning |
 | Feedback | None | Trade outcomes reported for pattern evolution |
 | Config used | `llm_config`, `decision` (strategy/prompts) | Neither (ignored for Rei bots) |
 | Cost tracking | OpenRouter usage → activities table | Rei API (separate, via REI_01_UNIT_SECRET) |
+
+### Compact Indicator Format
+
+Rei receives indicators in a **universal compact schema** designed for numerical precision and minimal payload size (~30KB API limit).
+
+#### Universal Schema
+Every indicator outputs the same structure (optional fields may be null):
+
+```python
+{
+    "indicator": "rsi",           # Indicator name
+    "timeframe": "1h",            # Timeframe
+    "timestamp": "2025-01-29...", # ISO timestamp
+
+    # Primary values
+    "value": 73.2,                # Primary value (RSI, MACD line, %B, ADX, etc.)
+    "value_secondary": null,      # Secondary (signal line, %D, upper band, +DI)
+    "value_tertiary": null,       # Tertiary (histogram, lower band, -DI)
+
+    # Derived metrics
+    "velocity": 0.73,             # Rate of change (normalized)
+    "rank": 0.85,                 # Position in recent range (0-1)
+
+    # State classification
+    "zone": "overbought",         # Current zone/state
+    "zone_periods": 3,            # Periods in current zone
+    "trend": "rising",            # Trend direction (up/down/flat)
+
+    # Crossover info (if applicable)
+    "crossover_type": "bullish",  # Recent crossover type
+    "crossover_periods_ago": 5,   # Periods since crossover
+
+    # Patterns (readable codes)
+    "patterns": ["divergence_bearish", "momentum_strong_up"],
+
+    # Text analysis (for hybrid LLM use)
+    "analysis": "RSI at 73.2 in overbought zone for 3 periods..."
+}
+```
+
+#### Indicator-to-Value Mapping
+| Indicator | value | value_secondary | value_tertiary |
+|-----------|-------|-----------------|----------------|
+| RSI | rsi_value | - | - |
+| MACD | macd_line | signal_line | histogram |
+| Stochastic | %K | %D | - |
+| Bollinger | %B | bandwidth | - |
+| ADX | adx | +DI | -DI |
+| ATR | atr | atr_pct | - |
+| Aroon | aroon_osc | aroon_up | aroon_down |
+| EMA/SMA | value | price_distance | - |
+
+#### Pattern Codes
+Standardized across all indicators for Rei's pattern recognition:
+- **Divergence**: `divergence_bullish`, `divergence_bearish`
+- **Momentum**: `momentum_strong_up`, `momentum_strong_down`, `momentum_rising`, `momentum_falling`
+- **Crossovers**: `crossover_bullish`, `crossover_bearish`
+- **Zone events**: `entering_overbought`, `exiting_overbought`, `entering_oversold`, `exiting_oversold`
+- **Volatility**: `squeeze_active`, `squeeze_firing`, `volatility_expanding`, `volatility_contracting`
+- **Formations**: `double_top`, `double_bottom`, `failure_swing`
+
+### Timeframe Selection by Indicator Type
+
+**Principle**: Each indicator type sends only its most signal-relevant timeframes to stay under payload limits while maximizing decision quality.
+
+```python
+# From extraction/v2/preprocessors/compact_config.py
+REI_INDICATOR_TIMEFRAMES = {
+    # === Momentum Oscillators ===
+    # Short-to-long coverage for confluence detection
+    "rsi": ["15m", "1h", "4h", "1d"],        # Full spectrum - divergences matter on all
+    "stochastic": ["15m", "1h", "4h"],       # Faster indicator, less useful on 1d
+    "cci": ["1h", "4h", "1d"],               # More meaningful on medium+ TFs
+    "mfi": ["1h", "4h"],                     # Volume-weighted, needs sufficient volume
+    "williams_r": ["15m", "1h", "4h"],       # Similar to stochastic
+
+    # === Trend Indicators ===
+    # Longer TFs to filter noise and confirm direction
+    "macd": ["1h", "4h", "1d"],              # Skip 15m (too noisy), 1d for major trend
+    "adx": ["4h", "1d"],                     # Trend STRENGTH best on longer TFs
+    "aroon": ["4h", "1d"],                   # Trend emergence needs history
+    "ema": ["1h", "4h", "1d"],               # Multi-TF alignment important
+    "sma": ["4h", "1d"],                     # Slower, skip short TFs
+
+    # === Volatility Indicators ===
+    # Medium TFs for actionable volatility context
+    "bbands": ["1h", "4h", "1d"],            # Squeezes occur anywhere, %B useful everywhere
+    "atr": ["1h", "4h"],                     # Stop placement, position sizing
+    "bbwidth": ["4h", "1d"],                 # Squeeze detection on significant TFs
+    "keltner": ["4h", "1d"],                 # Longer TF squeezes matter more
+    "donchian": ["4h", "1d"],                # Breakout levels significant on longer TFs
+
+    # === Volume Indicators ===
+    "obv": ["1h", "4h"],                     # Volume confirmation, noisy on short TFs
+    "vwap": ["15m", "1h"],                   # Intraday only by design
+
+    # === Other ===
+    "psar": ["1h", "4h"],                    # Trailing stops, entry timing
+    "roc": ["1h", "4h"],                     # Momentum rate, medium TFs
+    "vortex": ["4h", "1d"],                  # Trend direction changes
+    "trix": ["4h", "1d"],                    # Triple smoothed, filters noise
+}
+```
+
+#### Rationale by Category
+
+**Momentum Oscillators (RSI, Stochastic, CCI, MFI, Williams %R)**
+- Work well across all timeframes
+- Short TFs (15m, 1h) → scalping/intraday signals
+- Medium TFs (4h) → swing trading setups
+- Long TFs (1d) → trend confirmation and major divergences
+- **Why full spectrum**: Divergences and overbought/oversold conditions provide actionable signals at every timeframe
+
+**Trend Indicators (MACD, ADX, Aroon, EMA, SMA)**
+- Inherently laggy, noise amplified on short TFs
+- Skip 15m entirely (too much noise)
+- 1h provides intraday trend context
+- 4h and 1d are primary for trend direction/strength
+- **Why longer TFs**: Trend confirmation requires smoothing; short TF trends are often just noise
+
+**Volatility Indicators (BB, ATR, Keltner, Donchian, BBWidth)**
+- ATR needed for position sizing → 1h/4h sufficient
+- Squeezes meaningful on 4h+ (short TF squeezes resolve quickly)
+- Band breakouts more significant on longer TFs
+- **Why medium TFs**: Volatility context for risk management, not noise detection
+
+**Volume Indicators (OBV, VWAP)**
+- OBV confirms price moves → 1h/4h for swing trading
+- VWAP is intraday by design → 15m/1h only
+- **Why limited TFs**: Volume analysis most useful at trading timeframe, not multi-day
+
+### Payload Size Budget
+
+With compact format + timeframe filtering:
+
+| Component | Estimated Size |
+|-----------|----------------|
+| 21 indicators × ~2.5 TFs avg × 400 bytes | ~21KB |
+| Market intelligence (stripped) | ~6KB |
+| Positions, balance, metadata | ~2KB |
+| **Total** | **~29KB** ✅ |
+
+Without optimization: 21 × 7 × 2KB = **294KB** ❌
 
 ### Config
 ```sql
@@ -212,7 +358,10 @@ WHERE config_id = 'your-config-id';
 ```
 
 ### Files
-- `decision/rei_engine.py` — ReiDecisionEngine + report_trade_outcome_to_rei()
+- `decision/rei_engine.py` — ReiDecisionEngine + compact conversion + report_trade_outcome_to_rei()
+- `extraction/v2/preprocessors/compact_config.py` — Timeframe config, pattern codes
+- `extraction/v2/preprocessors/base.py` — BasePreprocessor.to_compact() method
+- `extraction/v2/preprocessors/*.py` — Indicator-specific to_compact() implementations
 - `core/services/rei_service.py` — Rei API client (httpx async, retry, auth)
 - `core/config/schemas.py` — `rei_enabled` field on ScheduledTradingConfigData
 - `trading/paper/supabase_service.py` — Feedback hook on trade close
@@ -221,6 +370,10 @@ WHERE config_id = 'your-config-id';
 ```
 REI_01_UNIT_SECRET=your-rei-unit-secret-key
 ```
+
+### Implementation Status
+
+See `DOCS/REI_COMPACT_PROGRESS.md` for tracking of `to_compact()` implementations across all 21 indicators.
 
 ---
 
@@ -295,6 +448,15 @@ REI_01_UNIT_SECRET=your-rei-unit-secret-key
 - Allows users to choose based on cost/performance
 - Future-proofs against LLM API changes
 - Enables easy testing with different models
+
+### LLM Model Configuration
+The platform supports **7 model families × 3 reasoning tiers = 21 configurations**:
+- **Grok**, **DeepSeek**, **Gemini**, **Claude**, **GPT**, **Kimi**, **Qwen**
+- **Economy** (cheap/fast), **Standard** (balanced), **Premium** (best quality)
+
+Model routing is defined in `decision/llm_providers/openrouter_provider.py`.
+
+**For updating models**: See [`decision/llm_providers/MODEL_UPDATE.md`](llm_providers/MODEL_UPDATE.md) for the systematic workflow including code changes, DB updates, and verification steps.
 
 ## Database Integration
 

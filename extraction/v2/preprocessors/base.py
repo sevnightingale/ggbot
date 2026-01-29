@@ -419,7 +419,35 @@ class BasePreprocessor:
         """
         # Generic fallback - subclasses should override with specific logic
         indicator_name = full_output.get("indicator", "unknown").lower()
+
+        # Normalize indicator names to short form
+        name_mapping = {
+            "bollinger_bands": "bbands",
+            "bollinger_width": "bbwidth",
+            "bb_width": "bbwidth",
+            "keltner_channels": "keltner",
+            "donchian_channels": "donchian",
+            "parabolic_sar": "psar",
+            "relative_strength_index": "rsi",
+            "stochastic_oscillator": "stochastic",
+            "williamsr": "williams_r",  # Keep underscore for this one
+            "williams%r": "williams_r",
+        }
+        # First try direct mapping, then remove underscores for others
+        normalized = indicator_name.replace("_", "").replace("%", "")
+        indicator_name = name_mapping.get(indicator_name, name_mapping.get(normalized, indicator_name))
+
         current = full_output.get("current", {})
+
+        # Helper to convert numpy types to Python native
+        def to_native(val):
+            if val is None:
+                return None
+            if isinstance(val, (np.integer, np.int64, np.int32)):
+                return int(val)
+            if isinstance(val, (np.floating, np.float64, np.float32)):
+                return float(val)
+            return val
 
         # Try to extract primary value from common structures
         value = current.get("value")
@@ -435,7 +463,7 @@ class BasePreprocessor:
             "timeframe": timeframe,
             "timestamp": current.get("timestamp"),
 
-            "value": value,
+            "value": to_native(value),
             "value_secondary": None,
             "value_tertiary": None,
 
