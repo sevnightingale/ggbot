@@ -1398,7 +1398,7 @@ Take Profit: {take_profit_text}
             if isinstance(data, dict):
                 lines.append(f"**{point_name.upper().replace('_', ' ')}**:")
                 for key, value in data.items():
-                    if key not in ['metadata', 'raw_data']:
+                    if key not in ['metadata', 'raw_data', '_meta']:
                         lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
                 lines.append("")
 
@@ -1412,7 +1412,7 @@ Take Profit: {take_profit_text}
             if isinstance(data, dict):
                 lines.append(f"**{point_name.upper().replace('_', ' ')}**:")
                 for key, value in data.items():
-                    if key not in ['metadata', 'raw_data']:
+                    if key not in ['metadata', 'raw_data', '_meta']:
                         lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
                 lines.append("")
 
@@ -1433,7 +1433,7 @@ Take Profit: {take_profit_text}
                         lines.append(f"    - {headline}")
                 else:
                     for key, value in data.items():
-                        if key not in ['metadata', 'raw_data']:
+                        if key not in ['metadata', 'raw_data', '_meta']:
                             lines.append(f"  - {key.replace('_', ' ').title()}: {value}")
                 lines.append("")
 

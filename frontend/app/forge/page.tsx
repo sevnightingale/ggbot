@@ -1249,13 +1249,16 @@ function ForgeApp() {
                   ) : (
                     <div className="space-y-3">
                       {/* Activity Timeline - Full Width */}
-                      <div data-tour="activity-timeline">
-                        <TVTimeline
-                          configId={selectedConfigId || ''}
-                          title={selectedBot.config_name}
-                          variant="embedded"
-                        />
-                      </div>
+                      {/* Guard: Skip rendering for temp IDs (optimistic placeholders during duplication) */}
+                      {selectedConfigId && !selectedConfigId.startsWith('temp-') && (
+                        <div data-tour="activity-timeline">
+                          <TVTimeline
+                            configId={selectedConfigId}
+                            title={selectedBot.config_name}
+                            variant="embedded"
+                          />
+                        </div>
+                      )}
 
                       {/* PositionsTable - Active trades (full width) */}
                       <PositionsTable

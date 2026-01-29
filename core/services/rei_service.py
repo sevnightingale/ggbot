@@ -68,8 +68,8 @@ class ReiService:
 
     BASE_URL = "https://api.reilabs.org"
     DEFAULT_TIMEOUT = 60.0  # Rei can take time for complex reasoning
-    MAX_RETRIES = 3
-    RETRY_DELAY = 1.0  # Base delay in seconds
+    MAX_RETRIES = 5  # Increased for rate limit handling
+    RETRY_DELAY = 2.0  # Base delay in seconds (increased for rate limits)
 
     def __init__(
         self,
@@ -252,11 +252,31 @@ class ReiService:
                     self._log.warning(f"Rei server error: {e}, retrying in {delay}s")
                     await asyncio.sleep(delay)
                 else:
-                    # Client error - don't retry
+                    # Client error - check if it's a wrapped rate limit
+                    error_detail = None
+                    try:
+                        error_detail = e.response.json() if e.response.content else None
+                    except Exception:
+                        error_detail = e.response.text[:500] if e.response.text else None
+
+                    # Check if this is a 400 wrapping a 429 rate limit (Rei API quirk)
+                    is_wrapped_rate_limit = (
+                        isinstance(error_detail, dict) and
+                        '429' in str(error_detail.get('details', ''))
+                    )
+
+                    if is_wrapped_rate_limit:
+                        # Treat as rate limit - retry with backoff
+                        delay = self.RETRY_DELAY * (2 ** attempt) * 2  # Longer delay for rate limits
+                        self._log.warning(f"Rei rate limited (wrapped in 400), waiting {delay}s before retry")
+                        await asyncio.sleep(delay)
+                        continue
+
+                    self._log.error(f"Rei API client error {e.response.status_code}: {error_detail}")
                     raise ReiAPIError(
                         f"Rei API error: {e}",
                         status_code=e.response.status_code,
-                        response=e.response.json() if e.response.content else None
+                        response=error_detail
                     )
 
         # All retries exhausted

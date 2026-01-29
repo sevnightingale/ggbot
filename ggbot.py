@@ -379,6 +379,12 @@ class GGBotOrchestrator:
                         f"no free runs remaining"
                     )
                     # Auto-deactivate bot if user lost permission
+                    # CRITICAL: Remove scheduler job to stop repeated execution attempts
+                    config_dict = config.to_jsonb()
+                    timeframe = extract_timeframe_from_config(config_dict)
+                    if timeframe and timeframe != "signal_driven":
+                        remove_bot_job(user_id, config_id, timeframe)
+                        self._log.info(f"Removed scheduler job for deactivated bot {config_id}")
                     await self.config_service.set_bot_state(config_id, user_id, "inactive")
                     raise HTTPException(
                         status_code=403,
@@ -1132,9 +1138,13 @@ class GGBotOrchestrator:
                     "action": action
                 }
             
-            if action in ["enter", "long"]:
+            # Normalize action to trading_action
+            # Handle: enter_long, long, enter → long
+            #         enter_short, short → short
+            #         exit, close → close
+            if action in ["enter", "long", "enter_long"]:
                 trading_action = "long"
-            elif action == "short":
+            elif action in ["short", "enter_short"]:
                 trading_action = "short"
             elif action in ["exit", "close"]:
                 trading_action = "close"

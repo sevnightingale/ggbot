@@ -151,6 +151,9 @@ class ReiDecisionEngine:
 
         Sends raw numerical data — no prose, no LLM articulation.
         Rei preserves Float64 precision (unlike LLMs which tokenize numbers).
+
+        NOTE: Current payload may exceed Rei's ~30KB limit with all timeframes.
+        TODO: Restructure preprocessors to output compact format (Option B).
         """
         # Extract technical indicators from extraction result
         # extraction_result has nested timeframe structure
@@ -158,12 +161,14 @@ class ReiDecisionEngine:
         if 'timeframes' in extraction_result:
             for tf_key, tf_data in extraction_result.get('timeframes', {}).items():
                 if isinstance(tf_data, dict) and 'indicators' in tf_data:
-                    technicals[tf_key] = tf_data['indicators']
+                    technicals[tf_key] = self._sanitize_numeric_data(tf_data['indicators'])
         elif 'indicators' in extraction_result:
-            technicals['default'] = extraction_result['indicators']
+            technicals['default'] = self._sanitize_numeric_data(extraction_result['indicators'])
 
-        # Market intelligence — prefer direct param, fall back to extraction_result
+        # Market intelligence — strip debug metadata (_meta, tool_calls, citations)
         intel = market_intelligence or extraction_result.get('market_intelligence', {})
+        intel = self._strip_meta_fields(intel)
+        intel = self._sanitize_numeric_data(intel)
 
         # Format open positions as concise data (not full DB rows)
         positions_summary = self._summarize_positions(open_positions)
@@ -184,6 +189,41 @@ class ReiDecisionEngine:
                 "take_profit (price level), and stop_loss (price level)."
             ),
         }
+
+    def _strip_meta_fields(self, data: Any) -> Any:
+        """
+        Recursively strip '_meta' debug fields from market intelligence data.
+        These contain tool_calls, citations, etc. that bloat the payload without
+        adding decision-making value.
+        """
+        if isinstance(data, dict):
+            return {
+                k: self._strip_meta_fields(v)
+                for k, v in data.items()
+                if k not in ['_meta', 'metadata', 'raw_data']
+            }
+        elif isinstance(data, list):
+            return [self._strip_meta_fields(item) for item in data]
+        else:
+            return data
+
+    def _sanitize_numeric_data(self, data: Any) -> Any:
+        """
+        Recursively sanitize numeric data to remove NaN/Infinity values.
+        These are not valid JSON and will cause 400 Bad Request errors.
+        """
+        import math
+
+        if isinstance(data, dict):
+            return {k: self._sanitize_numeric_data(v) for k, v in data.items()}
+        elif isinstance(data, list):
+            return [self._sanitize_numeric_data(item) for item in data]
+        elif isinstance(data, float):
+            if math.isnan(data) or math.isinf(data):
+                return None  # Replace invalid floats with None
+            return data
+        else:
+            return data
 
     def _summarize_positions(self, positions: Optional[List[Dict[str, Any]]]) -> str:
         """Summarize open positions for Rei context."""
@@ -223,16 +263,16 @@ class ReiDecisionEngine:
         """Convert Rei's response into standard decision_result format."""
         action = decision.get("action", "wait")
 
-        # Normalize action names to match what trading engine expects
+        # Normalize action names to platform standard: long, short, wait, close
         action_map = {
-            "enter_long": "enter_long",
-            "long": "enter_long",
-            "buy": "enter_long",
-            "enter_short": "enter_short",
-            "short": "enter_short",
-            "sell": "enter_short",
-            "exit": "exit",
-            "close": "exit",
+            "enter_long": "long",
+            "long": "long",
+            "buy": "long",
+            "enter_short": "short",
+            "short": "short",
+            "sell": "short",
+            "exit": "close",
+            "close": "close",
             "wait": "wait",
             "hold": "wait",
             "no_action": "wait",
